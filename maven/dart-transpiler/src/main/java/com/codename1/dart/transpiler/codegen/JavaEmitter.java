@@ -294,6 +294,28 @@ public final class JavaEmitter {
         return cn;
     }
 
+    /** Registers the shape a record type name (built by the parser as Rec$N$names) denotes. */
+    private void ensureRecordShape(String cn) {
+        if (cn == null || !cn.startsWith("Rec$") || recordShapes.containsKey(cn)) {
+            return;
+        }
+        String[] parts = cn.split("\\$", -1);
+        if (parts.length < 2) {
+            return;
+        }
+        int positional;
+        try {
+            positional = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        List<String> named = new ArrayList<String>();
+        for (int i = 2; i < parts.length; i++) {
+            named.add(parts[i]);
+        }
+        registerRecordShape(positional, named);
+    }
+
     /** Emits a generic Java record class for a record shape (component types are the type parameters). */
     private GeneratedFile emitRecordClass(String cn, RecordShape s) {
         int total = s.positional + s.named.size();
@@ -315,7 +337,21 @@ public final class JavaEmitter {
         if (total > 0) {
             sb.append('<').append(tp).append('>');
         }
-        sb.append('(').append(comps).append(") {\n}\n");
+        sb.append('(').append(comps).append(") {\n");
+        // Dart's record toString: `(1, a)`, `(a: 1, b: true)`, `(7, label: seven)`.
+        sb.append("    @Override\n    public String toString() {\n");
+        sb.append("        return \"(\"");
+        for (int i = 0; i < total; i++) {
+            if (i > 0) {
+                sb.append(" + \", \"");
+            }
+            String comp = i < s.positional ? "$" + (i + 1) : s.named.get(i - s.positional);
+            if (i >= s.positional) {
+                sb.append(" + \"").append(comp).append(": \"");
+            }
+            sb.append(" + dart.runtime.DartRuntime.str(").append(comp).append(')');
+        }
+        sb.append(" + \")\";\n    }\n}\n");
         return new GeneratedFile(cn + ".java", sb.toString());
     }
 
@@ -361,6 +397,7 @@ public final class JavaEmitter {
 
     /** The static type of a record component accessed by name (`$1`, `$2`, or a named field). */
     private TypeRef recordComponentType(TypeRef recordType, String name) {
+        ensureRecordShape(recordType.name);
         RecordShape s = recordShapes.get(recordType.name);
         if (s == null) {
             return TypeRef.DYNAMIC;
@@ -2891,6 +2928,18 @@ public final class JavaEmitter {
                 }
                 w.line("return " + (rt != null ? coerce(o, rt, ctx) : o.code) + ";");
             }
+        } else if (s instanceof PatternDeclStmt) {
+            PatternDeclStmt pd = (PatternDeclStmt) s;
+            Out init = emitExpr(pd.init, null, ctx);
+            TypeRef it = init.type != null ? init.type : TypeRef.DYNAMIC;
+            String tmp = ctx.newTemp();
+            w.line(javaType(it, true, ctx) + " " + tmp + " = " + init.code + ";");
+            ctx.declare(tmp, it);
+            List<String> binds = new ArrayList<String>();
+            patternMatch(pd.pattern, tmp, it, ctx, binds);
+            for (String b : binds) {
+                w.line(b);
+            }
         } else if (s instanceof RethrowStmt) {
             if (ctx.rethrowTarget == null) {
                 diags.error(s, "E0115", "rethrow is only allowed inside a catch clause");
@@ -3442,6 +3491,9 @@ public final class JavaEmitter {
         }
         if (p instanceof CastPattern) {
             return patternBinds(((CastPattern) p).inner);
+        }
+        if (p instanceof NullCheckPattern) {
+            return patternBinds(((NullCheckPattern) p).inner);
         }
         if (p instanceof ObjectPattern) {
             for (PatternField f : ((ObjectPattern) p).fields) {
@@ -4035,6 +4087,22 @@ public final class JavaEmitter {
             }
             String num = numericValue(subj, subjType);
             return "(" + num + " " + r.op + " " + operand.code + ")";
+        }
+        if (p instanceof NullCheckPattern) {
+            NullCheckPattern nc = (NullCheckPattern) p;
+            TypeRef inner = subjType;
+            if (subjType != null && subjType.nullable) {
+                inner = new TypeRef(subjType.name);
+                inner.args.addAll(subjType.args);
+                inner.funcParams = subjType.funcParams;
+                inner.funcReturn = subjType.funcReturn;
+            }
+            String sub = patternMatch(nc.inner, subj, inner, ctx, binds);
+            if (nc.assertNonNull) {
+                ctx.importClass("java.util.Objects");
+                return joinAnd("java.util.Objects.requireNonNull(" + subj + ") != null", sub);
+            }
+            return joinAnd(subj + " != null", sub);
         }
         if (p instanceof CastPattern) {
             CastPattern c = (CastPattern) p;
@@ -5681,7 +5749,24 @@ public final class JavaEmitter {
                         ? TypeRef.DYNAMIC : fn.returnType;
                 return new Out(Program.libClassName(owner.fileName) + "." + n + "()", rt);
             }
-            return new Out(Program.libClassName(owner.fileName) + "::" + n, new TypeRef("Function"));
+            String ref = Program.libClassName(owner.fileName) + "::" + n;
+            TypeRef ft = new TypeRef("Function");
+            ft.funcParams = new ArrayList<TypeRef>();
+            boolean simple = fn.params.size() <= 5 && fn.typeParams.isEmpty()
+                    && fn.returnType != null && !fn.returnType.is("var") && !fn.isAsync;
+            for (Param fp : fn.params) {
+                if (fp.named || fp.optional || fp.type == null || fp.type.is("var")) {
+                    simple = false;
+                }
+                ft.funcParams.add(fp.type);
+            }
+            if (simple) {
+                // A typed SAM cast makes the tear-off a standalone expression: a list
+                // element or a `??` operand gives a bare method reference no target type.
+                ft.funcReturn = fn.returnType;
+                return new Out("((" + javaType(ft, false, ctx) + ") " + ref + ")", ft);
+            }
+            return new Out(ref, new TypeRef("Function"));
         }
         // Top-level library values contributed by a stub (@JavaName maps the
         // Dart top-level `pi` / `timeDilation` / `defaultTargetPlatform` to a
@@ -5907,6 +5992,10 @@ public final class JavaEmitter {
         // static access through a class reference
         if (isClassRef(tt)) {
             String cls = tt.arg(0).name;
+            Out tear = staticTearOff(cls, tt.arg(0).args, name, posNode, ctx);
+            if (tear != null) {
+                return tear;
+            }
             // dart:core Duration's named constants: `zero` is the one non-int member (an
             // actual Duration instance, which the runtime class already declares), and the
             // rest are compile-time int constants. These are emitted as plain long literals
@@ -7993,9 +8082,70 @@ public final class JavaEmitter {
                 sig[i] = td.paramTypes.get(i);
             }
             sig[td.paramTypes.size()] = td.returnType;
+            if (!td.typeParams.isEmpty()) {
+                // a type parameter nested inside a component (`Future<List<T>>`) has no
+                // binding here; it must not reach Java as an undeclared `T`
+                for (int i = 0; i < sig.length; i++) {
+                    if (sig[i] != null && !td.typeParams.contains(sig[i].name)) {
+                        sig[i] = substTypeParams(sig[i], td.typeParams, java.util.Collections.<TypeRef>emptyList());
+                    }
+                }
+            }
             return sig;
         }
         return TYPEDEFS.get(name);
+    }
+
+    /**
+     * A generic user function typedef's signature with its type parameters replaced by
+     * name, however deeply nested (`Future<({List<T> items})> Function(int)`); a type
+     * parameter without an argument becomes dynamic. Null when not such a typedef.
+     */
+    private TypeRef[] userTypedefSig(String name, List<TypeRef> args) {
+        Ast.TypedefDecl td = program.typedefs.get(name);
+        if (td == null || td.returnType == null || td.typeParams.isEmpty()) {
+            return null;
+        }
+        TypeRef[] sig = new TypeRef[td.paramTypes.size() + 1];
+        for (int i = 0; i < td.paramTypes.size(); i++) {
+            sig[i] = substTypeParams(td.paramTypes.get(i), td.typeParams, args);
+        }
+        sig[td.paramTypes.size()] = substTypeParams(td.returnType, td.typeParams, args);
+        return sig;
+    }
+
+    private static TypeRef substTypeParams(TypeRef t, List<String> names, List<TypeRef> args) {
+        if (t == null) {
+            return null;
+        }
+        int at = names.indexOf(t.name);
+        if (at >= 0 && t.args.isEmpty()) {
+            TypeRef a = at < args.size() ? args.get(at) : TypeRef.DYNAMIC;
+            if (t.nullable && !a.nullable) {
+                TypeRef n = new TypeRef(a.name);
+                n.args.addAll(a.args);
+                n.funcParams = a.funcParams;
+                n.funcReturn = a.funcReturn;
+                n.nullable = true;
+                return n;
+            }
+            return a;
+        }
+        TypeRef c = new TypeRef(t.name);
+        c.nullable = t.nullable;
+        c.line = t.line;
+        c.col = t.col;
+        for (TypeRef a : t.args) {
+            c.args.add(substTypeParams(a, names, args));
+        }
+        if (t.funcParams != null) {
+            c.funcParams = new ArrayList<TypeRef>();
+            for (TypeRef a : t.funcParams) {
+                c.funcParams.add(substTypeParams(a, names, args));
+            }
+        }
+        c.funcReturn = substTypeParams(t.funcReturn, names, args);
+        return c;
     }
 
     /** Whether {@code name} is a function-type typedef (built-in or user-declared). */
@@ -11868,6 +12018,20 @@ public final class JavaEmitter {
                 t.name = stripped;
             }
         }
+        if (t.name != null && t.name.startsWith("Rec$")) {
+            ensureRecordShape(t.name);
+            if (t.args.isEmpty()) {
+                return t.name;
+            }
+            StringBuilder rb = new StringBuilder(t.name).append('<');
+            for (int i = 0; i < t.args.size(); i++) {
+                if (i > 0) {
+                    rb.append(", ");
+                }
+                rb.append(javaType(t.args.get(i), true, ctx));
+            }
+            return rb.append('>').toString();
+        }
         boolean box = boxed || t.nullable;
         if (t.is("int")) {
             return box ? "Long" : "long";
@@ -11942,7 +12106,10 @@ public final class JavaEmitter {
             // Substitute the typedef's type arguments (e.g. ValueChanged<int> => the `dynamic`
             // placeholder in `void Function(dynamic)` becomes `int`), so a callback of a
             // parameterized typedef renders VoidFunc1<Long> rather than VoidFunc1<Object>.
-            TypeRef[] sig = substituteTypedefTypeArgs(typedefSig(t.name), t.args);
+            TypeRef[] sig = userTypedefSig(t.name, t.args);
+            if (sig == null) {
+                sig = substituteTypedefTypeArgs(typedefSig(t.name), t.args);
+            }
             int arity = sig.length - 1;
             TypeRef ret = sig[arity];
             if (ret.is("void")) {
@@ -12249,6 +12416,147 @@ public final class JavaEmitter {
         Ast.Library lib = ctx != null && ctx.currentClass != null
                 ? ctx.currentClass.ownerLibrary : null;
         return program.resolveClass(name, lib);
+    }
+
+    /**
+     * A tear-off through a class name -- `Foo.new`, `Foo<T>.new`, `Foo.named`, a static
+     * method `Fmt.up`, a stub static such as `DateTime.now` -- desugared into the closure
+     * Dart defines it as, `(a, b) => Foo(a, b)`, so it is a typed function value in any
+     * context (a list literal, a field initializer, a `??` operand). Only the required
+     * positional parameters and the named ones are forwarded: an optional positional one
+     * omitted keeps its default, which a forwarded null would not. Null when `name` is
+     * not such a member, so the caller's resolution carries on.
+     */
+    private Out staticTearOff(String cls, List<TypeRef> typeArgs, String name, Node posNode, Ctx ctx) {
+        ClassDecl pc = program.classes.get(cls);
+        List<Param> params = null;
+        Expr body = null;
+        List<String> tps = pc != null ? pc.typeParams : java.util.Collections.<String>emptyList();
+        if (pc != null && !program.enums.containsKey(cls)) {
+            CtorDecl cd = null;
+            boolean isCtor = false;
+            if (name.equals("new")) {
+                for (CtorDecl c : pc.ctors) {
+                    if (c.name == null) {
+                        cd = c;
+                    }
+                }
+                isCtor = true;
+            } else if (pc.namedCtor(name) != null) {
+                cd = pc.namedCtor(name);
+                isCtor = true;
+            }
+            if (isCtor) {
+                params = cd != null ? cd.params : new ArrayList<Param>();
+                CtorCall call = new CtorCall();
+                call.type = new TypeRef(cls);
+                call.type.args.addAll(typeArgs);
+                call.ctorName = name.equals("new") ? null : name;
+                body = call;
+            } else {
+                MethodDecl md = pc.method(name);
+                if (md != null && md.isStatic && !md.isGetter && !md.isSetter) {
+                    params = md.params;
+                    body = staticCallNode(cls, name);
+                    tearOffReturn = md.returnType;
+                    tps = java.util.Collections.<String>emptyList();
+                }
+            }
+            if (params != null) {
+                return emitTearOffLambda(pc, params, tps, typeArgs, body, posNode, ctx);
+            }
+            return null;
+        }
+        if (stubs.isStubClass(cls)) {
+            Ast.MethodDecl m = stubs.findMethod(cls, name, false);
+            if (m != null && m.isStatic && !m.isGetter && !m.isSetter) {
+                tearOffReturn = m.returnType;
+                return emitTearOffLambda(null, m.params, tps, typeArgs, staticCallNode(cls, name), posNode, ctx);
+            }
+        }
+        return null;
+    }
+
+    /** The declared return type of the static method the next tear-off lambda calls. */
+    private TypeRef tearOffReturn;
+
+    private Expr staticCallNode(String cls, String name) {
+        Call c = new Call();
+        Ident t = new Ident();
+        t.name = cls;
+        c.target = t;
+        c.name = name;
+        return c;
+    }
+
+    private Out emitTearOffLambda(ClassDecl owner, List<Param> params, List<String> tps, List<TypeRef> typeArgs,
+            Expr body, Node posNode, Ctx ctx) {
+        Lambda l = new Lambda();
+        l.line = posNode.line;
+        l.col = posNode.col;
+        Args args = body instanceof CtorCall ? ((CtorCall) body).args : ((Call) body).args;
+        for (Param p : params) {
+            if (p.optional) {
+                continue;
+            }
+            Param lp = new Param();
+            lp.name = "p$" + p.name;
+            lp.named = p.named;
+            lp.required = p.required;
+            TypeRef pt = p.type;
+            if ((pt == null || pt.is("var")) && (p.isThis || p.isSuper) && owner != null) {
+                FieldDecl f = owner.field(p.name);
+                pt = f != null ? f.type : null;
+            }
+            if (pt != null && tps.contains(pt.name)) {
+                int at = tps.indexOf(pt.name);
+                pt = at < typeArgs.size() ? typeArgs.get(at) : TypeRef.DYNAMIC;
+            }
+            lp.type = pt != null ? pt : TypeRef.DYNAMIC;
+            if (p.named && !p.required) {
+                // an omitted named argument must keep the callee's default
+                lp.defaultValue = p.defaultValue;
+            }
+            l.params.add(lp);
+            Ident ref = new Ident();
+            ref.name = lp.name;
+            ref.line = posNode.line;
+            ref.col = posNode.col;
+            if (p.named) {
+                NamedArg na = new NamedArg();
+                na.name = p.name;
+                na.value = ref;
+                args.named.add(na);
+            } else {
+                args.positional.add(ref);
+            }
+        }
+        body.line = posNode.line;
+        body.col = posNode.col;
+        l.exprBody = body;
+        TypeRef ft = new TypeRef("Function");
+        ft.funcParams = new ArrayList<TypeRef>();
+        boolean simple = true;
+        for (Param lp : l.params) {
+            if (lp.named) {
+                simple = false;
+            }
+            ft.funcParams.add(lp.type);
+        }
+        if (body instanceof CtorCall) {
+            ft.funcReturn = ((CtorCall) body).type;
+        } else {
+            ft.funcReturn = tearOffReturn != null ? tearOffReturn : TypeRef.DYNAMIC;
+        }
+        tearOffReturn = null;
+        if (!simple || ft.funcParams.size() > 5 || (!tps.isEmpty() && typeArgs.isEmpty())) {
+            // an uninstantiated generic constructor is left for the call site to target-type
+            return emitExpr(l, null, ctx);
+        }
+        Out lo = emitExpr(l, ft, ctx);
+        // Cast to the typed SAM so the closure is a standalone expression: a list
+        // element, a `??` operand or an untyped local has no target type to bind it.
+        return new Out("((" + javaType(ft, false, ctx) + ") " + lo.code + ")", ft);
     }
 
     private boolean isClassRef(TypeRef t) {

@@ -627,6 +627,11 @@ localVariableDeclaration
     : metadata initializedVariableDeclaration SC
     ;
 
+// Dart 3 destructuring declaration -- CN1 addition: `final (a, b) = e;`, `var [x, y] = e;`
+patternVariableDeclaration
+    : metadata (FINAL_ | VAR_) (recordPattern | listPattern | objectPattern) EQ expr SC
+    ;
+
 logicalAndExpression
     : equalityExpression (AA equalityExpression)*
     ;
@@ -726,6 +731,7 @@ nonLabelledStatement
     // `yield i;` would otherwise parse as a variable declaration of a type named `yield`.
     | yieldEachStatement
     | yieldStatement
+    | patternVariableDeclaration
     | localVariableDeclaration
     | forStatement
     | whileStatement
@@ -855,7 +861,13 @@ primary
     | constObjectExpression
     | constructorInvocation
     | recordLiteral
+    | genericTearOff
     | OP expr CP
+    ;
+
+// `Cell<int>.new` -- CN1 addition: a constructor tear-off of an instantiated type
+genericTearOff
+    : typeIdentifier typeArguments D (NEW_ | identifier)
     ;
 
 // ===== Dart 3 records — CN1 addition =====
@@ -1044,6 +1056,8 @@ relationalPattern
 
 unaryPattern
     : primaryPattern (AS_ type)?
+    | primaryPattern QU
+    | primaryPattern NOT
     ;
 
 primaryPattern
@@ -1191,6 +1205,28 @@ typeNotVoidList
 typeNotVoidNotFunction
     : typeName typeArguments? QU?
     | FUNCTION_ QU?
+    | recordType QU?
+    ;
+
+// Dart 3 record types -- CN1 addition. A single positional field needs a
+// trailing comma, so `(T)` is never read as a record type.
+recordType
+    : OP recordTypeField C CP
+    | OP recordTypeField (C recordTypeField)+ C? CP
+    | OP recordTypeField (C recordTypeField)* C recordTypeNamedFields CP
+    | OP recordTypeNamedFields CP
+    ;
+
+recordTypeField
+    : metadata type identifier?
+    ;
+
+recordTypeNamedFields
+    : OBC recordTypeNamedField (C recordTypeNamedField)* C? CBC
+    ;
+
+recordTypeNamedField
+    : metadata type identifier
     ;
 
 typeNotVoidNotFunctionList
@@ -1220,6 +1256,7 @@ unaryExpression
 unconditionalAssignableSelector
     : OB expr CB
     | D identifier
+    | D NEW_
     ;
 
 uri

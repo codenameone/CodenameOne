@@ -1094,6 +1094,11 @@ public final class AstBuilder {
             // can leave the type node out; the parser's E0001 already reports it.
             return TypeRef.DYNAMIC;
         }
+        if (ctx.recordType() != null) {
+            TypeRef t = buildRecordType(ctx.recordType());
+            t.nullable = ctx.QU() != null;
+            return t;
+        }
         if (ctx.typeName() == null) {
             TypeRef t = new TypeRef("Function");
             pos(t, ctx);
@@ -1107,6 +1112,33 @@ public final class AstBuilder {
             }
         }
         t.nullable = ctx.QU() != null;
+        return t;
+    }
+
+    /**
+     * A Dart 3 record type becomes the structural shape class the emitter generates for
+     * record literals: {@code Rec$<positional>$<sorted named...>}, component types as
+     * type arguments in the same order (positional, then named sorted by name).
+     */
+    private TypeRef buildRecordType(Dart2Parser.RecordTypeContext ctx) {
+        List<TypeRef> positional = new ArrayList<TypeRef>();
+        for (Dart2Parser.RecordTypeFieldContext f : ctx.recordTypeField()) {
+            positional.add(buildType(f.type()));
+        }
+        java.util.TreeMap<String, TypeRef> named = new java.util.TreeMap<String, TypeRef>();
+        if (ctx.recordTypeNamedFields() != null) {
+            for (Dart2Parser.RecordTypeNamedFieldContext f : ctx.recordTypeNamedFields().recordTypeNamedField()) {
+                named.put(f.identifier().getText(), buildType(f.type()));
+            }
+        }
+        StringBuilder n = new StringBuilder("Rec$").append(positional.size());
+        for (String nm : named.keySet()) {
+            n.append('$').append(nm);
+        }
+        TypeRef t = new TypeRef(n.toString());
+        pos(t, ctx);
+        t.args.addAll(positional);
+        t.args.addAll(named.values());
         return t;
     }
 
@@ -1266,6 +1298,22 @@ public final class AstBuilder {
         }
         if (s.localFunctionDeclaration() != null) {
             return buildLocalFunction(s.localFunctionDeclaration());
+        }
+        if (s.patternVariableDeclaration() != null) {
+            Dart2Parser.PatternVariableDeclarationContext pd = s.patternVariableDeclaration();
+            PatternDeclStmt d = new PatternDeclStmt();
+            pos(d, s);
+            Pattern p;
+            if (pd.recordPattern() != null) {
+                p = buildRecordPattern(pd.recordPattern());
+            } else if (pd.listPattern() != null) {
+                p = buildListPattern(pd.listPattern());
+            } else {
+                p = buildObjectPattern(pd.objectPattern());
+            }
+            d.pattern = p;
+            d.init = buildExpr(pd.expr());
+            return d;
         }
         if (s.rethrowStatement() != null) {
             RethrowStmt r = new RethrowStmt();
@@ -1437,6 +1485,13 @@ public final class AstBuilder {
             c.type = buildType(ctx.type());
             return c;
         }
+        if (ctx.QU() != null || ctx.NOT() != null) {
+            NullCheckPattern n = new NullCheckPattern();
+            pos(n, ctx);
+            n.inner = p;
+            n.assertNonNull = ctx.NOT() != null;
+            return n;
+        }
         return p;
     }
 
@@ -1547,8 +1602,12 @@ public final class AstBuilder {
         // `Circle(:var radius)` shorthand — a colon with no name defaults to the bound variable's
         // name. This must NOT fire for positional record fields like `(var x, var y)`, which have no
         // colon and stay positional.
-        if (f.name == null && ctx.CO() != null && f.pattern instanceof VariablePattern) {
-            f.name = ((VariablePattern) f.pattern).name;
+        Pattern named = f.pattern;
+        while (named instanceof NullCheckPattern || named instanceof CastPattern) {
+            named = named instanceof NullCheckPattern ? ((NullCheckPattern) named).inner : ((CastPattern) named).inner;
+        }
+        if (f.name == null && ctx.CO() != null && named instanceof VariablePattern) {
+            f.name = ((VariablePattern) named).name;
         }
         return f;
     }
@@ -2112,11 +2171,11 @@ public final class AstBuilder {
     }
 
     private Expr applyUnconditional(Expr base, Dart2Parser.UnconditionalAssignableSelectorContext u) {
-        if (u.identifier() != null) {
+        if (u.identifier() != null || u.NEW_() != null) {
             PropertyGet pg = new PropertyGet();
             pos(pg, u);
             pg.target = base;
-            pg.name = u.identifier().getText();
+            pg.name = u.identifier() != null ? u.identifier().getText() : "new";
             return pg;
         }
         IndexGet ig = new IndexGet();
@@ -2234,6 +2293,19 @@ public final class AstBuilder {
         }
         if (ctx.recordLiteral() != null) {
             return buildRecordLit(ctx.recordLiteral());
+        }
+        if (ctx.genericTearOff() != null) {
+            // `Cell<int>.new` / `Cell<int>.named`: a constructor tear-off of an instantiated
+            // type. The emitter erases the type arguments' effect on the parameters.
+            Dart2Parser.GenericTearOffContext gt = ctx.genericTearOff();
+            Ident cls = new Ident();
+            pos(cls, gt);
+            cls.name = gt.typeIdentifier().getText();
+            PropertyGet pg = new PropertyGet();
+            pos(pg, gt);
+            pg.target = cls;
+            pg.name = gt.identifier() != null ? gt.identifier().getText() : "new";
+            return pg;
         }
         if (ctx.expr() != null) {
             ParenExpr p = new ParenExpr();

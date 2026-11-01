@@ -393,6 +393,18 @@ public final class Ast {
     public static class RethrowStmt extends Stmt {
     }
 
+    /** Dart 3 destructuring declaration: `final (a, b) = init;`. */
+    public static class PatternDeclStmt extends Stmt {
+        public Pattern pattern;
+        public Expr init;
+    }
+
+    /** A null-check (`p?`) or null-assert (`p!`) pattern. */
+    public static class NullCheckPattern extends Pattern {
+        public Pattern inner;
+        public boolean assertNonNull;             // `!` rather than `?`
+    }
+
     public static class ExprStmt extends Stmt {
         public Expr expr;
     }
