@@ -845,13 +845,22 @@ public final class JavaEmitter {
         Ctx ctx = new Ctx(null);
         ctx.currentLibrary = ext.ownerLibrary;
         ctx.extensionSelfType = ext.extensionOn;
+        ctx.currentExtension = ext;
         StringBuilder body = new StringBuilder();
         body.append("    private ").append(ext.name).append("() {\n    }\n\n");
         for (MethodDecl m : ext.methods) {
             ctx.pushScope();
             TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
             StringBuilder sig = new StringBuilder();
-            sig.append("    public static ").append(m.isSetter ? "void" : javaType(rt, false, ctx))
+            sig.append("    public static ");
+            if (!ext.typeParams.isEmpty() || (m.typeParams != null && !m.typeParams.isEmpty())) {
+                java.util.LinkedHashSet<String> tvs = new java.util.LinkedHashSet<String>(ext.typeParams);
+                if (m.typeParams != null) {
+                    tvs.addAll(m.typeParams);
+                }
+                sig.append('<').append(String.join(", ", tvs)).append("> ");
+            }
+            sig.append(m.isSetter ? "void" : javaType(rt, false, ctx))
                     .append(' ').append(m.name).append('(')
                     .append(javaType(ext.extensionOn, false, ctx)).append(" $self");
             for (Param pm : m.params) {
@@ -1996,7 +2005,7 @@ public final class JavaEmitter {
                     String present = p.named ? "(n != null && n.containsKey(\"" + p.name + "\"))"
                             : "(a.length > " + pi + ")";
                     cast = "(" + present + " ? " + cast + " : "
-                            + coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx) + ")";
+                            + coerce(emitDefaultValue(p, pt, c, ctx), pt, ctx) + ")";
                 }
                 if (!p.named) {
                     pi++;
@@ -6462,6 +6471,14 @@ public final class JavaEmitter {
                 return emitMemberGet(onSelf, n, id, ctx);
             }
         }
+        // A bare name in an extension body is first the extension's own getter: several
+        // extensions on one type (`on Iterable<int>`, `on Iterable<num>`) may each declare
+        // it, and only the enclosing one is meant.
+        if (ctx.currentExtension != null && ctx.currentExtension.getter(n) != null) {
+            MethodDecl eg = ctx.currentExtension.getter(n);
+            return new Out(ctx.currentExtension.name + "." + n + "($self)",
+                    eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
+        }
         // Inside `extension on List<E>`, a bare `length` is `this.length` on the extended value.
         if (ctx.extensionSelfType != null && resolveTopLevel(n, ctx) == null
                 && (hasMember(ctx.extensionSelfType.name, n, true, ctx)
@@ -7046,6 +7063,7 @@ public final class JavaEmitter {
             return new Out(target.code + ".mounted()", TypeRef.BOOL);
         }
         ClassDecl extCls = findUserExtension(tt.name, name, true, ctx);
+        extCls = mostSpecificExtension(extCls, tt, name, true);
         if (extCls != null) {
             MethodDecl eg = extCls.getter(name);
             String self = extensionSelf(target, tt, extCls, ctx);
@@ -8838,6 +8856,8 @@ public final class JavaEmitter {
         // (DateTime) -> void, for CupertinoDatePicker.onDateTimeChanged
         TYPEDEFS.put("DateTimeCallback", new TypeRef[] {new TypeRef("DateTime"), TypeRef.VOID});
         // (Duration) -> void, for CupertinoTimerPicker.onTimerDurationChanged
+        // dart:core `typedef Comparator<T> = int Function(T a, T b)`
+        TYPEDEFS.put("Comparator", new TypeRef[] {TypeRef.DYNAMIC, TypeRef.DYNAMIC, TypeRef.INT});
         TYPEDEFS.put("DurationCallback", new TypeRef[] {new TypeRef("Duration"), TypeRef.VOID});
         // (Set<MaterialState>) -> Color, for MaterialStateProperty/WidgetStateProperty.resolveWith
         TYPEDEFS.put("MaterialPropertyResolver",
@@ -8861,7 +8881,10 @@ public final class JavaEmitter {
         TypeRef[] out = new TypeRef[sig.length];
         int ai = 0;
         for (int i = 0; i < sig.length; i++) {
-            if (sig[i] != null && sig[i].is("dynamic") && ai < args.size()) {
+            if (sig[i] != null && sig[i].is("dynamic") && args.size() == 1) {
+                // one type variable, used for every placeholder: Comparator<T> is (T, T) -> int
+                out[i] = args.get(0);
+            } else if (sig[i] != null && sig[i].is("dynamic") && ai < args.size()) {
                 out[i] = args.get(ai++);
             } else {
                 out[i] = sig[i];
@@ -9054,7 +9077,10 @@ public final class JavaEmitter {
         lastLambdaNullTail = false;
         lastLambdaExprIsStatementShaped = false;
         // typedef-typed target position gives untyped lambda params real types
-        TypeRef[] sigTypes = expected != null ? typedefSig(expected.name) : null;
+        // `Comparator<int>` binds the typedef's placeholders, so `(a, b) => a.compareTo(b)`
+        // has int parameters and an int result.
+        TypeRef[] sigTypes = expected != null
+                ? substituteTypedefTypeArgs(typedefSig(expected.name), expected.args) : null;
         // An inline function type target (`Widget Function(BuildContext, T, Widget?)`,
         // e.g. a generic stub builder whose element type was just substituted) likewise
         // supplies concrete param types: flatten funcParams + funcReturn into a sig.
@@ -9550,7 +9576,8 @@ public final class JavaEmitter {
             if (sm != null) {
                 return new Out("$self." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
             }
-            ClassDecl extCls = findUserExtension(ctx.extensionSelfType.name, n, false, ctx);
+            ClassDecl extCls = ctx.currentExtension != null && ctx.currentExtension.method(n) != null
+                    ? ctx.currentExtension : findUserExtension(ctx.extensionSelfType.name, n, false, ctx);
             if (extCls != null) {
                 MethodDecl em = extCls.method(n);
                 return new Out(extCls.name + "." + n + "($self"
@@ -10041,9 +10068,10 @@ public final class JavaEmitter {
         }
         // extension methods
         ClassDecl extCls = findUserExtension(tt.name, n, false, ctx);
+        extCls = mostSpecificExtension(extCls, tt, n, false);
         if (extCls != null) {
             MethodDecl em = extCls.method(n);
-            String rest = methodArgs(em.params, c.args, ctx);
+            String rest = methodArgs(extensionCallbackParams(extCls, em.params, tt), c.args, ctx);
             String self = extensionSelf(target, tt, extCls, ctx);
             return new Out(extCls.name + "." + n + "(" + self
                     + (rest.isEmpty() ? "" : ", " + rest) + ")",
@@ -11343,8 +11371,24 @@ public final class JavaEmitter {
                 }
                 diamond = ta.append('>').toString();
             }
-            return new Out("new " + jn + diamond + "(" + canonicalArgs(ct, pc, args, ctx) + ")",
-                    constructed);
+            ClassDecl savedOwner = ctx.ctorTypeOwner;
+            java.util.Map<String, TypeRef> savedSubst = ctx.ctorTypeSubst;
+            if (!constructed.args.isEmpty()) {
+                // `Sorted<int>((a, b) => a.compareTo(b))`: the closure's parameters are the
+                // written type argument, not the class's unbound K.
+                ctx.ctorTypeOwner = pc;
+                ctx.ctorTypeSubst = new java.util.HashMap<String, TypeRef>();
+                for (int i = 0; i < pc.typeParams.size(); i++) {
+                    ctx.ctorTypeSubst.put(pc.typeParams.get(i), constructed.args.get(i));
+                }
+            }
+            try {
+                return new Out("new " + jn + diamond + "(" + canonicalArgs(ct, pc, args, ctx) + ")",
+                        constructed);
+            } finally {
+                ctx.ctorTypeOwner = savedOwner;
+                ctx.ctorTypeSubst = savedSubst;
+            }
         }
         Ast.ClassDecl sc = stubs.classes.get(className);
         if (sc == null) {
@@ -11627,6 +11671,29 @@ public final class JavaEmitter {
         return out;
     }
 
+    /**
+     * A parameter default inlined at a call site. It is written in the declaring class's
+     * scope, so a bare name there (`this.onEvent = _noOp`) is that class's static member,
+     * which the caller's scope cannot see by its simple name.
+     */
+    private Out emitDefaultValue(Param p, TypeRef pt, ClassDecl owner, Ctx ctx) {
+        if (owner != null && p.defaultValue instanceof Ident && ctx.lookup(((Ident) p.defaultValue).name) == null) {
+            String n = ((Ident) p.defaultValue).name;
+            MethodDecl sm = owner.method(n);
+            FieldDecl sf = owner.field(n);
+            if ((sm != null && sm.isStatic) || (sf != null && sf.isStatic)) {
+                ClassDecl saved = ctx.currentClass;
+                ctx.currentClass = owner;
+                try {
+                    return emitExpr(p.defaultValue, pt, ctx);
+                } finally {
+                    ctx.currentClass = saved;
+                }
+            }
+        }
+        return emitExpr(p.defaultValue, pt, ctx);
+    }
+
     /** Program-class calls use canonical positional order with defaults inlined. */
     private String canonicalArgs(CtorDecl ct, Args args, Ctx ctx) {
         return canonicalArgs(ct, null, args, ctx);
@@ -11654,13 +11721,13 @@ public final class JavaEmitter {
                 sb.append(", ");
             }
             first = false;
-            TypeRef pt = paramType(owner, p, ctx);
+            TypeRef pt = boundParamType(owner, p, ctx);
             if (!p.named) {
                 if (posIdx < args.positional.size()) {
                     Out o = emitExpr(args.positional.get(posIdx++), pt, ctx);
                     sb.append(coerce(o, pt, ctx));
                 } else if (p.defaultValue != null) {
-                    sb.append(coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx));
+                    sb.append(coerce(emitDefaultValue(p, pt, owner, ctx), pt, ctx));
                 } else {
                     sb.append(zeroValue(pt));
                 }
@@ -11687,7 +11754,7 @@ public final class JavaEmitter {
                     Out o = emitExpr(match.value, pt, ctx);
                     sb.append(coerce(o, pt, ctx));
                 } else if (p.defaultValue != null) {
-                    sb.append(coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx));
+                    sb.append(coerce(emitDefaultValue(p, pt, owner, ctx), pt, ctx));
                 } else {
                     sb.append(zeroValue(pt));
                 }
@@ -12012,7 +12079,7 @@ public final class JavaEmitter {
             Param p = ct.params.get(i);
             String code = slotCode[i];
             if (code == null) {
-                TypeRef pt = paramType(owner, p, ctx);
+                TypeRef pt = boundParamType(owner, p, ctx);
                 Expr supplied = null;
                 for (Map.Entry<Expr, Integer> en : slotOf.entrySet()) {
                     if (en.getValue().intValue() == i) {
@@ -12022,7 +12089,7 @@ public final class JavaEmitter {
                 if (supplied != null) {
                     code = coerce(emitExpr(supplied, pt, ctx), pt, ctx);
                 } else if (p.defaultValue != null) {
-                    code = coerce(emitExpr(p.defaultValue, pt, ctx), pt, ctx);
+                    code = coerce(emitDefaultValue(p, pt, owner, ctx), pt, ctx);
                 } else {
                     code = zeroValue(pt);
                 }
@@ -12532,6 +12599,33 @@ public final class JavaEmitter {
             }
         }
         return false;
+    }
+
+    /**
+     * Of several extensions on one class declaring {@code member}, the one whose `on` type
+     * matches the receiver's type arguments exactly: `extension on Iterable<int>` over
+     * `extension on Iterable<num>` for a List<int>, as Dart's most-specific rule picks.
+     */
+    private ClassDecl mostSpecificExtension(ClassDecl found, TypeRef tt, String member, boolean getter) {
+        if (found == null || tt == null || tt.args.isEmpty()) {
+            return found;
+        }
+        for (ClassDecl e : program.extensions) {
+            if (e == found || e.extensionOn == null || e.ownerLibrary != found.ownerLibrary
+                    || !e.extensionOn.name.equals(found.extensionOn.name)
+                    || e.extensionOn.args.size() != tt.args.size()
+                    || (getter ? e.getter(member) == null : e.method(member) == null)) {
+                continue;
+            }
+            boolean same = true;
+            for (int i = 0; i < tt.args.size() && same; i++) {
+                same = tt.args.get(i) != null && e.extensionOn.args.get(i).name.equals(tt.args.get(i).name);
+            }
+            if (same) {
+                return e;
+            }
+        }
+        return found;
     }
 
     private ClassDecl findUserExtension(String typeName, String member, boolean getter, Ctx ctx) {
@@ -13145,6 +13239,22 @@ public final class JavaEmitter {
     }
 
     /** Type of a constructor parameter, resolving this./super. against fields. */
+    /** {@link #paramType}, with the constructed class's written type arguments bound. */
+    private TypeRef boundParamType(ClassDecl owner, Param p, Ctx ctx) {
+        TypeRef t = paramType(owner, p, ctx);
+        if (owner == null || owner != ctx.ctorTypeOwner || ctx.ctorTypeSubst == null || t == null) {
+            return t;
+        }
+        // Only a callback is retyped: a value argument keeps its declared (erased) type.
+        if (t.funcParams != null) {
+            return substFunctionType(t, ctx.ctorTypeSubst);
+        }
+        if (typedefSig(t.name) != null && !t.args.isEmpty()) {
+            return substituteTypeParams(t, ctx.ctorTypeSubst);
+        }
+        return t;
+    }
+
     private TypeRef paramType(ClassDecl c, Param p, Ctx ctx) {
         // A `this.x`/`super.x` initializing formal often carries no written type (parsed as
         // `dynamic`); fall through to resolve it from the field / super constructor instead of
@@ -14189,6 +14299,49 @@ public final class JavaEmitter {
      * result javac then rejected. Unbound variables (a raw receiver) become dynamic.
      * Only callbacks change; value parameters keep their declared types.
      */
+    /**
+     * The parameters of a generic extension's method with the extension's type variables
+     * bound from the receiver: `extension on List<E>` called on a `List<int>` hands
+     * `(x) => x.isOdd` a parameter typed int instead of the unbound E. Only callback
+     * parameters change, as for stub receivers.
+     */
+    private List<Param> extensionCallbackParams(ClassDecl ext, List<Param> params, TypeRef receiver) {
+        if (ext.typeParams == null || ext.typeParams.isEmpty() || ext.extensionOn == null || receiver == null) {
+            return params;
+        }
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (int i = 0; i < ext.extensionOn.args.size() && i < receiver.args.size(); i++) {
+            TypeRef on = ext.extensionOn.args.get(i);
+            TypeRef a = receiver.args.get(i);
+            if (on.args.isEmpty() && on.funcParams == null && ext.typeParams.contains(on.name)
+                    && a != null && isConcreteType(a)) {
+                subst.put(on.name, a);
+            }
+        }
+        if (subst.isEmpty()) {
+            return params;
+        }
+        List<Param> out = new ArrayList<Param>();
+        for (Param p : params) {
+            TypeRef nt = p.type != null && p.type.funcParams != null ? substFunctionType(p.type, subst) : p.type;
+            if (nt == p.type) {
+                out.add(p);
+                continue;
+            }
+            Param q = new Param();
+            q.type = nt;
+            q.name = p.name;
+            q.named = p.named;
+            q.required = p.required;
+            q.optional = p.optional;
+            q.isThis = p.isThis;
+            q.isSuper = p.isSuper;
+            q.defaultValue = p.defaultValue;
+            out.add(q);
+        }
+        return out;
+    }
+
     private Ast.MethodDecl withReceiverCallbackTypes(Ast.MethodDecl m, TypeRef receiver) {
         Ast.ClassDecl c = receiver == null ? null : stubs.classes.get(receiver.name);
         if (c == null || c.typeParams.isEmpty() || !c.methods.contains(m)) {
@@ -14371,7 +14524,7 @@ public final class JavaEmitter {
         /// until the class or function resolution consumes it (see takeCallPrefix).
         String callPrefix;
 
-        final ClassDecl currentClass;
+        ClassDecl currentClass;
         /** The library whose top-level (lib-class) body is being emitted; set only when currentClass is null. */
         Library currentLibrary;
         final Map<String, String> imports = new TreeMap<String, String>();
@@ -14385,6 +14538,11 @@ public final class JavaEmitter {
         private final java.util.Set<String> boxedActive = new HashSet<String>();
         TypeRef methodReturnType;
         TypeRef extensionSelfType;
+        /** The extension whose body is being emitted; its own members resolve first. */
+        ClassDecl currentExtension;
+        /** The class being constructed with written type arguments, and their binding. */
+        ClassDecl ctorTypeOwner;
+        java.util.Map<String, TypeRef> ctorTypeSubst;
         boolean inAsyncBody;
         /** Inside an async closure's body, whose Future may be typed Future of dynamic. */
         boolean asyncLambda;

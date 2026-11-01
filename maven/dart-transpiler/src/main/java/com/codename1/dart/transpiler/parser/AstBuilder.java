@@ -235,6 +235,12 @@ public final class AstBuilder {
                     + Integer.toHexString(ext.getStart().getStartIndex());
             cd.javaName = javaName;
             cd.extensionOn = buildType(ext.type());
+            // `extension Picks<E> on List<E>`: kept so a call on a List<int> can bind E.
+            if (ext.typeParameters() != null) {
+                for (Dart2Parser.TypeParameterContext tp : ext.typeParameters().typeParameter()) {
+                    cd.typeParams.add(tp.identifier().getText());
+                }
+            }
             java.util.List<Dart2Parser.ClassMemberDeclarationContext> members = ext.classMemberDeclaration();
             java.util.List<Dart2Parser.MetadataContext> metas = ext.metadata();
             for (int i = 0; i < members.size(); i++) {
