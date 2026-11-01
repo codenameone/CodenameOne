@@ -580,9 +580,16 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileList___java_lang_String
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_storageDir___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     WCHAR base[MAX_PATH];
     WCHAR dir[MAX_PATH];
+#if defined(CN1_WINDOWS_UWP)
+    /* The app container may write only under its own package folder. */
+    if (!cn1UwpLocalFolder(base, MAX_PATH)) {
+        return JAVA_NULL;
+    }
+#else
     if (SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, SHGFP_TYPE_CURRENT, base) != S_OK) {
         return JAVA_NULL;
     }
+#endif
     _snwprintf(dir, MAX_PATH, L"%s\\CodenameOne", base);
     dir[MAX_PATH - 1] = L'\0';
     /* ensure the directory exists; ignore "already exists" */
@@ -608,6 +615,22 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_executableDir___R_java_lang
 }
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileRoots___R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE) {
+#if defined(CN1_WINDOWS_UWP)
+    /* The app container sees no drives, only its package folder: that is the
+     * one root. */
+    WCHAR local[MAX_PATH];
+    JAVA_OBJECT root;
+    JAVA_OBJECT arr;
+    if (!cn1UwpLocalFolder(local, MAX_PATH)) {
+        return JAVA_NULL;
+    }
+    root = cn1WinWideToJavaString(threadStateData, local);
+    arr = allocArray(threadStateData, 1, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    if (arr != JAVA_NULL) {
+        ((JAVA_OBJECT*) CN1_ARRAY_DATA(arr))[0] = root;
+    }
+    return arr;
+#else
     /* GetLogicalDriveStringsW fills a NUL-separated, double-NUL-terminated list */
     DWORD needed = GetLogicalDriveStringsW(0, NULL);
     WCHAR* buffer;
@@ -661,6 +684,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileRoots___R_java_lang_Str
     }
     free(names);
     return arr;
+#endif /* CN1_WINDOWS_UWP */
 }
 
 JAVA_LONG com_codename1_impl_windows_WindowsNative_fileRootSize___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
@@ -729,6 +753,10 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fileSetHidden___java_lang_Str
     SetFileAttributesW(path, attrs);
     free(path);
 }
+
+#if !defined(CN1_WINDOWS_UWP) /* uwp: desktop only */
+/* The Win32 clipboard, ShellExecute and the common file dialogs do not exist in
+ * the UWP app container; scripts/gen-windows-uwp-stubs.py stubs these natives. */
 
 /* --------------------------------------------------------------- clipboard */
 
@@ -1137,6 +1165,8 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileDialog___boolean_int_ja
     }
     return cn1WinWideToJavaString(threadStateData, req.result);
 }
+
+#endif /* uwp: end desktop only */
 
 /* ------------------------------------------------- DPAPI secure storage */
 

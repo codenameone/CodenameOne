@@ -145,6 +145,59 @@
  */
 #define AEGIS_OMIT_AES_HARDWARE_SUPPORT 1
 
+/*
+ * A UWP build (Xbox Developer Mode) compiles against the app partition, where
+ * five Win32 calls the amalgamation's os_win syscall table names do not exist.
+ * Upstream removed its SQLITE_OS_WINRT switch, so they are supplied here from
+ * what the app container does have. AreFileApisANSI answering FALSE keeps
+ * SQLite on its UTF-16 paths, so the ANSI CreateFileA is never reached.
+ */
+#if defined(_WIN32) && defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP
+/* before any CRT header, as the amalgamation itself does, or rand_s is undeclared */
+#ifndef _CRT_RAND_S
+#define _CRT_RAND_S
+#endif
+#include <windows.h>
+static BOOL WINAPI cn1SqliteAreFileApisANSI(void) { return FALSE; }
+static HANDLE WINAPI cn1SqliteCreateFileW(LPCWSTR name, DWORD access, DWORD share,
+        LPSECURITY_ATTRIBUTES sa, DWORD disposition, DWORD flags, HANDLE templ) {
+    CREATEFILE2_EXTENDED_PARAMETERS ex;
+    (void)templ;
+    ZeroMemory(&ex, sizeof(ex));
+    ex.dwSize = sizeof(ex);
+    ex.dwFileAttributes = flags & 0xFFFF;
+    ex.dwFileFlags = flags & 0xFFF00000;
+    ex.dwSecurityQosFlags = flags & 0x000F0000;
+    ex.lpSecurityAttributes = sa;
+    return CreateFile2(name, access, share, disposition, &ex);
+}
+static HANDLE WINAPI cn1SqliteCreateFileA(LPCSTR name, DWORD access, DWORD share,
+        LPSECURITY_ATTRIBUTES sa, DWORD disposition, DWORD flags, HANDLE templ) {
+    (void)name; (void)access; (void)share; (void)sa; (void)disposition; (void)flags; (void)templ;
+    SetLastError(ERROR_NOT_SUPPORTED);
+    return INVALID_HANDLE_VALUE;
+}
+static DWORD WINAPI cn1SqliteGetFileSize(HANDLE h, LPDWORD high) {
+    LARGE_INTEGER size;
+    if (!GetFileSizeEx(h, &size)) {
+        return INVALID_FILE_SIZE;
+    }
+    if (high) {
+        *high = (DWORD)size.HighPart;
+    }
+    return size.LowPart;
+}
+static BOOL WINAPI cn1SqliteHeapValidate(HANDLE heap, DWORD flags, LPCVOID mem) {
+    (void)heap; (void)flags; (void)mem;
+    return TRUE;
+}
+#define AreFileApisANSI cn1SqliteAreFileApisANSI
+#define CreateFileW cn1SqliteCreateFileW
+#define CreateFileA cn1SqliteCreateFileA
+#define GetFileSize cn1SqliteGetFileSize
+#define HeapValidate cn1SqliteHeapValidate
+#endif
+
 #include "cn1_sqlite3_amalgamation.h"
 
 #endif /* CN1_INCLUDE_SQLITE */

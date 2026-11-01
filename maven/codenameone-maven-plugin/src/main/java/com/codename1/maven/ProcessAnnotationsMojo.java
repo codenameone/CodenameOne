@@ -92,7 +92,10 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
                     // given; see AnnotationProcessing.
                     compileSourceRoots(project, userProperties()),
                     sourceEncodingOf(project, userProperties()),
-                    compileClasspathOf(project)).run();
+                    compileClasspathOf(project))
+                    // A server wires its backend libraries as its own classes.
+                    .withBackendLibraries(BackendModules.dependsOnBackend(project))
+                    .run();
         } catch (com.codename1.build.BuildFailureException e) {
             throw new MojoFailureException(e.getMessage(), e.getCause() == null ? e : e.getCause());
         } catch (com.codename1.build.BuildExecutionException e) {

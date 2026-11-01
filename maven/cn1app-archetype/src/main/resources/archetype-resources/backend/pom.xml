@@ -84,6 +84,8 @@
             <version>5.9.3</version>
             <scope>test</scope>
         </dependency>
+        <!-- cn1:install-cn1lib adds the server half of a cn1lib here. -->
+        <!-- INJECT DEPENDENCIES -->
     </dependencies>
 
     <build>

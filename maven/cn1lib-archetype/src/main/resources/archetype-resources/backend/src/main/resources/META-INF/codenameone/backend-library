@@ -1,0 +1,2 @@
+# Marks this jar as a Codename One backend library: a server that depends on it
+# wires its @RestController, @Service and @Entity classes as the server's own.
