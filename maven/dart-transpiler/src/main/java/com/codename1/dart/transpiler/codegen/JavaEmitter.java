@@ -5648,11 +5648,13 @@ public final class JavaEmitter {
         }
         if (m.body != null) {
             emitBodyStatements(m.params, m.body, ctx);
-            if (asyncFuture && !endsWithJump(m.body)) {
+            boolean closed = neverFallsOff(m.body, rt, ctx);
+            if (asyncFuture && !closed && !endsWithJump(m.body)) {
                 ctx.importClass("dart.async.Future");
                 ctx.writer().line("return Future.value(null);");
             }
         } else if (m.exprBody != null) {
+            boxCapturedParams(m.params, ctx);
             lineMark(m.exprBody, ctx);
             if (asyncFuture) {
                 Out o = emitExpr(m.exprBody, null, ctx);
@@ -5714,10 +5716,12 @@ public final class JavaEmitter {
         }
         if (m.body != null) {
             emitBodyStatements(m.params, m.body, ctx);
-            if (asyncFuture && !endsWithJump(m.body)) {
+            boolean closed = neverFallsOff(m.body, rt, ctx);
+            if (asyncFuture && !closed && !endsWithJump(m.body)) {
                 ctx.writer().line("return Future.value(null);");
             }
         } else if (m.exprBody != null) {
+            boxCapturedParams(m.params, ctx);
             if (asyncFuture) {
                 lineMark(m.exprBody, ctx);
                 Out o = emitExpr(m.exprBody, null, ctx);
@@ -5757,7 +5761,8 @@ public final class JavaEmitter {
      * trailing `return Future.value(null);` appended, which javac rejected as unreachable.
      */
     private boolean leavesMethod(Stmt last) {
-        if (last instanceof ReturnStmt) {
+        // `rethrow` is emitted as `throw DartRuntime.rethrow(..)`: it leaves as a throw does.
+        if (last instanceof ReturnStmt || last instanceof RethrowStmt) {
             return true;
         }
         if (last instanceof ExprStmt) {
@@ -5769,7 +5774,11 @@ public final class JavaEmitter {
         }
         if (last instanceof IfStmt) {
             IfStmt is = (IfStmt) last;
-            return is.casePattern == null && is.elseStmt != null
+            // An if-case without a guard lowers to a plain Java if/else around the pattern's
+            // bindings, so javac sees the same two branches (an async body ending in
+            // `if (r case Sub(:final u)) return ..; else return ..;` had Future.value(null)
+            // appended after it, which javac rejects as unreachable).
+            return (is.casePattern == null || is.caseGuard == null) && is.elseStmt != null
                     && leavesMethod(is.thenStmt) && leavesMethod(is.elseStmt);
         }
         if (last instanceof TryStmt) {
@@ -6488,6 +6497,18 @@ public final class JavaEmitter {
                 expected.funcParams.add(paramValueType(p));
             }
             expected.funcReturn = lf.returnType;
+        }
+        if (CaptureScan.mentions(lf.body, lf.exprBody, lf.name)) {
+            // A local function that calls itself (Tarjan's strongConnect, a recursive
+            // walk). A Java lambda cannot read the local it initialises ("might not have
+            // been initialized"), so the function lives in a Ref declared before the
+            // lambda is built, and every use of the name reads the box.
+            ctx.importClass("dart.runtime.Ref");
+            ctx.markBoxed(jn);
+            ctx.writer().line("final Ref<" + samType + "> " + jn + " = new Ref<>(null);");
+            Out init = emitExpr(l, expected, ctx);
+            ctx.writer().line(jn + ".v = " + init.code + ";");
+            return;
         }
         Out init = emitExpr(l, expected, ctx);
         ctx.writer().line(samType + " " + jn + " = " + init.code + ";");
@@ -8123,13 +8144,32 @@ public final class JavaEmitter {
                 ClassDecl pc = cc.type.runtimeOnly ? null : program.classes.get(cc.type.name);
                 if (pc != null && pc.namedCtor(cc.ctorName) != null) {
                     String tw = witnessArgs(pc, cc.type.args, cc, ctx);
-                    String na = canonicalArgs(pc.namedCtor(cc.ctorName), cc.args, ctx);
                     // `Converting<int, String>.fromFunction(f)`: the explicit type arguments
                     // type the result (a raw type left `bind`'s Sink<S> unsubstituted) and
                     // become the static factory's Java type witness, since a lambda
                     // argument gives javac nothing to infer S and T from.
                     boolean explicit = !cc.type.args.isEmpty()
                             && cc.type.args.size() == pc.typeParams.size();
+                    // They bind the parameters too: `Channel<S>.guarded(stream)` inside a
+                    // class of its own <S, T> emits the argument against Stream<S>, not the
+                    // declaration's Stream<T>, which there names the CALLER's unrelated T.
+                    String na;
+                    ClassDecl savedOwner = ctx.ctorTypeOwner;
+                    java.util.Map<String, TypeRef> savedSubst = ctx.ctorTypeSubst;
+                    if (explicit) {
+                        ctx.ctorTypeOwner = pc;
+                        ctx.ctorTypeSubst = new java.util.HashMap<String, TypeRef>();
+                        for (int i = 0; i < pc.typeParams.size(); i++) {
+                            ctx.ctorTypeSubst.put(pc.typeParams.get(i), cc.type.args.get(i));
+                        }
+                    }
+                    try {
+                        na = explicit ? canonicalArgs(pc.namedCtor(cc.ctorName), pc, cc.args, ctx)
+                                : canonicalArgs(pc.namedCtor(cc.ctorName), cc.args, ctx);
+                    } finally {
+                        ctx.ctorTypeOwner = savedOwner;
+                        ctx.ctorTypeSubst = savedSubst;
+                    }
                     StringBuilder jw = new StringBuilder();
                     if (explicit) {
                         for (TypeRef ta : cc.type.args) {
@@ -9838,6 +9878,45 @@ public final class JavaEmitter {
         return o;
     }
 
+    /// `[() => a.remove(1), () => a.removeLast()]` with no context: Dart types the list by
+    /// the closures' common function type (`Object Function()`). With no element type a
+    /// Java lambda has no target and `DartList.<Object>of(() -> ..)` does not compile, so
+    /// closures of one arity make a list of that function shape, returning dynamic (the
+    /// returns may disagree, and every caller reads the result as a value either way).
+    private TypeRef closureListElementType(List<Expr> elements) {
+        if (elements.isEmpty()) {
+            return null;
+        }
+        int arity = -1;
+        List<Param> params = null;
+        for (Expr e : elements) {
+            if (!(e instanceof Lambda)) {
+                return null;
+            }
+            Lambda l = (Lambda) e;
+            if (arity >= 0 && l.params.size() != arity) {
+                return null;
+            }
+            for (Param p : l.params) {
+                if (p.named || p.optional) {
+                    return null;
+                }
+            }
+            arity = l.params.size();
+            if (params == null) {
+                params = l.params;
+            }
+        }
+        List<Param> untyped = new ArrayList<Param>();
+        for (Param p : params) {
+            Param q = new Param();
+            q.name = p.name;
+            q.type = TypeRef.DYNAMIC;
+            untyped.add(q);
+        }
+        return funcTypeRef(TypeRef.DYNAMIC, untyped);
+    }
+
     private Out emitListLit(ListLit l, TypeRef expected, Ctx ctx) {
         ctx.importClass("dart.core.DartList");
         TypeRef elem = l.elementType;
@@ -9887,6 +9966,9 @@ public final class JavaEmitter {
                 emitListElementInto(tmp, e, elem, ctx);
             }
             return new Out(tmp, TypeRef.of("List", elem));
+        }
+        if (elem == null) {
+            elem = closureListElementType(l.elements);
         }
         StringBuilder sb = new StringBuilder();
         List<String> codes = new ArrayList<String>();
@@ -16861,8 +16943,23 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 String jcls = javaClassName(pc);
                 MethodDecl m = pc.method(n);
                 if (m != null && m.isStatic) {
-                    return new Out(jcls + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
-                            callExpected(c, ctx), ctx), methodArgs(m.params, c.args, ctx)) + ")",
+                    // `Channel.make<S>(stream)`: the written type arguments are handed to the
+                    // Java method and bound into the parameters, so an argument is emitted
+                    // against Stream<S> -- not the declaration's own Stream<T>, a variable
+                    // the caller does not have (javac then sees conflicting bounds for T).
+                    String targs = "";
+                    List<Param> mps = m.params;
+                    if (c.typeArgs != null && !c.typeArgs.isEmpty() && m.typeParams != null
+                            && c.typeArgs.size() == m.typeParams.size()) {
+                        StringBuilder tb = new StringBuilder("<");
+                        for (int i = 0; i < c.typeArgs.size(); i++) {
+                            tb.append(i > 0 ? ", " : "").append(javaType(boxType(c.typeArgs.get(i)), true, ctx));
+                        }
+                        targs = tb.append('>').toString();
+                        mps = bindGenericParams(m.typeParams, m.params, c, new ArrayList<TypeRef>(), ctx);
+                    }
+                    return new Out(jcls + "." + targs + n + "(" + withWitnesses(methodWitnessCall(m, c,
+                            callExpected(c, ctx), ctx), methodArgs(mps, c.args, ctx)) + ")",
                             // `Result.capture(f)` with `capture<T>(Future<T>)`: the method's
                             // own T is bound from the call, or the result names a type
                             // variable the caller does not declare and its uses see Object.
@@ -16877,11 +16974,32 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                             c, ctx);
                     // The owner types `this.parts` field formals, so `X._(List.from(parts))`
                     // gets the field's type as the argument's context.
-                    String na = canonicalArgs(named, pc, c.args, ctx);
                     // `Transformer<Object, String>.fromHandlers(...)` is a Transformer<Object,
                     // String>: members read through it (bind's StreamSink<S>) see the arguments.
                     List<TypeRef> written = c.target instanceof Ident && ((Ident) c.target).typeArgs != null
                             ? ((Ident) c.target).typeArgs : c.typeArgs;
+                    // `Channel<S>.guarded(stream)` inside a class of its own <S, T>: the written
+                    // type arguments bind the constructor's parameters, so the argument is
+                    // emitted against Stream<S>, not the declaration's Stream<T> -- which here
+                    // names the CALLER's unrelated T.
+                    String na;
+                    if (!written.isEmpty() && written.size() == pc.typeParams.size()) {
+                        ClassDecl savedOwner = ctx.ctorTypeOwner;
+                        java.util.Map<String, TypeRef> savedSubst = ctx.ctorTypeSubst;
+                        ctx.ctorTypeOwner = pc;
+                        ctx.ctorTypeSubst = new java.util.HashMap<String, TypeRef>();
+                        for (int i = 0; i < pc.typeParams.size(); i++) {
+                            ctx.ctorTypeSubst.put(pc.typeParams.get(i), written.get(i));
+                        }
+                        try {
+                            na = canonicalArgs(named, pc, c.args, ctx);
+                        } finally {
+                            ctx.ctorTypeOwner = savedOwner;
+                            ctx.ctorTypeSubst = savedSubst;
+                        }
+                    } else {
+                        na = canonicalArgs(named, pc, c.args, ctx);
+                    }
                     TypeRef made = written.size() == pc.typeParams.size() && !written.isEmpty()
                             ? TypeRef.of(cls, written.toArray(new TypeRef[0])) : new TypeRef(cls);
                     return new Out(jcls + "." + javaIdent(n) + "(" + (na.isEmpty() ? stripTrailingComma(tw)
@@ -17659,7 +17777,29 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     // a dynamic element still takes a one-argument callback
                     f = narrowFullArityValue(pos.get(0), f, inlineFuncType(TypeRef.DYNAMIC, TypeRef.DYNAMIC), ctx);
                 }
-                return new Out(target.code + ".map(" + f.code + ")", TypeRef.of("Iterable", TypeRef.DYNAMIC));
+                // A torn-off method (`keys.map(_prefixed)`) is an Iterable of what it answers:
+                // javac types the call DartIterable<String> from the method reference, so a
+                // local left Iterable<dynamic> here passed on to an Iterable<dynamic>
+                // parameter got no covariant cast and failed to compile.
+                TypeRef mapped = TypeRef.DYNAMIC;
+                TypeRef torn = f.type == null ? null : f.type.funcReturn;
+                if (torn == null && pos.get(0) instanceof Ident && ctx.currentClass != null) {
+                    // An instance method torn off by its bare name types the value only as
+                    // `Function`; its declaration still says what it answers.
+                    MethodDecl tm = ctx.currentClass.method(((Ident) pos.get(0)).name);
+                    if (tm != null && !tm.isGetter && !tm.isSetter
+                            && (tm.typeParams == null || tm.typeParams.isEmpty())) {
+                        torn = tm.returnType;
+                    }
+                }
+                if ((pos.get(0) instanceof Ident || pos.get(0) instanceof PropertyGet)
+                        && torn != null && torn.funcParams == null && isFullyConcrete(torn)
+                        && !torn.is("void") && !torn.is("dynamic") && !torn.is("var")
+                        && !torn.is("Null") && !torn.is("Object") && !torn.is("Future")
+                        && !torn.is("FutureOr")) {
+                    mapped = torn;
+                }
+                return new Out(target.code + ".map(" + f.code + ")", TypeRef.of("Iterable", mapped));
             }
             if (n.equals("where")) {
                 Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
@@ -24415,7 +24555,6 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return "null";
     }
 
-    /** Java holder class for a boxed captured local of the given type. */
     /// Emits a function body after boxing every parameter that a closure in it captures
     /// and that is reassigned anywhere in it (CaptureScan.boxedLocals). A Java lambda can
     /// capture only effectively-final locals, so such a parameter is copied into a Ref at
@@ -24423,6 +24562,66 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// Methods, constructors, top-level functions, extension members and block closures
     /// all reach their statements through here.
     private void emitBodyStatements(List<Param> params, Block body, Ctx ctx) {
+        boxCapturedParams(params, ctx);
+        emitStatements(body, ctx);
+    }
+
+    /// The parameter boxing of {@link #emitBodyStatements}, also run before an arrow body:
+    /// `f(int x) => (x += 1) > 0 ? () => x : ...` reassigns and captures x in one
+    /// expression, which Java rejects unless x is read through its box.
+    /// `Never _fail(String n) { error('expected $n'); }`: Dart knows the body cannot complete
+    /// because its last call answers Never; javac sees a non-void method fall off its end
+    /// ("missing return statement"). The unreachable end is closed with a throw.
+    /// The same holds for any non-void body whose last statement is a call answering Never:
+    /// package:collection's `bool remove(Object? e) { _throw(); }` with `static Never _throw()`.
+    /// Whether a call statement invokes something declared to return Never: a method of
+    /// the enclosing class or its supertypes, a static method named through its class,
+    /// or a top-level function. The quiet inference answers null for these calls.
+    private boolean callAnswersNever(Expr e, Ctx ctx) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        if (!(e instanceof Call) || ((Call) e).name == null) {
+            return false;
+        }
+        Call c = (Call) e;
+        TypeRef rt = null;
+        if (c.target == null) {
+            MethodDecl m = ctx.currentClass == null ? null : findMethodInHierarchy(ctx.currentClass, c.name);
+            if (m != null) {
+                rt = m.returnType;
+            } else {
+                FunctionDecl f = program.functions.get(c.name);
+                rt = f == null ? null : f.returnType;
+            }
+        } else if (c.target instanceof Ident && program.classes.containsKey(((Ident) c.target).name)) {
+            MethodDecl m = findMethodInHierarchy(program.classes.get(((Ident) c.target).name), c.name);
+            rt = m == null || !m.isStatic ? null : m.returnType;
+        } else {
+            rt = inferExprTypeQuiet(c, ctx);
+        }
+        return isCoreNever(rt);
+    }
+
+    private boolean neverFallsOff(Block body, TypeRef rt, Ctx ctx) {
+        if (rt == null || rt.is("void") || endsWithJump(body)) {
+            return false;
+        }
+        boolean endsInNever = false;
+        if (!body.statements.isEmpty()) {
+            Stmt last = body.statements.get(body.statements.size() - 1);
+            if (last instanceof ExprStmt) {
+                endsInNever = callAnswersNever(((ExprStmt) last).expr, ctx);
+            }
+        }
+        if (rt.is("Never") || endsInNever) {
+            ctx.writer().line("throw new IllegalStateException(\"a Never function completed\");");
+            return true;
+        }
+        return false;
+    }
+
+    private void boxCapturedParams(List<Param> params, Ctx ctx) {
         if (params != null) {
             for (Param p : params) {
                 if (p.isThis || p.isSuper || p.name == null || !ctx.boxedLocals.contains(p.name)) {
@@ -24443,9 +24642,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         + (holder.startsWith("Ref<") ? "<>" : "") + "(" + old + ");");
             }
         }
-        emitStatements(body, ctx);
     }
 
+    /** Java holder class for a boxed captured local of the given type. */
     private String refHolder(TypeRef t, Ctx ctx) {
         if (t.is("int") && !t.nullable) {
             ctx.importClass("dart.runtime.RefLong");

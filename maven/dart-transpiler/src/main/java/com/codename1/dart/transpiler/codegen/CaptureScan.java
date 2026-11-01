@@ -101,6 +101,18 @@ final class CaptureScan {
         return scan.valueCalls;
     }
 
+    /** True when {@code name} is referenced anywhere in a function's block or arrow body. */
+    static boolean mentions(Block body, Expr exprBody, String name) {
+        CaptureScan scan = new CaptureScan();
+        if (body != null) {
+            scan.walkBlock(body);
+        }
+        if (exprBody != null) {
+            scan.walkExpr(exprBody);
+        }
+        return scan.allReferenced.contains(name);
+    }
+
     /** Every identifier name referenced anywhere in an expression. */
     static Set<String> referencedNames(Expr e) {
         CaptureScan scan = new CaptureScan();

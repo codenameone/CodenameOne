@@ -70,9 +70,14 @@ public class DateRangePickerDialog extends StatefulWidget {
                 saveText == null ? "Save" : saveText);
     }
 
-    /** Top-level {@code showDateRangePicker(...)}: completes with the range, or null when cancelled. */
-    public static Future<Object> show(BuildContext context, DateTime firstDate, DateTime lastDate,
-            Object initialDateRange, DateTime currentDate, String helpText, String cancelText, String saveText) {
+    /**
+     * Top-level {@code showDateRangePicker(...)}: completes with the range, or null when cancelled.
+     * Typed as Flutter's {@code Future<DateTimeRange?>}: a {@code Future<Object>} left
+     * {@code DateTimeRange r = await showDateRangePicker(...)} with no T javac could infer.
+     */
+    public static Future<dart.core.DateTimeRange> show(BuildContext context, DateTime firstDate, DateTime lastDate,
+            dart.core.DateTimeRange initialDateRange, DateTime currentDate, String helpText, String cancelText,
+            String saveText) {
         DateRangePickerDialog d = new DateRangePickerDialog();
         d.firstDate(firstDate);
         d.lastDate(lastDate);
