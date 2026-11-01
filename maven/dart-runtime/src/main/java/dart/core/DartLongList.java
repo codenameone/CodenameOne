@@ -212,4 +212,25 @@ public class DartLongList extends DartList<Long> {
         modCount++;
         return old;
     }
+
+    /**
+     * Dart's {@code sublist(start, end)}, typed as this class: a {@code List<int>}
+     * is emitted as a {@code DartLongList}, so the inherited {@code DartList} result was
+     * not assignable back to the variable that holds it.
+     */
+    @Override
+    public DartLongList sublist(long start, long end) {
+        RangeError.checkValueInInterval(start, 0, len, "start");
+        RangeError.checkValueInInterval(end, start, len, "end");
+        int n = (int) (end - start);
+        long[] backing = new long[Math.max(8, n)];
+        System.arraycopy(a, (int) start, backing, 0, n);
+        return new DartLongList(backing, n, true);
+    }
+
+    /** Dart's {@code sublist(start)}; see {@link #sublist(long, long)}. */
+    @Override
+    public DartLongList sublist(long start) {
+        return sublist(start, len);
+    }
 }

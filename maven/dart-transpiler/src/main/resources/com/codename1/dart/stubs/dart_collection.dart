@@ -35,9 +35,29 @@ mixin ListMixin<E> {
   Iterator<E> get iterator;
   bool get isEmpty;
   bool get isNotEmpty;
+  E get first;
+  E get last;
+  E get single;
   void add(E element);
+  void addAll(Iterable<E> iterable);
+  E removeLast();
+  void clear();
+  void fillRange(int start, int end, [E? fill]);
   bool contains(Object? element);
   void forEach(void Function(E element) action);
+  E elementAt(int index);
+  int indexOf(Object? element, [int start = 0]);
+  int lastIndexOf(Object? element);
+  List<E> toList({bool growable = true});
+  List<E> sublist(int start, [int? end]);
+  Iterable<E> where(bool Function(E element) test);
+  Iterable<T> map<T>(T Function(E e) toElement);
+  Iterable<E> skip(int count);
+  Iterable<E> take(int count);
+  T fold<T>(T initialValue, T Function(T previousValue, E element) combine);
+  bool any(bool Function(E element) test);
+  bool every(bool Function(E element) test);
+  String join([String separator = '']);
 }
 
 // Map protocol.

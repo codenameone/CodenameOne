@@ -35,7 +35,7 @@ import java.util.List;
  * {@code base64} and {@code base64Url}. A byte input may be a {@link Uint8List} or any
  * {@code List<int>}; byte outputs are {@link Uint8List}, as in Dart.
  */
-public final class ByteCodec implements dart.async.StreamTransformer<Object, Object> {
+public final class ByteCodec implements dart.async.StreamTransformer<Object, Object>, Codec {
 
     static final int UTF8 = 0;
     static final int ASCII = 1;

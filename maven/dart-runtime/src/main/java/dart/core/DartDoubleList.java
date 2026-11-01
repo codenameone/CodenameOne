@@ -218,4 +218,34 @@ public class DartDoubleList extends DartList<Double> {
         modCount++;
         return old;
     }
+
+    /**
+     * Dart's {@code sublist(start, end)}, typed as this class: a {@code List<double>}
+     * is emitted as a {@code DartDoubleList}, so the inherited {@code DartList} result was
+     * not assignable back to the variable that holds it.
+     */
+    @Override
+    public DartDoubleList sublist(long start, long end) {
+        RangeError.checkValueInInterval(start, 0, len, "start");
+        RangeError.checkValueInInterval(end, start, len, "end");
+        int n = (int) (end - start);
+        double[] backing = new double[Math.max(8, n)];
+        System.arraycopy(a, (int) start, backing, 0, n);
+        return new DartDoubleList(backing, n, true);
+    }
+
+    /** Dart's {@code sublist(start)}; see {@link #sublist(long, long)}. */
+    @Override
+    public DartDoubleList sublist(long start) {
+        return sublist(start, len);
+    }
+
+    /**
+     * {@code list[i] = 5} on a {@code List<double>}: Dart converts the int literal to
+     * a double in that context, but the emitted Java hands over a {@code long}, which
+     * {@code idxSet(long, Double)} does not accept.
+     */
+    public Double idxSet(long index, long value) {
+        return idxSet(index, Double.valueOf((double) value));
+    }
 }

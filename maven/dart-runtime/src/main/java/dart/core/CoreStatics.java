@@ -115,4 +115,14 @@ public final class CoreStatics {
             return dart.async.Future.<Object>error(t);
         }
     }
+
+    /** Dart's {@code num.isNegative}: true for -0.0 and every value below zero, false for NaN. */
+    public static boolean isNegative(double d) {
+        return d < 0 || (d == 0 && Double.doubleToRawLongBits(d) != 0L);
+    }
+
+    /** Dart's {@code int.isNegative}. */
+    public static boolean isNegative(long v) {
+        return v < 0;
+    }
 }

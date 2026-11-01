@@ -39,8 +39,18 @@ class JsonUnsupportedObjectError {
   external Object? get unsupportedObject;
 }
 
+// Dart's Codec<S, T>. Only the byte codecs implement it (dart.convert.Codec); its
+// converters are the codec itself, which picks the direction by input type.
+@JavaName('dart.convert.Codec')
+abstract class Codec<S, T> {
+  external dynamic encode(dynamic input);
+  external dynamic decode(dynamic encoded);
+  external Encoding get encoder;
+  external Encoding get decoder;
+}
+
 @JavaName('dart.convert.ByteCodec')
-abstract class Encoding {
+abstract class Encoding extends Codec<String, List<int>> {
   external String get name;
   external dynamic encode(dynamic input);
   external dynamic decode(dynamic encoded, {bool? allowMalformed});
