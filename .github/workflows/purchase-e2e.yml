@@ -21,47 +21,20 @@ name: Purchase E2E (IAP)
 # screenshot / notification CI workflows.
 
 on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch: {}
   pull_request:
     branches: [ master ]
     paths:
       - 'CodenameOne/src/com/codename1/payment/**'
-      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java'
-      - 'Ports/Android/src/com/codename1/impl/android/BillingSupport.java'
-      - 'Ports/Android/src/com/codename1/impl/android/ZoozPurchase.java'
-      - 'Ports/Android/src/com/codename1/impl/android/IBillingSupport.java'
-      - 'Ports/Android/src/com/codename1/impl/android/CodenameOneActivity.java'
-      - 'maven/core-unittests/src/test/java/com/codename1/payment/**'
-      - 'maven/core-unittests/src/test/java/com/codename1/testing/TestCodenameOneImplementation.java'
       - 'scripts/purchase-test-app/**'
-      - 'scripts/lib/xcode.sh'
       - 'scripts/ios/purchase-tests/**'
       - 'scripts/run-ios-purchase-tests.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/build-android-app.sh'
       - '.github/workflows/purchase-e2e.yml'
-  push:
-    branches: [ master ]
-    paths:
-      - 'CodenameOne/src/com/codename1/payment/**'
-      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java'
-      - 'Ports/Android/src/com/codename1/impl/android/BillingSupport.java'
-      - 'Ports/Android/src/com/codename1/impl/android/ZoozPurchase.java'
-      - 'Ports/Android/src/com/codename1/impl/android/IBillingSupport.java'
-      - 'Ports/Android/src/com/codename1/impl/android/CodenameOneActivity.java'
-      - 'maven/core-unittests/src/test/java/com/codename1/payment/**'
-      - 'maven/core-unittests/src/test/java/com/codename1/testing/TestCodenameOneImplementation.java'
-      - 'scripts/purchase-test-app/**'
-      - 'scripts/lib/xcode.sh'
-      - 'scripts/ios/purchase-tests/**'
-      - 'scripts/run-ios-purchase-tests.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/build-android-app.sh'
-      - '.github/workflows/purchase-e2e.yml'
+  schedule:
+    - cron: '11 0 * * *'
 
 permissions:
   contents: read

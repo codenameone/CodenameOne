@@ -6,72 +6,18 @@ name: Car (Android Auto) integration
 # exercises the car API, so the build injects the androidx.car.app dependency + CarAppService) and
 # runs it on a native Android emulator + asserts the injected Android Auto wiring.
 'on':
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/car-android.yml'
       - 'CodenameOne/src/com/codename1/car/**'
       - 'Ports/Android/src/com/codename1/impl/android/AndroidCarSupport.java'
       - 'maven/build-engine/src/main/resources/com/codename1/builders/car/**'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
-      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-      - 'scripts/lib/cn1ss.sh'
-  push:
-    branches:
-      - master
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/car-android.yml'
-      - 'CodenameOne/src/com/codename1/car/**'
-      - 'Ports/Android/src/com/codename1/impl/android/AndroidCarSupport.java'
-      - 'maven/build-engine/src/main/resources/com/codename1/builders/car/**'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
-      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-      - 'scripts/lib/cn1ss.sh'
+  schedule:
+    - cron: '11 0 * * *'
+  workflow_dispatch:
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

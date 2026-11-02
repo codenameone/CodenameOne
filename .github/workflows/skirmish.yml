@@ -23,66 +23,16 @@ name: Skirmish (game sample)
 # holds screenshot baselines for this sample.
 
 on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     paths:
       - 'scripts/skirmish/**'
-      - 'vm/backend/src/**'
-      - 'vm/backend/impl/**'
-      - 'maven/backend/**'
-      - 'maven/backend-test/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
-      - 'CodenameOne/src/com/codename1/maps/**'
-      - 'CodenameOne/src/com/codename1/io/oidc/**'
-      - 'CodenameOne/src/com/codename1/io/rest/**'
-      # The REST client maps its responses through the mapper registry.
-      - 'CodenameOne/src/com/codename1/mapping/**'
-      # The ORM validates every mapping against its migration when the
-      # server starts, and the backend-database job is where that runs
-      # against a real database.
-      - 'CodenameOne/src/com/codename1/impl/orm/**'
-      - 'CodenameOne/src/com/codename1/orm/**'
-      - 'CodenameOne/src/com/codename1/annotations/**'
-      - 'scripts/ci/sample-server-tests-on-database.sh'
-      - 'scripts/build-android-app.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/sync-initializr-template.py'
-      - 'scripts/tests/generate-initializr-fixtures.py'
-      - 'scripts/tests/GenerateInitializr.java'
-      # The generator and the template.
-      - 'scripts/initializr/common/src/**'
-      - '.github/workflows/skirmish.yml'
-  push:
-    branches: [ master ]
-    paths:
-      - 'scripts/skirmish/**'
-      - 'vm/backend/src/**'
-      - 'vm/backend/impl/**'
-      - 'maven/backend/**'
-      - 'maven/backend-test/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
-      - 'CodenameOne/src/com/codename1/maps/**'
-      - 'CodenameOne/src/com/codename1/io/oidc/**'
-      - 'CodenameOne/src/com/codename1/io/rest/**'
-      # The REST client maps its responses through the mapper registry.
-      - 'CodenameOne/src/com/codename1/mapping/**'
-      # The ORM validates every mapping against its migration when the
-      # server starts, and the backend-database job is where that runs
-      # against a real database.
-      - 'CodenameOne/src/com/codename1/impl/orm/**'
-      - 'CodenameOne/src/com/codename1/orm/**'
-      - 'CodenameOne/src/com/codename1/annotations/**'
-      - 'scripts/ci/sample-server-tests-on-database.sh'
-      - 'scripts/build-android-app.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/sync-initializr-template.py'
-      - 'scripts/tests/generate-initializr-fixtures.py'
-      - 'scripts/tests/GenerateInitializr.java'
-      # The generator and the template.
-      - 'scripts/initializr/common/src/**'
       - '.github/workflows/skirmish.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '11 0 * * *'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
