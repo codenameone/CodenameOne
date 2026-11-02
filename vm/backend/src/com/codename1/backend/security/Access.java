@@ -35,7 +35,6 @@ final class Access extends SecurityAccess {
     public HttpSecurity httpSecurity(Config config, Object[] beans) {
         com.codename1.impl.backend.security.SecuritySupport.developmentProfile(
                 config != null && config.isDevelopmentProfile());
-        tableNames(config);
         return new HttpSecurity(config, beans);
     }
 
@@ -44,7 +43,6 @@ final class Access extends SecurityAccess {
             boolean[] primary) {
         com.codename1.impl.backend.security.SecuritySupport.developmentProfile(
                 config != null && config.isDevelopmentProfile());
-        tableNames(config);
         return new HttpSecurity(config, beans, names, primary);
     }
 
@@ -98,19 +96,5 @@ final class Access extends SecurityAccess {
     @Override
     public void clearTestCsrf() {
         CsrfFilter.testToken(null);
-    }
-
-    // The server's configuration names the security tables; read here so every
-    // repository uses them without a configuration of its own.
-    private static void tableNames(Config config) {
-        if (config == null) {
-            return;
-        }
-        try {
-            SecuritySchema.configure(config);
-        } catch (java.io.IOException err) {
-            throw new IllegalStateException("The security table names could not be read: "
-                    + err.getMessage(), err);
-        }
     }
 }
