@@ -22,7 +22,7 @@
  */
 
 /* Native virtual accessibility tree for the lightweight Win32 port. */
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(CN1_WINDOWS_UWP) /* desktop only: stubbed for UWP in cn1_windows_uwp_stubs.c */
 
 /* xwin may provide a newer MSVC STL than the clang-cl installed by the Linux
  * cross-compile runner.  This file uses only the long-stable string/vector

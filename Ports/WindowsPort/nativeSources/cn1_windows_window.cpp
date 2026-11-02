@@ -299,7 +299,9 @@ static LONG WINAPI cn1WinFaultToException(EXCEPTION_POINTERS* info) {
         /* Re-arm the guard page the overflow consumed so the (small) work below
          * has stack; the context restore then jumps to a frame high up the stack
          * with room to spare. */
-        _resetstkoflw();
+#if !defined(CN1_WINDOWS_UWP)
+        _resetstkoflw();   /* not in the UWP CRT: a second overflow then terminates */
+#endif
         t = getThreadLocalData();
         if (t == NULL || t->tryBlockOffset <= 0) {
             return EXCEPTION_CONTINUE_SEARCH;
@@ -557,6 +559,7 @@ int cn1WinPollEvent(CN1Event* out) {
 }
 
 /* ------------------------------------------------------------- input helpers */
+#if !defined(CN1_WINDOWS_UWP) /* Win32 window; cn1_windows_corewindow.cpp is the UWP host */
 
 /* The virtual key whose WM_KEYDOWN a menu accelerator consumed, so the matching WM_KEYUP can
  * be consumed as well. Zero when no such press is outstanding. Touched only from the window
@@ -976,7 +979,41 @@ int cn1WinCreateWindow(const char* utf8Title, int width, int height) {
     return cn1Win.hwnd != NULL ? 1 : 0;
 }
 
+#endif /* !CN1_WINDOWS_UWP */
+
 /* ------------------------------------------------- WindowsNative bridge */
+
+/*
+ * The part of initDisplay every host shares -- the Win32 window here and the UWP
+ * CoreWindow host (cn1_windows_corewindow.cpp): COM, the fault handlers that turn
+ * a null dereference into a NullPointerException, and the input ring. Returns 0
+ * when the runtime was already initialised.
+ */
+int cn1WinInitRuntime(void) {
+    if (InterlockedCompareExchange(&cn1Win.initialized, 1, 0) != 0) {
+        return 0; /* already initialised */
+    }
+
+    /* Under UWP the view thread is already initialised by CoreApplication and
+     * this answers RPC_E_CHANGED_MODE, which is harmless: the apartment the
+     * view thread has is the one the WinRT calls need. */
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    cn1PreviousUnhandled = SetUnhandledExceptionFilter(cn1WinUnhandled);
+    /* First-chance: turn null-deref / stack-overflow faults into catchable Java
+     * exceptions (see cn1WinFaultToException). Installed first (FirstHandler=1)
+     * so it runs before the OS default, but it only redirects genuine null
+     * derefs / overflows with a CN1 catch frame and lets everything else pass
+     * through to the unhandled-exception logger above. */
+    AddVectoredExceptionHandler(1, cn1WinFaultToException);
+
+    InitializeCriticalSection(&cn1Win.eventLock);
+    cn1Win.eventSignal = CreateEventW(NULL, FALSE, FALSE, NULL);
+    cn1Win.eventHead = 0;
+    cn1Win.eventTail = 0;
+    cn1Win.dpiScale = 1.0f;
+    return 1;
+}
+
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_nativeLog___java_lang_String(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
@@ -991,6 +1028,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_nativeLog___java_lang_String(
  * (from cn1WinBeginFrame) so the Resize happens between frames on the same
  * thread that draws -- never while a frame is open on another thread.
  */
+#if !defined(CN1_WINDOWS_UWP)
 void cn1WinApplyPendingResize(void) {
     if (cn1Win.pendingResize && g_hwndTarget != NULL) {
         D2D1_SIZE_U size;
@@ -1000,6 +1038,7 @@ void cn1WinApplyPendingResize(void) {
         cn1Win.pendingResize = 0;
     }
 }
+#endif
 
 /* True when CN1_FAULT_SELFTEST is set in the environment. The clean target does
  * not translate System.getenv, so the launcher's fault-handler self-test gate
@@ -1010,6 +1049,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_faultSelfTestEnabled___R_b
     return (n > 0 && n < sizeof(buf)) ? JAVA_TRUE : JAVA_FALSE;
 }
 
+#if !defined(CN1_WINDOWS_UWP) /* Win32 window; cn1_windows_corewindow.cpp is the UWP host */
 /*
  * The main window's title, after initDisplay has already set it once.
  *
@@ -1053,18 +1093,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
      * never returns in server mode -- it serves widgets and exits the process. */
     cn1WidgetBoardMaybeRunComServer();
 #endif
-    if (InterlockedCompareExchange(&cn1Win.initialized, 1, 0) != 0) {
+    if (!cn1WinInitRuntime()) {
         return; /* already initialised */
     }
-
-    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-    cn1PreviousUnhandled = SetUnhandledExceptionFilter(cn1WinUnhandled);
-    /* First-chance: turn null-deref / stack-overflow faults into catchable Java
-     * exceptions (see cn1WinFaultToException). Installed first (FirstHandler=1)
-     * so it runs before the OS default, but it only redirects genuine null
-     * derefs / overflows with a CN1 catch frame and lets everything else pass
-     * through to the unhandled-exception logger above. */
-    AddVectoredExceptionHandler(1, cn1WinFaultToException);
 
     /* The exe is linked as a GUI-subsystem app (see writeCmakeProject), so
      * double-clicking it never allocates a console -- no stray window, no stdout.
@@ -1088,11 +1119,6 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
         }
     }
 
-    InitializeCriticalSection(&cn1Win.eventLock);
-    cn1Win.eventSignal = CreateEventW(NULL, FALSE, FALSE, NULL);
-    cn1Win.eventHead = 0;
-    cn1Win.eventTail = 0;
-    cn1Win.dpiScale = 1.0f;
 
     /* Headless screenshot mode: no window; render into an offscreen WIC bitmap
      * that headlessTick later encodes to PNG. The EDT paints through the same
@@ -1255,15 +1281,27 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isScreenReaderEnabled___R_
     if (!SystemParametersInfoW(SPI_GETSCREENREADER, 0, &screenReader, 0)) return JAVA_FALSE;
     return screenReader ? JAVA_TRUE : JAVA_FALSE;
 }
+#endif /* !CN1_WINDOWS_UWP */
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayHeight___R_int(CODENAME_ONE_THREAD_STATE) {
     return cn1Win.height;
 }
 
+#if !defined(CN1_WINDOWS_UWP)
+/* A desktop window has no overscan to keep clear of; only the UWP host (on a
+ * television) reports a safe area. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_safeAreaInsets___int_1ARRAY_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    (void) __cn1Arg1;
+    return JAVA_FALSE;
+}
+#endif
+
 JAVA_LONG com_codename1_impl_windows_WindowsNative_getWindowGraphics___R_long(CODENAME_ONE_THREAD_STATE) {
     return (JAVA_LONG) (intptr_t) cn1Win.windowGraphics;
 }
 
+#if !defined(CN1_WINDOWS_UWP) /* Win32 window; cn1_windows_corewindow.cpp is the UWP host */
 JAVA_VOID com_codename1_impl_windows_WindowsNative_flushGraphics___long_int_int_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3,
         JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
@@ -1277,6 +1315,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_flushGraphics___long_int_int_
      * stopped painting (see runHeadlessLoop). */
     InterlockedIncrement(&cn1Win.flushGen);
 }
+#endif /* !CN1_WINDOWS_UWP */
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
@@ -1297,6 +1336,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_b
     return JAVA_TRUE;
 }
 
+#if !defined(CN1_WINDOWS_UWP) /* Win32 window; cn1_windows_corewindow.cpp is the UWP host */
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pumpMessages___R_boolean(CODENAME_ONE_THREAD_STATE) {
     /* Runs on the app's main thread (the window's owner) after Display.init.
      * Blocks for the next window message, dispatches it plus any already-queued
@@ -1333,6 +1373,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pumpMessages___R_boolean(C
     }
     return JAVA_TRUE;
 }
+#endif /* !CN1_WINDOWS_UWP */
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_runHeadlessLoop__(CODENAME_ONE_THREAD_STATE) {
     /* Headless capture has no window / message loop. The main thread parks here

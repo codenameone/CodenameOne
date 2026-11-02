@@ -23,6 +23,22 @@ function linux_device {
 
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=linux" "-Dcodename1.buildTarget=linux-device" "-U" "-e"
 }
+function linux_local {
+  BOARD_ARGS=()
+  if [ -n "$CN1_BOARD" ]; then BOARD_ARGS=("-Dcn1.board=$CN1_BOARD"); fi
+  "$MVNW" "cn1:buildLinuxLocal" "${BOARD_ARGS[@]}" "-U" "-e"
+}
+function device {
+  DEVICE_ARGS=()
+  if [ -n "$CN1_BOARD" ]; then DEVICE_ARGS+=("-Dcn1.board=$CN1_BOARD"); fi
+  if [ -n "$CN1_DEVICE_HOST" ]; then DEVICE_ARGS+=("-Dcn1.device.host=$CN1_DEVICE_HOST"); fi
+  "$MVNW" "cn1:runOnDevice" "${DEVICE_ARGS[@]}" "-U" "-e"
+}
+function device_logs {
+  DEVICE_ARGS=()
+  if [ -n "$CN1_DEVICE_HOST" ]; then DEVICE_ARGS+=("-Dcn1.device.host=$CN1_DEVICE_HOST"); fi
+  "$MVNW" "cn1:device-logs" "${DEVICE_ARGS[@]}" "-e"
+}
 function javascript {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=local-javascript" "-U" "-e"
@@ -98,6 +114,12 @@ function help {
   "echo" "-e" "    Builds a native Windows app (no JVM)."
   "echo" "-e" "  linux_device"
   "echo" "-e" "    Builds a native Linux app (ELF, no JVM)."
+  "echo" "-e" "  linux_local"
+  "echo" "-e" "    Builds a native Linux app locally. CN1_BOARD=rpi5 cross builds for an embedded board."
+  "echo" "-e" "  device"
+  "echo" "-e" "    Builds locally, deploys to CN1_DEVICE_HOST over SSH and follows the log."
+  "echo" "-e" "  device_logs"
+  "echo" "-e" "    Follows the app's log on CN1_DEVICE_HOST."
   "echo" "-e" "  javascript_cloud"
   "echo" "-e" "    Builds the web app using the build server."
 }

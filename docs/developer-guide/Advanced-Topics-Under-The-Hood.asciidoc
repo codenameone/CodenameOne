@@ -1081,6 +1081,8 @@ include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under
 
 Once the project is generated, add your cross-platform Java sources under `common/src/main/java`, CSS under `common/src/main/css`, and run `mvn install` from the project root to build. The build produces both a Maven artifact for pom-style consumption and a legacy `.cn1lib` file in `common/target` for users still on Ant.
 
+A library can also have a server half. The archetype's `backend` module holds classes for an application's server: its controllers, beans, entities, repositories and migrations are wired into any server that depends on the library, as if that server had compiled them. When the module has sources or resources, the `.cn1lib` carries them as `backend.zip`. See <<backend-libraries>>.
+
 ==== Build hints in cn1libs
 
 Some cn1libs are pretty simple to install - just add them as a Maven dependency in `common/pom.xml`. For example, many of the more elaborate cn1libs need some pretty complex configurations. This is the case when native code is involved where you need to add permissions or plist entries for the various native platforms to get everything to work. This makes the cn1lib's helpful but less than seamless which is where you want to go.
@@ -1159,6 +1161,7 @@ The table below covers the files that can/should be a part of a cn1lib file:
 | nativewin.zip        | &#215;   | Native Windows sources if applicable
 // vale-skip: Microsoft.FirstPerson: "ME" in "Java ME" is the Java Micro Edition platform abbreviation, not a first-person pronoun.
 | nativeme.zip         | &#215;   | Native Java ME sources if applicable
+| backend.zip          | &#215;   | The library's server half, compiled, if it has one. See <<backend-libraries>>
 |====
 
 ****

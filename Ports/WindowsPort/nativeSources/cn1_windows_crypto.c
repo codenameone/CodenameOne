@@ -1313,6 +1313,12 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_generateRsaKeyPair___int_R_
     }
 
     /* Public half: BCrypt handle -> CERT_PUBLIC_KEY_INFO -> X.509 SPKI DER. */
+#if defined(CN1_WINDOWS_UWP)
+    /* crypt32's SPKI export is outside the UWP app partition. Generating an
+     * RSA pair on the Xbox target reports failure rather than half a pair. */
+    cn1CryptoFail("RSA key pair export is not available in a UWP build", 0);
+    goto done;
+#else
     if (!CryptExportPublicKeyInfoFromBCryptKeyHandle(key, X509_ASN_ENCODING, NULL, 0, NULL,
                                                      NULL, &publicInfoLength)) {
         cn1CryptoFailLast("public key export size");
@@ -1330,6 +1336,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_generateRsaKeyPair___int_R_
         cn1CryptoFailLast("public key encode");
         goto done;
     }
+#endif /* CN1_WINDOWS_UWP */
 
     /* Private half: BCrypt blob -> PKCS#1 DER -> PKCS#8 PrivateKeyInfo DER. */
     status = BCryptExportKey(key, NULL, BCRYPT_RSAFULLPRIVATE_BLOB, NULL, 0, &privateBlobLength, 0);
