@@ -393,6 +393,43 @@ A start-up that fails partway runs the destroy methods of the beans already
 built, so a server a supervisor restarts doesn't leak what their constructors
 opened.
 
+[[backend-libraries]]
+=== Controllers and beans from a library
+
+A server's wiring is generated while it builds, from the classes it compiles.
+A library can take part in that wiring: its `@RestController` classes get
+routes, its `@Component` and `@Service` classes become beans, its entities and
+repositories get their data access, and its `db/migration` scripts run, all as
+if the server had compiled them itself. The server's own code can inject the
+library's beans like any other.
+
+A jar opts in by carrying the empty resource
+`META-INF/codenameone/backend-library`. A jar without the marker is an ordinary
+dependency: its classes are on the classpath, but none of them are wired.
+
+A cn1lib carries its server half inside the `.cn1lib` file, as `backend.zip`
+beside the client parts:
+
+* A library made from the Maven cn1lib archetype has a `backend` module. Put
+  the server classes in `backend/src/main/java`; the module already holds the
+  marker. When the module has sources or resources of its own, the `.cn1lib`
+  includes it, and a server
+  that uses the library depends on the `<library>-backend` artifact (or the
+  `backend` classifier of an installed `.cn1lib`):
++
+[source,xml]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-beans.xml[tag=backend-beans-library-dependency,indent=0]
+----
+* A Gradle cn1lib puts the server classes in `src/backend/java` and publishes
+  them as `<library>-backend`, marked.
+* A library with no client side is a plain jar that depends on
+  `codenameone-backend` with `provided` scope and carries the marker.
+
+The library itself is never wired at its own build; only the server that uses
+it generates the routes and beans. When the server defines a class with the
+same name as one in a library, the server's class is used.
+
 === What the build refuses
 
 Everything a container would discover at start-up is checked while the module

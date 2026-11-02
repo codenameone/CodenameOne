@@ -61,6 +61,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     private final org.gradle.api.provider.Provider<Map<String, String>> userProperties;
     private final FileCollection compileClasspath;
     private final List<File> pendingJavaSources = new ArrayList<File>();
+    private boolean backendLibraries;
     private org.gradle.api.provider.Provider<String> sourceEncoding;
 
     /// @param classesDir `compileJava`'s destination
@@ -86,6 +87,13 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     /// The encoding javac reads the sources in (`compileJava.options.encoding`),
     /// in place of the constructor's: the processors read sources back to tell a
     /// live class from a stale output, and must decode them as javac did.
+    /// Merges the backend libraries on the classpath into the classes first,
+    /// so they are wired as this module's own. A server's main Java pass only.
+    public ProcessAnnotationsAction withBackendLibraries() {
+        this.backendLibraries = true;
+        return this;
+    }
+
     public ProcessAnnotationsAction withSourceEncoding(org.gradle.api.provider.Provider<String> encoding) {
         this.sourceEncoding = encoding;
         return this;
@@ -219,6 +227,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
                     .withOwnClassDirectories(pending == null
                             ? java.util.Collections.<File>emptyList()
                             : java.util.Collections.singletonList(pending))
+                    .withBackendLibraries(backendLibraries)
                     .run();
         } catch (BuildExecutionException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());

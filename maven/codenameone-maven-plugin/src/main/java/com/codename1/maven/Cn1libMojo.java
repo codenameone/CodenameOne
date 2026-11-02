@@ -345,8 +345,73 @@ public final class Cn1libMojo extends AbstractCN1Mojo {
 
 
 
-    private void buildCn1lib() throws IOException {
+    /// The server half of the library, `backend.zip`: the compiled classes of
+    /// the sibling `backend` module, which the application's server wires as
+    /// its own (see BackendLibraries). Classes rather than sources, unlike the
+    /// native parts, because a server runs them on the JVM as they are and the
+    /// native backend build translates their bytecode.
+    ///
+    /// The archetype lists `backend` before `common`, so the reactor has built
+    /// it by the time this runs.
+    private void buildBackend() throws IOException, MojoExecutionException {
+        File module = getModuleProject("backend");
+        if (!new File(module, "pom.xml").isFile()) {
+            return;
+        }
+        File source = new File(module, path("src", "main", "java"));
+        File resources = new File(module, path("src", "main", "resources"));
+        if (!hasJava(source) && !hasResources(resources, resources)) {
+            // The archetype generates the module for every library; most have
+            // no server half. One with only resources -- migrations, say -- has.
+            return;
+        }
+        File classes = new File(module, path("target", "classes"));
+        File marker = new File(classes, path("META-INF", "codenameone", "backend-library"));
+        if (!marker.isFile()) {
+            throw new MojoExecutionException("The cn1lib has a backend module, but " + marker
+                    + " is missing. Build the backend module before common, as the cn1lib "
+                    + "archetype's module order does (mvn package from the project root).");
+        }
+        // Packed from target/classes as it stands, like every jar Maven builds:
+        // a class whose source was deleted without a clean ships here too, and
+        // a server would wire it. A release build is a clean build.
+        buildZip("backend", new File[]{classes});
+    }
+
+    /// Whether `dir` holds a resource other than the backend-library marker,
+    /// which the archetype puts in every library.
+    private static boolean hasResources(File root, File dir) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File child : children) {
+            if (child.isDirectory() ? hasResources(root, child)
+                    : !root.toURI().relativize(child.toURI()).getPath()
+                            .equals("META-INF/codenameone/backend-library")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasJava(File dir) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File child : children) {
+            if (child.isDirectory() ? hasJava(child)
+                    : child.getName().endsWith(".java") || child.getName().endsWith(".kt")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void buildCn1lib() throws IOException, MojoExecutionException {
         buildMainZip();
+        buildBackend();
         buildCSS();
         buildAndroid();
         buildIOS();

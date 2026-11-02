@@ -378,6 +378,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         boolean bank = template == Template.BASTION;
         boolean game = template == Template.SKIRMISH;
         boolean video = template == Template.REEL;
+        boolean studio = template == Template.PULSE;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
         String lower = GeneratorModel.toLowerCaseInvariant(name);
@@ -392,12 +393,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
-            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
                     label + "README lists the template's own demo accounts");
-            assertFalse(readme.indexOf(rides || chat || bank || video ? "courier@" : "rider@") >= 0,
+            assertFalse(readme.indexOf(rides || chat || bank || video || studio ? "courier@" : "rider@") >= 0,
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
@@ -418,15 +419,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : video ? "/api/CatalogApi.java" : "/api/OrderApi.java")),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : video ? "/api/CatalogApi.java" : studio ? "/api/BookingApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
-        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : "V1__accounts.sql")),
+        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio ? "V2__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         if (!game) {
             assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
@@ -451,6 +452,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 // from the library.
                 assertContains(settings, "codename1.arg.ios.NSPhotoLibraryUsageDescription=",
                         label + "the template's iOS photo library prompt");
+            } else if (studio) {
+                // The studio asks for no location; it reads workouts from Health
+                // and scans the door pass with the camera.
+                assertContains(settings, "codename1.arg.ios.NSHealthShareUsageDescription=",
+                        label + "the template's iOS Health prompt");
             } else if (!game) {
                 assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
                         label + "the template's iOS location prompt");
@@ -1383,7 +1389,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(sh, "CMD=\"jar\"", label + "build.sh keeps the local default");
             assertTrue(sh.startsWith("#!/bin/bash\n"), label + "build.sh keeps its shebang");
 
-            String bat = getText(entries, "build.bat");
+            String rawBat = getText(entries, "build.bat");
+            // Shipped as CRLF: with LF endings cmd.exe can miss a goto label that
+            // straddles one of its 512-byte reads. Checked once, then folded so the
+            // layout assertions below read lines.
+            assertTrue(rawBat.indexOf("\r\n") > 0 && StringUtil.replaceAll(rawBat, "\r\n", "").indexOf('\n') < 0,
+                    label + "build.bat must use CRLF line endings throughout");
+            String bat = StringUtil.replaceAll(rawBat, "\r\n", "\n");
             assertContains(bat, "set \"CN1_PROJECT_ID=" + id + "\"", label + "build.bat should carry the hashed package");
             assertContains(bat, "set \"CN1_MIN_JAVA=" + min + "\"", label + "build.bat should know the Java level");
             assertContains(bat, GeneratorModel.LAUNCHER_EVENTS_URL, label + "build.bat should report to the events URL");

@@ -622,6 +622,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return hardware;
     }
 
+    private LinuxRealtime realtime;
+
+    @Override
+    public com.codename1.realtime.Realtime getRealtime() {
+        if (realtime == null) {
+            realtime = new LinuxRealtime();
+        }
+        return realtime;
+    }
+
     @Override
     public com.codename1.security.SecureStorage getSecureStorage() {
         if (secureStorage == null) {

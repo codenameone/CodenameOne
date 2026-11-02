@@ -408,6 +408,9 @@ name. The set gets its own history table, so its versions never collide with
 the application's, and it runs before the application's scripts so they can
 refer to its tables.
 
+A library jar marked as a backend library ships its own `db/migration`
+scripts the same way; see <<backend-libraries>>.
+
 [source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/MigrationSnippets.java[tag=backend-migrations-library,indent=0]

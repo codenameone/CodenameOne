@@ -68,6 +68,18 @@
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=linux\" \"-Dcodename1.buildTarget=linux-device\" \"-U\" \"-e\""
   },
   {
+    "alias": "Local > Linux Local Build",
+    "command": "\"cn1:buildLinuxLocal\" \"-Dcn1.board=rpi5\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Device > Run on Device",
+    "command": "\"cn1:runOnDevice\" \"-Dcn1.board=rpi5\" \"-Dcn1.device.host=raspberrypi.local\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Device > Device Logs",
+    "command": "\"cn1:device-logs\" \"-Dcn1.device.host=raspberrypi.local\" \"-e\""
+  },
+  {
     "alias": "Local > Gradle Android Project",
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=android\" \"-Dcodename1.buildTarget=android-source\" \"-U\" \"-e\""
   },

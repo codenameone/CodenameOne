@@ -25,6 +25,7 @@ on:
       - 'scripts/parley/common/src/test/**'
       - 'scripts/reel/common/src/test/**'
       - 'scripts/bastion/common/src/test/**'
+      - 'scripts/pulse/common/src/test/**'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -44,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION, REEL]
+        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION, REEL, PULSE]
         java: ['17']
         # Developers download on current JDKs too: Kotlin 1.6.0 crashed on 25
         # ("IllegalArgumentException: 25") while every 17 leg was green.
