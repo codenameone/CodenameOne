@@ -50,7 +50,8 @@ public final class LongListView extends DartLongList implements MixinView {
     }
 
     @Override
-    public Long set(int index, Long element) {
+    protected Object setElement(int index, Object element$in) {
+        Long element = dart.core.DartLongList.checkedLong(element$in);
         RangeError.checkValidIndex(index, size());
         return src.set(index, element);
     }
@@ -61,13 +62,15 @@ public final class LongListView extends DartLongList implements MixinView {
     }
 
     @Override
-    public boolean add(Long e) {
+    protected boolean addElement(Object e$in) {
+        Long e = dart.core.DartLongList.checkedLong(e$in);
         modCount++;
         return src.add(e);
     }
 
     @Override
-    public void add(int index, Long element) {
+    protected void insertElement(int index, Object element$in) {
+        Long element = dart.core.DartLongList.checkedLong(element$in);
         RangeError.checkValueInInterval(index, 0, size(), "index");
         modCount++;
         src.add(index, element);

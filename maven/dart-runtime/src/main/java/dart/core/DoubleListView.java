@@ -50,7 +50,8 @@ public final class DoubleListView extends DartDoubleList implements MixinView {
     }
 
     @Override
-    public Double set(int index, Double element) {
+    protected Object setElement(int index, Object element$in) {
+        Double element = dart.core.DartDoubleList.checkedDouble(element$in);
         RangeError.checkValidIndex(index, size());
         return src.set(index, element);
     }
@@ -61,13 +62,15 @@ public final class DoubleListView extends DartDoubleList implements MixinView {
     }
 
     @Override
-    public boolean add(Double e) {
+    protected boolean addElement(Object e$in) {
+        Double e = dart.core.DartDoubleList.checkedDouble(e$in);
         modCount++;
         return src.add(e);
     }
 
     @Override
-    public void add(int index, Double element) {
+    protected void insertElement(int index, Object element$in) {
+        Double element = dart.core.DartDoubleList.checkedDouble(element$in);
         RangeError.checkValueInInterval(index, 0, size(), "index");
         modCount++;
         src.add(index, element);

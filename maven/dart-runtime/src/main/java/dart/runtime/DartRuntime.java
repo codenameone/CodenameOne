@@ -859,6 +859,17 @@ public final class DartRuntime {
             if (c == Boolean.class) {
                 return "bool";
             }
+            if (c == dart.core.DartList.class) {
+                return "List";
+            }
+            // The primitive-backed lists are how List<int> and List<double> are held, so
+            // their class stands for that whole type (a type argument's witness).
+            if (c == dart.core.DartLongList.class) {
+                return "List<int>";
+            }
+            if (c == dart.core.DartDoubleList.class) {
+                return "List<double>";
+            }
             return c.getSimpleName();
         }
         return v.toString();

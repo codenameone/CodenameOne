@@ -36,7 +36,57 @@ import java.util.LinkedHashSet;
  * view so a {@code Set} used as an iterable emits the same call shapes as a
  * {@code List}).
  */
-public class DartSet<E> extends LinkedHashSet<E> {
+public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified {
+
+    /// The runtimeType class of a set literal: Dart's VM names it `_Set<E>`, which is
+    /// not `Set<E>` (`<int>{}.runtimeType == Set<int>` is false there too).
+    public static final class _Set {
+        private _Set() {
+        }
+    }
+
+    /// The reified element type, null when nothing recorded it.
+    private dart.runtime.TypeWitness elem;
+
+    /// Records the element witness on {@code set} (null leaves it unknown) and answers it.
+    public static <S> S typed(S set, dart.runtime.TypeWitness elem) {
+        if (elem != null && set instanceof DartSet) {
+            ((DartSet<?>) set).elem = elem;
+        }
+        return set;
+    }
+
+    public dart.runtime.TypeWitness elementWitness() {
+        return elem;
+    }
+
+    @Override
+    public Object $runtimeType() {
+        if (getClass() != DartSet.class) {
+            // A subclass (a LinkedHashSet, an unmodifiable view) is its own Dart type.
+            return getClass();
+        }
+        return dart.runtime.TypeWitness.of(_Set.class, false, elem);
+    }
+
+    /// `value is Set<X>`/`Iterable<X>`: the covariant test on the reified argument, the
+    /// elements when nothing recorded it.
+    public static boolean isSetOf(Object value, dart.runtime.TypeWitness target) {
+        if (!(value instanceof DartSet)) {
+            return false;
+        }
+        DartSet<?> s = (DartSet<?>) value;
+        if (s.elem != null) {
+            return dart.runtime.TypeWitness.isSubtype(s.elem, target);
+        }
+        for (Object e : s) {
+            if (!target.test(e)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     /// Identity, as Dart's own {@code Set} has: {@code [1] == [1]} is false in Dart
     /// unless a type overrides {@code operator ==}. The inherited Java equality is
@@ -162,6 +212,10 @@ public class DartSet<E> extends LinkedHashSet<E> {
     @Override
     public boolean add(E e) {
         checkWritable();
+        if (elem != null && !elem.test(e)) {
+            throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                    + "' is not a subtype of type '" + elem + "' of 'value'");
+        }
         boolean added = storedElement(e) == e && super.add(e);
         if (added) {
             structure++;

@@ -27,7 +27,7 @@ import com.codename1.flutter.Widget;
 // Generated from main.dart -- do not edit.
 public class _DemoPageState extends State<DemoPage> {
 
-    private final DartList<String> _items = dart.core.DartList.typed(DartList.<String>of("Alpha", "Beta", "Gamma"), String.class, false);
+    private final DartList<String> _items = dart.core.DartList.typed(DartList.<String>of("Alpha", "Beta", "Gamma"), dart.runtime.TypeWitness.of(String.class, false));
     public DartList<String> get$_items() {
         return _items;
     }

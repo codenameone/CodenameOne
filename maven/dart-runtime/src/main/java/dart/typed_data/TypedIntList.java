@@ -98,12 +98,14 @@ public abstract class TypedIntList extends dart.core.DartLongList implements Typ
     }
 
     @Override
-    public void add(int index, Long element) {
+    protected void insertElement(int index, Object element$in) {
+        Long element = dart.core.DartLongList.checkedLong(element$in);
         throw new dart.core.UnsupportedError("Cannot add to a fixed-length list");
     }
 
     @Override
-    public boolean add(Long e) {
+    protected boolean addElement(Object e$in) {
+        Long e = dart.core.DartLongList.checkedLong(e$in);
         throw new dart.core.UnsupportedError("Cannot add to a fixed-length list");
     }
 
@@ -161,7 +163,8 @@ public abstract class TypedIntList extends dart.core.DartLongList implements Typ
     }
 
     @Override
-    public Long set(int index, Long element) {
+    protected Object setElement(int index, Object element$in) {
+        Long element = dart.core.DartLongList.checkedLong(element$in);
         int b = byteIndex(index);
         long old = load(b);
         store(b, element);

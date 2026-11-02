@@ -44,7 +44,7 @@ import java.util.RandomAccess;
  * {@link DartLongList}, {@link DartDoubleList}) inherits the whole surface
  * while avoiding boxing on the hot index/add paths.</p>
  */
-public class DartList<E> extends AbstractList<E> implements RandomAccess {
+public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.runtime.Reified {
 
     /// Identity, as Dart's own {@code List} has: {@code [1] == [1]} is false in Dart
     /// unless a type overrides {@code operator ==}. The inherited Java equality is
@@ -249,9 +249,19 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     @Override
     public E set(int index, E element) {
+        return (E) setElement(index, element);
+    }
+
+    /// The store behind {@link #set}, {@link #add(Object)} and {@link #add(int, Object)}:
+    /// the primitive lists override these, taking Object, so a covariant write of the
+    /// wrong type reaches their own check (a TypeError) instead of the ClassCastException
+    /// of a javac bridge method.
+    @SuppressWarnings("unchecked")
+    protected Object setElement(int index, Object element) {
         checkWritable();
+        checkElement(element);
         RangeError.checkValidIndex(index, impl.size());
-        return impl.set(index, element);
+        return impl.set(index, (E) element);
     }
 
     /// The reified element type, where the transpiler knew it when the list was made
@@ -260,18 +270,83 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     /// both false whatever the elements are. Null means unknown -- a list built by
     /// generic code, decoded JSON -- and the test falls back to the elements
     /// ({@link #isListOf}). Two fields per list and no per-element cost.
-    private Class<?> elemClass;
-    /// Whether the witnessed element type is nullable (`List<String?>`).
-    private boolean elemNullable;
+    private dart.runtime.TypeWitness elem;
 
     /// Records the element type {@code type} (nullable when {@code nullable}) on
     /// {@code list} and answers it, so an emitted constructor expression stays an
     /// expression.
     public static <L extends DartList<?>> L typed(L list, Class<?> type, boolean nullable) {
         DartList<?> l = list;
-        l.elemClass = type;
-        l.elemNullable = nullable;
+        l.elem = dart.runtime.TypeWitness.of(type, nullable);
         return list;
+    }
+
+    /// Records the element type's witness on {@code list} (a null witness leaves it
+    /// unknown) and answers the list: `<T>[]` in generic code, `List<Box<int>>` literals.
+    public static <L extends DartList<?>> L typed(L list, dart.runtime.TypeWitness elem) {
+        if (elem != null) {
+            ((DartList<?>) list).elem = elem;
+        }
+        return list;
+    }
+
+    /// The reified element type, or null when nothing recorded it. The primitive lists
+    /// answer their storage type.
+    public dart.runtime.TypeWitness elementWitness() {
+        return elem;
+    }
+
+    /// Dart's runtimeType: `List<int>`, with `dynamic` for an unrecorded argument.
+    @Override
+    public Object $runtimeType() {
+        Class<?> c = getClass();
+        if (c != DartList.class && c != DartLongList.class && c != DartDoubleList.class) {
+            // A typed-data list or any other subclass is its own Dart type (Uint32List),
+            // whose name already fixes the element type.
+            return c;
+        }
+        return dart.runtime.TypeWitness.of(DartList.class, false, elementWitness());
+    }
+
+    /// A covariant write (`List<num> l = <int>[]; l.add(2.5)`) is checked against the
+    /// reified element type, as Dart checks it. One null test when nothing is recorded.
+    final void checkElement(Object e) {
+        dart.runtime.TypeWitness w = elementWitness();
+        if (w != null && !w.test(e)) {
+            throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                    + "' is not a subtype of type '" + w + "' of 'value'");
+        }
+    }
+
+    /// `value is List<X>` (and `Iterable<X>` on a list) for any X with a witness: Dart's
+    /// covariant subtype test on the reified argument. A list whose argument nothing
+    /// recorded is tested by its elements, as {@link #isListOf} does.
+    public static boolean isListOfW(Object value, dart.runtime.TypeWitness target) {
+        if (value instanceof dart.collection.ListMixin) {
+            dart.collection.ListMixin<?> m = (dart.collection.ListMixin<?>) value;
+            long n = m.length();
+            for (long i = 0; i < n; i++) {
+                if (!target.test(m.$index(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (!(value instanceof DartList)) {
+            return false;
+        }
+        DartList<?> l = (DartList<?>) value;
+        dart.runtime.TypeWitness w = l.elementWitness();
+        if (w != null) {
+            return dart.runtime.TypeWitness.isSubtype(w, target);
+        }
+        int n = l.size();
+        for (int i = 0; i < n; i++) {
+            if (!target.test(l.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// `value is List<X>` for an element type X that is a plain class (bool, String,
@@ -299,8 +374,9 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
             return false;
         }
         DartList<?> l = (DartList<?>) value;
-        if (l.elemClass != null) {
-            return type.isAssignableFrom(l.elemClass) && (nullable || !l.elemNullable);
+        dart.runtime.TypeWitness w = l.elementWitness();
+        if (w != null) {
+            return dart.runtime.TypeWitness.isSubtype(w, dart.runtime.TypeWitness.of(type, nullable));
         }
         int n = l.size();
         for (int i = 0; i < n; i++) {
@@ -319,19 +395,31 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     @Override
     public boolean add(E e) {
+        return addElement(e);
+    }
+
+    @SuppressWarnings("unchecked")
+    protected boolean addElement(Object e) {
         checkGrowable("add");
+        checkElement(e);
         // Every structural change moves AbstractList's modCount. The storage is a
         // separate ArrayList, so without this the iterator never saw a change:
         // `for (x in l) l.add(x)` chased the growing size forever where Dart throws.
         modCount++;
-        return impl.add(e);
+        return impl.add((E) e);
     }
 
     @Override
     public void add(int index, E element) {
+        insertElement(index, element);
+    }
+
+    @SuppressWarnings("unchecked")
+    protected void insertElement(int index, Object element) {
         checkGrowable("insert");
+        checkElement(element);
         modCount++;
-        impl.add(index, element);
+        impl.add(index, (E) element);
     }
 
     /**
@@ -1057,7 +1145,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     private <L extends DartList<?>> L copyWitness(L copy) {
-        return elemClass == null ? copy : typed(copy, elemClass, elemNullable);
+        return typed(copy, elementWitness());
     }
 
     /// `value as List<X>` for a plain class X (see {@link #isListOf}); {@code dartType}

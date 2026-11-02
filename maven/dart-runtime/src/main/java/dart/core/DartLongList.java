@@ -23,6 +23,8 @@
  */
 package dart.core;
 
+import dart.runtime.DartRuntime;
+
 import java.util.Arrays;
 
 import dart.runtime.Funcs;
@@ -123,6 +125,10 @@ public class DartLongList extends DartList<Long> {
             return false;
         }
         DartList<?> l = (DartList<?>) value;
+        if (l.elementWitness() != null) {
+            // A boxed list that recorded its type argument answers by it, not its elements.
+            return dart.runtime.TypeWitness.isSubtype(l.elementWitness(), ELEMENT);
+        }
         int n = l.size();
         for (int i = 0; i < n; i++) {
             Object e = l.get(i);
@@ -216,6 +222,25 @@ public class DartLongList extends DartList<Long> {
         return true;
     }
 
+    private static final dart.runtime.TypeWitness ELEMENT = dart.runtime.TypeWitness.of(Long.class, false);
+
+    @Override
+    public dart.runtime.TypeWitness elementWitness() {
+        dart.runtime.TypeWitness w = super.elementWitness();
+        return w != null ? w : ELEMENT;
+    }
+
+    /// The boxed boundary of a covariant write: a List<int> held as a List<num> or
+    /// List<Object> refuses anything that is no int with Dart's TypeError rather than a
+    /// ClassCastException.
+    protected static Long checkedLong(Object e) {
+        if (e instanceof Long) {
+            return (Long) e;
+        }
+        throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                + "' is not a subtype of type 'int' of 'value'");
+    }
+
     // --- storage accessors (boxed boundary for the inherited surface) ---
 
     @Override
@@ -225,7 +250,8 @@ public class DartLongList extends DartList<Long> {
     }
 
     @Override
-    public Long set(int index, Long element) {
+    protected Object setElement(int index, Object element$in) {
+        Long element = checkedLong(element$in);
         checkWritable();
         RangeError.checkValidIndex(index, len);
         long old = a[index];
@@ -250,12 +276,14 @@ public class DartLongList extends DartList<Long> {
     }
 
     @Override
-    public boolean add(Long e) {
+    protected boolean addElement(Object e$in) {
+        Long e = checkedLong(e$in);
         return addLong(e);
     }
 
     @Override
-    public void add(int index, Long element) {
+    protected void insertElement(int index, Object element$in) {
+        Long element = checkedLong(element$in);
         checkGrowable("insert");
         ensure(len + 1);
         System.arraycopy(a, index, a, index + 1, len - index);

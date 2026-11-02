@@ -97,12 +97,14 @@ public abstract class TypedFloatList extends dart.core.DartDoubleList implements
     }
 
     @Override
-    public void add(int index, Double element) {
+    protected void insertElement(int index, Object element$in) {
+        Double element = dart.core.DartDoubleList.checkedDouble(element$in);
         throw new dart.core.UnsupportedError("Cannot add to a fixed-length list");
     }
 
     @Override
-    public boolean add(Double e) {
+    protected boolean addElement(Object e$in) {
+        Double e = dart.core.DartDoubleList.checkedDouble(e$in);
         throw new dart.core.UnsupportedError("Cannot add to a fixed-length list");
     }
 
@@ -160,7 +162,8 @@ public abstract class TypedFloatList extends dart.core.DartDoubleList implements
     }
 
     @Override
-    public Double set(int index, Double element) {
+    protected Object setElement(int index, Object element$in) {
+        Double element = dart.core.DartDoubleList.checkedDouble(element$in);
         int b = byteIndex(index);
         double old = load(b);
         store(b, element);

@@ -34,23 +34,103 @@ import java.util.Map;
  * insertion order, matching LinkedHashMap). Extends LinkedHashMap so it
  * interoperates with Java/CN1 APIs directly.
  */
-public class DartMap<K, V> extends LinkedHashMap<K, V> {
+public class DartMap<K, V> extends LinkedHashMap<K, V> implements dart.runtime.Reified {
+
+    /// The runtimeType class of a map literal: Dart's VM names it `_Map<K, V>`.
+    public static final class _Map {
+        private _Map() {
+        }
+    }
+
 
     /// The reified key and value types where the program wrote them as `dynamic`
     /// (`<String, dynamic>{..}`), as DartList's element witness: Object.class for a
     /// dynamic argument, null for one that is unknown. A Map<String, dynamic> is no
     /// Map<String, int> whatever its values are (DartRuntime.asMapOf reads it).
-    private Class<?> keyWitness;
-    private Class<?> valueWitness;
+    private dart.runtime.TypeWitness keyWitness;
+    private dart.runtime.TypeWitness valueWitness;
 
     /// Records {@code key}/{@code value} witnesses (either may be null) on {@code map}
     /// when it is a DartMap and answers it, so an emitted literal stays an expression.
     public static <M> M typed(M map, Class<?> key, Class<?> value) {
         if (map instanceof DartMap) {
-            ((DartMap<?, ?>) map).keyWitness = key;
-            ((DartMap<?, ?>) map).valueWitness = value;
+            ((DartMap<?, ?>) map).keyWitness = key == null ? null
+                    : dart.runtime.TypeWitness.of(key, key == Object.class);
+            ((DartMap<?, ?>) map).valueWitness = value == null ? null
+                    : dart.runtime.TypeWitness.of(value, value == Object.class);
         }
         return map;
+    }
+
+    /// Records the key and value witnesses (each may be null: unknown) and answers the map.
+    public static <M> M typed(M map, dart.runtime.TypeWitness key, dart.runtime.TypeWitness value) {
+        if (map instanceof DartMap) {
+            DartMap<?, ?> m = (DartMap<?, ?>) map;
+            if (key != null) {
+                m.keyWitness = key;
+            }
+            if (value != null) {
+                m.valueWitness = value;
+            }
+        }
+        return map;
+    }
+
+    @Override
+    public Object $runtimeType() {
+        if (getClass() != DartMap.class) {
+            // A subclass (a LinkedHashMap, an unmodifiable view) is its own Dart type.
+            return getClass();
+        }
+        return dart.runtime.TypeWitness.of(_Map.class, false, keyWitness, valueWitness);
+    }
+
+    /// `value is Map<K, V>`: the covariant test on both reified arguments, the entries
+    /// for an argument nothing recorded. A null target argument is not tested.
+    public static boolean isMapOf(Object value, dart.runtime.TypeWitness key, dart.runtime.TypeWitness val) {
+        if (!(value instanceof java.util.Map)) {
+            return false;
+        }
+        DartMap<?, ?> m = value instanceof DartMap ? (DartMap<?, ?>) value : null;
+        boolean scanKeys = false;
+        boolean scanValues = false;
+        if (key != null) {
+            if (m != null && m.keyWitness != null) {
+                if (!dart.runtime.TypeWitness.isSubtype(m.keyWitness, key)) {
+                    return false;
+                }
+            } else {
+                scanKeys = true;
+            }
+        }
+        if (val != null) {
+            if (m != null && m.valueWitness != null) {
+                if (!dart.runtime.TypeWitness.isSubtype(m.valueWitness, val)) {
+                    return false;
+                }
+            } else {
+                scanValues = true;
+            }
+        }
+        if (scanKeys || scanValues) {
+            for (Map.Entry<?, ?> e : ((java.util.Map<?, ?>) value).entrySet()) {
+                if (scanKeys && !key.test(e.getKey()) || scanValues && !val.test(e.getValue())) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private void checkEntry(Object key, Object value) {
+        if (keyWitness != null && !keyWitness.test(key)) {
+            throw new TypeError("type '" + dart.runtime.DartRuntime.str(dart.runtime.TypeWitness.runtimeType(key))
+                    + "' is not a subtype of type '" + keyWitness + "' of 'key'");
+        }
+        if (valueWitness != null && !valueWitness.test(value)) {
+            throw new TypeError("type '" + dart.runtime.DartRuntime.str(dart.runtime.TypeWitness.runtimeType(value))
+                    + "' is not a subtype of type '" + valueWitness + "' of 'value'");
+        }
     }
 
     /// Whether this map's reified key (or value) type is known to fall outside
@@ -59,8 +139,8 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         if (!(map instanceof DartMap) || type == null) {
             return false;
         }
-        Class<?> w = key ? ((DartMap<?, ?>) map).keyWitness : ((DartMap<?, ?>) map).valueWitness;
-        return w != null && !type.isAssignableFrom(w);
+        dart.runtime.TypeWitness w = key ? ((DartMap<?, ?>) map).keyWitness : ((DartMap<?, ?>) map).valueWitness;
+        return w != null && !type.isAssignableFrom(w.type());
     }
 
     /// Identity, as Dart's own {@code Map} has: {@code [1] == [1]} is false in Dart
@@ -208,6 +288,9 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
     @Override
     @SuppressWarnings("unchecked")
     public V put(K key, V value) {
+        if (keyWitness != null || valueWitness != null) {
+            checkEntry(key, value);
+        }
         Object stored = storedKey(key);
         if (!super.containsKey(stored)) {
             structure++;

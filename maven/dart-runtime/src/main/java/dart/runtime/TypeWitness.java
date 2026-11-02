@@ -188,6 +188,73 @@ public final class TypeWitness {
         return true;
     }
 
+    /// `f is R Function(P0, ..)`: {@code sam} is the Funcs interface of that arity and
+    /// kind. A signed closure's parameters are tested contravariantly (each target
+    /// parameter must be a subtype of the closure's) and its return covariantly; a null
+    /// target witness (dynamic/void return, an unnameable type) is not tested.
+    public static boolean isFunctionOf(Object f, Class<?> sam, TypeWitness ret, TypeWitness... params) {
+        if (!sam.isInstance(f)) {
+            return false;
+        }
+        if (!(f instanceof Signed)) {
+            return true;
+        }
+        TypeWitness[] sig = ((Signed) f).$sig();
+        if (ret != null && sig[0] != null && !isSubtype(sig[0], ret)) {
+            return false;
+        }
+        for (int i = 0; i < params.length && i + 1 < sig.length; i++) {
+            if (params[i] != null && sig[i + 1] != null && !isSubtype(params[i], sig[i + 1])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Collection kinds for {@link #isCollectionOf}.
+    public static final int LIST = 0;
+    public static final int SET = 1;
+    public static final int MAP = 2;
+    public static final int ITERABLE = 3;
+
+    /// `v is List<X>`/`Set<X>`/`Map<K, V>`/`Iterable<X>` with reified arguments: the
+    /// erased class first, then the arguments the collection recorded (its elements where
+    /// it recorded none). A null argument witness is not tested.
+    public static boolean isCollectionOf(Object v, int kind, Class<?> erased, TypeWitness a0, TypeWitness a1) {
+        switch (kind) {
+            case LIST:
+                return a0 == null ? erased.isInstance(v) || v instanceof dart.collection.ListMixin
+                        : dart.core.DartList.isListOfW(v, a0);
+            case SET:
+                if (v instanceof dart.core.DartSet) {
+                    return a0 == null || dart.core.DartSet.isSetOf(v, a0);
+                }
+                return dart.core.SetMixinView.isSet(v);
+            case MAP:
+                return erased.isInstance(v) && (!(v instanceof java.util.Map)
+                        || dart.core.DartMap.isMapOf(v, a0, a1));
+            default:
+                if (a0 != null && (v instanceof dart.core.DartList || v instanceof dart.collection.ListMixin)) {
+                    return dart.core.DartList.isListOfW(v, a0);
+                }
+                if (a0 != null && v instanceof dart.core.DartSet) {
+                    return dart.core.DartSet.isSetOf(v, a0);
+                }
+                return erased.isInstance(v) || v instanceof dart.core.DartList || v instanceof dart.core.DartSet;
+        }
+    }
+
+    /// `v as List<X>` (and the other kinds): {@code v} itself when the test holds, else
+    /// Dart's TypeError naming {@code target}.
+    public static Object checkCast(Object v, int kind, Class<?> erased, TypeWitness a0, TypeWitness a1,
+            boolean nullable, String target) {
+        if (v == null ? nullable : isCollectionOf(v, kind, erased, a0, a1)) {
+            return v;
+        }
+        throw new dart.core.TypeError("type '" + DartRuntime.str(runtimeType(v)) + "' is not a subtype of type '"
+                + target + "' in type cast");
+    }
+
     // ---- Dart Type values -------------------------------------------------------------
     //
     // A Type value of a non-generic type is its Java class, exactly as before. Only a type

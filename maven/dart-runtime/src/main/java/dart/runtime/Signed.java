@@ -1,0 +1,35 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package dart.runtime;
+
+/// A closure that carries its reified Dart signature, for `f is int Function(Object)`.
+/// The transpiler binds such a closure to a generated sub-interface of its Funcs SAM
+/// whose default method answers a constant array, so a closure costs nothing more to
+/// build or call; a closure without it is tested by its arity alone.
+public interface Signed {
+    /// The return type's witness followed by each positional parameter's; an entry may be
+    /// null where the type could not be named (a type variable), and is then not tested.
+    TypeWitness[] $sig();
+}

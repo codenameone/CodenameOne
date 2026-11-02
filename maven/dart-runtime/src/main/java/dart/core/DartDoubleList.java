@@ -23,6 +23,8 @@
  */
 package dart.core;
 
+import dart.runtime.DartRuntime;
+
 import java.util.Arrays;
 
 import dart.runtime.Funcs;
@@ -131,6 +133,10 @@ public class DartDoubleList extends DartList<Double> {
             return false;
         }
         DartList<?> l = (DartList<?>) value;
+        if (l.elementWitness() != null) {
+            // A boxed list that recorded its type argument answers by it, not its elements.
+            return dart.runtime.TypeWitness.isSubtype(l.elementWitness(), ELEMENT);
+        }
         int n = l.size();
         for (int i = 0; i < n; i++) {
             Object e = l.get(i);
@@ -222,6 +228,25 @@ public class DartDoubleList extends DartList<Double> {
         return true;
     }
 
+    private static final dart.runtime.TypeWitness ELEMENT = dart.runtime.TypeWitness.of(Double.class, false);
+
+    @Override
+    public dart.runtime.TypeWitness elementWitness() {
+        dart.runtime.TypeWitness w = super.elementWitness();
+        return w != null ? w : ELEMENT;
+    }
+
+    /// The boxed boundary of a covariant write: a List<double> held as a List<num> or
+    /// List<Object> refuses anything that is no double with Dart's TypeError rather than a
+    /// ClassCastException.
+    protected static Double checkedDouble(Object e) {
+        if (e instanceof Double) {
+            return (Double) e;
+        }
+        throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                + "' is not a subtype of type 'double' of 'value'");
+    }
+
     // --- storage accessors (boxed boundary for the inherited surface) ---
 
     @Override
@@ -231,7 +256,8 @@ public class DartDoubleList extends DartList<Double> {
     }
 
     @Override
-    public Double set(int index, Double element) {
+    protected Object setElement(int index, Object element$in) {
+        Double element = checkedDouble(element$in);
         checkWritable();
         RangeError.checkValidIndex(index, len);
         double old = a[index];
@@ -256,12 +282,14 @@ public class DartDoubleList extends DartList<Double> {
     }
 
     @Override
-    public boolean add(Double e) {
+    protected boolean addElement(Object e$in) {
+        Double e = checkedDouble(e$in);
         return addDouble(e);
     }
 
     @Override
-    public void add(int index, Double element) {
+    protected void insertElement(int index, Object element$in) {
+        Double element = checkedDouble(element$in);
         checkGrowable("insert");
         ensure(len + 1);
         System.arraycopy(a, index, a, index + 1, len - index);

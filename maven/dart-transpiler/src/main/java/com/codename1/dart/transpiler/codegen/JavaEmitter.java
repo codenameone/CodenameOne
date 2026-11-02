@@ -164,7 +164,10 @@ public final class JavaEmitter {
 
     public List<GeneratedFile> emit() {
         pinMemberTypesToOwnLibraries();
-        List<GeneratedFile> pruned = pruneDynamicCases(emitAll());
+        List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
+        if (!closureSignatures.isEmpty()) {
+            pruned.add(closureSignatureFile());
+        }
         // After the pruning, which drops lines: the table pairs final Java lines.
         List<GeneratedFile> mapped = new ArrayList<GeneratedFile>(pruned.size());
         for (GeneratedFile g : pruned) {
@@ -2474,7 +2477,7 @@ public final class JavaEmitter {
             "dart.collection.ListMixin", "dart.collection.MapMixin", "dart.collection.SetMixin",
             "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase",
             "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.MixinView",
-            "dart.runtime.DynamicObject", "dart.runtime.Reified", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
+            "dart.runtime.DynamicObject", "dart.runtime.Reified", "dart.runtime.Signed", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
 
     /** The fully qualified dart-runtime class a rendered Java type name refers to, or null. */
     private static String runtimeFqcn(String javaRaw, Ctx ctx) {
@@ -5583,8 +5586,12 @@ public final class JavaEmitter {
             paramDecls.append(", dart.runtime.TypeWitness $tw$").append(tw);
             paramNames.append(", $tw$").append(tw);
         }
-        for (String tw : m.witnesses) {
-            sb.append("dart.runtime.TypeWitness $tw$").append(tw).append(m.params.isEmpty() ? "" : ", ");
+        for (int twi = 0; twi < m.witnesses.size(); twi++) {
+            String tw = m.witnesses.get(twi);
+            // Each witness is followed by a separator unless it is the last declaration:
+            // `<K, V>` with no value parameters takes two witnesses and nothing after them.
+            sb.append("dart.runtime.TypeWitness $tw$").append(tw)
+                    .append(m.params.isEmpty() && twi == m.witnesses.size() - 1 ? "" : ", ");
             paramDecls.append(", dart.runtime.TypeWitness $tw$").append(tw);
             paramNames.append(", $tw$").append(tw);
         }
@@ -6123,6 +6130,11 @@ public final class JavaEmitter {
             TypeRef asyncFn = (declared == null || declared.is("var")) && v.initializer instanceof Lambda
                     ? asyncClosureType((Lambda) v.initializer, v.name, ctx) : null;
             if (v.initializer != null) {
+                // `var f = (int x) => x` / `Object g = (Object o) => ..`: no function type
+                // is imposed, so the local holds the closure by its own SAM and it can be
+                // signed (signClosure).
+                signableClosure = v.initializer instanceof Lambda && (declared == null || declared.is("var")
+                        || isDynamicType(declared) || declared.is("Function")) ? v.initializer : null;
                 tearOffKeepAll = (declared == null || declared.is("var")) && v.initializer instanceof Ident;
                 // In Java a local is in scope in its own initializer, so a closure parameter
                 // of the same name (`var sink = make((data, sink) => ...)`) is a duplicate
@@ -8046,7 +8058,7 @@ public final class JavaEmitter {
                 Out o = emitSetLit(sl, expected, ctx);
                 return sl.isConst ? constCollection(o, ctx) : o;
             }
-            Out o = emitMapLit(ml, expected, ctx);
+            Out o = withMapWitness(emitMapLit(ml, expected, ctx), ctx);
             boolean dynK = ml.keyType != null && isDynamicType(ml.keyType);
             boolean dynV = ml.valueType != null && isDynamicType(ml.valueType);
             if ((dynK || dynV) && !ml.isConst) {
@@ -8072,7 +8084,7 @@ public final class JavaEmitter {
             return ml.isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof SetLit) {
-            Out o = emitSetLit((SetLit) e, expected, ctx);
+            Out o = withSetWitness(emitSetLit((SetLit) e, expected, ctx), ctx);
             return ((SetLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof Ident) {
@@ -8264,7 +8276,8 @@ public final class JavaEmitter {
                 // routed to the primitive Dart*List when E is a non-nullable int/double.
                 if (cc.type.name.equals("List")
                         && (cc.ctorName.equals("generate") || cc.ctorName.equals("filled")
-                            || cc.ctorName.equals("from") || cc.ctorName.equals("unmodifiable"))) {
+                            || cc.ctorName.equals("from") || cc.ctorName.equals("unmodifiable")
+                            || cc.ctorName.equals("empty"))) {
                     return withListWitness(emitListFactory(cc, expected, ctx), ctx);
                 }
                 // Map/Set/Iterable named factory constructors -- dart:core intrinsics
@@ -8748,7 +8761,13 @@ public final class JavaEmitter {
                 // and the promoted reads view it (viewLongs) rather than cast it.
                 String erased = erasedJavaType(t.type, ctx);
                 String pk = t.type.is("List") ? primitiveListKind(t.type) : null;
-                if (pk != null) {
+                String coll = pk == null ? collectionTest(subject, t.type, erased, ctx) : null;
+                String fn = pk == null && coll == null ? functionTest(subject, t.type, erased, ctx) : null;
+                if (coll != null) {
+                    check = coll;
+                } else if (fn != null) {
+                    check = fn;
+                } else if (pk != null) {
                     check = "dart.core.Dart" + pk + "List.is" + pk + "s(" + subject + ")";
                 } else if (isCoreSet(t.type)) {
                     // A program SetBase/SetMixin class is a Set in Dart, though its Java class
@@ -8812,14 +8831,327 @@ public final class JavaEmitter {
         if (t == null || !t.is("List") || t.args.size() != 1 || primitiveListKind(t) != null) {
             return o;
         }
-        TypeRef el = t.arg(0);
-        if (el == null || el.name == null || el.funcReturn != null || el.funcParams != null
-                || !el.args.isEmpty() || !(el.is("String") || el.is("bool") || el.is("num")
-                    || el.is("Object") || el.is("int") || el.is("double"))) {
+        String w = reifiedArgWitness(t.arg(0), ctx);
+        if (w == null) {
             return o;
         }
-        return new Out("dart.core.DartList.typed(" + o.code + ", " + erasedJavaType(copyNonNull(el), ctx)
-                + ".class, " + el.nullable + ")", t, o.fromError);
+        return new Out("dart.core.DartList.typed(" + o.code + ", " + w + ")", t, o.fromError);
+    }
+
+    /// A set literal's element witness (DartSet.typed), as withListWitness records a list's.
+    private Out withSetWitness(Out o, Ctx ctx) {
+        TypeRef t = o.type;
+        String w = t == null || !t.is("Set") || t.args.size() != 1 ? null : reifiedArgWitness(t.arg(0), ctx);
+        return w == null ? o : new Out("dart.core.DartSet.typed(" + o.code + ", " + w + ")", t, o.fromError);
+    }
+
+    /// A map literal's key and value witnesses (DartMap.typed).
+    private Out withMapWitness(Out o, Ctx ctx) {
+        TypeRef t = o.type;
+        if (t == null || !t.is("Map") || t.args.size() != 2 || isPrimitiveLongMap(t)) {
+            // A DartLongMap is no DartMap: its class is Map<int, int>, nothing to record.
+            return o;
+        }
+        String k = reifiedArgWitness(t.arg(0), ctx);
+        String v = reifiedArgWitness(t.arg(1), ctx);
+        if (k == null && v == null) {
+            return o;
+        }
+        return new Out("dart.core.DartMap.typed(" + o.code + ", " + nullWitness(k) + ", " + nullWitness(v) + ")",
+                t, o.fromError);
+    }
+
+    /// A type argument a collection cannot record: `dynamic`, an untyped `var` or FutureOr.
+    /// Unlike isDynamicType, `Object` is a real argument (`List<Object>.filled` is no
+    /// List<bool>).
+    private static boolean isUnrecordedArg(TypeRef t) {
+        return t == null || t.is("var") || t.is("dynamic") || t.is("FutureOr");
+    }
+
+    private static String nullWitness(String w) {
+        return w == null ? "(dart.runtime.TypeWitness) null" : w;
+    }
+
+    /// The witness a runtime collection records for one type argument, or null where the
+    /// argument is unknown here. Only types whose Java class is exactly their runtime
+    /// representation are named: the core scalars, the collections (by their Java
+    /// interface, with their own arguments), program classes that are not seen through a
+    /// collection-mixin view, and type variables that have a witness in scope. A function
+    /// type, an inferred `dynamic` and every other runtime type stay unknown, which the
+    /// tests read as Dart's answer for an unrecorded argument would be erased: true.
+    private String reifiedArgWitness(TypeRef el, Ctx ctx) {
+        if (el == null || el.name == null || el.funcReturn != null || el.funcParams != null
+                || isUnrecordedArg(el)) {
+            return null;
+        }
+        if (el.args.isEmpty() && isTypeVariable(el, ctx)) {
+            String w = witnessFor(el.name, ctx);
+            return w == null ? null : el.nullable ? "dart.runtime.TypeWitness.nullable(" + w + ")" : w;
+        }
+        if (el.is("List") || el.is("Set") || el.is("Map") || el.is("Iterable")) {
+            String cls = el.is("List") ? "java.util.List" : el.is("Set") ? "java.util.Set"
+                    : el.is("Map") ? "java.util.Map" : "java.lang.Iterable";
+            StringBuilder sb = new StringBuilder("dart.runtime.TypeWitness.of(" + cls + ".class, " + el.nullable);
+            boolean any = false;
+            for (TypeRef a : el.args) {
+                String aw = isUnrecordedArg(a) ? null : reifiedArgWitness(a, ctx);
+                any |= aw != null;
+                sb.append(", ").append(nullWitness(aw));
+            }
+            return any ? sb.append(")").toString()
+                    : "dart.runtime.TypeWitness.of(" + cls + ".class, " + el.nullable + ")";
+        }
+        boolean scalar = el.is("int") || el.is("double") || el.is("num") || el.is("String") || el.is("bool")
+                || el.is("Object");
+        boolean programClass = !scalar && program.classes.containsKey(el.name)
+                && appliedCollectionMixin(el.name) == null;
+        if (!scalar && !programClass) {
+            return null;
+        }
+        if (programClass && el.args.isEmpty()) {
+            return witnessOf(el, ctx);
+        }
+        return "dart.runtime.TypeWitness.of(" + erasedJavaType(copyNonNull(el), ctx) + ".class, " + el.nullable + ")";
+    }
+
+    /// A target type argument of an is/as test or a function signature: `dynamic` (and
+    /// Object?) is the top witness, which a function parameter test must still compare.
+    private String targetArgWitness(TypeRef a, Ctx ctx) {
+        if (a != null && (isDynamicType(a) || a.is("Object") && a.nullable)) {
+            return "dart.runtime.TypeWitness.of(Object.class, true)";
+        }
+        return reifiedArgWitness(a, ctx);
+    }
+
+    /// `x is List<X>`/`Set<X>`/`Map<K, V>`/`Iterable<X>` read through the arguments the
+    /// collection recorded (TypeWitness.isCollectionOf); null when no argument is testable,
+    /// which keeps the erased test.
+    private String collectionTest(String subject, TypeRef t, String erased, Ctx ctx) {
+        String[] w = collectionTestArgs(t, ctx);
+        if (w == null) {
+            return null;
+        }
+        return "dart.runtime.TypeWitness.isCollectionOf(" + subject + ", " + w[0] + ", " + erased + ".class, "
+                + w[1] + ", " + w[2] + ")";
+    }
+
+    private String[] collectionTestArgs(TypeRef t, Ctx ctx) {
+        if (t == null || t.args.isEmpty()) {
+            return null;
+        }
+        String kind = t.is("List") && t.args.size() == 1 ? "dart.runtime.TypeWitness.LIST"
+                : t.is("Set") && t.args.size() == 1 ? "dart.runtime.TypeWitness.SET"
+                : t.is("Map") && t.args.size() == 2 ? "dart.runtime.TypeWitness.MAP"
+                : t.is("Iterable") && t.args.size() == 1 ? "dart.runtime.TypeWitness.ITERABLE" : null;
+        if (kind == null) {
+            return null;
+        }
+        String a0 = isDynamicType(t.arg(0)) ? null : reifiedArgWitness(t.arg(0), ctx);
+        String a1 = t.args.size() < 2 || isDynamicType(t.arg(1)) ? null : reifiedArgWitness(t.arg(1), ctx);
+        if (a0 == null && a1 == null) {
+            return null;
+        }
+        return new String[] {kind, nullWitness(a0), nullWitness(a1)};
+    }
+
+    /// `f is R Function(P..)`: the closure's reified signature (TypeWitness.isFunctionOf);
+    /// null when nothing in the signature is testable, which keeps the erased arity test.
+    private String functionTest(String subject, TypeRef t, String erased, Ctx ctx) {
+        if (t.funcReturn == null || t.funcParams == null || (t.funcNamed != null && !t.funcNamed.isEmpty())
+                || !(erased.startsWith("dart.runtime.Funcs.") || erased.startsWith("Funcs."))) {
+            return null;
+        }
+        String ret = t.funcReturn.is("void") || isDynamicType(t.funcReturn) ? null
+                : reifiedArgWitness(t.funcReturn, ctx);
+        StringBuilder sb = new StringBuilder();
+        boolean any = ret != null;
+        for (TypeRef p : t.funcParams) {
+            String w = targetArgWitness(p, ctx);
+            any |= w != null;
+            sb.append(", ").append(nullWitness(w));
+        }
+        if (!any) {
+            return null;
+        }
+        return "dart.runtime.TypeWitness.isFunctionOf(" + subject + ", " + erased + ".class, " + nullWitness(ret)
+                + sb + ")";
+    }
+
+    /// The local initializer signClosure may sign, set by the declaration that emits it.
+    private Expr signableClosure;
+    /// Whether some is/as in the program tests a function type: only then do closures carry
+    /// their signatures (signClosure).
+    private boolean functionTypeTested;
+    /// The generated signed SAM interfaces, by signature key, in creation order.
+    private final java.util.LinkedHashMap<String, String[]> closureSignatures =
+            new java.util.LinkedHashMap<String, String[]>();
+
+    /// Binds a closure to a generated sub-interface of its SAM that answers its reified
+    /// signature (dart.runtime.Signed), when the program tests a function type. The
+    /// closure's parameter and return types are Dart's: declared ones, else the context's
+    /// (downward inference), else the arrow body's type. Entries that cannot be named
+    /// statically (a type variable) stay null and untested.
+    private String signClosure(String code, Lambda l, TypeRef expected, TypeRef bodyType, Ctx ctx) {
+        reifiedClassNames();
+        if (!functionTypeTested) {
+            return code;
+        }
+        boolean ownSite = signableClosure == l;
+        if (ownSite) {
+            signableClosure = null;
+        }
+        if (!ownSite || expected != null && !ownTyped(l, expected)) {
+            // A closure in a typed context is held as the SAM its consumer chooses -- the
+            // parameter's, or the void/value one pinnedHandler casts it to after this
+            // returns -- and that choice is made outside this method. A signed sub-interface
+            // picked here from a context type can name another SAM or other type arguments
+            // than the consumer's (VoidFunc1<T> vs Func1<Object, Object>), which javac
+            // rejects. So only a closure whose SAM follows from its own declared type is
+            // signed: the initializer of a local that imposes no function type (the only
+            // site whose Java type follows the closure's own), with no context or one that
+            // is exactly its declared parameters (`Object g = (Object o) => ..`). Even an
+            // own-typed context elsewhere is cast by its consumer to its erased SAM
+            // (VoidFunc2<Object, Object> for an onError slot). A
+            // contextual closure keeps the arity test, which is Dart's answer whenever the
+            // tested type is the context's own.
+            return code;
+        }
+        if (expected == null) {
+            // `var f = (int x) => x`: the closure's own type, from its declared parameters.
+            expected = new TypeRef("Function");
+            expected.funcParams = new ArrayList<TypeRef>();
+            for (Param p : l.params) {
+                if (p.type == null || p.type.is("var")) {
+                    return code;
+                }
+                expected.funcParams.add(p.type);
+            }
+            expected.funcReturn = l.exprBody != null && bodyType != null ? bodyType : TypeRef.DYNAMIC;
+        }
+        if (expected.funcParams == null || expected.funcParams.size() != l.params.size()) {
+            return code;
+        }
+        if (isDynamicType(expected.funcReturn)) {
+            // No return type to hold it by: the SAM is the void or the value one by the body,
+            // the choice pinnedHandler makes when it casts the closure, and a value SAM keeps
+            // the dynamic return it casts to. The signature still records the body's type.
+            boolean value = l.exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(l);
+            if (!value) {
+                TypeRef own = new TypeRef("Function");
+                own.funcParams = expected.funcParams;
+                own.funcReturn = new TypeRef("void");
+                expected = own;
+            }
+        }
+        for (Param p : l.params) {
+            if (p.named || p.optional) {
+                return code;
+            }
+        }
+        String jt = javaType(expected, false, ctx);
+        if (!(jt.startsWith("dart.runtime.Funcs.") || jt.startsWith("Funcs.")) || jt.indexOf('?') >= 0) {
+            return code;
+        }
+        int lt = jt.indexOf('<');
+        String head = lt < 0 ? jt : jt.substring(0, lt);
+        if (head.startsWith("Funcs.")) {
+            head = "dart.runtime." + head;
+        }
+        List<String> targs = new ArrayList<String>();
+        if (lt >= 0) {
+            int depth = 0;
+            int start = lt + 1;
+            for (int i = lt + 1; i < jt.length() - 1; i++) {
+                char ch = jt.charAt(i);
+                if (ch == '<') {
+                    depth++;
+                } else if (ch == '>') {
+                    depth--;
+                } else if (ch == ',' && depth == 0) {
+                    targs.add(jt.substring(start, i).trim());
+                    start = i + 1;
+                }
+            }
+            targs.add(jt.substring(start, jt.length() - 1).trim());
+        }
+        TypeRef ret = expected.funcReturn != null && !isDynamicType(expected.funcReturn) ? expected.funcReturn
+                : l.exprBody != null ? bodyType : null;
+        StringBuilder sig = new StringBuilder();
+        sig.append(staticWitness(ret == null || ret.is("void") ? null : reifiedArgWitness(ret, ctx)));
+        boolean any = false;
+        for (int i = 0; i < l.params.size(); i++) {
+            TypeRef pt = l.params.get(i).type;
+            if (pt == null || pt.is("var")) {
+                pt = expected.funcParams.get(i);
+            }
+            String w = staticWitness(targetArgWitness(pt, ctx));
+            any |= !"null".equals(w);
+            sig.append(", ").append(w);
+        }
+        if (!any && sig.toString().startsWith("null")) {
+            return code;
+        }
+        String key = head + "|" + targs.size() + "|" + sig;
+        String[] entry = closureSignatures.get(key);
+        if (entry == null) {
+            entry = new String[] {"S" + closureSignatures.size(), head, String.valueOf(targs.size()), sig.toString()};
+            closureSignatures.put(key, entry);
+        }
+        StringBuilder call = new StringBuilder(pkg + ".DartFnSigs.");
+        if (!targs.isEmpty()) {
+            call.append('<').append(String.join(", ", targs)).append('>');
+        }
+        return call.append("s").append(entry[0].substring(1)).append("(").append(code).append(")").toString();
+    }
+
+    /// Whether a closure's context is its own declared type: every parameter declared,
+    /// positional, and the same type the context names, with no return imposed.
+    private boolean ownTyped(Lambda l, TypeRef expected) {
+        if (expected.funcParams == null || expected.funcParams.size() != l.params.size()
+                || (expected.funcReturn != null && !isDynamicType(expected.funcReturn))) {
+            return false;
+        }
+        for (int i = 0; i < l.params.size(); i++) {
+            Param p = l.params.get(i);
+            if (p.named || p.optional || p.type == null || p.type.is("var")
+                    || !p.type.toString().equals(String.valueOf(expected.funcParams.get(i)))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A witness expression a static initializer can evaluate, or "null".
+    private static String staticWitness(String w) {
+        return w == null || w.contains("$tw$") || w.contains("this.") ? "null" : w;
+    }
+
+    /// The holder of every signed SAM interface signClosure used.
+    private GeneratedFile closureSignatureFile() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("package ").append(pkg).append(";\n\n");
+        sb.append("import dart.core.*;\n\n");
+        sb.append("/** Closure SAMs carrying their reified Dart signatures (dart.runtime.Signed). */\n");
+        sb.append("public final class DartFnSigs {\n    private DartFnSigs() {\n    }\n");
+        for (String[] e : closureSignatures.values()) {
+            int n = Integer.parseInt(e[2]);
+            StringBuilder tp = new StringBuilder();
+            for (int i = 0; i < n; i++) {
+                tp.append(i == 0 ? "<" : ", ").append("T").append(i);
+            }
+            if (n > 0) {
+                tp.append('>');
+            }
+            sb.append("\n    public interface ").append(e[0]).append(tp).append(" extends ").append(e[1]).append(tp)
+                    .append(", dart.runtime.Signed {\n        dart.runtime.TypeWitness[] SIG = {").append(e[3])
+                    .append("};\n\n        @Override\n        default dart.runtime.TypeWitness[] $sig() {\n")
+                    .append("            return SIG;\n        }\n    }\n");
+            sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(e[0]).append(tp).append(" s")
+                    .append(e[0].substring(1)).append("(").append(e[0]).append(tp).append(" f) {\n")
+                    .append("        return f;\n    }\n");
+        }
+        sb.append("}\n");
+        return new GeneratedFile("DartFnSigs.java", sb.toString());
     }
 
     /// The class literal a runtime collection check tests one type argument against, or
@@ -9054,8 +9386,10 @@ public final class JavaEmitter {
         }
         if (o instanceof IsTest) {
             noteReifiedType(((IsTest) o).type);
+            functionTypeTested |= ((IsTest) o).type != null && ((IsTest) o).type.funcReturn != null;
         } else if (o instanceof AsCast) {
             noteReifiedType(((AsCast) o).type);
+            functionTypeTested |= ((AsCast) o).type != null && ((AsCast) o).type.funcReturn != null;
         } else if (o instanceof CatchClause) {
             noteReifiedType(((CatchClause) o).onType);
         } else if (o instanceof Call && "whereType".equals(((Call) o).name) && ((Call) o).typeArgs.size() == 1) {
@@ -9103,6 +9437,20 @@ public final class JavaEmitter {
                 used.add(a.name);
             }
             noteReifiedTypeVars(a, tps, used);
+        }
+    }
+
+    /// The type variables a collection's type argument names, itself or nested
+    /// (`<T>[]`, `<List<T>>[]`): the collection records their witnesses.
+    private static void noteCollectionTypeVars(TypeRef t, java.util.Set<String> tps, java.util.Set<String> used) {
+        if (t == null) {
+            return;
+        }
+        if (t.args.isEmpty() && t.funcParams == null && tps.contains(t.name)) {
+            used.add(t.name);
+        }
+        for (TypeRef a : t.args) {
+            noteCollectionTypeVars(a, tps, used);
         }
     }
 
@@ -9528,6 +9876,26 @@ public final class JavaEmitter {
                 }
             }
         }
+        // `<T>[]`, `<K, V>{}`, `List<T>.empty()`: the collection records T's witness, so a
+        // later `is List<String>` answers by the caller's argument. A soft use: a caller
+        // that cannot name T (`parseList(scanner, () => ..)`, T inferred from a closure)
+        // passes an unknown witness and the collection's argument stays unrecorded, as
+        // one built by unwitnessed generic code is.
+        java.util.Set<String> collUses = softUses != null ? softUses : discardedUses;
+        if (o instanceof ListLit) {
+            noteCollectionTypeVars(((ListLit) o).elementType, tps, collUses);
+        } else if (o instanceof SetLit) {
+            noteCollectionTypeVars(((SetLit) o).elementType, tps, collUses);
+        } else if (o instanceof MapLit) {
+            noteCollectionTypeVars(((MapLit) o).keyType, tps, collUses);
+            noteCollectionTypeVars(((MapLit) o).valueType, tps, collUses);
+        } else if (o instanceof CtorCall && ((CtorCall) o).type != null
+                && (((CtorCall) o).type.is("List") || ((CtorCall) o).type.is("Set")
+                    || ((CtorCall) o).type.is("Map"))) {
+            for (TypeRef a : ((CtorCall) o).type.args) {
+                noteCollectionTypeVars(a, tps, collUses);
+            }
+        }
         if (o instanceof IsTest) {
             TypeRef t = ((IsTest) o).type;
             if (t != null && t.args.isEmpty() && tps.contains(t.name)) {
@@ -9584,6 +9952,8 @@ public final class JavaEmitter {
             new java.util.IdentityHashMap<Object, java.util.Set<String>>();
     /// Where scanTypeValueUses records witness uses needed only for runtimeType.
     private java.util.Set<String> softUses;
+    /// Where a scan that tracks no soft uses (a class's) drops them.
+    private final java.util.Set<String> discardedUses = new HashSet<String>();
     /** Counts calls to a witnessed generic that write no type arguments (see the scan). */
     private int implicitWitnessCalls;
     /** The same, for callees whose witnesses only runtimeType reads. */
@@ -10529,6 +10899,14 @@ public final class JavaEmitter {
             // `as List<String>`: the same witnessed test as `is` (DartList.isListOf).
             String acall = "dart.core.DartList.asListOf(" + operand + ", " + erasedJavaType(copyNonNull(asEl), ctx)
                     + ".class, " + asEl.nullable + ", " + target.nullable + ", " + quote(target.toString()) + ")";
+            return new Out("((" + jt + ") " + acall + ")", c.type);
+        }
+        String[] collArgs = primitiveListKind(target) == null ? collectionTestArgs(target, ctx) : null;
+        if (collArgs != null) {
+            // `as Map<String, String>`: the arguments the collection recorded, as `is` reads them.
+            String acall = "dart.runtime.TypeWitness.checkCast(" + operand + ", " + collArgs[0] + ", " + erased
+                    + ".class, " + collArgs[1] + ", " + collArgs[2] + ", " + target.nullable + ", "
+                    + quote(target.toString()) + ")";
             return new Out("((" + jt + ") " + acall + ")", c.type);
         }
         String reified = reifiedIsCheck("$ra", target.nullable, target, ctx);
@@ -16690,7 +17068,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // Last, so a lambda nested in this one cannot overwrite what this one yields.
         lastLambdaExprType = exprType;
         lastLambdaReturns = returns;
-        return new Out(code, new TypeRef("Function"));
+        return new Out(signClosure(code, l, expected, exprType, ctx), new TypeRef("Function"));
     }
 
     /**
@@ -19260,6 +19638,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (na.name.equals("growable")) {
                 growable = emitExpr(na.value, TypeRef.BOOL, ctx).code;
             }
+        }
+        if (cc.ctorName.equals("empty")) {
+            // `List<E>.empty({bool growable = false})`: fixed-length unless asked otherwise.
+            String g = growable != null ? growable : "false";
+            return new Out(cls + witness + "filled(0L, " + (pk == null ? "null" : "Long".equals(pk) ? "0L" : "0.0")
+                    + ", " + g + ")", listType);
         }
         if (cc.ctorName.equals("unmodifiable")) {
             // A read-only copy; unresolved before, so any use failed the build.
@@ -23626,6 +24010,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (valueOfOwnTypeParam) {
             // `SimplePipe<int>('x', [1, 2])`: the literal is a List<int>, not a List<T>.
             return substituteTypeParams(t, ctx.ctorTypeSubst);
+        }
+        if (t.args.isEmpty() && t.funcParams == null && owner.typeParams.contains(t.name)) {
+            // `Box<List<int>>([])`: a parameter typed by the bare T takes its context from the
+            // written argument, so the literal is a List<int> (a DartLongList) as Dart infers
+            // it downwards. Only a collection is retyped: its literal's Java class depends on
+            // the context, where any other value is held as T's erasure either way.
+            TypeRef bound = substituteTypeParams(t, ctx.ctorTypeSubst);
+            if (bound != null && (bound.is("List") || bound.is("Set") || bound.is("Map"))) {
+                return bound;
+            }
         }
         // Only a callback is retyped: a value argument keeps its declared (erased) type.
         if (t.funcParams != null) {
