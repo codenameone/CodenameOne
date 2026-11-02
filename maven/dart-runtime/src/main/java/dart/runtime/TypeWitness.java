@@ -56,6 +56,7 @@ public final class TypeWitness {
 
     /// Dart's function subtyping for a function-type witness ({@link #function}), or null.
     private Tester tester;
+    private TypeWitness[] fnSig;
 
     private TypeWitness(Class<?> type, boolean nullable, TypeWitness[] args) {
         this.type = type;
@@ -75,6 +76,17 @@ public final class TypeWitness {
     public static TypeWitness function(Class<?> sam, boolean nullable, Tester tester) {
         TypeWitness w = new TypeWitness(sam, nullable, null);
         w.tester = tester;
+        return w;
+    }
+
+    /// {@link #function(Class, boolean, Tester)} that also carries the function type's
+    /// signature, {@code sig}: its return witness first, then one per positional parameter
+    /// (null where it is untested). Two such witnesses compare by Dart's function
+    /// subtyping in {@link #isSubtype}, so a `List<int Function(int)>` is not a
+    /// `List<int Function(num)>`.
+    public static TypeWitness function(Class<?> sam, boolean nullable, Tester tester, TypeWitness[] sig) {
+        TypeWitness w = function(sam, nullable, tester);
+        w.fnSig = sig;
         return w;
     }
 
@@ -172,7 +184,7 @@ public final class TypeWitness {
             return w;
         }
         if (w.tester != null) {
-            return function(w.type, true, w.tester);
+            return function(w.type, true, w.tester, w.fnSig);
         }
         if (w.args == null) {
             return of(w.type, true);
@@ -231,6 +243,17 @@ public final class TypeWitness {
         }
         if (!target.type.isAssignableFrom(actual.type)) {
             return false;
+        }
+        if (target.fnSig != null && actual.fnSig != null && target.fnSig.length == actual.fnSig.length) {
+            // Return covariant, parameters contravariant.
+            if (!isSubtype(actual.fnSig[0], target.fnSig[0])) {
+                return false;
+            }
+            for (int i = 1; i < target.fnSig.length; i++) {
+                if (!isSubtype(target.fnSig[i], actual.fnSig[i])) {
+                    return false;
+                }
+            }
         }
         if (target.args != null && actual.args != null && target.args.length == actual.args.length) {
             for (int i = 0; i < target.args.length; i++) {

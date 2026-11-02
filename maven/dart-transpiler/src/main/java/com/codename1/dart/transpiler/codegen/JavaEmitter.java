@@ -5980,6 +5980,9 @@ public final class JavaEmitter {
         }
         ctx.pushWriter(2);
         ctx.methodReturnType = rt;
+        // The Java signature can be wider than the Dart declaration (a pinned or erased
+        // return): a completed value is then typed by the signature, not by the Dart T.
+        ctx.asyncReturnWidened = m.isAsync && !rjt.equals(javaType(rt, false, ctx));
         ctx.pinnedReturnCast = m.javaReturn != null && !m.isAsync && !m.isSyncStar && !m.isAsyncStar && ctx.currentClass != null
                 && ctx.currentClass.typeParams.contains(rt.name) && rt.args.isEmpty() ? m.javaReturn : null;
         ctx.inAsyncBody = m.isAsync;
@@ -6172,10 +6175,10 @@ public final class JavaEmitter {
             boxCapturedParams(m.params, ctx);
             lineMark(m.exprBody, ctx);
             if (asyncFuture) {
-                Out o = emitExpr(m.exprBody, null, ctx);
+                Out o = emitExpr(m.exprBody, rt.args.size() == 1 && rt.is("Future") ? rt.arg(0) : null, ctx);
                 ctx.importClass("dart.async.Future");
                 ctx.writer().line("return " + (o.type.is("Future") ? o.code
-                        : reifyAsyncResult("Future.value(" + boxIfPrimitive(o, ctx) + ")", rt, ctx)) + ";");
+                        : reifyAsyncResult(typedAsyncValue(o, rt, ctx), rt, ctx)) + ";");
             } else {
                 if (rt.is("void")) {
                     // `void f() => expr;` -- and a value-returning arrow override narrowed
@@ -6204,6 +6207,7 @@ public final class JavaEmitter {
         ctx.popScope();
         ctx.methodReturnType = null;
         ctx.pinnedReturnCast = null;
+        ctx.asyncReturnWidened = false;
         ctx.inAsyncBody = false;
         sb.append("    }\n\n");
         return sb.toString();
@@ -6240,9 +6244,9 @@ public final class JavaEmitter {
             boxCapturedParams(m.params, ctx);
             if (asyncFuture) {
                 lineMark(m.exprBody, ctx);
-                Out o = emitExpr(m.exprBody, null, ctx);
+                Out o = emitExpr(m.exprBody, rt.args.size() == 1 && rt.is("Future") ? rt.arg(0) : null, ctx);
                 ctx.writer().line("return " + (o.type.is("Future") ? o.code
-                        : reifyAsyncResult("Future.value(" + boxIfPrimitive(o, ctx) + ")", rt, ctx)) + ";");
+                        : reifyAsyncResult(typedAsyncValue(o, rt, ctx), rt, ctx)) + ";");
             } else if (rt.is("void")) {
                 // `void f() => expr;` runs expr for its effects, whatever its shape.
                 emitDiscardedValue(m.exprBody, ctx);
@@ -6680,7 +6684,8 @@ public final class JavaEmitter {
                     Out o = emitExpr(r.value, inner, ctx);
                     // await already unwraps; returning a Future directly passes through
                     String rv = asyncReturnValue(o, inner, ctx);
-                    w.line("return " + (ctx.asyncLambda || o.type != null && o.type.is("Future") ? rv : reifyAsyncResult(rv, rt, ctx)) + ";");
+                    w.line("return " + (ctx.asyncLambda || o.type != null && o.type.is("Future") ? rv
+                            : reifyAsyncResult(typedAsyncValue(o, rt, ctx), rt, ctx)) + ";");
                 }
                 return;
             }
@@ -9706,6 +9711,11 @@ public final class JavaEmitter {
             // List<int>. The shared TypeRef.DYNAMIC is the emitter's "not known" instead.
             return "dart.runtime.TypeWitness.DYNAMIC";
         }
+        if (el != null && el.funcReturn != null && el.funcParams != null && !isUnrecordedArg(el)) {
+            // `List<int Function(int)>`: the function witness, with its signature, so the
+            // argument compares by function subtyping. Null where none can be formed.
+            return isTypeVariable(el, ctx) ? null : functionWitness(el, el.nullable, ctx);
+        }
         if (el == null || el.name == null || el.funcReturn != null || el.funcParams != null
                 || isUnrecordedArg(el)) {
             return null;
@@ -9914,7 +9924,7 @@ public final class JavaEmitter {
         if (own) {
             ownTypedClosure = null;
         }
-        if (!functionTypeTested) {
+        if (!functionTypeTested && !signEscapingClosure && !escapesToTopType(expected)) {
             return code;
         }
         int required = -1;
@@ -9986,6 +9996,10 @@ public final class JavaEmitter {
                 : !returnsValue ? new TypeRef("void") : l.exprBody != null ? bodyType : null;
         StringBuilder sig = new StringBuilder();
         String retWitness = ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
+                // No context return and an expression body of static type dynamic: Dart infers the
+                // return dynamic, which is no int (`(x) => x * 2` is no int Function(int)).
+                : (ctxRet == null || isDynamicType(ctxRet)) && l.exprBody != null && returnsValue && ret != null && isDynamicType(ret)
+                        ? "dart.runtime.TypeWitness.DYNAMIC"
                 : staticWitness(ret, true, ctx);
         sig.append(retWitness);
         boolean any = !"null".equals(retWitness);
@@ -10583,6 +10597,12 @@ public final class JavaEmitter {
             }
             TypeRef r = selfBoundInstantiation(s.name, g, seen);
             if (r != null) {
+                // r is spelled in s's own type parameters (Ent<T> implements Comparable<T>);
+                // E1 extends Ent<E1> instantiates it at s's arguments.
+                ClassDecl sc = program.classes.get(s.name);
+                if (sc != null && !sc.typeParams.isEmpty()) {
+                    r = substTypeParams(r, sc.typeParams, s.args);
+                }
                 return r;
             }
         }
@@ -10677,7 +10697,8 @@ public final class JavaEmitter {
     private GeneratedFile closureSignatureFile(List<GeneratedFile> files) {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(pkg).append(";\n\n");
-        sb.append("import dart.core.*;\n\n");
+        // A function-typed parameter's witness names its erased SAM (Funcs.*).
+        sb.append("import dart.core.*;\nimport dart.runtime.Funcs;\n\n");
         sb.append("/** Closure SAMs carrying their reified Dart signatures (dart.runtime.Signed). */\n");
         sb.append("public final class DartFnSigs {\n    private DartFnSigs() {\n    }\n");
         for (String[] m : closureSignatures.values()) {
@@ -11174,8 +11195,7 @@ public final class JavaEmitter {
             while (ct instanceof ParenExpr) {
                 ct = ((ParenExpr) ct).inner;
             }
-            functionTypeTested |= ct instanceof AsCast && ((AsCast) ct).type != null
-                    && ((AsCast) ct).type.is("dynamic");
+            functionTypeTested |= ct instanceof AsCast && escapesToTopType(((AsCast) ct).type);
         } else if (o instanceof CatchClause) {
             noteReifiedType(((CatchClause) o).onType);
         } else if (o instanceof Call && "whereType".equals(((Call) o).name) && ((Call) o).typeArgs.size() == 1) {
@@ -12537,6 +12557,36 @@ public final class JavaEmitter {
     }
 
     /** The witness of the type {@code t} written at a construction site, or null. */
+    /// The trailing signature argument of a function witness: ", new TypeWitness[] {ret,
+    /// p0, ..}" over the positional parameters, a slot null where it is dynamic, void or a
+    /// type variable; "" for a function with named parameters, which is not compared.
+    private String functionWitness(TypeRef t, boolean nullable, Ctx ctx) {
+        String erased = erasedJavaType(t, ctx);
+        String test = functionTest("$twf", t, erased, ctx);
+        return test == null ? null : "dart.runtime.TypeWitness.function(" + erased + ".class, " + nullable
+                + ", ($twf) -> " + test + functionSigWitnesses(t, ctx) + ")";
+    }
+
+    private String functionSigWitnesses(TypeRef t, Ctx ctx) {
+        if (t.funcNamed != null && !t.funcNamed.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(", new dart.runtime.TypeWitness[] {");
+        sb.append(sigSlotWitness(t.funcReturn, ctx));
+        for (TypeRef p : t.funcParams) {
+            sb.append(", ").append(sigSlotWitness(p, ctx));
+        }
+        return sb.append("}").toString();
+    }
+
+    private String sigSlotWitness(TypeRef t, Ctx ctx) {
+        if (t == null || isDynamicType(t) || t.is("void") || readsTypeVarWitness(t, ctx)) {
+            return "null";
+        }
+        String w = reifiedArgWitness(t, ctx);
+        return w == null ? "null" : w;
+    }
+
     private String witnessOf(TypeRef t, Ctx ctx) {
         if (t == null) {
             return null;
@@ -12556,11 +12606,9 @@ public final class JavaEmitter {
             // `Box<int Function(int)>`: the erased SAM alone would accept any one-argument
             // function, so a covariant write of `(String s) => s` through a Box<Object>
             // passed. The witness tests Dart's function subtyping, as `is` does.
-            String erased = erasedJavaType(t, ctx);
-            String test = functionTest("$twf", t, erased, ctx);
-            if (test != null) {
-                return "dart.runtime.TypeWitness.function(" + erased + ".class, " + nullable
-                        + ", ($twf) -> " + test + ")";
+            String fw = functionWitness(t, nullable, ctx);
+            if (fw != null) {
+                return fw;
             }
         }
         String nested = reifiedHead(t, ctx) != null ? reifiedArgWitnesses(t, ctx) : "";
@@ -18958,6 +19006,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// SAM afterwards instead, so it is not.
     private boolean programFnSlot;
 
+    /// Whether the arrow closure just emitted has a void body lowered as a value lambda
+    /// (the statement followed by `return null`), so its Java SAM returns a value.
+    private boolean lastLambdaVoidAsValue;
+
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
         if (l.boundRecv != null) {
             return emitBoundTearOff(l, expected, ctx);
@@ -19195,6 +19247,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return adapted;
         }
         lastLambdaVoid = false;
+        lastLambdaVoidAsValue = false;
         lastLambdaNullTail = false;
         lastLambdaExprIsStatementShaped = false;
         // typedef-typed target position gives untyped lambda params real types
@@ -19467,6 +19520,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     // value-returning FuncN, so `collect(3, () => record(x))` returns null.
                     || programSlot && !ownSam && lambdaReturn == null && expected != null && expected.funcReturn != null
                     && expected.funcReturn.is("dynamic"));
+            lastLambdaVoidAsValue = genericVoid;
             if (genericVoid) {
                 // `() => sink.write(x)` passed as `T Function()`: Dart infers T = void, but
                 // the Java SAM returns a value, so the statement is followed by `return null`.
@@ -19614,12 +19668,52 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// {@code future}, recording the type argument of the Future {@code rt} an async body
     /// declares (`Future<int> f() async` makes a Future<int>), so `is Future<String>`
     /// answers false. Unchanged where the argument has no witness here.
+    /// The completed Future an async body of declared type {@code rt} returns for the
+    /// value {@code o}, typed at the declared T: `Future.<T>value(v)`. Java infers nothing
+    /// from the value then, so a List<int> literal, a FutureOr<int> local or a
+    /// DartList of a wider element type all land as the declared Future<T>. A value whose
+    /// Java type is not the declared one is converted with Dart's implicit downcast
+    /// (coerce) and then cast through Object: Dart's typing already proved it a T, and
+    /// Java generics are invariant. A void value (`Future<void> f() async => print(..)`)
+    /// completes with null after it runs.
+    private String typedAsyncValue(Out o, TypeRef rt, Ctx ctx) {
+        if (rt == null || !rt.is("Future") || rt.args.size() != 1 || isDynamicType(rt.arg(0))
+                || rt.arg(0).is("void") || o.type == null || isDynamicType(o.type) && rt.arg(0).is("Object")) {
+            if (o.type != null && o.type.is("void")) {
+                ctx.writer().line(o.code + ";");
+                return "Future.value(null)";
+            }
+            return "Future.value(" + boxIfPrimitive(o, ctx) + ")";
+        }
+        if (o.type.is("void") || o.type.is("Null")) {
+            if (o.type.is("void")) {
+                ctx.writer().line(o.code + ";");
+            }
+            return "Future.value(null)";
+        }
+        TypeRef inner = rt.arg(0);
+        if (ctx.asyncReturnWidened) {
+            // The signature's Future is not Future<T> (erased or pinned wider): a raw
+            // Future converts to it unchecked, and the value is still coerced to T.
+            return "(Future) Future.value(" + boxIfPrimitive(new Out(coerce(o, inner, ctx), o.type), ctx) + ")";
+        }
+        String j = javaType(inner, true, ctx);
+        String v = boxIfPrimitive(new Out(coerce(o, inner, ctx), o.type), ctx);
+        if (!j.equals(javaType(o.type, true, ctx))) {
+            v = "(" + j + ") (Object) " + paren(v);
+        }
+        return "Future.<" + j + ">value(" + v + ")";
+    }
+
     private String reifyAsyncResult(String future, TypeRef rt, Ctx ctx) {
         if (rt == null || !rt.is("Future") || rt.args.size() != 1 || isDynamicType(rt.arg(0))) {
             return future;
         }
         String w = reifiedArgWitness(rt.arg(0), ctx);
-        return w == null ? future : "dart.async.Future.reify(" + future + ", " + w + ")";
+        // A completed value is already typed at the declared T (typedAsyncValue), so reify
+        // infers the declared Future type from it; a returned Future keeps its own type.
+        return w == null ? future
+                : "dart.async.Future.reify(" + future + ", " + w + ")";
     }
 
     /**
@@ -26543,9 +26637,54 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (i > 0) {
                 sb.append(", ");
             }
-            sb.append(emitExpr(args.positional.get(i), null, ctx).code);
+            Expr a = args.positional.get(i);
+            sb.append(a instanceof Lambda ? dynamicCallClosureArg((Lambda) a, ctx) : emitExpr(a, null, ctx).code);
         }
         return sb.toString();
+    }
+
+    /// A closure handed to a callee of static type dynamic (`dynamic tw = twice;
+    /// tw((int x) => x + 1, 3)`). No parameter type flows down to it, so it is typed as
+    /// Dart types it: its declared parameter types (dynamic when untyped) and its body's
+    /// result (inferredClosureType). It is cast to that SAM, so its Java parameters have
+    /// their declared types, and it is signed (signClosure: it escapes to a dynamic
+    /// value) so Dyn.invoke can check it against the callee's parameter type.
+    private String dynamicCallClosureArg(Lambda l, Ctx ctx) {
+        if (l.boundRecv != null || l.isAsync || !l.typeParams.isEmpty()) {
+            return emitExpr(l, TypeRef.DYNAMIC, ctx).code;
+        }
+        // Dart's type of the closure comes from its body, which only an emission types:
+        // the first one (to a dynamic context) is read for it and discarded, and the
+        // closure is then emitted to that function type -- a void closure to a void SAM,
+        // as a callee taking `void Function(int)` calls it.
+        ctx.pushWriter(ctx.currentIndent());
+        try {
+            emitExpr(l, TypeRef.DYNAMIC, ctx);
+        } finally {
+            ctx.popWriter();
+        }
+        TypeRef ft = inferredClosureType(l, null, ctx);
+        boolean saved = signEscapingClosure;
+        signEscapingClosure = true;
+        Out o;
+        try {
+            o = emitExpr(l, ft, ctx);
+        } finally {
+            signEscapingClosure = saved;
+        }
+        return samCast(l, o, javaType(ft, true, ctx));
+    }
+
+    /// Whether a closure whose context type is {@code t} escapes to a value of static type
+    /// dynamic, Object or Function. Such a value can be called through Dyn.invoke or
+    /// type-tested, both of which read the closure's Dart signature, so a closure landing
+    /// there is always signed (signClosure) -- whatever else the program does.
+    /// Set while a closure that escapes to a dynamic callee is emitted (dynamicCallClosureArg).
+    private boolean signEscapingClosure;
+
+    private boolean escapesToTopType(TypeRef t) {
+        return t != null && t.funcParams == null && t.funcReturn == null
+                && (t.is("dynamic") || t.is("Object") || t.is("Function"));
     }
 
     // ==================================================================
@@ -29915,6 +30054,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         /// interfacePinnedReturn): Java erases the variable without its bound, so the value
         /// goes through Object. Null everywhere else, lambdas included.
         String pinnedReturnCast;
+        /// The enclosing async method's Java return is not javaType of its Dart Future type
+        /// (pinned or erased), so completed values are emitted as a raw Future.
+        boolean asyncReturnWidened;
         /// The closure being emitted is bound to a void-returning slot (its SAM is a VoidFunc),
         /// so a `return expr;` in it must run the expression and return bare.
         boolean lambdaReturnsVoid;

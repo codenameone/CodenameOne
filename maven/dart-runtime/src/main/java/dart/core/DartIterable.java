@@ -811,6 +811,11 @@ public class DartIterable<E> implements Iterable<E> {
 
     @Override
     public String toString() {
+        if (source instanceof DartList || source instanceof DartSet) {
+            // A List or Set held as an Iterable (`Future<Iterable<int>> f() async => [3, 4]`)
+            // is still that collection: Dart prints it as one, `[3, 4]`, not `(3, 4)`.
+            return source.toString();
+        }
         if (!DartRuntime.beginFormat(this)) {
             return "(...)";
         }

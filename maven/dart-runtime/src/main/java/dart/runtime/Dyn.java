@@ -735,6 +735,19 @@ public final class Dyn {
                             + "' is not a subtype of the parameter type of this closure");
                 }
             }
+            // Omitted optional positionals (`(int a, [int b = 2])` called with one
+            // argument) arrive as the omitted-argument marker, which the closure's adapter
+            // replaces with the default. Fewer than the required count still falls through
+            // to the arity mismatch below.
+            int req = ((Signed) f).$required();
+            if (req >= 0 && sig != null && a.length >= req && a.length < sig.length - 1) {
+                Object[] padded = new Object[sig.length - 1];
+                System.arraycopy(a, 0, padded, 0, a.length);
+                for (int i = a.length; i < padded.length; i++) {
+                    padded[i] = DartRuntime.absent();
+                }
+                a = padded;
+            }
         }
         switch (a.length) {
             case 0:
