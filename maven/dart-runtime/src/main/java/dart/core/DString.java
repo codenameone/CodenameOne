@@ -351,6 +351,30 @@ public final class DString {
         return p instanceof String ? indexOf(s, (String) p) : indexOf(s, (RegExp) p);
     }
 
+    /** {@code contains(other, startIndex)} with a dynamic {@code Pattern} argument. */
+    public static boolean contains(String s, Object other, long startIndex) {
+        Object p = pattern(other);
+        return p instanceof String ? contains(s, (String) p, startIndex) : contains(s, (RegExp) p, startIndex);
+    }
+
+    /** {@code indexOf(pattern, start)} with a dynamic {@code Pattern} argument. */
+    public static long indexOf(String s, Object other, long start) {
+        Object p = pattern(other);
+        return p instanceof String ? indexOf(s, (String) p, start) : indexOf(s, (RegExp) p, start);
+    }
+
+    /** {@code lastIndexOf} with a dynamic {@code Pattern} argument. */
+    public static long lastIndexOf(String s, Object other) {
+        Object p = pattern(other);
+        return p instanceof String ? lastIndexOf(s, (String) p) : lastIndexOf(s, (RegExp) p);
+    }
+
+    /** {@code lastIndexOf(pattern, start)} with a dynamic {@code Pattern} argument. */
+    public static long lastIndexOf(String s, Object other, long start) {
+        Object p = pattern(other);
+        return p instanceof String ? lastIndexOf(s, (String) p, start) : lastIndexOf(s, (RegExp) p, start);
+    }
+
     /** {@code split} with a dynamic {@code Pattern} argument. */
     public static DartList<String> split(String s, Object pattern) {
         Object p = pattern(pattern);

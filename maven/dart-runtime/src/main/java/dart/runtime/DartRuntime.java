@@ -489,7 +489,25 @@ public final class DartRuntime {
                 }
             }
         }
+        if (a instanceof Number) {
+            // num declares the operator; a wrongly typed argument fails its parameter
+            // type (num for arithmetic, int for the bitwise operators an int declares),
+            // which is Dart's TypeError rather than a missing member.
+            boolean arith = op.equals("+") || op.equals("-") || op.equals("*") || op.equals("/")
+                    || op.equals("~/") || op.equals("%");
+            boolean bits = isIntegral((Number) a) && (op.equals("&") || op.equals("|") || op.equals("^")
+                    || op.equals("<<") || op.equals(">>") || op.equals(">>>"));
+            if (arith || bits) {
+                throw new TypeError("type '" + typeName(b) + "' is not a subtype of type '"
+                        + (arith ? "num" : "int") + "'");
+            }
+        }
         if (a instanceof String) {
+            if (op.equals("*")) {
+                if (!(b instanceof Number) || !isIntegral((Number) b)) {
+                    throw new TypeError("type '" + typeName(b) + "' is not a subtype of type 'int'");
+                }
+            }
             if (op.equals("+")) {
                 if (!(b instanceof String)) {
                     throw new TypeError("type '" + typeName(b) + "' is not a subtype of type 'String'");
@@ -532,6 +550,11 @@ public final class DartRuntime {
         throw noOperator(op, a, b);
     }
 
+    /** Evaluates its argument for its effect (a checked cast whose value is discarded). */
+    public static void discard(Object value) {
+        // nothing: the argument has already been evaluated
+    }
+
     /** Dart's relational {@code op} ({@code < > <= >=}) on values of unknown static type. */
     public static boolean dynCompare(String op, Object a, Object b) {
         if (a instanceof Number && b instanceof Number) {
@@ -566,6 +589,9 @@ public final class DartRuntime {
             if (op.equals(">=")) {
                 return c >= 0;
             }
+        }
+        if (a instanceof Number && (op.equals("<") || op.equals(">") || op.equals("<=") || op.equals(">="))) {
+            throw new TypeError("type '" + typeName(b) + "' is not a subtype of type 'num'");
         }
         if (a instanceof dart.core.Duration && b instanceof dart.core.Duration) {
             int c = ((dart.core.Duration) a).compareTo((dart.core.Duration) b);

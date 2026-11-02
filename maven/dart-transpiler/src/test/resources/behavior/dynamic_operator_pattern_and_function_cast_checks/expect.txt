@@ -1,0 +1,60 @@
+true
+true
+false
+true
+false
+1
+4
+3
+0
+--c--
+aBcab
+abcAb
+[ab, ab]
+[0, 3]
+startsWith int true
+contains int true
+replaceAll to int true
+lastIndexOf null true
+allMatches int true
+num + true
+num - true
+num * true
+num / true
+num ~/ true
+num % true
+num < true
+int & true
+int << true
+double + true
+String * true
+String * double true
+String + true
+where true
+map true
+any true
+every true
+forEach true
+firstWhere true
+fold true
+reduce true
+expand true
+sort true
+[3, 3, 1, 1, 2, 2]
+map forEach true
+[1]
+map value elements true
+list add elements true
+list []= elements true
+set add elements true
+[[1], [2]] 0
+Function as true
+3
+true
+false
+true
+true
+false
+Object as true
+null
+Invalid argument(s)

@@ -13629,8 +13629,11 @@ public final class JavaEmitter {
         }
         boolean unchecked = target.is("dynamic") || target.is("var")
                 || (target.is("Object") && target.nullable)
-                // An upcast to the static type it already has cannot fail.
-                || (o.type != null && !isDynamic(o.type) && o.type.args.isEmpty() && target.args.isEmpty()
+                // An upcast to the static type it already has cannot fail. A function type
+                // is not that: its name is Function whatever the signature, so `f as
+                // String Function(String)` on a Function value is checked (asFunction).
+                || (target.funcParams == null && target.funcReturn == null
+                    && o.type != null && !isDynamic(o.type) && o.type.args.isEmpty() && target.args.isEmpty()
                     && o.type.name != null && o.type.name.equals(target.name)
                     && (target.nullable || !o.type.nullable));
         if (unchecked) {
@@ -20458,6 +20461,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             Out o = emitExpr(l.exprBody, lambdaReturn, ctx);
             ctx.statementExpr = savedStmt;
+            if (l.exprBody instanceof AsCast && (lambdaReturn != null ? lambdaReturn.is("void")
+                    : expected != null && expected.funcReturn != null && expected.funcReturn.is("void"))) {
+                // `() => f as T` into a void slot: the value is discarded, and a cast is no
+                // statement in Java. The check still runs, as the argument of a no-op call.
+                o = new Out("dart.runtime.DartRuntime.discard(" + o.code + ")", TypeRef.VOID);
+            }
             if (lambdaReturn != null && o.type != null && o.type.is("num")
                     && (lambdaReturn.is("double") || lambdaReturn.is("int"))) {
                 // num arithmetic is a Number; a lambda typed to return a double or int
@@ -21252,9 +21261,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // Dart prints the bare class name.
                 return new Out("new " + simple + "()", new TypeRef("Exception"));
             }
+            int npos = c.args.positional.size();
+            if (n.equals("ArgumentError") && npos <= 2) {
+                // ArgumentError([dynamic message, String? name]): an omitted message is null
+                // (Dart prints "Invalid argument(s)"), never "". Typed as ArgumentError so
+                // its members (message, name) resolve.
+                String am = npos == 0 ? "(String) null"
+                        : emitExpr(c.args.positional.get(0), TypeRef.STRING, ctx).code;
+                String an = npos == 2 ? emitExpr(c.args.positional.get(1), TypeRef.STRING, ctx).code
+                        : "(String) null";
+                return new Out("new " + simple + "(" + am + ", " + an + ")", new TypeRef("ArgumentError"));
+            }
             String msg = c.args.positional.isEmpty() ? "\"\""
                     : emitExpr(c.args.positional.get(0), TypeRef.STRING, ctx).code;
-            int npos = c.args.positional.size();
             if (n.equals("RangeError") && npos == 1) {
                 // Dart's RangeError(message) prints "RangeError: message"; new RangeError(String)
                 // is the runtime guards' finished text, so the Dart constructor has its own path.

@@ -213,8 +213,13 @@ public final class TypeWitness {
         if (args != null && args.length > 0) {
             // A core collection's witness with element arguments (`List<String>`): the
             // arguments the collection recorded are compared, as `is List<String>` does.
-            int kind = type == dart.core.DartList.class ? LIST : type == dart.core.DartSet.class ? SET
-                    : type == dart.core.DartMap.class ? MAP : type == dart.core.DartIterable.class ? ITERABLE : -1;
+            // The emitter records a nested collection argument by its interface
+            // (`Map<String, List<int>>` witnesses java.util.List with int), which is the
+            // same kind: without it the element type went unchecked on `m[k] = <String>[]`.
+            int kind = type == dart.core.DartList.class || type == java.util.List.class ? LIST
+                    : type == dart.core.DartSet.class || type == java.util.Set.class ? SET
+                    : type == dart.core.DartMap.class || type == java.util.Map.class ? MAP
+                    : type == dart.core.DartIterable.class || type == Iterable.class ? ITERABLE : -1;
             if (kind >= 0) {
                 return isCollectionOf(value, kind, type, args[0], args.length > 1 ? args[1] : null);
             }

@@ -121,6 +121,18 @@ public final class Dyn {
      * static type is dynamic, e.g. {@code (clock ?? DateTime.now)().year}.
      */
     private static Object coreTypeGet(Object o, String name) {
+        if (o instanceof dart.core.RegExpMatch) {
+            // allMatches/firstMatch answer these; a dynamic receiver reads Match's getters.
+            dart.core.RegExpMatch m = (dart.core.RegExpMatch) o;
+            switch (name) {
+                case "start": return Long.valueOf(m.start());
+                case "end": return Long.valueOf(m.end());
+                case "groupCount": return Long.valueOf(m.groupCount());
+                case "input": return m.input();
+                case "pattern": return m.pattern();
+                default: break;
+            }
+        }
         if (o instanceof dart.core.DateTime) {
             dart.core.DateTime d = (dart.core.DateTime) o;
             switch (name) {
@@ -409,6 +421,7 @@ public final class Dyn {
                 return v;
             }
         } else if (o instanceof dart.core.DateTime || o instanceof dart.core.RegExp
+                || o instanceof dart.core.RegExpMatch
                 || o instanceof dart.core.StringBuffer) {
             Object v = coreTypeCall(o, name, args);
             if (v != NO_MEMBER) {
@@ -437,12 +450,15 @@ public final class Dyn {
                 return 0;
             case "containsKey": case "containsValue": case "remove": case "addAll": case "forEach": case "add":
             case "removeAt": case "sort": case "map": case "where": case "any": case "every":
-            case "reduce": case "join": case "elementAt": case "skip": case "take": case "endsWith":
+            case "reduce": case "expand": case "join": case "elementAt": case "skip": case "take": case "endsWith":
             case "split": case "codeUnitAt": case "compareTo": case "toStringAsFixed":
                 return 1;
             case "putIfAbsent": case "insert": case "indexOf": case "sublist": case "firstWhere": case "fold":
             case "substring": case "replaceAll": case "padLeft": case "clamp": case "contains": case "startsWith":
+            case "lastIndexOf": case "allMatches":
                 return 2;
+            case "replaceFirst":
+                return 3;
             default:
                 return Integer.MAX_VALUE;
         }
@@ -472,7 +488,7 @@ public final class Dyn {
                 }
                 return null;
             case "forEach": {
-                Object f = arg(a, 0);
+                Object f = fnArg(arg(a, 0), "(dynamic, dynamic) => void");
                 for (Object o : copy(m.entrySet())) {
                     Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
                     invoke(f, new Object[] {e.getKey(), e.getValue()});
@@ -519,7 +535,7 @@ public final class Dyn {
                     if (a.length == 0 || a[0] == null) {
                         l.sortDefault();
                     } else {
-                        final Object cmp = a[0];
+                        final Object cmp = fnArg(a[0], "(dynamic, dynamic) => int");
                         l.sort(new Funcs.Func2<Object, Object, Long>() {
                             @Override
                             public Long call(Object x, Object y) {
@@ -532,15 +548,33 @@ public final class Dyn {
                     break;
             }
         }
+        if (o instanceof dart.core.DartSet) {
+            // Set's own mutators; add checks the element against the set's witness.
+            dart.core.DartSet<Object> st = (dart.core.DartSet<Object>) o;
+            switch (name) {
+                case "add":
+                    return Boolean.valueOf(st.add(arg(a, 0)));
+                case "addAll":
+                    st.addAllIterable(asIterable(arg(a, 0)));
+                    return null;
+                case "remove":
+                    return Boolean.valueOf(st.remove(arg(a, 0)));
+                case "clear":
+                    st.clear();
+                    return null;
+                default:
+                    break;
+            }
+        }
         switch (name) {
             case "map":
-                return it.map(fn1(arg(a, 0)));
+                return it.map(fn1(fnArg(arg(a, 0), "(dynamic) => dynamic")));
             case "where":
-                return it.where(pred(arg(a, 0)));
+                return it.where(pred(fnArg(arg(a, 0), "(dynamic) => bool")));
             case "any":
-                return Boolean.valueOf(it.any(pred(arg(a, 0))));
+                return Boolean.valueOf(it.any(pred(fnArg(arg(a, 0), "(dynamic) => bool"))));
             case "every":
-                return Boolean.valueOf(it.every(pred(arg(a, 0))));
+                return Boolean.valueOf(it.every(pred(fnArg(arg(a, 0), "(dynamic) => bool"))));
             case "contains":
                 return Boolean.valueOf(it.contains(arg(a, 0)));
             case "toList":
@@ -550,7 +584,7 @@ public final class Dyn {
             case "join":
                 return a.length == 0 || a[0] == null ? it.join() : it.join(DartRuntime.as(a[0], String.class, false, "String"));
             case "forEach": {
-                Object f = arg(a, 0);
+                Object f = fnArg(arg(a, 0), "(dynamic) => void");
                 for (Object e : it.toList()) {
                     invoke(f, new Object[] {e});
                 }
@@ -559,7 +593,8 @@ public final class Dyn {
             case "elementAt":
                 return it.elementAt(num(arg(a, 0)).longValue());
             case "firstWhere": {
-                final Object orElse = a.length > 1 ? a[1] : null;
+                fnArg(arg(a, 0), "(dynamic) => bool");
+                final Object orElse = a.length > 1 && a[1] != null ? fnArg(a[1], "() => dynamic") : null;
                 for (Object e : it) {
                     if (truthy(invoke(arg(a, 0), new Object[] {e}))) {
                         return e;
@@ -571,6 +606,7 @@ public final class Dyn {
                 throw new dart.core.StateError("No element");
             }
             case "fold": {
+                fnArg(arg(a, 1), "(dynamic, dynamic) => dynamic");
                 Object acc = arg(a, 0);
                 for (Object e : it) {
                     acc = invoke(arg(a, 1), new Object[] {acc, e});
@@ -578,6 +614,7 @@ public final class Dyn {
                 return acc;
             }
             case "reduce": {
+                fnArg(arg(a, 0), "(dynamic, dynamic) => dynamic");
                 // Missing, a dynamic list's reduce -- a top-level `final xs = ws.map(...)
                 // .toList()` is one -- threw NoSuchMethodError though fold worked.
                 java.util.Iterator<?> i = it.iterator();
@@ -589,6 +626,15 @@ public final class Dyn {
                     acc = invoke(arg(a, 0), new Object[] {acc, i.next()});
                 }
                 return acc;
+            }
+            case "expand": {
+                final Object f = fnArg(arg(a, 0), "(dynamic) => Iterable<dynamic>");
+                return it.expand(new Funcs.Func1<Object, Iterable<Object>>() {
+                    @Override
+                    public Iterable<Object> call(Object x) {
+                        return asIterable(invoke(f, new Object[] {x}));
+                    }
+                });
             }
             case "skip":
                 return it.skip(num(arg(a, 0)).longValue());
@@ -631,8 +677,25 @@ public final class Dyn {
                 default: return NO_MEMBER;
             }
         }
-        if (o instanceof dart.core.RegExp && name.equals("hasMatch")) {
-            return Boolean.valueOf(((dart.core.RegExp) o).hasMatch(typed(arg(a, 0), String.class, "String")));
+        if (o instanceof dart.core.RegExpMatch) {
+            dart.core.RegExpMatch m = (dart.core.RegExpMatch) o;
+            switch (name) {
+                case "group": case "[]": return m.group(typed(arg(a, 0), Long.class, "int").longValue());
+                case "namedGroup": return m.namedGroup(typed(arg(a, 0), String.class, "String"));
+                default: return NO_MEMBER;
+            }
+        }
+        if (o instanceof dart.core.RegExp) {
+            dart.core.RegExp r = (dart.core.RegExp) o;
+            switch (name) {
+                case "hasMatch": return Boolean.valueOf(r.hasMatch(typed(arg(a, 0), String.class, "String")));
+                case "firstMatch": return r.firstMatch(typed(arg(a, 0), String.class, "String"));
+                case "stringMatch": return r.stringMatch(typed(arg(a, 0), String.class, "String"));
+                case "allMatches":
+                    return r.allMatches(typed(arg(a, 0), String.class, "String"),
+                            a.length > 1 && a[1] != null ? typed(a[1], Long.class, "int").longValue() : 0L);
+                default: return NO_MEMBER;
+            }
         }
         if (o instanceof dart.core.StringBuffer) {
             dart.core.StringBuffer b = (dart.core.StringBuffer) o;
@@ -676,32 +739,35 @@ public final class Dyn {
                 return DString.toUpperCase(s);
             case "trim":
                 return DString.trim(s);
+            // Every Pattern parameter takes a String or a RegExp, and anything else is the
+            // TypeError Dart's implicit downcast raises: the DString Object overloads check.
             case "contains":
-                // The optional offset goes to DString's range-checked overloads, as a typed call would.
                 return Boolean.valueOf(a.length > 1 && a[1] != null
-                        ? DString.contains(s, String.valueOf(a[0]), num(a[1]).longValue())
-                        : s.contains(String.valueOf(arg(a, 0))));
+                        ? DString.contains(s, a[0], typed(a[1], Long.class, "int").longValue())
+                        : DString.contains(s, arg(a, 0)));
             case "startsWith":
-                return Boolean.valueOf(a.length > 1 && a[1] != null
-                        ? DString.startsWith(s, String.valueOf(a[0]), num(a[1]).longValue())
-                        : s.startsWith(String.valueOf(arg(a, 0))));
+                return Boolean.valueOf(DString.startsWith(s, arg(a, 0),
+                        a.length > 1 && a[1] != null ? typed(a[1], Long.class, "int").longValue() : 0L));
             case "endsWith":
-                return Boolean.valueOf(s.endsWith(String.valueOf(arg(a, 0))));
+                return Boolean.valueOf(s.endsWith(typed(arg(a, 0), String.class, "String")));
             case "split":
-                // split(Pattern): a String or a RegExp; anything else is Dart's TypeError.
-                if (arg(a, 0) instanceof dart.core.RegExp) {
-                    return DString.split(s, String.valueOf(a[0]));
-                }
-                return DString.split(s, typed(a[0], String.class, "Pattern"));
+                return DString.split(s, arg(a, 0));
             case "substring":
                 return a.length > 1 && a[1] != null ? DString.substring(s, num(a[0]).longValue(), num(a[1]).longValue())
                         : DString.substring(s, num(arg(a, 0)).longValue());
             case "replaceAll":
-                return DString.replaceAll(s, String.valueOf(arg(a, 0)), String.valueOf(arg(a, 1)));
+                return DString.replaceAll(s, arg(a, 0), typed(arg(a, 1), String.class, "String"));
+            case "replaceFirst":
+                return DString.replaceFirst(s, arg(a, 0), typed(arg(a, 1), String.class, "String"),
+                        a.length > 2 && a[2] != null ? typed(a[2], Long.class, "int").longValue() : 0L);
             case "indexOf":
                 return Long.valueOf(a.length > 1 && a[1] != null
-                        ? DString.indexOf(s, String.valueOf(a[0]), num(a[1]).longValue())
-                        : DString.indexOf(s, String.valueOf(arg(a, 0))));
+                        ? DString.indexOf(s, a[0], typed(a[1], Long.class, "int").longValue())
+                        : DString.indexOf(s, arg(a, 0)));
+            case "lastIndexOf":
+                return Long.valueOf(a.length > 1 && a[1] != null
+                        ? DString.lastIndexOf(s, a[0], typed(a[1], Long.class, "int").longValue())
+                        : DString.lastIndexOf(s, arg(a, 0)));
             case "codeUnitAt":
                 return Long.valueOf(DString.codeUnitAt(s, num(arg(a, 0)).longValue()));
             case "padLeft":
@@ -967,6 +1033,17 @@ public final class Dyn {
                 break;
         }
         throw new NoSuchMethodError("Closure call with mismatched arguments: " + a.length + " argument(s)");
+    }
+
+    /// Dart's implicit downcast of a dynamic argument to a callback parameter: a value
+    /// that is not a function is a TypeError at the call, before anything runs (a lazy
+    /// `where(5)` would otherwise fail only when iterated, or never).
+    private static Object fnArg(Object f, String dartType) {
+        if (isFunction(f)) {
+            return f;
+        }
+        throw new dart.core.TypeError("type '" + DartRuntime.typeName(f) + "' is not a subtype of type '"
+                + dartType + "'");
     }
 
     private static Funcs.Func1<Object, Object> fn1(final Object f) {
