@@ -1750,7 +1750,11 @@ public final class JavaEmitter {
         // the state (field + accessors) the mixin's abstract accessors need
         StringBuilder impls = new StringBuilder();
         TypeRef mixinClassAsSuper = null;
+        // One part per mixin, run last mixin first (see emitMixinFieldInits).
+        List<StringBuilder> mixinInitParts = new ArrayList<StringBuilder>();
         for (TypeRef mixRef : c.mixins) {
+            StringBuilder mixinFieldInits = new StringBuilder();
+            mixinInitParts.add(mixinFieldInits);
             ClassDecl mx = program.classes.get(mixRef.name);
             if (mx != null && stubs.isStubClass(mixRef.name) && !classVisibleFrom(mx, c.ownerLibrary)) {
                 // An unrelated package class that shares a runtime mixin's name (a package's
@@ -1799,7 +1803,11 @@ public final class JavaEmitter {
                         : substituteTypeParams(fieldType(f, ctx), mixSubst);
                 String jt = javaType(ft, false, ctx);
                 body.append("    private ").append(jt).append(' ').append(f.name);
-                if (f.initializer != null) {
+                if (f.initializer != null && !f.isStatic && dartOrder(c)) {
+                    // Run by $mixinFieldInit$ when Dart's order reaches the mixin
+                    // application (emitMixinFieldInits), not as a Java field initializer.
+                    mixinFieldInits.append(emitMixinFieldInit(f, ft, ctx));
+                } else if (f.initializer != null) {
                     ctx.pushWriter(2);
                     Out init = emitExpr(f.initializer, ft, ctx);
                     String lifted = ctx.popWriter();
@@ -1830,6 +1838,16 @@ public final class JavaEmitter {
                                 .append(") v;\n    }\n\n");
                     }
                 }
+            }
+        }
+        if (dartOrder(c)) {
+            StringBuilder all = new StringBuilder();
+            for (int mi = mixinInitParts.size() - 1; mi >= 0; mi--) {
+                all.append(mixinInitParts.get(mi));
+            }
+            if (all.length() > 0) {
+                body.append("    protected final void ").append(mixinFieldInitName(c)).append("() {\n")
+                        .append(all).append("    }\n\n");
             }
         }
         // Dart `implements X` clauses (c.interfaces): the runtime interface the class satisfies
@@ -4316,11 +4334,20 @@ public final class JavaEmitter {
             Out v = emitExpr(fi.value, typeOfField(c, fi.field, ctx), ctx);
             w.line(fieldStore(c, fi.field, v.code));
         }
+        boolean mixinInits = hasMixinFieldInits(c);
         if (progSuper != null) {
             Args superArgs = superArgsOf(ct);
             String target = ct.superInit != null ? ct.superInit.namedCtor : null;
             CtorDecl superCtor = target != null ? progSuper.namedCtor(target) : progSuper.defaultCtor();
             storeWitnesses(c, "this", false, true, w, ctx);
+            if (mixinInits) {
+                // Dart evaluates the super arguments, then runs the mixin applications'
+                // field initializers, then the superclass constructor: the arguments are
+                // held in locals so the mixin fields can run between the two.
+                superArgs = superArgsToLocals(superArgs, superCtor,
+                        c.superclass.args == null || c.superclass.args.isEmpty() ? progSuper : null, ctx);
+                w.line("this." + mixinFieldInitName(c) + "();");
+            }
             // As the Java super(..) call does: the arguments' closures take their
             // parameter types from the superclass's written type arguments.
             ClassDecl savedOwner = ctx.ctorTypeOwner;
@@ -4363,17 +4390,36 @@ public final class JavaEmitter {
                         + code.substring(at + marker.length(), code.length() - 1) + ");");
             }
         } else if (stubClassOf(c.superclass) != null) {
+            List<String> setters = new ArrayList<String>();
             if (ct.superInit != null) {
                 for (NamedArg na : ct.superInit.args.named) {
                     Out v = emitExpr(na.value, null, ctx);
-                    w.line("this." + na.name + "(" + v.code + ");");
+                    if (mixinInits && v.type != null) {
+                        // Evaluated before the mixin fields, as Dart passes it on.
+                        TypeRef vt = v.type;
+                        String local = ctx.declareShadowSafe("$superArg" + (superArgLocal++), vt);
+                        w.line("final " + javaType(vt, false, ctx) + " " + local + " = " + v.code + ";");
+                        setters.add("this." + na.name + "(" + local + ");");
+                    } else {
+                        setters.add("this." + na.name + "(" + v.code + ");");
+                    }
                 }
             }
             for (Param p : ct.params) {
                 if (p.isSuper) {
-                    w.line("this." + p.name + "(" + javaIdent(p.name) + ");");
+                    setters.add("this." + p.name + "(" + javaIdent(p.name) + ");");
                 }
             }
+            if (mixinInits) {
+                w.line("this." + mixinFieldInitName(c) + "();");
+            }
+            for (String line : setters) {
+                w.line(line);
+            }
+        } else if (mixinInits) {
+            // Object (or a runtime mixin with no state) is the superclass: the mixin fields
+            // run after the initializer list, where Dart reaches the mixin applications.
+            w.line("this." + mixinFieldInitName(c) + "();");
         }
         if (ct.body != null) {
             ctx.beginBodyCaptures(ct.body, null);
@@ -4388,6 +4434,61 @@ public final class JavaEmitter {
      * super parameter used to go by name, so a positional one reached nothing and the
      * superclass saw its default. A copy: the declaration is emitted more than once.
      */
+    /// Counter naming the super-argument locals of an $init$ method.
+    private int superArgLocal;
+
+    /// {@code args} evaluated into locals in Dart's order (positionals, then named, as
+    /// written), returned as the same arguments naming those locals. Each takes the
+    /// target parameter's type as its context type when the superclass is not generic
+    /// ({@code owner} null otherwise), as the direct call would.
+    private Args superArgsToLocals(Args args, CtorDecl target, ClassDecl owner, Ctx ctx) {
+        Ctx.Writer w = ctx.writer();
+        List<Param> positional = new ArrayList<Param>();
+        if (target != null) {
+            for (Param p : target.params) {
+                if (!p.named) {
+                    positional.add(p);
+                }
+            }
+        }
+        Args out = new Args();
+        for (int i = 0; i < args.positional.size(); i++) {
+            Param p = i < positional.size() ? positional.get(i) : null;
+            out.positional.add(superArgToLocal(args.positional.get(i), p, owner, ctx, w));
+        }
+        for (NamedArg na : args.named) {
+            Param p = null;
+            if (target != null) {
+                for (Param q : target.params) {
+                    if (q.named && q.name.equals(na.name)) {
+                        p = q;
+                    }
+                }
+            }
+            NamedArg copy = new NamedArg();
+            copy.name = na.name;
+            copy.value = superArgToLocal(na.value, p, owner, ctx, w);
+            out.named.add(copy);
+        }
+        return out;
+    }
+
+    private Expr superArgToLocal(Expr e, Param p, ClassDecl owner, Ctx ctx, Ctx.Writer w) {
+        TypeRef expected = p != null && owner != null ? paramType(owner, p, ctx) : null;
+        Out v = emitExpr(e, expected, ctx);
+        TypeRef vt = expected != null ? expected : v.type != null ? v.type : TypeRef.DYNAMIC;
+        String dartName = "$superArg" + (superArgLocal++);
+        String local = ctx.declareShadowSafe(dartName, vt);
+        w.line("final " + javaType(vt, false, ctx) + " " + local + " = "
+                + (expected != null ? coerce(v, vt, ctx) : v.code) + ";");
+        Ident id = new Ident();
+        id.name = dartName;
+        id.file = e.file;
+        id.line = e.line;
+        id.col = e.col;
+        return id;
+    }
+
     private static Args superArgsOf(CtorDecl ct) {
         Args superArgs = new Args();
         if (ct.superInit != null) {
@@ -4494,11 +4595,11 @@ public final class JavaEmitter {
                         for (CtorDecl ct : a.ctors) {
                             generative |= !ct.isFactory;
                         }
-                        ok = generative && !a.isMixin && a.mixins.isEmpty() && a.extensionOn == null
+                        ok = generative && !a.isMixin && dartOrderMixins(a) && a.extensionOn == null
                                 && !a.forwardSuperCtors && !chain.contains(a);
                         chain.add(a);
                         ClassDecl next = a.superclass != null ? superDeclOf(a, a.superclass) : null;
-                        if (next == null && a.superclass != null) {
+                        if (next == null && a.superclass != null && !dartOrderRuntimeRoot(a)) {
                             ok = false;
                         }
                         a = next;
@@ -4511,6 +4612,55 @@ public final class JavaEmitter {
             dartOrderClasses = out;
         }
         return dartOrderClasses;
+    }
+
+    /// Whether every mixin {@code c} applies can be initialized by its $init$: a program
+    /// `mixin` (its fields are copied into the class and initialized by
+    /// $mixinFieldInit$, see emitMixinFieldInits), or a runtime mixin with no Dart state
+    /// (`extends IterableBase` is applied as the IterableMixin interface). A `mixin
+    /// class` applied first is the Java superclass instead, and no marker chain reaches it.
+    private boolean dartOrderMixins(ClassDecl c) {
+        for (TypeRef mixRef : c.mixins) {
+            ClassDecl mx = program.classes.get(mixRef.name);
+            if (mx != null) {
+                if (!mx.isMixin || mx.superclass != null || !mx.mixins.isEmpty()) {
+                    return false;
+                }
+            } else if (!stubs.isStubClass(mixRef.name) || "ChangeNotifier".equals(mixRef.name)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether the root of a program chain may extend the runtime class it names and
+    /// still be constructed in Dart's order: the runtime class is a stub constructed by
+    /// its Java no-argument constructor (from the root's marker constructor), which runs
+    /// no Dart code, and every constructor of the root hands it only named arguments or
+    /// named super parameters, which its $init$ applies as setters at the point Dart runs
+    /// the superclass constructor. A stub constructor that takes positionals, or a
+    /// `super.named(..)` call, needs the arguments at Java construction time, before
+    /// the subclass initializers Dart runs first, so such a chain keeps Java's order.
+    private boolean dartOrderRuntimeRoot(ClassDecl root) {
+        Ast.ClassDecl stub = stubClassOf(root.superclass);
+        if (stub == null || stubTakesPositionals(stub) || stub.isMixin) {
+            return false;
+        }
+        for (CtorDecl ct : root.ctors) {
+            if (ct.isFactory || ct.redirect != null) {
+                continue;
+            }
+            if (ct.superInit != null && (ct.superInit.namedCtor != null
+                    || !ct.superInit.args.positional.isEmpty())) {
+                return false;
+            }
+            for (Param p : ct.params) {
+                if (p.isSuper && !p.named) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private boolean dartOrder(ClassDecl c) {
@@ -12990,6 +13140,41 @@ public final class JavaEmitter {
     /// class so a subclass's never overrides its superclass's.
     private String witnessFieldInitName(ClassDecl c) {
         return "$fieldInit$" + javaClassName(c);
+    }
+
+    /// The method running the field initializers of the program mixins {@code c} applies,
+    /// emitted only for a class constructed in Dart's order. A mixin application sits
+    /// between the class and its superclass, so Dart runs these after the class's own
+    /// initializer list and super arguments and before the superclass constructor; for
+    /// `with A, B` the application of B is the nearer one, so B's fields come first.
+    private String mixinFieldInitName(ClassDecl c) {
+        return "$mixinFieldInit$" + javaClassName(c);
+    }
+
+    private boolean hasMixinFieldInits(ClassDecl c) {
+        if (!dartOrder(c)) {
+            return false;
+        }
+        for (TypeRef mixRef : c.mixins) {
+            ClassDecl mx = program.classes.get(mixRef.name);
+            if (mx != null && mx.isMixin) {
+                for (FieldDecl f : mx.fields) {
+                    if (!f.isStatic && f.initializer != null) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /// One mixin field's initializer as a statement of $mixinFieldInit$; {@code ft} is
+    /// the field's type with the mixin's type arguments applied.
+    private String emitMixinFieldInit(FieldDecl f, TypeRef ft, Ctx ctx) {
+        ctx.pushWriter(2);
+        Out init = emitExpr(f.initializer, ft, ctx);
+        String lifted = ctx.popWriter();
+        return lifted + "        this." + f.name + " = " + coerce(init, ft, ctx) + ";\n";
     }
 
     private boolean hasWitnessFieldInits(ClassDecl c) {
@@ -24685,15 +24870,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // The same program-slot rule as a top-level function's arguments (programFnSlot).
         boolean programOwner = owner != null && program.classes.get(owner.name) == owner
                 && !stubs.isStubClass(owner.name) && ct != null && hasFunctionParam(ct.params);
-        if (!programOwner) {
-            return canonicalArgs0(ct, owner, args, ctx);
-        }
         boolean savedSlot = programFnSlot;
-        programFnSlot = true;
+        programFnSlot = programOwner || savedSlot;
         try {
             String out = canonicalArgs0(ct, owner, args, ctx);
-            if (ct != null && ct.name == null && !ct.isFactory && ct.params.size() == 1
-                    && "null".equals(out.trim()) && needsMarker(owner)) {
+            if (owner != null && program.classes.get(owner.name) == owner && !stubs.isStubClass(owner.name)
+                    && ct != null && ct.name == null && !ct.isFactory && ct.params.size() == 1
+                    && "null".equals(out.trim()) && needsMarker(owner) && witnessParams(owner).isEmpty()) {
                 // `Ordered<E>([cmp])` called with nothing passes one null, and a class built
                 // through the marker chain also has `Ordered($NamedCtor)`: javac cannot pick
                 // between the two. The parameter's own type names the constructor.
@@ -24701,6 +24884,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // calling code does not declare.
                 String pj = javaType(paramType(owner, ct.params.get(0), ctx), true, ctx);
                 int lt = pj.indexOf('<');
+                if (owner.typeParams.contains(pj)) {
+                    // A bare type variable erases to Object, which still names one constructor.
+                    return "(Object) null";
+                }
                 return "(" + (lt < 0 ? pj : pj.substring(0, lt)) + ") null";
             }
             return out;
