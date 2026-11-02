@@ -398,7 +398,7 @@ Every Codename One figure below appears twice, from the same executable.
 
 *Codename One* is the program on a machine with memory to spare. Its
 collector adapts to the load. While collecting costs the program little CPU it
-keeps the heap close to what the program really uses. When the program is busy
+keeps the heap close to what the program uses. When the program is busy
 enough that collecting more often would take throughput away, it lets the heap
 grow instead: memory the machine isn't using earns nothing, and the speed it
 buys is real. That's a choice the runtime makes because the memory is there,
@@ -478,7 +478,7 @@ image::img/python-flask-memory.svg["Footprint of the Flask sample on CPython, Py
 
 Unconstrained, the server spends memory for speed: 110 MB after load, at about
 23,000 requests a second. That's the collector seeing a busy program and spare
-memory, and choosing throughput; it briefly reaches its peak while the load is
+memory, and choosing throughput; it reaches its peak only while the load is
 heaviest. Under the 128 MB budget the same binary keeps the heap tight instead:
 68 MB, never past 104 MB, at 19,500 requests a second. It keeps 85% of its
 unconstrained throughput, uses less memory than PyPy, and still serves 29 times
