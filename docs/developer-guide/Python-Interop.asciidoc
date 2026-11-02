@@ -399,8 +399,8 @@ Every Codename One figure below appears twice, from the same executable.
 *Codename One* is the program on a machine with memory to spare. Its
 collector adapts to the load. While collecting costs the program little CPU it
 keeps the heap close to what the program uses. When the program is busy
-enough that collecting more often would take throughput away, it lets the heap
-grow instead: memory the machine isn't using earns nothing, and the speed it
+enough that more frequent collections would cost it throughput, it lets the heap
+grow instead: idle memory on the machine earns nothing, and the speed it
 buys is real. That's a choice the runtime makes because the memory is there,
 not a size it needs.
 
