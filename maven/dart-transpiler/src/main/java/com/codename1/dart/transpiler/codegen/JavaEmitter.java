@@ -4119,6 +4119,24 @@ public final class JavaEmitter {
                 }
             }
             stubSuperParamsToCtor = toCtor;
+        } else if (coreErrorSuperclass(c) != null) {
+            // `class E extends StateError { E(String m) : super(m); }`: the superclass is a
+            // dart.core Java exception, built by its own constructor. Nothing may precede a
+            // Java super(..), so its arguments are evaluated before this class's this.x
+            // stores and initializer list, where Dart evaluates them last. dart:core's error
+            // constructors only store what they are given and call nothing the subclass can
+            // override, so the order is observable only through side effects of the
+            // initializer expressions themselves; this class cannot use the $init$ chain
+            // (dartOrderClasses), which needs a superclass constructor taking no arguments.
+            inSuperInitializer = true;
+            try {
+                String args = coreErrorSuperArgs(c, ct, params, ctx);
+                if (args != null) {
+                    w.line("super(" + args + ");");
+                }
+            } finally {
+                inSuperInitializer = false;
+            }
         }
         storeWitnesses(c, "this", true, superNamedInit != null, w, ctx);
         // super.x params against stub superclasses -> inherited setters (a positional one
@@ -4487,6 +4505,129 @@ public final class JavaEmitter {
         id.line = e.line;
         id.col = e.col;
         return id;
+    }
+
+    /// The dart:core error class `c` extends directly (StateError, ArgumentError, ...), or
+    /// null when its superclass is anything else: a program class of the same name wins,
+    /// and Exception has only a factory constructor, so no class extends it.
+    private String coreErrorSuperclass(ClassDecl c) {
+        TypeRef s = c.superclass;
+        if (s == null || s.is("Exception") || superDeclOf(c, s) != null
+                || (!s.runtimeOnly && program.classes.containsKey(s.name))) {
+            return null;
+        }
+        return CORE_ERRORS.containsKey(s.name) ? s.name : null;
+    }
+
+    /// The Java super(..) arguments for a constructor of a class extending a dart:core
+    /// error, mapped from the Dart constructor it names onto the runtime class's Java
+    /// constructors (dart.core.*). Null, with a diagnostic, for a constructor that has
+    /// no Java counterpart.
+    private String coreErrorSuperArgs(ClassDecl c, CtorDecl ct, List<Param> params, Ctx ctx) {
+        String sup = coreErrorSuperclass(c);
+        String named = ct.superInit != null ? ct.superInit.namedCtor : null;
+        Args a = new Args();
+        if (ct.superInit != null) {
+            a.positional.addAll(ct.superInit.args.positional);
+            a.named.addAll(ct.superInit.args.named);
+        }
+        for (Param p : params) {
+            if (p.isSuper) {
+                Ident id = new Ident();
+                id.name = p.name;
+                if (p.named) {
+                    NamedArg na = new NamedArg();
+                    na.name = p.name;
+                    na.value = id;
+                    a.named.add(na);
+                } else {
+                    a.positional.add(id);
+                }
+            }
+        }
+        int n = a.positional.size();
+        String res = null;
+        if (!a.named.isEmpty()) {
+            res = null;
+        } else if (sup.equals("ArgumentError") && "value".equals(named) && n >= 1 && n <= 3) {
+            res = "(Object) " + paren(emitExpr(a.positional.get(0), null, ctx).code) + ", "
+                    + coreStringArg(a, 1, ctx) + ", " + coreStringArg(a, 2, ctx);
+        } else if (sup.equals("RangeError") && "range".equals(named) && n >= 3 && n <= 5) {
+            res = "\"range\", " + coreLongArg(a, 0, ctx) + ", " + coreLongArg(a, 1, ctx) + ", "
+                    + coreLongArg(a, 2, ctx) + ", " + coreStringArg(a, 3, ctx) + ", " + coreStringArg(a, 4, ctx);
+        } else if (sup.equals("RangeError") && "value".equals(named) && n >= 1 && n <= 3) {
+            res = "\"value\", " + coreLongArg(a, 0, ctx) + ", (Long) null, (Long) null, "
+                    + coreStringArg(a, 1, ctx) + ", " + coreStringArg(a, 2, ctx);
+        } else if (named != null) {
+            res = null;
+        } else if (sup.equals("RangeError") && n == 1) {
+            // Dart's RangeError(message), printed "RangeError: message".
+            res = "\"message\", (Long) null, (Long) null, (Long) null, (String) null, "
+                    + coreStringArg(a, 0, ctx);
+        } else if (sup.equals("ArgumentError") && n <= 2) {
+            res = coreStringArg(a, 0, ctx) + ", " + coreStringArg(a, 1, ctx);
+        } else if (sup.equals("FormatException") && n <= 3) {
+            res = n == 0 ? "" : n == 1 ? coreStringArg(a, 0, ctx)
+                    : coreStringArg(a, 0, ctx) + ", (Object) "
+                            + paren(emitExpr(a.positional.get(1), null, ctx).code) + ", "
+                            + coreLongArg(a, 2, ctx);
+        } else if (sup.equals("ConcurrentModificationError") && n <= 1) {
+            res = n == 0 ? "" : "(Object) " + paren(emitExpr(a.positional.get(0), null, ctx).code);
+        } else if (!sup.equals("RangeError") && !sup.equals("ArgumentError")
+                && !sup.equals("FormatException") && !sup.equals("ConcurrentModificationError") && n <= 1) {
+            // StateError, UnsupportedError, UnimplementedError, TypeError, NoSuchMethodError,
+            // AssertionError: one message, which Dart's own constructors may leave null.
+            res = coreStringArg(a, 0, ctx);
+        }
+        if (res == null) {
+            diags.error(ct, "E0131", "cannot run super" + (named != null ? "." + named : "")
+                    + " of " + sup + " with these arguments from a subclass constructor");
+        }
+        return res;
+    }
+
+    /// The dart:core error a program class type inherits from through its superclass
+    /// chain (`class B extends A`, `class A extends StateError`), or null.
+    private TypeRef coreErrorAncestorType(TypeRef t) {
+        if (t == null || t.name == null || t.runtimeOnly) {
+            return null;
+        }
+        ClassDecl c = t.resolved != null ? t.resolved : program.classes.get(t.name);
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        while (c != null && seen.add(c)) {
+            String core = coreErrorSuperclass(c);
+            if (core != null) {
+                return new TypeRef(core);
+            }
+            c = c.superclass != null ? superDeclOf(c, c.superclass) : null;
+        }
+        return null;
+    }
+
+    /// Whether emitMemberGet reads getter `name` of dart:core error `core`; the same
+    /// members its core-error cases below handle.
+    private static boolean coreErrorGetter(String core, String name) {
+        if (core.equals("FormatException")) {
+            return name.equals("message") || name.equals("source") || name.equals("offset");
+        }
+        if (name.equals("message")) {
+            return !core.equals("TypeError") && !core.equals("ConcurrentModificationError");
+        }
+        if (core.equals("ArgumentError") || core.equals("RangeError")) {
+            return name.equals("invalidValue") || name.equals("name")
+                    || core.equals("RangeError") && (name.equals("start") || name.equals("end"));
+        }
+        return core.equals("ConcurrentModificationError") && name.equals("modifiedObject");
+    }
+
+    private String coreStringArg(Args a, int i, Ctx ctx) {
+        return i < a.positional.size()
+                ? "(String) " + paren(emitExpr(a.positional.get(i), TypeRef.STRING, ctx).code) : "(String) null";
+    }
+
+    private String coreLongArg(Args a, int i, Ctx ctx) {
+        return i < a.positional.size()
+                ? "(Long) " + paren(emitExpr(a.positional.get(i), TypeRef.INT, ctx).code) : "(Long) null";
     }
 
     private static Args superArgsOf(CtorDecl ct) {
@@ -14808,6 +14949,12 @@ public final class JavaEmitter {
             if (iface != null) {
                 return emitMemberGet(new Out("this", iface), n, id, ctx);
             }
+            // A getter inherited from the dart:core error the class extends (`message` in a
+            // `class E extends StateError`): read off `this`, as `this.message` is.
+            TypeRef core = coreErrorAncestorType(new TypeRef(cc.name));
+            if (core != null && coreErrorGetter(core.name, n)) {
+                return emitMemberGet(new Out("this", new TypeRef(cc.name)), n, id, ctx);
+            }
         }
         // A bare name in an extension body is first the extension's own getter: several
         // extensions on one type (`on Iterable<int>`, `on Iterable<num>`) may each declare
@@ -16394,10 +16541,17 @@ public final class JavaEmitter {
             rt = stubExtensionSubst(stubExt, tt, rt);
             return new Out(extSimple + "." + name + "(" + target.code + ")", rt);
         }
+        // A program class extending a dart:core error reads the getters it inherits from it
+        // exactly as the core type does: `et` is that core type for those members.
+        TypeRef et = tt;
+        TypeRef inheritedCore = coreErrorAncestorType(tt);
+        if (inheritedCore != null && coreErrorGetter(inheritedCore.name, name)) {
+            et = inheritedCore;
+        }
         // FormatException's members go through its virtual readers: a program class that
         // `implements FormatException` extends it and overrides message()/offset()/source(),
         // and getMessage() would answer the superclass's empty message instead.
-        if (tt.is("FormatException") && !program.classes.containsKey("FormatException")
+        if (et.is("FormatException") && !program.classes.containsKey("FormatException")
                 && (name.equals("message") || name.equals("source") || name.equals("offset"))) {
             TypeRef rt = name.equals("message") ? new TypeRef("String")
                     : name.equals("offset") ? new TypeRef("int") : new TypeRef("Object");
@@ -16406,23 +16560,23 @@ public final class JavaEmitter {
         }
         // `e.message` on dart:core's errors that declare one. Each maps to a Java exception
         // built from its message, so getMessage() is that field.
-        if (name.equals("message") && CORE_ERRORS.containsKey(tt.name) && !tt.is("Exception")
-                && !tt.is("TypeError") && !tt.is("ConcurrentModificationError")) {
+        if (name.equals("message") && CORE_ERRORS.containsKey(et.name) && !et.is("Exception")
+                && !et.is("TypeError") && !et.is("ConcurrentModificationError")) {
             TypeRef str = new TypeRef("String");
             str.nullable = true;
             return new Out(target.code + ".getMessage()", str);
         }
         // ArgumentError's own getters, which RangeError inherits and extends with the
         // range it was checked against (dart.core.ArgumentError / RangeError).
-        if ((tt.is("ArgumentError") || tt.is("RangeError")) && !program.classes.containsKey(tt.name)
+        if ((et.is("ArgumentError") || et.is("RangeError")) && !program.classes.containsKey(et.name)
                 && (name.equals("invalidValue") || name.equals("name")
-                        || (tt.is("RangeError") && (name.equals("start") || name.equals("end"))))) {
+                        || (et.is("RangeError") && (name.equals("start") || name.equals("end"))))) {
             TypeRef rt = name.equals("invalidValue") ? new TypeRef("Object")
                     : name.equals("name") ? new TypeRef("String") : new TypeRef("int");
             rt.nullable = true;
             return new Out(target.code + "." + name + "()", rt);
         }
-        if (name.equals("modifiedObject") && tt.is("ConcurrentModificationError")
+        if (name.equals("modifiedObject") && et.is("ConcurrentModificationError")
                 && !program.classes.containsKey("ConcurrentModificationError")) {
             TypeRef obj = new TypeRef("Object");
             obj.nullable = true;
@@ -21303,6 +21457,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(call, rt);
             }
             return new Out(call, sf.returnType);
+        }
+        // `toString()` with no receiver in a class extending a dart:core error: the Java
+        // class inherits (or overrides) the core error's toString, which is Dart's.
+        if (ctx.currentClass != null && n.equals("toString") && c.args.positional.isEmpty()
+                && c.args.named.isEmpty() && coreErrorAncestorType(new TypeRef(ctx.currentClass.name)) != null) {
+            return new Out("this.toString()", TypeRef.STRING);
         }
         diags.error(c, "E0135", "Cannot resolve function or constructor '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");

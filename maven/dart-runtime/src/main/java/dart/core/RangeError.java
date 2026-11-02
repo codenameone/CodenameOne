@@ -61,6 +61,17 @@ public class RangeError extends ArgumentError {
         this.kind = kind;
     }
 
+    /// A program subclass's `super(message)`, `super.range(..)` or `super.value(..)`:
+    /// Java cannot run the static factories as a super constructor, so `ctor` names the
+    /// Dart constructor ("message", "range" or "value") and the defaults are applied here.
+    protected RangeError(String ctor, Long value, Long min, Long max, String name, String message) {
+        super(value, !"message".equals(ctor), name, "message".equals(ctor) || message != null ? message
+                : "range".equals(ctor) ? "Invalid value" : "Value not in range");
+        this.start = min;
+        this.end = max;
+        this.kind = ctor;
+    }
+
     public Long start() {
         return start;
     }
