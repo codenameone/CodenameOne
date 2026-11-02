@@ -1709,7 +1709,9 @@ public final class JavaEmitter {
             }
             if (spellingBridged) {
                 body.append(emitJavaSpellingBridges(c, m, mm, ctx));
-            } else if (m.isOverride && !mm.isOverride && !c.isMixin) {
+            } else if (!mm.isOverride && !c.isMixin) {
+                // Not gated on `@override`: the annotation is optional in Dart, and a
+                // same-named instance member below a superclass's always overrides it.
                 body.append(emitCovariantBridge(c, m, mm, ctx));
             }
         }
@@ -2761,7 +2763,9 @@ public final class JavaEmitter {
             String narrowJava = javaType(narrow, false, ctx);
             String we = wideJava.indexOf('<') >= 0 ? wideJava.substring(0, wideJava.indexOf('<')) : wideJava;
             String ne = narrowJava.indexOf('<') >= 0 ? narrowJava.substring(0, narrowJava.indexOf('<')) : narrowJava;
-            if (we.equals(ne) || isJavaPrimitive(wideJava) || isJavaPrimitive(narrowJava)) {
+            // A primitive narrowing (`int x` over `covariant num x`) bridges too: set$x(Number)
+            // checks the value is an int and unboxes it into set$x(long).
+            if (we.equals(ne) || isJavaPrimitive(wideJava)) {
                 continue;
             }
             sb.append("    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    public void set$").append(f.name)
@@ -2874,6 +2878,11 @@ public final class JavaEmitter {
         return sb.toString();
     }
 
+    /// A setter has exactly one positional parameter, so it bridges like a plain method.
+    private static boolean bridgeableSetter(MethodDecl m) {
+        return !m.isStatic && !m.name.startsWith("$") && m.params.size() == 1 && !m.params.get(0).named;
+    }
+
     private static boolean bridgeable(MethodDecl m) {
         return bridgeable(m, false);
     }
@@ -2898,7 +2907,9 @@ public final class JavaEmitter {
      */
     private List<IfaceSig> interfaceSigs(ClassDecl c, MethodDecl m, Ctx ctx) {
         List<IfaceSig> out = new ArrayList<IfaceSig>();
-        if (m.isStatic || m.isSetter || m.name.startsWith("$")) {
+        // Setters included: `set s(Cat c)` implementing `set s(covariant Pet p)` needs the
+        // s(Pet) bridge, or a write through the interface reaches S$I's throwing default.
+        if (m.isStatic || m.name.startsWith("$")) {
             return out;
         }
         java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
@@ -2924,7 +2935,7 @@ public final class JavaEmitter {
             args.add(substTypeParams(a, outerNames, outerArgs));
         }
         for (MethodDecl sm : im.methods) {
-            if (sm.isStatic || sm.isSetter || sm.isGetter != m.isGetter || !sm.name.equals(m.name)
+            if (sm.isStatic || sm.isSetter != m.isSetter || sm.isGetter != m.isGetter || !sm.name.equals(m.name)
                     || sm.params.size() != m.params.size() || sm.typeParams.size() != m.typeParams.size()) {
                 continue;
             }
@@ -3292,7 +3303,9 @@ public final class JavaEmitter {
     /// accessor returns Number, which long does not override. Null when the field's own
     /// type serves. Readers that know the subclass cast the value back to the field's type.
     private String pinnedFieldGetter(ClassDecl c, FieldDecl f, Ctx ctx) {
-        if (f.isStatic || !f.isFinal && !f.isConst) {
+        // Mutable fields too: `int x` over `covariant num x` -- its setter is bridged by
+        // covariantFieldSetterBridges, and the getter must return the inherited Number.
+        if (f.isStatic) {
             return null;
         }
         TypeRef ft = fieldType(f, ctx);
@@ -3359,7 +3372,7 @@ public final class JavaEmitter {
             if (erased.equals(implErased)) {
                 continue;
             }
-            if (!bridgeable(m)) {
+            if (!(m.isSetter ? bridgeableSetter(m) : bridgeable(m))) {
                 diags.error(m, "E0405", c.name + "." + m.name + " implements " + sig.owner + "." + m.name
                         + " with a different signature, which cannot be bridged when the method"
                         + " has optional, named or type parameters");
@@ -4804,6 +4817,29 @@ public final class JavaEmitter {
                 // primitive: `implements EventSink<int>` substitutes add(Long) while the
                 // Dart `add(int)` is emitted as add(long), so the boxed spelling is bridged.
                 String prim = javaType(narrow, false, ctx);
+                Map<String, TypeRef> chainArgs = found.length > 3 ? (Map<String, TypeRef>) found[3] : null;
+                TypeRef sub = chainArgs == null || !ownerTypeParams.contains(wide.name) ? null : chainArgs.get(wide.name);
+                if (!isJavaPrimitive(prim) && sub != null && sub.funcParams == null
+                        && !c.typeParams.contains(sub.name) && !isJavaPrimitive(javaType(sub, false, ctx))) {
+                    // `GS extends G<Pet>` narrowing G's put(T) to put(covariant Cat): Java sees
+                    // put(Pet) as G's method in GS, so the bridge takes the substituted
+                    // argument's erasure. When it already equals the narrowed type, the
+                    // method overrides by itself and this parameter needs no bridging.
+                    String subJava = javaType(sub, false, ctx);
+                    String subErased = subJava.indexOf('<') >= 0 ? subJava.substring(0, subJava.indexOf('<')) : subJava;
+                    String nj = javaType(narrow, false, ctx);
+                    String narrowErased0 = nj.indexOf('<') >= 0 ? nj.substring(0, nj.indexOf('<')) : nj;
+                    if (!subErased.equals(narrowErased0)) {
+                        differs = true;
+                    }
+                    if (i > 0) {
+                        sig.append(", ");
+                        call.append(", ");
+                    }
+                    sig.append(subErased).append(" $b").append(i);
+                    call.append(checkedBridgeArg("$b" + i, narrow, ctx));
+                    continue;
+                }
                 String boxed = "long".equals(prim) ? "Long" : "double".equals(prim) ? "Double"
                         : "boolean".equals(prim) ? "Boolean" : null;
                 // A collection-mixin class already emits that element side boxed itself.
@@ -4912,8 +4948,18 @@ public final class JavaEmitter {
      */
     private Object[] widerBaseMethod(ClassDecl c, MethodDecl m) {
         ClassDecl p = c;
+        // The superclass chain's type arguments as c sees them: `GS extends G<Pet>` maps
+        // G's T to Pet, so a `put(T)` two levels up is known to be put(Pet) in Java.
+        Map<String, TypeRef> subst = new LinkedHashMap<String, TypeRef>();
         while (p != null && p.superclass != null) {
             ClassDecl sp = superDeclOf(p, p.superclass);
+            if (sp != null) {
+                Map<String, TypeRef> next = new LinkedHashMap<String, TypeRef>();
+                for (int i = 0; i < sp.typeParams.size() && i < p.superclass.args.size(); i++) {
+                    next.put(sp.typeParams.get(i), substituteTypeParams(p.superclass.args.get(i), subst));
+                }
+                subst = next;
+            }
             if (sp == null) {
                 Object[] s = widerStubMethod(p.superclass.name, m);
                 if (s != null) {
@@ -4924,7 +4970,7 @@ public final class JavaEmitter {
             MethodDecl sm = sp.method(m.name);
             if (sm != null && !sm.isGetter && !sm.isSetter && !sm.isStatic) {
                 if (sm.params.size() == m.params.size() && !sameParamTypes(sm.params, m.params)) {
-                    return new Object[] {sm, sp.typeParams, sp};
+                    return new Object[] {sm, sp.typeParams, sp, subst};
                 }
                 return null;
             }
@@ -10496,7 +10542,21 @@ public final class JavaEmitter {
         }
         if (o instanceof List) {
             for (Object e : (List<?>) o) {
-                scanReifiedChecks(e, seen);
+                if (e instanceof TypeRef) {
+                    // A type argument list (`Box<int Function(int)>(..)`): a function type
+                    // there can become a class's witness, which a covariant write tests
+                    // with Dart's function subtyping -- against a closure's signature.
+                    functionTypeTested |= mentionsFunctionType((TypeRef) e);
+                } else {
+                    scanReifiedChecks(e, seen);
+                }
+            }
+            return;
+        }
+        if (o instanceof TypeRef) {
+            // A declared type (`Box<int Function(int)> b`): its type arguments, as above.
+            for (TypeRef a : ((TypeRef) o).args) {
+                functionTypeTested |= mentionsFunctionType(a);
             }
             return;
         }
@@ -10534,6 +10594,21 @@ public final class JavaEmitter {
                 }
             }
         }
+    }
+
+    private static boolean mentionsFunctionType(TypeRef t) {
+        if (t == null) {
+            return false;
+        }
+        if (t.funcReturn != null) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsFunctionType(a)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void noteReifiedType(TypeRef t) {
@@ -11862,6 +11937,17 @@ public final class JavaEmitter {
         }
         boolean nullable = t.nullable || t.is("dynamic") || t.is("var") || t.is("Null")
                 || t.is("void");
+        if (t.funcReturn != null && t.funcParams != null) {
+            // `Box<int Function(int)>`: the erased SAM alone would accept any one-argument
+            // function, so a covariant write of `(String s) => s` through a Box<Object>
+            // passed. The witness tests Dart's function subtyping, as `is` does.
+            String erased = erasedJavaType(t, ctx);
+            String test = functionTest("$twf", t, erased, ctx);
+            if (test != null) {
+                return "dart.runtime.TypeWitness.function(" + erased + ".class, " + nullable
+                        + ", ($twf) -> " + test + ")";
+            }
+        }
         String nested = reifiedHead(t, ctx) != null ? reifiedArgWitnesses(t, ctx) : "";
         return "dart.runtime.TypeWitness.of(" + erasedJavaType(t, ctx) + ".class, " + nullable + nested + ")";
     }

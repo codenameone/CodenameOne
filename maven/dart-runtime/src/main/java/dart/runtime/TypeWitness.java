@@ -49,10 +49,28 @@ public final class TypeWitness {
     /// Parameterized witnesses derived from this plain one, interned by argument identity.
     private java.util.ArrayList<TypeWitness> derived;
 
+    /// Dart's function subtyping for a function-type witness ({@link #function}), or null.
+    private Tester tester;
+
     private TypeWitness(Class<?> type, boolean nullable, TypeWitness[] args) {
         this.type = type;
         this.nullable = nullable;
         this.args = args;
+    }
+
+    /// The full test of a non-null value against a function type, as `is` lowers it.
+    public interface Tester {
+        boolean test(Object value);
+    }
+
+    /// The witness of a function type such as `int Function(int)`: its erased SAM class
+    /// {@code sam} alone would admit every function of that arity, so a value is tested
+    /// by {@code tester}, which applies Dart's function subtyping. Not interned: each
+    /// carries its own signature.
+    public static TypeWitness function(Class<?> sam, boolean nullable, Tester tester) {
+        TypeWitness w = new TypeWitness(sam, nullable, null);
+        w.tester = tester;
+        return w;
     }
 
     /// The interned witness of {@code type}.
@@ -148,6 +166,9 @@ public final class TypeWitness {
         if (w.nullable) {
             return w;
         }
+        if (w.tester != null) {
+            return function(w.type, true, w.tester);
+        }
         if (w.args == null) {
             return of(w.type, true);
         }
@@ -166,7 +187,10 @@ public final class TypeWitness {
 
     /// Whether {@code value} is an instance of the witnessed type (erased below the top level).
     public boolean test(Object value) {
-        return value == null ? nullable : type.isInstance(value);
+        if (value == null) {
+            return nullable;
+        }
+        return tester != null ? tester.test(value) : type.isInstance(value);
     }
 
     /// Dart's covariant subtype test of a reified type argument: whether a value whose
