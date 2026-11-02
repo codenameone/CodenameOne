@@ -106,6 +106,25 @@ class CityRouteTest {
         assertThrows(IllegalArgumentException.class, () -> CityRoute.decode(null));
     }
 
+    /// The developer guide's two examples, compiled and run here.
+    @Test
+    void theGuidesRoutesBuildLevels() {
+        // tag::dash-city-route[]
+        CityRoute route = new CityRoute("Old Harbour")
+                .leg(420, CityRoute.STRAIGHT, "Quay Street")
+                .leg(310, CityRoute.LEFT, "Rope Walk");
+        LevelDef level = route.level();
+        // end::dash-city-route[]
+        assertEquals(level.id, route.level().id);
+        // tag::dash-city-landmark[]
+        CityRoute withPlace = new CityRoute("Old Harbour")
+                .leg(420, CityRoute.STRAIGHT, "Quay Street")
+                .landmark(180, CityRoute.MUSEUM, "Maritime Museum");
+        // end::dash-city-landmark[]
+        assertTrue(!withPlace.id().equals(new CityRoute("Old Harbour")
+                .leg(420, CityRoute.STRAIGHT, "Quay Street").id()));
+    }
+
     @Test
     void landmarksRoundTripAndShowWhereTheyStand() {
         CityRoute r = new CityRoute("City of London").leg(500, CityRoute.STRAIGHT, "Cannon Street")

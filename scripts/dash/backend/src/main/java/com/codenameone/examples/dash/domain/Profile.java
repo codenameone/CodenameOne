@@ -51,7 +51,7 @@ public class Profile {
     @Column(nullable = false)
     private int gems;
 
-    @Column(nullable = false, type = "VARCHAR(255)")
+    @Column(nullable = false, type = "VARCHAR(40)")
     private String runner = "runner-dash";
 
     @Column(nullable = false, type = "VARCHAR(1000)")

@@ -56,9 +56,7 @@ public class VirtualButton {
     /// Pins this button to a corner of the view's safe area (using `TouchControls#LEFT`
     /// etc.); `TouchControls` recomputes its center as the view resizes or rotates.
     /// `marginX`/`marginY` are the gaps from the safe-area edges to the button's edge.
-    /// Separate margins let two controls share a corner, side by side or one above
-    /// the other.
-    public void setAnchor(int hAlign, int vAlign, float marginX, float marginY) {
+    void setAnchor(int hAlign, int vAlign, float marginX, float marginY) {
         this.anchored = true;
         this.anchorH = hAlign;
         this.anchorV = vAlign;

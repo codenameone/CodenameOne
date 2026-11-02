@@ -51,8 +51,8 @@ include::../demos/common/src/main/snippets/developer-guide/dash.sh[tag=dash-sh-t
 
 A new player is taken straight into *First Steps*, a short level in which a coach
 introduces one move at a time: jump the hurdle, slide under the barrier, change lanes
-around the hauler. On a touch screen four buttons sit under the thumbs -- left and
-right on one side, jump over slide on the other -- drawn by the framework's
+around the hauler. On a touch screen four buttons sit under the thumbs -- left
+with slide above it in one corner, right with jump above it in the other -- drawn by the framework's
 `TouchControls`; swipes and taps work anywhere else, and the settings can hide the
 buttons. On a desktop the keyboard (arrows, WASD and space) drives the same four
 inputs.
@@ -277,10 +277,7 @@ two streets meet, and hands the result to the rules as a `CityRoute`:
 
 [source,java,role=cn1-no-try]
 ----
-CityRoute route = new CityRoute("Old Harbour")
-        .leg(420, CityRoute.STRAIGHT, "Quay Street")
-        .leg(310, CityRoute.LEFT, "Rope Walk");
-LevelDef level = route.level();
+include::../../scripts/dash/rules/src/test/java/com/codenameone/examples/dash/rules/CityRouteTest.java[tag=dash-city-route,indent=0]
 ----
 
 `level()` is deterministic, so the server needs no map. A city run's result
@@ -309,9 +306,7 @@ same boards:
 
 [source,java,role=cn1-no-try]
 ----
-CityRoute route = new CityRoute("Old Harbour")
-        .leg(420, CityRoute.STRAIGHT, "Quay Street")
-        .landmark(180, CityRoute.MUSEUM, "Maritime Museum");
+include::../../scripts/dash/rules/src/test/java/com/codenameone/examples/dash/rules/CityRouteTest.java[tag=dash-city-landmark,indent=0]
 ----
 
 The public Overpass server is shared and rate limited. A game with players points

@@ -966,11 +966,12 @@ public class RunView extends GameView {
     private VirtualButton[] buttons = new VirtualButton[0];
 
     /// On a touch screen the four moves are buttons too, drawn and tracked by
-    /// the framework's [TouchControls]: left and right under the left thumb,
-    /// jump (^) over slide (v) under the right. They press the same game keys the
-    /// arrow keys do, so [#input()] reads them with the keyboard, and swipes
-    /// keep working everywhere else on the screen. A desktop has a keyboard,
-    /// and a player who swipes can turn them off in the settings.
+    /// the framework's [TouchControls]: left in the bottom left corner with
+    /// slide (v) above it, right in the bottom right corner with jump (^)
+    /// above it, so each thumb steers toward its own side. They press the same
+    /// game keys the arrow keys do, so [#input()] reads them with the keyboard,
+    /// and swipes keep working everywhere else on the screen. A desktop has a
+    /// keyboard, and a player who swipes can turn them off in the settings.
     private void touchButtons() {
         if (!driver.interactive() || !Display.getInstance().isTouchScreenDevice() || CN.isDesktop()
                 || !Preferences.get(BUTTONS_KEY, true)) {
@@ -979,19 +980,19 @@ public class RunView extends GameView {
         TouchControls c = getControls();
         float r = CN.convertToPixels(6.5f);
         float gap = CN.convertToPixels(3);
-        float step = r * 2 + CN.convertToPixels(2.5f);
+        // A corner anchor takes one margin for both edges, so the second
+        // button of a corner sits diagonally inward from the first.
+        float inner = gap + r * 1.6f;
         buttons = new VirtualButton[] {
-            button(c, Display.GAME_LEFT, "<", TouchControls.LEFT, gap, gap + step * 0.5f),
-            button(c, Display.GAME_RIGHT, ">", TouchControls.LEFT, gap + step, gap + step * 0.5f),
-            button(c, Display.GAME_UP, "^", TouchControls.RIGHT, gap, gap + step),
-            button(c, Display.GAME_DOWN, "v", TouchControls.RIGHT, gap, gap)
+            button(c, Display.GAME_LEFT, "<", r, TouchControls.LEFT, gap),
+            button(c, Display.GAME_DOWN, "v", r, TouchControls.LEFT, inner),
+            button(c, Display.GAME_RIGHT, ">", r, TouchControls.RIGHT, gap),
+            button(c, Display.GAME_UP, "^", r, TouchControls.RIGHT, inner)
         };
     }
 
-    private static VirtualButton button(TouchControls c, int action, String label, int h, float mx, float my) {
-        VirtualButton b = c.addButton(Display.getInstance().getKeyCode(action), CN.convertToPixels(6.5f),
-                h, TouchControls.BOTTOM, 0);
-        b.setAnchor(h, TouchControls.BOTTOM, mx, my);
+    private static VirtualButton button(TouchControls c, int action, String label, float r, int h, float margin) {
+        VirtualButton b = c.addButton(Display.getInstance().getKeyCode(action), r, h, TouchControls.BOTTOM, margin);
         b.setLabel(label);
         b.setColor(0x662ee6ff);
         return b;
