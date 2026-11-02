@@ -195,7 +195,19 @@ public final class TypeWitness {
         if (value == null) {
             return nullable;
         }
-        return tester != null ? tester.test(value) : type.isInstance(value);
+        if (tester != null) {
+            return tester.test(value);
+        }
+        if (args != null && args.length > 0) {
+            // A core collection's witness with element arguments (`List<String>`): the
+            // arguments the collection recorded are compared, as `is List<String>` does.
+            int kind = type == dart.core.DartList.class ? LIST : type == dart.core.DartSet.class ? SET
+                    : type == dart.core.DartMap.class ? MAP : type == dart.core.DartIterable.class ? ITERABLE : -1;
+            if (kind >= 0) {
+                return isCollectionOf(value, kind, type, args[0], args.length > 1 ? args[1] : null);
+            }
+        }
+        return type.isInstance(value);
     }
 
     /// Dart's covariant subtype test of a reified type argument: whether a value whose
@@ -468,7 +480,8 @@ public final class TypeWitness {
             return "dynamic";
         }
         StringBuilder sb = new StringBuilder(DartRuntime.str(type));
-        if (args != null) {
+        // A primitive-backed list class already names its element type (`List<int>`).
+        if (args != null && type != dart.core.DartLongList.class && type != dart.core.DartDoubleList.class) {
             sb.append('<');
             for (int i = 0; i < args.length; i++) {
                 if (i > 0) {

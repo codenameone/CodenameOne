@@ -1,0 +1,17 @@
+R true
+R2 true
+sq
+DC true
+DL true
+AS true
+2
+String
+List<int>
+List<double>
+(int) => int
+DF true
+AS2 true
+AS3 true
+[1]
+null
+AS4 true

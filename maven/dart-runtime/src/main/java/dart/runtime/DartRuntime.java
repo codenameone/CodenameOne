@@ -833,6 +833,15 @@ public final class DartRuntime {
         return v;
     }
 
+    /// A dynamic call's argument for a parameter declared `int`: a double is a TypeError,
+    /// as in Dart, never truncated to the int a Java `longValue()` would make of it.
+    public static Number intArg(Number v) {
+        if (v instanceof Double || v instanceof Float) {
+            throw new TypeError("type '" + typeName(v) + "' is not a subtype of type 'int'");
+        }
+        return v;
+    }
+
     /// `v as T` for a type variable T whose witness {@code w} is in scope (a generic
     /// closure's or method's own): the checked cast, answering {@code v}. A null witness is
     /// a type argument nobody could name, which is not tested.
