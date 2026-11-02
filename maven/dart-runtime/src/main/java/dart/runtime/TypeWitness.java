@@ -41,6 +41,11 @@ public final class TypeWitness {
     /// argument nothing could record.
     public static final TypeWitness DYNAMIC = new TypeWitness(Object.class, true, null);
 
+    /// Dart's `Object?` where it must print as written: the parameter of a tear-off whose
+    /// parameter is covariant (`D<num>().take` is `(Object?) => void`). It tests as any
+    /// other nullable Object witness; the plain `of(Object.class, true)` prints `Object`.
+    public static final TypeWitness OBJECT_NULLABLE = new TypeWitness(Object.class, true, null);
+
     private final Class<?> type;
     private final boolean nullable;
     /// The witnesses of a program generic class's own type arguments
@@ -440,6 +445,11 @@ public final class TypeWitness {
 
     /// Dart's runtimeType of {@code o}: a reified generic instance answers its arguments.
     public static Object runtimeType(Object o) {
+        if (o instanceof dart.core.MixinView) {
+            // A view (a boxed List<int> seen as DartLongList, a program Set seen as a Set)
+            // is the object behind it, whose type is the one Dart reports.
+            return runtimeType(((dart.core.MixinView) o).source());
+        }
         if (o instanceof Reified) {
             return ((Reified) o).$runtimeType();
         }
@@ -467,6 +477,9 @@ public final class TypeWitness {
                 sb.append(args[i] == null ? "dynamic" : args[i].toString());
             }
             sb.append('>');
+        }
+        if (this == OBJECT_NULLABLE) {
+            return "Object?";
         }
         if (nullable && type != Object.class) {
             sb.append('?');

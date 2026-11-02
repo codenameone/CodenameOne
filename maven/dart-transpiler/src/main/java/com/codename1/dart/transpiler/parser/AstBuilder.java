@@ -2653,7 +2653,8 @@ public final class AstBuilder {
         return false;
     }
 
-    private static String dartSpelling(TypeRef t) {
+    /// The Dart spelling of a type (`List<T>`, `(V) => K`), as a generic signature slot.
+    public static String dartSpelling(TypeRef t) {
         if (t == null || t.is("var")) {
             return "dynamic";
         }
@@ -2762,8 +2763,15 @@ public final class AstBuilder {
             }
             l.typeVarSlots.add(null);
             for (Param p : l.params) {
-                l.typeVarSlots.add(typeVarName(p.type, l.typeParams));
-                p.type = eraseTypeParams(p.type, l.typeParams);
+                String slot = typeVarName(p.type, l.typeParams);
+                l.typeVarSlots.add(slot);
+                // A bare `T x` is typed by its slot (the instantiation's witness); a type
+                // built from one (`List<T> xs`) is kept, so the body types it and a call
+                // instantiates it with the call's type arguments.
+                if (p.type != null && p.type.args.isEmpty() && p.type.funcParams == null
+                        && l.typeParams.contains(p.type.name)) {
+                    p.type = eraseTypeParams(p.type, l.typeParams);
+                }
             }
         }
         Dart2Parser.FunctionExpressionBodyContext body = ctx.functionExpressionBody();

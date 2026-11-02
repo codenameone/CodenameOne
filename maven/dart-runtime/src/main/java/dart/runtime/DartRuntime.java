@@ -823,6 +823,24 @@ public final class DartRuntime {
         }
     }
 
+    /// The caller-side check of an argument for a generic-covariant parameter (`void
+    /// take(T x)` called through a `D<num>` that is an `E extends D<int>`): {@code v}
+    /// tested against the receiver's witness {@code w}, then answered with its own static
+    /// type. It runs before the call, because javac's bridge into an override with a
+    /// narrower Java type casts first, and that cast is unchecked on ParparVM.
+    public static <T> T checkedArg(T v, TypeWitness w) {
+        checkWitness(v, w);
+        return v;
+    }
+
+    /// `v as T` for a type variable T whose witness {@code w} is in scope (a generic
+    /// closure's or method's own): the checked cast, answering {@code v}. A null witness is
+    /// a type argument nobody could name, which is not tested.
+    public static Object asWitness(Object v, TypeWitness w) {
+        checkWitness(v, w);
+        return v;
+    }
+
     /// `num.round()`, `floor()` and `ceil()` on a value typed only num: an int answers
     /// itself, a double rounds as double's method does (UnsupportedError for NaN and the
     /// infinities). {@code mode} is 'r', 'f' or 'c'.
