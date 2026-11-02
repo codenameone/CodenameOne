@@ -95,7 +95,7 @@ Future<void> main() async {
   h.relays = [Relay<int>(1), Relay<String>('b'), Relay<Object?>(null)];
   print(h.fireAll());
 
-  final List<Object> mixed = [Relay<int>(1), 'not a relay', 3, Relay<int>(2), <int>[5], <String>['s']];
+  final List<Object> mixed = [Relay<int>(1), Relay<String>('c'), 'not a relay', 3, Relay<int>(2), <int>[5], <String>['s']];
   final ints = mixed.whereType<Relay<int>>().toList();
   print(ints.map((r) => r.value + 1).toList());
   print(mixed.whereType<Relay>().length);

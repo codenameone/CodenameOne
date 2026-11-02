@@ -1,0 +1,8 @@
+ListPile<int> of 3
+list
+tag<int>
+ListPile<int>
+true
+read
+a,b
+true

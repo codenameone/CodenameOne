@@ -23,6 +23,15 @@ class ReadOnlyBag {
 
 Never fail(String why) => throw StateError(why);
 
+class Guard {
+  Never stop(String why) => throw ArgumentError(why);
+}
+
+int throughReceiver(Guard g, int x) {
+  if (x > 0) return x;
+  g.stop('not positive: $x');
+}
+
 String pick(int i) {
   if (i == 0) return 'zero';
   fail('no name for $i');
@@ -38,6 +47,12 @@ Future<void> main() async {
     }
   }
   print(pick(0));
+  print(throughReceiver(Guard(), 2));
+  try {
+    throughReceiver(Guard(), -1);
+  } catch (e) {
+    print(e);
+  }
   try {
     await bag.removeLater(2);
   } catch (e) {

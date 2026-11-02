@@ -227,7 +227,13 @@ public final class JavaEmitter {
                     } else if (c.isMixin) {
                         addMapped(out, emitMixin(c), dart);
                     } else {
+                        int at = out.size();
                         addMapped(out, emitClass(c), dart);
+                        for (MixinImplementer mi : mixinImplementers) {
+                            if (mi.decl == c) {
+                                mi.outIndex = at;
+                            }
+                        }
                         for (GeneratedFile extra : pendingFiles) {
                             addMapped(out, extra, dart);
                         }
@@ -274,13 +280,74 @@ public final class JavaEmitter {
     /** A class that applies program mixins and implements an interfaced class (see below). */
     private static final class MixinImplementer {
         final String jname;
-        final List<String> interfaceTypes = new ArrayList<String>();
+        final ClassDecl decl;
+        /** Where the class's file is in the emitted list; -1 until it is added. */
+        int outIndex = -1;
+        /** Each interfaced class implemented, with its Java type arguments as spelled. */
+        final List<ClassDecl> interfaces = new ArrayList<ClassDecl>();
+        final List<List<String>> interfaceArgs = new ArrayList<List<String>>();
         final java.util.LinkedHashMap<String, java.util.Set<String>> mixins =
                 new java.util.LinkedHashMap<String, java.util.Set<String>>();
 
-        MixinImplementer(String jname) {
+        MixinImplementer(String jname, ClassDecl decl) {
             this.jname = jname;
+            this.decl = decl;
         }
+    }
+
+    /**
+     * What emitImplicitInterface put in {@code X$I}, kept as declarations rather than read
+     * back from its text: its type parameter names, the head of every default it declares
+     * (written in X's own type variables), its interfaced superinterfaces with the Java
+     * type arguments X passes them, and the imports those heads may name.
+     */
+    private static final class ImplicitIface {
+        final List<String> typeParams = new ArrayList<String>();
+        final List<String> heads = new ArrayList<String>();
+        final List<ClassDecl> supers = new ArrayList<ClassDecl>();
+        final List<List<String>> superArgs = new ArrayList<List<String>>();
+        final List<String> imports = new ArrayList<String>();
+    }
+
+    private final java.util.Map<ClassDecl, ImplicitIface> implicitIfaces =
+            new java.util.IdentityHashMap<ClassDecl, ImplicitIface>();
+
+    /** The type arguments of a spelled Java type ({@code V$I<Long, String>}); empty when raw. */
+    private static List<String> javaTypeArgs(String spelled) {
+        int lt = spelled.indexOf('<');
+        List<String> args = new ArrayList<String>();
+        if (lt < 0) {
+            return args;
+        }
+        for (String a : splitTopLevel(spelled.substring(lt + 1, spelled.lastIndexOf('>')))) {
+            args.add(a.trim());
+        }
+        return args;
+    }
+
+    /**
+     * {@code text} with every type variable of {@code params} replaced, all at once, by the
+     * matching entry of {@code args} -- by the erasure (Object) when the type is used raw.
+     * Only whole identifiers that are not qualified or part of a longer name are replaced.
+     */
+    private static String substituteTypeVars(String text, List<String> params, List<String> args) {
+        if (params.isEmpty()) {
+            return text;
+        }
+        java.util.Map<String, String> to = new java.util.HashMap<String, String>();
+        StringBuilder alt = new StringBuilder();
+        for (int i = 0; i < params.size(); i++) {
+            to.put(params.get(i), i < args.size() ? args.get(i) : "Object");
+            alt.append(alt.length() > 0 ? "|" : "").append(java.util.regex.Pattern.quote(params.get(i)));
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "(?<![\\w$.])(" + alt + ")(?![\\w$])").matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(to.get(m.group(1))));
+        }
+        m.appendTail(sb);
+        return sb.toString();
     }
 
     private final List<MixinImplementer> mixinImplementers = new ArrayList<MixinImplementer>();
@@ -298,52 +365,46 @@ public final class JavaEmitter {
         if (mixinImplementers.isEmpty()) {
             return;
         }
-        java.util.Map<String, Integer> index = new java.util.HashMap<String, Integer>();
-        for (int i = 0; i < out.size(); i++) {
-            GeneratedFile g = out.get(i);
-            if (g != null && g.relativePath.endsWith(".java")) {
-                String base = g.relativePath.substring(g.relativePath.lastIndexOf('/') + 1);
-                index.put(base.substring(0, base.length() - 5), i);
-            }
-        }
-        java.util.regex.Pattern defaultHead = java.util.regex.Pattern.compile("^    default (.*\\))\\s*\\{\\s*$");
         for (MixinImplementer mi : mixinImplementers) {
-            Integer ci = index.get(mi.jname);
+            Integer ci = mi.outIndex >= 0 && mi.outIndex < out.size() && out.get(mi.outIndex) != null
+                    ? Integer.valueOf(mi.outIndex) : null;
             if (ci == null) {
                 continue;
             }
             String cls = out.get(ci).content;
             List<String> heads = new ArrayList<String>();
             java.util.Set<String> imports = new java.util.LinkedHashSet<String>();
-            java.util.Set<String> visited = new HashSet<String>();
-            List<String> work = new ArrayList<String>(mi.interfaceTypes);
+            // Walk the interfaced supertypes as declared, carrying the type arguments down:
+            // a head of V$I<E> is written in E, so in a class implementing V$I<Long> it is
+            // rewritten in Long before it is used -- as is every head of V's own interfaced
+            // supertypes, through the arguments V passes them.
+            java.util.Set<ClassDecl> visited = java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<ClassDecl, Boolean>());
+            List<ClassDecl> work = new ArrayList<ClassDecl>(mi.interfaces);
+            List<List<String>> workArgs = new ArrayList<List<String>>(mi.interfaceArgs);
             while (!work.isEmpty()) {
-                String it = work.remove(work.size() - 1);
-                Integer ii = index.get(it);
-                if (!visited.add(it) || ii == null) {
+                ClassDecl it = work.remove(work.size() - 1);
+                List<String> args = workArgs.remove(workArgs.size() - 1);
+                ImplicitIface rec = implicitIfaces.get(it);
+                if (rec == null || !visited.add(it)) {
                     continue;
                 }
-                String src = out.get(ii).content;
-                for (String line : src.split("\n")) {
-                    if (line.startsWith("import ") && !cls.contains("\n" + line + "\n")) {
-                        // A forwarder head is copied as written there (`DartList<E> toList`).
+                for (String line : rec.imports) {
+                    if (!cls.contains("\n" + line + "\n")) {
+                        // A forwarder head names types as the interface's file imports them.
                         imports.add(line);
                     }
-                    java.util.regex.Matcher dm = defaultHead.matcher(line);
-                    if (dm.matches()) {
-                        heads.add(dm.group(1).trim());
-                    }
                 }
-                java.util.regex.Matcher ex = java.util.regex.Pattern.compile(
-                        "interface \\S+ extends ([^{]*)\\{").matcher(src);
-                if (ex.find()) {
-                    for (String sup : splitTopLevel(ex.group(1))) {
-                        String raw = sup.trim();
-                        raw = raw.indexOf('<') < 0 ? raw : raw.substring(0, raw.indexOf('<'));
-                        if (raw.endsWith("$I")) {
-                            work.add(raw);
-                        }
+                for (String head : rec.heads) {
+                    heads.add(substituteTypeVars(head, rec.typeParams, args));
+                }
+                for (int i = 0; i < rec.supers.size(); i++) {
+                    List<String> passed = new ArrayList<String>();
+                    for (String a : rec.superArgs.get(i)) {
+                        passed.add(substituteTypeVars(a, rec.typeParams, args));
                     }
+                    work.add(rec.supers.get(i));
+                    workArgs.add(passed);
                 }
             }
             StringBuilder add = new StringBuilder();
@@ -842,7 +903,7 @@ public final class JavaEmitter {
      * </pre>
      *
      * <p>which threw {@code ExceptionInInitializerError} on the class's very
-     * first use — the whole study failed to open. Only initialisers that
+     * first use -- the whole study failed to open. Only initialisers that
      * cannot depend on anything (a bare literal) stay plain fields, so the
      * common {@code const kPadding = 8.0} keeps reading as a constant.</p>
      */
@@ -1003,7 +1064,7 @@ public final class JavaEmitter {
     /**
      * A top-level variable as a lazily-initialised accessor pair. Named
      * {@code get$x} / {@code set$x} so reads and writes route through the
-     * emitter's existing accessor handling — {@code x = v} becomes
+     * emitter's existing accessor handling -- {@code x = v} becomes
      * {@code Lib.set$x(v)} with no special case at the assignment site.
      */
     private String emitLazyTopLevel(FieldDecl v, TypeRef vt, String jt, Ctx ctx) {
@@ -1151,7 +1212,7 @@ public final class JavaEmitter {
     }
 
     /**
-     * extension X on T { ... } — a final class of static methods whose first
+     * extension X on T { ... } -- a final class of static methods whose first
      * parameter is the receiver ($self). Bodies see `this` as $self; bare
      * member CALLS are probed against the receiver type (intrinsics, stubs,
      * other extensions); bare PROPERTY access needs explicit `this.`.
@@ -1262,7 +1323,7 @@ public final class JavaEmitter {
     }
 
     /**
-     * mixin M { ... } — a Java interface with default methods; mixin fields
+     * mixin M { ... } -- a Java interface with default methods; mixin fields
      * become abstract get$x/set$x accessor pairs that the applying class
      * synthesizes (Java interfaces hold no state).
      */
@@ -1396,7 +1457,9 @@ public final class JavaEmitter {
                         .append(javaType(itf.arg(0), true, ctx)).append('>');
             }
         }
-        return finishClassFile(mx.name, "public interface " + mx.name + typeParams,
+        // javaClassName: a mixin sharing its name with another library's declaration is
+        // emitted, and referred to, under its library-qualified name like any class.
+        return finishClassFile(javaClassName(mx), "public interface " + javaClassName(mx) + typeParams,
                 mext.length() == 0 ? null : mext.toString(), null, body, ctx, mx.file);
     }
 
@@ -1404,7 +1467,7 @@ public final class JavaEmitter {
         Ctx ctx = new Ctx(c);
         StringBuilder body = new StringBuilder();
 
-        // fields — Dart initializes statics lazily and order-independently, but Java runs
+        // fields -- Dart initializes statics lazily and order-independently, but Java runs
         // static field initializers top-to-bottom, so a static whose initializer reads a
         // later static reads null. Reorder statics so dependencies initialize first.
         for (FieldDecl f : orderStaticFieldsByDependency(c)) {
@@ -1481,8 +1544,18 @@ public final class JavaEmitter {
         for (String tw : witnessParams(c)) {
             body.append("    public dart.runtime.TypeWitness ").append(witnessField(c, tw)).append(";\n");
         }
+        body.append(reifiedTestMethod(c, javaClassName(c)));
+        body.append(implementedWitnessAccessors(c, ctx));
         ClassDecl twSuper = c.superclass != null ? superDeclOf(c, c.superclass) : null;
-        boolean implicitWitnessCtor = c.ctors.isEmpty()
+        boolean onlyFactories = !c.ctors.isEmpty();
+        for (CtorDecl ct0 : c.ctors) {
+            if (!ct0.isFactory) {
+                onlyFactories = false;
+            }
+        }
+        // A class whose constructors are all factories has no generative one, yet its
+        // Java subclasses (or implicit default) still construct through it, witnesses included.
+        boolean implicitWitnessCtor = (c.ctors.isEmpty() || (onlyFactories && !c.isMixin))
                 && (!witnessParams(c).isEmpty() || (twSuper != null && !witnessParams(twSuper).isEmpty()));
         // constructors
         if (needsMarker(c)) {
@@ -1496,6 +1569,9 @@ public final class JavaEmitter {
             body.append("    ").append(javaClassName(c)).append("($NamedCtor $marker) {\n");
             if (markerSuper != null) {
                 body.append("        super((").append(javaClassName(markerSuper)).append(".$NamedCtor) null);\n");
+            } else if (mixinSuperWitnessCall(c, true, c, ctx) != null) {
+                // The marker chain has no witnesses to hand on; the mixin's stay unknown.
+                body.append("        ").append(mixinSuperWitnessCall(c, true, c, ctx)).append('\n');
             }
             body.append("    }\n\n");
             if (c.ctors.isEmpty() && !implicitWitnessCtor) {
@@ -1521,6 +1597,8 @@ public final class JavaEmitter {
             Ctx.Writer iw = ctx.pushWriter(2);
             if (twSuper != null && !witnessParams(twSuper).isEmpty()) {
                 iw.line("super(" + stripTrailingComma(witnessArgs(twSuper, c.superclass.args, c, ctx)) + ");");
+            } else if (mixinSuperWitnessCall(c, false, c, ctx) != null) {
+                iw.line(mixinSuperWitnessCall(c, false, c, ctx));
             }
             storeWitnesses(c, "this", true, false, iw, ctx);
             body.append(ctx.popWriter());
@@ -1929,7 +2007,7 @@ public final class JavaEmitter {
         body.append(emitStubGetterBridges(c, ctx));
         body.append(emitSinkAddErrorBridges(c, ctx));
         body.append(defaultDartToString(c));
-        // Dart 3 sealed → Java sealed: a sealed class with subtypes lists them in a permits clause and
+        // Dart 3 sealed -> Java sealed: a sealed class with subtypes lists them in a permits clause and
         // its direct subtypes are marked non-sealed. Falls back to a plain abstract class when the
         // hierarchy has no subtypes (a permits-less sealed class is illegal in Java).
         List<String> subtypes = directSubtypes(c.name);
@@ -2001,7 +2079,19 @@ public final class JavaEmitter {
         emitMixinForwarders(c, body, ctx);
         recordMixinImplementer(c, jname, ctx);
         if (interfacedClasses().contains(c)) {
-            pendingFiles.add(emitImplicitInterface(c, jname, typeParamsSb.toString(), body, ctx));
+            GeneratedFile itfFile = emitImplicitInterface(c, jname, typeParamsSb.toString(), body, ctx);
+            ImplicitIface rec = implicitIfaces.get(c);
+            if (rec != null && itfFile != null) {
+                for (String line : itfFile.content.split("\n")) {
+                    if (line.startsWith("import ")) {
+                        rec.imports.add(line);
+                    }
+                }
+            }
+            pendingFiles.add(itfFile);
+        }
+        if (reifiedClassNames().contains(c.name)) {
+            impls.append(impls.length() > 0 ? ", " : "").append("dart.runtime.Reified");
         }
         return finishClassFile(jname, decl, ext, impls.length() == 0 ? null : impls.toString(),
                 permits, body, ctx, c.file);
@@ -2014,13 +2104,12 @@ public final class JavaEmitter {
         if (c.mixins.isEmpty() || c.interfaces.isEmpty()) {
             return;
         }
-        MixinImplementer mi = new MixinImplementer(jname);
+        MixinImplementer mi = new MixinImplementer(jname, c);
         for (TypeRef it : c.interfaces) {
             ClassDecl id = superDeclOf(c, it);
             if (id != null && !id.isMixin && interfacedClasses().contains(id)) {
-                String spelled = javaClassType(it, ctx);
-                spelled = spelled.indexOf('<') < 0 ? spelled : spelled.substring(0, spelled.indexOf('<'));
-                mi.interfaceTypes.add(spelled.substring(spelled.lastIndexOf('.') + 1) + "$I");
+                mi.interfaces.add(id);
+                mi.interfaceArgs.add(javaTypeArgs(javaClassType(it, ctx)));
             }
         }
         for (TypeRef mx : c.mixins) {
@@ -2044,7 +2133,7 @@ public final class JavaEmitter {
             String spelled = javaClassType(mx, ctx);
             mi.mixins.put(spelled.indexOf('<') < 0 ? spelled : spelled.substring(0, spelled.indexOf('<')), names);
         }
-        if (!mi.interfaceTypes.isEmpty() && !mi.mixins.isEmpty()) {
+        if (!mi.interfaces.isEmpty() && !mi.mixins.isEmpty()) {
             mixinImplementers.add(mi);
         }
     }
@@ -2162,6 +2251,15 @@ public final class JavaEmitter {
                                                 CharSequence classBody, Ctx ctx) {
         StringBuilder body = new StringBuilder();
         java.util.Set<String> seen = new java.util.HashSet<String>();
+        ImplicitIface rec = new ImplicitIface();
+        implicitIfaces.put(c, rec);
+        if (typeParams.startsWith("<")) {
+            for (String tp : splitTopLevel(typeParams.substring(1, typeParams.lastIndexOf('>')))) {
+                String t = tp.trim();
+                int sp = t.indexOf(' ');
+                rec.typeParams.add(sp < 0 ? t : t.substring(0, sp));
+            }
+        }
         // A library-private member is not part of the interface outside its library:
         // typed_data's `_TypedQueue<E, L> implements QueueList<E>` declares a `L _table` of
         // its own, unrelated to QueueList's `List<E?> _table`. With a foreign implementer
@@ -2198,6 +2296,7 @@ public final class JavaEmitter {
             if (!seen.add(head.replaceAll("\\s+", " "))) {
                 continue;
             }
+            rec.heads.add(head);
             body.append("    default ").append(head).append(" {\n")
                     .append("        throw new UnsupportedOperationException(\"")
                     .append(c.name).append('.').append(name).append("\");\n    }\n\n");
@@ -2212,11 +2311,13 @@ public final class JavaEmitter {
             String jt = javaType(fieldType(f, ctx), false, ctx);
             String gh = jt + " " + f.name + "()";
             if (seen.add(gh)) {
+                rec.heads.add(gh);
                 body.append("    default ").append(gh).append(" {\n        return get$").append(f.name)
                         .append("();\n    }\n\n");
             }
             String sh = "void " + f.name + "(" + jt + " v)";
             if (!f.isFinal && seen.add(sh)) {
+                rec.heads.add(sh);
                 body.append("    default ").append(sh).append(" {\n        set$").append(f.name)
                         .append("(v);\n    }\n\n");
             }
@@ -2225,12 +2326,18 @@ public final class JavaEmitter {
         java.util.Set<ClassDecl> mine = interfacedClasses();
         ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         if (sup != null && mine.contains(sup)) {
-            ext.append(withRawSuperArgs(javaType(c.superclass, false, ctx), c, c.superclass));
+            String spelledSup = withRawSuperArgs(javaType(c.superclass, false, ctx), c, c.superclass);
+            ext.append(spelledSup);
+            rec.supers.add(sup);
+            rec.superArgs.add(javaTypeArgs(spelledSup));
         }
         for (TypeRef itf : c.interfaces) {
             ClassDecl im = superDeclOf(c, itf);
             if (im != null && mine.contains(im)) {
-                ext.append(ext.length() > 0 ? ", " : "").append(withRawSuperArgs(javaType(itf, false, ctx), c, itf));
+                String spelledItf = withRawSuperArgs(javaType(itf, false, ctx), c, itf);
+                ext.append(ext.length() > 0 ? ", " : "").append(spelledItf);
+                rec.supers.add(im);
+                rec.superArgs.add(javaTypeArgs(spelledItf));
             }
         }
         // `abstract class SocketChannel extends ChannelMixin { SocketSink get sink; }`: a
@@ -2301,6 +2408,7 @@ public final class JavaEmitter {
             ext.append(ext.length() > 0 ? ", " : "").append("dart.collection.ListMixin<")
                     .append(javaType(coreList.arg(0), true, ctx)).append('>');
         }
+        body.append(reifiedInterfaceMethods(c, jname + "$I"));
         return finishClassFile(jname + "$I", "public interface " + jname + "$I" + typeParams,
                 ext.length() == 0 ? null : ext.toString(), null, body, ctx, c.file);
     }
@@ -2366,7 +2474,7 @@ public final class JavaEmitter {
             "dart.collection.ListMixin", "dart.collection.MapMixin", "dart.collection.SetMixin",
             "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase",
             "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.MixinView",
-            "dart.runtime.DynamicObject", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
+            "dart.runtime.DynamicObject", "dart.runtime.Reified", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
 
     /** The fully qualified dart-runtime class a rendered Java type name refers to, or null. */
     private static String runtimeFqcn(String javaRaw, Ctx ctx) {
@@ -2449,7 +2557,8 @@ public final class JavaEmitter {
             List<ClassDecl> parts = new ArrayList<ClassDecl>();
             parts.add(k);
             for (TypeRef mx : k.mixins) {
-                ClassDecl md = program.classes.get(mx.name);
+                // The mixin k's own library sees, not the last-registered one of that name.
+                ClassDecl md = mx.resolved != null ? mx.resolved : program.resolveClass(mx.name, k.ownerLibrary);
                 if (md == null) {
                     return "";
                 }
@@ -2502,8 +2611,8 @@ public final class JavaEmitter {
                         rt = fieldType(f, ctx);
                         read = "(" + javaType(rt, false, ctx) + ") (Object) " + read;
                     }
-                    sb.append("    public ").append(javaType(rt, false, ctx)).append(" get$").append(f.name)
-                            .append("() {\n        return ").append(read).append(";\n    }\n\n");
+                    sb.append("    public ").append(javaType(rt, fieldErasedToObject(im, f), ctx)).append(" get$")
+                            .append(f.name).append("() {\n        return ").append(read).append(";\n    }\n\n");
                 }
                 MethodDecl st = findSetterInChain(c, f.name);
                 if (st != null && st.params.size() == 1) {
@@ -2618,10 +2727,21 @@ public final class JavaEmitter {
                 rt = fieldType(findFieldInChain(sup, g.name), ctx);
                 read = "(" + javaType(rt, false, ctx) + ") (Object) " + read;
             }
-            sb.append("    public ").append(javaType(rt, false, ctx)).append(" get$").append(g.name)
+            FieldDecl sf = findFieldInChain(sup, g.name);
+            ClassDecl owner = fieldOwnerInChain(sup, g.name);
+            sb.append("    public ").append(javaType(rt, owner != null && fieldErasedToObject(owner, sf), ctx))
+                    .append(" get$").append(g.name)
                     .append("() {\n        return ").append(read).append(";\n    }\n\n");
         }
         return sb.toString();
+    }
+
+    /// Whether {@code f}, declared in {@code owner}, is typed by one of owner's own type
+    /// parameters (`final T size;`): its get$ accessor returns the erased T there, so a bridge
+    /// in an implementer with `T = int` must return Long, since long would not implement it.
+    private static boolean fieldErasedToObject(ClassDecl owner, FieldDecl f) {
+        return f != null && f.type != null && f.type.args.isEmpty() && f.type.name != null
+                && owner.typeParams.contains(f.type.name);
     }
 
     /** The declared type of the nearest superclass getter {@code name}, in {@code c}'s type variables. */
@@ -3100,7 +3220,8 @@ public final class JavaEmitter {
             List<ClassDecl> parts = new ArrayList<ClassDecl>();
             parts.add(k);
             for (TypeRef mx : k.mixins) {
-                ClassDecl md = program.classes.get(mx.name);
+                // The mixin k's own library sees, not the last-registered one of that name.
+                ClassDecl md = mx.resolved != null ? mx.resolved : program.resolveClass(mx.name, k.ownerLibrary);
                 if (md == null) {
                     return;
                 }
@@ -3161,6 +3282,17 @@ public final class JavaEmitter {
             FieldDecl f = k.field(name);
             if (f != null && !f.isStatic) {
                 return f;
+            }
+        }
+        return null;
+    }
+
+    /// The class of {@code c}'s superclass chain that declares the instance field, or null.
+    private ClassDecl fieldOwnerInChain(ClassDecl c, String name) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+            FieldDecl f = k.field(name);
+            if (f != null && !f.isStatic) {
+                return k;
             }
         }
         return null;
@@ -3628,6 +3760,8 @@ public final class JavaEmitter {
                     ctx.ctorTypeSubst = savedSubst;
                 }
             }
+        } else if (c.superclass == null && mixinSuperWitnessCall(c, false, ct, ctx) != null) {
+            w.line(mixinSuperWitnessCall(c, false, ct, ctx));
         } else if (stubClassOf(c.superclass) != null
                 && (ct.superInit == null || ct.superInit.args != null)) {
             // Positional arguments go to the stub superclass's Java constructor --
@@ -5114,8 +5248,15 @@ public final class JavaEmitter {
             if (implementedCoreList(mc) != null) {
                 return true;
             }
+            // `extends ListBase<int>` (or `extends ListMixin<int>`) implements the same
+            // generic runtime interface as `with ListMixin<int>`, so its operators need the
+            // same boxed element side or the class neither implements nor overrides them.
+            if (mc.superclass != null && program.classes.get(mc.superclass.name) == null
+                    && (mc.superclass.is("ListBase") || mc.superclass.is("ListMixin"))) {
+                return true;
+            }
             for (TypeRef mix : mc.mixins) {
-                if ("ListMixin".equals(mix.name)) {
+                if ("ListMixin".equals(mix.name) || "ListBase".equals(mix.name)) {
                     return true;
                 }
             }
@@ -8143,7 +8284,8 @@ public final class JavaEmitter {
                 }
                 ClassDecl pc = cc.type.runtimeOnly ? null : program.classes.get(cc.type.name);
                 if (pc != null && pc.namedCtor(cc.ctorName) != null) {
-                    String tw = witnessArgs(pc, cc.type.args, cc, ctx);
+                    String tw = witnessArgs(pc, argInferredWitnessTypeArgs(pc, pc.namedCtor(cc.ctorName),
+                            cc.type.args, cc.args, ctx), cc, ctx);
                     // `Converting<int, String>.fromFunction(f)`: the explicit type arguments
                     // type the result (a raw type left `bind`'s Sink<S> unsubstituted) and
                     // become the static factory's Java type witness, since a lambda
@@ -8573,6 +8715,9 @@ public final class JavaEmitter {
                 // T is not merely wrong -- javac refuses both, since erasure leaves T with no
                 // reifiable class to test against. Diagnosed above rather than emitted.
                 check = "false";
+            } else if (reifiedIsCheck(subject, t.type.nullable, t.type, ctx) != null) {
+                // `x is Box<int>` on a program generic class: the type arguments too.
+                check = reifiedIsCheck(subject, t.type.nullable, t.type, ctx);
             } else if (t.type.nullable) {
                 // `x is int?` holds for null too. The subject is evaluated once, inside the
                 // helper, so `next() is int?` does not call next() twice.
@@ -8813,12 +8958,317 @@ public final class JavaEmitter {
             }
         }
         List<String> out = new ArrayList<String>();
+        boolean reified = reifiedClassNames().contains(c.name);
         for (String n : c.typeParams) {
             if (used.contains(n)) {
                 out.add(n);
+            } else if (reified) {
+                // Kept only so `is`/`as`/whereType can check this class's type arguments.
+                out.add(n);
+                reifyOnlyParams.add(c.name + "<" + n);
             }
         }
         return out;
+    }
+
+    // ---- reified type arguments of program generic classes ------------------------------
+    //
+    // `x is Box<int>`, `x as Box<String>` and `whereType<Box<int>>()` check the type
+    // arguments, as Dart does. Only a class some check names WITH a non-top argument pays
+    // for it: such a class keeps a witness of every type parameter (the same fields the
+    // witnesses above use), and gets a static `$isArgs$<Class>` test the checks call. A
+    // construction that cannot name an argument stores a null witness, which the test
+    // reads as "unknown" and answers as the erased check did -- never a wrong false.
+
+    /// "Class<Param>" keys of witnesses kept only for a reified check (no body use).
+    private final java.util.Set<String> reifyOnlyParams = new HashSet<String>();
+    private java.util.Set<String> reifiedNames;
+
+    /// The program generic classes some is/as/whereType names with a non-top argument.
+    private java.util.Set<String> reifiedClassNames() {
+        if (reifiedNames == null) {
+            reifiedNames = new HashSet<String>();
+            java.util.Set<Object> seen = java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>());
+            for (Library lib : program.libraries) {
+                scanReifiedChecks(lib, seen);
+            }
+            if (runtimeTypeRead) {
+                // Dart's runtimeType names the type arguments, and any object may be asked
+                // for it, so a program that reads one keeps every generic class's.
+                for (ClassDecl c : program.classes.values()) {
+                    if (reifiableClass(c) && reifiedNames.add(c.name)) {
+                        runtimeTypeOnlyReified.add(c.name);
+                    }
+                }
+            }
+        }
+        return reifiedNames;
+    }
+
+    private boolean runtimeTypeRead;
+    /// Classes reified only so runtimeType can name their arguments. A generic method
+    /// constructing one does not demand its own type argument for that: where none is
+    /// inferable the construction records an unknown witness, as Dart's runtimeType would
+    /// still answer, only without the argument.
+    private final java.util.Set<String> runtimeTypeOnlyReified = new HashSet<String>();
+
+    /// Whether constructing {@code pc} makes the enclosing generic demand a witness for the
+    /// type variable written as {@code pc}'s parameter {@code cp}. A witness kept only so
+    /// runtimeType can name the argument does not: the construction takes an unknown one.
+    private boolean constructionDemandsWitness(ClassDecl pc, String cp) {
+        return witnessParams(pc).contains(cp)
+                && !(runtimeTypeOnlyReified.contains(pc.name) && reifyOnlyParams.contains(pc.name + "<" + cp));
+    }
+
+    private void scanReifiedChecks(Object o, java.util.Set<Object> seen) {
+        if (o == null || !seen.add(o)) {
+            return;
+        }
+        if ((o instanceof PropertyGet && "runtimeType".equals(((PropertyGet) o).name))
+                || (o instanceof Ident && "runtimeType".equals(((Ident) o).name))) {
+            runtimeTypeRead = true;
+        }
+        if (o instanceof Ident && ((Ident) o).typeArgs != null && !((Ident) o).typeArgs.isEmpty()
+                && program.classes.containsKey(((Ident) o).name)) {
+            // `Box<int>` as a value (a type literal) compares with runtimeType's answer.
+            TypeRef lit = new TypeRef(((Ident) o).name);
+            lit.args.addAll(((Ident) o).typeArgs);
+            noteReifiedType(lit);
+        }
+        if (o instanceof List) {
+            for (Object e : (List<?>) o) {
+                scanReifiedChecks(e, seen);
+            }
+            return;
+        }
+        if (o instanceof Args) {
+            scanReifiedChecks(((Args) o).positional, seen);
+            for (NamedArg na : ((Args) o).named) {
+                scanReifiedChecks(na.value, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Node)) {
+            return;
+        }
+        if (o instanceof IsTest) {
+            noteReifiedType(((IsTest) o).type);
+        } else if (o instanceof AsCast) {
+            noteReifiedType(((AsCast) o).type);
+        } else if (o instanceof CatchClause) {
+            noteReifiedType(((CatchClause) o).onType);
+        } else if (o instanceof Call && "whereType".equals(((Call) o).name) && ((Call) o).typeArgs.size() == 1) {
+            noteReifiedType(((Call) o).typeArgs.get(0));
+        }
+        for (java.lang.reflect.Field f : o.getClass().getFields()) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+                continue;
+            }
+            Class<?> ft = f.getType();
+            if (Node.class.isAssignableFrom(ft) || List.class.isAssignableFrom(ft) || ft == Args.class) {
+                try {
+                    scanReifiedChecks(f.get(o), seen);
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        }
+    }
+
+    private void noteReifiedType(TypeRef t) {
+        if (t == null || t.args.isEmpty() || t.funcReturn != null) {
+            return;
+        }
+        ClassDecl pc = program.classes.get(t.name);
+        boolean anyNonTop = false;
+        for (TypeRef a : t.args) {
+            if (a != null && !isTopType(a)) {
+                anyNonTop = true;
+            }
+            noteReifiedType(a);
+        }
+        if (anyNonTop && reifiableClass(pc) && pc.typeParams.size() == t.args.size()) {
+            reifiedNames.add(pc.name);
+        }
+    }
+
+    /// `o is Box<T>` inside a generic class reads T's witness when Box is reified.
+    private void noteReifiedTypeVars(TypeRef t, java.util.Set<String> tps, java.util.Set<String> used) {
+        if (t == null || t.args.isEmpty() || !reifiedClassNames().contains(t.name)) {
+            return;
+        }
+        for (TypeRef a : t.args) {
+            if (a != null && a.args.isEmpty() && tps.contains(a.name)) {
+                used.add(a.name);
+            }
+            noteReifiedTypeVars(a, tps, used);
+        }
+    }
+
+    private static boolean isTopType(TypeRef a) {
+        return a.is("dynamic") || a.is("var") || (a.is("Object") && a.nullable && a.args.isEmpty());
+    }
+
+    private boolean reifiableClass(ClassDecl c) {
+        return c != null && !c.typeParams.isEmpty() && !c.isMixin && c.extensionOn == null
+                && c.enumOf == null && isProgramClassDecl(c);
+    }
+
+    /// The reified check `$isArgs$C(subject, orNull, witnesses...)` for {@code t}, or null
+    /// when {@code t} is not a type argument check this class can make.
+    private String reifiedIsCheck(String subject, boolean orNull, TypeRef t, Ctx ctx) {
+        String head = reifiedHead(t, ctx);
+        if (head == null) {
+            return null;
+        }
+        return head + "$isArgs$" + javaSimple(t.name) + "(" + subject + ", " + orNull + reifiedArgWitnesses(t, ctx) + ")";
+    }
+
+    /// "pkg.Box." for a reified program class type with its full argument list, or null.
+    private String reifiedHead(TypeRef t, Ctx ctx) {
+        if (t == null || t.args.isEmpty() || t.funcReturn != null) {
+            return null;
+        }
+        ClassDecl pc = program.classes.get(t.name);
+        if (!reifiableClass(pc) || !reifiedClassNames().contains(pc.name)
+                || pc.typeParams.size() != t.args.size()) {
+            return null;
+        }
+        // An erased `$I` (the class is implemented elsewhere) declares the same test,
+        // reading the witnesses through its accessors.
+        return erasedJavaType(copyNonNull(t), ctx) + ".";
+    }
+
+    private static String javaSimple(String n) {
+        return n.replace('.', '_');
+    }
+
+    private String reifiedArgWitnesses(TypeRef t, Ctx ctx) {
+        StringBuilder sb = new StringBuilder();
+        for (TypeRef a : t.args) {
+            String w = isTopType(a) ? null : witnessOf(a, ctx);
+            sb.append(", ").append(w == null ? "(dart.runtime.TypeWitness) null" : w);
+        }
+        return sb.toString();
+    }
+
+    /// The static reified-argument test a reified class declares, or "".
+    private String reifiedTestMethod(ClassDecl c, String jname) {
+        if (!reifiedClassNames().contains(c.name)) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("    public static boolean $isArgs$").append(javaSimple(c.name)).append("(Object o, boolean orNull");
+        for (int i = 0; i < c.typeParams.size(); i++) {
+            sb.append(", dart.runtime.TypeWitness a").append(i);
+        }
+        sb.append(") {\n        if (o == null) {\n            return orNull;\n        }\n");
+        sb.append("        if (!(o instanceof ").append(jname).append(")) {\n            return false;\n        }\n");
+        sb.append("        ").append(jname).append(" r = (").append(jname).append(") o;\n        return true");
+        for (int i = 0; i < c.typeParams.size(); i++) {
+            sb.append("\n                && dart.runtime.TypeWitness.isSubtype(r.")
+                    .append(witnessField(c, c.typeParams.get(i))).append(", a").append(i).append(")");
+        }
+        sb.append(";\n    }\n\n");
+        String n = javaSimple(c.name);
+        StringBuilder ps = new StringBuilder();
+        StringBuilder as = new StringBuilder();
+        for (int i = 0; i < c.typeParams.size(); i++) {
+            ps.append(", dart.runtime.TypeWitness a").append(i);
+            as.append(", a").append(i);
+        }
+        sb.append("    public static Object $asArgs$").append(n).append("(Object o, boolean orNull, String t")
+                .append(ps).append(") {\n        if ($isArgs$").append(n).append("(o, orNull").append(as)
+                .append(")) {\n            return o;\n        }\n")
+                .append("        return dart.runtime.DartRuntime.as(o, Void.class, false, t);\n    }\n\n");
+        // The witnesses through the implicit interface (`$I`), whose `$isArgs$` reads them
+        // there, and the runtimeType carrying the arguments (dart.runtime.Reified).
+        StringBuilder ws = new StringBuilder();
+        for (String tp : c.typeParams) {
+            sb.append("    public dart.runtime.TypeWitness ").append(witnessAccessor(c, tp))
+                    .append("() {\n        return this.").append(witnessField(c, tp)).append(";\n    }\n\n");
+            ws.append(", this.").append(witnessField(c, tp));
+        }
+        sb.append("    @Override\n    public Object $runtimeType() {\n        if (getClass() != ").append(jname)
+                .append(".class) {\n            return getClass();\n        }\n")
+                .append("        return dart.runtime.TypeWitness.typeValue(").append(jname).append(".class")
+                .append(ws).append(");\n    }\n\n");
+        return sb.toString();
+    }
+
+    /// `class Square implements Shape<int>`: Square answers Shape's witness accessors with
+    /// the arguments it implements Shape at, so a check through `Shape$I` reads them.
+    private String implementedWitnessAccessors(ClassDecl c, Ctx ctx) {
+        StringBuilder sb = new StringBuilder();
+        java.util.Set<String> done = new HashSet<String>();
+        for (TypeRef im : c.interfaces) {
+            ClassDecl ic = im == null ? null : superDeclOf(c, im);
+            if (ic == null || ic == c || !reifiableClass(ic) || !reifiedClassNames().contains(ic.name)
+                    || ic.typeParams.size() != im.args.size() || !done.add(ic.name)
+                    || extendsClass(c, ic)) {
+                continue;
+            }
+            for (int i = 0; i < ic.typeParams.size(); i++) {
+                TypeRef a = im.args.get(i);
+                String w = a == null || isTopType(a) ? null : witnessOf(a, ctx);
+                sb.append("    @Override\n    public dart.runtime.TypeWitness ")
+                        .append(witnessAccessor(ic, ic.typeParams.get(i))).append("() {\n        return ")
+                        .append(w == null ? "null" : w).append(";\n    }\n\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    /// Whether {@code c} inherits from {@code sup} through its extends chain.
+    private boolean extendsClass(ClassDecl c, ClassDecl sup) {
+        java.util.Set<ClassDecl> seen = new HashSet<ClassDecl>();
+        ClassDecl k = c;
+        while (k != null && k.superclass != null && seen.add(k)) {
+            k = superDeclOf(k, k.superclass);
+            if (k == sup) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String witnessAccessor(ClassDecl owner, String tp) {
+        // The EMITTED name: two libraries' same-named classes keep distinct accessors.
+        return "$twa$" + javaClassName(owner).replace('.', '_') + "$" + tp;
+    }
+
+    /// The `$I` side of a reified class: default witness accessors (an unrelated
+    /// implementor recorded none, so its arguments read as unknown) and the static
+    /// `$isArgs$`/`$asArgs$` a check through the interface type calls.
+    private String reifiedInterfaceMethods(ClassDecl c, String iname) {
+        if (!reifiedClassNames().contains(c.name)) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        String n = javaSimple(c.name);
+        StringBuilder ps = new StringBuilder();
+        StringBuilder as = new StringBuilder();
+        for (int i = 0; i < c.typeParams.size(); i++) {
+            sb.append("    default dart.runtime.TypeWitness ").append(witnessAccessor(c, c.typeParams.get(i)))
+                    .append("() {\n        return null;\n    }\n\n");
+            ps.append(", dart.runtime.TypeWitness a").append(i);
+            as.append(", a").append(i);
+        }
+        sb.append("    static boolean $isArgs$").append(n).append("(Object o, boolean orNull").append(ps)
+                .append(") {\n        if (o == null) {\n            return orNull;\n        }\n")
+                .append("        if (!(o instanceof ").append(iname).append(")) {\n            return false;\n        }\n")
+                .append("        ").append(iname).append(" r = (").append(iname).append(") o;\n        return true");
+        for (int i = 0; i < c.typeParams.size(); i++) {
+            sb.append("\n                && dart.runtime.TypeWitness.isSubtype(r.")
+                    .append(witnessAccessor(c, c.typeParams.get(i))).append("(), a").append(i).append(")");
+        }
+        sb.append(";\n    }\n\n");
+        sb.append("    static Object $asArgs$").append(n).append("(Object o, boolean orNull, String t")
+                .append(ps).append(") {\n        if ($isArgs$").append(n).append("(o, orNull").append(as)
+                .append(")) {\n            return o;\n        }\n")
+                .append("        return dart.runtime.DartRuntime.as(o, Void.class, false, t);\n    }\n\n");
+        return sb.toString();
     }
 
     /**
@@ -8833,6 +9283,100 @@ public final class JavaEmitter {
             return written;
         }
         return expected.args;
+    }
+
+    /**
+     * The type arguments Dart infers upward from the arguments of an unparameterised
+     * construction of a class that keeps witnesses: {@code Box(1)} is a {@code Box<int>},
+     * {@code Pair(1, 2.5)} with both parameters typed T a {@code Pair<num>}. A parameter
+     * no argument constrains is instantiated to its bound (dynamic when unbounded), as
+     * Dart does. Used only for the witnesses -- the Java diamond keeps its own inference.
+     * When an argument's static type cannot be found, a witness kept only for checks is
+     * left null (unknown, so the check keeps the erased answer); a class whose body uses
+     * the witness keeps the written (empty) list and its usual bound.
+     */
+    private List<TypeRef> argInferredWitnessTypeArgs(ClassDecl pc, CtorDecl ct, List<TypeRef> written,
+            Args args, Ctx ctx) {
+        if (pc == null || ct == null || args == null || (written != null && !written.isEmpty())
+                || witnessParams(pc).isEmpty() || ct.redirect != null && ct.params.isEmpty()) {
+            return written;
+        }
+        java.util.Map<String, TypeRef> bound = new java.util.HashMap<String, TypeRef>();
+        java.util.Set<String> unknown = new HashSet<String>();
+        int pos = 0;
+        for (Ast.Param p : ct.params) {
+            Expr arg = null;
+            if (p.named) {
+                for (NamedArg na : args.named) {
+                    if (na.name.equals(p.name)) {
+                        arg = na.value;
+                    }
+                }
+            } else {
+                arg = pos < args.positional.size() ? args.positional.get(pos) : null;
+                pos++;
+            }
+            TypeRef pt = p.type;
+            if ((pt == null || pt.is("var")) && (p.isThis || p.isSuper)) {
+                FieldDecl f = p.isThis ? pc.field(p.name) : null;
+                pt = f != null ? f.type : null;
+            }
+            if (arg == null || pt == null || !pt.args.isEmpty() || pt.funcReturn != null
+                    || !pc.typeParams.contains(pt.name)) {
+                continue;
+            }
+            TypeRef at = elementTypeQuiet(arg, ctx);
+            if (at == null || at.is("var") || at.is("dynamic") && !(arg instanceof Ident)) {
+                unknown.add(pt.name);
+                continue;
+            }
+            TypeRef prev = bound.get(pt.name);
+            bound.put(pt.name, prev == null ? at : upperBound(prev, at));
+        }
+        List<TypeRef> out = new ArrayList<TypeRef>();
+        boolean anyNull = false;
+        for (String n : pc.typeParams) {
+            TypeRef a = bound.get(n);
+            if (a != null && (a.is("Null") || witnessOf(a, ctx) == null)) {
+                a = null;
+                unknown.add(n);
+            }
+            if (a == null && unknown.contains(n)) {
+                if (witnessParams(pc).contains(n) && !reifyOnlyParams.contains(pc.name + "<" + n)) {
+                    return written;
+                }
+                anyNull = true;
+            } else if (a == null) {
+                TypeRef b = pc.typeParamBounds.get(n);
+                a = b != null && b.funcReturn == null && b.args.isEmpty() && !pc.typeParams.contains(b.name)
+                        ? b : new TypeRef("dynamic");
+            }
+            out.add(a);
+        }
+        return bound.isEmpty() && !anyNull ? written : out;
+    }
+
+    /// Dart's least upper bound of two inferred argument types, for the cases a witness can
+    /// tell apart: equal types, a subtype of the other, the numbers, and Object otherwise.
+    private TypeRef upperBound(TypeRef a, TypeRef b) {
+        boolean nullable = a.nullable || b.nullable || a.is("Null") || b.is("Null");
+        TypeRef r;
+        if (a.is("Null")) {
+            r = b;
+        } else if (b.is("Null")) {
+            r = a;
+        } else if (a.name != null && a.name.equals(b.name) && a.args.isEmpty() && b.args.isEmpty()) {
+            r = a;
+        } else if ((a.is("int") || a.is("double") || a.is("num")) && (b.is("int") || b.is("double") || b.is("num"))) {
+            r = new TypeRef("num");
+        } else {
+            r = new TypeRef("Object");
+        }
+        if (nullable && !r.nullable) {
+            r = copyNonNull(r);
+            r.nullable = true;
+        }
+        return r;
     }
 
     /**
@@ -8947,24 +9491,40 @@ public final class JavaEmitter {
             Call call = (Call) o;
             for (int i = 0; i < call.typeArgs.size(); i++) {
                 TypeRef a = call.typeArgs.get(i);
-                if (a != null && a.args.isEmpty() && tps.contains(a.name) && callNeedsWitness(call, i)) {
-                    used.add(a.name);
+                if (a != null && a.args.isEmpty() && tps.contains(a.name)) {
+                    int d = witnessDemand(call, i);
+                    if (d == HARD_DEMAND) {
+                        used.add(a.name);
+                    } else if (d == SOFT_DEMAND && softUses != null) {
+                        softUses.add(a.name);
+                    }
                 }
             }
         }
-        if (o instanceof Call && ((Call) o).typeArgs.isEmpty() && ((Call) o).name != null
-                && calleeTakesWitness((Call) o)) {
-            // `registerAdapter(Adapter<T>(...))`: the callee infers its witness from T.
-            collectTypeNames(((Call) o).args, tps, used, 0);
-            implicitWitnessCalls++;
+        if (o instanceof Call && ((Call) o).typeArgs.isEmpty() && ((Call) o).name != null) {
+            // `registerAdapter(Adapter<T>(...))`: the callee infers its witness from T. A callee
+            // that keeps its witness only for runtimeType makes these uses soft as well.
+            int d = calleeWitnessDemand((Call) o);
+            if (d == HARD_DEMAND) {
+                collectTypeNames(((Call) o).args, tps, used, 0);
+                implicitWitnessCalls++;
+            } else if (d == SOFT_DEMAND && softUses != null) {
+                collectTypeNames(((Call) o).args, tps, softUses, 0);
+                implicitSoftWitnessCalls++;
+            }
         }
         if (o instanceof CtorCall && ((CtorCall) o).type != null) {
             TypeRef ct = ((CtorCall) o).type;
             ClassDecl pc = program.classes.get(ct.name);
             for (int i = 0; pc != null && i < ct.args.size() && i < pc.typeParams.size(); i++) {
                 TypeRef a = ct.args.get(i);
-                if (a.args.isEmpty() && tps.contains(a.name) && witnessParams(pc).contains(pc.typeParams.get(i))) {
-                    used.add(a.name);
+                String cp = pc.typeParams.get(i);
+                if (a.args.isEmpty() && tps.contains(a.name) && witnessParams(pc).contains(cp)) {
+                    if (constructionDemandsWitness(pc, cp)) {
+                        used.add(a.name);
+                    } else if (softUses != null) {
+                        softUses.add(a.name);
+                    }
                 }
             }
         }
@@ -8973,6 +9533,13 @@ public final class JavaEmitter {
             if (t != null && t.args.isEmpty() && tps.contains(t.name)) {
                 used.add(t.name);
             }
+            noteReifiedTypeVars(t, tps, used);
+        }
+        if (o instanceof AsCast) {
+            noteReifiedTypeVars(((AsCast) o).type, tps, used);
+        }
+        if (o instanceof Call && "whereType".equals(((Call) o).name) && ((Call) o).typeArgs.size() == 1) {
+            noteReifiedTypeVars(((Call) o).typeArgs.get(0), tps, used);
         }
         java.util.Set<String> inner = tps;
         List<String> shadow = o instanceof MethodDecl ? ((MethodDecl) o).typeParams
@@ -9012,8 +9579,15 @@ public final class JavaEmitter {
     private final java.util.Map<Object, List<String>> methodWitnessCache =
             new java.util.IdentityHashMap<Object, List<String>>();
     private java.util.Map<String, List<MethodDecl>> methodsByName;
+    /// Per generic declaration, the witnesses it needs as values (see hardMethodWitness).
+    private final java.util.Map<Object, java.util.Set<String>> methodHardWitnessCache =
+            new java.util.IdentityHashMap<Object, java.util.Set<String>>();
+    /// Where scanTypeValueUses records witness uses needed only for runtimeType.
+    private java.util.Set<String> softUses;
     /** Counts calls to a witnessed generic that write no type arguments (see the scan). */
     private int implicitWitnessCalls;
+    /** The same, for callees whose witnesses only runtimeType reads. */
+    private int implicitSoftWitnessCalls;
     private java.util.Map<MethodDecl, ClassDecl> methodOwners;
 
     private void indexMethods() {
@@ -9151,6 +9725,7 @@ public final class JavaEmitter {
         }
         boolean changed = false;
         boolean[] need = new boolean[tps.size()];
+        boolean[] hardNeed = new boolean[tps.size()];
         for (Object g : group) {
             List<String> gt = g instanceof MethodDecl ? ((MethodDecl) g).typeParams : ((FunctionDecl) g).typeParams;
             java.util.Set<String> used = new HashSet<String>();
@@ -9158,6 +9733,10 @@ public final class JavaEmitter {
                     new java.util.IdentityHashMap<Object, Boolean>());
             java.util.Set<String> set = new HashSet<String>(gt);
             int implicitBefore = implicitWitnessCalls;
+            int implicitSoftBefore = implicitSoftWitnessCalls;
+            java.util.Set<String> savedSoft = softUses;
+            java.util.Set<String> soft = new HashSet<String>();
+            softUses = soft;
             TypeRef gret = g instanceof MethodDecl ? ((MethodDecl) g).returnType : ((FunctionDecl) g).returnType;
             if (g instanceof MethodDecl) {
                 MethodDecl m = (MethodDecl) g;
@@ -9170,25 +9749,35 @@ public final class JavaEmitter {
                 scanTypeValueUses(f.body, set, used, seen);
                 scanTypeValueUses(f.exprBody, set, used, seen);
             }
+            if (implicitSoftWitnessCalls != implicitSoftBefore) {
+                collectTypeNames(gret, set, soft, 0);
+            }
             if (implicitWitnessCalls != implicitBefore) {
                 // `return box(name);`: the callee infers its witness from this method's
                 // return type, so the type parameters that type names are needed too.
                 collectTypeNames(gret, set, used, 0);
             }
+            softUses = savedSoft;
             for (int i = 0; i < gt.size(); i++) {
-                need[i] |= used.contains(gt.get(i));
+                need[i] |= used.contains(gt.get(i)) || soft.contains(gt.get(i));
+                hardNeed[i] |= used.contains(gt.get(i));
             }
         }
         for (Object g : group) {
             List<String> gt = g instanceof MethodDecl ? ((MethodDecl) g).typeParams : ((FunctionDecl) g).typeParams;
             List<String> out = new ArrayList<String>();
+            java.util.Set<String> hard = new HashSet<String>();
             for (int i = 0; i < gt.size(); i++) {
                 if (need[i]) {
                     out.add(gt.get(i));
                 }
+                if (hardNeed[i]) {
+                    hard.add(gt.get(i));
+                }
             }
             List<String> old = methodWitnessCache.put(g, out);
-            changed |= old == null || !old.equals(out);
+            java.util.Set<String> oldHard = methodHardWitnessCache.put(g, hard);
+            changed |= old == null || !old.equals(out) || oldHard == null || !oldHard.equals(hard);
         }
         return changed;
     }
@@ -9223,6 +9812,41 @@ public final class JavaEmitter {
             p = sp;
         }
         return false;
+    }
+
+    /**
+     * `class S with M<E>` where M is the first mixin, a plain class with no superclass: the
+     * emitter makes M the Java superclass (see mixinClassAsSuper), so S's constructors must
+     * call M's, witnesses included. Null when the class extends something or M is a mixin.
+     */
+    private TypeRef mixinClassAsSuperRef(ClassDecl c) {
+        if (c.superclass != null || c.mixins.isEmpty()) {
+            return null;
+        }
+        TypeRef mixRef = c.mixins.get(0);
+        ClassDecl mx = program.classes.get(mixRef.name);
+        if (mx == null || mx.isMixin || mx.superclass != null || !mx.mixins.isEmpty()
+                || (stubs.isStubClass(mixRef.name) && !classVisibleFrom(mx, c.ownerLibrary))) {
+            return null;
+        }
+        return mixRef;
+    }
+
+    /** The witnesses a constructor of c passes to the Java superclass it gets from its first mixin. */
+    private String mixinSuperWitnessCall(ClassDecl c, boolean unknown, Node pos, Ctx ctx) {
+        TypeRef mixRef = mixinClassAsSuperRef(c);
+        ClassDecl mx = mixRef == null ? null : program.classes.get(mixRef.name);
+        if (mx == null || witnessParams(mx).isEmpty()) {
+            return null;
+        }
+        if (unknown) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < witnessParams(mx).size(); i++) {
+                sb.append(i == 0 ? "" : ", ").append("(dart.runtime.TypeWitness) null");
+            }
+            return "super(" + sb + ");";
+        }
+        return "super(" + stripTrailingComma(witnessArgs(mx, mixRef.args, pos, ctx)) + ");";
     }
 
     private ClassDecl superDeclOf(ClassDecl k, TypeRef t) {
@@ -9319,20 +9943,33 @@ public final class JavaEmitter {
     }
 
     /** Whether a call written with {@code <..., tp, ...>} at {@code idx} needs tp's witness. */
-    private boolean callNeedsWitness(Call c, int idx) {
+    private static final int NO_DEMAND = 0;
+    /// The witness is kept only so runtimeType can name the argument: a caller that cannot
+    /// form one passes an unknown (null) witness, as Dart's runtimeType still answers.
+    private static final int SOFT_DEMAND = 1;
+    /// The witness is used as a value (is/as, a type literal...): one must be formed.
+    private static final int HARD_DEMAND = 2;
+
+    /// What the call's type argument at {@code idx} must be witnessed as.
+    private int witnessDemand(Call c, int idx) {
         if ("whereType".equals(c.name) && c.target != null) {
-            return true;
+            return HARD_DEMAND;
         }
         if (c.name == null) {
-            return false;
+            return NO_DEMAND;
         }
         ClassDecl pc = c.target == null ? program.classes.get(c.name) : null;
         if (pc != null) {
-            return idx < pc.typeParams.size() && witnessParams(pc).contains(pc.typeParams.get(idx));
+            // `Box<T>(..)` written without `new` parses as a Call: the same rule as a CtorCall.
+            if (idx >= pc.typeParams.size() || !witnessParams(pc).contains(pc.typeParams.get(idx))) {
+                return NO_DEMAND;
+            }
+            return constructionDemandsWitness(pc, pc.typeParams.get(idx)) ? HARD_DEMAND : SOFT_DEMAND;
         }
+        int d = NO_DEMAND;
         FunctionDecl f = c.target == null ? program.functions.get(c.name) : null;
         if (f != null && idx < f.typeParams.size() && methodWitnesses(f).contains(f.typeParams.get(idx))) {
-            return true;
+            d = Math.max(d, hardMethodWitness(f, f.typeParams.get(idx)) ? HARD_DEMAND : SOFT_DEMAND);
         }
         indexMethods();
         List<MethodDecl> ms = methodsByName.get(c.name);
@@ -9340,27 +9977,43 @@ public final class JavaEmitter {
             for (MethodDecl m : ms) {
                 if (idx < m.typeParams.size() && m.typeParams.size() == c.typeArgs.size()
                         && methodWitnesses(m).contains(m.typeParams.get(idx))) {
-                    return true;
+                    d = Math.max(d, hardMethodWitness(m, m.typeParams.get(idx)) ? HARD_DEMAND : SOFT_DEMAND);
                 }
             }
         }
-        return false;
+        return d;
     }
 
-    private boolean calleeTakesWitness(Call c) {
+    /// Whether decl's witness for its type parameter {@code n} is needed as a value, not only
+    /// for runtimeType; an override group not computed yet answers true (the strict reading).
+    private boolean hardMethodWitness(Object decl, String n) {
+        java.util.Set<String> hard = methodHardWitnessCache.get(decl);
+        return hard == null || hard.contains(n);
+    }
+
+    /// HARD_DEMAND when some callee of that name needs a witness as a value, SOFT_DEMAND when
+    /// every one that takes witnesses needs them only for runtimeType, else NO_DEMAND.
+    private int calleeWitnessDemand(Call c) {
         FunctionDecl f = c.target == null ? program.functions.get(c.name) : null;
         if (f != null) {
-            return !methodWitnesses(f).isEmpty();
+            return declWitnessDemand(f);
         }
+        int d = NO_DEMAND;
         List<MethodDecl> ms = methodsByName.get(c.name);
         if (ms != null) {
             for (MethodDecl m : ms) {
-                if (!methodWitnesses(m).isEmpty()) {
-                    return true;
-                }
+                d = Math.max(d, declWitnessDemand(m));
             }
         }
-        return false;
+        return d;
+    }
+
+    private int declWitnessDemand(Object decl) {
+        int d = NO_DEMAND;
+        for (String n : methodWitnesses(decl)) {
+            d = Math.max(d, hardMethodWitness(decl, n) ? HARD_DEMAND : SOFT_DEMAND);
+        }
+        return d;
     }
 
     /** Adds every type-parameter name in tps written as a type argument inside o. */
@@ -9397,6 +10050,61 @@ public final class JavaEmitter {
             collectTypeNames(((CtorCall) o).type, tps, used, depth + 1);
             collectTypeNames(((CtorCall) o).args, tps, used, depth + 1);
         }
+    }
+
+    /// The type a synchronous `=> expr` function literal returns, when it can be known here:
+    /// only if the body names none of the literal's own parameters, which are not in scope
+    /// for inference at the call (an outer variable of the same name would answer wrongly).
+    private TypeRef lambdaBodyType(Lambda l, Ctx ctx) {
+        if (l.exprBody == null || l.isAsync || l.isSyncStar || l.isAsyncStar) {
+            return null;
+        }
+        java.util.Set<String> names = new HashSet<String>();
+        for (Param lp : l.params) {
+            names.add(lp.name);
+        }
+        if (!names.isEmpty()) {
+            if (mentionsIdent(l.exprBody, names, java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()))) {
+                return null;
+            }
+        }
+        TypeRef t = elementTypeQuiet(l.exprBody, ctx);
+        return t == null || t.is("dynamic") || t.is("var") ? null : t;
+    }
+
+    private static boolean mentionsIdent(Object o, java.util.Set<String> names, java.util.Set<Object> seen) {
+        if (o == null || !seen.add(o)) {
+            return false;
+        }
+        if (o instanceof Ident && names.contains(((Ident) o).name)) {
+            return true;
+        }
+        if (o instanceof List) {
+            for (Object x : (List<?>) o) {
+                if (mentionsIdent(x, names, seen)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!(o instanceof Node) && !(o instanceof Args) && !(o instanceof Ast.NamedArg)) {
+            return false;
+        }
+        for (java.lang.reflect.Field f : o.getClass().getFields()) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType().isPrimitive()
+                    || f.getType() == String.class) {
+                continue;
+            }
+            try {
+                if (mentionsIdent(f.get(o), names, seen)) {
+                    return true;
+                }
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        return false;
     }
 
     private static String withWitnesses(String w, String args) {
@@ -9437,8 +10145,20 @@ public final class JavaEmitter {
                 } else if (pos < c.args.positional.size()) {
                     a = c.args.positional.get(pos++);
                 }
+                if (a instanceof Lambda && p.type != null && p.type.funcReturn != null) {
+                    // `op.then((v) => 1)`: R unifies with what the function literal returns.
+                    TypeRef lr = lambdaBodyType((Lambda) a, ctx);
+                    TypeRef pr = p.type.funcReturn;
+                    if (lr != null && pr.is("FutureOr") && pr.args.size() == 1
+                            && !lr.is("Future") && !lr.is("FutureOr")) {
+                        pr = pr.args.get(0);
+                    }
+                    if (lr != null) {
+                        unifyThroughSupers(pr, lr, tps, m, 0);
+                    }
+                }
                 if (a != null && !(a instanceof Lambda)) {
-                    TypeRef at = inferExprTypeQuiet(a, ctx);
+                    TypeRef at = elementTypeQuiet(a, ctx);
                     if ((at == null || at.is("dynamic")) && a instanceof Call && ((Call) a).target == null
                             && ((Call) a).name != null && program.classes.containsKey(((Call) a).name)) {
                         // An unannotated construction: its class, with what was written.
@@ -9461,6 +10181,12 @@ public final class JavaEmitter {
                 } else if (e.is("Future") && e.args.size() == 1 && !r.is("Future")) {
                     e = e.args.get(0);
                 }
+                if (r != null && r.args.isEmpty() && tps.contains(r.name) && !m.containsKey(r.name)
+                        && e != null) {
+                    // `Future<dynamic> f() => sync.run(() async {..})`: the context type is the
+                    // type argument itself (dynamic included), as Dart's downward inference has it.
+                    m.put(r.name, e);
+                }
                 TypeRef sup = asSuper(r, e.name, 0);
                 unifyTypeVars(sup, e, tps, m);
                 if (sup != null && e.args.isEmpty() && sup.name != null && sup.name.equals(e.name)) {
@@ -9478,6 +10204,10 @@ public final class JavaEmitter {
         for (String n : ws) {
             TypeRef t = m.get(n);
             String w = t == null ? null : witnessOf(t, ctx);
+            if (w == null && !hardMethodWitness(decl, n)) {
+                // Only runtimeType reads it: the callee records an unknown argument.
+                w = "(dart.runtime.TypeWitness) null";
+            }
             if (w == null) {
                 diags.error(c, "E0142", "Calling " + name + " needs its type argument '" + n
                         + "' at run time (its body uses " + n + " as a value), and none is "
@@ -9617,7 +10347,8 @@ public final class JavaEmitter {
         }
         boolean nullable = t.nullable || t.is("dynamic") || t.is("var") || t.is("Null")
                 || t.is("void");
-        return "dart.runtime.TypeWitness.of(" + erasedJavaType(t, ctx) + ".class, " + nullable + ")";
+        String nested = reifiedHead(t, ctx) != null ? reifiedArgWitnesses(t, ctx) : "";
+        return "dart.runtime.TypeWitness.of(" + erasedJavaType(t, ctx) + ".class, " + nullable + nested + ")";
     }
 
     /**
@@ -9646,7 +10377,12 @@ public final class JavaEmitter {
                 a = bound != null && bound.funcReturn == null && bound.args.isEmpty()
                         && !pc.typeParams.contains(bound.name) ? bound : new TypeRef("dynamic");
             }
+            boolean reifyOnly = reifyOnlyParams.contains(pc.name + "<" + n);
             String w = witnessOf(a, ctx);
+            if (w == null && reifyOnly) {
+                sb.add("(dart.runtime.TypeWitness) null");
+                continue;
+            }
             if (w == null) {
                 diags.error(pos, "E0142", "Constructing " + pc.name + " needs its type argument '" + n
                         + "' at run time (its body uses " + n + " as a value), and none is "
@@ -9795,6 +10531,14 @@ public final class JavaEmitter {
                     + ".class, " + asEl.nullable + ", " + target.nullable + ", " + quote(target.toString()) + ")";
             return new Out("((" + jt + ") " + acall + ")", c.type);
         }
+        String reified = reifiedIsCheck("$ra", target.nullable, target, ctx);
+        if (reified != null) {
+            // `as Box<int>`: the type arguments are checked as `is` checks them; a mismatch
+            // throws the cast's TypeError (Void.class is never an instance).
+            String acall = reifiedHead(target, ctx) + "$asArgs$" + javaSimple(target.name) + "(" + operand
+                    + ", " + target.nullable + ", " + quote(target.toString()) + reifiedArgWitnesses(target, ctx) + ")";
+            return new Out("((" + jt + ") " + acall + ")", c.type);
+        }
         String call = "DartRuntime.as(" + operand + ", " + erased + ".class, " + target.nullable + ", "
                 + quote(target.toString()) + ")";
         // The helper answers the erased class; a parameterized target narrows it unchecked:
@@ -9881,8 +10625,8 @@ public final class JavaEmitter {
     /// `[() => a.remove(1), () => a.removeLast()]` with no context: Dart types the list by
     /// the closures' common function type (`Object Function()`). With no element type a
     /// Java lambda has no target and `DartList.<Object>of(() -> ..)` does not compile, so
-    /// closures of one arity make a list of that function shape, returning dynamic (the
-    /// returns may disagree, and every caller reads the result as a value either way).
+    /// closures of one arity make a list of that function shape. The result is read as
+    /// dynamic: the returns may disagree, and a call of an element is used as a value.
     private TypeRef closureListElementType(List<Expr> elements) {
         if (elements.isEmpty()) {
             return null;
@@ -9907,14 +10651,31 @@ public final class JavaEmitter {
                 params = l.params;
             }
         }
-        List<Param> untyped = new ArrayList<Param>();
-        for (Param p : params) {
+        // A parameter keeps the type the closures declare for it when they all agree
+        // (`[(int x) => x + 1, (int x) => x * 2]` is a List<int Function(int)>); one
+        // that is untyped or declared differently is dynamic there.
+        List<Param> shape = new ArrayList<Param>();
+        for (int i = 0; i < arity; i++) {
+            TypeRef common = null;
+            for (Expr e : elements) {
+                TypeRef t = ((Lambda) e).params.get(i).type;
+                if (t == null || t.is("var") || isDynamicType(t)) {
+                    common = TypeRef.DYNAMIC;
+                    break;
+                }
+                if (common == null) {
+                    common = t;
+                } else if (!common.toString().equals(t.toString())) {
+                    common = TypeRef.DYNAMIC;
+                    break;
+                }
+            }
             Param q = new Param();
-            q.name = p.name;
-            q.type = TypeRef.DYNAMIC;
-            untyped.add(q);
+            q.name = params.get(i).name;
+            q.type = common;
+            shape.add(q);
         }
-        return funcTypeRef(TypeRef.DYNAMIC, untyped);
+        return funcTypeRef(TypeRef.DYNAMIC, shape);
     }
 
     private Out emitListLit(ListLit l, TypeRef expected, Ctx ctx) {
@@ -10823,6 +11584,17 @@ public final class JavaEmitter {
     }
 
     private Out emitIdent(Ident id, TypeRef expected, Ctx ctx) {
+        Out o = emitIdentUntyped(id, expected, ctx);
+        if (id.typeArgs != null && !id.typeArgs.isEmpty() && o.type != null && isClassRef(o.type)
+                && o.type.arg(0).args.isEmpty()) {
+            // `Box<int>` as a value: the class reference keeps its arguments, which the
+            // Type it denotes carries (classLiteral).
+            o.type.arg(0).args.addAll(id.typeArgs);
+        }
+        return o;
+    }
+
+    private Out emitIdentUntyped(Ident id, TypeRef expected, Ctx ctx) {
         if (id.pinnedClass != null) {
             TypeRef ref = classRef(id.name);
             ref.args.get(0).resolved = id.pinnedClass;
@@ -10950,9 +11722,9 @@ public final class JavaEmitter {
             if (n.equals("mounted") && isStateSubclass(cc)) {
                 return new Out("this.mounted()", TypeRef.BOOL);
             }
-            // bare `runtimeType` — the receiver is the implicit `this`
+            // bare `runtimeType` -- the receiver is the implicit `this`
             if (n.equals("runtimeType")) {
-                return new Out("this.getClass()", new TypeRef("Type"));
+                return new Out("dart.runtime.TypeWitness.runtimeType(this)", new TypeRef("Type"));
             }
             // inside an enhanced-enum body: a bare enum-constant name resolves to the
             // constant, and the implicit name()/index() intrinsics are in scope.
@@ -11029,7 +11801,7 @@ public final class JavaEmitter {
         // A type parameter used as a value (`Type get type => T`, `T == int`): its witness.
         String tw = witnessFor(n, ctx);
         if (tw != null) {
-            return new Out(tw + ".type()", new TypeRef("Type"));
+            return new Out("dart.runtime.TypeWitness.value(" + tw + ")", new TypeRef("Type"));
         }
         // `dynamic` as a value (`T == dynamic`): the class a dynamic witness carries,
         // which is Object's -- erasure cannot tell `dynamic` from `Object` apart.
@@ -11057,7 +11829,7 @@ public final class JavaEmitter {
      * enum, a top-level const/var, a top-level function (as a method reference), or a
      * stub-contributed top-level value. Returns null when the name is not top-level.
      * Shared by bare-identifier resolution and import-prefix ({@code prefix.name})
-     * member access — both denote the same global namespace in the single-package model.
+     * member access -- both denote the same global namespace in the single-package model.
      */
     /**
      * Set while an untyped local's initializer is a bare name (`final f = jsonEncode;`):
@@ -11133,7 +11905,7 @@ public final class JavaEmitter {
 
     /**
      * @param prefix the import prefix the name was accessed through ({@code prefix.n}),
-     *               or null for a bare identifier — used to disambiguate a top-level
+     *               or null for a bare identifier -- used to disambiguate a top-level
      *               name declared in several libraries.
      */
     private Out resolveTopLevel(String n, String prefix, Ctx ctx) {
@@ -11153,7 +11925,7 @@ public final class JavaEmitter {
         if (program.topLevelVars.containsKey(n)) {
             Library owner = program.resolveTopLevelVarOwner(n, ctx.library(), prefix);
             FieldDecl v = program.topLevelVars.get(n);
-            // A lazily-initialised variable is an accessor pair, not a field —
+            // A lazily-initialised variable is an accessor pair, not a field --
             // see isLazyTopLevel for why it cannot be a field.
             String ref = Program.libClassName(owner.fileName)
                     + (isLazyTopLevel(v) ? ".get$" + n + "()" : "." + n);
@@ -11451,7 +12223,7 @@ public final class JavaEmitter {
     }
 
     /**
-     * {@code SomeEnum.values} — Dart exposes an enum's members as a GETTER returning a
+     * {@code SomeEnum.values} -- Dart exposes an enum's members as a GETTER returning a
      * {@code List}, Java as a static method returning an ARRAY.
      *
      * <p>Both halves of that matter. Emitting the Dart spelling is a field access to
@@ -11699,26 +12471,48 @@ public final class JavaEmitter {
      * A declaration that names the element type itself already returns the primitive class.
      */
     private String primitiveListSeen(String code, TypeRef declared, TypeRef seen, Ctx ctx) {
-        // `Stream<List<T>> readStream()` on a `Reader<int>`: the caller holds a
-        // Stream<DartLongList>, which Java's invariant generics refuse the generic body's
-        // Stream<DartList<Long>> for; every element is viewed the same way a bare one is.
-        if (declared != null && seen != null && declared.is("Stream") && seen.is("Stream")
-                && declared.args.size() == 1 && seen.args.size() == 1
-                && declared.args.get(0).is("List") && seen.args.get(0).is("List")) {
-            String pk = primitiveListKind(seen.args.get(0));
-            if (pk != null && primitiveListKind(declared.args.get(0)) == null) {
-                return "(" + code + ").map(dart.core.Dart" + pk + "List::view" + pk + "s)";
+        String c = primitiveListConversion(code, declared, seen, 0);
+        return c == null ? code : c;
+    }
+
+    /**
+     * The one rule behind primitiveListSeen, applied to every type position: where the
+     * caller's type holds List&lt;int&gt; (List&lt;double&gt;) and the declaration's holds a
+     * List of a type variable, the value there is viewed as the primitive list class. A
+     * bare list is viewed directly; one inside a List, a Map value, an Iterable, a Future
+     * or a Stream is reached through the matching live view in dart.core.ElementViews, so
+     * `Map&lt;String, List&lt;T&gt;&gt;` seen as `Map&lt;String, List&lt;int&gt;&gt;` and any deeper
+     * nesting are converted the same way. Null when nothing in the type needs it.
+     */
+    private String primitiveListConversion(String code, TypeRef declared, TypeRef seen, int depth) {
+        if (declared == null || seen == null || declared.name == null
+                || !declared.name.equals(seen.name) || declared.args.size() != seen.args.size()) {
+            return null;
+        }
+        if (seen.is("List") && seen.args.size() == 1) {
+            String pk = primitiveListKind(seen);
+            if (pk != null) {
+                return primitiveListKind(declared) != null ? null
+                        : "dart.core.Dart" + pk + "List.view" + pk + "s(" + code + ")";
             }
-            return code;
         }
-        if (declared == null || seen == null || !declared.is("List") || !seen.is("List")) {
-            return code;
+        String helper = seen.is("List") ? "list" : seen.is("Map") ? "map" : seen.is("Iterable") ? "iterable"
+                : seen.is("Future") ? "future" : seen.is("Stream") ? "stream" : null;
+        if (helper == null || seen.args.isEmpty()) {
+            return null;
         }
-        String pk = primitiveListKind(seen);
-        if (pk == null || primitiveListKind(declared) != null) {
-            return code;
+        // A Map's values only: a key is hashed by lookups, and a retyped key would not find
+        // the entry it names (ElementViews.map).
+        int arg = seen.args.size() - 1;
+        if ("map".equals(helper) ? seen.args.size() != 2 : seen.args.size() != 1) {
+            return null;
         }
-        return "dart.core.Dart" + pk + "List.view" + pk + "s(" + code + ")";
+        String v = "$pl" + depth;
+        String inner = primitiveListConversion(v, declared.args.get(arg), seen.args.get(arg), depth + 1);
+        if (inner == null) {
+            return null;
+        }
+        return "dart.core.ElementViews." + helper + "(" + code + ", " + v + " -> " + inner + ")";
     }
 
     /**
@@ -11838,7 +12632,7 @@ public final class JavaEmitter {
             return new Out(target.code + "." + name, TypeRef.DYNAMIC, true);
         }
         // Genuine `dynamic` receiver: a member read is legal Dart (dynamic dispatch,
-        // resolved at runtime) — e.g. `(dynamic demo) => demo.slug` or a dynamic-typed
+        // resolved at runtime) -- e.g. `(dynamic demo) => demo.slug` or a dynamic-typed
         // `platformDispatcher.platformBrightness`. Emit the access with a dynamic result.
         if (tt != null && tt.is("dynamic")) {
             ctx.importClass("dart.runtime.Dyn");
@@ -11849,11 +12643,12 @@ public final class JavaEmitter {
         if (tt != null && tt.name.startsWith("Rec$")) {
             return new Out(target.code + "." + name + "()", recordComponentType(tt, name));
         }
-        // Object protocol: `x.runtimeType` — every Dart object exposes it. Maps to the
+        // Object protocol: `x.runtimeType` -- every Dart object exposes it. Maps to the
         // Java class token, which compares by identity exactly like Dart's Type equality
         // (`other.runtimeType == runtimeType`).
         if (name.equals("runtimeType") && tt != null && !isClassRef(tt)) {
-            return new Out(target.code + ".getClass()", new TypeRef("Type"));
+            return new Out("dart.runtime.TypeWitness.runtimeType(" + boxIfPrimitive(target, ctx) + ")",
+                    new TypeRef("Type"));
         }
         // static access through a class reference
         if (isClassRef(tt)) {
@@ -11922,7 +12717,7 @@ public final class JavaEmitter {
                 }
                 Ast.MethodDecl m = stubs.findMethod(cls, name, false);
                 if (m != null && m.isStatic) {
-                    // static method tear-off — unsupported
+                    // static method tear-off -- unsupported
                     diags.error(posNode, "E0130", "Static method tear-offs are not supported yet");
                     return new Out("null", TypeRef.DYNAMIC);
                 }
@@ -12192,7 +12987,7 @@ public final class JavaEmitter {
             if (g != null) {
                 TypeRef rt = g.returnType;
                 // Narrow a generic getter (declared `V get value`) to the concrete
-                // type argument the receiver instantiates — e.g.
+                // type argument the receiver instantiates -- e.g.
                 // MapEntry<Locale,DisplayOption>.value -> DisplayOption.
                 TypeRef sub = stubMemberReturnType(tt, name, true);
                 if (sub != null) {
@@ -12212,7 +13007,7 @@ public final class JavaEmitter {
             // instance-method tear-off: `controller.reverse` / `controller.forward` used as a
             // callback value (e.g. `onTap: controller.reverse`). The member is a method on the
             // stub type, not a field/getter, so emit a Java method reference typed as a Function
-            // — mirroring the own-method `this::name` tear-off. The stub already carries the
+            // -- mirroring the own-method `this::name` tear-off. The stub already carries the
             // no-arg / optional-arg overloads the target functional interface needs.
             Ast.MethodDecl tearoff = stubs.findMethod(tt.name, name, false);
             if (tearoff != null && !tearoff.isStatic) {
@@ -12240,7 +13035,7 @@ public final class JavaEmitter {
                 }
             }
         }
-        // `.mounted` (bool) — on a State receiver, or the BuildContext.mounted guard;
+        // `.mounted` (bool) -- on a State receiver, or the BuildContext.mounted guard;
         // neither is part of the minimal State/BuildContext stub surface.
         if ((tt.is("State") || tt.is("BuildContext")) && name.equals("mounted")) {
             return new Out(target.code + ".mounted()", TypeRef.BOOL);
@@ -12450,7 +13245,7 @@ public final class JavaEmitter {
      * puts/gets avoid Long boxing. Other key/value combinations keep the boxed
      * {@code DartMap}.
      */
-    /** A side-effect-free constant literal — safe to evaluate eagerly (e.g. for a ?? default). */
+    /** A side-effect-free constant literal -- safe to evaluate eagerly (e.g. for a ?? default). */
     private static boolean isPureLiteral(Expr e) {
         return e instanceof IntLit || e instanceof DoubleLit || e instanceof BoolLit
                 || e instanceof NullLit || e instanceof StringLit;
@@ -13082,7 +13877,9 @@ public final class JavaEmitter {
                         : coerce(emitExpr(a.rhs, vt, ctx), vt, ctx);
                 return new Out(target.code + ".putLong(" + key + ", " + rhsCode + ")", vt);
             }
-            String key = target.type.is("Map") ? boxIfPrimitive(idx, ctx) : idx.code;
+            // `types[Box<int>] = v`: a type literal key is the Type it denotes.
+            String key = idx.type != null && isClassRef(idx.type) ? classLiteral(idx, ctx)
+                    : target.type.is("Map") ? boxIfPrimitive(idx, ctx) : idx.code;
             if (postfixValue(a, ctx)) {
                 final String tc = target.code;
                 return postfixIndex(tc + ".idx(" + key + ")", vt, a, ctx,
@@ -13111,7 +13908,7 @@ public final class JavaEmitter {
                             a.op.equals("=") ? null : recv + "." + pg.name + "()", pt, ctx);
                 }
             }
-            // App class (or its supers) declaring `set prop(v)` — emitted as the overloaded
+            // App class (or its supers) declaring `set prop(v)` -- emitted as the overloaded
             // instance method `prop(v)`, so `x.prop = v` becomes `x.prop(v)` (never `x.prop() = v`).
             // A compound `x.prop += v` reads through the getter, `x.prop(x.prop() + v)`, as the
             // stub branch above does; it fell through to `x.prop() += v`, which is not Java.
@@ -13310,7 +14107,7 @@ public final class JavaEmitter {
     }
 
     /**
-     * Promotions implied by a boolean guard {@code cond} holding FALSE — used for the right
+     * Promotions implied by a boolean guard {@code cond} holding FALSE -- used for the right
      * operand of {@code ||} (reached only when the left is false). A false {@code ||} means
      * every disjunct is false, so recurse both sides; a false {@code x is! T} narrows
      * {@code x} to {@code T}.
@@ -14015,7 +14812,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         if (b.op.equals("||")) {
             // `x is! T || x.member`: reaching the right operand means the left was false,
-            // i.e. `x is T` held — flow-promote x to T for the right operand.
+            // i.e. `x is T` held -- flow-promote x to T for the right operand.
             Out l = emitExpr(b.left, null, ctx);
             List<Object[]> undo = new ArrayList<Object[]>();
             collectNegativePromotions(b.left, ctx, undo);
@@ -14278,6 +15075,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     jt = javaType(on, true, ctx);
                 }
                 test = caught + " instanceof " + jt;
+                // `on Box<int>` checks the type arguments too, as `is Box<int>` does.
+                String reified = reifiedIsCheck(caught, false, on, ctx);
+                if (reified != null) {
+                    test = reified;
+                }
                 bindType = jt;
                 bindValue = "(" + jt + ") " + caught;
                 varType = on;
@@ -14295,7 +15097,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 ctx.importClass("dart.core.DartThrown");
                 String jt = javaType(on, true, ctx);
                 String value = "((DartThrown) " + caught + ").value()";
-                test = caught + " instanceof DartThrown && " + value + " instanceof " + jt;
+                String reified = reifiedIsCheck(value, false, on, ctx);
+                test = caught + " instanceof DartThrown && "
+                        + (reified != null ? reified : value + " instanceof " + jt);
                 bindType = jt;
                 bindValue = "(" + jt + ") " + value;
                 varType = on;
@@ -15078,6 +15882,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         np.required = p.required;
                         np.defaultValue = p.defaultValue;
                         np.type = p.type == null ? null : substTypeParams(p.type, mx.typeParams, mref.args);
+                        if (np.type != null && !np.type.nullable && p.type.args.isEmpty()
+                                && mx.typeParams.contains(p.type.name)) {
+                            // `E sample` in M<E>: the mixin's Java default takes E erased, a
+                            // reference, so with E bound to int the override must take Long,
+                            // not long, or it only overloads it. Declaring the forwarder's
+                            // parameter `int?` spells exactly that boxed type; the body just
+                            // passes it on, so nothing else about the parameter changes.
+                            TypeRef boxedArg = new TypeRef(np.type.name);
+                            boxedArg.args.addAll(np.type.args);
+                            boxedArg.nullable = true;
+                            np.type = boxedArg;
+                        }
                         mm.params.add(np);
                         Ident id = new Ident();
                         id.name = p.name;
@@ -15473,8 +16289,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * The legal Java identifier for an arbitrary Dart name emitted as a Java
      * name. Folds in the reserved-word escape ({@link #javaMethodName}) and
      * additionally rewrites Dart's all-underscore wildcard/placeholder names
-     * ({@code _}, {@code __}, ...) — a bare {@code _} is a reserved keyword in
-     * Java 9+ — by appending a trailing underscore ({@code _}->{@code __},
+     * ({@code _}, {@code __}, ...) -- a bare {@code _} is a reserved keyword in
+     * Java 9+ -- by appending a trailing underscore ({@code _}->{@code __},
      * {@code __}->{@code ___}), which is always legal. Deterministic: the same
      * Dart name always maps to the same Java name so declarations and
      * references stay consistent.
@@ -16173,7 +16989,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (c.target == null) {
             return emitBareCall(c, expected, ctx);
         }
-        // deferred import: `m.loadLibrary()` — AOT, so the library is already loaded;
+        // deferred import: `m.loadLibrary()` -- AOT, so the library is already loaded;
         // hand back an already-completed future.
         if (c.name != null && c.name.equals("loadLibrary") && isImportPrefix(c.target, ctx)) {
             ctx.importClass("dart.async.Future");
@@ -16212,7 +17028,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 ctx.callPrefix = outer;
             }
         }
-        // Static factory methods on the primitive numeric types — `double.parse(s)`,
+        // Static factory methods on the primitive numeric types -- `double.parse(s)`,
         // `double.tryParse(s)`, `int.parse(s)`, `int.tryParse(s)`. The type name is not a
         // resolvable value expression, so intercept before emitting it as a target.
         if (c.name != null && c.target instanceof Ident
@@ -16330,7 +17146,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.importClass("dart.runtime.DartRuntime");
             Expr arg = c.args.positional.isEmpty() ? null : c.args.positional.get(0);
             Out o = arg == null ? new Out("\"\"", TypeRef.STRING) : emitExpr(arg, null, ctx);
-            return new Out("DartRuntime.print(" + o.code + ")", TypeRef.VOID);
+            // `print(Box<int>)`: a type literal prints as the Type it denotes.
+            String pc = o.type != null && isClassRef(o.type) ? classLiteral(o, ctx) : o.code;
+            return new Out("DartRuntime.print(" + pc + ")", TypeRef.VOID);
         }
         // local closure variable
         TypeRef local = ctx.lookup(n);
@@ -16381,12 +17199,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
             }
         }
-        // Stopwatch() — dart:core intrinsic (no-arg monotonic timer)
+        // Stopwatch() -- dart:core intrinsic (no-arg monotonic timer)
         if (n.equals("Stopwatch") && c.args.positional.isEmpty() && c.args.named.isEmpty()) {
             ctx.importClass("dart.core.Stopwatch");
             return new Out("new Stopwatch()", new TypeRef("Stopwatch"));
         }
-        // Duration(seconds: 2, ...) — dart:core intrinsic with canonical named order
+        // Duration(seconds: 2, ...) -- dart:core intrinsic with canonical named order
         if (n.equals("Duration")) {
             return emitDurationOf(c.args, ctx);
         }
@@ -16970,8 +17788,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 CtorDecl named = pc.namedCtor(n);
                 if (named != null) {
                     // named (or named factory) constructor -> static factory
-                    String tw = witnessArgs(pc, inferredWitnessTypeArgs(pc, c.typeArgs, callExpected(c, ctx)),
-                            c, ctx);
+                    String tw = witnessArgs(pc, argInferredWitnessTypeArgs(pc, named,
+                            inferredWitnessTypeArgs(pc, c.typeArgs, callExpected(c, ctx)), c.args, ctx), c, ctx);
                     // The owner types `this.parts` field formals, so `X._(List.from(parts))`
                     // gets the field's type as the argument's context.
                     // `Transformer<Object, String>.fromHandlers(...)` is a Transformer<Object,
@@ -17151,7 +17969,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         target.code + "." + n, ctx, ret);
             }
             // invocation of a function-typed field: `obj.onTap(args)` where onTap is a
-            // `void Function(...)`/callback field — read the field then invoke its SAM.
+            // `void Function(...)`/callback field -- read the field then invoke its SAM.
             FieldDecl ff = pc.field(n);
             if (ff == null) {
                 ff = findInheritedField(pc, n);
@@ -17840,7 +18658,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     String erased = erasedJavaType(sub, ctx);
                     String pk = sub.is("List") ? primitiveListKind(sub) : null;
                     TypeRef el = pk == null && sub.is("List") ? scalarListElement(sub) : null;
-                    String elemCheck = pk != null ? "dart.core.Dart" + pk + "List.is" + pk + "s($wt)"
+                    String reifiedEl = reifiedIsCheck("$wt", false, sub, ctx);
+                    String elemCheck = reifiedEl != null ? reifiedEl
+                            : pk != null ? "dart.core.Dart" + pk + "List.is" + pk + "s($wt)"
                             : el != null ? "dart.core.DartList.isListOf($wt, " + erasedJavaType(el, ctx)
                                     + ".class, " + el.nullable + ")" : null;
                     String code = target.code + ".whereType((java.lang.Class) " + erased + ".class"
@@ -17849,7 +18669,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         code = "((dart.core.DartIterable<Object>) " + code
                                 + ").where(($wt) -> $wt == null || " + elemCheck + ")";
                     }
-                    return new Out("((dart.core.DartIterable) " + code + ")", TypeRef.of("Iterable", sub));
+                    // Typed, so a lambda over the result (`.map((b) => b.value)`) sees the
+                    // element's members rather than Object's.
+                    return new Out("((dart.core.DartIterable<" + javaType(sub, true, ctx) + ">) (dart.core.DartIterable) "
+                            + code + ")", TypeRef.of("Iterable", sub));
                 }
                 String token = sub != null ? javaType(sub, true, ctx) + ".class" : "null";
                 boolean admitsNull = sub == null || sub.nullable || sub.is("dynamic") || sub.is("var");
@@ -19060,7 +19883,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * <p>Java erases {@code Selector<A, S>}, so the runtime cannot recover {@code A} and used
      * to ask the provider chain for the nearest value of ANY type. With more than one model
      * in scope that is right only by luck: Reply has its localizations and its EmailStore
-     * above the same Selector, took the localizations, and failed — visibly as a cast error
+     * above the same Selector, took the localizations, and failed -- visibly as a cast error
      * on the desktop, and on iOS as a wrong object that flowed on until an unrelated switch
      * matched nothing and the page came up blank.</p>
      */
@@ -19075,7 +19898,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * Emits {@code tmp.providedType(A.class)} for those widgets.
      *
      * <p>Only for a plain class: a generic or dynamic argument has no class literal, and the
-     * runtime's Object default (nearest provider) remains — no worse than before.</p>
+     * runtime's Object default (nearest provider) remains -- no worse than before.</p>
      */
     private void emitProvidedTypeToken(String tmp, String className, List<TypeRef> typeArgs,
             Ctx ctx) {
@@ -19164,11 +19987,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (prefixProvides(ctx.library(), ctorPrefix, pc)) {
                 constructed.resolved = pc;
             }
-            String twArgs = witnessArgs(pc, typeArgs, posNode, ctx);
+            String twArgs = witnessArgs(pc, argInferredWitnessTypeArgs(pc, ct, typeArgs, args, ctx), posNode, ctx);
             if (ct != null && ct.isFactory) {
                 List<TypeRef> contextArgs = ctx.ctorContextArgs;
                 ctx.ctorContextArgs = null;
-                if (constructed.args.isEmpty() && contextArgs != null && contextArgs.size() == pc.typeParams.size()) {
+                if (!constructed.args.isEmpty() && constructed.args.size() == pc.typeParams.size()) {
+                    // Type arguments written or taken from a supertype context bind $create's
+                    // type variables the same way: javac must not infer them from the
+                    // arguments (a diamond in a hoisted cascade target reads as Object).
+                    contextArgs = constructed.args;
+                }
+                if (contextArgs != null && contextArgs.size() == pc.typeParams.size()) {
                     // `Chan<S> cast<S>() => Chan(s.cast(), StreamController(sync: true)..)` with
                     // an unnamed factory: Dart takes the type arguments from the return
                     // context. javac inferred the static $create's T from the arguments alone
@@ -19198,7 +20027,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         constructed);
             }
             // A generic program class constructed raw (`new Foo(...)`) erases the generics on ALL
-            // its members — a constructor param typed Func1<BuildContext, Widget> becomes raw
+            // its members -- a constructor param typed Func1<BuildContext, Widget> becomes raw
             // Func1, so a lambda argument gets Object params. A diamond keeps the signatures.
             String diamond = pc.typeParams.isEmpty() ? "" : "<>";
             if (!constructed.args.isEmpty()) {
@@ -19259,8 +20088,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         String simple = stubSimpleName(className, ctx);
         // A generic stub class constructed raw (`new Foo()`) erases the generics on ALL its
-        // instance members — including builder/callback setters whose SAM types don't even
-        // mention the type variable — so a lambda passed to such a setter gets Object params.
+        // instance members -- including builder/callback setters whose SAM types don't even
+        // mention the type variable -- so a lambda passed to such a setter gets Object params.
         // Emit an explicit type witness (diamond) to keep those signatures intact, filling any
         // missing Dart type argument with Object. For the provider/scoped_model builders we
         // also thread the argument into the setter param types so the lambda BODY resolves the
@@ -19379,7 +20208,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
             }
             if (pt == null) {
-                // inherited named param (e.g. key) — look up stub super chain
+                // inherited named param (e.g. key) -- look up stub super chain
                 Ast.ClassDecl cur = sc;
                 outer:
                 while (cur != null && cur.superclass != null) {
@@ -20358,7 +21187,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * Reports every named argument the callee does not declare.
      *
      * <p>Canonical expansion walks the PARAMETERS and looks up an argument for each, so an
-     * argument nobody declared is simply never read — it vanishes with no diagnostic and no
+     * argument nobody declared is simply never read -- it vanishes with no diagnostic and no
      * runtime complaint. That is how {@code ListView.builder(shrinkWrap: true, ...)} came to
      * be built without shrink-wrapping: the value was written, transpiled, and dropped.</p>
      *
@@ -20655,8 +21484,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (rt != null && !isConcreteType(rt)) {
             // The stub method returns one of its own type parameters, so the runtime
             // method takes a trailing Class<T> witness. Recover T from the explicit
-            // <T> at the call site, or — when it was inferred and dropped (the common
-            // `X.of(context) => context.dependOnInheritedWidgetOfExactType()` shape) —
+            // <T> at the call site, or -- when it was inferred and dropped (the common
+            // `X.of(context) => context.dependOnInheritedWidgetOfExactType()` shape) --
             // from the enclosing method's return type.
             TypeRef sub = null;
             if (!c.typeArgs.isEmpty()) {
@@ -21420,7 +22249,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * The instantiation of {@code sup} that {@code sub<args>} already inherits, or null when the
      * superclass chain does not reach {@code sup}. From {@code class _MyHomePageState extends
      * State<MyHomePage>} the instantiation of {@code State} seen from {@code _MyHomePageState} is
-     * {@code State<MyHomePage>} — which is why assigning one to the other needs no cast.
+     * {@code State<MyHomePage>} -- which is why assigning one to the other needs no cast.
      *
      * <p>Walks the same chain as {@link #isSubtypeName}, but substitutes each class's type
      * parameters with the arguments carried down from the previous link.</p>
@@ -23058,8 +23887,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         if (t.is("Type") && !program.classes.containsKey("Type") && !stubs.classes.containsKey("Type")) {
             // dart:core Type: a reified type is its Java class at run time (`T` through its
-            // witness, `x.runtimeType`, a type literal), so a declared Type is a Class<?>.
-            return "Class<?>";
+            // witness, `x.runtimeType`, a type literal) -- or, with known type arguments, its
+            // interned dart.runtime.TypeWitness -- so a declared Type is an Object.
+            return "Object";
         }
         if (t.is("List")) {
             String pk = primitiveListKind(t);
@@ -23159,7 +23989,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             return "Object";
         }
-        // app class (preferred when visible) — a disambiguated name resolves a collision with
+        // app class (preferred when visible) -- a disambiguated name resolves a collision with
         // another app class or a stub type of the same simple name. A type that came from a
         // prefixed name keeps the class the prefix chose.
         String appName = t.resolved != null && t.name.equals(t.resolved.name)
@@ -23270,10 +24100,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /**
-     * The Java class name for an app class. When its simple name collides — with another
+     * The Java class name for an app class. When its simple name collides -- with another
      * app class of the same name in a different library (new_gallery has several
      * {@code _FrontLayer} / {@code HomePage} / {@code Backdrop}) or with a stub type (the
-     * routes.dart {@code Path} vs dart:ui {@code Path}) — it is disambiguated with a
+     * routes.dart {@code Path} vs dart:ui {@code Path}) -- it is disambiguated with a
      * library-path prefix. Non-colliding names are returned unchanged to minimise churn.
      */
     private String javaClassName(ClassDecl c) {
@@ -23537,6 +24367,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (dartName == null) {
             return o.code + ".class";
         }
+        TypeRef lit = o.type.arg(0);
+        if (!lit.args.isEmpty() && reifiedHead(lit, ctx) != null) {
+            // `Box<int>` as a value: the interned witness its instances' runtimeType answers.
+            String jt = erasedJavaType(copyNonNull(lit), ctx);
+            if (jt.endsWith("$I")) {
+                jt = jt.substring(0, jt.length() - 2);
+            }
+            return "dart.runtime.TypeWitness.typeValue(" + jt + ".class" + reifiedArgWitnesses(lit, ctx) + ")";
+        }
         String jt = javaType(new TypeRef(dartName), true, ctx);
         int lt = jt.indexOf('<');
         return (lt >= 0 ? jt.substring(0, lt) : jt) + ".class";
@@ -23636,9 +24475,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private ClassDecl programClass(String name, Ctx ctx) {
-        Ast.Library lib = ctx != null && ctx.currentClass != null
-                ? ctx.currentClass.ownerLibrary : null;
-        return program.resolveClass(name, lib);
+        // The library the code being emitted belongs to -- a top-level function's too. Only a
+        // class body's used to count, so `Shelf<int>` in a top-level function resolved to
+        // the last-registered Shelf of any library, not the one this library sees.
+        return program.resolveClass(name, ctx != null ? ctx.library() : null);
     }
 
     /**
@@ -24026,7 +24866,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /**
      * Element/value coercion for collection literals: applies a functional-target cast for
      * callback elements, and a raw-type bridge when the element type is a `G&lt;dynamic&gt;`
-     * (rendered `G&lt;Object&gt;`) but the concrete element is `G&lt;X&gt;` — which Java will not
+     * (rendered `G&lt;Object&gt;`) but the concrete element is `G&lt;X&gt;` -- which Java will not
      * convert to `G&lt;Object&gt;`. The unchecked raw cast mirrors Dart's `dynamic` covariance.
      */
     private String elementCode(Out o, TypeRef elem, Ctx ctx) {
@@ -24165,7 +25005,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         // A Dart `double` value reaching a Dart `int` target only happens through stub
         // imprecision (e.g. math.max/min typed to return double): Dart itself forbids the
-        // implicit narrowing, so the value is known int-valued — truncate to match.
+        // implicit narrowing, so the value is known int-valued -- truncate to match.
         if (target.is("int") && !target.nullable && o.type != null && o.type.is("double")) {
             return "(long) " + paren(o.code);
         }
@@ -24241,7 +25081,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // type with differing type arguments (e.g. DartList<RotatedBox> -> DartList<Widget>,
         // Future<List<Object>> -> Future<Object>), bridge with a RAW cast. A cast between two
         // distinct concrete parameterizations is illegal ("inconvertible types") in Java, so we
-        // erase through the raw type — matching Dart's covariance (unchecked at runtime).
+        // erase through the raw type -- matching Dart's covariance (unchecked at runtime).
         if (target.name != null && o.type != null && o.type.name != null
                 && target.name.equals(o.type.name)
                 && !target.args.isEmpty() && !o.type.args.isEmpty()
@@ -24250,7 +25090,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && !target.toString().equals(o.type.toString())) {
             // Erase through Object so javac accepts the cross-parameterization cast (a direct cast
             // between two distinct concrete parameterizations is "inconvertible types"). Only when
-            // the target is fully concrete — a type-variable arg (e.g. DartList<T>) is resolved by
+            // the target is fully concrete -- a type-variable arg (e.g. DartList<T>) is resolved by
             // Java's own inference and must not be pinned by a cast.
             return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
         }
@@ -24532,7 +25372,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private String boxIfPrimitive(Out o, Ctx ctx) {
-        // Java autoboxing covers long/double/boolean → Long/Double/Boolean
+        // Java autoboxing covers long/double/boolean -> Long/Double/Boolean
         return o.code;
     }
 
@@ -24566,17 +25406,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         emitStatements(body, ctx);
     }
 
-    /// The parameter boxing of {@link #emitBodyStatements}, also run before an arrow body:
-    /// `f(int x) => (x += 1) > 0 ? () => x : ...` reassigns and captures x in one
-    /// expression, which Java rejects unless x is read through its box.
-    /// `Never _fail(String n) { error('expected $n'); }`: Dart knows the body cannot complete
-    /// because its last call answers Never; javac sees a non-void method fall off its end
-    /// ("missing return statement"). The unreachable end is closed with a throw.
-    /// The same holds for any non-void body whose last statement is a call answering Never:
-    /// package:collection's `bool remove(Object? e) { _throw(); }` with `static Never _throw()`.
     /// Whether a call statement invokes something declared to return Never: a method of
-    /// the enclosing class or its supertypes, a static method named through its class,
-    /// or a top-level function. The quiet inference answers null for these calls.
+    /// the enclosing class or its supertypes, a top-level function, a static method named
+    /// through its class, or an instance method of a program class reached through any
+    /// receiver whose static type is known. The quiet inference answers null for the first
+    /// three, so they are looked up by declaration.
     private boolean callAnswersNever(Expr e, Ctx ctx) {
         while (e instanceof ParenExpr) {
             e = ((ParenExpr) e).inner;
@@ -24599,10 +25433,21 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             rt = m == null || !m.isStatic ? null : m.returnType;
         } else {
             rt = inferExprTypeQuiet(c, ctx);
+            if (rt == null) {
+                TypeRef recv = inferExprTypeQuiet(c.target, ctx);
+                ClassDecl rc = recv == null || recv.name == null ? null : program.classes.get(recv.name);
+                MethodDecl m = rc == null ? null : findMethodInHierarchy(rc, c.name);
+                rt = m == null || m.isStatic ? null : m.returnType;
+            }
         }
         return isCoreNever(rt);
     }
 
+    /// `Never _fail(String n) { error('expected $n'); }`: Dart knows the body cannot complete
+    /// because its last call answers Never; javac sees a non-void method fall off its end
+    /// ("missing return statement"). The unreachable end is closed with a throw.
+    /// The same holds for any non-void body whose last statement is a call answering Never:
+    /// package:collection's `bool remove(Object? e) { _throw(); }` with `static Never _throw()`.
     private boolean neverFallsOff(Block body, TypeRef rt, Ctx ctx) {
         if (rt == null || rt.is("void") || endsWithJump(body)) {
             return false;
@@ -24621,6 +25466,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return false;
     }
 
+    /// The parameter boxing of {@link #emitBodyStatements}, also run before an arrow body:
+    /// `f(int x) => (x += 1) > 0 ? () => x : ...` reassigns and captures x in one
+    /// expression, which Java rejects unless x is read through its box.
     private void boxCapturedParams(List<Param> params, Ctx ctx) {
         if (params != null) {
             for (Param p : params) {
@@ -24704,7 +25552,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /** Turns an expression emission into a valid Java statement expression. */
     private String statementize(String code) {
         if (code.matches("[A-Za-z_$][A-Za-z0-9_$]*")) {
-            // a bare temp/identifier (e.g. a cascade's receiver) — no-op statement
+            // a bare temp/identifier (e.g. a cascade's receiver) -- no-op statement
             return "";
         }
         if (code.startsWith("(") && code.endsWith(")") && outerParenEnclosesAll(code)) {
@@ -25298,7 +26146,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /**
      * The concrete declared return type of a getter/method {@code member} inherited by
      * a program class {@code pc} from a generic stub superclass whose type argument the
-     * program class fixes — e.g. {@code class _RestorableEmailState extends
+     * program class fixes -- e.g. {@code class _RestorableEmailState extends
      * RestorableListenable<EmailStore>} reading the inherited {@code value} getter
      * resolves the getter's {@code T} to {@code EmailStore}. Walks the program then stub
      * superclass chain composing the substitution. Returns {@code null} when the member
