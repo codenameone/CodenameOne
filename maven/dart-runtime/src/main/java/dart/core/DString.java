@@ -109,7 +109,7 @@ public final class DString {
     }
 
     public static DartList<String> split(String s, String pattern) {
-        DartList<String> out = new DartList<>();
+        DartList<String> out = new DartList<>(dart.runtime.TypeWitness.of(String.class, false));
         if (pattern.isEmpty()) {
             for (int i = 0; i < s.length(); i++) {
                 out.add(String.valueOf(s.charAt(i)));
@@ -137,7 +137,7 @@ public final class DString {
      * rejected.
      */
     public static DartList<String> split(String s, RegExp pattern) {
-        DartList<String> out = new DartList<>();
+        DartList<String> out = new DartList<>(dart.runtime.TypeWitness.of(String.class, false));
         int length = s.length();
         java.util.Iterator<RegExpMatch> matches = pattern.allMatches(s).iterator();
         if (length == 0 && matches.hasNext()) {

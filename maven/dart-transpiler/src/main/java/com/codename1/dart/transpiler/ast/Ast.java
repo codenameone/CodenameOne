@@ -520,6 +520,12 @@ public final class Ast {
         public boolean isAsync;
         public boolean isSyncStar;                // Iterable<T> f() sync* { ... }
         public boolean isAsyncStar;               // Stream<T> f() async* { ... }
+        /// A generic local function's type parameters (`T id<T>(T v)`), erased from the
+        /// types above; {@link #typeVarSlots} keeps where each one was written.
+        public List<String> typeParams = new ArrayList<String>();
+        /// For a generic local function: the type parameter its return type, then each
+        /// parameter's type, was before erasure (`T`, `T?`), or null; empty otherwise.
+        public List<String> typeVarSlots = new ArrayList<String>();
     }
 
     // ------------------------------------------------------------------
@@ -746,6 +752,13 @@ public final class Ast {
         public boolean isSyncStar;                // () sync* { ... }
         public boolean isAsyncStar;               // () async* { ... }
         public List<String> typeParams = new ArrayList<String>();  // <T>(T x) => ... (erased)
+        /// For a generic closure: the type parameter its declared return type (null for a
+        /// function literal, which declares none), then each parameter's type, was before
+        /// erasure, or null. Empty when the closure is not generic. runtimeType prints it.
+        public List<String> typeVarSlots = new ArrayList<String>();
+        /// The closure is a local function declaration: its signature is its own, even
+        /// though it is emitted against the SAM of that signature.
+        public boolean ownSignature;
         public List<Param> params = new ArrayList<Param>();
         public Block body;                        // nullable
         public Expr exprBody;                     // for `=> expr`

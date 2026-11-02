@@ -84,7 +84,7 @@ class ApiMadeRealTest {
         RasterDisplay.install();
         try {
             ScrollController controller = new ScrollController();
-            DartList<Widget> rows = new DartList<Widget>();
+            DartList<Widget> rows = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             for (int i = 0; i < 30; i++) {
                 rows.add(new ProbeBox(10, 40));
             }

@@ -313,7 +313,8 @@ public final class JsonCodec implements Codec<Object, String> {
         }
 
         private DartMap<String, Object> object() {
-            DartMap<String, Object> m = new DartMap<String, Object>();
+            DartMap<String, Object> m = DartMap.typed(new DartMap<String, Object>(),
+                    dart.runtime.TypeWitness.of(String.class, false), dart.runtime.TypeWitness.DYNAMIC);
             i++;
             skipWs();
             if (i < s.length() && s.charAt(i) == '}') {
@@ -349,7 +350,7 @@ public final class JsonCodec implements Codec<Object, String> {
         }
 
         private DartList<Object> array() {
-            DartList<Object> l = new DartList<Object>();
+            DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
             i++;
             skipWs();
             if (i < s.length() && s.charAt(i) == ']') {

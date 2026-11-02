@@ -184,7 +184,7 @@ public class TabBar extends StatelessWidget {
      * are white.</p>
      */
     private DartList<Widget> styledTabs(BuildContext context) {
-        DartList<Widget> out = new DartList<Widget>();
+        DartList<Widget> out = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (tabs == null) {
             return out;
         }
@@ -269,7 +269,7 @@ public class TabBar extends StatelessWidget {
             cb.color(indicatorColor);
             bar.child(cb);
         }
-        DartList<Widget> kids = new DartList<Widget>();
+        DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         kids.add(content);
         kids.add(bar);
         col.children(kids);

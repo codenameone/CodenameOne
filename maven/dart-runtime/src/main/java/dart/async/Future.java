@@ -271,7 +271,7 @@ public class Future<T> {
         }
         final int count = inputs.size();
         if (count == 0) {
-            result.complete(new DartList<Object>());
+            result.complete(new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC));
             return result;
         }
         final Object[] values = new Object[count];
@@ -334,7 +334,7 @@ public class Future<T> {
                         result.completeError(error);
                         return;
                     }
-                    DartList<Object> out = new DartList<Object>();
+                    DartList<Object> out = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
                     for (Object v : values) {
                         out.add(v);
                     }

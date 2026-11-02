@@ -90,7 +90,7 @@ public class PageTransitionSwitcher extends AnimatedChildWidget {
         com.codename1.flutter.widgets.Stack stack =
                 new com.codename1.flutter.widgets.Stack();
         dart.core.DartList<com.codename1.flutter.Widget> kids =
-                new dart.core.DartList<com.codename1.flutter.Widget>();
+                new dart.core.DartList<com.codename1.flutter.Widget>(dart.runtime.TypeWitness.of(com.codename1.flutter.Widget.class, false));
         kids.add(build.call(out, e.arrived(), e.primary()));
         kids.add(incoming);
         stack.children(kids);

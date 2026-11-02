@@ -364,9 +364,53 @@ public final class ElementViews {
             return src.isEmpty();
         }
 
+        /// A key read through the view is checked against K, as Dart's CastMap checks
+        /// every key it hands out (keys, entries, forEach).
+        K key(K k) {
+            if (keyTarget != null && !keyTarget.test(k)) {
+                throw new TypeError("type '" + dart.runtime.DartRuntime.str(dart.runtime.TypeWitness.runtimeType(k))
+                        + "' is not a subtype of type '" + keyTarget + "' in type cast");
+            }
+            return k;
+        }
+
         @Override
         public Set<K> keySet() {
-            return src.keySet();
+            if (keyTarget == null) {
+                return src.keySet();
+            }
+            return new AbstractSet<K>() {
+                @Override
+                public Iterator<K> iterator() {
+                    final Iterator<K> it = src.keySet().iterator();
+                    return new Iterator<K>() {
+                        @Override
+                        public boolean hasNext() {
+                            return it.hasNext();
+                        }
+
+                        @Override
+                        public K next() {
+                            return key(it.next());
+                        }
+
+                        @Override
+                        public void remove() {
+                            it.remove();
+                        }
+                    };
+                }
+
+                @Override
+                public boolean contains(Object o) {
+                    return src.containsKey(o);
+                }
+
+                @Override
+                public int size() {
+                    return src.size();
+                }
+            };
         }
 
         @Override
@@ -415,7 +459,7 @@ public final class ElementViews {
                         @Override
                         public Map.Entry<K, T> next() {
                             final Map.Entry<K, S> e = it.next();
-                            return new AbstractMap.SimpleEntry<K, T>(e.getKey(), in(e.getValue())) {
+                            return new AbstractMap.SimpleEntry<K, T>(key(e.getKey()), in(e.getValue())) {
                                 @Override
                                 @SuppressWarnings("unchecked")
                                 public T setValue(T value) {

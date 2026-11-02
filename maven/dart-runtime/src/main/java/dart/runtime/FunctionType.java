@@ -31,11 +31,35 @@ public final class FunctionType {
     private final TypeWitness[] sig;
     private final int required;
     private final String[] named;
+    /// A generic closure's type parameter names (Signed.$typeVars), or null.
+    private final String[] typeVars;
 
     FunctionType(Signed s) {
         this.sig = s.$sig();
         this.required = s.$required();
         this.named = s.$named();
+        this.typeVars = s.$generic() ? s.$typeVars() : null;
+    }
+
+    /// Dart prints a generic function type with its type parameters renamed in order,
+    /// `Y0`, `Y1`...: `T id<T>(T v)` is `<Y0>(Y0) => Y0`, whatever the source called T.
+    private String canonical(String name) {
+        boolean q = name.endsWith("?");
+        String bare = q ? name.substring(0, name.length() - 1) : name;
+        String[] params = typeVars[0].split(", ");
+        for (int k = 0; k < params.length; k++) {
+            if (params[k].equals(bare)) {
+                return "Y" + k + (q ? "?" : "");
+            }
+        }
+        return name;
+    }
+
+    private String slot(int i) {
+        if (typeVars != null && i + 1 < typeVars.length && typeVars[i + 1] != null) {
+            return canonical(typeVars[i + 1]);
+        }
+        return str(sig[i]);
     }
 
     private int namedCount() {
@@ -56,7 +80,16 @@ public final class FunctionType {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("(");
+        StringBuilder sb = new StringBuilder();
+        if (typeVars != null && typeVars.length > 0) {
+            String[] params = typeVars[0].split(", ");
+            sb.append('<');
+            for (int k = 0; k < params.length; k++) {
+                sb.append(k > 0 ? ", " : "").append('Y').append(k);
+            }
+            sb.append('>');
+        }
+        sb.append('(');
         int pos = positional();
         int req = requiredPositional();
         for (int i = 0; i < pos; i++) {
@@ -66,7 +99,7 @@ public final class FunctionType {
             if (i == req) {
                 sb.append('[');
             }
-            sb.append(str(sig[i + 1]));
+            sb.append(slot(i + 1));
         }
         if (req < pos) {
             sb.append(']');
@@ -76,8 +109,11 @@ public final class FunctionType {
                 sb.append(", ");
             }
             sb.append('{');
-            for (int i = 0; i < named.length; i++) {
-                if (i > 0) {
+            // Dart prints the named parameters by name, whatever order declared them.
+            Integer[] order = sortedNamed();
+            for (int k = 0; k < order.length; k++) {
+                int i = order[k];
+                if (k > 0) {
                     sb.append(", ");
                 }
                 String n = named[i];
@@ -85,11 +121,11 @@ public final class FunctionType {
                 if (r) {
                     sb.append("required ");
                 }
-                sb.append(str(sig[1 + pos + i])).append(' ').append(r ? n.substring(1) : n);
+                sb.append(slot(1 + pos + i)).append(' ').append(r ? n.substring(1) : n);
             }
             sb.append('}');
         }
-        return sb.append(") => ").append(str(sig[0])).toString();
+        return sb.append(") => ").append(slot(0)).toString();
     }
 
     @Override
@@ -105,17 +141,40 @@ public final class FunctionType {
                 || f.namedCount() != namedCount()) {
             return false;
         }
-        for (int i = 0; i < sig.length; i++) {
+        int pos = positional();
+        for (int i = 0; i <= pos; i++) {
             if (!sameType(sig[i], f.sig[i])) {
                 return false;
             }
         }
+        // Named parameters are a set: matched by name (and requiredness), never by the
+        // order they were declared in.
         for (int i = 0; i < namedCount(); i++) {
-            if (!named[i].equals(f.named[i])) {
+            int j = -1;
+            for (int k = 0; k < f.named.length; k++) {
+                if (named[i].equals(f.named[k])) {
+                    j = k;
+                    break;
+                }
+            }
+            if (j < 0 || !sameType(sig[1 + pos + i], f.sig[1 + pos + j])) {
                 return false;
             }
         }
         return true;
+    }
+
+    private Integer[] sortedNamed() {
+        Integer[] order = new Integer[namedCount()];
+        for (int i = 0; i < order.length; i++) {
+            order[i] = i;
+        }
+        java.util.Arrays.sort(order, (a, b) -> bare(named[a]).compareTo(bare(named[b])));
+        return order;
+    }
+
+    private static String bare(String n) {
+        return n.charAt(0) == '!' ? n.substring(1) : n;
     }
 
     /// Type equality: a null witness is `dynamic`, which equals only `dynamic`.

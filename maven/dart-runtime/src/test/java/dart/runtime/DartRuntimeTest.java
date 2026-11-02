@@ -110,7 +110,7 @@ public class DartRuntimeTest {
         assertTrue(DartRuntime.eq(Long.valueOf(Long.MAX_VALUE), Double.valueOf(9.223372036854775807E18)),
                 "the largest int == 2^63 on the VM");
         assertFalse(DartRuntime.eq(Long.valueOf(1), Double.valueOf(1.5)));
-        dart.core.DartList<Object> nums = new dart.core.DartList<Object>();
+        dart.core.DartList<Object> nums = new dart.core.DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         nums.add(Long.valueOf(1));
         assertTrue(nums.contains(Double.valueOf(1.0)), "List<num>.contains(1.0) finds the int 1");
     }

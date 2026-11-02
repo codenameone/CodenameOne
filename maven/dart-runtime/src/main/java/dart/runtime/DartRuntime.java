@@ -174,7 +174,7 @@ public final class DartRuntime {
             value = ((dart.core.MixinView) value).source();
         }
         if (value != null && (value instanceof java.util.List || value instanceof dart.collection.ListMixin)
-                && (elem == null || dart.core.DartList.isListOf(value, elem, elemNullable))) {
+                && (elem == null || dart.core.DartList.isListOfW(value, dart.runtime.TypeWitness.of(elem, elemNullable)))) {
             if (elem == Long.class && !elemNullable && !(value instanceof dart.core.DartLongList)
                     && value instanceof dart.core.DartList) {
                 return dart.core.DartLongList.viewLongs(value);

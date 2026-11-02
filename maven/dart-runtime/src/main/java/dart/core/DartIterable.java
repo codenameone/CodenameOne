@@ -179,11 +179,28 @@ public class DartIterable<E> implements Iterable<E> {
      * and it would cost a thread per live iterator. The limitation is listed in
      * flutter-runtime/READINESS.md and in the conversion skill.</p>
      */
+    /// A `sync*` body whose declared element type is {@code elem}: the generated
+    /// iterable, and the list each iteration fills, record it.
+    public static <E> DartIterable<E> syncStar(final dart.runtime.TypeWitness elem,
+            final Funcs.VoidFunc1<DartList<E>> body) {
+        DartIterable<E> it = wrap(new Iterable<E>() {
+            @Override
+            public Iterator<E> iterator() {
+                DartList<E> out = new DartList<E>(elem);
+                body.call(out);
+                return out.iterator();
+            }
+        });
+        it.elem = elem;
+        return it;
+    }
+
+    /// A `sync*` body whose element type is an unwitnessed type variable: unrecorded.
     public static <E> DartIterable<E> syncStar(final Funcs.VoidFunc1<DartList<E>> body) {
         return wrap(new Iterable<E>() {
             @Override
             public Iterator<E> iterator() {
-                DartList<E> out = new DartList<E>();
+                DartList<E> out = new DartList<E>((dart.runtime.TypeWitness) null);
                 body.call(out);
                 return out.iterator();
             }
@@ -755,7 +772,7 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     public DartList<E> toList() {
-        DartList<E> l = DartList.typed(new DartList<E>(), elementWitness());
+        DartList<E> l = new DartList<E>(elementWitness());
         for (E e : this) {
             l.add(e);
         }

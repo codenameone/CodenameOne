@@ -877,7 +877,7 @@ public final class DartUri {
 
     /** Dart's {@code Uri.pathSegments} — the non-empty, decoded path segments. */
     public DartList<String> pathSegments() {
-        DartList<String> out = new DartList<>();
+        DartList<String> out = new DartList<>(dart.runtime.TypeWitness.of(String.class, false));
         String p = path;
         if (p.startsWith("/")) {
             p = p.substring(1);

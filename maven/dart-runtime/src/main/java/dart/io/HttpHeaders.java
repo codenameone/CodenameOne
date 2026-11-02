@@ -78,7 +78,7 @@ public class HttpHeaders {
         if (v == null) {
             return null;
         }
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         out.addAll(v);
         return out;
     }
@@ -149,7 +149,7 @@ public class HttpHeaders {
      */
     public void forEach(Funcs.VoidFunc2<String, DartList<String>> action) {
         for (Map.Entry<String, List<String>> e : new ArrayList<Map.Entry<String, List<String>>>(values.entrySet())) {
-            DartList<String> l = new DartList<String>();
+            DartList<String> l = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
             l.addAll(e.getValue());
             action.call(e.getKey(), l);
         }

@@ -102,7 +102,9 @@ public final class Dyn {
             return Long.valueOf(o == null ? 0 : o.hashCode());
         }
         if (name.equals("runtimeType")) {
-            return o == null ? null : o.getClass();
+            // The reified type (`List<dynamic>`, a generic class's arguments), as a typed
+            // receiver's `runtimeType` answers it; a bare class token loses the arguments.
+            return o == null ? null : TypeWitness.runtimeType(o);
         }
         if (o instanceof DynamicObject) {
             Object v = ((DynamicObject) o).noSuchMethod(dart.core.Invocation.getter(name));
@@ -209,7 +211,7 @@ public final class Dyn {
     }
 
     private static DartList<Object> copy(java.util.Collection<?> c) {
-        DartList<Object> l = new DartList<Object>();
+        DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         for (Object o : c) {
             l.add(o);
         }
@@ -217,7 +219,7 @@ public final class Dyn {
     }
 
     private static DartList<Object> reversed(Iterable<Object> it) {
-        DartList<Object> l = new DartList<Object>();
+        DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         for (Object o : it) {
             l.add(0, o);
         }

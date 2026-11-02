@@ -41,7 +41,7 @@ public final class AutovalidateMode {
     public static final DartList<AutovalidateMode> values = buildValues();
 
     private static DartList<AutovalidateMode> buildValues() {
-        DartList<AutovalidateMode> v = new DartList<AutovalidateMode>();
+        DartList<AutovalidateMode> v = new DartList<AutovalidateMode>(dart.runtime.TypeWitness.of(AutovalidateMode.class, false));
         v.add(disabled);
         v.add(always);
         v.add(onUserInteraction);
@@ -63,7 +63,7 @@ public final class AutovalidateMode {
     public static AutovalidateMode onUserInteraction() { return onUserInteraction; }
 
     public static DartList<AutovalidateMode> values() {
-        DartList<AutovalidateMode> v = new DartList<AutovalidateMode>();
+        DartList<AutovalidateMode> v = new DartList<AutovalidateMode>(dart.runtime.TypeWitness.of(AutovalidateMode.class, false));
         v.add(disabled);
         v.add(always);
         v.add(onUserInteraction);

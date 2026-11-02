@@ -145,7 +145,7 @@ public class PaginatedDataTable extends StatelessWidget {
      * percentage columns sat in acres of space.</p>
      */
     private Row rowOf(DartList<Widget> cells, double height) {
-        DartList<Widget> flexed = new DartList<Widget>();
+        DartList<Widget> flexed = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < cells.size(); i++) {
             boolean numeric = isNumericColumn(i);
             com.codename1.flutter.widgets.Container cell =
@@ -183,7 +183,7 @@ public class PaginatedDataTable extends StatelessWidget {
 
     /** Wraps the sized row so the Column sees a Row-shaped child. */
     private static Row rowOfBox(Widget box) {
-        DartList<Widget> one = new DartList<Widget>();
+        DartList<Widget> one = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         Expanded e = new Expanded();
         e.child(box);
         one.add(e);
@@ -204,7 +204,7 @@ public class PaginatedDataTable extends StatelessWidget {
         final DataColumn column = columns.get(index);
         Widget label = column.getLabel();
         if (sortColumnIndex != null && sortColumnIndex.longValue() == index) {
-            DartList<Widget> parts = new DartList<Widget>();
+            DartList<Widget> parts = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             parts.add(label);
             com.codename1.flutter.widgets.Icon arrow = new com.codename1.flutter.widgets.Icon(
                     isSortAscending()
@@ -243,7 +243,7 @@ public class PaginatedDataTable extends StatelessWidget {
     private Widget footer(long total) {
         final long first = initialFirstRowIndex;
         final long last = Math.min(first + rowsPerPage, total);
-        DartList<Widget> parts = new DartList<Widget>();
+        DartList<Widget> parts = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
 
         com.codename1.flutter.widgets.Text range = new com.codename1.flutter.widgets.Text(
                 (total == 0 ? 0 : first + 1) + "-" + last + " of " + total);
@@ -282,7 +282,7 @@ public class PaginatedDataTable extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        DartList<Widget> body = new DartList<Widget>();
+        DartList<Widget> body = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (header != null) {
             com.codename1.flutter.widgets.Container headerBox =
                     new com.codename1.flutter.widgets.Container();
@@ -293,7 +293,7 @@ public class PaginatedDataTable extends StatelessWidget {
             body.add(headerBox);
         }
         if (columns != null) {
-            DartList<Widget> labels = new DartList<Widget>();
+            DartList<Widget> labels = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             for (int i = 0; i < columns.size(); i++) {
                 labels.add(headingCell(i));
             }
@@ -309,7 +309,7 @@ public class PaginatedDataTable extends StatelessWidget {
                     continue;
                 }
                 DartList<DataCell> cells = dr.getCells();
-                DartList<Widget> cellWidgets = new DartList<Widget>();
+                DartList<Widget> cellWidgets = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
                 for (int j = 0; j < cells.size(); j++) {
                     cellWidgets.add(cells.get(j).getChild());
                 }
@@ -335,7 +335,7 @@ public class PaginatedDataTable extends StatelessWidget {
 
         // The header and the pager belong to the table, not to the scrolled area, so they
         // stay put while the columns move under them - as they do in Flutter.
-        DartList<Widget> outer = new DartList<Widget>();
+        DartList<Widget> outer = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         outer.add(across);
         outer.add(footer(total));
         Column framed = new Column();

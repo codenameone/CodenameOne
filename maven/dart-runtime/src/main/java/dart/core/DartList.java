@@ -71,10 +71,20 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     /// changes.
     private boolean readOnly;
 
-    public DartList() {
+    /// Subclass hook only: a list made with no witness says nothing of its element type,
+    /// so code outside the runtime's own lists names one (or an explicit null where the
+    /// argument genuinely cannot be known) through {@link #DartList(dart.runtime.TypeWitness)}.
+    protected DartList() {
         this.impl = new ArrayList<>();
         this.growable = true;
         this.readOnly = false;
+    }
+
+    /// An empty growable list whose element type is {@code elem}; null only where the
+    /// type argument is unknown at the construction site (an unreified type variable).
+    public DartList(dart.runtime.TypeWitness elem) {
+        this();
+        this.elem = elem;
     }
 
     DartList(ArrayList<E> impl, boolean growable) {
@@ -123,7 +133,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     /** Literal helper: DartList.of(a, b, c) for Dart's [a, b, c]. */
     @SafeVarargs
     public static <E> DartList<E> of(E... elements) {
-        DartList<E> l = new DartList<>();
+        DartList<E> l = new DartList<>((dart.runtime.TypeWitness) null);
         for (E e : elements) {
             l.impl.add(e);
         }
@@ -169,7 +179,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     }
 
     public static <E> DartList<E> from(Iterable<E> elements) {
-        DartList<E> l = new DartList<>();
+        DartList<E> l = new DartList<>((dart.runtime.TypeWitness) null);
         for (E e : elements) {
             l.impl.add(e);
         }
@@ -296,6 +306,17 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         return elem;
     }
 
+    /// The reified element type of any Dart list value, or null when it records none.
+    static dart.runtime.TypeWitness listWitness(Object list) {
+        if (list instanceof DartList) {
+            return ((DartList<?>) list).elementWitness();
+        }
+        if (list instanceof dart.collection.ListMixin) {
+            return ((dart.collection.ListMixin<?>) list).$listElementWitness();
+        }
+        return null;
+    }
+
     /// Dart's runtimeType: `List<int>`, with `dynamic` for an unrecorded argument.
     @Override
     public Object $runtimeType() {
@@ -323,14 +344,10 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     /// recorded is unknown and passes, as an erased test would.
     public static boolean isListOfW(Object value, dart.runtime.TypeWitness target) {
         if (value instanceof dart.collection.ListMixin) {
-            dart.collection.ListMixin<?> m = (dart.collection.ListMixin<?>) value;
-            long n = m.length();
-            for (long i = 0; i < n; i++) {
-                if (!target.test(m.$index(i))) {
-                    return false;
-                }
-            }
-            return true;
+            // A program list class reifies its element argument (the emitter overrides
+            // $listElementWitness), compared as a DartList's recorded one is.
+            dart.runtime.TypeWitness w = ((dart.collection.ListMixin<?>) value).$listElementWitness();
+            return w == null || dart.runtime.TypeWitness.isSubtype(w, target);
         }
         if (!(value instanceof DartList)) {
             return false;
@@ -340,45 +357,6 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         // Nothing recorded the argument: unknown, which is erased's answer. Every
         // runtime and emitted construction path records one where it can be known.
         return w == null || dart.runtime.TypeWitness.isSubtype(w, target);
-    }
-
-    /// `value is List<X>` for an element type X that is a plain class (bool, String,
-    /// num). With a witness the answer is Dart's subtype test on the type argument,
-    /// covariant as Dart's generics are (a List<String> is a List<Object>; a
-    /// List<String?> is no List<String>). Without one it is true when every element is
-    /// an X (or null, when X is nullable): sound for every read the test promotes, and
-    /// different from Dart only for a list of unknown argument whose elements all happen
-    /// to be X.
-    public static boolean isListOf(Object value, Class<?> type, boolean nullable) {
-        if (value instanceof dart.collection.ListMixin) {
-            // A program class applying ListMixin, or `implements List<E>` alone (emitted as
-            // one): a List in Dart, tested by its elements as an untyped DartList is.
-            dart.collection.ListMixin<?> m = (dart.collection.ListMixin<?>) value;
-            long n = m.length();
-            for (long i = 0; i < n; i++) {
-                Object e = m.$index(i);
-                if (e == null ? !nullable : !type.isInstance(e)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        if (!(value instanceof DartList)) {
-            return false;
-        }
-        DartList<?> l = (DartList<?>) value;
-        dart.runtime.TypeWitness w = l.elementWitness();
-        if (w != null) {
-            return dart.runtime.TypeWitness.isSubtype(w, dart.runtime.TypeWitness.of(type, nullable));
-        }
-        int n = l.size();
-        for (int i = 0; i < n; i++) {
-            Object e = l.get(i);
-            if (e == null ? !nullable : !type.isInstance(e)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     @Override
@@ -670,7 +648,8 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
 
     /** Dart's {@code List + List}: a new list with the elements of {@code a} then {@code b}. */
     public static <E> DartList<E> concat(java.util.List<? extends E> a, java.util.List<? extends E> b) {
-        DartList<E> r = new DartList<E>();
+        // `List<E> operator +(List<E> other)`: the result is a List of the receiver's E.
+        DartList<E> r = new DartList<E>(listWitness(a));
         if (a != null) {
             r.addAll(a);
         }
@@ -855,7 +834,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     public DartList<E> sublist(long start, long end) {
         RangeError.checkValueInInterval(start, 0, size(), "start");
         RangeError.checkValueInInterval(end, start, size(), "end");
-        DartList<E> l = new DartList<>();
+        DartList<E> l = new DartList<>(elem);
         for (long i = start; i < end; i++) {
             l.add(get((int) i));
         }
@@ -1145,7 +1124,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     /// names the target in the TypeError.
     public static Object asListOf(Object value, Class<?> type, boolean nullable, boolean listNullable,
                                   String dartType) {
-        if (value == null ? listNullable : isListOf(value, type, nullable)) {
+        if (value == null ? listNullable : isListOfW(value, dart.runtime.TypeWitness.of(type, nullable))) {
             return value;
         }
         throw new TypeError("type '" + DartRuntime.typeName(value) + "' is not a subtype of type '"

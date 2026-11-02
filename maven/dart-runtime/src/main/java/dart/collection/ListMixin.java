@@ -55,6 +55,13 @@ public interface ListMixin<E> extends IterableMixin<E> {
     /** Dart's {@code operator []=(index, value)}. */
     void $indexSet(long index, E value);
 
+    /// The reified element type of a program list class: the emitter overrides this in
+    /// every class that applies the mixin, with the class's own type argument. Null only
+    /// where the argument is a type variable of an unreified generic (unknown).
+    default dart.runtime.TypeWitness $listElementWitness() {
+        return null;
+    }
+
     @Override
     default Iterator<E> iterator() {
         return new Iterator<E>() {
@@ -251,7 +258,8 @@ public interface ListMixin<E> extends IterableMixin<E> {
 
     /** Dart's {@code toList()}: a growable copy. */
     default DartList<E> toList() {
-        DartList<E> out = new DartList<E>();
+        // The copy is a List<E> of this list's own E, reified by the class.
+        DartList<E> out = new DartList<E>($listElementWitness());
         long n = length();
         for (long i = 0; i < n; i++) {
             out.add($index(i));
@@ -270,7 +278,7 @@ public interface ListMixin<E> extends IterableMixin<E> {
         if (start < 0 || start > n || end < start || end > n) {
             throw new dart.core.RangeError("RangeError: Invalid range " + start + ".." + end + " for length " + n);
         }
-        DartList<E> out = new DartList<E>();
+        DartList<E> out = new DartList<E>($listElementWitness());
         for (long i = start; i < end; i++) {
             out.add($index(i));
         }

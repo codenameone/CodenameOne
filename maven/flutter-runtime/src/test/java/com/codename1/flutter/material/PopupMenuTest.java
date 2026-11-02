@@ -70,7 +70,7 @@ class PopupMenuTest {
         b.itemBuilder(new Funcs.Func1<BuildContext, Object>() {
             @Override
             public Object call(BuildContext context) {
-                DartList<PopupMenuEntry<String>> list = new DartList<PopupMenuEntry<String>>();
+                DartList<PopupMenuEntry<String>> list = new DartList<PopupMenuEntry<String>>(dart.runtime.TypeWitness.of(PopupMenuEntry.class, false, dart.runtime.TypeWitness.of(String.class, false)));
                 for (String v : values) {
                     list.add(item(v, new ProbeBox(60, 20)));
                 }
@@ -132,7 +132,7 @@ class PopupMenuTest {
             @Override
             public Object call(BuildContext context) {
                 builds[0]++;
-                DartList<PopupMenuEntry<String>> l = new DartList<PopupMenuEntry<String>>();
+                DartList<PopupMenuEntry<String>> l = new DartList<PopupMenuEntry<String>>(dart.runtime.TypeWitness.of(PopupMenuEntry.class, false, dart.runtime.TypeWitness.of(String.class, false)));
                 l.add(item("one", new ProbeBox(60, 20)));
                 return l;
             }

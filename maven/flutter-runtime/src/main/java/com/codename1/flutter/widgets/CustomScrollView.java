@@ -368,7 +368,7 @@ public class CustomScrollView extends StatefulWidget {
 
         Widget buildBody(final BuildContext context) {
             CustomScrollView w = widget();
-            DartList<Widget> all = w.slivers != null ? w.slivers : new DartList<Widget>();
+            DartList<Widget> all = w.slivers != null ? w.slivers : new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             boolean vertical = w.scrollDirection != com.codename1.flutter.Axis.horizontal;
             final java.util.List<Header> headers = new java.util.ArrayList<Header>();
             // index into all -> header index, -1 for an ordinary sliver
@@ -413,7 +413,7 @@ public class CustomScrollView extends StatefulWidget {
             lastHeaders = headers;
             lastLead = lead;
             lastGeometry = geo;
-            DartList<Widget> content = new DartList<Widget>();
+            DartList<Widget> content = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             for (int i = 0; i < all.size(); i++) {
                 final int hi = headerAt[i];
                 if (hi < 0) {
@@ -450,7 +450,7 @@ public class CustomScrollView extends StatefulWidget {
             if (w.shrinkWrap) {
                 list.shrinkWrap(true);
             }
-            DartList<Widget> layers = new DartList<Widget>();
+            DartList<Widget> layers = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             layers.add(list);
             for (int i = 0; i < headers.size(); i++) {
                 if (!stuck[i] || extent[i] <= 0) {

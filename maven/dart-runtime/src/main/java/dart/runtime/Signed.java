@@ -51,4 +51,11 @@ public interface Signed {
     default String[] $named() {
         return null;
     }
+
+    /// For a generic closure: its type parameters as Dart writes them (`T, U`), then, for
+    /// each entry of {@link #$sig()}, the type parameter that slot is or null. Null for a
+    /// closure that is not generic. Only what runtimeType prints reads it.
+    default String[] $typeVars() {
+        return null;
+    }
 }

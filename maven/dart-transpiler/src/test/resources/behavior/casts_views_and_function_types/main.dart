@@ -5,6 +5,12 @@ class Holder {
   String name(int n) => 'h$n';
 }
 
+T pickFirst<T>(T a, T b) => a;
+
+class Keeper {
+  K pair<K>(int n, K k) => k;
+}
+
 void main() {
   List<Object> ls = <Object>[1, 2];
   final ci = ls.cast<int>();
@@ -49,4 +55,15 @@ void main() {
   Object h = (int x, {int k = 1}) => x;
   print(h is int Function(int, {required int k}));
   print(h is int Function(int, {int k}));
+
+  // A generic function keeps its own type parameters: runtimeType renames them Y0, Y1..
+  T same<T>(T v) => v;
+  print(same.runtimeType);
+  print(same<int>(4));
+  S? maybe<S, U>(U u, S? s) => s;
+  print(maybe.runtimeType);
+  Object first = pickFirst;
+  print(first.runtimeType);
+  Object paired = Keeper().pair;
+  print(paired.runtimeType);
 }

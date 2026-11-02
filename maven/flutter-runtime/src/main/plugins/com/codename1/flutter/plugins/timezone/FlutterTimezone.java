@@ -49,7 +49,7 @@ public final class FlutterTimezone {
     }
 
     public static Future<DartList<String>> getAvailableTimezones() {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         String local = localId();
         boolean hasLocal = false;
         String[] ids = TimeZone.getAvailableIDs();

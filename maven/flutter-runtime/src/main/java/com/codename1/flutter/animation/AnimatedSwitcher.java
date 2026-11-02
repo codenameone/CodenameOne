@@ -76,7 +76,7 @@ public class AnimatedSwitcher extends StatefulWidget {
     /// or Flutter's default, a centred Stack with the current child on top.
     private Widget layout(Widget current, java.util.List<Widget> previous) {
         if (layoutBuilder != null) {
-            dart.core.DartList<Widget> l = new dart.core.DartList<Widget>();
+            dart.core.DartList<Widget> l = new dart.core.DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             l.addAll(previous);
             return layoutBuilder.call(current, l);
         }

@@ -1530,7 +1530,10 @@ public final class AstBuilder {
                     : sig.formalParameterPart().typeParameters().typeParameter()) {
                 tps.add(tp.identifier().getText());
             }
+            lf.typeParams = tps;
+            lf.typeVarSlots.add(typeVarName(lf.returnType, tps));
             for (Param p : lf.params) {
+                lf.typeVarSlots.add(typeVarName(p.type, tps));
                 p.type = eraseTypeParams(p.type, tps);
             }
             lf.returnType = eraseTypeParams(lf.returnType, tps);
@@ -2606,6 +2609,15 @@ public final class AstBuilder {
     }
 
     /** {@code t} with every reference to one of {@code names} replaced by dynamic. */
+    /// The type parameter {@code t} is written as (`T`, or `T?` when nullable), or null when
+    /// it is none of {@code names}.
+    private static String typeVarName(TypeRef t, List<String> names) {
+        if (t == null || !t.args.isEmpty() || t.funcParams != null || !names.contains(t.name)) {
+            return null;
+        }
+        return t.nullable ? t.name + "?" : t.name;
+    }
+
     private static TypeRef eraseTypeParams(TypeRef t, List<String> names) {
         if (t == null) {
             return null;
@@ -2690,7 +2702,9 @@ public final class AstBuilder {
             for (Dart2Parser.TypeParameterContext tp : ctx.formalParameterPart().typeParameters().typeParameter()) {
                 l.typeParams.add(tp.identifier().getText());
             }
+            l.typeVarSlots.add(null);
             for (Param p : l.params) {
+                l.typeVarSlots.add(typeVarName(p.type, l.typeParams));
                 p.type = eraseTypeParams(p.type, l.typeParams);
             }
         }

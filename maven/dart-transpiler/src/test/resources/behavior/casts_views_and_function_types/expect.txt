@@ -24,3 +24,8 @@ true
 false
 true
 true
+<Y0>(Y0) => Y0
+4
+<Y0, Y1>(Y1, Y0?) => Y0?
+<Y0>(Y0, Y0) => Y0
+<Y0>(int, Y0) => Y0

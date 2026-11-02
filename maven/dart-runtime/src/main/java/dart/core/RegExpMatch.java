@@ -75,7 +75,7 @@ public final class RegExpMatch {
 
     /// Dart's {@code RegExpMatch.groupNames}, in declaration order.
     public DartList<String> groupNames() {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         if (names != null) {
             for (int i = 1; i < names.length; i++) {
                 if (names[i] != null) {
@@ -135,7 +135,7 @@ public final class RegExpMatch {
 
     /** Dart's {@code Match.groups(indices)} — the listed groups in order. */
     public DartList<String> groups(java.util.List<? extends Number> indices) {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         for (Number n : indices) {
             out.add(group(n.longValue()));
         }

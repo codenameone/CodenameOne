@@ -563,7 +563,7 @@ public class PageViewRenderElement extends ScrollRenderElement {
     @Override
     protected Widget buildContent() {
         PageView w = pageView();
-        DartList<Widget> items = new DartList<Widget>();
+        DartList<Widget> items = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (w.isBuilderMode()) {
             long count = w.getItemCount() == null ? 0 : w.getItemCount();
             for (long i = 0; i < count; i++) {

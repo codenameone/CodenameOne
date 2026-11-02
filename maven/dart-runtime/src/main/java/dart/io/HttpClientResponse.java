@@ -112,11 +112,11 @@ public class HttpClientResponse extends Stream<dart.core.DartLongList> {
     }
 
     public DartList<Object> redirects() {
-        return new DartList<Object>();
+        return new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
     }
 
     public DartList<Object> cookies() {
-        return new DartList<Object>();
+        return new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
     }
 
     /** Dart's {@code compressionState}; the platform has already decompressed the body. */

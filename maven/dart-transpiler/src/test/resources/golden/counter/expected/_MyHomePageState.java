@@ -48,7 +48,7 @@ public class _MyHomePageState extends State<MyHomePage> {
         $t3.mainAxisAlignment(MainAxisAlignment.center);
         var $t4 = new Text(DartRuntime.str(this._counter));
         $t4.style(Theme.of(context).textTheme().headlineMedium());
-        $t3.children(DartList.<Widget>of(new Text("You have pushed the button this many times:"), $t4));
+        $t3.children(dart.core.DartList.typed(DartList.<Widget>of(new Text("You have pushed the button this many times:"), $t4), dart.runtime.TypeWitness.of(Widget.class, false)));
         $t2.child($t3);
         $t0.body($t2);
         var $t5 = new FloatingActionButton();

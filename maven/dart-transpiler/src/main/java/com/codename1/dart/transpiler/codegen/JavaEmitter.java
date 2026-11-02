@@ -1304,7 +1304,8 @@ public final class JavaEmitter {
             ctx.importClass("dart.core.DartIterable");
             TypeRef elem = rt.is("Iterable") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
             String ej = javaType(elem, true, ctx);
-            w.line("return DartIterable.syncStar((DartList<" + ej + "> " + v + ") -> {");
+            w.line("return DartIterable.syncStar(" + syncStarWitnessArg(elem, ctx) + "(DartList<" + ej + "> "
+                    + v + ") -> {");
             ctx.syncStarList = v;
             ctx.asyncStarSink = null;
             ctx.syncStarElem = elem;
@@ -1549,6 +1550,7 @@ public final class JavaEmitter {
         }
         body.append(reifiedTestMethod(c, javaClassName(c)));
         body.append(implementedWitnessAccessors(c, ctx));
+        body.append(listElementWitnessAccessor(c, ctx));
         ClassDecl twSuper = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         boolean onlyFactories = !c.ctors.isEmpty();
         for (CtorDecl ct0 : c.ctors) {
@@ -2509,6 +2511,40 @@ public final class JavaEmitter {
      * {@code with ListMixin<E>} class is, implementing the runtime ListMixin interface, and
      * converted through ListMixinView where a DartList is needed.
      */
+    /// The element argument a program class applies the runtime ListMixin at, directly
+    /// (`extends ListBase<E>`, `with ListMixin<int>`, `implements List<E>`), or null.
+    private TypeRef directListMixinArg(ClassDecl c) {
+        TypeRef core = implementedCoreList(c);
+        if (core != null) {
+            return core.arg(0);
+        }
+        java.util.List<TypeRef> applied = new java.util.ArrayList<TypeRef>(c.mixins);
+        if (c.superclass != null) {
+            applied.add(c.superclass);
+        }
+        for (TypeRef mix : applied) {
+            if (mix != null && mix.args.size() == 1 && !program.classes.containsKey(mix.name)
+                    && (mix.is("ListBase") || mix.is("ListMixin"))) {
+                return mix.arg(0);
+            }
+        }
+        return null;
+    }
+
+    /// `class Shelf<E> extends ListBase<E>`: the list's element witness is the class's own
+    /// reified argument (or the fixed one it applies the mixin at), answered through
+    /// ListMixin.$listElementWitness so `is List<X>` compares types, never elements.
+    private String listElementWitnessAccessor(ClassDecl c, Ctx ctx) {
+        TypeRef el = directListMixinArg(c);
+        if (el == null) {
+            return "";
+        }
+        String w = isUnrecordedArg(el) || el.is("dynamic") ? "dart.runtime.TypeWitness.DYNAMIC"
+                : witnessOf(el, ctx);
+        return "    @Override\n    public dart.runtime.TypeWitness $listElementWitness() {\n        return "
+                + (w == null ? "null" : w) + ";\n    }\n\n";
+    }
+
     private TypeRef implementedCoreList(ClassDecl c) {
         if (c == null || c.superclass != null || !c.mixins.isEmpty() || c.isMixin
                 || program.classes.containsKey("List")) {
@@ -5738,7 +5774,8 @@ public final class JavaEmitter {
             String ej = javaType(elem, true, ctx);
             String out = ctx.newTemp();
             String helper = m.name + "$sync";
-            ctx.writer().line("return DartIterable.syncStar((DartList<" + ej + "> " + out + ") -> "
+            ctx.writer().line("return DartIterable.syncStar(" + syncStarWitnessArg(elem, ctx) + "(DartList<"
+                    + ej + "> " + out + ") -> "
                     + helper + "(" + out + paramNames + "));");
             sb.append(ctx.popWriter());
             sb.append("    }\n\n");
@@ -5784,7 +5821,8 @@ public final class JavaEmitter {
             TypeRef elem = (rt.is("Iterable") || rt.is("List") || rt.is("Set")) && !rt.args.isEmpty()
                     ? rt.arg(0) : TypeRef.DYNAMIC;
             String lst = ctx.newTemp();
-            ctx.writer().line("DartList<" + javaType(elem, true, ctx) + "> " + lst + " = new DartList<>();");
+            ctx.writer().line("DartList<" + javaType(elem, true, ctx) + "> " + lst + " = new DartList<>("
+                    + nullWitness(reifiedArgWitness(elem, ctx)) + ");");
             String savedList = ctx.syncStarList;
             TypeRef savedElem = ctx.syncStarElem;
             ctx.syncStarList = lst;
@@ -6673,6 +6711,11 @@ public final class JavaEmitter {
         l.params = lf.params;
         l.body = lf.body;
         l.exprBody = lf.exprBody;
+        // A generic local function is a generic closure: runtimeType prints its own type
+        // parameters (`<Y0>(Y0) => Y0`), though the closure is emitted against its erased SAM.
+        l.typeParams = lf.typeParams;
+        l.typeVarSlots = lf.typeVarSlots;
+        l.ownSignature = true;
         // Declare the local first so a recursive body can reference the name.
         // Declared with its real signature, so a call of it is typed by its return type
         // (`stopAll().whenComplete(...)` binds statically instead of through Dyn).
@@ -8041,7 +8084,8 @@ public final class JavaEmitter {
             return ownSam.contains("Funcs.") ? new Out("((" + ownSam + ") " + out.code + ")", ft) : out;
         }
         String ownSam = javaType(ft, false, ctx);
-        boolean generic = isGenericTearOff(e, ctx);
+        Object genericDecl = genericTearOffDecl(e, ctx);
+        boolean generic = genericDecl != null;
         TypeRef ret = ft.funcReturn;
         if (generic && ctxSig != null && isDynamicType(ret)) {
             ret = ctxSig[ctxSig.length - 1];
@@ -8057,7 +8101,8 @@ public final class JavaEmitter {
             sig.append(", ").append(pt == null || isDynamicType(pt) ? "null" : staticWitness(targetArgWitness(pt, ctx)));
         }
         String[] signed = signWith(ref, objectSlot ? ft : expected, sig.toString(), generic && objectSlot,
-                false, ft.funcRequired, namedSpec(ft), ctx);
+                false, ft.funcRequired, namedSpec(ft), generic && objectSlot ? tearOffTypeVars(genericDecl) : null,
+                ctx);
         if (signed == null) {
             return objectSlot && castSam == null && ownSam.contains("Funcs.") ? new Out("((" + ownSam + ") " + out.code + ")", ft) : out;
         }
@@ -8073,25 +8118,48 @@ public final class JavaEmitter {
     /// Whether a tear-off names a generic function or method (`identity<T>`), whose
     /// uninstantiated type is no subtype of any non-generic function type.
     private boolean isGenericTearOff(Expr e, Ctx ctx) {
+        return genericTearOffDecl(e, ctx) != null;
+    }
+
+    /// The Signed.$typeVars literal of a generic tear-off: the declaration's type
+    /// parameters, then the one its return type and each parameter's type is, or null.
+    private static String tearOffTypeVars(Object decl) {
+        List<String> tps = decl instanceof MethodDecl ? ((MethodDecl) decl).typeParams
+                : ((FunctionDecl) decl).typeParams;
+        TypeRef rt = decl instanceof MethodDecl ? ((MethodDecl) decl).returnType
+                : ((FunctionDecl) decl).returnType;
+        List<Param> ps = decl instanceof MethodDecl ? ((MethodDecl) decl).params
+                : ((FunctionDecl) decl).params;
+        StringBuilder tv = new StringBuilder("\"").append(String.join(", ", tps)).append('"');
+        tv.append(", ").append(typeVarSlot(rt, tps));
+        for (Param p : ps) {
+            tv.append(", ").append(typeVarSlot(p.type, tps));
+        }
+        return tv.toString();
+    }
+
+    /// The generic method or function {@code e} tears off (a MethodDecl or FunctionDecl),
+    /// or null when it is not a tear-off of a generic one.
+    private Object genericTearOffDecl(Expr e, Ctx ctx) {
         if (e instanceof Ident) {
             String name = ((Ident) e).name;
             // An instance or static method of the current class or one it inherits, else a
             // top-level function.
             MethodDecl md = ctx.currentClass != null ? findMethodInHierarchy(ctx.currentClass, name) : null;
             if (md != null) {
-                return !md.typeParams.isEmpty();
+                return md.typeParams.isEmpty() ? null : md;
             }
             FunctionDecl fn = program.functions.get(name);
-            return fn != null && !fn.typeParams.isEmpty();
+            return fn != null && !fn.typeParams.isEmpty() ? fn : null;
         }
         if (!(e instanceof PropertyGet)) {
-            return false;
+            return null;
         }
         PropertyGet pg = (PropertyGet) e;
         if (isImportPrefix(pg.target, ctx)) {
             // `lib.identity`: a top-level function through an import prefix.
             FunctionDecl fn = program.functions.get(pg.name);
-            return fn != null && !fn.typeParams.isEmpty();
+            return fn != null && !fn.typeParams.isEmpty() ? fn : null;
         }
         if (pg.target instanceof Ident && ctx.lookup(((Ident) pg.target).name) == null
                 && (ctx.currentClass == null || ctx.currentClass.field(((Ident) pg.target).name) == null)) {
@@ -8099,7 +8167,7 @@ public final class JavaEmitter {
             if (owner != null) {
                 // `Box.keep`: a static method, which Dart does not inherit.
                 MethodDecl md = owner.method(pg.name);
-                return md != null && !md.typeParams.isEmpty();
+                return md != null && !md.typeParams.isEmpty() ? md : null;
             }
         }
         // `box.pick`: an instance method of the receiver's static class or a supertype.
@@ -8110,7 +8178,7 @@ public final class JavaEmitter {
         }
         ClassDecl rc = rt == null ? null : programClass(rt.name, ctx);
         MethodDecl md = rc == null ? null : findMethodInHierarchy(rc, pg.name);
-        return md != null && !md.typeParams.isEmpty();
+        return md != null && !md.typeParams.isEmpty() ? md : null;
     }
 
     /// A tear-off with optional parameters is a SAM of its full arity (see tearOffAdapter),
@@ -8956,11 +9024,10 @@ public final class JavaEmitter {
                     // `x is List<bool>`/`List<String>`/`List<num>`: the raw instanceof
                     // answered true for any list. A list made where its type argument is
                     // known carries it (withListWitness), and the test is then Dart's
-                    // covariant subtype test on the argument; an unwitnessed list (generic
-                    // code, decoded JSON) has its elements checked -- see DartList.isListOf.
+                    // covariant subtype test on the argument (DartList.isListOfW).
                     TypeRef el = scalarListElement(t.type);
-                    check = "dart.core.DartList.isListOf(" + subject + ", "
-                            + erasedJavaType(el, ctx) + ".class, " + el.nullable + ")";
+                    check = "dart.core.DartList.isListOfW(" + subject + ", dart.runtime.TypeWitness.of("
+                            + erasedJavaType(el, ctx) + ".class, " + el.nullable + "))";
                 } else {
                     check = subject + " instanceof " + erased;
                 }
@@ -8999,12 +9066,18 @@ public final class JavaEmitter {
         return el.is("bool") || el.is("String") || el.is("num") ? el : null;
     }
 
-    /// Records a list's reified element type on the value (DartList.typed) when this
-    /// emission knows it. Only for the element types whose list test reads it
-    /// (scalarListElement: `is List<String|bool|num>`) and the ones that can answer
-    /// such a test differently from the elements -- Object, int?/double? (a List<num>
-    /// test) -- so the common List<Widget> children literal stays a bare call. The
-    /// primitive lists need none; their storage class is their witness.
+    /// The leading witness argument of a DartIterable.syncStar call: the declared element
+    /// type's (`Iterable<X> f() sync*`), with its comma, or "" when X is an unwitnessed
+    /// type variable and the generated elements stay unrecorded.
+    private String syncStarWitnessArg(TypeRef elem, Ctx ctx) {
+        String w = reifiedArgWitness(elem, ctx);
+        return w == null ? "" : w + ", ";
+    }
+
+    /// Records a list's reified element type on the value (DartList.typed) whenever this
+    /// emission knows it -- every element type with a Java class, runtime and Flutter
+    /// classes included, so `<Widget>[] is List<String>` is false. The primitive lists
+    /// need none; their storage class is their witness.
     private Out withListWitness(Out o, Ctx ctx) {
         TypeRef t = o.type;
         if (t == null || !t.is("List") || t.args.size() != 1 || primitiveListKind(t) != null) {
@@ -9092,13 +9165,29 @@ public final class JavaEmitter {
         // member type name their own library's class (resolved), a bare name this one's.
         ClassDecl elClass = scalar ? null : el.resolved != null ? el.resolved : prefixedOrScopedClass(el.name, ctx);
         boolean programClass = elClass != null && appliedCollectionMixin(elClass.name) == null;
-        if (!scalar && !programClass) {
+        if (!scalar && !programClass && (elClass != null || !hasJavaClass(el, ctx))) {
+            // A program class seen through a collection-mixin view, or a name with no Java
+            // class of its own (an unresolved or synthetic type): unknown.
             return null;
         }
         if (programClass && el.args.isEmpty()) {
             return witnessOf(el, ctx);
         }
         return "dart.runtime.TypeWitness.of(" + erasedJavaType(copyNonNull(el), ctx) + ".class, " + el.nullable + ")";
+    }
+
+    /// Whether {@code el} names a runtime or Flutter class whose Java class is its runtime
+    /// representation, so a collection can record it as an element witness. The types a
+    /// value can satisfy without being an instance of that Java class (a String is a
+    /// Comparable and a Pattern, any closure a Function, an enum constant an Enum) are not.
+    private boolean hasJavaClass(TypeRef el, Ctx ctx) {
+        if (el.is("Function") || el.is("Comparable") || el.is("Pattern") || el.is("Null") || el.is("Never")
+                || el.is("void") || el.is("Record") || el.is("Enum") || el.is("Type")
+                || el.is("Iterator")) {
+            return false;
+        }
+        Ast.ClassDecl sc = stubs.classes.get(el.name);
+        return sc != null && sc.javaName != null && !sc.javaName.isEmpty();
     }
 
     /// The program class {@code name} names in this library: `b.Item` through its import
@@ -9303,15 +9392,27 @@ public final class JavaEmitter {
             any |= !"null".equals(w);
             sig.append(", ").append(w);
         }
-        boolean generic = false;
-        if (!any && sig.toString().startsWith("null") && (l.typeParams.isEmpty() || ctxSig != null)) {
+        // Generic unless a context instantiated it; a local function's context is its own
+        // (erased) signature, which instantiates nothing.
+        boolean generic = !l.typeParams.isEmpty() && (ctxSig == null || l.ownSignature);
+        if (!any && sig.toString().startsWith("null") && !generic) {
             return code;
         }
-        if (!l.typeParams.isEmpty() && ctxSig == null) {
-            generic = true;
-        }
         boolean spellArgs = own && expected == null;
-        String[] signed = signWith(code, samType, sig.toString(), generic, spellArgs, required, named, ctx);
+        // A generic closure prints its own type parameters (`<T>(T) => T`): the names of
+        // the parameters and of each signature slot that is one of them.
+        String typeVars = null;
+        if (generic) {
+            StringBuilder tv = new StringBuilder("\"").append(String.join(", ", l.typeParams)).append('"');
+            // The slots were recorded before the parser erased the type parameters.
+            tv.append(", ").append(slotLiteral(l.typeVarSlots, 0));
+            for (int i = 0; i < l.params.size(); i++) {
+                tv.append(", ").append(slotLiteral(l.typeVarSlots, i + 1));
+            }
+            typeVars = tv.toString();
+        }
+        String[] signed = signWith(code, samType, sig.toString(), generic, spellArgs, required, named, typeVars,
+                ctx);
         if (signed == null) {
             return code;
         }
@@ -9346,6 +9447,27 @@ public final class JavaEmitter {
     /// required one as `!name`, whose witnesses follow the positional ones in {@code sig}).
     private String[] signWith(String code, TypeRef samType, String sig, boolean generic, boolean spellArgs,
             int required, List<String> named, Ctx ctx) {
+        return signWith(code, samType, sig, generic, spellArgs, required, named, null, ctx);
+    }
+
+    /// Entry {@code i} of a recorded Signed.$typeVars slot list as a Java literal.
+    private static String slotLiteral(List<String> slots, int i) {
+        String n = i < slots.size() ? slots.get(i) : null;
+        return n == null ? "null" : "\"" + n + "\"";
+    }
+
+    /// The Java literal naming the type parameter {@code t} is, for a generic closure's
+    /// printed signature (Signed.$typeVars), or null when it is none of {@code params}.
+    private static String typeVarSlot(TypeRef t, List<String> params) {
+        if (t == null || !t.args.isEmpty() || t.funcParams != null || !params.contains(t.name)) {
+            return "null";
+        }
+        return "\"" + t.name + (t.nullable ? "?" : "") + "\"";
+    }
+
+    /// signWith for a generic closure: {@code typeVars} is the Signed.$typeVars literal.
+    private String[] signWith(String code, TypeRef samType, String sig, boolean generic, boolean spellArgs,
+            int required, List<String> named, String typeVars, Ctx ctx) {
         String jt = javaType(samType, false, ctx);
         if (!(jt.startsWith("dart.runtime.Funcs.") || jt.startsWith("Funcs."))) {
             return null;
@@ -9377,11 +9499,11 @@ public final class JavaEmitter {
         }
         String namedLit = named == null || named.isEmpty() ? null
                 : "\"" + String.join("\", \"", named) + "\"";
-        String mkey = (generic ? "<>" : "") + sig + "|" + required + "|" + namedLit;
+        String mkey = (generic ? "<>" : "") + sig + "|" + required + "|" + namedLit + "|" + typeVars;
         String[] marker = closureSignatures.get(mkey);
         if (marker == null) {
             marker = new String[] {"M" + closureSignatures.size(), sig, String.valueOf(generic),
-                    String.valueOf(required), namedLit};
+                    String.valueOf(required), namedLit, typeVars};
             closureSignatures.put(mkey, marker);
         }
         String samKey = head + "|" + targs.size() + "|" + marker[0];
@@ -9471,6 +9593,10 @@ public final class JavaEmitter {
             if (m[4] != null) {
                 sb.append("\n        String[] NAMED = {").append(m[4]).append("};\n\n        @Override\n")
                         .append("        default String[] $named() {\n            return NAMED;\n        }\n");
+            }
+            if (m.length > 5 && m[5] != null) {
+                sb.append("\n        String[] TYPE_VARS = {").append(m[5]).append("};\n\n        @Override\n")
+                        .append("        default String[] $typeVars() {\n            return TYPE_VARS;\n        }\n");
             }
             sb.append("    }\n");
         }
@@ -9632,18 +9758,15 @@ public final class JavaEmitter {
         java.util.Set<String> tps = new HashSet<String>(c.typeParams);
         java.util.Set<Object> seen = java.util.Collections.newSetFromMap(
                 new java.util.IdentityHashMap<Object, Boolean>());
-        for (FieldDecl f : c.fields) {
-            scanTypeValueUses(f, tps, used, seen);
-        }
-        for (CtorDecl ct : c.ctors) {
-            if (!ct.isFactory) {
-                scanTypeValueUses(ct, tps, used, seen);
-            }
-        }
-        for (MethodDecl m : c.methods) {
-            if (!m.isStatic) {
-                scanTypeValueUses(m, tps, used, seen);
-            }
+        // `<E>[]`, `List<E>.of(..)` in the body: the collection records E, so the class keeps
+        // E's witness. Saved and restored, as witnessParams recurses into other classes.
+        java.util.Set<String> outerColl = classCollUses;
+        java.util.Set<String> coll = new HashSet<String>();
+        classCollUses = coll;
+        try {
+            scanClassBodies(c, tps, used, seen);
+        } finally {
+            classCollUses = outerColl;
         }
         ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         if (sup != null) {
@@ -9661,13 +9784,41 @@ public final class JavaEmitter {
         for (String n : c.typeParams) {
             if (used.contains(n)) {
                 out.add(n);
-            } else if (reified) {
-                // Kept only so `is`/`as`/whereType can check this class's type arguments.
+            } else if (reified || coll.contains(n)) {
+                // Kept only so `is`/`as`/whereType can check this class's type arguments,
+                // or so the collections its body builds record their element type. A
+                // construction that cannot name the argument passes an unknown witness.
                 out.add(n);
                 reifyOnlyParams.add(c.name + "<" + n);
+                if (!reified) {
+                    collectionOnlyParams.add(c.name + "<" + n);
+                }
             }
         }
         return out;
+    }
+
+    /// Where scanTypeValueUses records a class's collection-construction uses (see
+    /// computeClassWitnesses); null outside a class scan.
+    private java.util.Set<String> classCollUses;
+    /// "Class<Param>" keys of witnesses kept only so the class's collections record them.
+    private final java.util.Set<String> collectionOnlyParams = new HashSet<String>();
+
+    private void scanClassBodies(ClassDecl c, java.util.Set<String> tps, java.util.Set<String> used,
+            java.util.Set<Object> seen) {
+        for (FieldDecl f : c.fields) {
+            scanTypeValueUses(f, tps, used, seen);
+        }
+        for (CtorDecl ct : c.ctors) {
+            if (!ct.isFactory) {
+                scanTypeValueUses(ct, tps, used, seen);
+            }
+        }
+        for (MethodDecl m : c.methods) {
+            if (!m.isStatic) {
+                scanTypeValueUses(m, tps, used, seen);
+            }
+        }
     }
 
     // ---- reified type arguments of program generic classes ------------------------------
@@ -9691,6 +9842,18 @@ public final class JavaEmitter {
                     new java.util.IdentityHashMap<Object, Boolean>());
             for (Library lib : program.libraries) {
                 scanReifiedChecks(lib, seen);
+            }
+            // A list class of the program carries its element type as Dart's lists do, so
+            // `is List<X>` on one reads its reified argument (listElementWitnessAccessor).
+            for (ClassDecl c : program.classes.values()) {
+                TypeRef el = directListMixinArg(c);
+                if (el != null && el.args.isEmpty() && c.typeParams.contains(el.name) && reifiableClass(c)
+                        && reifiedNames.add(c.name)) {
+                    runtimeTypeOnlyReified.add(c.name);
+                    for (String tp : c.typeParams) {
+                        reifyOnlyParams.add(c.name + "<" + tp);
+                    }
+                }
             }
             if (runtimeTypeRead) {
                 // Dart's runtimeType names the type arguments, and any object may be asked
@@ -9717,6 +9880,7 @@ public final class JavaEmitter {
     /// runtimeType can name the argument does not: the construction takes an unknown one.
     private boolean constructionDemandsWitness(ClassDecl pc, String cp) {
         return witnessParams(pc).contains(cp)
+                && !collectionOnlyParams.contains(pc.name + "<" + cp)
                 && !(runtimeTypeOnlyReified.contains(pc.name) && reifyOnlyParams.contains(pc.name + "<" + cp));
     }
 
@@ -10251,7 +10415,8 @@ public final class JavaEmitter {
         // that cannot name T (`parseList(scanner, () => ..)`, T inferred from a closure)
         // passes an unknown witness and the collection's argument stays unrecorded, as
         // one built by unwitnessed generic code is.
-        java.util.Set<String> collUses = softUses != null ? softUses : discardedUses;
+        java.util.Set<String> collUses = softUses != null ? softUses
+                : classCollUses != null ? classCollUses : discardedUses;
         if (o instanceof ListLit) {
             noteCollectionTypeVars(((ListLit) o).elementType, tps, collUses);
         } else if (o instanceof SetLit) {
@@ -11469,7 +11634,8 @@ public final class JavaEmitter {
                 ctx.importClass("dart.core.Dart" + pk + "List");
                 ctx.writer().line("Dart" + pk + "List " + tmp + " = new Dart" + pk + "List();");
             } else {
-                ctx.writer().line("DartList<" + javaType(elem, true, ctx) + "> " + tmp + " = new DartList<>();");
+                ctx.writer().line("DartList<" + javaType(elem, true, ctx) + "> " + tmp + " = new DartList<>("
+                    + nullWitness(reifiedArgWitness(elem, ctx)) + ");");
             }
             for (Expr e : l.elements) {
                 emitListElementInto(tmp, e, elem, ctx);
@@ -17350,7 +17516,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             } else {
                 ctx.importClass("dart.core.DartList");
                 ctx.importClass("dart.core.DartIterable");
-                code = head + " -> DartIterable.syncStar((DartList<" + ej + "> " + target + ") -> {\n"
+                code = head + " -> DartIterable.syncStar(" + syncStarWitnessArg(elem, ctx) + "(DartList<" + ej
+                        + "> " + target + ") -> {\n"
                         + body + ind + "    })";
             }
         } else if (asyncValue) {
@@ -19071,9 +19238,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         List<Expr> pos = c.args.positional;
         if ((tt.is("Iterable") || tt.is("List") || tt.is("Set")) && !tt.nullable && n.equals("cast")
                 && pos.isEmpty() && c.typeArgs.size() == 1 && !c.typeArgs.get(0).is("int")
-                && !c.typeArgs.get(0).is("double") && !c.typeArgs.get(0).is("num")
-                && !c.typeArgs.get(0).is("bool")) {
-            // (a primitive element has its own list classes; left to the general path)
+                && !c.typeArgs.get(0).is("double")) {
+            // (int and double have their own list classes, below; num and bool are boxed
+            // and take this checked view like any other element type)
             // Iterable.cast<R>() is a view of R: typed as one, so a callback over it
             // (`keys.cast<String>().map((k) => k.length)`) sees R rather than dynamic.
             TypeRef sub = c.typeArgs.get(0);
@@ -19106,6 +19273,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out("CoreExt.<" + javaType(k, true, ctx) + ", " + javaType(v, true, ctx) + ">cast("
                         + target.code + ", " + nullWitness(reifiedArgWitness(k, ctx)) + ", "
                         + nullWitness(reifiedArgWitness(v, ctx)) + ")", mt);
+            }
+        }
+        if (tt.is("Stream") && n.equals("toList") && pos.isEmpty() && c.args.named.isEmpty()
+                && tt.args.size() == 1) {
+            // Stream<X>.toList() is a Future<List<X>>: the list records X, which only the
+            // stream's static type names (a stream carries no element witness).
+            String w = reifiedArgWitness(tt.arg(0), ctx);
+            if (w != null) {
+                return new Out(target.code + ".toList(" + w + ")",
+                        TypeRef.of("Future", TypeRef.of("List", tt.arg(0))));
             }
         }
         if (tt.is("Stream") && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 1) {
@@ -19479,8 +19656,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     String reifiedEl = reifiedIsCheck("$wt", false, sub, ctx);
                     String elemCheck = reifiedEl != null ? reifiedEl
                             : pk != null ? "dart.core.Dart" + pk + "List.is" + pk + "s($wt)"
-                            : el != null ? "dart.core.DartList.isListOf($wt, " + erasedJavaType(el, ctx)
-                                    + ".class, " + el.nullable + ")" : null;
+                            : el != null ? "dart.core.DartList.isListOfW($wt, dart.runtime.TypeWitness.of("
+                                    + erasedJavaType(el, ctx) + ".class, " + el.nullable + "))" : null;
                     String code = target.code + ".whereType((java.lang.Class) " + erased + ".class"
                             + (sub.nullable ? ", true" : "") + ")";
                     if (elemCheck != null) {

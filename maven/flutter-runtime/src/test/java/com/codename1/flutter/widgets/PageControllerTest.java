@@ -63,7 +63,7 @@ class PageControllerTest {
 
     private PageView carousel(PageController controller, int pages, Boolean snapping,
                               Funcs.VoidFunc1<Long> onPageChanged) {
-        DartList<Widget> children = new DartList<Widget>();
+        DartList<Widget> children = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < pages; i++) {
             children.add(new ProbeBox(10, 10));
         }

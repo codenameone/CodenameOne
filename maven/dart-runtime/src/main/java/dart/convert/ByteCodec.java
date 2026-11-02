@@ -426,7 +426,7 @@ public class ByteCodec extends Converter<Object, Object> implements Codec {
 
     /** {@code LineSplitter.split(s)} and {@code const LineSplitter().convert(s)}. */
     public static DartList<String> splitLines(String s) {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         int start = 0;
         int i = 0;
         while (i < s.length()) {

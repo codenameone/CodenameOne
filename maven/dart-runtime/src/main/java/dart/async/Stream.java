@@ -1279,9 +1279,15 @@ public class Stream<T> {
         return c.future();
     }
 
-    /** Dart's {@code toList}. */
+    /** Dart's {@code toList}, unrecorded: for a stream whose X is an unwitnessed type variable. */
     public final Future<dart.core.DartList<T>> toList() {
-        final dart.core.DartList<T> out = new dart.core.DartList<T>();
+        return toList((dart.runtime.TypeWitness) null);
+    }
+
+    /// Dart's {@code toList} on a Stream<X>: the list records {@code elem}, X's witness,
+    /// which the call site names from the stream's static type.
+    public final Future<dart.core.DartList<T>> toList(dart.runtime.TypeWitness elem) {
+        final dart.core.DartList<T> out = new dart.core.DartList<T>(elem);
         return collect(new Funcs.Func1<T, Boolean>() {
             @Override
             public Boolean call(T v) {

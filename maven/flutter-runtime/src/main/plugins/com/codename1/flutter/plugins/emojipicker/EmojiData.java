@@ -554,7 +554,7 @@ final class EmojiData {
 
     static DartList<CategoryEmoji> all() {
         if (all == null) {
-            all = new DartList<CategoryEmoji>();
+            all = new DartList<CategoryEmoji>(dart.runtime.TypeWitness.of(CategoryEmoji.class, false));
             add(Category.SMILEYS, SMILEYS);
             add(Category.ANIMALS, ANIMALS);
             add(Category.FOODS, FOODS);
@@ -568,7 +568,7 @@ final class EmojiData {
     }
 
     private static void add(Category c, String[] pairs) {
-        DartList<Emoji> list = new DartList<Emoji>();
+        DartList<Emoji> list = new DartList<Emoji>(dart.runtime.TypeWitness.of(Emoji.class, false));
         for (int i = 0; i + 1 < pairs.length; i += 2) {
             list.add(new Emoji(pairs[i], pairs[i + 1]));
         }
@@ -588,7 +588,7 @@ final class EmojiData {
 
     /** Recents, newest first; empty without a display (Preferences needs storage). */
     static DartList<Emoji> recents() {
-        DartList<Emoji> out = new DartList<Emoji>();
+        DartList<Emoji> out = new DartList<Emoji>(dart.runtime.TypeWitness.of(Emoji.class, false));
         if (!Display.isInitialized()) {
             return out;
         }

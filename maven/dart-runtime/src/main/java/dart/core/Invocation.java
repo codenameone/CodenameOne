@@ -47,7 +47,7 @@ public final class Invocation {
 
     /// A method call `o.name(args...)`; named holds the named arguments by name, or null.
     public static Invocation method(String name, Object[] args, DartMap<String, Object> named) {
-        DartList<Object> pos = new DartList<Object>();
+        DartList<Object> pos = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         if (args != null) {
             for (Object a : args) {
                 pos.add(a);
@@ -64,13 +64,13 @@ public final class Invocation {
 
     /// A getter read `o.name`.
     public static Invocation getter(String name) {
-        return new Invocation(new Symbol(name), DartList.unmodifiable(new DartList<Object>()),
+        return new Invocation(new Symbol(name), DartList.unmodifiable(new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC)),
                 new DartMap<Symbol, Object>(), GETTER);
     }
 
     /// A setter write `o.name = value`; the member name carries the trailing `=`, as in Dart.
     public static Invocation setter(String name, Object value) {
-        DartList<Object> pos = new DartList<Object>();
+        DartList<Object> pos = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         pos.add(value);
         return new Invocation(new Symbol(name + "="), DartList.unmodifiable(pos),
                 new DartMap<Symbol, Object>(), SETTER);
@@ -89,7 +89,7 @@ public final class Invocation {
     }
 
     public DartList<Object> typeArguments() {
-        return DartList.unmodifiable(new DartList<Object>());
+        return DartList.unmodifiable(new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC));
     }
 
     public boolean isMethod() {

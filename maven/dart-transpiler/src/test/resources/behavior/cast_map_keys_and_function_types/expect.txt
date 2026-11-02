@@ -1,0 +1,11 @@
+2
+key TypeError
+forEach TypeError
+1
+num TypeError
+true
+bool TypeError
+true
+({int a, int b}) => void
+({int a, int b}) => void
+true

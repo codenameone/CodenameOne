@@ -139,8 +139,12 @@ public final class TypeWitness {
         return d;
     }
 
-    /// The witness admitting null too.
+    /// The witness admitting null too. An unknown witness (an unreified type variable's,
+    /// null) stays unknown: `T?` of an unknown T is unknown as well.
     public static TypeWitness nullable(TypeWitness w) {
+        if (w == null) {
+            return null;
+        }
         if (w.nullable) {
             return w;
         }
@@ -307,6 +311,12 @@ public final class TypeWitness {
                 if (a0 != null && v instanceof dart.core.DartSet) {
                     return dart.core.DartSet.isSetOf(v, a0);
                 }
+                if (a0 != null && v instanceof dart.core.DartIterable) {
+                    // A lazy iterable (a sync* generator, a map view) that records its
+                    // element type is tested by it; an unrecorded one is unknown and passes.
+                    TypeWitness w = ((dart.core.DartIterable<?>) v).elementWitness();
+                    return erased.isInstance(v) && (w == null || isSubtype(w, a0));
+                }
                 return erased.isInstance(v) || v instanceof dart.core.DartList || v instanceof dart.core.DartSet;
         }
     }
@@ -365,7 +375,9 @@ public final class TypeWitness {
         if (o instanceof Reified) {
             return ((Reified) o).$runtimeType();
         }
-        if (o instanceof Signed && !((Signed) o).$generic()) {
+        if (o instanceof Signed) {
+            // A generic closure too: FunctionType prints its type parameters, renamed in
+            // order as Dart does (`<Y0>(Y0) => Y0`).
             return new FunctionType((Signed) o);
         }
         return o == null ? Void.class : o.getClass();
