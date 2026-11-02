@@ -402,7 +402,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
             -DbackendAnalysis \
-            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat,swing-compat,javafx-compat,compose-compat,fxml-compiler,desktop-compat-runtime,python-transpiler -am verify
+            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat,swing-compat,javafx-compat,compose-compat,fxml-compiler,desktop-compat-runtime,cn1-app-kit/backend,cn1-app-kit/common,python-transpiler -am verify
       # The Python runtime compiles at release 17, so it cannot join the JDK 8
       # reactor above; it runs against the core that reactor installed. It ships
       # inside applications, so it is held to the same zero-findings gate.

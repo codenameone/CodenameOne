@@ -1,0 +1,155 @@
+name: Nightly watchdog
+
+# The expensive suites -- the sample applications, the cn1libs, the device
+# integrations, the benchmarks, the full Maven reactor -- run on a pull request
+# only when their own tree changes, and on master once a night at 00:11 UTC
+# (each carries `cron: '11 0 * * *'`, off the top of the hour, where GitHub
+# delays and may drop scheduled runs). Shared code (core, ports, builders,
+# backend) therefore reaches them only through that nightly run, so a failure
+# there must not go unread the way a red master push did.
+#
+# This job reads the nightly set from the workflow files themselves -- every
+# workflow with an uncommented `- cron: '11 0 * * *'` -- so adding a suite to the
+# nightly is one cron line, with no list here to keep in sync. It then finds
+# the newest scheduled run of each on master and keeps ONE issue open,
+# assigned to NIGHTLY_ALERT_ASSIGNEE, listing every suite that failed or has
+# not run in the last 30 hours. A run still going when checked is judged by
+# the previous completed one, so a suite that fails after this job has looked
+# is reported the next morning; and the issue closes only when every suite has
+# finished green, never on one still running.
+
+on:
+  schedule:
+    # Late enough for the slowest suite (the iOS sample builds) to finish.
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-watchdog
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Open, update, or close the nightly failure issue
+        uses: actions/github-script@v8
+        env:
+          ALERT_ASSIGNEE: ${{ vars.NIGHTLY_ALERT_ASSIGNEE || 'shai-almog' }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { owner, repo } = context.repo;
+            const title = 'Nightly CI failures';
+            const marker = '<!-- nightly-watchdog -->';
+            const NIGHTLY = /^\s*-\s*cron:\s*['"]11 0 \* \* \*['"]/m;
+
+            const dir = '.github/workflows';
+            const nightly = fs.readdirSync(dir)
+              .filter(f => /\.ya?ml$/.test(f) && f !== 'nightly-watchdog.yml')
+              .filter(f => NIGHTLY.test(fs.readFileSync(path.join(dir, f), 'utf8')))
+              .sort();
+            if (nightly.length === 0) {
+              core.setFailed(`No workflow in ${dir} is scheduled at '11 0 * * *'; the watchdog would report every night clean.`);
+              return;
+            }
+
+            // No wall-clock window: a dispatch at any hour, or a delayed
+            // schedule, judges the newest scheduled run, which only has to be
+            // recent enough to prove the schedule still fires.
+            const STALE_MS = 30 * 3600 * 1000;
+            const GREEN = ['success', 'skipped', 'neutral'];
+            const problems = [];
+            const running = [];
+            const cancelled = [];
+            for (const file of nightly) {
+              let runs;
+              try {
+                ({ data: { workflow_runs: runs } } = await github.rest.actions.listWorkflowRuns({
+                  owner, repo, workflow_id: file, event: 'schedule', branch: 'master', per_page: 10,
+                }));
+              } catch (e) {
+                // One unreadable suite must not stop the report on the others.
+                problems.push(`- \`${file}\`: could not list its runs (${e.status || e.message})`);
+                continue;
+              }
+              const newest = runs[0];
+              if (!newest || Date.now() - new Date(newest.created_at).getTime() > STALE_MS) {
+                problems.push(`- \`${file}\`: no scheduled run in the last 30 hours (workflow disabled, or the schedule did not fire)`);
+                continue;
+              }
+              const done = runs.find(r => r.status === 'completed');
+              if (newest.status !== 'completed') {
+                running.push(`- [\`${file}\`](${newest.html_url}): still ${newest.status}`);
+              }
+              // A cancelled run (a maintainer, or a newer run in its group) is
+              // listed but is not a failure: it neither opens nor renews the issue.
+              if (done && done.conclusion === 'cancelled') {
+                cancelled.push(`- [\`${file}\`](${done.html_url}): cancelled`);
+              } else if (done && !GREEN.includes(done.conclusion)
+                  && Date.now() - new Date(done.created_at).getTime() <= 2 * STALE_MS) {
+                problems.push(`- [\`${file}\`](${done.html_url}): ${done.conclusion}`);
+              }
+            }
+
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const issue = open.find(i => !i.pull_request && i.title === title && (i.body || '').includes(marker));
+            const now = new Date().toISOString();
+
+            await core.summary
+              .addHeading('Nightly watchdog')
+              .addRaw(`${nightly.length} nightly workflows, ${problems.length} failing, ${running.length} still running.\n\n`)
+              .addRaw([...problems, ...running].join('\n') || 'All green.')
+              .write();
+
+            if (problems.length === 0) {
+              // Close only on a night where everything finished green.
+              if (issue && running.length === 0) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+                  body: `Recovered: every nightly workflow passed on the run checked at ${now}.` });
+                await github.rest.issues.update({ owner, repo, issue_number: issue.number,
+                  state: 'closed', state_reason: 'completed' });
+              } else if (issue) {
+                // Nothing failing any more, but not every suite has finished:
+                // keep the issue open and stop it listing failures that are gone.
+                await github.rest.issues.update({ owner, repo, issue_number: issue.number, body: [
+                  marker, `No failures as of ${now}; the issue closes once these finish green:`, '', ...running,
+                ].join('\n') });
+              }
+              return;
+            }
+
+            const body = [
+              marker,
+              `These nightly workflows failed on master (checked ${now}):`,
+              '',
+              ...problems,
+              ...(running.length ? ['', 'Still running when checked (judged by their previous completed run):', '', ...running] : []),
+              ...(cancelled.length ? ['', 'Cancelled (not counted as failures):', '', ...cancelled] : []),
+              '',
+              'They run on a pull request only when their own tree changes, so a change to shared code (core, ports, builders, backend) first meets them here. This issue closes itself after a fully green night.',
+            ].join('\n');
+
+            const assignees = process.env.ALERT_ASSIGNEE ? [process.env.ALERT_ASSIGNEE] : undefined;
+            if (!issue) {
+              await github.rest.issues.create({ owner, repo, title, body, assignees });
+            } else {
+              await github.rest.issues.update({ owner, repo, issue_number: issue.number, body });
+              // A comment, not only a body edit, so every failing night notifies;
+              // a manual re-check the same day updates the body without a ping.
+              if (context.eventName === 'schedule') await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+                body: `@${process.env.ALERT_ASSIGNEE} still failing:\n\n${problems.join('\n')}` });
+            }

@@ -19,34 +19,18 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     paths:
       - '.github/workflows/javase-cef-ffmpeg-smoke.yml'
-      - 'Ports/JavaSE/**'
-      - 'maven/javase/**'
-      - 'maven/cn1-binaries/**'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'maven/build-engine/**'
-      - 'maven/project-model/**'
       - 'maven/tests/javase-cef-ffmpeg-smoke/**'
-      - 'maven/pom.xml'
       - 'scripts/run-javase-cef-ffmpeg-smoke.py'
       - 'scripts/javase-cef-ffmpeg-smoke/**'
-  push:
-    branches:
-      - master
-    paths:
-      - '.github/workflows/javase-cef-ffmpeg-smoke.yml'
-      - 'Ports/JavaSE/**'
-      - 'maven/javase/**'
-      - 'maven/cn1-binaries/**'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'maven/build-engine/**'
-      - 'maven/project-model/**'
-      - 'maven/tests/javase-cef-ffmpeg-smoke/**'
-      - 'maven/pom.xml'
-      - 'scripts/run-javase-cef-ffmpeg-smoke.py'
-      - 'scripts/javase-cef-ffmpeg-smoke/**'
+  schedule:
+    - cron: '11 0 * * *'
+  workflow_dispatch:
 
 jobs:
   javase-smoke:

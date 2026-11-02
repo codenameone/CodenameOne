@@ -5,15 +5,20 @@ name: First build environments
 # a healthy build stops) or stop earlier with the reason the launcher reports
 # for it. See scripts/tests/first-build-environment.py.
 on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
-    paths: ['scripts/initializr/common/src/main/**', 'scripts/tests/first-build-environment.py',
-            'scripts/tests/generate-initializr-fixtures.py', 'maven/cn1app-archetype/src/main/resources/archetype-resources/**',
-            '.github/workflows/first-build-environments.yml']
+    paths:
+      - 'scripts/tests/first-build-environment.py'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - '.github/workflows/first-build-environments.yml'
   schedule:
     # Nightly: a new JDK, Maven or runner image can break a first build with no
     # change on our side.
-    - cron: '17 3 * * *'
+    - cron: '11 0 * * *'
   workflow_dispatch:
+
 permissions:
   contents: read
 concurrency:

@@ -1129,9 +1129,10 @@ Traps:
 - **Anything new that determines the archive goes into the cache key** in the
   reusable workflow. A stale cached archive is not refused downstream -- it is
   self-consistent -- it is simply used.
-- **Every workflow that builds the application lists the gallery, both
+- **Every PR-gating workflow that builds the application lists the gallery, both
   modules, the script, the workflow and the action in its `paths`**, and
   `.github/ci/apple-checks.json` lists them for the four Apple suites.
+  A nightly suite (see *Nightly CI*) lists only its own tree and is exempt.
 - **`unpack` after `mvn clean` on the application, never before**: the output
   lives under `common/target`.
 - `unity-compat.yml`'s `unity-gallery-consumer` job is the end-to-end test:
@@ -1383,6 +1384,33 @@ Traps that have already cost a fix:
 target's upload (`.github/workflows/kmp-compat.yml`). `scripts/kmp-bench` runs
 the same Compose source against Compose Multiplatform on an iOS simulator; see
 its README for the numbers and what they do not show.
+
+### Nightly CI: what runs on a pull request and what does not
+
+Measured over two weeks, the sample applications, cn1libs, device
+integrations, benchmarks, `gradle-smoke` and the full reactor (`ant.yml`,
+"Java CI") took about half of all runner time on pull requests and almost
+never failed there. They now run:
+
+- **On a pull request only when their own tree changes** -- the sample's
+  `scripts/<name>/**`, the cn1lib's module, the feature's own files -- plus
+  their workflow file. Never on core, ports, builders or backend paths.
+- **Nightly on master**, each with exactly `cron: '11 0 * * *'` -- off the top
+  of the hour, where GitHub delays and may drop scheduled runs. No `push`
+  trigger: a red master push went unread.
+- **`nightly-watchdog.yml`** (07:30 UTC) finds every workflow carrying exactly
+  that uncommented cron, judges its newest scheduled run (the previous
+  completed one while a run is still going), and keeps one issue, "Nightly
+  CI failures", open and assigned to `vars.NIGHTLY_ALERT_ASSIGNEE` (default
+  `shai-almog`) until a night where every suite finished green. A suite with
+  no scheduled run in 30 hours is reported too.
+
+Moving a suite to the nightly is therefore one cron line and a narrowed
+`paths`; there is no list to update. Keep on pull requests whatever has
+caught real regressions there: `pr.yml`, the `scripts-*` device suites, the
+ParparVM tests, `linux-build-run`, the docs and source gates.
+`scripts/check-cn1lib-native-coverage.py` accepts a cn1lib as covered when
+its module is in the `pull_request` paths and the workflow runs nightly.
 
 ### Integration Tests
 

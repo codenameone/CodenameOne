@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>cn1-app-kit</artifactId>
+    <packaging>pom</packaging>
+    <name>Codename One App Kit</name>
+    <description>The account, networking and notification plumbing the full-stack samples share, client and server</description>
+    <!--
+      One cn1lib with a client half (common) and a server half (backend). The
+      backend module builds first: the cn1lib goal in common packs its classes
+      into the .cn1lib as backend.zip. A server depends on cn1-app-kit-backend,
+      and wires its components as its own (BackendLibraries in build-engine).
+
+      Versioned with the framework: every project that uses it names
+      ${cn1.version}, so the version an Initializr download is stamped with
+      resolves both.
+    -->
+    <properties>
+        <cn1lib.name>cn1-app-kit</cn1lib.name>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <build>
+        <plugins>
+            <!-- The zero-findings gate pr.yml holds both halves to. -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>true</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${maven.multiModuleProjectDirectory}/cn1-app-kit/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+    <modules>
+        <module>backend</module>
+        <module>common</module>
+        <module>lib</module>
+    </modules>
+</project>

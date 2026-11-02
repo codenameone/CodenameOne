@@ -1,6 +1,9 @@
 name: CN1 Playground Language Tests
 
 on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -9,29 +12,10 @@ on:
       # translated by ParparVM and loaded into the running VM.
       - 'vm/JavaCompiler/**'
       - 'maven/javac/**'
-      - 'vm/ByteCodeTranslator/src/javascript/**'
-      - 'vm/ByteCodeTranslator/src/com/codename1/tools/translator/Javascript*.java'
-      - 'Ports/JavaScriptPort/**'
-      - 'CodenameOne/src/com/codename1/gpu/**'
-      - 'CodenameOne/src/com/codename1/camera/**'
-      - 'CodenameOne/src/com/codename1/ui/**'
-      - '.github/workflows/cn1playground-language.yml'
-  push:
-    branches: [main, master]
-    paths:
-      - 'scripts/cn1playground/**'
-      # Playground code is compiled by the in-tree compiler and, in the browser,
-      # translated by ParparVM and loaded into the running VM.
-      - 'vm/JavaCompiler/**'
-      - 'maven/javac/**'
-      - 'vm/ByteCodeTranslator/src/javascript/**'
-      - 'vm/ByteCodeTranslator/src/com/codename1/tools/translator/Javascript*.java'
-      - 'Ports/JavaScriptPort/**'
-      - 'CodenameOne/src/com/codename1/gpu/**'
-      - 'CodenameOne/src/com/codename1/camera/**'
-      - 'CodenameOne/src/com/codename1/ui/**'
       - '.github/workflows/cn1playground-language.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '11 0 * * *'
 
 permissions:
   contents: read
