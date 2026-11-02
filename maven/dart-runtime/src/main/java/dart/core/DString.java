@@ -438,7 +438,7 @@ public final class DString {
     public static long parseInt(String s) {
         Long v = tryParseInt(s);
         if (v == null) {
-            throw new dart.core.FormatException("Invalid radix-10 number: " + s);
+            throw intFormatError(s, 10);
         }
         return v.longValue();
     }
@@ -447,9 +447,43 @@ public final class DString {
     public static long parseInt(String s, long radix) {
         Long v = tryParseInt(s, radix);
         if (v == null) {
-            throw new dart.core.FormatException("Invalid radix-" + radix + " number: " + s);
+            throw intFormatError(s, radix);
         }
         return v.longValue();
+    }
+
+    /**
+     * The FormatException Dart's int.parse throws: the message names the radix and
+     * nothing else, the input is its source, and the offset is where the number was
+     * expected to start (past any leading whitespace). Blank input is "Invalid number".
+     */
+    private static dart.core.FormatException intFormatError(String s, long radix) {
+        int start = 0;
+        while (s != null && start < s.length() && Character.isWhitespace(s.charAt(start))) {
+            start++;
+        }
+        if (s == null || start == s.length()) {
+            return new dart.core.FormatException("Invalid number", s, Long.valueOf(0));
+        }
+        return new dart.core.FormatException("Invalid radix-" + radix + " number", s, Long.valueOf(start));
+    }
+
+    /** Dart's num.parse: an int when the text is one, else a double; the source is the message. */
+    public static Number parseNum(String s) {
+        Number v = tryParseNum(s);
+        if (v == null) {
+            throw new dart.core.FormatException(s);
+        }
+        return v;
+    }
+
+    /** Dart's num.tryParse: int.tryParse, then double.tryParse. */
+    public static Number tryParseNum(String s) {
+        Long i = tryParseInt(s);
+        if (i != null) {
+            return i;
+        }
+        return tryParseDouble(s);
     }
 
     /** Dart's int.tryParse: decimal, or hexadecimal with a 0x prefix. */
@@ -809,7 +843,7 @@ public final class DString {
     public static double parseDouble(String s) {
         Double d = tryParseDouble(s);
         if (d == null) {
-            throw new dart.core.FormatException("Invalid double: " + s);
+            throw new dart.core.FormatException("Invalid double", s, null);
         }
         return d.doubleValue();
     }

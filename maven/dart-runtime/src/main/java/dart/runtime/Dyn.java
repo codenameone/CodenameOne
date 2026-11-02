@@ -94,6 +94,12 @@ public final class Dyn {
                 return Boolean.valueOf(b.isNotEmpty());
             }
         }
+        if (o instanceof Enum && name.equals("index")) {
+            // Dart's Enum.index, a real instance member of every enum value, so a dynamic
+            // receiver answers it. `name` is not: it is the EnumName extension, which
+            // Dart resolves statically, so a dynamic `.name` is a NoSuchMethodError there too.
+            return Long.valueOf(((Enum<?>) o).ordinal());
+        }
         Object core = coreTypeGet(o, name);
         if (core != NO_MEMBER) {
             return core;

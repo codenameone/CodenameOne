@@ -40,6 +40,15 @@ public class SplayTreeSet<E> extends DartSet<E> {
     }
 
     @SuppressWarnings("unchecked")
+    /** SplayTreeSet.from / .of: the source copied in, ordered by {@code compare}. */
+    public static <E> SplayTreeSet<E> copyOf(Object compare, Iterable<? extends E> src) {
+        SplayTreeSet<E> s = new SplayTreeSet<E>(compare);
+        for (E e : src) {
+            s.add(e);
+        }
+        return s;
+    }
+
     public SplayTreeSet(Object compare) {
         this.compare = (Funcs.Func2<Object, Object, Long>) compare;
     }

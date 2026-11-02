@@ -34,6 +34,20 @@ public final class CoreStatics {
     private CoreStatics() {
     }
 
+    /**
+     * Dart's {@code values.byName(name)} (the EnumByName extension): the value whose name
+     * is {@code name}, or ArgumentError when none is. {@code nameOf} answers a value's
+     * Dart name, which a value named after a Java keyword does not keep as its constant.
+     */
+    public static <E> E enumByName(Iterable<E> values, String name, dart.runtime.Funcs.Func1<E, String> nameOf) {
+        for (E v : values) {
+            if (v != null && nameOf.call(v).equals(name)) {
+                return v;
+            }
+        }
+        throw ArgumentError.value(name, "name", "No enum value with that name");
+    }
+
     /** Uri.encodeComponent: everything but unreserved characters percent-encoded as UTF-8. */
     public static String encodeComponent(String s) {
         return encode(s, "-_.!~*'()", false);

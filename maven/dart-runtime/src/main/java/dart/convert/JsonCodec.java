@@ -261,7 +261,10 @@ public final class JsonCodec implements Codec<Object, String> {
         }
 
         private void fail(String msg) {
-            throw new FormatException(msg + " (at character " + (i + 1) + ")");
+            // Dart's parser: the message alone, the input as its source and the offset
+            // apart, so FormatException.toString adds the position and a caret; running
+            // out of input is "Unexpected end of input" whatever was expected.
+            throw new FormatException(i >= s.length() ? "Unexpected end of input" : msg, s, Long.valueOf(i));
         }
 
         private void skipWs() {
@@ -324,12 +327,12 @@ public final class JsonCodec implements Codec<Object, String> {
             while (true) {
                 skipWs();
                 if (i >= s.length() || s.charAt(i) != '"') {
-                    fail("Expected a string key");
+                    fail("Unexpected character");
                 }
                 String k = string();
                 skipWs();
                 if (i >= s.length() || s.charAt(i) != ':') {
-                    fail("Expected ':'");
+                    fail("Unexpected character");
                 }
                 i++;
                 skipWs();
@@ -344,7 +347,7 @@ public final class JsonCodec implements Codec<Object, String> {
                 }
                 if (c != ',') {
                     i--;
-                    fail("Expected ',' or '}'");
+                    fail("Unexpected character");
                 }
             }
         }
@@ -370,7 +373,7 @@ public final class JsonCodec implements Codec<Object, String> {
                 }
                 if (c != ',') {
                     i--;
-                    fail("Expected ',' or ']'");
+                    fail("Unexpected character");
                 }
             }
         }

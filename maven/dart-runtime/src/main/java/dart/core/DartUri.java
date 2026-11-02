@@ -339,7 +339,7 @@ public final class DartUri {
         String text = uri == null ? "" : uri;
         String error = malformed(text);
         if (error != null) {
-            throw new FormatException(error + ": " + text);
+            throw new FormatException(error, text, null);
         }
         return new DartUri(text);
     }

@@ -816,6 +816,10 @@ public final class JavaEmitter {
             mm.exprBody = m.exprBody;
             body.append(emitMethodLike(mm, ctx, false));
         }
+        // An enhanced enum's own fields, getters and methods, reached by a dynamic receiver
+        // (`dynamic l = Level.high; l.weight`) as any program class's are.
+        boolean dynamicMembers = !e.fields.isEmpty() || !e.methods.isEmpty()
+                ? emitDynamicMembers(syn, body, ctx) : false;
         // `boundary('boundary')`: the entry's arguments go to the enum's constructor, in the
         // constructor's own (canonical) parameter order. Emitted before the imports are
         // written, since an argument may need one.
@@ -841,7 +845,8 @@ public final class JavaEmitter {
             sb.append('\n');
         }
         sb.append(dartRef(e)).append("\n");
-        sb.append("public enum ").append(enumJava).append(" {\n    ");
+        sb.append("public enum ").append(enumJava).append(dynamicMembers ? " implements dart.runtime.DynamicObject" : "")
+                .append(" {\n    ");
         StringBuilder names = new StringBuilder();
         for (int i = 0; i < e.entries.size(); i++) {
             if (i > 0) {
@@ -9547,6 +9552,12 @@ public final class JavaEmitter {
                 TypeRef inner = o.type != null && o.type.is("FutureOr") && !o.type.args.isEmpty()
                         ? o.type.arg(0) : TypeRef.DYNAMIC;
                 String v = "Await.awaitAny(" + o.code + ")";
+                if (inner.is("void")) {
+                    // `await f()` on a FutureOr<void>: a void value nothing may use, so no
+                    // cast -- a cast is no Java statement, and `=> await f()` in a
+                    // Future<void> function is emitted as one.
+                    return new Out(v, TypeRef.VOID);
+                }
                 return new Out(isDynamicType(inner) ? v : "((" + javaType(boxType(inner), true, ctx) + ") " + v + ")",
                         boxType(inner));
             }
@@ -9565,6 +9576,11 @@ public final class JavaEmitter {
                     }
                 }
                 String v = "Await.awaitAny(" + o.code + ")";
+                if (awaited != null && awaited.is("void")) {
+                    // A Future<void> class awaited: a void value nothing may use, so no
+                    // cast, which would be no Java statement on its own.
+                    return new Out(v, TypeRef.VOID);
+                }
                 return new Out(isDynamicType(awaited) ? v
                         : "((" + javaType(boxType(awaited), true, ctx) + ") " + v + ")", boxType(awaited));
             }
@@ -15060,6 +15076,11 @@ public final class JavaEmitter {
         // which is Object's -- erasure cannot tell `dynamic` from `Object` apart.
         if (n.equals("dynamic") && ctx.lookup(n) == null) {
             return new Out("Object.class", new TypeRef("Type"));
+        }
+        // `Null` as a value (`x.runtimeType == Null`): the class null's runtimeType
+        // answers (TypeWitness.runtimeType), unless the program declares its own Null.
+        if (n.equals("Null") && ctx.lookup(n) == null && !program.classes.containsKey("Null")) {
+            return new Out("Void.class", new TypeRef("Type"));
         }
         // dart:core `print` as a value (`list.forEach(print)`): a tear-off of the runtime's
         // print. Bare, so the call site's parameter supplies the functional interface; the
@@ -20765,6 +20786,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             return o.code;
         }
+        if (o.type != null && o.type.is("void")) {
+            // `() async => print(..)`: the void call runs, and the Future completes with
+            // null -- a void expression is no argument to Future.value.
+            ctx.writer().line(o.code + ";");
+            return "Future.value(null)";
+        }
         return "Future.value(" + boxIfPrimitive(o, ctx) + ")";
     }
 
@@ -21119,11 +21146,21 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private Out emitPrimitiveStaticCall(String typeName, Call c, Ctx ctx) {
         boolean isInt = typeName.equals("int");
         boolean isDouble = typeName.equals("double");
-        if ((!isInt && !isDouble) || c.args.positional.isEmpty()) {
+        boolean isNum = typeName.equals("num");
+        if ((!isInt && !isDouble && !isNum) || c.args.positional.isEmpty()) {
             return null;
         }
         if (!c.name.equals("parse") && !c.name.equals("tryParse")) {
             return null;
+        }
+        if (isNum) {
+            // num.parse answers an int when the text is one and a double otherwise;
+            // the runtime returns the boxed Long or Double as a Number.
+            ctx.importClass("dart.core.DString");
+            TypeRef nt = new TypeRef("num");
+            nt.nullable = c.name.equals("tryParse");
+            return new Out("DString." + c.name + "Num("
+                    + coreArg(c.args.positional.get(0), TypeRef.STRING, ctx).code + ")", nt);
         }
         String arg = coreArg(c.args.positional.get(0), TypeRef.STRING, ctx).code;
         boolean nullable = c.name.equals("tryParse");
@@ -22328,6 +22365,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             Out elem = emitMemberGet(target, n, c, ctx);
             return new Out(fnCall(callable(elem), tt.arg(0), c.args, ctx), funcResultType(tt.arg(0)));
         }
+        if (n.equals("byName") && c.args.positional.size() == 1 && c.args.named.isEmpty()
+                && (tt.is("List") || tt.is("Iterable") || tt.is("Set")) && !tt.args.isEmpty()
+                && (program.enums.containsKey(tt.arg(0).name) || stubs.isStubEnum(tt.arg(0).name))) {
+            // `Role.values.byName('x')`: dart:core's EnumByName extension on an iterable
+            // of enum values, typed by the element; a missing name throws ArgumentError.
+            ctx.importClass("dart.core.CoreStatics");
+            TypeRef el = copyNonNull(tt.arg(0));
+            String ej = javaType(el, true, ctx);
+            return new Out("CoreStatics.<" + ej + ">enumByName(" + target.code + ", "
+                    + coreArg(c.args.positional.get(0), TypeRef.STRING, ctx).code + ", ($v) -> $v."
+                    + (program.enums.containsKey(el.name) ? "name$()" : "name()") + ")", el);
+        }
         diags.error(c, "E0137", "Cannot resolve method '" + n + "' on type " + tt
                 + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
         return new Out(target.code + "." + n + "(" + plainArgs(c.args, ctx) + ")", TypeRef.DYNAMIC, true);
@@ -23106,6 +23155,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         && !torn.is("Null") && !torn.is("Object") && !torn.is("Future")
                         && !torn.is("FutureOr")) {
                     mapped = torn;
+                }
+                if (pos.get(0) instanceof Lambda && isDynamicType(mapped)) {
+                    // `raw.map((e) => Item(..))` on a List<dynamic>: Dart infers R from the
+                    // closure's static return type, so the result is an Iterable<Item>; left
+                    // dynamic, `items.first.role` dispatched dynamically and lost Item's members.
+                    TypeRef r = lastLambdaExprType;
+                    if (r == null && lastLambdaReturns != null && lastLambdaReturns.size() == 1) {
+                        r = lastLambdaReturns.get(0);
+                    }
+                    if (r != null && r.funcParams == null && isFullyConcrete(r) && !isTypeVariable(r, ctx)
+                            && !r.is("void") && !r.is("dynamic") && !r.is("var") && !r.is("Null")
+                            && !r.is("Object") && !r.is("Future") && !r.is("FutureOr")) {
+                        mapped = r;
+                    }
                 }
                 return new Out(target.code + ".map(" + f.code + ")", TypeRef.of("Iterable", mapped));
             }
@@ -24065,6 +24128,71 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /**
+     * {@code SplayTreeMap.from/of/fromIterable/fromIterables} and {@code SplayTreeSet.from/of}:
+     * the same source the matching Map or Set factory builds, copied into a splay tree
+     * ordered by the comparator ({@code compare:} named, or the second positional
+     * argument of from/of). The factories were unresolved, so any use failed the build.
+     */
+    private Out emitSplayTreeFactory(CtorCall cc, TypeRef expected, Ctx ctx) {
+        String name = cc.type.name;
+        boolean isMap = name.equals("SplayTreeMap");
+        if (!isMap && !name.equals("SplayTreeSet")) {
+            return null;
+        }
+        String ctor = cc.ctorName;
+        boolean copy = ctor.equals("from") || ctor.equals("of");
+        if (!copy && !(isMap && (ctor.equals("fromIterable") || ctor.equals("fromIterables")))) {
+            return null;
+        }
+        CtorCall src = new CtorCall();
+        src.file = cc.file;
+        src.line = cc.line;
+        src.col = cc.col;
+        src.type = new TypeRef(isMap ? "Map" : "Set");
+        src.type.args.addAll(cc.type.args);
+        src.ctorName = ctor;
+        Expr cmpE = null;
+        int keep = copy ? 1 : ctor.equals("fromIterables") ? 2 : 1;
+        for (int i = 0; i < cc.args.positional.size(); i++) {
+            if (i < keep) {
+                src.args.positional.add(cc.args.positional.get(i));
+            } else if (i == keep) {
+                cmpE = cc.args.positional.get(i);
+            }
+        }
+        for (NamedArg na : cc.args.named) {
+            if (na.name.equals("compare")) {
+                cmpE = na.value;
+            } else if (!na.name.equals("isValidKey")) {
+                src.args.named.add(na);
+            }
+        }
+        TypeRef exp = null;
+        if (expected != null && (expected.is("Map") || expected.is("Set") || expected.is(name))) {
+            exp = new TypeRef(isMap ? "Map" : "Set");
+            exp.args.addAll(expected.args);
+        }
+        Out built = emitExpr(src, exp, ctx);
+        TypeRef type = built.type != null ? built.type : src.type;
+        TypeRef k = type.args.isEmpty() ? TypeRef.DYNAMIC : type.arg(0);
+        String cmp = "null";
+        if (cmpE != null) {
+            String j = javaType(k, true, ctx);
+            cmp = castTo("dart.runtime.Funcs.Func2<" + j + ", " + j + ", Long>",
+                    emitExpr(cmpE, inlineFuncType2(k, k, TypeRef.INT), ctx));
+        }
+        StringBuilder w = new StringBuilder();
+        for (TypeRef a : type.args) {
+            w.append(w.length() == 0 ? ".<" : ", ").append(javaType(a, true, ctx));
+        }
+        if (w.length() > 0) {
+            w.append('>');
+        }
+        ctx.importClass("dart.collection." + name);
+        return new Out(name + w + "copyOf(" + cmp + ", " + built.code + ")", type);
+    }
+
+    /**
      * Static members of dart:core types called on the type name: {@code List.of(x)},
      * {@code String.fromCharCode(65)}, {@code RangeError.checkNotNegative(n)},
      * {@code Uri.encodeComponent(s)}. The collection factories route through the same
@@ -24256,6 +24384,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private Out emitCoreCollectionFactory(CtorCall cc, TypeRef expected, Ctx ctx) {
+        Out splay = emitSplayTreeFactory(cc, expected, ctx);
+        if (splay != null) {
+            return splay;
+        }
         checkDynamicCoreCtorArgs(cc, ctx);
         String name = cc.type.name;
         String ctor = cc.ctorName;

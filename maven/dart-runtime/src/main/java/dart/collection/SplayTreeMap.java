@@ -40,6 +40,18 @@ public class SplayTreeMap<K, V> extends DartMap<K, V> {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * SplayTreeMap.from / .of / .fromIterable(s): the emitter builds the source as the
+     * matching Map factory would and copies it in, so the keys sort by {@code compare}.
+     */
+    public static <K, V> SplayTreeMap<K, V> copyOf(Object compare, java.util.Map<? extends K, ? extends V> src) {
+        SplayTreeMap<K, V> m = new SplayTreeMap<K, V>(compare);
+        for (java.util.Map.Entry<? extends K, ? extends V> e : src.entrySet()) {
+            m.put(e.getKey(), e.getValue());
+        }
+        return m;
+    }
+
     public SplayTreeMap(Object compare) {
         this.compare = (Funcs.Func2<Object, Object, Long>) compare;
     }
