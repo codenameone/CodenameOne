@@ -146,7 +146,7 @@ public class InetAddress implements java.io.Serializable {
         int nh;
         int nt = 0;
         if (dbl >= 0) {
-            nh = groups(s.substring(0, dbl), head);
+            nh = s.substring(0, dbl).indexOf('.') >= 0 ? -1 : groups(s.substring(0, dbl), head);
             nt = groups(s.substring(dbl + 2), tail);
             if (nh < 0 || nt < 0 || nh + nt > 7) {
                 return null;
@@ -195,7 +195,10 @@ public class InetAddress implements java.io.Serializable {
             }
             int v = 0;
             for (int i = 0; i < g.length(); i++) {
-                int d = Character.digit(g.charAt(i), 16);
+                // ASCII only: Character.digit also takes other scripts' digits
+                char c = g.charAt(i);
+                int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                        : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
                 if (d < 0) {
                     return -1;
                 }

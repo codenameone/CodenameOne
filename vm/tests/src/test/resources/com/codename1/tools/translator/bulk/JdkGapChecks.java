@@ -260,6 +260,8 @@ public final class JdkGapChecks {
             Bulk.p("namedHost", named.getHostName());
             Bulk.pThrown("badLength", UnknownHostException.class, () -> InetAddress.getByAddress(new byte[3]));
             Bulk.pThrown("badV6", UnknownHostException.class, () -> InetAddress.getByName("1::2::3"));
+            Bulk.pThrown("badV6DottedHead", UnknownHostException.class,
+                    () -> InetAddress.getByName("[1.2.3.4::]"));
         });
         Bulk.cn1Only("JdkGap.inetAddressDoesNotResolveNames", () -> {
             Bulk.expectEquals("UnknownHostException",
