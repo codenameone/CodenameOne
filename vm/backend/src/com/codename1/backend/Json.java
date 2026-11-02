@@ -176,6 +176,12 @@ public final class Json {
             if (tree instanceof Double && n.doubleValue() != Math.floor(n.doubleValue())) {
                 throw new IllegalArgumentException("$: expected a whole number, got " + tree);
             }
+            if (tree instanceof Double && (n.doubleValue() >= 9.223372036854775807E18
+                    || n.doubleValue() < -9.223372036854775808E18)) {
+                // longValue() would clamp 1e30 to Long.MAX_VALUE without a word
+                throw new IllegalArgumentException("$: " + tree + " is out of range for "
+                        + type.getName());
+            }
             long l = n.longValue();
             if (type == Long.class) {
                 return Long.valueOf(l);

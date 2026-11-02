@@ -96,4 +96,14 @@ class JsonCodecTest {
         assertEquals("$[0]", JsonCodec.enter(ROOT, null, 0).toString());
         assertEquals("$", JsonCodec.enter(ROOT, null, -1).toString());
     }
+
+    @Test
+    @DisplayName("a typed read refuses a double past the long range instead of clamping it")
+    void typedLongOutOfRange() throws java.io.IOException {
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.Json.read("1e30", Long.class));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.Json.read("-1e300", Long.class));
+        assertEquals(Long.valueOf(5), com.codename1.backend.Json.read("5", Long.class));
+    }
 }

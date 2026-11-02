@@ -80,6 +80,9 @@ class RoutePolicyTest {
         assertTrue(MediaTypes.consumable("application/json; charset=UTF-8", "application/json"));
         assertTrue(MediaTypes.consumable("text/csv", "application/json,text/*"));
         assertFalse(MediaTypes.consumable(null, "application/json"));
+        assertFalse(MediaTypes.consumable("*/*", "application/json"));
+        assertFalse(MediaTypes.consumable("application/*", "application/json"));
+        assertFalse(MediaTypes.consumable("*", "application/json"));
         assertFalse(MediaTypes.consumable("application/jsonx", "application/json"));
         assertTrue(MediaTypes.acceptable(null, "application/json"));
         assertTrue(MediaTypes.acceptable("*/*", "application/json"));

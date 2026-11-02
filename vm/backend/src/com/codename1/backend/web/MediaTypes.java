@@ -42,7 +42,9 @@ public final class MediaTypes {
             return false;
         }
         String type = bare(contentType, 0, contentType.length());
-        if (type.length() == 0) {
+        // A request names one concrete type; a wildcard there would satisfy any
+        // consumes list and let a client past the route's guard. Spring rejects it too.
+        if (type.length() == 0 || type.indexOf('*') >= 0 || type.indexOf('/') < 0) {
             return false;
         }
         int pos = 0;
