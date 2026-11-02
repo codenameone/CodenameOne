@@ -103,6 +103,26 @@ final class CaptureScan {
         return scan.assignedInLambda.contains(name);
     }
 
+    /**
+     * True when a closure within {@code body} captures {@code name} and something in
+     * {@code body} -- the closure or the loop body itself -- writes it. A C-style loop
+     * variable like that cannot be read through a final per-iteration copy: the body
+     * and the closures share this pass's variable, so the pass gets a mutable cell.
+     */
+    static boolean capturedAndAssigned(Stmt body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkStmt(body);
+        return scan.referencedInLambda.contains(name)
+                && (scan.assigned.contains(name) || scan.assignedInLambda.contains(name));
+    }
+
+    static boolean capturedAndAssigned(Expr body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkExpr(body);
+        return scan.referencedInLambda.contains(name)
+                && (scan.assigned.contains(name) || scan.assignedInLambda.contains(name));
+    }
+
     static boolean readInLambda(Stmt body, String name) {
         CaptureScan scan = new CaptureScan();
         scan.walkStmt(body);

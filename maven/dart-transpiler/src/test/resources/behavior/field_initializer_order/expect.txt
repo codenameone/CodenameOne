@@ -1,0 +1,22 @@
+init plain 1
+init base 2
+Base ctor sees x=5 l=[1] tracked=1
+Plain body x=5
+x=5 l=[1] tracked=1
+init b 3
+init a 4
+init base 5
+Base ctor sees a=104 b=3
+WithInitList body a=104 b=3
+a=104 b=3
+init x 6
+A ctor sees B items=0 x=6 seed=7
+B body x=6
+init y 7
+7
+7
+init z 8
+init x 9
+A ctor sees B items=0 x=9 seed=s
+B body x=9
+8

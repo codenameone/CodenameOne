@@ -1502,20 +1502,18 @@ public final class JavaEmitter {
                 body.append("    private ");
             }
             boolean lazyInit = isLateLazyInstance(f, c);
-            if (!lazyInit && initializerNeedsClassWitness(f, c)) {
-                // Its value depends on a class type parameter's witness, which the
-                // constructor stores AFTER Java's field initializers run: it is assigned by
-                // $fieldInit$ (see emitWitnessFieldInits), called right after the store.
+            if (deferredFieldInit(f, c)) {
+                // Assigned by $fieldInit$ (see emitWitnessFieldInits), so it cannot be final.
                 body.append(jt).append(' ').append(f.name).append(";\n");
             } else if ((f.isFinal || f.isConst) && f.initializer != null && !lazyInit) {
                 body.append("final ");
             }
-            if (!lazyInit && initializerNeedsClassWitness(f, c)) {
+            if (deferredFieldInit(f, c)) {
                 // declaration already written above
             } else {
                 body.append(jt).append(' ').append(f.name);
             }
-            if (!lazyInit && initializerNeedsClassWitness(f, c)) {
+            if (deferredFieldInit(f, c)) {
                 // assigned in $fieldInit$
             } else if (lazyInit) {
                 ctx.pushWriter(3);
@@ -1586,7 +1584,8 @@ public final class JavaEmitter {
         // A class whose constructors are all factories has no generative one, yet its
         // Java subclasses (or implicit default) still construct through it, witnesses included.
         boolean implicitWitnessCtor = (c.ctors.isEmpty() || (onlyFactories && !c.isMixin))
-                && (!witnessParams(c).isEmpty() || (twSuper != null && !witnessParams(twSuper).isEmpty()));
+                && (!witnessParams(c).isEmpty() || (twSuper != null && !witnessParams(twSuper).isEmpty())
+                        || (c.ctors.isEmpty() && dartOrder(c)));
         // constructors
         if (needsMarker(c)) {
             body.append("    /** Marker distinguishing named-constructor instantiation. */\n");
@@ -1604,14 +1603,14 @@ public final class JavaEmitter {
                 body.append("        ").append(mixinSuperWitnessCall(c, true, c, ctx)).append('\n');
             }
             body.append("    }\n\n");
-            if (c.ctors.isEmpty() && !implicitWitnessCtor) {
+            if (c.ctors.isEmpty() && !implicitWitnessCtor && !dartOrder(c)) {
                 // Declaring the marker constructor removes Java's implicit default one,
                 // which a class with no Dart constructor still needs.
                 body.append("    public ").append(javaClassName(c)).append("() {\n    }\n\n");
             }
             // A named constructor redirecting to the unnamed one (`C.from(x) : this(x)`) runs
             // it as $init$ too, on the instance its own marker chain built.
-            if (isSuperOfMarker(c) || redirectsToUnnamed(c)) {
+            if (isSuperOfMarker(c) || redirectsToUnnamed(c) || dartOrder(c)) {
                 body.append(emitUnnamedInit(c, ctx));
             }
         }
@@ -1626,12 +1625,17 @@ public final class JavaEmitter {
             java.util.Set<String> savedLocals = ctx.witnessLocals;
             ctx.witnessLocals = new HashSet<String>(witnessParams(c));
             Ctx.Writer iw = ctx.pushWriter(2);
-            if (twSuper != null && !witnessParams(twSuper).isEmpty()) {
+            if (dartOrder(c)) {
+                iw.line("this(($NamedCtor) null);");
+            } else if (twSuper != null && !witnessParams(twSuper).isEmpty()) {
                 iw.line("super(" + stripTrailingComma(witnessArgs(twSuper, c.superclass.args, c, ctx)) + ");");
             } else if (mixinSuperWitnessCall(c, false, c, ctx) != null) {
                 iw.line(mixinSuperWitnessCall(c, false, c, ctx));
             }
             storeWitnesses(c, "this", true, false, iw, ctx);
+            if (dartOrder(c)) {
+                iw.line("this.$init$();");
+            }
             body.append(ctx.popWriter());
             ctx.witnessLocals = savedLocals;
             body.append("    }\n\n");
@@ -3976,6 +3980,26 @@ public final class JavaEmitter {
             sb.append("    }\n\n");
             return sb.toString();
         }
+        if (dartOrder(c)) {
+            // Built through the marker chain, then initialized by $init$ in Dart's order
+            // (see dartOrderClasses). Only an exact instance of this class runs this
+            // constructor: every program subclass is built through the marker chain too.
+            w.line("this(($NamedCtor) null);");
+            storeWitnesses(c, "this", true, false, w, ctx);
+            StringBuilder initArgs = new StringBuilder();
+            for (Param p : params) {
+                if (initArgs.length() > 0) {
+                    initArgs.append(", ");
+                }
+                initArgs.append(ctx.javaNameOf(p.name));
+            }
+            w.line("this.$init$(" + initArgs + ");");
+            ctx.witnessLocals = savedWitnessLocals;
+            sb.append(ctx.popWriter());
+            ctx.popScope();
+            sb.append("    }\n\n");
+            return sb.toString();
+        }
         String superNamedInit = null;
 
         // super(...) initializer for program superclasses
@@ -4204,7 +4228,7 @@ public final class JavaEmitter {
             for (String tw : witnessParams(c)) {
                 sb.append("        $self.").append(witnessField(c, tw)).append(" = $tw$").append(tw).append(";\n");
             }
-            if (hasWitnessFieldInits(c)) {
+            if (hasWitnessFieldInits(c) && !dartOrder(c)) {
                 sb.append("        $self.").append(witnessFieldInitName(c)).append("();\n");
             }
             sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
@@ -4279,6 +4303,10 @@ public final class JavaEmitter {
             return;
         }
         ClassDecl progSuper = c.superclass != null ? superDeclOf(c, c.superclass) : null;
+        if (dartOrder(c) && hasWitnessFieldInits(c)) {
+            // Dart's order: this class's field initializers first (see dartOrderClasses).
+            w.line("this." + witnessFieldInitName(c) + "();");
+        }
         for (Param p : ct.params) {
             if (p.isThis) {
                 w.line(fieldStore(c, p.name, javaIdent(p.name)));
@@ -4293,8 +4321,26 @@ public final class JavaEmitter {
             String target = ct.superInit != null ? ct.superInit.namedCtor : null;
             CtorDecl superCtor = target != null ? progSuper.namedCtor(target) : progSuper.defaultCtor();
             storeWitnesses(c, "this", false, true, w, ctx);
-            w.line("super.$init$" + (target != null ? target : "") + "("
-                    + canonicalArgs(superCtor, superArgs, ctx) + ");");
+            // As the Java super(..) call does: the arguments' closures take their
+            // parameter types from the superclass's written type arguments.
+            ClassDecl savedOwner = ctx.ctorTypeOwner;
+            java.util.Map<String, TypeRef> savedSubst = ctx.ctorTypeSubst;
+            if (c.superclass.args != null && c.superclass.args.size() == progSuper.typeParams.size()
+                    && !progSuper.typeParams.isEmpty()) {
+                ctx.ctorTypeOwner = progSuper;
+                ctx.ctorTypeSubst = new java.util.HashMap<String, TypeRef>();
+                for (int i = 0; i < progSuper.typeParams.size(); i++) {
+                    ctx.ctorTypeSubst.put(progSuper.typeParams.get(i), c.superclass.args.get(i));
+                }
+            }
+            try {
+                w.line("super.$init$" + (target != null ? target : "") + "("
+                        + canonicalArgs(superCtor, ctx.ctorTypeOwner == progSuper ? progSuper : null, superArgs, ctx)
+                        + ");");
+            } finally {
+                ctx.ctorTypeOwner = savedOwner;
+                ctx.ctorTypeSubst = savedSubst;
+            }
         } else if (stubClassOf(c.superclass) != null && ct.superInit != null
                 && ct.superInit.namedCtor != null) {
             // `Child.x(..) : super.named(..)` over a runtime class: Java cannot call a
@@ -4409,9 +4455,76 @@ public final class JavaEmitter {
                     }
                 }
             }
+            out.addAll(dartOrderClasses());
             markerClasses = out;
         }
         return markerClasses;
+    }
+
+    private java.util.Set<ClassDecl> dartOrderClasses;
+
+    /// The classes constructed in Dart's order. Dart runs a class's field initializers,
+    /// its this.x parameters and its initializer list BEFORE the superclass constructor,
+    /// and every constructor body after the whole chain is initialized, so a superclass
+    /// constructor that calls an override sees the subclass's fields set. Java runs a
+    /// superclass constructor first, and nothing of the subclass may precede it. A chain
+    /// of program classes is therefore built through the marker constructors (which run
+    /// no Dart code) and then initialized by the $init$ methods, each of which runs its
+    /// class's field initializers ($fieldInit$), this.x stores and initializer list, then
+    /// its superclass's $init$, then its body -- Dart's order exactly.
+    ///
+    /// A chain qualifies when it has two or more program classes, its root extends
+    /// Object, and no class in it applies a mixin: a runtime superclass is constructed
+    /// by its Java constructor, which the marker chain cannot hand arguments to, and a
+    /// mixin application has no $init$ to run its fields. A class with only factory
+    /// constructors has no generative one to run as $init$.
+    private java.util.Set<ClassDecl> dartOrderClasses() {
+        if (dartOrderClasses == null) {
+            java.util.Set<ClassDecl> out = new java.util.HashSet<ClassDecl>();
+            for (List<ClassDecl> same : program.classesByName.values()) {
+                for (ClassDecl c : same) {
+                    if (c.superclass == null || superDeclOf(c, c.superclass) == null) {
+                        continue;
+                    }
+                    List<ClassDecl> chain = new ArrayList<ClassDecl>();
+                    boolean ok = true;
+                    ClassDecl a = c;
+                    while (a != null && ok) {
+                        boolean generative = a.ctors.isEmpty();
+                        for (CtorDecl ct : a.ctors) {
+                            generative |= !ct.isFactory;
+                        }
+                        ok = generative && !a.isMixin && a.mixins.isEmpty() && a.extensionOn == null
+                                && !a.forwardSuperCtors && !chain.contains(a);
+                        chain.add(a);
+                        ClassDecl next = a.superclass != null ? superDeclOf(a, a.superclass) : null;
+                        if (next == null && a.superclass != null) {
+                            ok = false;
+                        }
+                        a = next;
+                    }
+                    if (ok) {
+                        out.addAll(chain);
+                    }
+                }
+            }
+            dartOrderClasses = out;
+        }
+        return dartOrderClasses;
+    }
+
+    private boolean dartOrder(ClassDecl c) {
+        return dartOrderClasses().contains(c);
+    }
+
+    /// Whether a field's initializer runs in the class's $fieldInit$ method instead of as
+    /// a Java field initializer: it needs a class witness, which is stored only after
+    /// Java's field initializers run, or its class is constructed in Dart's order.
+    private boolean deferredFieldInit(FieldDecl f, ClassDecl c) {
+        if (f.isStatic || isLateLazyInstance(f, c)) {
+            return false;
+        }
+        return initializerNeedsClassWitness(f, c) || (f.initializer != null && dartOrder(c));
     }
 
     private void appendParams(StringBuilder sb, ClassDecl c, List<Param> params, Ctx ctx) {
@@ -6885,8 +6998,9 @@ public final class JavaEmitter {
                     // reassigned by the update clause (not effectively final), so emit a
                     // per-iteration final alias and route body references through it.
                     String cell = null;
-                    if (forVarDart$ != null && CaptureScan.assignedInLambda(f$.body, forVarDart$)) {
-                        // A closure writes the variable: this pass gets its own mutable
+                    if (forVarDart$ != null && CaptureScan.capturedAndAssigned(f$.body, forVarDart$)) {
+                        // A closure captures the variable and the closure or the body
+                        // writes it: this pass gets its own mutable
                         // cell, copied back for the update clause even when the body
                         // continues, as Dart copies the per-iteration binding forward.
                         cell = boxPerIterationLoopVar(forVarDart$, forVarType$, forVarJava$, ctx);
@@ -10044,7 +10158,13 @@ public final class JavaEmitter {
         if (own) {
             ownTypedClosure = null;
         }
-        if (!functionTypeTested && !signEscapingClosure && !escapesToTopType(expected)) {
+        boolean hasNamed = false;
+        for (Param p : l.params) {
+            hasNamed |= p.named;
+        }
+        // A closure with named parameters is always signed: its signature ($named) is the
+        // only way a call through a dynamic or untyped value can place a named argument.
+        if (!functionTypeTested && !signEscapingClosure && !escapesToTopType(expected) && !hasNamed) {
             return code;
         }
         int required = -1;
@@ -12848,7 +12968,7 @@ public final class JavaEmitter {
         for (String n : own ? witnessParams(c) : java.util.Collections.<String>emptyList()) {
             w.line(self + "." + witnessField(c, n) + " = $tw$" + n + ";");
         }
-        if (own && hasWitnessFieldInits(c)) {
+        if (own && hasWitnessFieldInits(c) && !dartOrder(c)) {
             w.line(self + "." + witnessFieldInitName(c) + "();");
         }
         if (parentToo) {
@@ -12859,7 +12979,7 @@ public final class JavaEmitter {
                 for (int i = 0; i < sw.size(); i++) {
                     w.line(self + "." + witnessField(sup, sw.get(i)) + " = " + parts.get(i) + ";");
                 }
-                if (hasWitnessFieldInits(sup)) {
+                if (hasWitnessFieldInits(sup) && !dartOrder(sup)) {
                     w.line(self + "." + witnessFieldInitName(sup) + "();");
                 }
             }
@@ -12874,7 +12994,7 @@ public final class JavaEmitter {
 
     private boolean hasWitnessFieldInits(ClassDecl c) {
         for (FieldDecl f : c.fields) {
-            if (!f.isStatic && !isLateLazyInstance(f, c) && initializerNeedsClassWitness(f, c)) {
+            if (deferredFieldInit(f, c)) {
                 return true;
             }
         }
@@ -12949,8 +13069,10 @@ public final class JavaEmitter {
         return false;
     }
 
-    /// The `$fieldInit$` method of a class: its witness-dependent field initializers, in
-    /// declaration order.
+    /// The `$fieldInit$` method of a class: the field initializers Java cannot run as field
+    /// initializers (deferredFieldInit), in declaration order. A class constructed in
+    /// Dart's order runs it at the start of each $init$, before its initializer list and
+    /// its superclass; any other class runs it right after its witnesses are stored.
     private String emitWitnessFieldInits(ClassDecl c, Ctx ctx) {
         if (!hasWitnessFieldInits(c)) {
             return "";
@@ -12958,7 +13080,7 @@ public final class JavaEmitter {
         StringBuilder sb = new StringBuilder();
         sb.append("    protected final void ").append(witnessFieldInitName(c)).append("() {\n");
         for (FieldDecl f : c.fields) {
-            if (f.isStatic || isLateLazyInstance(f, c) || !initializerNeedsClassWitness(f, c)) {
+            if (!deferredFieldInit(f, c)) {
                 continue;
             }
             TypeRef ft = fieldType(f, ctx);
@@ -13812,7 +13934,7 @@ public final class JavaEmitter {
         String name = ((VarDeclStmt) init).name;
         TypeRef t = ctx.lookup(name);
         String java = ctx.javaNameOf(name);
-        if (CaptureScan.assignedInLambda(body, name)) {
+        if (CaptureScan.capturedAndAssigned(body, name)) {
             return java + " = " + boxPerIterationLoopVar(name, t, java, ctx) + ".v;";
         }
         if (!CaptureScan.readInLambda(body, name)) {
@@ -19568,6 +19690,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         programFnSlot = false;
         Out adapted = optionalParamLambda(l, expected, ctx);
         if (adapted != null) {
+            boolean named = false;
+            for (Param p : l.params) {
+                named |= p.named;
+            }
+            if (named) {
+                // The adapter takes the named parameters in the closure's own order, which
+                // is the order its reified $named records, so a dynamic call can place them.
+                String signed = signAdaptedNamedClosure(adapted, l, ctx);
+                if (signed != null) {
+                    return new Out(signed, adapted.type);
+                }
+            }
             return adapted;
         }
         lastLambdaVoid = false;
@@ -21610,6 +21744,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.importClass("dart.core.DartComparable");
             return new Out("DartComparable.compare(" + target.code + ", "
                     + emitExpr(c.args.positional.get(0), null, ctx).code + ")", TypeRef.INT);
+        }
+        if ((n.equals("first") || n.equals("last") || n.equals("single")) && !c.nullAware
+                && (tt.is("List") || tt.is("Iterable") || tt.is("Set")) && !tt.args.isEmpty()
+                && isFunctionValued(tt.arg(0))) {
+            // `fs.last()` on a list of closures: the element getter, then the call.
+            Out elem = emitMemberGet(target, n, c, ctx);
+            return new Out(fnCall(callable(elem), tt.arg(0), c.args, ctx), funcResultType(tt.arg(0)));
         }
         diags.error(c, "E0137", "Cannot resolve method '" + n + "' on type " + tt
                 + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
@@ -26914,6 +27055,33 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }, ctx);
     }
 
+    /// Signs the adapter optionalParamLambda built for a closure with named parameters
+    /// through dart.runtime.SignedFns.named, recording the names ($named) and the required
+    /// positional count when the adapter carries no signature of its own. The adapter is
+    /// not a bare lambda, so the static marker cast signClosure uses cannot apply. Null
+    /// when the adapter's SAM is no Funcs one.
+    private String signAdaptedNamedClosure(Out adapted, Lambda l, Ctx ctx) {
+        String jt = adapted.type != null ? functionSam(adapted.type, ctx) : null;
+        if (jt == null || !isFuncsSamName(jt) || l.params.size() > 5) {
+            return null;
+        }
+        StringBuilder named = new StringBuilder();
+        int positional = 0;
+        int required = -1;
+        for (Param p : l.params) {
+            if (p.named) {
+                named.append(named.length() > 0 ? ", " : "").append(quote(p.required ? "!" + p.name : p.name));
+            } else {
+                if (p.optional && required < 0) {
+                    required = positional;
+                }
+                positional++;
+            }
+        }
+        return "((" + jt + ") dart.runtime.SignedFns.named(" + adapted.code + ", " + l.params.size() + ", "
+                + required + ", new String[] {" + named + "}))";
+    }
+
     /**
      * A closure declaring optional or named parameters ({@code ([x = 1]) => ...}): the
      * same closure with every parameter required, behind a {@link #tearOffAdapter} that
@@ -27275,6 +27443,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// ones, which the runtime matches against the closure's reified named parameters.
     private String dynInvokeCode(String recv, Args args, Ctx ctx) {
         ctx.importClass("dart.runtime.Dyn");
+        // The value may be a callable object, which Dyn reaches through its `call` case.
+        dynNames.add("call");
         String a = plainArgs(args, ctx);
         if (args.named.isEmpty()) {
             return "Dyn.invoke(" + recv + (a.isEmpty() ? "" : ", " + a) + ")";

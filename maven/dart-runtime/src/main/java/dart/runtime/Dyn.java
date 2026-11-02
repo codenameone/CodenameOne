@@ -725,6 +725,15 @@ public final class Dyn {
     /// reified parameter type: a mismatch is a TypeError and an unknown name or a
     /// missing required one a NoSuchMethodError, as in Dart.
     public static Object invokeNamed(Object f, Object[] positional, String[] names, Object[] values) {
+        if (f instanceof DynamicObject && !isFunction(f)) {
+            // A callable object (`dynamic p = P(); p(a: 1)`): Dart calls its call method,
+            // named arguments and all.
+            DartMap<String, Object> named = new DartMap<String, Object>();
+            for (int k = 0; k < names.length; k++) {
+                named.put(names[k], values[k]);
+            }
+            return call(f, "call", positional, named);
+        }
         if (!(f instanceof Signed) || ((Signed) f).$named() == null || ((Signed) f).$generic()) {
             throw noSuch(f, "call");
         }
@@ -766,7 +775,7 @@ public final class Dyn {
                         + "' is not a subtype of the parameter type of this closure");
             }
         }
-        return invoke(f, a);
+        return invokePlaced(f, a);
     }
 
     private static String bareName(String declared) {
@@ -778,6 +787,22 @@ public final class Dyn {
     public static Object invoke(Object f, Object... a) {
         if (a == null) {
             a = NONE;
+        }
+        if (f instanceof Signed && ((Signed) f).$named() != null && !((Signed) f).$generic()) {
+            // A closure with named parameters called with positionals only: every named
+            // one is omitted, which invokeNamed checks against the signature (a missing
+            // required one is a NoSuchMethodError) before padding with the defaults.
+            return invokeNamed(f, a, new String[0], new Object[0]);
+        }
+        return invokePlaced(f, a);
+    }
+
+    /// Invokes a function value with its arguments already in the SAM's positional slots.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Object invokePlaced(Object f, Object[] a) {
+        if (f instanceof DynamicObject && !isFunction(f)) {
+            // A callable object (`dynamic p = P(); p(21)`): Dart calls its call method.
+            return call(f, "call", a, null);
         }
         if (f instanceof Signed && ((Signed) f).$named() == null && !((Signed) f).$generic()) {
             // A dynamic call checks each argument against the closure's own parameter

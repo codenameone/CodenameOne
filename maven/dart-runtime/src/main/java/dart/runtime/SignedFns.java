@@ -161,6 +161,17 @@ public final class SignedFns {
         return 5;
     }
 
+    /// A closure with named parameters, given the names a dynamic call places its
+    /// arguments by ($named) when it carries no signature of its own; one already signed
+    /// keeps its own, which also records its parameter types. Parameter types it lacks
+    /// stay untested here (null witnesses): the closure's own casts check them.
+    public static Object named(Object f, int params, int required, String[] named) {
+        if (f instanceof Signed || f == null) {
+            return f;
+        }
+        return wrap(f, new TypeWitness[params + 1], required, named);
+    }
+
     /// {@code f}, a closure of any Funcs SAM, signed with {@code sig}.
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Base wrap(Object f, TypeWitness[] sig, int required, String[] named) {
