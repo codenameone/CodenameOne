@@ -1535,10 +1535,13 @@ public final class JavaEmitter {
                 // the accessor, so `other._x` reaches it through an interface-typed value,
                 // and an implementer's own `_x` must not assign weaker access.
                 String vis = "    public ";
-                body.append(vis).append(jt).append(" get$").append(f.name).append("() {\n")
+                String pinnedGet = pinnedFieldGetter(c, f, ctx);
+                body.append(vis).append(pinnedGet != null ? pinnedGet : jt).append(" get$").append(f.name).append("() {\n")
                         .append("        return ").append(f.name).append(";\n    }\n");
                 if (!f.isFinal && !f.isConst) {
+                    String chk = covariantWriteCheck("v", f.type, ctx);
                     body.append(vis).append("void set$").append(f.name).append("(").append(jt).append(" v) {\n")
+                            .append(chk == null ? "" : "        " + chk + "\n")
                             .append("        this.").append(f.name).append(" = v;\n    }\n");
                 }
             }
@@ -3237,6 +3240,19 @@ public final class JavaEmitter {
                 return javaType(rt, true, ctx);
             }
         }
+        if (isJavaPrimitive(implRet) && !m.isSetter && m.typeParams.isEmpty()) {
+            // `int get area` (or `int scale(num f)`) overriding a program superclass's
+            // `num get area`: Dart narrows the return covariantly, Java's long overrides no
+            // Number. The base's boxed return is declared, and callers that know the subclass
+            // read the typed value back through pinnedCallBox.
+            TypeRef over = overriddenProgramReturn(c, m, new HashSet<String>(), ctx);
+            if (over != null && !over.is("void")) {
+                String baseRet = javaType(over, false, ctx);
+                if (!isJavaPrimitive(baseRet) && !"void".equals(baseRet) && !baseRet.equals(implRet)) {
+                    return baseRet;
+                }
+            }
+        }
         if (!m.isGetter && implRet.indexOf('<') > 0) {
             // `Future<List<Frame>> compact(...)` overriding a program superclass's
             // `Future<void> compact(...)`: covariant in Dart, no override in Java. The base's
@@ -3269,6 +3285,48 @@ public final class JavaEmitter {
             }
         }
         return null;
+    }
+
+    /// The Java return a field's get$ accessor must declare to override the program member
+    /// it narrows: `final int h` over a superclass's `num h` (or `num get h`), whose
+    /// accessor returns Number, which long does not override. Null when the field's own
+    /// type serves. Readers that know the subclass cast the value back to the field's type.
+    private String pinnedFieldGetter(ClassDecl c, FieldDecl f, Ctx ctx) {
+        if (f.isStatic || !f.isFinal && !f.isConst) {
+            return null;
+        }
+        TypeRef ft = fieldType(f, ctx);
+        if (ft == null || !isJavaPrimitive(javaType(ft, false, ctx))) {
+            return null;
+        }
+        Ast.MethodDecl probe = new Ast.MethodDecl();
+        probe.name = f.name;
+        probe.isGetter = true;
+        TypeRef over = overriddenProgramReturn(c, probe, new HashSet<String>(), ctx);
+        if (over == null || over.is("void")) {
+            return null;
+        }
+        String baseRet = javaType(over, false, ctx);
+        return isJavaPrimitive(baseRet) || "void".equals(baseRet) ? null : baseRet;
+    }
+
+    /// A get$ read {@code code} of field {@code f}, declared by {@code pc} or a superclass of
+    /// it, cast back to the field's own type when pinnedFieldGetter pinned its accessor.
+    private String pinnedFieldRead(ClassDecl pc, FieldDecl f, String code, Ctx ctx) {
+        for (ClassDecl k = pc; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+            if (k.fields.contains(f)) {
+                return pinnedFieldGetter(k, f, ctx) == null ? code
+                        : "((" + javaType(fieldType(f, ctx), true, ctx) + ") (Object) " + code + ")";
+            }
+        }
+        return code;
+    }
+
+    /// A getter read {@code code} on a receiver of class {@code pc}, cast back to the getter's
+    /// own typed value when its Java return was pinned to an overridden member's.
+    private String pinnedGetterRead(ClassDecl pc, MethodDecl g, String code, Ctx ctx) {
+        String box = pinnedCallBox(pc, g, ctx);
+        return box == null ? code : "((" + box + ") (Object) " + code + ")";
     }
 
     private final java.util.Set<String> interfaceBridgesDone = new java.util.HashSet<String>();
@@ -5818,6 +5876,18 @@ public final class JavaEmitter {
         ctx.beginBodyCaptures(m.body, m.exprBody);
         ctx.valueCalledLocals.clear();
         ctx.valueCalledLocals.addAll(CaptureScan.valueCalledNames(m.body, m.exprBody));
+        if (!m.isStatic && !m.isGetter && (m.body != null || m.exprBody != null)) {
+            // Parameters naming a class type variable are checked on entry, before an async
+            // body starts: Dart refuses the call itself.
+            for (Param p : m.params) {
+                Ident pid = new Ident();
+                pid.name = p.name;
+                String chk = p.type == null ? null : covariantWriteCheck(emitExpr(pid, null, ctx).code, p.type, ctx);
+                if (chk != null) {
+                    ctx.writer().line(chk);
+                }
+            }
+        }
         if (m.isAsyncStar && !m.isSetter) {
             // async* generator. As for sync*, the body moves into a helper, here taking the
             // generator's AsyncStar.Sink: `yield x` -> sink.yield$(x), `yield* s` ->
@@ -8131,6 +8201,8 @@ public final class JavaEmitter {
     /// {@code marker} its signature marker (DartFnSigs.Mn), null when unsigned;
     /// {@code signedCall} is true for `DartFnSigs.sk(bare)` and {@code doubleCast} for
     /// samCast's `(SAM) (SAM & marker) bare`, where the outer plain cast is what javac infers from.
+    /// {@code runTime} is non-null for a closure signAtRunTime wrapped: {closure, the factory
+    /// call's tail after the closure}, which a recast re-wraps with the target SAM's factory.
     private static final class FnForm {
         final FnKind kind;
         final String bare;
@@ -8138,14 +8210,26 @@ public final class JavaEmitter {
         final String marker;
         final boolean signedCall;
         final boolean doubleCast;
+        final String[] runTime;
 
         FnForm(FnKind kind, String bare, String sam, String marker, boolean signedCall, boolean doubleCast) {
+            this(kind, bare, sam, marker, signedCall, doubleCast, null);
+        }
+
+        FnForm(FnKind kind, String bare, String sam, String marker, boolean signedCall, boolean doubleCast,
+                String[] runTime) {
             this.kind = kind;
             this.bare = bare;
             this.sam = sam;
             this.marker = marker;
             this.signedCall = signedCall;
             this.doubleCast = doubleCast;
+            this.runTime = runTime;
+        }
+
+        /// A closure signAtRunTime wrapped: {@code wrapped} is the SignedFns factory call.
+        static FnForm runTimeSigned(String wrapped, String closure, String tail) {
+            return new FnForm(FnKind.LAMBDA, wrapped, null, null, false, false, new String[] {closure, tail});
         }
 
         static FnForm methodRef(String ref) {
@@ -8158,12 +8242,12 @@ public final class JavaEmitter {
 
         /// This value cast to {@code sam}, intersected with {@code marker} when non-null.
         FnForm castTo(String sam, String marker, boolean doubleCast) {
-            return new FnForm(kind, bare, sam, marker, false, doubleCast);
+            return new FnForm(kind, bare, sam, marker, false, doubleCast, runTime);
         }
 
         /// This value passed through `DartFnSigs.sk(..)` with {@code marker}.
         FnForm signed(String marker) {
-            return new FnForm(kind, bare, null, marker, true, false);
+            return new FnForm(kind, bare, null, marker, true, false, runTime);
         }
 
         boolean uncastMethodRef() {
@@ -8173,7 +8257,7 @@ public final class JavaEmitter {
 
     /// `((sam) bare)` as an Out that remembers it is a cast of {@code f}.
     private Out samCastOut(String sam, FnForm f, TypeRef type) {
-        String rr = recastRunTimeSigned(sam, f.bare);
+        String rr = recastRunTimeSigned(sam, f);
         return new Out(rr != null ? "(" + rr + ")" : "((" + sam + ") " + f.bare + ")", type,
                 f.castTo(sam, null, false));
     }
@@ -9628,8 +9712,8 @@ public final class JavaEmitter {
             String wrapped = signAtRunTime(code, samType, dynSig.toString(), required, named, own && expected == null, ctx);
             if (wrapped != null) {
                 String names = named == null ? "null" : "new String[] {\"" + String.join("\", \"", named) + "\"}";
-                runTimeSigned.put(wrapped, new String[] {code, ", new dart.runtime.TypeWitness[] {" + dynSig
-                        + "}, " + required + ", " + names + ")"});
+                runTimeSignedLast = new String[] {code, ", new dart.runtime.TypeWitness[] {" + dynSig
+                        + "}, " + required + ", " + names + ")"};
                 return wrapped;
             }
         }
@@ -9816,7 +9900,7 @@ public final class JavaEmitter {
     /// interface (a runtime callback type such as GestureDragStartCallback) takes the
     /// intersection alone. Null when {@code o} is no signed function value.
     private String recastSigned(String type, Out o) {
-        String rr = recastRunTimeSigned(type, o.code);
+        String rr = recastRunTimeSigned(type, o.fn);
         if (rr != null) {
             return rr;
         }
@@ -9873,21 +9957,17 @@ public final class JavaEmitter {
         return FUNCS_SAMS.contains(q) ? q : head;
     }
 
-    /// Closures signAtRunTime wrapped, by the wrapped call: {closure, the factory call's tail
-    /// after the closure}. A consumer casting one to a Funcs SAM re-wraps the closure cast to
-    /// that SAM, with that SAM's factory, so the generic factory infers its type arguments
-    /// from the typed argument and yields exactly the consumer's type: a cast around a
-    /// generic call is no target javac infers the lambda's parameter types from. Closures
-    /// and tear-offs alike, so the map is keyed by the code every cast site holds.
-    private final java.util.HashMap<String, String[]> runTimeSigned = new java.util.HashMap<String, String[]>();
+    /// What the last signClosure call wrapped with signAtRunTime ({closure, factory tail}),
+    /// else null: its caller moves it onto the closure's FnForm, which is where every recast
+    /// reads it. A consumer casting one to a Funcs SAM re-wraps the closure cast to that SAM,
+    /// with that SAM's factory, so the generic factory infers its type arguments from the
+    /// typed argument and yields exactly the consumer's type: a cast around a generic call
+    /// is no target javac infers the lambda's parameter types from.
+    private String[] runTimeSignedLast;
 
-    /// recastSigned for a closure signAtRunTime wrapped; null for any other code or SAM.
-    private String recastRunTimeSigned(String sam, String code) {
-        String c = code;
-        while (c.startsWith("(") && c.endsWith(")") && runTimeSigned.get(c) == null && balancedParen(c)) {
-            c = c.substring(1, c.length() - 1);
-        }
-        String[] r = runTimeSigned.get(c);
+    /// recastSigned for a closure signAtRunTime wrapped; null for any other value or SAM.
+    private String recastRunTimeSigned(String sam, FnForm f) {
+        String[] r = f == null ? null : f.runTime;
         if (r == null || !isFuncsSamName(sam)) {
             return null;
         }
@@ -9901,31 +9981,8 @@ public final class JavaEmitter {
         return "(" + sam + ") dart.runtime.SignedFns." + factory + "((" + sam + ") " + paren(r[0]) + r[1];
     }
 
-    /// Whether the outer parentheses of {@code c} enclose all of it.
-    private static boolean balancedParen(String c) {
-        int depth = 0;
-        for (int i = 0; i < c.length(); i++) {
-            char ch = c.charAt(i);
-            if (ch == '"' || ch == '\'') {
-                // A literal's parentheses are no nesting: skip to its closing quote.
-                for (i++; i < c.length() && c.charAt(i) != ch; i++) {
-                    if (c.charAt(i) == '\\') {
-                        i++;
-                    }
-                }
-                continue;
-            }
-            if (ch == '(') {
-                depth++;
-            } else if (ch == ')' && --depth == 0 && i < c.length() - 1) {
-                return false;
-            }
-        }
-        return depth == 0;
-    }
-
     private String samCast(Expr src, Out o, String sam) {
-        String rr = recastRunTimeSigned(sam, o.code);
+        String rr = recastRunTimeSigned(sam, o.fn);
         if (rr != null) {
             return rr;
         }
@@ -9946,6 +10003,9 @@ public final class JavaEmitter {
             return new Out(code, type, FnForm.lambda(s[0]).castTo(sam, s[1], true));
         }
         FnForm f = o.fn != null ? o.fn : FnForm.lambda(o.code);
+        if (f.runTime != null) {
+            return new Out(code, type, f.castTo(sam, null, false));
+        }
         return new Out(code, type, f.marker != null && isFuncsSamName(sam) ? f.castTo(sam, f.marker, true)
                 : new FnForm(f.kind, o.code, sam, null, false, false));
     }
@@ -10299,6 +10359,17 @@ public final class JavaEmitter {
                     }
                 }
             }
+            // A class taking its type variable in a parameter or a mutable field checks the
+            // argument against the receiver's own type argument (Box<num> b = Box<int>(..);
+            // b.set(1.5) is a TypeError), so it keeps the witnesses that check reads.
+            for (ClassDecl c : program.classes.values()) {
+                if (reifiableClass(c) && covariantWrites(c) && reifiedNames.add(c.name)) {
+                    runtimeTypeOnlyReified.add(c.name);
+                    for (String tp : c.typeParams) {
+                        reifyOnlyParams.add(c.name + "<" + tp);
+                    }
+                }
+            }
             if (runtimeTypeRead) {
                 // Dart's runtimeType names the type arguments, and any object may be asked
                 // for it, so a program that reads one keeps every generic class's.
@@ -10313,6 +10384,83 @@ public final class JavaEmitter {
     }
 
     private boolean runtimeTypeRead;
+
+    /// Whether {@code c} has an instance method parameter or a mutable instance field whose
+    /// type names one of its type variables where a narrower argument could be refused
+    /// (covariantMention): the writes Dart checks at entry.
+    private static boolean covariantWrites(ClassDecl c) {
+        if (c.typeParams.isEmpty() || c.isMixin || c.extensionOn != null) {
+            return false;
+        }
+        for (FieldDecl f : c.fields) {
+            if (!f.isStatic && !f.isFinal && !f.isConst && covariantMention(f.type, c.typeParams)) {
+                return true;
+            }
+        }
+        for (MethodDecl m : c.methods) {
+            if (m.isStatic || m.isGetter) {
+                continue;
+            }
+            for (Param p : m.params) {
+                if (covariantMention(p.type, c.typeParams)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// Whether {@code t} names one of {@code params} outside a function type's parameters
+    /// (`T`, `List<T>`, `T Function()`): there a narrower type argument refuses some values.
+    /// `void Function(T)` accepts a wider function either way, so it is never checked.
+    private static boolean covariantMention(TypeRef t, List<String> params) {
+        if (t == null) {
+            return false;
+        }
+        if (t.args.isEmpty() && t.funcParams == null && params.contains(t.name)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (covariantMention(a, params)) {
+                return true;
+            }
+        }
+        return t.funcParams != null && covariantMention(t.funcReturn, params);
+    }
+
+    /// The statement checking a write of {@code code} into a slot typed {@code t} of the
+    /// current class against the receiver's reified type arguments, or null when nothing is
+    /// checked: a bare type variable is tested against its witness field, any other type
+    /// naming one (`List<E>`) as `code as t` tests it.
+    private String covariantWriteCheck(String code, TypeRef t, Ctx ctx) {
+        ClassDecl c = ctx.currentClass;
+        if (c == null || ctx.staticMember || t == null || !reifiedClassNames().contains(c.name)
+                || !covariantWrites(c) || !covariantMention(t, c.typeParams)) {
+            return null;
+        }
+        if (t.args.isEmpty() && t.funcParams == null) {
+            String w = witnessFor(t.name, ctx);
+            if (w == null) {
+                return null;
+            }
+            return "dart.runtime.DartRuntime.checkWitness(" + code + ", "
+                    + (t.nullable ? "dart.runtime.TypeWitness.nullable(" + w + ")" : w) + ");";
+        }
+        ctx.pushScope();
+        try {
+            String tmp = ctx.newTemp();
+            ctx.declare(tmp, TypeRef.DYNAMIC);
+            Ident id = new Ident();
+            id.name = tmp;
+            AsCast ac = new AsCast();
+            ac.operand = id;
+            ac.type = t;
+            return "{ final Object " + tmp + " = " + code + "; final Object " + tmp + "c = "
+                    + emitAsCast(ac, ctx).code + "; }";
+        } finally {
+            ctx.popScope();
+        }
+    }
     /// Classes reified only so runtimeType can name their arguments. A generic method
     /// constructing one does not demand its own type argument for that: where none is
     /// inferable the construction records an unknown witness, as Dart's runtimeType would
@@ -13045,7 +13193,7 @@ public final class JavaEmitter {
             }
             MethodDecl getter = cc.getter(n);
             if (getter != null) {
-                return new Out("this." + n + "()", getter.returnType);
+                return new Out(pinnedGetterRead(cc, getter, "this." + n + "()", ctx), getter.returnType);
             }
             // tear-off of an own method when a function-ish value is expected
             // (a static method tears off through the class name, never `this`)
@@ -13063,7 +13211,7 @@ public final class JavaEmitter {
             // a getter is a public zero-arg method.
             FieldDecl inhF = findInheritedField(cc, n);
             if (inhF != null && !inhF.isStatic && inheritedFieldVisible(cc, n)) {
-                return new Out("this.get$" + n + "()", fieldType(inhF, ctx));
+                return new Out(pinnedFieldRead(cc, inhF, "this.get$" + n + "()", ctx), fieldType(inhF, ctx));
             }
             if (!cc.isMixin) {
                 // state a mixin contributes: the applying class holds it behind get$/set$
@@ -13085,7 +13233,7 @@ public final class JavaEmitter {
             }
             MethodDecl inhG = findInheritedGetter(cc, n);
             if (inhG != null) {
-                return new Out("this." + n + "()", inhG.returnType);
+                return new Out(pinnedGetterRead(cc, inhG, "this." + n + "()", ctx), inhG.returnType);
             }
             MethodDecl inhM = findMethodInHierarchy(cc, n);
             if (inhM != null) {
@@ -13272,7 +13420,7 @@ public final class JavaEmitter {
         if (!f.sam.equals(have)) {
             return top;
         }
-        String rr = recastRunTimeSigned(want, f.bare);
+        String rr = recastRunTimeSigned(want, f);
         if (rr != null) {
             return new Out("(" + rr + ")", expected, f.castTo(want, null, false));
         }
@@ -14345,14 +14493,15 @@ public final class JavaEmitter {
                     return new Out(primitiveListSeen(recv + ".get$" + name + "()", fieldType(f, ctx), fSeen, ctx),
                             fSeen);
                 }
-                return new Out(primitiveListSeen(rawReceiver(target.code, pc, tt, fieldType(f, ctx), ctx)
-                        + ".get$" + name + "()", fieldType(f, ctx), fSeen, ctx), fSeen);
+                String read = pinnedFieldRead(pc, f, rawReceiver(target.code, pc, tt, fieldType(f, ctx), ctx)
+                        + ".get$" + name + "()", ctx);
+                return new Out(primitiveListSeen(read, fieldType(f, ctx), fSeen, ctx), fSeen);
             }
             MethodDecl g = pc.getter(name);
             if (g != null) {
                 TypeRef gSeen = asSeenFrom(g.returnType, g, null, pc, tt);
-                return new Out(primitiveListSeen(rawReceiver(target.code, pc, tt, g.returnType, ctx)
-                        + "." + name + "()", g.returnType, gSeen, ctx), gSeen);
+                return new Out(primitiveListSeen(pinnedGetterRead(pc, g, rawReceiver(target.code, pc, tt,
+                        g.returnType, ctx) + "." + name + "()", ctx), g.returnType, gSeen, ctx), gSeen);
             }
             Object mixF = findMixinMember(pc, name, true);
             if (mixF instanceof FieldDecl) {
@@ -14368,14 +14517,14 @@ public final class JavaEmitter {
             FieldDecl inhF = findInheritedField(pc, name);
             if (inhF != null && inheritedFieldVisible(pc, name)) {
                 TypeRef ifSeen = asSeenFrom(fieldType(inhF, ctx), inhF, null, pc, tt);
-                return new Out(primitiveListSeen(target.code + ".get$" + name + "()", fieldType(inhF, ctx),
-                        ifSeen, ctx), ifSeen);
+                return new Out(primitiveListSeen(pinnedFieldRead(pc, inhF, target.code + ".get$" + name + "()", ctx),
+                        fieldType(inhF, ctx), ifSeen, ctx), ifSeen);
             }
             MethodDecl inhG = findInheritedGetter(pc, name);
             if (inhG != null) {
                 TypeRef igSeen = asSeenFrom(inhG.returnType, inhG, null, pc, tt);
-                return new Out(primitiveListSeen(target.code + "." + name + "()", inhG.returnType, igSeen, ctx),
-                        igSeen);
+                return new Out(primitiveListSeen(pinnedGetterRead(pc, inhG, target.code + "." + name + "()", ctx),
+                        inhG.returnType, igSeen, ctx), igSeen);
             }
             // method tear-off on an instance: `obj.method` as a function value (method reference)
             MethodDecl tm = pc.method(name);
@@ -18122,7 +18271,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // Last, so a lambda nested in this one cannot overwrite what this one yields.
         lastLambdaExprType = exprType;
         lastLambdaReturns = returns;
+        runTimeSignedLast = null;
         String signed = signClosure(code, l, expected, exprType, ctx);
+        String[] rt = runTimeSignedLast;
+        runTimeSignedLast = null;
+        if (rt != null) {
+            return new Out(signed, new TypeRef("Function"), FnForm.runTimeSigned(signed, rt[0], rt[1]));
+        }
         String[] rec = signedClosures.get(l);
         return new Out(signed, new TypeRef("Function"), rec != null && rec[2].equals(signed)
                 ? FnForm.lambda(rec[0]).signed(rec[1]) : FnForm.lambda(signed));
@@ -19929,6 +20084,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (n.equals("toDouble")) {
                 return new Out("DartRuntime.numToDouble(" + target.code + ")", TypeRef.DOUBLE);
+            }
+            if (n.equals("round") || n.equals("floor") || n.equals("ceil")) {
+                return new Out("DartRuntime.numRounded(" + target.code + ", '" + n.charAt(0) + "')", TypeRef.INT);
             }
         }
         if (tt.is("double")) {
@@ -26488,7 +26646,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 widened.funcReturn = TypeRef.DYNAMIC;
                 String wj = javaType(widened, false, ctx);
                 if (!wj.equals(ownSam)) {
-                    String rr = recastRunTimeSigned(wj, f.bare);
+                    String rr = recastRunTimeSigned(wj, f);
                     if (rr != null) {
                         return "(" + rr + ")";
                     }

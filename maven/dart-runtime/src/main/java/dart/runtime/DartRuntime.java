@@ -813,6 +813,31 @@ public final class DartRuntime {
         throw new dart.core.NoSuchMethodError("Class '" + (n == null ? "Null" : n.getClass().getSimpleName()) + "' has no instance method 'toInt'.");
     }
 
+    /// The entry check of a parameter or field write whose type is a class type variable
+    /// (`void set(T x)` called on a `Box<num>` that is a `Box<int>`): Dart checks the
+    /// argument against the receiver's reified type argument, {@code w}. A null witness is
+    /// an argument the construction could not name, which is not tested.
+    public static void checkWitness(Object v, TypeWitness w) {
+        if (w != null && !w.test(v)) {
+            throw new TypeError("type '" + typeName(v) + "' is not a subtype of type '" + w + "'");
+        }
+    }
+
+    /// `num.round()`, `floor()` and `ceil()` on a value typed only num: an int answers
+    /// itself, a double rounds as double's method does (UnsupportedError for NaN and the
+    /// infinities). {@code mode} is 'r', 'f' or 'c'.
+    public static long numRounded(Object n, char mode) {
+        if (n instanceof Double d) {
+            double v = d.doubleValue();
+            return mode == 'f' ? floor(v) : mode == 'c' ? ceil(v) : round(v);
+        }
+        if (n instanceof Number num) {
+            return num.longValue();
+        }
+        String m = mode == 'f' ? "floor" : mode == 'c' ? "ceil" : "round";
+        throw new dart.core.NoSuchMethodError("Class '" + (n == null ? "Null" : n.getClass().getSimpleName()) + "' has no instance method '" + m + "'.");
+    }
+
     public static double numToDouble(Object n) {
         if (n instanceof Number num) {
             return num.doubleValue();
