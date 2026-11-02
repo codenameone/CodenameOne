@@ -10181,6 +10181,30 @@ public final class JavaEmitter {
     /// signature constants are static), or "null" when it reads a type parameter's witness
     /// -- a `$tw$` local or an instance field. {@code reified} picks reifiedArgWitness over
     /// targetArgWitness.
+    /// Whether {@code t} names any of {@code names} anywhere inside it.
+    private static boolean mentionsTypeParams(TypeRef t, List<String> names) {
+        if (t == null) {
+            return false;
+        }
+        if (names.contains(t.name)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsTypeParams(a, names)) {
+                return true;
+            }
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (mentionsTypeParams(a, names)) {
+                    return true;
+                }
+            }
+            return mentionsTypeParams(t.funcReturn, names);
+        }
+        return false;
+    }
+
     private String staticWitness(TypeRef t, boolean reified, Ctx ctx) {
         if (t == null || readsTypeVarWitness(t, ctx)) {
             return "null";
@@ -12581,10 +12605,18 @@ public final class JavaEmitter {
             if (i > 0) {
                 sb.append(", ");
             }
-            sb.append(codes.get(i));
+            sb.append(soleNullElementCast(l.elements, elem, ctx)).append(codes.get(i));
         }
         sb.append(')');
         return new Out(sb.toString(), TypeRef.of("List", elem));
+    }
+
+    /// `(Long) ` before the one element of `<int?>[null]`: a lone null argument to the
+    /// varargs `of(E...)` is the array itself, so the list was built from a null array
+    /// and threw a NullPointerException. Decided from the literal, not the emitted code.
+    private String soleNullElementCast(List<Expr> elements, TypeRef elem, Ctx ctx) {
+        return elements.size() == 1 && elements.get(0) instanceof NullLit
+                ? "(" + javaType(elem, true, ctx) + ") " : "";
     }
 
     /**
@@ -13056,7 +13088,7 @@ public final class JavaEmitter {
             if (i > 0) {
                 sb.append(", ");
             }
-            sb.append(codes.get(i));
+            sb.append(soleNullElementCast(s.elements, elem, ctx)).append(codes.get(i));
         }
         sb.append(')');
         return new Out(sb.toString(), TypeRef.of("Set", elem));
@@ -18771,6 +18803,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // value: nothing static checked the argument, so the body tests it against
                 // the instantiation's witness, as Dart's entry check does.
                 String tw = "$tw$" + pt.name;
+                TypeRef bound = l.typeParamBounds.get(pt.name);
+                String bw = bound != null && !mentionsTypeParams(bound, l.typeParams)
+                        ? staticWitness(bound, false, ctx) : "null";
+                if (!"null".equals(bw)) {
+                    // `<T extends num>(T x)` called dynamically with nothing to instantiate
+                    // it: Dart infers T from the argument, and one outside the bound is a
+                    // TypeError, so an unknown witness tests the declared bound instead.
+                    tw = "(" + tw + " != null ? " + tw + " : " + bw + ")";
+                }
                 genericParamChecks.append("dart.runtime.DartRuntime.checkWitness(").append(jn).append(", ")
                         .append(pt.nullable ? "dart.runtime.TypeWitness.nullable(" + tw + ")" : tw).append(");\n");
             }

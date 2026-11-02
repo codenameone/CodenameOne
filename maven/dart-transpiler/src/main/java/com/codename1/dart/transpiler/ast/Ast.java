@@ -762,6 +762,10 @@ public final class Ast {
         /// function literal, which declares none), then each parameter's type, was before
         /// erasure, or null. Empty when the closure is not generic. runtimeType prints it.
         public List<String> typeVarSlots = new ArrayList<String>();
+        /// A generic closure's declared bounds (`<T extends num>`), by type parameter name.
+        /// An uninstantiated call infers T from its argument, so the bound is what that
+        /// argument is tested against.
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         /// The closure is a local function declaration: its signature is its own, even
         /// though it is emitted against the SAM of that signature.
         public boolean ownSignature;

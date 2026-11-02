@@ -2760,6 +2760,9 @@ public final class AstBuilder {
             // parameters are erased to dynamic, which is what an uninstantiated call sees.
             for (Dart2Parser.TypeParameterContext tp : ctx.formalParameterPart().typeParameters().typeParameter()) {
                 l.typeParams.add(tp.identifier().getText());
+                if (tp.typeNotVoid() != null) {
+                    l.typeParamBounds.put(tp.identifier().getText(), buildTypeNotVoid(tp.typeNotVoid()));
+                }
             }
             l.typeVarSlots.add(null);
             for (Param p : l.params) {
