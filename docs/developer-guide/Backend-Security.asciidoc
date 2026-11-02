@@ -1626,7 +1626,7 @@ are the same on SQLite, PostgreSQL, and MySQL.
 
 To use tables you already have, give their names in `application.properties`.
 A per-table setting names one table, and a prefix replaces the `cn1_` in front
-of all of them. The per-table setting wins:
+of every name. The per-table setting wins:
 
 [source,properties]
 ----
