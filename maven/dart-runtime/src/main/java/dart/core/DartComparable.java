@@ -42,6 +42,9 @@ public final class DartComparable {
         if (a instanceof Number && b instanceof Number) {
             return compareNumbers((Number) a, (Number) b);
         }
+        if (a instanceof DartEnumComparable) {
+            return ((DartEnumComparable) a).compareTo$(b);
+        }
         if (a instanceof Comparable) {
             return ((Comparable) a).compareTo(b);
         }

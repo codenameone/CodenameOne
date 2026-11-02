@@ -726,6 +726,35 @@ public final class JavaEmitter {
         return new GeneratedFile("FlutterRegistry.java", sb.toString());
     }
 
+    /**
+     * The Java name of an enhanced enum's own {@code int compareTo(T other)}. Java's
+     * {@code Enum.compareTo} is final, so the Dart method cannot be emitted under its own
+     * name; the enum implements {@code dart.core.DartEnumComparable} instead, which every
+     * comparator path ({@code DartComparable.compare}: Comparable.compare, List.sort with
+     * no comparator, SplayTree*) consults before Java's ordinal order, and every call site
+     * whose receiver is such an enum calls this name.
+     */
+    static final String ENUM_COMPARE_TO = "compareTo$";
+
+    /** Whether {@code m} is enum {@code e}'s own instance {@code compareTo(other)}. */
+    static boolean isEnumCompareTo(Ast.EnumDecl e, MethodDecl m) {
+        return e != null && "compareTo".equals(m.name) && !m.isStatic && !m.isGetter && !m.isSetter
+                && m.params.size() == 1;
+    }
+
+    /** The enum compareTo of {@code e}, or null when it has none of its own. */
+    static MethodDecl enumCompareTo(Ast.EnumDecl e) {
+        if (e == null) {
+            return null;
+        }
+        for (MethodDecl m : e.methods) {
+            if (isEnumCompareTo(e, m)) {
+                return m;
+            }
+        }
+        return null;
+    }
+
     private GeneratedFile emitEnum(EnumDecl e) {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(pkg).append(";\n\n");
@@ -795,9 +824,15 @@ public final class JavaEmitter {
                 entryCtor = ct;
             }
         }
+        boolean ownCompareTo = false;
         for (MethodDecl m : e.methods) {
             Method mm = new Method();
             mm.name = m.name;
+            if (isEnumCompareTo(e, m)) {
+                // java.lang.Enum.compareTo is final; see ENUM_COMPARE_TO.
+                mm.name = ENUM_COMPARE_TO;
+                ownCompareTo = true;
+            }
             mm.isStatic = m.isStatic;
             mm.isGetter = m.isGetter;
             mm.isSetter = m.isSetter;
@@ -845,7 +880,9 @@ public final class JavaEmitter {
             sb.append('\n');
         }
         sb.append(dartRef(e)).append("\n");
-        sb.append("public enum ").append(enumJava).append(dynamicMembers ? " implements dart.runtime.DynamicObject" : "")
+        String enumImpls = (dynamicMembers ? "dart.runtime.DynamicObject" : "")
+                + (ownCompareTo ? (dynamicMembers ? ", " : "") + "dart.core.DartEnumComparable<" + enumJava + ">" : "");
+        sb.append("public enum ").append(enumJava).append(enumImpls.isEmpty() ? "" : " implements " + enumImpls)
                 .append(" {\n    ");
         StringBuilder names = new StringBuilder();
         for (int i = 0; i < e.entries.size(); i++) {
@@ -2545,7 +2582,7 @@ public final class JavaEmitter {
             "dart.async.StreamTransformer", "dart.async.StreamSink", "dart.collection.IterableMixin",
             "dart.collection.ListMixin", "dart.collection.MapMixin", "dart.collection.SetMixin",
             "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase",
-            "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.MixinView",
+            "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.DartEnumComparable", "dart.core.MixinView",
             "dart.runtime.DynamicObject", "dart.runtime.Reified", "dart.runtime.Signed", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
 
     /** The fully qualified dart-runtime class a rendered Java type name refers to, or null. */
@@ -3718,7 +3755,8 @@ public final class JavaEmitter {
             // A `Future close()` renamed to close$future: its void close() bridge would answer
             // null, while `(s as dynamic).close()` must still answer the Future.
             boolean futureClose = isFutureSinkClose(c, m);
-            String invoke = "this." + (futureClose ? FUTURE_SINK_CLOSE : javaMethodName(m.name)) + "(" + args + ")";
+            String invoke = "this." + (futureClose ? FUTURE_SINK_CLOSE
+                    : isEnumCompareTo(c.enumOf, m) ? ENUM_COMPARE_TO : javaMethodName(m.name)) + "(" + args + ")";
             call.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": ");
             // Dart checks a dynamic call's shape before running the method: a missing
             // required argument, an extra positional one or an unknown name is a
@@ -22016,6 +22054,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             diags.error(c, "E0136", "Cannot resolve static method '" + n + "' on " + cls);
             return new Out("null", TypeRef.DYNAMIC, true);
         }
+        // An enhanced enum's own compareTo, emitted as ENUM_COMPARE_TO: ahead of the
+        // intrinsics, whose compareTo would reach Java's final ordinal Enum.compareTo.
+        MethodDecl enumCmp = tt != null ? enumCompareTo(programEnum(tt.name, ctx)) : null;
+        if (enumCmp != null && n.equals("compareTo") && c.args.named.isEmpty()
+                && c.args.positional.size() == 1) {
+            return new Out(target.code + "." + ENUM_COMPARE_TO + "(" + methodArgs(enumCmp.params, c.args, ctx) + ")",
+                    TypeRef.INT);
+        }
+        if (tt != null && tt.is("Comparable") && n.equals("compareTo") && c.args.named.isEmpty()
+                && c.args.positional.size() == 1) {
+            // A receiver typed Comparable may be an enum with its own compareTo, which
+            // Java's Comparable.compareTo (Enum's, final) would bypass for ordinal order.
+            ctx.importClass("dart.core.DartComparable");
+            return new Out("DartComparable.compare(" + target.code + ", "
+                    + emitExpr(c.args.positional.get(0), null, ctx).code + ")", TypeRef.INT);
+        }
         // intrinsics
         Out intrinsic = intrinsicCall(target, c, ctx);
         if (intrinsic != null) {
@@ -23468,6 +23522,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
         }
         if (tt.is("Map")) {
+            // SplayTreeMap's ordered-key queries. A SplayTreeMap is typed as the Map it
+            // implements (AstBuilder.collectionAlias), so these members, which only the
+            // sorted map declares, are reached through the runtime class itself.
+            if ((n.equals("firstKey") || n.equals("lastKey")) && pos.isEmpty()) {
+                TypeRef kt = boxType(tt.args.size() == 2 ? tt.arg(0) : null);
+                return new Out("((" + javaType(kt, true, ctx) + ") ((dart.collection.SplayTreeMap) "
+                        + paren(target.code) + ")." + n + "())", kt);
+            }
+            if ((n.equals("firstKeyAfter") || n.equals("lastKeyBefore")) && pos.size() == 1) {
+                Out k = coreArg(pos.get(0), tt.args.size() == 2 ? tt.arg(0) : null, ctx);
+                TypeRef kt = boxType(tt.args.size() == 2 ? tt.arg(0) : null);
+                return new Out("((" + javaType(kt, true, ctx) + ") ((dart.collection.SplayTreeMap) "
+                        + paren(target.code) + ")." + n + "(" + boxIfPrimitive(k, ctx) + "))", kt);
+            }
             if (n.equals("containsKey")) {
                 Out v = coreArg(pos.get(0), null, ctx);
                 return new Out(target.code + ".containsKey(" + boxIfPrimitive(v, ctx) + ")", TypeRef.BOOL);

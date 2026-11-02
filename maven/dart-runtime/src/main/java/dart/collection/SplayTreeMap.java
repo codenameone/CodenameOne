@@ -88,4 +88,43 @@ public class SplayTreeMap<K, V> extends DartMap<K, V> {
         }
         return null;
     }
+
+    /** The least key, or null when the map is empty. */
+    public K firstKey() {
+        for (K k : keySet()) {
+            return k;
+        }
+        return null;
+    }
+
+    /** The greatest key, or null when the map is empty. */
+    public K lastKey() {
+        K last = null;
+        for (K k : keySet()) {
+            last = k;
+        }
+        return last;
+    }
+
+    /** The least key greater than {@code key}, or null when there is none. */
+    public K firstKeyAfter(Object key) {
+        for (K k : keySet()) {
+            if (cmp(k, key) > 0) {
+                return k;
+            }
+        }
+        return null;
+    }
+
+    /** The greatest key less than {@code key}, or null when there is none. */
+    public K lastKeyBefore(Object key) {
+        K found = null;
+        for (K k : keySet()) {
+            if (cmp(k, key) >= 0) {
+                break;
+            }
+            found = k;
+        }
+        return found;
+    }
 }

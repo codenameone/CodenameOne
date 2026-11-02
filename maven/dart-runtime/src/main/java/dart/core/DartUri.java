@@ -337,16 +337,19 @@ public final class DartUri {
     /** Dart's {@code Uri.parse}. */
     public static DartUri parse(String uri) {
         String text = uri == null ? "" : uri;
-        String error = malformed(text);
+        // Dart reports where in the text the parse failed; FormatException.toString
+        // renders that as "(at character N)" plus the line and a caret under it.
+        int[] at = {-1};
+        String error = malformed(text, at);
         if (error != null) {
-            throw new FormatException(error, text, null);
+            throw new FormatException(error, text, at[0] < 0 ? null : Long.valueOf(at[0]));
         }
         return new DartUri(text);
     }
 
     /** Dart's {@code Uri.tryParse}: null for what {@link #parse} rejects. */
     public static DartUri tryParse(String uri) {
-        return uri == null || malformed(uri) != null ? null : new DartUri(uri);
+        return uri == null || malformed(uri, new int[1]) != null ? null : new DartUri(uri);
     }
 
     /**
@@ -357,7 +360,7 @@ public final class DartUri {
      * Dart SDK; it is lenient about the rest (a stray space or a bad escape is encoded,
      * an out-of-range port is kept), and so is this.
      */
-    static String malformed(String text) {
+    static String malformed(String text, int[] at) {
         int end = text.length();
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
@@ -371,7 +374,25 @@ public final class DartUri {
         if (colon >= 0 && colon < end) {
             // A colon before the first '/', '?' or '#' ends a scheme, so what precedes
             // it has to be one.
-            if (colon == 0 || !isSchemeText(text.substring(0, colon))) {
+            // Dart's three scheme errors, each at the offending position.
+            if (colon == 0) {
+                at[0] = 0;
+                return "Invalid empty scheme";
+            }
+            char first = text.charAt(0);
+            if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z'))) {
+                at[0] = 0;
+                return "Scheme not starting with alphabetic character";
+            }
+            for (int i = 1; i < colon; i++) {
+                char ch = text.charAt(i);
+                if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
+                        || ch == '+' || ch == '-' || ch == '.')) {
+                    at[0] = i;
+                    return "Illegal scheme character";
+                }
+            }
+            if (!isSchemeText(text.substring(0, colon))) {
                 return "Invalid scheme";
             }
             rest = colon + 1;
@@ -389,23 +410,29 @@ public final class DartUri {
             }
         }
         String authority = text.substring(authStart, authEnd);
-        int at = authority.lastIndexOf('@');
-        String hostPort = at >= 0 ? authority.substring(at + 1) : authority;
+        int atSign = authority.lastIndexOf('@');
+        String hostPort = atSign >= 0 ? authority.substring(atSign + 1) : authority;
+        int hostStart = authStart + atSign + 1;
         String port = null;
         if (hostPort.startsWith("[")) {
             int close = hostPort.indexOf(']');
             if (close < 0) {
+                at[0] = hostStart;
                 return "Missing end `]` to match `[` in host";
             }
             // The brackets hold an IP literal, never a name: Dart rejects
             // http://[not-an-ip]/ and this accepted anything between them.
-            String bad = bracketHostError(hostPort.substring(1, close));
+            int[] inner = {-1};
+            String bad = bracketHostError(hostPort.substring(1, close), inner);
             if (bad != null) {
+                at[0] = inner[0] < 0 ? -1 : hostStart + 1 + inner[0];
                 return bad;
             }
             if (close + 1 < hostPort.length()) {
                 if (hostPort.charAt(close + 1) != ':') {
-                    return "Invalid end of authority";
+                    // Dart's host scan wants the ']' right before the port or the end.
+                    at[0] = hostStart;
+                    return "Missing end `]` to match `[` in host";
                 }
                 port = hostPort.substring(close + 2);
             }
@@ -421,6 +448,7 @@ public final class DartUri {
         // http://a.com:8 0/, and non-ASCII digits, which the Long parse accepted.
         if (port != null && port.length() > 0 && portValue(port) == null
                 && !(oversizedPort(port) && !hostPort.startsWith("[") && needsNoNormalizing(text, colon < end ? colon : -1))) {
+            at[0] = authEnd - port.length();
             return "Invalid port";
         }
         return null;
@@ -577,7 +605,7 @@ public final class DartUri {
      * address -- at most one {@code ::}, groups of up to four hex digits, an optional
      * dotted IPv4 tail -- optionally followed by a {@code %} zone ID.
      */
-    static String bracketHostError(String c) {
+    static String bracketHostError(String c, int[] at) {
         if (c.startsWith("v")) {
             int i = 1;
             while (i < c.length() && hexValue(c.charAt(i)) >= 0) {
@@ -589,13 +617,14 @@ public final class DartUri {
             for (int k = i + 1; k < c.length(); k++) {
                 char ch = c.charAt(k);
                 if (!isUnreserved(ch) && "!$&'()*+,;=:".indexOf(ch) < 0) {
+                    at[0] = k;
                     return "Invalid IPvFuture address character";
                 }
             }
             return null;
         }
         int zone = c.indexOf('%');
-        String bad = ipv6Error(c, zone >= 0 ? zone : c.length());
+        String bad = ipv6Error(c, zone >= 0 ? zone : c.length(), at);
         if (bad != null || zone < 0) {
             return bad;
         }
@@ -603,6 +632,7 @@ public final class DartUri {
         for (int i = z; i < c.length(); i++) {
             if (c.charAt(i) == '%' && (i + 2 >= c.length() || hexValue(c.charAt(i + 1)) < 0
                     || hexValue(c.charAt(i + 2)) < 0)) {
+                at[0] = i;
                 return "ZoneID should not contain % anymore";
             }
         }
@@ -660,7 +690,7 @@ public final class DartUri {
     }
 
     /** Dart's parseIPv6Address over {@code c[0, end)}: an error message, or null when valid. */
-    private static String ipv6Error(String c, int end) {
+    private static String ipv6Error(String c, int end, int[] at) {
         int parts = 0;
         boolean wildcard = false;
         boolean lastWildcard = false;
@@ -673,12 +703,14 @@ public final class DartUri {
                     // a leading ':' must open a "::"
                     i++;
                     if (i >= end || c.charAt(i) != ':') {
+                        at[0] = i;
                         return "Illegal IPv6 address, invalid start colon.";
                     }
                     partStart = i;
                 }
                 if (i == partStart) {
                     if (wildcard) {
+                        at[0] = i;
                         return "Illegal IPv6 address, only one wildcard `::` is allowed";
                     }
                     wildcard = true;
@@ -700,6 +732,7 @@ public final class DartUri {
         }
         boolean atEnd = partStart == end;
         if (atEnd && !lastWildcard) {
+            at[0] = end;
             return "Illegal IPv6 address, expected a part after last `:`";
         }
         if (!atEnd) {
