@@ -222,9 +222,12 @@ void cn1_watch_runtime_markJavaReady(void) {
     cn1WatchReplayPendingPhase();
     // ...and a complication tap that arrived before the VM did. A tap on a terminated watch app
     // launches it WITH the URL, and SwiftUI delivers onOpenURL as soon as the scene exists --
-    // which is before this. Same readiness, same drain point.
+    // which is before this. Same readiness, same drain point. Only an app with widgets
+    // (CN1_USE_WIDGETS) has complications to tap, or the surfaces natives that define the drain.
+#ifdef CN1_USE_WIDGETS
     extern void cn1_watch_surface_drainPending(void);
     cn1_watch_surface_drainPending();
+#endif
 }
 
 /// Whether the Java lifecycle callback has run, for the surface-URL path in IOSNative.m. An int
