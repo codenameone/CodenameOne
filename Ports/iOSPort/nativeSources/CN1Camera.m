@@ -67,6 +67,16 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 @property (nonatomic, copy) NSString *pendingPhotoFilePath;
 @property (nonatomic, assign) int pendingPhotoCallbackId;
 @property (nonatomic, assign) int pendingPhotoQuality;
+// What configureForCloseRangeAnalysis: changed, so turning it off puts back
+// the application's own zoom and focus mode -- the zoom only when nothing has
+// zoomed since, so a setZoom made during analysis is kept.
+@property (nonatomic, assign) CGFloat analysisZoom;
+@property (nonatomic, assign) CGFloat zoomBeforeAnalysis;
+@property (nonatomic, assign) NSInteger focusModeBeforeAnalysis;
+// One RGBA buffer per session, reused across raw frames. A 1080p frame is
+// 8MB; allocating one per frame on top of the Java array it is copied into
+// was a large-object churn the GC had to absorb at the frame rate.
+@property (nonatomic, strong) NSMutableData *rawFrameBuffer;
 @end
 
 @implementation CN1Camera
@@ -173,8 +183,17 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
     self.session = [[AVCaptureSession alloc] init];
     [self.session beginConfiguration];
 
-    // Preset selection: prefer 1280x720 for previewW > 800, 640x480 otherwise.
-    if (previewW >= 1280 && [self.session canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
+    // Preset selection. No requested size (0, "let the platform pick") gets
+    // 1080p -- for every session, not only analysis, which also lifts default
+    // still photos off 640x480, the ceiling the preset puts on them: it used to fall through to 640x480, and that is too coarse for a
+    // dense PDF417 to decode -- every Vision scanner ran on it, since
+    // VisionCameraView requests no size. An explicit request keeps the old
+    // mapping: 1280x720 for a width of 1280 or more, 640x480 otherwise.
+    if (previewW <= 0 && [self.session canSetSessionPreset:AVCaptureSessionPreset1920x1080]) {
+        self.session.sessionPreset = AVCaptureSessionPreset1920x1080;
+    } else if (previewW <= 0 && [self.session canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
+        self.session.sessionPreset = AVCaptureSessionPreset1280x720;
+    } else if (previewW >= 1280 && [self.session canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
         self.session.sessionPreset = AVCaptureSessionPreset1280x720;
     } else if ([self.session canSetSessionPreset:AVCaptureSessionPreset640x480]) {
         self.session.sessionPreset = AVCaptureSessionPreset640x480;
@@ -275,6 +294,11 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
     self.photoOutput = nil;
     self.movieOutput = nil;
     self.session = nil;
+    // On the delivery queue, because a frame may still be rendering into the
+    // buffer there; the block keeps self alive until it has run.
+    dispatch_async(self.videoQueue, ^{
+        self.rawFrameBuffer = nil;
+    });
 }
 
 #pragma mark - Photo
@@ -363,9 +387,69 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
 
 #pragma mark - Frame delivery
 
-- (void)setFrameDeliveryEnabled:(BOOL)enabled maxFps:(int)maxFps {
+- (void)setFrameDeliveryEnabled:(BOOL)enabled maxFps:(int)maxFps raw:(BOOL)raw {
+    BOOL wasEnabled = self.frameDeliveryEnabled;
     self.frameDeliveryEnabled = enabled;
+    self.frameDeliveryRaw = raw;
     if (maxFps > 0) self.frameMaxFps = maxFps;
+    if (enabled != wasEnabled) {
+        [self configureForCloseRangeAnalysis:enabled];
+    }
+}
+
+// A frame listener is analysis -- codes, documents, text -- and that is held
+// close to the lens. The defaults are tuned for a scene at a distance, and a
+// newer iPhone's main camera cannot focus closer than ~20cm at all: a PDF417
+// held where it fills the screen stays blurred however long autofocus hunts.
+// So while frames are delivered, focus continuously with a near-range bias,
+// and zoom in just enough that a 20mm code filling 80% of the preview sits at
+// the lens' minimum focus distance (Apple's AVCamBarcode formula). Focus mode,
+// range and zoom are all put back when delivery stops, so a plain photo or
+// video session is untouched.
+- (void)configureForCloseRangeAnalysis:(BOOL)on {
+#if !TARGET_OS_OSX
+    AVCaptureDevice *d = self.device;
+    if (!d || ![d lockForConfiguration:nil]) return;
+    if (on) {
+        self.focusModeBeforeAnalysis = d.focusMode;
+        if ([d isFocusModeSupported:AVCaptureFocusModeContinuousAutoFocus]) {
+            d.focusMode = AVCaptureFocusModeContinuousAutoFocus;
+        }
+    } else if ([d isFocusModeSupported:(AVCaptureFocusMode)self.focusModeBeforeAnalysis]) {
+        d.focusMode = (AVCaptureFocusMode)self.focusModeBeforeAnalysis;
+    }
+    if (d.isAutoFocusRangeRestrictionSupported) {
+        d.autoFocusRangeRestriction = on ? AVCaptureAutoFocusRangeRestrictionNear
+                                         : AVCaptureAutoFocusRangeRestrictionNone;
+    }
+    if (@available(iOS 15.0, *)) {
+        if (on) {
+            CGFloat zoom = d.videoZoomFactor;
+            self.zoomBeforeAnalysis = zoom;
+            NSInteger minFocusMm = d.minimumFocusDistance;
+            float fov = d.activeFormat.videoFieldOfView;
+            if (minFocusMm > 0 && fov > 0) {
+                double halfFov = (fov / 2.0) * M_PI / 180.0;
+                double minSubjectMm = (20.0 / 0.8) / tan(halfFov);
+                if ((double)minFocusMm > minSubjectMm) {
+                    // Never zoom OUT of what the application already chose.
+                    zoom = MAX(zoom, (CGFloat)((double)minFocusMm / minSubjectMm));
+                }
+            }
+            d.videoZoomFactor = MAX(1.0, MIN(zoom, d.activeFormat.videoMaxZoomFactor));
+            self.analysisZoom = d.videoZoomFactor;
+        } else {
+            if (self.analysisZoom > 0 && d.videoZoomFactor == self.analysisZoom) {
+                d.videoZoomFactor = MAX(1.0, MIN(self.zoomBeforeAnalysis,
+                                                 d.activeFormat.videoMaxZoomFactor));
+            }
+            self.analysisZoom = 0;
+        }
+    }
+    [d unlockForConfiguration];
+#else
+    (void)on;
+#endif
 }
 
 - (void)captureOutput:(AVCaptureOutput *)output
@@ -400,13 +484,6 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         [ctx retain];
 #endif
     }
-    CGImageRef cg = [ctx createCGImage:ci fromRect:rect];
-    if (!cg) return;
-    CN1Image *img = [CN1Image imageWithCGImage:cg];
-    CGImageRelease(cg);
-    NSData *jpeg = UIImageJPEGRepresentation(img, 0.8);
-    if (!jpeg) return;
-
     int rotation = 0;
     if (connection.isVideoOrientationSupported) {
         switch (connection.videoOrientation) {
@@ -416,8 +493,37 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
             case AVCaptureVideoOrientationLandscapeRight:     rotation = 0;   break;
         }
     }
-
     int64_t ts = (int64_t)(now * 1e9);
+
+    if (self.frameDeliveryRaw) {
+        // A raw format was asked for, so hand over the pixels themselves as
+        // RGBA8888. They used to go through a JPEG at quality 0.8 whatever was
+        // requested, and the artifacts ate the thin bars of a PDF417 before
+        // Vision saw them. The capture is BGRA; Core Image swizzles it.
+        if (w <= 0 || h <= 0 || w > 16384 || h > 16384) return;
+        NSUInteger need = (NSUInteger)w * (NSUInteger)h * 4;
+        if (self.rawFrameBuffer.length != need) {
+            self.rawFrameBuffer = [NSMutableData dataWithLength:need];
+        }
+        NSMutableData *rgba = self.rawFrameBuffer;
+        if (!rgba) return;
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+        [ctx render:ci toBitmap:rgba.mutableBytes rowBytes:(ptrdiff_t)w * 4
+             bounds:rect format:kCIFormatRGBA8 colorSpace:cs];
+        CGColorSpaceRelease(cs);
+        self.frameInFlight = YES;
+        [self fireRawFrame:rgba width:w height:h rotation:rotation timestamp:ts];
+        self.frameInFlight = NO;
+        return;
+    }
+
+    CGImageRef cg = [ctx createCGImage:ci fromRect:rect];
+    if (!cg) return;
+    CN1Image *img = [CN1Image imageWithCGImage:cg];
+    CGImageRelease(cg);
+    NSData *jpeg = UIImageJPEGRepresentation(img, 0.8);
+    if (!jpeg) return;
+
     self.frameInFlight = YES;
     [self fireFrame:jpeg width:w height:h rotation:rotation timestamp:ts];
     self.frameInFlight = NO;
@@ -479,6 +585,13 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
          rotation:(int)rotation timestamp:(int64_t)ts {
     JAVA_OBJECT bytes = nsDataToByteArr(jpeg);
     com_codename1_impl_ios_IOSCameraImpl_onFrameDelivered___byte_1ARRAY_int_int_int_long(
+        CN1_THREAD_GET_STATE_PASS_ARG bytes, w, h, rotation, (JAVA_LONG)ts);
+}
+
+- (void)fireRawFrame:(NSData *)rgba width:(int)w height:(int)h
+            rotation:(int)rotation timestamp:(int64_t)ts {
+    JAVA_OBJECT bytes = nsDataToByteArr(rgba);
+    com_codename1_impl_ios_IOSCameraImpl_onRawFrameDelivered___byte_1ARRAY_int_int_int_long(
         CN1_THREAD_GET_STATE_PASS_ARG bytes, w, h, rotation, (JAVA_LONG)ts);
 }
 
@@ -698,16 +811,17 @@ void com_codename1_impl_ios_IOSNative_cn1CameraStopVideo___long_int(
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_cn1CameraSetFrameDelivery___long_boolean_int(
+void com_codename1_impl_ios_IOSNative_cn1CameraSetFrameDelivery___long_boolean_int_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
-        JAVA_LONG sessionPeer, JAVA_BOOLEAN enabled, JAVA_INT maxFps) {
+        JAVA_LONG sessionPeer, JAVA_BOOLEAN enabled, JAVA_INT maxFps,
+        JAVA_BOOLEAN raw) {
 #if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
 #ifndef CN1_USE_ARC
     CN1Camera *cam = (CN1Camera *)sessionPeer;
 #else
     CN1Camera *cam = (__bridge CN1Camera *)(void *)sessionPeer;
 #endif
-    [cam setFrameDeliveryEnabled:enabled maxFps:maxFps];
+    [cam setFrameDeliveryEnabled:enabled maxFps:maxFps raw:raw];
 #endif
 }
 
