@@ -8,7 +8,7 @@ name: Protocol E2E (REST / GraphQL / gRPC)
 # responses -- an end-to-end check of the full generated-client stack.
 
 on:
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
@@ -20,7 +20,7 @@ on:
       - '.github/workflows/protocol-e2e.yml'
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

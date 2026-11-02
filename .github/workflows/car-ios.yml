@@ -7,7 +7,7 @@ name: Car (CarPlay) integration
 # CarPlay.framework and injects the CarPlay scene/entitlement) and runs it on the iOS Simulator,
 # asserts the CarPlay scene/define/native sources are injected, and boots it on the iOS Simulator.
 'on':
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
@@ -19,7 +19,7 @@ name: Car (CarPlay) integration
       - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.h'
       - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.m'
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
   workflow_dispatch:
 
 concurrency:

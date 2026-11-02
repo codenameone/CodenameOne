@@ -1392,12 +1392,15 @@ never failed there. They now run:
 - **On a pull request only when their own tree changes** -- the sample's
   `scripts/<name>/**`, the cn1lib's module, the feature's own files -- plus
   their workflow file. Never on core, ports, builders or backend paths.
-- **Nightly at 00:00 UTC on master**, each with `cron: '0 0 * * *'`. No `push`
+- **Nightly on master**, each with exactly `cron: '11 0 * * *'` -- off the top
+  of the hour, where GitHub delays and may drop scheduled runs. No `push`
   trigger: a red master push went unread.
 - **`nightly-watchdog.yml`** (07:30 UTC) finds every workflow carrying exactly
-  that cron, checks that night's scheduled run, and keeps one issue, "Nightly
+  that uncommented cron, judges its newest scheduled run (the previous
+  completed one while a run is still going), and keeps one issue, "Nightly
   CI failures", open and assigned to `vars.NIGHTLY_ALERT_ASSIGNEE` (default
-  `shai-almog`) until a fully green night closes it.
+  `shai-almog`) until a night where every suite finished green. A suite with
+  no scheduled run in 30 hours is reported too.
 
 Moving a suite to the nightly is therefore one cron line and a narrowed
 `paths`; there is no list to update. Keep on pull requests whatever has

@@ -25,7 +25,7 @@ name: Gradle build smoke
 # the floor Gradle projects support and the current LTS, and on both the Gradle
 # the wrapper pins and the oldest one the plugin supports.
 on:
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
@@ -34,9 +34,13 @@ on:
       - 'maven/codenameone-gradle-plugin/**'
       - 'maven/codenameone-gradle-plugin-marker/**'
       - 'maven/integration-tests/gradle-*.sh'
+      # Run with DISPLAY cleared: a CSS compiler change that reaches for a
+      # display must fail on its own pull request (CLAUDE.md, headless CSS).
+      - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - '.github/workflows/gradle-smoke.yml'
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
   workflow_dispatch:
 
 concurrency:

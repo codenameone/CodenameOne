@@ -6,7 +6,7 @@ name: Car (Android Auto) integration
 # exercises the car API, so the build injects the androidx.car.app dependency + CarAppService) and
 # runs it on a native Android emulator + asserts the injected Android Auto wiring.
 'on':
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
@@ -16,7 +16,7 @@ name: Car (Android Auto) integration
       - 'Ports/Android/src/com/codename1/impl/android/AndroidCarSupport.java'
       - 'maven/build-engine/src/main/resources/com/codename1/builders/car/**'
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
   workflow_dispatch:
 
 concurrency:

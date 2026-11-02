@@ -67,7 +67,9 @@ JOB_START = re.compile(r'^  ([A-Za-z_][\w.\-]*):\s*$')
 # issue when it fails), which also catches a break that reaches the library
 # through shared code no paths filter lists.
 REQUIRED_TRIGGERS = ('pull_request',)
-NIGHTLY = re.compile(r"cron:\s*['\"]0 0 \* \* \*['\"]")
+# The nightly's exact schedule (nightly-watchdog.yml reads the same one);
+# commented-out lines do not count.
+NIGHTLY = re.compile(r"^\s*-\s*cron:\s*['\"]11 0 \* \* \*['\"]", re.M)
 
 
 def jobs(text):

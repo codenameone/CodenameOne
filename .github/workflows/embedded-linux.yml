@@ -16,7 +16,7 @@
 name: Embedded Linux
 
 on:
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch:
@@ -27,10 +27,10 @@ on:
       - 'scripts/embedded/**'
       - '.github/workflows/embedded-linux.yml'
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
 
 concurrency:
-  group: embedded-linux-${{ github.ref }}
+  group: embedded-linux-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:

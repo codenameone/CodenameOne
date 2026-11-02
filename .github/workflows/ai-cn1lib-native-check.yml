@@ -5,7 +5,7 @@ name: Large AI cn1lib iOS xcodebuild check
 # check for the two deliberately large cn1libs.
 
 on:
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
       - '.github/workflows/ai-cn1lib-native-check.yml'
       - 'scripts/ci/select-cn1lib-checks.py'
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

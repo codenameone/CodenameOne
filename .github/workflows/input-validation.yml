@@ -14,7 +14,7 @@ name: Input validation gesture suite
 # scripts/input-validation-app/README.adoc for the "not yet covered" list.
 
 on:
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
@@ -24,7 +24,7 @@ on:
       - 'scripts/ios/keyboard-peer-tests/**'
   workflow_dispatch: {}
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
 
 env:
   # A method the translator culled as unreachable is still emitted as a stub,

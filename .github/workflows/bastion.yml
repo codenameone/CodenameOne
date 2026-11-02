@@ -27,7 +27,7 @@ name: Bastion (full-stack sample)
 # the jailbreak checks -- is not built here; the app reports it as inactive.
 
 on:
-  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
@@ -38,7 +38,7 @@ on:
   # checked is checked again when it lands.
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '11 0 * * *'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

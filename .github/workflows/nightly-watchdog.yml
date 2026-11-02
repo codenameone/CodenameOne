@@ -3,16 +3,20 @@ name: Nightly watchdog
 # The expensive suites -- the sample applications, the cn1libs, the device
 # integrations, the benchmarks, the full Maven reactor -- run on a pull request
 # only when their own tree changes, and on master once a night at 00:00 UTC
-# (each carries `cron: '0 0 * * *'`). Shared code (core, ports, builders,
+# (each carries `cron: '11 0 * * *'`, off the top of the hour, where GitHub
+# delays and may drop scheduled runs). Shared code (core, ports, builders,
 # backend) therefore reaches them only through that nightly run, so a failure
 # there must not go unread the way a red master push did.
 #
 # This job reads the nightly set from the workflow files themselves -- every
-# workflow whose schedule is exactly '0 0 * * *' -- so adding a suite to the
+# workflow with an uncommented `- cron: '11 0 * * *'` -- so adding a suite to the
 # nightly is one cron line, with no list here to keep in sync. It then finds
-# that night's scheduled run of each on master and keeps ONE issue open,
-# assigned to NIGHTLY_ALERT_ASSIGNEE, listing every suite that failed or never
-# started. A night with everything green closes it.
+# the newest scheduled run of each on master and keeps ONE issue open,
+# assigned to NIGHTLY_ALERT_ASSIGNEE, listing every suite that failed or has
+# not run in the last 30 hours. A run still going when checked is judged by
+# the previous completed one, so a suite that fails after this job has looked
+# is reported the next morning; and the issue closes only when every suite has
+# finished green, never on one still running.
 
 on:
   schedule:
@@ -49,7 +53,7 @@ jobs:
             const { owner, repo } = context.repo;
             const title = 'Nightly CI failures';
             const marker = '<!-- nightly-watchdog -->';
-            const NIGHTLY = /cron:\s*['"]0 0 \* \* \*['"]/;
+            const NIGHTLY = /^\s*-\s*cron:\s*['"]11 0 \* \* \*['"]/m;
 
             const dir = '.github/workflows';
             const nightly = fs.readdirSync(dir)
@@ -57,29 +61,34 @@ jobs:
               .filter(f => NIGHTLY.test(fs.readFileSync(path.join(dir, f), 'utf8')))
               .sort();
             if (nightly.length === 0) {
-              core.setFailed(`No workflow in ${dir} is scheduled at '0 0 * * *'; the watchdog would report every night clean.`);
+              core.setFailed(`No workflow in ${dir} is scheduled at '11 0 * * *'; the watchdog would report every night clean.`);
               return;
             }
 
-            // Tonight's run started at 00:00 UTC; allow GitHub's schedule lag.
-            const since = new Date();
-            since.setUTCHours(0, 0, 0, 0);
-            since.setUTCMinutes(-30);
-
+            // No wall-clock window: a dispatch at any hour, or a delayed
+            // schedule, judges the newest scheduled run, which only has to be
+            // recent enough to prove the schedule still fires.
+            const STALE_MS = 30 * 3600 * 1000;
+            const GREEN = ['success', 'skipped', 'neutral'];
             const problems = [];
             const running = [];
             for (const file of nightly) {
               const { data } = await github.rest.actions.listWorkflowRuns({
-                owner, repo, workflow_id: file, event: 'schedule', branch: 'master',
-                per_page: 5, created: `>=${since.toISOString()}`,
+                owner, repo, workflow_id: file, event: 'schedule', branch: 'master', per_page: 10,
               });
-              const run = data.workflow_runs[0];
-              if (!run) {
-                problems.push(`- \`${file}\`: no scheduled run since ${since.toISOString()} (disabled, or the schedule did not fire)`);
-              } else if (run.status !== 'completed') {
-                running.push(`- [\`${file}\`](${run.html_url}): still ${run.status}`);
-              } else if (!['success', 'skipped', 'neutral'].includes(run.conclusion)) {
-                problems.push(`- [\`${file}\`](${run.html_url}): ${run.conclusion}`);
+              const runs = data.workflow_runs;
+              const newest = runs[0];
+              if (!newest || Date.now() - new Date(newest.created_at).getTime() > STALE_MS) {
+                problems.push(`- \`${file}\`: no scheduled run in the last 30 hours (workflow disabled, or the schedule did not fire)`);
+                continue;
+              }
+              const done = runs.find(r => r.status === 'completed');
+              if (newest.status !== 'completed') {
+                running.push(`- [\`${file}\`](${newest.html_url}): still ${newest.status}`);
+              }
+              if (done && !GREEN.includes(done.conclusion)
+                  && Date.now() - new Date(done.created_at).getTime() <= 2 * STALE_MS) {
+                problems.push(`- [\`${file}\`](${done.html_url}): ${done.conclusion}`);
               }
             }
 
@@ -96,7 +105,8 @@ jobs:
               .write();
 
             if (problems.length === 0) {
-              if (issue) {
+              // Close only on a night where everything finished green.
+              if (issue && running.length === 0) {
                 await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
                   body: `Recovered: every nightly workflow passed on the run checked at ${now}.` });
                 await github.rest.issues.update({ owner, repo, issue_number: issue.number,
