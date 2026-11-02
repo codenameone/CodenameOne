@@ -125,6 +125,12 @@ class ScaleStartDetails {
   external int get pointerCount;
 }
 
+// Signature for a drag-start callback -- Flutter's `GestureDragStartCallback`
+// (`void Function(DragStartDetails)`), the type GestureDetector's drag-start
+// parameters declare.
+@JavaName('com.codename1.flutter.gestures.GestureDragStartCallback')
+class GestureDragStartCallback {}
+
 // Signature for a drag-update callback — Flutter's `GestureDragUpdateCallback`
 // (`void Function(DragUpdateDetails)`). A SAM the transpiler binds closures to;
 // the reply bottom-drawer stores one and hands it to a GestureDetector.

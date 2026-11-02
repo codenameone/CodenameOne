@@ -510,6 +510,34 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     }
 
     /** Dart's list[i] = v. */
+    /// The transpiler calls this instead when the receiver's static element type is exact
+    /// (a type with no proper subtype a collection could be reified with), so the reified
+    /// witness can only be that type and the write cannot fail its check. Any subclass keeps
+    /// its own write path, checks included.
+    public final boolean addUnchecked(E e) {
+        if (getClass() != DartList.class) {
+            return add(e);
+        }
+        checkGrowable("add");
+        modCount++;
+        impl.add(e);
+        return true;
+    }
+
+    /// The transpiler calls this instead when the receiver's static element type is exact
+    /// (a type with no proper subtype a collection could be reified with), so the reified
+    /// witness can only be that type and the write cannot fail its check. Any subclass keeps
+    /// its own write path, checks included.
+    public final E idxSetUnchecked(long index, E value) {
+        if (getClass() != DartList.class) {
+            return idxSet(index, value);
+        }
+        checkWritable();
+        RangeError.checkValidIndex(index, impl.size());
+        impl.set((int) index, value);
+        return value;
+    }
+
     public E idxSet(long index, E value) {
         RangeError.checkValidIndex(index, size());
         set((int) index, value);

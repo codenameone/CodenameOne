@@ -66,4 +66,18 @@ void main() {
   print(first.runtimeType);
   Object paired = Keeper().pair;
   print(paired.runtimeType);
+
+  // Type parameters nested in the signature print renamed too.
+  List<K> wrapped<K>(K k) => [k];
+  print(wrapped.runtimeType);
+  int sizeOf<K, V>(Map<K, V> m) => m.length;
+  print(sizeOf.runtimeType);
+  K applyTo<K, V>(K Function(V) f, V v) => f(v);
+  print(applyTo.runtimeType);
+  print(applyTo<String, int>((n) => 'n$n', 7));
+  final ident = <T>(T x) => x;
+  print(ident.runtimeType);
+  print(ident(5));
+  final listed = <E>(List<E> xs, E Function(E)? g) => xs.length;
+  print(listed.runtimeType);
 }

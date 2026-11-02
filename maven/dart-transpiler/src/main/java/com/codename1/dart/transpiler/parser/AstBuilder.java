@@ -2611,11 +2611,62 @@ public final class AstBuilder {
     /** {@code t} with every reference to one of {@code names} replaced by dynamic. */
     /// The type parameter {@code t} is written as (`T`, or `T?` when nullable), or null when
     /// it is none of {@code names}.
+    /// How a generic function's signature slot of type {@code t} prints when it names one of
+    /// the function's type parameters {@code names}, bare or nested (`T`, `List<K>`,
+    /// `Map<K, V>`, `K Function(V)` as `(V) => K`), in Dart's own spelling; the runtime
+    /// renames the parameters to Y0, Y1... Null when the slot names none of them, so it
+    /// prints from its witness.
     private static String typeVarName(TypeRef t, List<String> names) {
-        if (t == null || !t.args.isEmpty() || t.funcParams != null || !names.contains(t.name)) {
+        if (t == null || !mentionsAny(t, names)) {
             return null;
         }
-        return t.nullable ? t.name + "?" : t.name;
+        return dartSpelling(t);
+    }
+
+    private static boolean mentionsAny(TypeRef t, List<String> names) {
+        if (t == null) {
+            return false;
+        }
+        if (t.args.isEmpty() && t.funcParams == null && names.contains(t.name)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsAny(a, names)) {
+                return true;
+            }
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (mentionsAny(a, names)) {
+                    return true;
+                }
+            }
+            return mentionsAny(t.funcReturn, names);
+        }
+        return false;
+    }
+
+    private static String dartSpelling(TypeRef t) {
+        if (t == null || t.is("var")) {
+            return "dynamic";
+        }
+        if (t.funcParams != null) {
+            StringBuilder sb = new StringBuilder("(");
+            for (int i = 0; i < t.funcParams.size(); i++) {
+                sb.append(i > 0 ? ", " : "").append(dartSpelling(t.funcParams.get(i)));
+            }
+            sb.append(") => ").append(dartSpelling(t.funcReturn));
+            return t.nullable ? "(" + sb + ")?" : sb.toString();
+        }
+        StringBuilder sb = new StringBuilder(t.name);
+        if (!t.args.isEmpty()) {
+            sb.append('<');
+            for (int i = 0; i < t.args.size(); i++) {
+                sb.append(i > 0 ? ", " : "").append(dartSpelling(t.args.get(i)));
+            }
+            sb.append('>');
+        }
+        return t.nullable ? sb.append('?').toString() : sb.toString();
     }
 
     private static TypeRef eraseTypeParams(TypeRef t, List<String> names) {

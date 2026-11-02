@@ -208,6 +208,22 @@ public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified
             throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
                     + "' is not a subtype of type '" + elem + "' of 'value'");
         }
+        return addStored(e);
+    }
+
+    /// The transpiler calls this instead when the receiver's static element type is exact
+    /// (a type with no proper subtype a collection could be reified with), so the reified
+    /// witness can only be that type and the write cannot fail its check. Any subclass keeps
+    /// its own write path, checks included.
+    public final boolean addUnchecked(E e) {
+        if (getClass() != DartSet.class) {
+            return add(e);
+        }
+        checkWritable();
+        return addStored(e);
+    }
+
+    private boolean addStored(E e) {
         boolean added = storedElement(e) == e && super.add(e);
         if (added) {
             structure++;

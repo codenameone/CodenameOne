@@ -420,6 +420,23 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> implements dart.runtime.R
         return value;
     }
 
+    /// The transpiler calls this instead when the receiver's static key and value types are exact
+    /// (a type with no proper subtype a collection could be reified with), so the reified
+    /// witness can only be that type and the write cannot fail its check. Any subclass keeps
+    /// its own write path, checks included.
+    @SuppressWarnings("unchecked")
+    public final V idxSetUnchecked(K key, V value) {
+        if (getClass() != DartMap.class) {
+            return idxSet(key, value);
+        }
+        Object stored = storedKey(key);
+        if (!super.containsKey(stored)) {
+            structure++;
+        }
+        super.put((K) stored, value);
+        return value;
+    }
+
     public long length() {
         return size();
     }

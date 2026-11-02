@@ -2828,7 +2828,7 @@ class IconButton extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.GestureDetector')
 class GestureDetector extends Widget {
-  external GestureDetector({Key? key, VoidCallback? onTap, VoidCallback? onLongPress, VoidCallback? onDoubleTap, void Function(ScaleStartDetails details)? onScaleStart, void Function(ScaleUpdateDetails details)? onScaleUpdate, void Function(ScaleEndDetails details)? onScaleEnd, Widget? child});
+  external GestureDetector({Key? key, VoidCallback? onTap, VoidCallback? onLongPress, VoidCallback? onDoubleTap, HitTestBehavior? behavior, bool excludeFromSemantics, Object? dragStartBehavior, GestureTapDownCallback? onTapDown, GestureTapUpCallback? onTapUp, GestureDragStartCallback? onVerticalDragStart, GestureDragUpdateCallback? onVerticalDragUpdate, GestureDragEndCallback? onVerticalDragEnd, GestureDragStartCallback? onHorizontalDragStart, GestureDragUpdateCallback? onHorizontalDragUpdate, GestureDragEndCallback? onHorizontalDragEnd, GestureDragStartCallback? onPanStart, GestureDragUpdateCallback? onPanUpdate, GestureDragEndCallback? onPanEnd, void Function(ScaleStartDetails details)? onScaleStart, void Function(ScaleUpdateDetails details)? onScaleUpdate, void Function(ScaleEndDetails details)? onScaleEnd, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.material.InkWell')

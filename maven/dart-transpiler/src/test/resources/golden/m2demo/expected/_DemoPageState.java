@@ -94,7 +94,7 @@ public class _DemoPageState extends State<DemoPage> {
         //@dart:91 main.dart
         this.setState(() -> {
             //@dart:92 main.dart
-            this._items.add("Item " + DartRuntime.str(this._items.length() + 1L));
+            this._items.addUnchecked("Item " + DartRuntime.str(this._items.length() + 1L));
         });
     }
 

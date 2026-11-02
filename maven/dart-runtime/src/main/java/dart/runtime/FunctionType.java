@@ -43,16 +43,35 @@ public final class FunctionType {
 
     /// Dart prints a generic function type with its type parameters renamed in order,
     /// `Y0`, `Y1`...: `T id<T>(T v)` is `<Y0>(Y0) => Y0`, whatever the source called T.
-    private String canonical(String name) {
-        boolean q = name.endsWith("?");
-        String bare = q ? name.substring(0, name.length() - 1) : name;
+    /// The slot is a Dart type spelling (`T`, `List<K>`, `(V) => K`); every identifier in
+    /// it that is one of the type parameters is renamed.
+    private String canonical(String spelled) {
         String[] params = typeVars[0].split(", ");
-        for (int k = 0; k < params.length; k++) {
-            if (params[k].equals(bare)) {
-                return "Y" + k + (q ? "?" : "");
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        while (i < spelled.length()) {
+            char c = spelled.charAt(i);
+            if (Character.isLetterOrDigit(c) || c == '_' || c == '$') {
+                int start = i;
+                while (i < spelled.length() && (Character.isLetterOrDigit(spelled.charAt(i))
+                        || spelled.charAt(i) == '_' || spelled.charAt(i) == '$')) {
+                    i++;
+                }
+                String word = spelled.substring(start, i);
+                String renamed = word;
+                for (int k = 0; k < params.length; k++) {
+                    if (params[k].equals(word)) {
+                        renamed = "Y" + k;
+                        break;
+                    }
+                }
+                sb.append(renamed);
+            } else {
+                sb.append(c);
+                i++;
             }
         }
-        return name;
+        return sb.toString();
     }
 
     private String slot(int i) {

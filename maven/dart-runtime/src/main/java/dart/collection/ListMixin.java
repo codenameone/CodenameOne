@@ -291,6 +291,16 @@ public interface ListMixin<E> extends IterableMixin<E> {
     }
 
     /**
+     * Dart's {@code sublist(start, [int? end])} as Dart declares it, with a nullable
+     * {@code end}: null (an omitted argument, or a program forwarding its own {@code int?})
+     * is the one-argument form. A program override of {@code sublist(int, [int? end])} is
+     * this signature in Java, and its bridges cover the unboxed overloads.
+     */
+    default DartList<E> sublist(long start, Long end) {
+        return end == null ? sublist(start, length()) : sublist(start, end.longValue());
+    }
+
+    /**
      * A view that re-reads {@code length()} and {@code [index]} on every step, so
      * where/map/skip/take see later changes to the list, as Dart's lazy iterables do.
      */
