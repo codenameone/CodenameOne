@@ -2010,6 +2010,7 @@ public final class JavaEmitter {
             impls.append("dart.runtime.DynamicObject");
         }
         body.append(emitStubGetterBridges(c, ctx));
+        body.append(covariantFieldSetterBridges(c, ctx));
         body.append(emitSinkAddErrorBridges(c, ctx));
         body.append(defaultDartToString(c));
         // Dart 3 sealed -> Java sealed: a sealed class with subtypes lists them in a permits clause and
@@ -2728,6 +2729,45 @@ public final class JavaEmitter {
      * abstract getter, or its getter's @Override named nothing. implementerBridges covers
      * the implements edge; this is the same bridge for the superclass chain.
      */
+    /// `class CatHolder extends Holder { Cat h; }` over `covariant Pet h`: the narrowed field's
+    /// set$h(Cat) is only a Java overload of the inherited set$h(Pet), so a write through a
+    /// Holder stored any Pet unchecked. The inherited spelling is overridden here, checking
+    /// the value as Dart's covariant setter does (a TypeError) before storing it.
+    private String covariantFieldSetterBridges(ClassDecl c, Ctx ctx) {
+        ClassDecl sup = c.superclass != null && !c.isMixin ? superDeclOf(c, c.superclass) : null;
+        if (sup == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (FieldDecl f : c.fields) {
+            if (f.isStatic || f.isFinal || f.isConst) {
+                continue;
+            }
+            ClassDecl owner = null;
+            FieldDecl sf = null;
+            for (ClassDecl k = sup; k != null && sf == null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+                sf = k.field(f.name);
+                owner = k;
+            }
+            if (sf == null || sf.isStatic || sf.isFinal || sf.isConst || sf.type == null
+                    || owner.typeParams.contains(sf.type.name)) {
+                continue;
+            }
+            TypeRef narrow = fieldType(f, ctx);
+            String wideJava = javaType(sf.type, false, ctx);
+            String narrowJava = javaType(narrow, false, ctx);
+            String we = wideJava.indexOf('<') >= 0 ? wideJava.substring(0, wideJava.indexOf('<')) : wideJava;
+            String ne = narrowJava.indexOf('<') >= 0 ? narrowJava.substring(0, narrowJava.indexOf('<')) : narrowJava;
+            if (we.equals(ne) || isJavaPrimitive(wideJava) || isJavaPrimitive(narrowJava)) {
+                continue;
+            }
+            sb.append("    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    public void set$").append(f.name)
+                    .append('(').append(wideJava).append(" $b0) {\n        set$").append(f.name).append('(')
+                    .append(checkedBridgeArg("$b0", narrow, ctx)).append(");\n    }\n\n");
+        }
+        return sb.toString();
+    }
+
     private String superclassFieldGetterBridges(ClassDecl c, Ctx ctx) {
         ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         if (sup == null) {
@@ -3278,7 +3318,15 @@ public final class JavaEmitter {
                     call.append(", ");
                 }
                 ps.append(sig.params.get(i)).append(" $b").append(i);
-                call.append("((").append(implParams.get(i)).append(") $b").append(i).append(')');
+                TypeRef narrow = i < m.params.size() ? m.params.get(i).type : null;
+                if ((pinned != null && pinned.get(i) != null) || narrow == null || isTypeVariable(narrow, ctx)) {
+                    // A pinned Java type, or a type variable Java erases: nothing to test against.
+                    call.append("((").append(implParams.get(i)).append(") $b").append(i).append(')');
+                } else {
+                    // `void put(int x)` implementing `put(covariant Object x)`: checked as
+                    // Dart checks it, a TypeError for a non-int.
+                    call.append(checkedBridgeArg("$b" + i, narrow, ctx));
+                }
             }
             sb.append("    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    public ").append(sig.ret)
                     .append(' ').append(m.name).append('(').append(ps).append(") {\n        ")
@@ -3483,6 +3531,12 @@ public final class JavaEmitter {
                 continue;
             }
             StringBuilder args = new StringBuilder();
+            // A generic method's hidden witnesses lead its Java parameters. A dynamic call
+            // writes no type arguments here, so each is unknown (null), as for any caller
+            // that cannot name them.
+            for (int twi = 0; twi < methodWitnesses(m).size(); twi++) {
+                args.append(args.length() == 0 ? "" : ", ").append("(dart.runtime.TypeWitness) null");
+            }
             int positional = 0;
             for (Param p : m.params) {
                 if (!p.named) {
@@ -4721,7 +4775,7 @@ public final class JavaEmitter {
             }
             String wideJava = javaType(wideRef, false, ctx);
             String narrowJava = javaType(narrow, false, ctx);
-            if (isJavaPrimitive(wideJava) || isJavaPrimitive(narrowJava)) {
+            if (isJavaPrimitive(wideJava)) {
                 return "";
             }
             String narrowErased = narrowJava.indexOf('<') >= 0
@@ -4734,7 +4788,11 @@ public final class JavaEmitter {
                 call.append(", ");
             }
             sig.append(wideJava).append(" $b").append(i);
-            call.append("((").append(narrowJava).append(") $b").append(i).append(')');
+            // Dart checks the narrowed parameter at entry: `A a = B(); a.m(1.5)` against
+            // `void m(covariant int x)` throws a TypeError, never a ClassCastException (which
+            // ParparVM does not even raise). A primitive is unboxed explicitly, or the boxed
+            // argument would select this bridge again.
+            call.append(checkedBridgeArg("$b" + i, narrow, ctx));
         }
         if (!differs) {
             return "";
@@ -4759,6 +4817,29 @@ public final class JavaEmitter {
                 .append("void".equals(rjt) ? "" : "return ").append(m.name).append('(').append(call)
                 .append(");\n    }\n\n");
         return sb.toString();
+    }
+
+    /// The bridge argument {@code var} (received under the overridden member's wider Java
+    /// type) checked against the overriding parameter's Dart type {@code narrow}, exactly as
+    /// `var as narrow` is lowered, and unboxed when the override takes a primitive.
+    private String checkedBridgeArg(String var, TypeRef narrow, Ctx ctx) {
+        ctx.pushScope();
+        try {
+            ctx.declare(var, TypeRef.DYNAMIC);
+            Ident id = new Ident();
+            id.name = var;
+            AsCast ac = new AsCast();
+            ac.operand = id;
+            ac.type = narrow;
+            String code = emitAsCast(ac, ctx).code;
+            String prim = javaType(narrow, false, ctx);
+            if ("long".equals(prim) || "double".equals(prim) || "boolean".equals(prim)) {
+                code = paren(code) + "." + prim + "Value()";
+            }
+            return code;
+        } finally {
+            ctx.popScope();
+        }
     }
 
     private static boolean isJavaPrimitive(String t) {
@@ -8091,8 +8172,10 @@ public final class JavaEmitter {
     }
 
     /// `((sam) bare)` as an Out that remembers it is a cast of {@code f}.
-    private static Out samCastOut(String sam, FnForm f, TypeRef type) {
-        return new Out("((" + sam + ") " + f.bare + ")", type, f.castTo(sam, null, false));
+    private Out samCastOut(String sam, FnForm f, TypeRef type) {
+        String rr = recastRunTimeSigned(sam, f.bare);
+        return new Out(rr != null ? "(" + rr + ")" : "((" + sam + ") " + f.bare + ")", type,
+                f.castTo(sam, null, false));
     }
 
     /**
@@ -8615,7 +8698,20 @@ public final class JavaEmitter {
                         && (cc.ctorName.equals("generate") || cc.ctorName.equals("filled")
                             || cc.ctorName.equals("from") || cc.ctorName.equals("unmodifiable")
                             || cc.ctorName.equals("empty"))) {
-                    return withListWitness(emitListFactory(cc, expected, ctx), ctx);
+                    Out built = emitListFactory(cc, expected, ctx);
+                    Out typed = withListWitness(built, ctx);
+                    if (typed == built && built.type != null && primitiveListKind(built.type) == null
+                            && (built.type.args.isEmpty() || isDynamicType(built.type.arg(0)))
+                            && cc.type.args.isEmpty() && !contextNamesElementType(expected)
+                            && (cc.ctorName.equals("from") || cc.ctorName.equals("unmodifiable"))) {
+                        // `List.from(xs)` / `List.unmodifiable(xs)` take an Iterable<dynamic>, so
+                        // with no element type from the context E IS dynamic -- Dart's rule, not
+                        // an inference gap -- and `List.unmodifiable(<int>[1]) is List<String>`
+                        // is false. Unrecorded, the null witness answered every test true.
+                        typed = new Out("dart.core.DartList.typed(" + built.code + ", dart.runtime.TypeWitness.DYNAMIC)",
+                                built.type, built.fromError);
+                    }
+                    return typed;
                 }
                 // Map/Set/Iterable named factory constructors -- dart:core intrinsics
                 // routed to the existing statics on Dart{Map,Set,Iterable}.
@@ -9346,9 +9442,28 @@ public final class JavaEmitter {
     /// `f is R Function(P..)`: the closure's reified signature (TypeWitness.isFunctionOf);
     /// null when nothing in the signature is testable, which keeps the erased arity test.
     private String functionTest(String subject, TypeRef t, String erased, Ctx ctx) {
-        if (t.funcReturn == null || t.funcParams == null
-                || !(erased.startsWith("dart.runtime.Funcs.") || erased.startsWith("Funcs."))) {
+        if (t.funcReturn == null || t.funcParams == null || !isFuncsSamName(erased)) {
             return null;
+        }
+        if (t.funcTypeParams != null && !t.funcTypeParams.isEmpty()
+                && (t.funcNamed == null || t.funcNamed.isEmpty()) && t.funcRequired < 0) {
+            // A generic function type: only a generic closure is one (and a generic closure is
+            // no non-generic function type, which isFunction answers).
+            List<TypeRef> slots = new ArrayList<TypeRef>();
+            slots.add(t.funcReturn);
+            slots.addAll(t.funcParams);
+            StringBuilder vars = new StringBuilder();
+            StringBuilder ws = new StringBuilder();
+            for (int i = 0; i < slots.size(); i++) {
+                TypeRef st = slots.get(i);
+                int v = st.args.isEmpty() && st.funcParams == null ? t.funcTypeParams.indexOf(st.name) : -1;
+                vars.append(i == 0 ? "" : ", ").append(v);
+                String w = v >= 0 || isDynamicType(st) || st.is("void") ? null
+                        : i == 0 ? reifiedArgWitness(st, ctx) : targetArgWitness(st, ctx);
+                ws.append(", ").append(nullWitness(w));
+            }
+            return "dart.runtime.TypeWitness.isGenericFunction(" + subject + ", " + t.funcTypeParams.size()
+                    + ", new int[] {" + vars + "}" + ws + ")";
         }
         boolean topReturn = t.funcReturn.is("void") || isDynamicType(t.funcReturn)
                 || t.funcReturn.is("Object") && t.funcReturn.nullable;
@@ -9359,7 +9474,7 @@ public final class JavaEmitter {
         }
         // The SAMs an unsigned function of the target's positional arity is held by.
         int positional = t.funcParams.size() - (t.funcNamed == null ? 0 : t.funcNamed.size());
-        String base = erased.substring(0, erased.lastIndexOf('.') + 1);
+        String base = "dart.runtime.Funcs.";
         List<String> spec = namedSpec(t);
         String named = spec == null || spec.isEmpty() ? "null"
                 : "new String[] {\"" + String.join("\", \"", spec) + "\"}";
@@ -9480,9 +9595,17 @@ public final class JavaEmitter {
         TypeRef ret = ctxRet != null && !isDynamicType(ctxRet) ? ctxRet
                 : !returnsValue ? new TypeRef("void") : l.exprBody != null ? bodyType : null;
         StringBuilder sig = new StringBuilder();
-        sig.append(ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
-                : staticWitness(ret, true, ctx));
-        boolean any = false;
+        String retWitness = ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
+                : staticWitness(ret, true, ctx);
+        sig.append(retWitness);
+        boolean any = !"null".equals(retWitness);
+        // The same signature read at run time: a slot naming a type parameter whose witness
+        // this scope holds (`(T x) => x` in g<T>()) is that witness, not untested.
+        StringBuilder dynSig = new StringBuilder();
+        boolean dynamicSlot = false;
+        String dynRet = ret != null && readsTypeVarWitness(ret, ctx) ? reifiedArgWitness(ret, ctx) : null;
+        dynamicSlot |= dynRet != null;
+        dynSig.append(dynRet != null ? dynRet : retWitness);
         for (int i = 0; i < l.params.size(); i++) {
             TypeRef pt = l.params.get(i).type;
             if (pt == null || pt.is("var")) {
@@ -9491,11 +9614,26 @@ public final class JavaEmitter {
             String w = pt == null ? "null" : staticWitness(pt, false, ctx);
             any |= !"null".equals(w);
             sig.append(", ").append(w);
+            String dw = pt != null && readsTypeVarWitness(pt, ctx) ? targetArgWitness(pt, ctx) : null;
+            dynamicSlot |= dw != null;
+            dynSig.append(", ").append(dw != null ? dw : w);
         }
         // Generic unless a context instantiated it; a local function's context is its own
         // (erased) signature, which instantiates nothing.
-        boolean generic = !l.typeParams.isEmpty() && (ctxSig == null || l.ownSignature);
-        if (!any && sig.toString().startsWith("null") && !generic) {
+        // The SAM emitLambdaIn builds for an Object/Function/dynamic slot is the closure's
+        // own erased shape, not a context: `Object h = <T>(T x) => x` stays generic.
+        boolean generic = !l.typeParams.isEmpty() && (ctxSig == null || l.ownSignature
+                || expected == ownSamContext);
+        if (dynamicSlot && !generic) {
+            String wrapped = signAtRunTime(code, samType, dynSig.toString(), required, named, own && expected == null, ctx);
+            if (wrapped != null) {
+                String names = named == null ? "null" : "new String[] {\"" + String.join("\", \"", named) + "\"}";
+                runTimeSigned.put(wrapped, new String[] {code, ", new dart.runtime.TypeWitness[] {" + dynSig
+                        + "}, " + required + ", " + names + ")"});
+                return wrapped;
+            }
+        }
+        if (!any && !generic) {
             return code;
         }
         boolean spellArgs = own && expected == null;
@@ -9519,6 +9657,26 @@ public final class JavaEmitter {
         }
         signedClosures.put(l, new String[] {code, signed[0], signed[1]});
         return signed[1];
+    }
+
+    /// A closure signed with witnesses read at run time (dart.runtime.SignedFns): the
+    /// static markers hold constants only. Null when the SAM is no Funcs one.
+    private String signAtRunTime(String code, TypeRef samType, String sig, int required, List<String> named,
+            boolean spellArgs, Ctx ctx) {
+        String jt = functionSam(samType, ctx);
+        if (jt == null || spellArgs && jt.indexOf('?') >= 0 || !isFuncsSamName(jt) || samType.funcParams == null
+                || samType.funcParams.size() > 5) {
+            return null;
+        }
+        int lt = jt.indexOf('<');
+        // As signWith: javac infers the type arguments from the consumer's target, which may
+        // differ from the closure's own SAM; only a site with no target spells them.
+        String targs = !spellArgs || lt < 0 ? "" : jt.substring(lt);
+        String factory = (samType.funcReturn != null && samType.funcReturn.is("void") ? "voidFunc" : "func")
+                + samType.funcParams.size();
+        String names = named == null ? "null" : "new String[] {\"" + String.join("\", \"", named) + "\"}";
+        return "dart.runtime.SignedFns." + targs + factory + "(" + code + ", new dart.runtime.TypeWitness[] {"
+                + sig + "}, " + required + ", " + names + ")";
     }
 
     /// A function type's named parameters as the runtime spells them (Signed.$named): a
@@ -9603,9 +9761,7 @@ public final class JavaEmitter {
         }
         int lt = jt.indexOf('<');
         String head = lt < 0 ? jt : jt.substring(0, lt);
-        if (head.startsWith("Funcs.")) {
-            head = "dart.runtime." + head;
-        }
+        head = qualifiedFuncsSam(head);
         List<String> targs = new ArrayList<String>();
         if (lt >= 0) {
             int depth = 0;
@@ -9660,6 +9816,10 @@ public final class JavaEmitter {
     /// interface (a runtime callback type such as GestureDragStartCallback) takes the
     /// intersection alone. Null when {@code o} is no signed function value.
     private String recastSigned(String type, Out o) {
+        String rr = recastRunTimeSigned(type, o.code);
+        if (rr != null) {
+            return rr;
+        }
         FnForm f = o.fn;
         if (f == null || f.marker == null || "Object".equals(type) || "java.lang.Object".equals(type)) {
             return null;
@@ -9688,10 +9848,87 @@ public final class JavaEmitter {
 
     /// Whether a Java type name (as javaType spells it) is one of the Funcs SAMs.
     private static boolean isFuncsSamName(String javaTypeName) {
-        return javaTypeName.startsWith("Funcs.") || javaTypeName.startsWith("dart.runtime.Funcs.");
+        int lt = javaTypeName.indexOf('<');
+        String head = (lt < 0 ? javaTypeName : javaTypeName.substring(0, lt)).trim();
+        return FUNCS_SAMS.contains(qualifiedFuncsSam(head));
+    }
+
+    /// The Funcs SAM interfaces, by qualified name: every interface javaType spells for an
+    /// inline function type (Func0..Func5, VoidFunc0..VoidFunc5).
+    private static final java.util.Set<String> FUNCS_SAMS = funcsSams();
+
+    private static java.util.Set<String> funcsSams() {
+        java.util.Set<String> out = new HashSet<String>();
+        for (int n = 0; n <= 5; n++) {
+            out.add("dart.runtime.Funcs.Func" + n);
+            out.add("dart.runtime.Funcs.VoidFunc" + n);
+        }
+        return out;
+    }
+
+    /// A Funcs SAM name as the import of dart.runtime.Funcs lets javaType write it
+    /// (`Funcs.Func1`), qualified; any other name unchanged.
+    private static String qualifiedFuncsSam(String head) {
+        String q = "dart.runtime." + head;
+        return FUNCS_SAMS.contains(q) ? q : head;
+    }
+
+    /// Closures signAtRunTime wrapped, by the wrapped call: {closure, the factory call's tail
+    /// after the closure}. A consumer casting one to a Funcs SAM re-wraps the closure cast to
+    /// that SAM, with that SAM's factory, so the generic factory infers its type arguments
+    /// from the typed argument and yields exactly the consumer's type: a cast around a
+    /// generic call is no target javac infers the lambda's parameter types from. Closures
+    /// and tear-offs alike, so the map is keyed by the code every cast site holds.
+    private final java.util.HashMap<String, String[]> runTimeSigned = new java.util.HashMap<String, String[]>();
+
+    /// recastSigned for a closure signAtRunTime wrapped; null for any other code or SAM.
+    private String recastRunTimeSigned(String sam, String code) {
+        String c = code;
+        while (c.startsWith("(") && c.endsWith(")") && runTimeSigned.get(c) == null && balancedParen(c)) {
+            c = c.substring(1, c.length() - 1);
+        }
+        String[] r = runTimeSigned.get(c);
+        if (r == null || !isFuncsSamName(sam)) {
+            return null;
+        }
+        int lt = sam.indexOf('<');
+        String head = (lt < 0 ? sam : sam.substring(0, lt)).trim();
+        head = head.substring(head.lastIndexOf('.') + 1);
+        String factory = Character.toLowerCase(head.charAt(0)) + head.substring(1);
+        if (!factory.matches("(voidFunc|func)[0-5]")) {
+            return null;
+        }
+        return "(" + sam + ") dart.runtime.SignedFns." + factory + "((" + sam + ") " + paren(r[0]) + r[1];
+    }
+
+    /// Whether the outer parentheses of {@code c} enclose all of it.
+    private static boolean balancedParen(String c) {
+        int depth = 0;
+        for (int i = 0; i < c.length(); i++) {
+            char ch = c.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                // A literal's parentheses are no nesting: skip to its closing quote.
+                for (i++; i < c.length() && c.charAt(i) != ch; i++) {
+                    if (c.charAt(i) == '\\') {
+                        i++;
+                    }
+                }
+                continue;
+            }
+            if (ch == '(') {
+                depth++;
+            } else if (ch == ')' && --depth == 0 && i < c.length() - 1) {
+                return false;
+            }
+        }
+        return depth == 0;
     }
 
     private String samCast(Expr src, Out o, String sam) {
+        String rr = recastRunTimeSigned(sam, o.code);
+        if (rr != null) {
+            return rr;
+        }
         String[] s = src instanceof Lambda ? signedClosures.get(src) : null;
         if (s != null && s[2].equals(o.code)) {
             // The outer plain cast is what a generic consumer infers its type arguments
@@ -10624,6 +10861,21 @@ public final class JavaEmitter {
         // one built by unwitnessed generic code is.
         java.util.Set<String> collUses = softUses != null ? softUses
                 : classCollUses != null ? classCollUses : discardedUses;
+        if (softUses != null && (o instanceof ListLit && ((ListLit) o).elementType == null
+                || o instanceof SetLit && ((SetLit) o).elementType == null
+                || o instanceof MapLit && ((MapLit) o).keyType == null
+                || o instanceof Lambda && functionTypeTested)) {
+            // An untyped literal's element type is inferred -- `List<T> wrap<T>(T x) => [x]`
+            // is a List<T>, exactly as `<T>[x]` is -- and a closure's signature may name T
+            // (`(T x) => x` in g<T>()): which type parameters they involve is a matter of
+            // inference this scan cannot do, so each counts as a use of every one in scope.
+            // A soft use, so a caller that cannot name them passes an unknown witness.
+            for (String tp : tps) {
+                if (!(o instanceof Lambda) || !((Lambda) o).typeParams.contains(tp)) {
+                    collUses.add(tp);
+                }
+            }
+        }
         if (o instanceof ListLit) {
             noteCollectionTypeVars(((ListLit) o).elementType, tps, collUses);
         } else if (o instanceof SetLit) {
@@ -10706,6 +10958,9 @@ public final class JavaEmitter {
         if (methodsByName != null) {
             return;
         }
+        // functionTypeTested decides whether a closure in a generic method needs its type
+        // arguments' witnesses (scanTypeValueUses).
+        reifiedClassNames();
         methodsByName = new java.util.HashMap<String, List<MethodDecl>>();
         methodOwners = new java.util.IdentityHashMap<MethodDecl, ClassDecl>();
         java.util.Set<ClassDecl> all = java.util.Collections.newSetFromMap(
@@ -11825,12 +12080,16 @@ public final class JavaEmitter {
             }
         }
         if (structured) {
+            // Whether the element type is dynamic because Dart's inference says so (an
+            // element typed dynamic), not because nothing here could infer it.
+            boolean inferredDynamic = false;
             if (elem == null) {
                 // No type argument and no context: Dart infers the element type from
                 // the elements. Built as List<dynamic> instead, `x == null ? <int>[] :
                 // [...x]` held a DartList where its int type promised a DartLongList,
                 // and the cast to it failed.
                 elem = structuredElementTypeQuiet(l.elements, ctx);
+                inferredDynamic = elem != null && isDynamicType(elem);
             }
             if (elem == null) {
                 elem = TypeRef.DYNAMIC;
@@ -11842,7 +12101,8 @@ public final class JavaEmitter {
                 ctx.writer().line("Dart" + pk + "List " + tmp + " = new Dart" + pk + "List();");
             } else {
                 ctx.writer().line("DartList<" + javaType(elem, true, ctx) + "> " + tmp + " = new DartList<>("
-                    + nullWitness(reifiedArgWitness(elem, ctx)) + ");");
+                    + (inferredDynamic ? "dart.runtime.TypeWitness.DYNAMIC" : nullWitness(reifiedArgWitness(elem, ctx)))
+                    + ");");
             }
             for (Expr e : l.elements) {
                 emitListElementInto(tmp, e, elem, ctx);
@@ -11901,10 +12161,17 @@ public final class JavaEmitter {
      */
     private TypeRef structuredElementTypeQuiet(List<Expr> elements, Ctx ctx) {
         TypeRef common = null;
+        boolean dynamicElement = false;
         for (Expr e : elements) {
             TypeRef t = elementTypeQuiet(e, ctx);
-            if (t == null || isDynamicType(t)) {
+            if (t == null) {
                 return null;
+            }
+            if (isDynamicType(t)) {
+                // `[...dl]` with dl a List<dynamic>: the upper bound with dynamic is dynamic,
+                // a known element type (recorded), unlike an element nothing could type.
+                dynamicElement = true;
+                continue;
             }
             if (common == null) {
                 common = t;
@@ -11917,7 +12184,7 @@ public final class JavaEmitter {
                 }
             }
         }
-        return common;
+        return dynamicElement ? TypeRef.DYNAMIC : common;
     }
 
     /**
@@ -13004,6 +13271,10 @@ public final class JavaEmitter {
         FnForm f = top.fn;
         if (!f.sam.equals(have)) {
             return top;
+        }
+        String rr = recastRunTimeSigned(want, f.bare);
+        if (rr != null) {
+            return new Out("(" + rr + ")", expected, f.castTo(want, null, false));
         }
         if (f.doubleCast) {
             // samCast's `(SAM) (SAM & marker) bare`: both casts are retargeted.
@@ -17485,6 +17756,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
 
     /** Set while a closure is bound to its own value-returning FuncN for an Object slot. */
     private boolean ownSamLambda;
+    /// The SAM emitLambdaIn made from a closure's own parameters for a slot that imposes no
+    /// function type; signClosure does not read it as an instantiating context.
+    private TypeRef ownSamContext;
     /// Set while a program top-level function's arguments are emitted: its parameters
     /// are declared Java FuncN types, so a `dynamic`-returning (or unbound `T`) slot is a
     /// value SAM. A runtime stub's dynamic slot (`Future.then`) may be pinned to a void
@@ -17568,12 +17842,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             own.funcReturn = TypeRef.DYNAMIC;
             boolean savedOwn = ownSamLambda;
+            TypeRef savedOwnCtx = ownSamContext;
             ownSamLambda = true;
+            ownSamContext = own;
             Out o;
             try {
                 o = emitLambda(l, own, ctx);
             } finally {
                 ownSamLambda = savedOwn;
+                ownSamContext = savedOwnCtx;
             }
             if (o.fn == null || o.fn.sam == null) {
                 return samCastOut(l, o, javaType(own, false, ctx), own);
@@ -20370,6 +20647,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * result stays index/add consistent with how {@code List<int>}/{@code List<double>}
      * variables are typed elsewhere; everything else uses the boxed {@link dart.core.DartList}.
      */
+    /// Whether a context type supplies a list factory's element type by downward inference
+    /// (`List<E>`, `Iterable<E>`, or either inside `FutureOr`), as emitListFactory reads it.
+    private boolean contextNamesElementType(TypeRef expected) {
+        if (expected != null && expected.is("FutureOr") && expected.args.size() == 1) {
+            expected = expected.arg(0);
+        }
+        return expected != null && (expected.is("List") || expected.is("Iterable")) && expected.args.size() == 1;
+    }
+
     private Out emitListFactory(CtorCall cc, TypeRef expected, Ctx ctx) {
         TypeRef listType = cc.type;
         boolean implicitDynamic = listType.args.size() == 1 && isDynamicType(listType.arg(0));
@@ -20490,6 +20776,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 String raw = lt >= 0 ? jt.substring(0, lt) : jt;
                 return new Out(cls + witness + "fromChecked(" + src + ", " + raw + ".class, " + elem.nullable
                         + ", " + (growable != null ? growable : "true") + ")", listType);
+            }
+            if (pk != null) {
+                // The primitive lists check each element as an Object: a source typed
+                // List<dynamic> is no Iterable<? extends Number> to javac, and a cast to one
+                // would be unchecked on ParparVM.
+                return new Out(cls + ".from" + sfx + "Checked(" + src + ", "
+                        + (growable != null ? growable : "true") + ")", listType);
             }
             // growable: false was parsed above and then dropped for from().
             // Dart's parameter is a plain Iterable, so `List<Object>.from(<String>[..])` is
@@ -26025,6 +26318,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         c.nullable = true;
         c.funcParams = t.funcParams;
         c.funcReturn = t.funcReturn;
+        c.funcTypeParams = t.funcTypeParams;
         return c;
     }
 
@@ -26039,6 +26333,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // `?.call()` was emitted as a statement that dropped the value.
         c.funcParams = t.funcParams;
         c.funcReturn = t.funcReturn;
+        c.funcTypeParams = t.funcTypeParams;
         return c;
     }
 
@@ -26193,6 +26488,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 widened.funcReturn = TypeRef.DYNAMIC;
                 String wj = javaType(widened, false, ctx);
                 if (!wj.equals(ownSam)) {
+                    String rr = recastRunTimeSigned(wj, f.bare);
+                    if (rr != null) {
+                        return "(" + rr + ")";
+                    }
                     if (f.doubleCast) {
                         // samCast's `(SAM) (SAM & marker) closure`: the intersection is
                         // widened with the plain cast, or the closure stays the narrower SAM.

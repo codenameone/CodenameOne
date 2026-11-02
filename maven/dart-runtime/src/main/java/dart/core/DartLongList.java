@@ -150,6 +150,26 @@ public class DartLongList extends DartList<Long> {
         return fromLongs((Iterable<? extends Number>) value);
     }
 
+    /// `List<int>.from(source)` whatever the source's static type (`List<dynamic>`,
+    /// `dynamic`, an `Iterable<num>`): every element is tested as an Object before it is
+    /// read as a number, so a String in a dynamic list is Dart's TypeError rather than a
+    /// cast that ParparVM would not check.
+    public static DartLongList fromLongsChecked(Object source, boolean growable) {
+        if (!(source instanceof Iterable)) {
+            throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(source))
+                    + "' is not a subtype of type 'Iterable<dynamic>'");
+        }
+        DartLongList l = new DartLongList();
+        for (Object e : (Iterable<?>) source) {
+            if (!(e instanceof Long || e instanceof Integer || e instanceof Short || e instanceof Byte)) {
+                throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                        + "' is not a subtype of type 'int'");
+            }
+            l.addLong(((Number) e).longValue());
+        }
+        return growable ? l : new DartLongList(l.a, l.len, false);
+    }
+
     public static DartLongList fromLongs(Iterable<? extends Number> elements) {
         DartLongList l = new DartLongList();
         for (Number e : elements) {

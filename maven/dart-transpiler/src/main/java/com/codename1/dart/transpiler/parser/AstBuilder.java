@@ -1219,6 +1219,13 @@ public final class AstBuilder {
         t.funcNamed = parameterTypeShape(ft, t.funcParams, req, rn$);
         t.funcNamedRequired = rn$[0];
         t.funcRequired = req[0];
+        Dart2Parser.FunctionTypeTailsContext tails = ft.functionTypeTails();
+        if (tails != null && tails.functionTypeTail() != null && tails.functionTypeTail().typeParameters() != null) {
+            t.funcTypeParams = new ArrayList<String>();
+            for (Dart2Parser.TypeParameterContext tp : tails.functionTypeTail().typeParameters().typeParameter()) {
+                t.funcTypeParams.add(tp.identifier().getText());
+            }
+        }
     }
 
     private TypeRef buildTypeNotFunction(Dart2Parser.TypeNotFunctionContext ctx) {

@@ -85,6 +85,8 @@ public final class Ast {
         // positional ones follow, then the named ones (names in funcNamed, in order).
         public int funcRequired = -1;
         public List<String> funcNamed;
+        /// A generic function type's own type parameters (`T Function<T>(T)`); null otherwise.
+        public List<String> funcTypeParams;
         // The named parameters of funcNamed that are `required`; null when none are.
         public List<String> funcNamedRequired;
 

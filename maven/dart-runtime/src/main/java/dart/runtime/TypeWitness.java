@@ -265,6 +265,50 @@ public final class TypeWitness {
         return topReturn || ret == null || sig[0] == null || isSubtype(sig[0], ret);
     }
 
+    /// `f is R Function<T0..Tn>(P..)`, a generic function type: only a generic closure with
+    /// as many type parameters and the same positional arity is one. A slot of the target
+    /// that is its i-th type parameter ({@code slotVars}: return first, then each
+    /// parameter; -1 for a slot that is not one) must be the closure's i-th type parameter;
+    /// every other slot is tested as {@link #isFunction} tests it. Type parameter bounds
+    /// are not recorded on either side, so both are compared as unbounded.
+    public static boolean isGenericFunction(Object f, int typeParamCount, int[] slotVars, TypeWitness ret,
+            TypeWitness... params) {
+        if (!(f instanceof Signed) || !((Signed) f).$generic()) {
+            return false;
+        }
+        Signed s = (Signed) f;
+        String[] vars = s.$typeVars();
+        TypeWitness[] sig = s.$sig();
+        if (vars == null || vars.length != sig.length + 1 || s.$named() != null || s.$required() >= 0
+                || sig.length != params.length + 1) {
+            return false;
+        }
+        String[] own = vars[0].split(", ");
+        if (own.length != typeParamCount) {
+            return false;
+        }
+        for (int slot = 0; slot < sig.length; slot++) {
+            String v = vars[slot + 1];
+            int ownIndex = -1;
+            for (int i = 0; v != null && i < own.length; i++) {
+                if (own[i].equals(v)) {
+                    ownIndex = i;
+                }
+            }
+            if (ownIndex != slotVars[slot]) {
+                return false;
+            }
+            if (ownIndex < 0) {
+                boolean ok = slot == 0 ? ret == null || sig[0] == null || isSubtype(sig[0], ret)
+                        : paramOk(params[slot - 1], sig[slot]);
+                if (!ok) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static boolean paramOk(TypeWitness target, TypeWitness own) {
         return target == null || own == null || isSubtype(target, own);
     }

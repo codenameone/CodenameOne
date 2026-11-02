@@ -175,6 +175,26 @@ public class DartDoubleList extends DartList<Double> {
         return fromDoubles((Iterable<? extends Number>) value);
     }
 
+    /// `List<double>.from(source)` whatever the source's static type (`List<dynamic>`,
+    /// `dynamic`, an `Iterable<num>`): every element is tested as an Object before it is
+    /// read as a number, so a String in a dynamic list is Dart's TypeError rather than a
+    /// cast that ParparVM would not check.
+    public static DartDoubleList fromDoublesChecked(Object source, boolean growable) {
+        if (!(source instanceof Iterable)) {
+            throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(source))
+                    + "' is not a subtype of type 'Iterable<dynamic>'");
+        }
+        DartDoubleList l = new DartDoubleList();
+        for (Object e : (Iterable<?>) source) {
+            if (!(e instanceof Double || e instanceof Float)) {
+                throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                        + "' is not a subtype of type 'double'");
+            }
+            l.addDouble(((Number) e).doubleValue());
+        }
+        return growable ? l : new DartDoubleList(l.a, l.len, false);
+    }
+
     public static DartDoubleList fromDoubles(Iterable<? extends Number> elements) {
         DartDoubleList l = new DartDoubleList();
         for (Number e : elements) {
