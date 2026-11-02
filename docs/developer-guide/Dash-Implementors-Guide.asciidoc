@@ -90,7 +90,7 @@ image::img/dash-race.png["A quick race against the waiting runners and bots",sca
 image::img/dash-party-race.png["A race in progress: the friend in the next lane, live standings and emotes on screen",scaledwidth=30%]
 
 *Track editor* is where players make levels. A pack holds levels and the pieces they
-use, and is published for others to play, rate, race and remix. Every level in a pack
+use, and is published for others to play, rate, race, and remix. Every level in a pack
 has its own board.
 
 image::img/dash-forge-home.png["The track editor's home: your packs and the official one to remix",scaledwidth=30%]
@@ -300,8 +300,8 @@ the corner shows how far along the route the runner is.
 The places come from OpenStreetMap through the Overpass API: `Landmarks` asks for
 named tourist, historic, religious, station and park features within 70 metres of
 the route, projects each onto the line, keeps them at least 60 metres apart and at
-most twelve, and adds them to the `CityRoute`. They are part of the route the server
-receives, so they are part of the level and its hash, and the server places the
+most twelve, and adds them to the `CityRoute`. They're part of the route the server
+receives, so they're part of the level and its hash, and the server places the
 same boards:
 
 [source,java,role=cn1-no-try]
@@ -323,7 +323,7 @@ Before you ship this, point `Routing` at a routing server of your own:
 default is OSRM's public demo server, which is rate limited, has no service
 guarantee and serves only its car profile, whatever travel mode the request
 asks for. The map data is OpenStreetMap's, whose licence
-asks for credit wherever it is shown; the city screen carries that line, and a
+asks for credit wherever it's shown; the city screen carries that line, and a
 reskin has to keep it.
 
 [[dash-engagement]]
@@ -356,7 +356,7 @@ The operator's side is in the admin console:
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/social/Pipelines.java[tag=dash-pipelines-schedule,indent=0]
 ----
 
-On a phone the console is a list of pages; on a desktop or a tablet it is a side bar
+On a phone the console is a list of pages; on a desktop or a tablet it's a side bar
 and a page, and the *Promote* tab is shown:
 
 image::img/dash-admin-overview.png["The admin console on a phone: the live numbers and the pages it leads to",scaledwidth=30%]
@@ -370,7 +370,7 @@ image::img/dash-desktop-admin-pipelines.png["Engagement pipelines with their aud
 image::img/dash-desktop-admin-pipeline-edit.png["Editing a pipeline: the query, the push or gift, and the cool-down",scaledwidth=70%]
 image::img/dash-desktop-admin-broadcast.png["A broadcast push to a segment of players",scaledwidth=70%]
 image::img/dash-desktop-admin-promote.png["Promote on a desktop: broadcast, spotlight, a campaign link and how many invited players went on to race",scaledwidth=70%]
-image::img/dash-desktop-admin-broadcast-confirm.png["Confirming a broadcast before it is sent",scaledwidth=70%]
+image::img/dash-desktop-admin-broadcast-confirm.png["Confirming a broadcast before it's sent",scaledwidth=70%]
 image::img/dash-desktop-admin-spotlight.png["Setting the home screen's spotlight banner",scaledwidth=70%]
 image::img/dash-desktop-home-spotlight.png["The banner as players see it on the home screen",scaledwidth=70%]
 
