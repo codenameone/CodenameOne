@@ -30,6 +30,8 @@ abstract class List<E> implements Iterable<E> {
   external List<E> sublist(int start, [int? end]);
   external Iterable<E> getRange(int start, int end);
   external void removeRange(int start, int end);
+  external void removeWhere(bool Function(E element) test);
+  external void fillRange(int start, int end, [E? fillValue]);
 }
 
 abstract class Set<E> implements Iterable<E> {
@@ -52,4 +54,10 @@ abstract class String {
   external String substring(int start, [int? end]);
   external int codeUnitAt(int index);
   external int compareTo(String other);
+  external List<String> split(Pattern pattern);
+  external bool contains(Pattern other, [int startIndex = 0]);
+}
+
+abstract class RegExp implements Pattern {
+  external bool hasMatch(String input);
 }

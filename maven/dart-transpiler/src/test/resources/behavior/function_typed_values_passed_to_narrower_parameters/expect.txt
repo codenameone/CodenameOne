@@ -1,0 +1,9 @@
+take 3
+c 3
+wide 3
+cast true
+take 4
+n 4
+true
+true
+false

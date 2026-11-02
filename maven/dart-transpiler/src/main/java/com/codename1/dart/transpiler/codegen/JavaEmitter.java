@@ -13019,6 +13019,60 @@ public final class JavaEmitter {
                 || astMentionsTypeParams(f.initializer, names, new java.util.IdentityHashMap<Object, Boolean>());
     }
 
+    /// The type-parameter names still visible inside the scope node {@code n} opens:
+    /// {@code names} itself when {@code n} binds none of them, otherwise a copy without the
+    /// names it binds. Dart forbids reading a block-local before its declaration, so a
+    /// declaration shadows for the whole block.
+    private static List<String> shadowedTypeParams(Object n, List<String> names) {
+        List<String> bound = new ArrayList<String>();
+        if (n instanceof com.codename1.dart.transpiler.ast.Ast.Lambda) {
+            com.codename1.dart.transpiler.ast.Ast.Lambda l = (com.codename1.dart.transpiler.ast.Ast.Lambda) n;
+            bound.addAll(l.typeParams);
+            for (com.codename1.dart.transpiler.ast.Ast.Param p : l.params) {
+                bound.add(p.name);
+            }
+        } else if (n instanceof com.codename1.dart.transpiler.ast.Ast.LocalFunc) {
+            com.codename1.dart.transpiler.ast.Ast.LocalFunc l = (com.codename1.dart.transpiler.ast.Ast.LocalFunc) n;
+            bound.add(l.name);
+            for (com.codename1.dart.transpiler.ast.Ast.Param p : l.params) {
+                bound.add(p.name);
+            }
+        } else if (n instanceof com.codename1.dart.transpiler.ast.Ast.Block) {
+            for (Object st : ((com.codename1.dart.transpiler.ast.Ast.Block) n).statements) {
+                collectDeclaredNames(st, bound);
+            }
+        } else if (n instanceof com.codename1.dart.transpiler.ast.Ast.ForStmt) {
+            collectDeclaredNames(((com.codename1.dart.transpiler.ast.Ast.ForStmt) n).init, bound);
+        } else if (n instanceof com.codename1.dart.transpiler.ast.Ast.ForInStmt) {
+            bound.add(((com.codename1.dart.transpiler.ast.Ast.ForInStmt) n).varName);
+        } else if (n instanceof com.codename1.dart.transpiler.ast.Ast.CatchClause) {
+            bound.add(((com.codename1.dart.transpiler.ast.Ast.CatchClause) n).exceptionVar);
+            bound.add(((com.codename1.dart.transpiler.ast.Ast.CatchClause) n).stackVar);
+        }
+        List<String> out = names;
+        for (String b : bound) {
+            if (b != null && out.contains(b)) {
+                if (out == names) {
+                    out = new ArrayList<String>(names);
+                }
+                out.remove(b);
+            }
+        }
+        return out;
+    }
+
+    private static void collectDeclaredNames(Object st, List<String> into) {
+        if (st instanceof com.codename1.dart.transpiler.ast.Ast.VarDeclStmt) {
+            into.add(((com.codename1.dart.transpiler.ast.Ast.VarDeclStmt) st).name);
+        } else if (st instanceof com.codename1.dart.transpiler.ast.Ast.VarDeclGroup) {
+            for (Object d : ((com.codename1.dart.transpiler.ast.Ast.VarDeclGroup) st).decls) {
+                collectDeclaredNames(d, into);
+            }
+        } else if (st instanceof com.codename1.dart.transpiler.ast.Ast.LocalFunc) {
+            into.add(((com.codename1.dart.transpiler.ast.Ast.LocalFunc) st).name);
+        }
+    }
+
     private static boolean astMentionsTypeParams(Object n, List<String> names,
             java.util.IdentityHashMap<Object, Boolean> seen) {
         if (n == null || seen.put(n, Boolean.TRUE) != null) {
@@ -13026,6 +13080,18 @@ public final class JavaEmitter {
         }
         if (n instanceof TypeRef) {
             return mentionsTypeParams((TypeRef) n, names);
+        }
+        // A binding inside the initializer (a closure's parameter or type parameter, a
+        // local variable, a loop or catch variable, a local function) shadows a class
+        // type parameter of the same name for the scope it opens, so a reference to it
+        // is not the witness. Each such scope is walked with that name removed.
+        List<String> inner = shadowedTypeParams(n, names);
+        if (inner != names) {
+            seen.remove(n);
+            if (inner.isEmpty()) {
+                return false;
+            }
+            return astMentionsTypeParams(n, inner, seen);
         }
         if (n instanceof java.util.Collection) {
             for (Object o : (java.util.Collection<?>) n) {
@@ -16161,6 +16227,16 @@ public final class JavaEmitter {
             str.nullable = true;
             return new Out(target.code + ".getMessage()", str);
         }
+        // ArgumentError's own getters, which RangeError inherits and extends with the
+        // range it was checked against (dart.core.ArgumentError / RangeError).
+        if ((tt.is("ArgumentError") || tt.is("RangeError")) && !program.classes.containsKey(tt.name)
+                && (name.equals("invalidValue") || name.equals("name")
+                        || (tt.is("RangeError") && (name.equals("start") || name.equals("end"))))) {
+            TypeRef rt = name.equals("invalidValue") ? new TypeRef("Object")
+                    : name.equals("name") ? new TypeRef("String") : new TypeRef("int");
+            rt.nullable = true;
+            return new Out(target.code + "." + name + "()", rt);
+        }
         if (name.equals("modifiedObject") && tt.is("ConcurrentModificationError")
                 && !program.classes.containsKey("ConcurrentModificationError")) {
             TypeRef obj = new TypeRef("Object");
@@ -17725,6 +17801,26 @@ public final class JavaEmitter {
      * the operator's mangled name; null when {@code op} is not one Duration declares for
      * that operand type.
      */
+    /// A statically dynamic right operand of a Duration operator is Dart's implicit
+    /// downcast to the parameter type Duration declares for that operator (`num` for `*`,
+    /// `int` for `~/`, Duration for the others), so a mismatch is the TypeError Dart throws.
+    private Out checkedDurationOperand(Out l, String op, Out r, Ctx ctx) {
+        if (l.type == null || !l.type.is("Duration") || r.type == null || !isDynamicType(r.type)
+                || program.classes.containsKey("Duration")) {
+            return r;
+        }
+        String mangled = com.codename1.dart.transpiler.parser.AstBuilder.mangleOperator(op);
+        TypeRef pt = "$times".equals(mangled) ? new TypeRef("num")
+                : "$tdiv".equals(mangled) ? TypeRef.INT
+                : ("$plus".equals(mangled) || "$minus".equals(mangled) || "$lt".equals(mangled)
+                        || "$le".equals(mangled) || "$gt".equals(mangled) || "$ge".equals(mangled))
+                        ? new TypeRef("Duration") : null;
+        if (pt == null) {
+            return r;
+        }
+        return new Out(coerce(r, pt, ctx), pt);
+    }
+
     private Out durationOperator(Out l, String op, Out r) {
         if (l.type == null || !l.type.is("Duration") || r.type == null
                 || program.classes.containsKey("Duration")) {
@@ -17912,6 +18008,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             String mangled = com.codename1.dart.transpiler.parser.AstBuilder.mangleOperator(b.op);
             Ast.MethodDecl om = mangled != null ? stubs.findMethod(l.type.name, mangled, false) : null;
             if (om != null) {
+                // A statically dynamic operand is Dart's implicit downcast to the parameter
+                // type the operator declares (Duration * dynamic checks against num).
+                TypeRef opPt = om.params.isEmpty() ? null : om.params.get(0).type;
+                if (r.type != null && isDynamicType(r.type) && opPt != null && !isDynamicType(opPt)
+                        && !opPt.is("Object") && typeVarsInScope(opPt, ctx)) {
+                    TypeRef chk = opPt.is("double") && !opPt.nullable ? new TypeRef("num") : opPt;
+                    r = new Out(coerce(r, chk, ctx), chk);
+                }
                 return new Out(l.code + "." + mangled + "(" + paren(r.code) + ")",
                         om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType);
             }
@@ -17966,7 +18070,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // class carries them under the mangled names. Without this they reached the
         // fallback below, which emitted `a + b` on two objects and javac rejected it.
         if (opClass == null) {
-            Out dur = durationOperator(l, b.op, r);
+            Out dur = durationOperator(l, b.op, checkedDurationOperand(l, b.op, r, ctx));
             if (dur != null) {
                 return dur;
             }
@@ -20728,6 +20832,27 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             String msg = c.args.positional.isEmpty() ? "\"\""
                     : emitExpr(c.args.positional.get(0), TypeRef.STRING, ctx).code;
+            int npos = c.args.positional.size();
+            if (n.equals("RangeError") && npos == 1) {
+                // Dart's RangeError(message) prints "RangeError: message"; new RangeError(String)
+                // is the runtime guards' finished text, so the Dart constructor has its own path.
+                return new Out(simple + ".ofMessage(" + msg + ")", new TypeRef("Exception"));
+            }
+            if (n.equals("ArgumentError") && npos == 2) {
+                // ArgumentError([message, name]): the runtime constructor takes both.
+                return new Out("new " + simple + "(" + msg + ", "
+                        + emitExpr(c.args.positional.get(1), TypeRef.STRING, ctx).code + ")",
+                        new TypeRef("Exception"));
+            }
+            if (n.equals("FormatException") && npos >= 2) {
+                // FormatException([message, source, offset]).
+                String src = "(Object) " + paren(emitExpr(c.args.positional.get(1), null, ctx).code);
+                String off = npos >= 3
+                        ? "(Long) " + paren(emitExpr(c.args.positional.get(2), TypeRef.INT, ctx).code)
+                        : "(Long) null";
+                return new Out("new " + simple + "(" + msg + ", " + src + ", " + off + ")",
+                        new TypeRef("Exception"));
+            }
             return new Out("new " + simple + "(" + msg + ")", new TypeRef("Exception"));
         }
         // constructor of program class
@@ -21098,6 +21223,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.importClass("dart.runtime.Dyn");
             dynNames.add(n);
             String dc = "Dyn.call(" + target.code + ", \"" + n + "\", " + dynArgs(c.args, ctx) + ")";
+            if (ctx.statementExpr == c) {
+                // Its value is discarded (a void arrow body): a cast is no statement in Java.
+                return new Out(dc, TypeRef.DYNAMIC);
+            }
             if (n.equals("compareTo") && c.args.positional.size() == 1 && c.args.named.isEmpty()) {
                 // Comparable.compareTo answers an int whatever the receiver: a sort
                 // comparator over erased elements still returns the SAM's Long.
@@ -22009,7 +22138,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 continue;
             }
             TypeRef pt = decl.get(i);
-            if (pt == null || pt.is("Object") || isDynamicType(pt) || pt.funcParams != null
+            if (pt == null || pt.is("Object") || isDynamicType(pt)
                     || pt.is("Function") || !typeVarsInScope(pt, ctx)
                     || pt.is("Iterable") || pt.is("List") || pt.is("Set") || pt.is("Map")) {
                 continue;
@@ -22046,6 +22175,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             cast.col = a.col;
             cast.file = a.file;
             return emitExpr(cast, param, ctx);
+        }
+        if (param != null && param.funcParams != null && param.funcReturn != null
+                && !(a instanceof Lambda) && typeVarsInScope(param, ctx) && staticallyDynamic(a, ctx)) {
+            // A dynamic function value passed for a callback parameter (removeWhere(pred)):
+            // Dart's implicit downcast to the declared function type, checked by coerce.
+            Out o = emitExpr(a, null, ctx);
+            if (o.type != null && isDynamicType(o.type)) {
+                return new Out(coerce(o, param, ctx), param);
+            }
+            return o;
         }
         return emitExpr(a, param, ctx);
     }
@@ -29267,6 +29406,61 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return coerce(o, elem, ctx);
     }
 
+    /// Whether function type {@code src} is a Dart subtype of {@code dst}: the same
+    /// positional arity, every parameter of {@code dst} a subtype of {@code src}'s
+    /// (contravariance) and {@code src}'s return a subtype of {@code dst}'s.
+    private boolean functionTypeAssignable(TypeRef src, TypeRef dst) {
+        if (src.funcParams.size() != dst.funcParams.size() || src.funcReturn == null || dst.funcReturn == null) {
+            return false;
+        }
+        for (int i = 0; i < src.funcParams.size(); i++) {
+            if (!staticSubtype(dst.funcParams.get(i), src.funcParams.get(i))) {
+                return false;
+            }
+        }
+        return dst.funcReturn.is("void") || staticSubtype(src.funcReturn, dst.funcReturn);
+    }
+
+    /// A conservative Dart subtype test over the static type model: the top types,
+    /// int and double under num, identical types, and a class under its superclasses.
+    /// A function type nests through {@link #functionTypeAssignable}.
+    private boolean staticSubtype(TypeRef sub, TypeRef sup) {
+        if (sub == null || sup == null) {
+            return false;
+        }
+        if (isDynamicType(sup) || (sup.is("Object") && sup.args.isEmpty() && sup.funcReturn == null
+                && (sup.nullable || !sub.nullable))) {
+            return true;
+        }
+        if (sub.nullable && !sup.nullable) {
+            return false;
+        }
+        if (sub.funcReturn != null || sup.funcReturn != null) {
+            TypeRef a = sub.funcParams != null ? sub : expandFunctionTypedef(sub);
+            TypeRef b = sup.funcParams != null ? sup : expandFunctionTypedef(sup);
+            return a != null && b != null && a.funcParams != null && b.funcParams != null
+                    && functionTypeAssignable(a, b);
+        }
+        if (sup.is("num") && sup.args.isEmpty() && (sub.is("int") || sub.is("double") || sub.is("num"))) {
+            return true;
+        }
+        if (sub.name == null || sup.name == null) {
+            return false;
+        }
+        if (sub.args.isEmpty() && sup.args.isEmpty()) {
+            return isSubtypeName(sub.name, sup.name);
+        }
+        if (!sub.name.equals(sup.name) || sub.args.size() != sup.args.size()) {
+            return false;
+        }
+        for (int i = 0; i < sub.args.size(); i++) {
+            if (!staticSubtype(sub.args.get(i), sup.args.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private String coerce(Out o, TypeRef target, Ctx ctx) {
         if (target == null) {
             return o.code;
@@ -29365,6 +29559,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         return "((" + wj + ") (" + wj + " & " + f.marker + ") " + paren(f.bare) + ")";
                     }
                     return "((" + wj + (f.marker == null ? "" : " & " + f.marker) + ") " + f.bare + ")";
+                }
+            }
+        }
+        // A function value whose static type is a Dart subtype of a function-typed slot
+        // with a different Java parameterization: a `void Function(num)` (a variable, a
+        // typedef, a field) passed for a `void Function(int)`. Function types are
+        // contravariant in their parameters and covariant in their return, so Dart accepts
+        // it, while Java's VoidFunc1<Number> is no VoidFunc1<Long>. Erasure makes them one
+        // object, so the value goes through the raw SAM, which Java converts unchecked.
+        // A bare lambda is left to the rules that type it from the slot.
+        if (o.type != null && target.funcReturn != null && !isBareLambda(o.code) && !isDynamicType(o.type)) {
+            TypeRef src = o.type.funcParams != null ? o.type : expandFunctionTypedef(o.type);
+            TypeRef dst = target.funcParams != null ? target : expandFunctionTypedef(target);
+            if (src != null && dst != null && src.funcParams != null && dst.funcParams != null
+                    && !isGenericFunctionType(src) && !isGenericFunctionType(dst)
+                    && functionTypeAssignable(src, dst)) {
+                String jt = javaType(target, false, ctx);
+                int lt = jt.indexOf('<');
+                if (lt > 0 && !jt.equals(javaType(o.type, false, ctx))) {
+                    return "((" + jt.substring(0, lt) + ") " + paren(o.code) + ")";
                 }
             }
         }

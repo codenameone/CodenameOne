@@ -522,6 +522,12 @@ public final class DartRuntime {
                     return d.$tdiv(((Number) b).longValue());
                 }
             }
+            if (op.equals("+") || op.equals("-") || op.equals("*") || op.equals("~/")) {
+                // Duration declares the operator; the argument fails its parameter type
+                // (Duration for + and -, num for *, int for ~/), which is Dart's TypeError.
+                throw new dart.core.TypeError("type '" + typeName(b) + "' is not a subtype of type '"
+                        + (op.equals("*") ? "num" : op.equals("~/") ? "int" : "Duration") + "'");
+            }
         }
         throw noOperator(op, a, b);
     }

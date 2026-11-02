@@ -163,6 +163,14 @@ public final class Dyn {
                 case "fragment": return u.fragment();
                 case "pathSegments": return u.pathSegments();
                 case "hasScheme": return Boolean.valueOf(u.hasScheme());
+                case "queryParameters": return u.queryParameters();
+                default: return NO_MEMBER;
+            }
+        }
+        if (o instanceof dart.core.StringBuffer) {
+            dart.core.StringBuffer b = (dart.core.StringBuffer) o;
+            switch (name) {
+                case "length": return Long.valueOf(b.length());
                 default: return NO_MEMBER;
             }
         }
@@ -400,6 +408,12 @@ public final class Dyn {
             if (v != NO_MEMBER) {
                 return v;
             }
+        } else if (o instanceof dart.core.DateTime || o instanceof dart.core.RegExp
+                || o instanceof dart.core.StringBuffer) {
+            Object v = coreTypeCall(o, name, args);
+            if (v != NO_MEMBER) {
+                return v;
+            }
         } else if (o instanceof Uint8List && name.equals("toList")) {
             return ((Uint8List) o).toList();
         }
@@ -599,6 +613,61 @@ public final class Dyn {
         return n instanceof Double ? n : Double.valueOf(n.doubleValue());
     }
 
+    /// Methods of the dart:core classes the runtime implements as plain Java classes,
+    /// called on a value whose static type is dynamic. Each argument is checked against
+    /// the parameter type the SDK declares, as Dart's dynamic invocation does: a mismatch
+    /// is a TypeError, not whatever the Java method would make of it.
+    private static Object coreTypeCall(Object o, String name, Object[] a) {
+        if (o instanceof dart.core.DateTime) {
+            dart.core.DateTime d = (dart.core.DateTime) o;
+            switch (name) {
+                case "add": return d.add(typed(arg(a, 0), dart.core.Duration.class, "Duration"));
+                case "subtract": return d.subtract(typed(arg(a, 0), dart.core.Duration.class, "Duration"));
+                case "difference": return d.difference(typed(arg(a, 0), dart.core.DateTime.class, "DateTime"));
+                case "isBefore":
+                    return Boolean.valueOf(d.isBefore(typed(arg(a, 0), dart.core.DateTime.class, "DateTime")));
+                case "compareTo":
+                    return Long.valueOf(d.compareTo(typed(arg(a, 0), dart.core.DateTime.class, "DateTime")));
+                default: return NO_MEMBER;
+            }
+        }
+        if (o instanceof dart.core.RegExp && name.equals("hasMatch")) {
+            return Boolean.valueOf(((dart.core.RegExp) o).hasMatch(typed(arg(a, 0), String.class, "String")));
+        }
+        if (o instanceof dart.core.StringBuffer) {
+            dart.core.StringBuffer b = (dart.core.StringBuffer) o;
+            switch (name) {
+                case "write":
+                    b.write(arg(a, 0));
+                    return null;
+                case "writeln":
+                    if (a.length == 0) {
+                        b.writeln();
+                    } else {
+                        b.writeln(a[0]);
+                    }
+                    return null;
+                case "writeCharCode":
+                    b.writeCharCode(typed(arg(a, 0), Long.class, "int").longValue());
+                    return null;
+                case "clear":
+                    b.clear();
+                    return null;
+                default: return NO_MEMBER;
+            }
+        }
+        return NO_MEMBER;
+    }
+
+    /// Dart's implicit downcast of a dynamic argument to its declared parameter type.
+    private static <T> T typed(Object v, Class<T> type, String dartType) {
+        if (type.isInstance(v)) {
+            return type.cast(v);
+        }
+        throw new dart.core.TypeError("type '" + DartRuntime.typeName(v)
+                + "' is not a subtype of type '" + dartType + "'");
+    }
+
     private static Object stringCall(String s, String name, Object[] a) {
         switch (name) {
             case "toLowerCase":
@@ -619,7 +688,11 @@ public final class Dyn {
             case "endsWith":
                 return Boolean.valueOf(s.endsWith(String.valueOf(arg(a, 0))));
             case "split":
-                return DString.split(s, String.valueOf(arg(a, 0)));
+                // split(Pattern): a String or a RegExp; anything else is Dart's TypeError.
+                if (arg(a, 0) instanceof dart.core.RegExp) {
+                    return DString.split(s, String.valueOf(a[0]));
+                }
+                return DString.split(s, typed(a[0], String.class, "Pattern"));
             case "substring":
                 return a.length > 1 && a[1] != null ? DString.substring(s, num(a[0]).longValue(), num(a[1]).longValue())
                         : DString.substring(s, num(arg(a, 0)).longValue());
@@ -663,6 +736,11 @@ public final class Dyn {
                 return dbl ? (Object) Double.valueOf(Math.abs(d)) : (Object) Long.valueOf(Math.abs(n.longValue()));
             case "toStringAsFixed":
                 return DartRuntime.toStringAsFixed(d, num(arg(a, 0)).longValue());
+            case "toRadixString":
+                if (dbl) {
+                    return NO_MEMBER;
+                }
+                return DartRuntime.toRadixString(n.longValue(), typed(arg(a, 0), Long.class, "int").longValue());
             case "compareTo":
                 // Dart's total order: NaN after everything, -0.0 before 0.0
                 return Long.valueOf(dart.core.DartComparable.compare(n, num(arg(a, 0))));

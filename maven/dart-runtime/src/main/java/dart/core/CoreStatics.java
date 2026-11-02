@@ -85,7 +85,7 @@ public final class CoreStatics {
 
     /** ArgumentError.notNull(name). */
     public static ArgumentError notNull(String name) {
-        return new ArgumentError(null, name, "Must not be null");
+        return new ArgumentError("Must not be null", name);
     }
 
     public static long identityHashCode(Object o) {
