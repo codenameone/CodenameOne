@@ -1290,11 +1290,15 @@ public final class JavaEmitter {
         boolean savedAsync = ctx.inAsyncBody;
         TypeRef savedRt = ctx.methodReturnType;
         String v = ctx.newTemp();
+        String starWitness = null;
         if (m.isAsyncStar) {
             ctx.importClass("dart.async.AsyncStar");
             TypeRef elem = rt.is("Stream") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
             String ej = javaType(elem, true, ctx);
-            w.line("return AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + v + ") -> {");
+            // The stream records its declared element type: `Stream<int> gen() async*` is
+            // no Stream<String>.
+            starWitness = isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx);
+            w.line("return " + (starWitness != null ? "dart.async.Stream.reify(" : "") + "AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + v + ") -> {");
             ctx.syncStarList = null;
             ctx.asyncStarSink = v;
             ctx.syncStarElem = elem;
@@ -1317,7 +1321,7 @@ public final class JavaEmitter {
         emitBodyStatements(m.params, m.body, ctx);
         ctx.popScope();
         ctx.indent(-1);
-        w.line("});");
+        w.line(starWitness != null ? "}), " + starWitness + ");" : "});");
         ctx.syncStarList = savedList;
         ctx.asyncStarSink = savedSink;
         ctx.syncStarElem = savedElem;
@@ -6004,8 +6008,13 @@ public final class JavaEmitter {
             String ej = javaType(elem, true, ctx);
             String sink = ctx.newTemp();
             String helper = m.name + "$asyncStar";
-            ctx.writer().line("return AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + sink
-                    + ") -> " + helper + "(" + sink + paramNames + "));");
+            // The stream records its declared element type: `Stream<int> gen() async*` is no
+            // Stream<String>.
+            String starWitness = isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx);
+            String star = "AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + sink
+                    + ") -> " + helper + "(" + sink + paramNames + "))";
+            ctx.writer().line("return " + (starWitness == null ? star
+                    : "dart.async.Stream.reify(" + star + ", " + starWitness + ")") + ";");
             sb.append(ctx.popWriter());
             sb.append("    }\n\n");
             StringBuilder hb = new StringBuilder("    private ");
@@ -6157,7 +6166,7 @@ public final class JavaEmitter {
             boolean closed = neverFallsOff(m.body, rt, ctx);
             if (asyncFuture && !closed && !endsWithJump(m.body)) {
                 ctx.importClass("dart.async.Future");
-                ctx.writer().line("return Future.value(null);");
+                ctx.writer().line("return " + reifyAsyncResult("Future.value(null)", rt, ctx) + ";");
             }
         } else if (m.exprBody != null) {
             boxCapturedParams(m.params, ctx);
@@ -6166,7 +6175,7 @@ public final class JavaEmitter {
                 Out o = emitExpr(m.exprBody, null, ctx);
                 ctx.importClass("dart.async.Future");
                 ctx.writer().line("return " + (o.type.is("Future") ? o.code
-                        : "Future.value(" + boxIfPrimitive(o, ctx) + ")") + ";");
+                        : reifyAsyncResult("Future.value(" + boxIfPrimitive(o, ctx) + ")", rt, ctx)) + ";");
             } else {
                 if (rt.is("void")) {
                     // `void f() => expr;` -- and a value-returning arrow override narrowed
@@ -6186,7 +6195,7 @@ public final class JavaEmitter {
             ctx.indent(-1);
             ctx.writer().line("} catch (RuntimeException " + asyncErr + ") {");
             ctx.indent(1);
-            ctx.writer().line("return Future.error(" + asyncErr + ");");
+            ctx.writer().line("return " + reifyAsyncResult("Future.error(" + asyncErr + ")", rt, ctx) + ";");
             ctx.indent(-1);
             ctx.writer().line("}");
         }
@@ -6225,7 +6234,7 @@ public final class JavaEmitter {
             emitBodyStatements(m.params, m.body, ctx);
             boolean closed = neverFallsOff(m.body, rt, ctx);
             if (asyncFuture && !closed && !endsWithJump(m.body)) {
-                ctx.writer().line("return Future.value(null);");
+                ctx.writer().line("return " + reifyAsyncResult("Future.value(null)", rt, ctx) + ";");
             }
         } else if (m.exprBody != null) {
             boxCapturedParams(m.params, ctx);
@@ -6233,7 +6242,7 @@ public final class JavaEmitter {
                 lineMark(m.exprBody, ctx);
                 Out o = emitExpr(m.exprBody, null, ctx);
                 ctx.writer().line("return " + (o.type.is("Future") ? o.code
-                        : "Future.value(" + boxIfPrimitive(o, ctx) + ")") + ";");
+                        : reifyAsyncResult("Future.value(" + boxIfPrimitive(o, ctx) + ")", rt, ctx)) + ";");
             } else if (rt.is("void")) {
                 // `void f() => expr;` runs expr for its effects, whatever its shape.
                 emitDiscardedValue(m.exprBody, ctx);
@@ -6246,7 +6255,7 @@ public final class JavaEmitter {
             ctx.indent(-1);
             ctx.writer().line("} catch (RuntimeException " + asyncErr + ") {");
             ctx.indent(1);
-            ctx.writer().line("return Future.error(" + asyncErr + ");");
+            ctx.writer().line("return " + reifyAsyncResult("Future.error(" + asyncErr + ")", rt, ctx) + ";");
             ctx.indent(-1);
             ctx.writer().line("}");
         }
@@ -6666,11 +6675,12 @@ public final class JavaEmitter {
                 ctx.importClass("dart.async.Future");
                 TypeRef inner = rt.args.isEmpty() ? TypeRef.DYNAMIC : rt.arg(0);
                 if (r.value == null) {
-                    w.line("return Future.value(null);");
+                    w.line("return " + (ctx.asyncLambda ? "Future.value(null)" : reifyAsyncResult("Future.value(null)", rt, ctx)) + ";");
                 } else {
                     Out o = emitExpr(r.value, inner, ctx);
                     // await already unwraps; returning a Future directly passes through
-                    w.line("return " + asyncReturnValue(o, inner, ctx) + ";");
+                    String rv = asyncReturnValue(o, inner, ctx);
+                    w.line("return " + (ctx.asyncLambda || o.type != null && o.type.is("Future") ? rv : reifyAsyncResult(rv, rt, ctx)) + ";");
                 }
                 return;
             }
@@ -19601,6 +19611,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return ctx.popWriter();
     }
 
+    /// {@code future}, recording the type argument of the Future {@code rt} an async body
+    /// declares (`Future<int> f() async` makes a Future<int>), so `is Future<String>`
+    /// answers false. Unchanged where the argument has no witness here.
+    private String reifyAsyncResult(String future, TypeRef rt, Ctx ctx) {
+        if (rt == null || !rt.is("Future") || rt.args.size() != 1 || isDynamicType(rt.arg(0))) {
+            return future;
+        }
+        String w = reifiedArgWitness(rt.arg(0), ctx);
+        return w == null ? future : "dart.async.Future.reify(" + future + ", " + w + ")";
+    }
+
     /**
      * What an async body returns for {@code o}: a Future passes through, any other value is
      * wrapped. In an async closure typed Future of dynamic, a Future of a narrower type is
@@ -20427,6 +20448,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private Out emitMethodCallOn(Out target, Call c, Ctx ctx) {
+        Out out = emitMethodCallOnTarget(target, c, ctx);
+        if (out == null || out.fromError || out.shortGuard != null || target == null || target.type == null || !c.name.equals("map")
+                || c.args.positional.size() != 1 || asyncReifiedClass(target.type, ctx) == null
+                || !target.type.is("Stream") || out.type == null || !out.type.is("Stream")) {
+            return out;
+        }
+        // Stream.map<R>: the mapped stream records R, the explicit type argument or else
+        // the closure's static return type, which the call's own type carries.
+        TypeRef r = c.typeArgs.size() == 1 ? c.typeArgs.get(0) : out.type.args.size() == 1 ? out.type.arg(0) : null;
+        String w = r == null || isDynamicType(r) ? null : reifiedArgWitness(r, ctx);
+        return w == null ? out : new Out("dart.async.Stream.reify(" + out.code + ", " + w + ")", out.type);
+    }
+
+    private Out emitMethodCallOnTarget(Out target, Call c, Ctx ctx) {
         TypeRef tt = target.type;
         // A receiver typed with an import prefix (`intl.DateFormat`, `ui.Size`) keeps the
         // prefix in its type name; strip it so method resolution sees the real stub type.
@@ -20567,7 +20602,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     }
                     Out v = c.args.positional.isEmpty() ? new Out("null", TypeRef.NULL)
                             : emitExpr(c.args.positional.get(0), vt, ctx);
-                    return new Out("Future.value(" + boxIfPrimitive(v, ctx) + ")",
+                    // The Future records its type argument, written, taken from the context
+                    // or inferred from the value: `Future.value(3)` is a Future<int>.
+                    TypeRef arg = vt != null ? vt : v.type;
+                    String w = arg == null || isDynamicType(arg) || arg.is("Null") ? null : reifiedArgWitness(arg, ctx);
+                    String made = "Future.value(" + boxIfPrimitive(v, ctx) + ")";
+                    return new Out(w == null ? made : "dart.async.Future.reify(" + made + ", " + w + ")",
                             TypeRef.of("Future", v.type));
                 }
                 if (n.equals("wait")) {
@@ -21205,9 +21245,102 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** Core-type method table (String / List / Map / int / double). */
+    /// The positional parameter types of the dart:core members the intrinsics below emit by
+    /// hand, as the SDK declares them, in terms of the receiver's own type parameters (E for
+    /// an element, K and V for a map). Only parameters whose type a value can fail are
+    /// listed: an Object?, a Pattern (no Java type names it) or a callback is not. A
+    /// collection parameter (addAll, insertAll, addEntries, writeAll, union) is not listed
+    /// either: its intrinsic checks the argument itself through runtimeArg, which keeps
+    /// the runtime's element-specialized collections whole.
+    private static final Map<String, String[]> CORE_PARAM_TYPES = new java.util.HashMap<String, String[]>();
+    static {
+        String[][] rows = {
+            {"String.endsWith", "String"}, {"String.padLeft", "int", "String"},
+            {"String.padRight", "int", "String"}, {"String.substring", "int", "int"},
+            {"String.codeUnitAt", "int"}, {"String.compareTo", "String"},
+            {"List.add", "E"}, {"List.insert", "int", "E"}, {"List.indexOf", "E", "int"},
+            {"List.lastIndexOf", "E"}, {"List.removeAt", "int"}, {"List.elementAt", "int"},
+            {"List.sublist", "int", "int"}, {"List.getRange", "int", "int"},
+            {"List.removeRange", "int", "int"}, {"List.join", "String"}, {"List.take", "int"}, {"List.skip", "int"},
+            {"Set.add", "E"}, {"Set.elementAt", "int"}, {"Set.join", "String"},
+            {"Iterable.elementAt", "int"}, {"Iterable.take", "int"}, {"Iterable.skip", "int"},
+            {"Iterable.join", "String"},
+            {"StringBuffer.writeCharCode", "int"},
+        };
+        for (String[] r : rows) {
+            CORE_PARAM_TYPES.put(r[0], java.util.Arrays.copyOfRange(r, 1, r.length));
+        }
+    }
+
+    /// One {@link #CORE_PARAM_TYPES} entry, its type parameters bound to the receiver's
+    /// arguments; null where one is unknown.
+    private static TypeRef coreParamType(String decl, TypeRef receiver) {
+        TypeRef e = receiver.args.size() == 1 ? receiver.arg(0) : null;
+        if (decl.equals("int")) {
+            return TypeRef.INT;
+        }
+        if (decl.equals("String")) {
+            return TypeRef.STRING;
+        }
+        return decl.equals("E") ? e : null;
+    }
+
+    /// A dynamic argument to a dart:core member whose parameter has a non-dynamic type is
+    /// Dart's implicit downcast: it is made an explicit `as` on the argument, so a mismatch
+    /// is a TypeError at the call and a match is seen as the parameter's type by the
+    /// intrinsic that emits the call. Idempotent: a checked argument is no longer dynamic.
+    private void checkDynamicCoreArgs(TypeRef tt, Call c, Ctx ctx) {
+        if (tt == null || tt.name == null || programClass(tt.name, ctx) != null) {
+            return;
+        }
+        String[] decl = CORE_PARAM_TYPES.get(tt.name + "." + c.name);
+        if (decl == null) {
+            return;
+        }
+        List<Expr> pos = c.args.positional;
+        for (int i = 0; i < pos.size() && i < decl.length; i++) {
+            Expr a = pos.get(i);
+            if (a instanceof Lambda || a instanceof Ast.AsCast) {
+                continue;
+            }
+            TypeRef pt = coreParamType(decl[i], tt);
+            if (pt == null || isDynamicType(pt) || !typeVarsInScope(pt, ctx)
+                    || pt.is("Iterable") || pt.is("List") || pt.is("Set") || pt.is("Map")) {
+                continue;
+            }
+            if (!staticallyDynamic(a, ctx)) {
+                continue;
+            }
+            Ast.AsCast cast = new Ast.AsCast();
+            cast.operand = a;
+            cast.type = pt;
+            cast.line = a.line;
+            cast.col = a.col;
+            cast.file = a.file;
+            pos.set(i, cast);
+        }
+    }
+
+    /// Whether {@code e}'s static type is dynamic: a name declared or inferred so, or an
+    /// index into such a value (`[]` is no Object member, so it answers dynamic).
+    private boolean staticallyDynamic(Expr e, Ctx ctx) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        if (e instanceof IndexGet) {
+            return staticallyDynamic(((IndexGet) e).target, ctx);
+        }
+        if (!(e instanceof Ident)) {
+            return false;
+        }
+        TypeRef t = inferExprTypeQuiet(e, ctx);
+        return t != null && isDynamicType(t);
+    }
+
     private Out intrinsicCall(Out target, Call c, Ctx ctx) {
         TypeRef tt = target.type;
         String n = c.name;
+        checkDynamicCoreArgs(tt, c, ctx);
         List<Expr> pos = c.args.positional;
         if ((tt.is("Iterable") || tt.is("List") || tt.is("Set")) && !tt.nullable && n.equals("cast")
                 && pos.isEmpty() && c.typeArgs.size() == 1 && !c.typeArgs.get(0).is("int")
@@ -21926,7 +22059,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         boxType(tt.arg(1)));
             }
             if (n.equals("addAll")) {
-                return new Out(target.code + ".addAll(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
+                // A dynamic argument is Dart's checked downcast to Map<K, V> (runtimeArg).
+                TypeRef mapType = tt.args.size() == 2 && typeVarsInScope(tt, ctx) ? TypeRef.of("Map", tt.arg(0), tt.arg(1)) : null;
+                return new Out(target.code + ".addAll(" + runtimeArg(pos.get(0), mapType, ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("addEntries")) {
                 // `[MapEntry('n', 1), MapEntry('s', 'x')]` into a Map<String, Object> is an
@@ -23748,7 +23883,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         // implicit downcast a program parameter takes (coerce).
                         boolean dynToFn = o.type != null && isDynamicType(o.type) && pt != null
                                 && pt.funcParams != null && pt.funcReturn != null;
-                        sb.append(covChecked(cov, p, ct.file == STUB_ARGS && !dynToFn ? rawStreamSubclassArg(o, pt, ctx)
+                        // So is any dynamic value into a runtime parameter of a non-dynamic
+                        // type (runtimeArg): `set.addAll(json['xs'])` checks the downcast,
+                        // and a mismatch is a TypeError at the call.
+                        boolean dynToTyped = ct.file == STUB_ARGS && o.type != null && isDynamicType(o.type)
+                                && pt != null && !isDynamicType(pt) && typeVarsInScope(pt, ctx);
+                        sb.append(covChecked(cov, p, ct.file == STUB_ARGS && !dynToFn && !dynToTyped
+                                ? rawStreamSubclassArg(o, pt, ctx)
                                 : coerce(o, pt, ctx)));
                     }
                 } else if (p.defaultValue != null) {
@@ -28461,15 +28602,29 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // cast to (the cast was a ClassCastException no `on TypeError` caught). An
         // Object-typed bare name takes the same path: it reaches here only where the
         // value's type was not inferred, and the checked form is right either way.
-        if (o.type != null && !target.args.isEmpty() && target.funcParams == null
-                && (target.is("List") || target.is("Map") || target.is("Iterable")
+        if (o.type != null && target.funcParams == null
+                && (!target.args.isEmpty() || target.is("Iterable") || target.is("Set"))
+                && (target.is("List") || target.is("Map") || target.is("Iterable") || target.is("Set")
                     || target.is("Future") || target.is("Stream"))
                 && (o.type.is("dynamic") || o.type.is("var")
                     || (o.type.is("Object") && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$]*")))
                 && isFullyConcrete(target) && !classTypeVarInScope(target, ctx)) {
             String jt = javaType(copyNonNull(target), true, ctx);
             String call;
-            if (target.is("List") && target.args.size() == 1) {
+            if ((target.is("Iterable") || target.is("Set")) && target.args.size() <= 1) {
+                // A raw `Iterable` (StringBuffer.writeAll) is tested erased, by its kind.
+                // Tested by the witness, which knows every runtime collection: a List<int>
+                // is a DartLongList and an element view no DartIterable, so the erased
+                // DartRuntime.as(.., DartIterable.class) refused a list Dart accepts. The
+                // value that passes is then handed over in the slot's Java shape.
+                String[] ca = collectionTestArgs(target, ctx);
+                String kind = target.is("Set") ? "dart.runtime.TypeWitness.SET" : "dart.runtime.TypeWitness.ITERABLE";
+                String checked = "dart.runtime.TypeWitness.checkCast((Object) " + paren(o.code) + ", " + kind + ", "
+                        + erasedJavaType(target, ctx) + ".class, " + (ca == null ? "null" : ca[1]) + ", null, "
+                        + target.nullable + ", " + quote(target.toString()) + ")";
+                call = target.is("Set") ? "dart.core.SetMixinView.asSet(" + checked + ")"
+                        : "dart.core.DartIterable.viewOf(" + checked + ")";
+            } else if (target.is("List") && target.args.size() == 1) {
                 TypeRef el = target.arg(0);
                 call = "dart.runtime.DartRuntime.asListOf((Object) " + paren(o.code) + ", "
                         + elementClassLiteral(el, ctx) + ", " + (el != null && el.nullable) + ", "

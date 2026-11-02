@@ -551,6 +551,11 @@ public class Stream<T> {
      * <p>Concretely typed, like {@link #map} -- see the class comment.</p>
      */
     public final Stream<T> where(final Funcs.Func1<T, Boolean> test) {
+        // A filtered stream has the source's element type, and records it.
+        return reify(filtered(test), typeArg);
+    }
+
+    private Stream<T> filtered(final Funcs.Func1<T, Boolean> test) {
         final Stream<T> upstream = this;
         return new Stream<T>() {
             private StreamSubscription<T> upstreamSub;

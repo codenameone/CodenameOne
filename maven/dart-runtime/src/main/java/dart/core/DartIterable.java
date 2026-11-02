@@ -159,6 +159,28 @@ public class DartIterable<E> implements Iterable<E> {
         return value;
     }
 
+    /**
+     * The DartIterable a value that already passed Dart's checked downcast to
+     * {@code Iterable} (TypeWitness.checkCast) is handed over as: itself when it is one,
+     * a live view of any other runtime collection -- a DartList, a primitive-backed
+     * DartLongList, an ElementViews view -- and of a program object applying
+     * IterableMixin. Null stays null (the cast already decided whether it may be).
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static Object viewOf(Object value) {
+        if (value == null || value instanceof DartIterable) {
+            return value;
+        }
+        if (value instanceof Iterable) {
+            return new DartIterable((Iterable) value);
+        }
+        if (value instanceof dart.collection.IterableMixin) {
+            return ofMixin((dart.collection.IterableMixin) value);
+        }
+        throw new TypeError("type '" + dart.runtime.DartRuntime.typeName(value)
+                + "' is not a subtype of type 'Iterable'");
+    }
+
     public static <E> DartIterable<E> wrap(Iterable<E> source) {
         return source instanceof DartIterable<E> di ? di : new DartIterable<>(source);
     }

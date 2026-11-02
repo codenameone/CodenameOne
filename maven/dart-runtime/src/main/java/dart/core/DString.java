@@ -318,7 +318,49 @@ public final class DString {
             java.util.Iterator<RegExpMatch> it = ((RegExp) pattern).allMatches(s, (int) index).iterator();
             return it.hasNext() && it.next().start() == index;
         }
-        throw new ArgumentError("startsWith: unsupported pattern " + pattern);
+        throw notAPattern(pattern);
+    }
+
+    /**
+     * Dart's checked implicit downcast of a dynamic argument to {@code Pattern}: the
+     * runtime's patterns are a String and a {@link RegExp}, so anything else (null
+     * included -- the parameters are non-nullable) is a TypeError at the call, as Dart
+     * raises it.
+     */
+    private static Object pattern(Object p) {
+        if (p instanceof String || p instanceof RegExp) {
+            return p;
+        }
+        throw notAPattern(p);
+    }
+
+    private static TypeError notAPattern(Object p) {
+        return new TypeError("type '" + dart.runtime.DartRuntime.typeName(p)
+                + "' is not a subtype of type 'Pattern'");
+    }
+
+    /** {@code contains} with a dynamic {@code Pattern} argument. */
+    public static boolean contains(String s, Object other) {
+        Object p = pattern(other);
+        return p instanceof String ? contains(s, (String) p) : contains(s, (RegExp) p);
+    }
+
+    /** {@code indexOf} with a dynamic {@code Pattern} argument. */
+    public static long indexOf(String s, Object other) {
+        Object p = pattern(other);
+        return p instanceof String ? indexOf(s, (String) p) : indexOf(s, (RegExp) p);
+    }
+
+    /** {@code split} with a dynamic {@code Pattern} argument. */
+    public static DartList<String> split(String s, Object pattern) {
+        Object p = pattern(pattern);
+        return p instanceof String ? split(s, (String) p) : split(s, (RegExp) p);
+    }
+
+    /** {@code replaceAll} with a dynamic {@code Pattern} argument. */
+    public static String replaceAll(String s, Object from, String to) {
+        Object p = pattern(from);
+        return p instanceof String ? replaceAll(s, (String) p, to) : replaceAll(s, (RegExp) p, to);
     }
 
     public static boolean contains(String s, String other) {
