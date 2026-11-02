@@ -214,11 +214,7 @@ public class RangeError extends ArgumentError {
     }
 
     public static RangeError index(long index, Object indexable, String name, String message, Long length) {
-        long len = length != null ? length.longValue()
-                : indexable instanceof java.util.Collection ? ((java.util.Collection<?>) indexable).size() : 0;
-        // Dart's IndexError: its start and end are 0 and length - 1.
-        return new RangeError(Long.valueOf(index), name == null ? "index" : name,
-                message == null ? "Index out of range" : message, Long.valueOf(0), Long.valueOf(len - 1), "index");
+        return new IndexError(index, indexable, name == null ? "index" : name, message, length);
     }
 
 }

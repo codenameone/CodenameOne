@@ -1803,7 +1803,16 @@ public final class JavaEmitter {
                         : substituteTypeParams(fieldType(f, ctx), mixSubst);
                 String jt = javaType(ft, false, ctx);
                 body.append("    private ").append(jt).append(' ').append(f.name);
-                if (f.initializer != null && !f.isStatic && dartOrder(c)) {
+                boolean lazyMixinField = f.isLate && !f.isStatic && !f.isConst && f.initializer != null;
+                if (lazyMixinField) {
+                    // `late x = init;` in a mixin: run on the first read, as a class's own
+                    // late field is (isLateLazyInstance), never at construction.
+                    ctx.pushWriter(3);
+                    Out init = emitExpr(f.initializer, ft, ctx);
+                    String lifted = ctx.popWriter();
+                    body.append(";\n").append(emitLateAccessors(f, jt, lifted, coerce(init, ft, ctx)))
+                            .append('\n');
+                } else if (f.initializer != null && !f.isStatic && dartOrder(c)) {
                     // Run by $mixinFieldInit$ when Dart's order reaches the mixin
                     // application (emitMixinFieldInits), not as a Java field initializer.
                     mixinFieldInits.append(emitMixinFieldInit(f, ft, ctx));
@@ -1817,11 +1826,13 @@ public final class JavaEmitter {
                         diags.error(f, "E0403", "Complex mixin field initializers are not supported yet");
                     }
                 }
-                body.append(";\n");
-                body.append("    public ").append(jt).append(" get$").append(f.name)
-                        .append("() {\n        return ").append(f.name).append(";\n    }\n");
-                body.append("    public void set$").append(f.name).append('(').append(jt)
-                        .append(" v) {\n        this.").append(f.name).append(" = v;\n    }\n\n");
+                if (!lazyMixinField) {
+                    body.append(";\n");
+                    body.append("    public ").append(jt).append(" get$").append(f.name)
+                            .append("() {\n        return ").append(f.name).append(";\n    }\n");
+                    body.append("    public void set$").append(f.name).append('(').append(jt)
+                            .append(" v) {\n        this.").append(f.name).append(" = v;\n    }\n\n");
+                }
                 if (!mixSubst.isEmpty()) {
                     // The mixin interface declares set$x over its type parameter, which the
                     // primitive storage classes (List<int> is a DartLongList) do not match:
@@ -4547,7 +4558,13 @@ public final class JavaEmitter {
         }
         int n = a.positional.size();
         String res = null;
-        if (!a.named.isEmpty()) {
+        if (sup.equals("IndexError") && "withLength".equals(named) && n == 2
+                && namedOnly(a, "indexable", "name", "message")) {
+            // IndexError.withLength(index, length, {indexable, name, message}).
+            res = "(" + coreLongArg(a, 0, ctx) + ").longValue(), " + namedObjectArg(a, "indexable", ctx) + ", "
+                    + namedStringArg(a, "name", ctx) + ", " + namedStringArg(a, "message", ctx) + ", "
+                    + coreLongArg(a, 1, ctx);
+        } else if (!a.named.isEmpty()) {
             res = null;
         } else if (sup.equals("ArgumentError") && "value".equals(named) && n >= 1 && n <= 3) {
             res = "(Object) " + paren(emitExpr(a.positional.get(0), null, ctx).code) + ", "
@@ -4573,7 +4590,7 @@ public final class JavaEmitter {
                             + coreLongArg(a, 2, ctx);
         } else if (sup.equals("ConcurrentModificationError") && n <= 1) {
             res = n == 0 ? "" : "(Object) " + paren(emitExpr(a.positional.get(0), null, ctx).code);
-        } else if (!sup.equals("RangeError") && !sup.equals("ArgumentError")
+        } else if (!sup.equals("RangeError") && !sup.equals("ArgumentError") && !sup.equals("IndexError")
                 && !sup.equals("FormatException") && !sup.equals("ConcurrentModificationError") && n <= 1) {
             // StateError, UnsupportedError, UnimplementedError, TypeError, NoSuchMethodError,
             // AssertionError: one message, which Dart's own constructors may leave null.
@@ -4613,11 +4630,42 @@ public final class JavaEmitter {
         if (name.equals("message")) {
             return !core.equals("TypeError") && !core.equals("ConcurrentModificationError");
         }
-        if (core.equals("ArgumentError") || core.equals("RangeError")) {
+        if (core.equals("IndexError") && (name.equals("length") || name.equals("indexable"))) {
+            return true;
+        }
+        if (core.equals("ArgumentError") || core.equals("RangeError") || core.equals("IndexError")) {
             return name.equals("invalidValue") || name.equals("name")
-                    || core.equals("RangeError") && (name.equals("start") || name.equals("end"));
+                    || !core.equals("ArgumentError") && (name.equals("start") || name.equals("end"));
         }
         return core.equals("ConcurrentModificationError") && name.equals("modifiedObject");
+    }
+
+    /// Whether every named argument of {@code a} is one of {@code names}.
+    private static boolean namedOnly(Args a, String... names) {
+        for (NamedArg na : a.named) {
+            if (!java.util.Arrays.asList(names).contains(na.name)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String namedStringArg(Args a, String name, Ctx ctx) {
+        for (NamedArg na : a.named) {
+            if (na.name.equals(name)) {
+                return "(String) " + paren(emitExpr(na.value, TypeRef.STRING, ctx).code);
+            }
+        }
+        return "(String) null";
+    }
+
+    private String namedObjectArg(Args a, String name, Ctx ctx) {
+        for (NamedArg na : a.named) {
+            if (na.name.equals(name)) {
+                return "(Object) " + paren(emitExpr(na.value, null, ctx).code);
+            }
+        }
+        return "(Object) null";
     }
 
     private String coreStringArg(Args a, int i, Ctx ctx) {
@@ -10063,6 +10111,15 @@ public final class JavaEmitter {
             if (t.type.is("Null")) {
                 // `x is Null` holds only for null; it mapped to Object, which is the opposite.
                 check = subject + " == null";
+            } else if ((t.type.is("Error") || t.type.is("Exception")) && t.type.args.isEmpty()
+                    && !t.type.nullable && program.resolveClass(t.type.name, ctx.library()) == null) {
+                // dart:core's Error and Exception are not Java's: every Dart error and
+                // exception is a Java RuntimeException, so an instanceof of either Java
+                // class answered wrongly. The test is the one `on Error`/`on Exception`
+                // catch clauses use.
+                ctx.importClass("dart.runtime.DartRuntime");
+                check = "DartRuntime." + (t.type.is("Error") ? "isDartErrorValue" : "isDartExceptionValue")
+                        + "(" + subject + ")";
             } else if (tw != null) {
                 // `x is T` for a T the class keeps a witness of.
                 check = (t.type.nullable ? "dart.runtime.TypeWitness.nullable(" + tw + ")" : tw)
@@ -16568,9 +16625,17 @@ public final class JavaEmitter {
         }
         // ArgumentError's own getters, which RangeError inherits and extends with the
         // range it was checked against (dart.core.ArgumentError / RangeError).
-        if ((et.is("ArgumentError") || et.is("RangeError")) && !program.classes.containsKey(et.name)
+        // IndexError's own: the length it was checked against and the indexed object.
+        if (et.is("IndexError") && !program.classes.containsKey(et.name)
+                && (name.equals("length") || name.equals("indexable"))) {
+            TypeRef rt = name.equals("length") ? TypeRef.INT : new TypeRef("Object");
+            rt.nullable = name.equals("indexable");
+            return new Out(target.code + "." + name + "()", rt);
+        }
+        if ((et.is("ArgumentError") || et.is("RangeError") || et.is("IndexError"))
+                && !program.classes.containsKey(et.name)
                 && (name.equals("invalidValue") || name.equals("name")
-                        || (et.is("RangeError") && (name.equals("start") || name.equals("end"))))) {
+                        || (!et.is("ArgumentError") && (name.equals("start") || name.equals("end"))))) {
             TypeRef rt = name.equals("invalidValue") ? new TypeRef("Object")
                     : name.equals("name") ? new TypeRef("String") : new TypeRef("int");
             rt.nullable = true;
@@ -18750,6 +18815,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         } else if (sc != null && "dart.collection.IterableMixin".equals(sc.javaName)) {
             open = "(";
             close = ")";
+        } else if (sc != null && "dart.collection.SetMixin".equals(sc.javaName)) {
+            // SetMixin/SetBase print {a, b}.
+            open = "{";
+            close = "}";
+        } else if (sc != null && "dart.collection.MapMixin".equals(sc.javaName)) {
+            // MapMixin/MapBase print {k: v}; null marks the map form below.
+            open = null;
+            close = null;
         } else {
             return;
         }
@@ -18757,6 +18830,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if ("toString".equals(m.name) && !m.isStatic) {
                 return;
             }
+        }
+        if (open == null) {
+            body.append("    @Override\n    public String toString() {\n        return $mixinMapToString();\n    }\n\n");
+            return;
         }
         body.append("    @Override\n    public String toString() {\n        return $mixinToString(\"")
                 .append(open).append("\", \"").append(close).append("\");\n    }\n\n");
@@ -18773,6 +18850,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         CORE_ERRORS.put("UnsupportedError", "dart.core.UnsupportedError");
         CORE_ERRORS.put("UnimplementedError", "dart.core.UnimplementedError");
         CORE_ERRORS.put("RangeError", "dart.core.RangeError");
+        CORE_ERRORS.put("IndexError", "dart.core.IndexError");
         CORE_ERRORS.put("ConcurrentModificationError", "dart.core.ConcurrentModificationError");
         CORE_ERRORS.put("TypeError", "dart.core.TypeError");
         CORE_ERRORS.put("NoSuchMethodError", "dart.core.NoSuchMethodError");
@@ -21168,6 +21246,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 String obj = c.args.positional.isEmpty() ? ""
                         : "(Object) " + paren(emitExpr(c.args.positional.get(0), null, ctx).code);
                 return new Out("new " + simple + "(" + obj + ")", new TypeRef("Exception"));
+            }
+            if (n.equals("UnimplementedError") && c.args.positional.isEmpty()) {
+                // UnimplementedError([String? message]): omitted, the message is null and
+                // Dart prints the bare class name.
+                return new Out("new " + simple + "()", new TypeRef("Exception"));
             }
             String msg = c.args.positional.isEmpty() ? "\"\""
                     : emitExpr(c.args.positional.get(0), TypeRef.STRING, ctx).code;
@@ -23947,7 +24030,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /** dart:core type names that only ever appear as the receiver of a static member here. */
     private static final java.util.Set<String> CORE_STATIC_RECEIVERS = new java.util.HashSet<String>(
             java.util.Arrays.asList("List", "Map", "Set", "String", "bool", "int", "double", "num",
-                    "RangeError", "ArgumentError"));
+                    "RangeError", "ArgumentError", "IndexError"));
 
     private String posArg(Call c, int i, TypeRef t, Ctx ctx) {
         return i < c.args.positional.size() ? emitExpr(c.args.positional.get(i), t, ctx).code : "null";
@@ -24113,6 +24196,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         + paren(posArg(c, 3, TypeRef.STRING, ctx)) + ", (Long) " + paren(posArg(c, 4, nl, ctx)) + ")",
                         new TypeRef("RangeError"));
             }
+        }
+        if (cls.equals("IndexError") && n.equals("withLength") && pos.size() == 2) {
+            ctx.importClass("dart.core.IndexError");
+            Expr ix = namedArg(c, "indexable");
+            Expr nm = namedArg(c, "name");
+            Expr msg = namedArg(c, "message");
+            return new Out("IndexError.withLength(" + posArg(c, 0, TypeRef.INT, ctx) + ", "
+                    + posArg(c, 1, TypeRef.INT, ctx) + ", (Object) "
+                    + (ix == null ? "null" : paren(emitExpr(ix, null, ctx).code)) + ", (String) "
+                    + (nm == null ? "null" : paren(emitExpr(nm, TypeRef.STRING, ctx).code)) + ", (String) "
+                    + (msg == null ? "null" : paren(emitExpr(msg, TypeRef.STRING, ctx).code)) + ")",
+                    new TypeRef("IndexError"));
         }
         if (cls.equals("ArgumentError")) {
             if (n.equals("checkNotNull")) {

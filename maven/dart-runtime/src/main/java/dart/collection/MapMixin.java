@@ -108,6 +108,27 @@ public interface MapMixin<K, V> {
         return v;
     }
 
+    /// Dart's {@code MapBase.toString}, {@code {k: v, k2: v2}}, read through
+    /// {@link #forEach} as Dart's is. A Java interface cannot supply {@code toString()},
+    /// so the transpiler gives a class applying this mixin one that calls this.
+    default String $mixinMapToString() {
+        final StringBuilder sb = new StringBuilder("{");
+        final boolean[] firstEntry = {true};
+        final Object self = this;
+        forEach(new dart.runtime.Funcs.VoidFunc2<K, V>() {
+            @Override
+            public void call(K k, V v) {
+                if (!firstEntry[0]) {
+                    sb.append(", ");
+                }
+                firstEntry[0] = false;
+                sb.append(k == self ? "{...}" : dart.runtime.DartRuntime.str(k)).append(": ")
+                        .append(v == self ? "{...}" : dart.runtime.DartRuntime.str(v));
+            }
+        });
+        return sb.append('}').toString();
+    }
+
     /// {@code MapBase.mapToString(map)}: {@code {k: v, k2: v2}}.
     static String mapToString(java.util.Map<?, ?> m) {
         final StringBuilder sb = new StringBuilder("{");

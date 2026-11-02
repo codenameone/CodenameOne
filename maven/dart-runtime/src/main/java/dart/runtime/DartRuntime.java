@@ -1328,6 +1328,16 @@ public final class DartRuntime {
         return !isDartError(t) && !(t instanceof dart.core.DartThrown);
     }
 
+    /** Dart's {@code x is Error} for any value: the test {@code on Error} makes. */
+    public static boolean isDartErrorValue(Object o) {
+        return o instanceof Throwable && isDartError((Throwable) o);
+    }
+
+    /** Dart's {@code x is Exception} for any value: the test {@code on Exception} makes. */
+    public static boolean isDartExceptionValue(Object o) {
+        return o instanceof Throwable && isDartException((Throwable) o);
+    }
+
     /** Marker for switch arms `dart analyze` proved unreachable. */
     public static RuntimeException unreachable() {
         return new IllegalStateException("unreachable code reached — transpiler/analyzer mismatch");
