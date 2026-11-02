@@ -2,7 +2,7 @@ name: Nightly watchdog
 
 # The expensive suites -- the sample applications, the cn1libs, the device
 # integrations, the benchmarks, the full Maven reactor -- run on a pull request
-# only when their own tree changes, and on master once a night at 00:00 UTC
+# only when their own tree changes, and on master once a night at 00:11 UTC
 # (each carries `cron: '11 0 * * *'`, off the top of the hour, where GitHub
 # delays and may drop scheduled runs). Shared code (core, ports, builders,
 # backend) therefore reaches them only through that nightly run, so a failure
@@ -72,11 +72,18 @@ jobs:
             const GREEN = ['success', 'skipped', 'neutral'];
             const problems = [];
             const running = [];
+            const cancelled = [];
             for (const file of nightly) {
-              const { data } = await github.rest.actions.listWorkflowRuns({
-                owner, repo, workflow_id: file, event: 'schedule', branch: 'master', per_page: 10,
-              });
-              const runs = data.workflow_runs;
+              let runs;
+              try {
+                ({ data: { workflow_runs: runs } } = await github.rest.actions.listWorkflowRuns({
+                  owner, repo, workflow_id: file, event: 'schedule', branch: 'master', per_page: 10,
+                }));
+              } catch (e) {
+                // One unreadable suite must not stop the report on the others.
+                problems.push(`- \`${file}\`: could not list its runs (${e.status || e.message})`);
+                continue;
+              }
               const newest = runs[0];
               if (!newest || Date.now() - new Date(newest.created_at).getTime() > STALE_MS) {
                 problems.push(`- \`${file}\`: no scheduled run in the last 30 hours (workflow disabled, or the schedule did not fire)`);
@@ -86,7 +93,11 @@ jobs:
               if (newest.status !== 'completed') {
                 running.push(`- [\`${file}\`](${newest.html_url}): still ${newest.status}`);
               }
-              if (done && !GREEN.includes(done.conclusion)
+              // A cancelled run (a maintainer, or a newer run in its group) is
+              // listed but is not a failure: it neither opens nor renews the issue.
+              if (done && done.conclusion === 'cancelled') {
+                cancelled.push(`- [\`${file}\`](${done.html_url}): cancelled`);
+              } else if (done && !GREEN.includes(done.conclusion)
                   && Date.now() - new Date(done.created_at).getTime() <= 2 * STALE_MS) {
                 problems.push(`- [\`${file}\`](${done.html_url}): ${done.conclusion}`);
               }
@@ -111,6 +122,12 @@ jobs:
                   body: `Recovered: every nightly workflow passed on the run checked at ${now}.` });
                 await github.rest.issues.update({ owner, repo, issue_number: issue.number,
                   state: 'closed', state_reason: 'completed' });
+              } else if (issue) {
+                // Nothing failing any more, but not every suite has finished:
+                // keep the issue open and stop it listing failures that are gone.
+                await github.rest.issues.update({ owner, repo, issue_number: issue.number, body: [
+                  marker, `No failures as of ${now}; the issue closes once these finish green:`, '', ...running,
+                ].join('\n') });
               }
               return;
             }
@@ -120,7 +137,8 @@ jobs:
               `These nightly workflows failed on master (checked ${now}):`,
               '',
               ...problems,
-              ...(running.length ? ['', 'Still running when checked (not counted as failures):', '', ...running] : []),
+              ...(running.length ? ['', 'Still running when checked (judged by their previous completed run):', '', ...running] : []),
+              ...(cancelled.length ? ['', 'Cancelled (not counted as failures):', '', ...cancelled] : []),
               '',
               'They run on a pull request only when their own tree changes, so a change to shared code (core, ports, builders, backend) first meets them here. This issue closes itself after a fully green night.',
             ].join('\n');
@@ -130,7 +148,8 @@ jobs:
               await github.rest.issues.create({ owner, repo, title, body, assignees });
             } else {
               await github.rest.issues.update({ owner, repo, issue_number: issue.number, body });
-              // A comment, not only a body edit, so every failing night notifies.
-              await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+              // A comment, not only a body edit, so every failing night notifies;
+              // a manual re-check the same day updates the body without a ping.
+              if (context.eventName === 'schedule') await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
                 body: `@${process.env.ALERT_ASSIGNEE} still failing:\n\n${problems.join('\n')}` });
             }
