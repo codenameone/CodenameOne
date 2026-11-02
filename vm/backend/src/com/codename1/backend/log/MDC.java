@@ -84,7 +84,9 @@ public final class MDC {
 
     /// Empties this thread's context.
     public static void clear() {
-        CONTEXT.set(null);
+        if (CONTEXT.get() != null) {
+            CONTEXT.set(null);
+        }
     }
 
     /// Appends this thread's context as ` {key=value, ...}`, or nothing when empty.

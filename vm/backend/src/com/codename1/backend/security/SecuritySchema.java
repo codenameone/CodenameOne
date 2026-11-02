@@ -212,6 +212,12 @@ public final class SecuritySchema {
         return name;
     }
 
+    /// An index's name, derived from its table's configured name so that two
+    /// schemas configured differently in one database do not collide.
+    private static String index(String defaultTable, String suffix) {
+        return table(defaultTable) + "_" + suffix;
+    }
+
     private static Map<String, String> names() {
         Map<String, String> names = NAMES.get();
         if (names == null) {
@@ -235,26 +241,21 @@ public final class SecuritySchema {
         return -1;
     }
 
-    /// A name that can be written into SQL as it is: one or two dot-separated
-    /// parts, each a letter or `_` followed by letters, digits and `_`.
+    /// A name that can be written into SQL as it is: a letter or `_` followed by
+    /// letters, digits and `_`, at most 48 characters. It is never qualified by a
+    /// schema: SQLite wants the schema on an index's name and PostgreSQL refuses it
+    /// there, so a dotted name cannot be indexed portably -- point the connection's
+    /// search path at the schema instead. The cap leaves room for the index suffix
+    /// under MySQL's 64 and PostgreSQL's 63 character identifiers. The name is not
+    /// quoted, so a reserved word such as `user` is the database's to refuse.
     static String checkIdentifier(String name) {
-        boolean ok = name != null && name.length() > 0 && name.length() <= 128;
-        boolean start = true;
-        int dots = 0;
+        boolean ok = name != null && name.length() > 0 && name.length() <= 48;
         for (int iter = 0 ; ok && iter < name.length() ; iter++) {
             char c = name.charAt(iter);
             boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-            if (c == '.') {
-                ok = !start && ++dots == 1;
-                start = true;
-            } else if (start) {
-                ok = letter;
-                start = false;
-            } else {
-                ok = letter || (c >= '0' && c <= '9');
-            }
+            ok = letter || iter > 0 && c >= '0' && c <= '9';
         }
-        if (!ok || start) {
+        if (!ok) {
             throw new IllegalArgumentException("Not a safe SQL table name: " + name);
         }
         return name;
@@ -390,8 +391,8 @@ public final class SecuritySchema {
                 + "id " + key(d) + " NOT NULL, owner " + key(d) + " NOT NULL, scopes " + text(d)
                 + ", prefix " + text(d) + ", last_four " + text(d) + ", revoked " + flag(d)
                 + ", created_at " + moment(d) + ")",
-            "CREATE UNIQUE INDEX cn1_api_key_id ON " + table("cn1_api_key") + " (id)",
-            "CREATE INDEX cn1_api_key_owner ON " + table("cn1_api_key") + " (owner)"};
+            "CREATE UNIQUE INDEX " + index("cn1_api_key", "id") + " ON " + table("cn1_api_key") + " (id)",
+            "CREATE INDEX " + index("cn1_api_key", "owner") + " ON " + table("cn1_api_key") + " (owner)"};
     }
 
     private static String[] persistentLogins(Dialect d) {
@@ -399,7 +400,7 @@ public final class SecuritySchema {
             "CREATE TABLE " + table("cn1_persistent_logins") + " (series " + key(d) + " NOT NULL PRIMARY KEY, "
                 + "username_key " + key(d) + " NOT NULL, username " + text(d) + ", token_hash "
                 + text(d) + ", last_used " + moment(d) + ")",
-            "CREATE INDEX cn1_persistent_logins_user ON " + table("cn1_persistent_logins") + " (username_key)"};
+            "CREATE INDEX " + index("cn1_persistent_logins", "user") + " ON " + table("cn1_persistent_logins") + " (username_key)"};
     }
 
     private static String[] secondFactors(Dialect d) {
@@ -441,7 +442,7 @@ public final class SecuritySchema {
             "CREATE TABLE " + table("cn1_federated_identity") + " (provider " + key(d) + " NOT NULL, subject "
                 + key(d) + " NOT NULL, username_key " + key(d) + " NOT NULL, username " + text(d)
                 + ", created_at " + moment(d) + ", PRIMARY KEY (provider, subject))",
-            "CREATE INDEX cn1_federated_identity_user ON " + table("cn1_federated_identity") + " (username_key)"};
+            "CREATE INDEX " + index("cn1_federated_identity", "user") + " ON " + table("cn1_federated_identity") + " (username_key)"};
     }
 
     private static String[] registeredClients(Dialect d) {
@@ -451,8 +452,7 @@ public final class SecuritySchema {
                 + ", client_name " + text(d) + ", authentication_methods " + text(d)
                 + ", grant_types " + text(d) + ", redirect_uris " + text(d) + ", scopes "
                 + text(d) + ", settings " + text(d) + ", created_at " + moment(d) + ")",
-            "CREATE UNIQUE INDEX cn1_oauth2_registered_client_cid ON "
-                + table("cn1_oauth2_registered_client") + " (client_id)"};
+            "CREATE UNIQUE INDEX " + index("cn1_oauth2_registered_client", "cid") + " ON " + table("cn1_oauth2_registered_client") + " (client_id)"};
     }
 
     /// A grant, and beside it the secrets issued under it -- the authorization
@@ -465,12 +465,12 @@ public final class SecuritySchema {
                 + ", grant_type " + text(d) + ", scopes " + text(d) + ", status " + key(d)
                 + " NOT NULL, attributes " + text(d) + ", created_at " + moment(d)
                 + ", expires_at " + moment(d) + ")",
-            "CREATE INDEX cn1_oauth2_authorization_exp ON " + table("cn1_oauth2_authorization") + " (expires_at)",
+            "CREATE INDEX " + index("cn1_oauth2_authorization", "exp") + " ON " + table("cn1_oauth2_authorization") + " (expires_at)",
             "CREATE TABLE " + table("cn1_oauth2_token") + " (token_hash " + key(d) + " NOT NULL PRIMARY KEY, "
                 + "authorization_id " + key(d) + " NOT NULL, kind " + key(d) + " NOT NULL, used "
                 + flag(d) + ", expires_at " + moment(d) + ", polled_at " + moment(d) + ")",
-            "CREATE INDEX cn1_oauth2_token_auth ON " + table("cn1_oauth2_token") + " (authorization_id)",
-            "CREATE INDEX cn1_oauth2_token_exp ON " + table("cn1_oauth2_token") + " (expires_at)"};
+            "CREATE INDEX " + index("cn1_oauth2_token", "auth") + " ON " + table("cn1_oauth2_token") + " (authorization_id)",
+            "CREATE INDEX " + index("cn1_oauth2_token", "exp") + " ON " + table("cn1_oauth2_token") + " (expires_at)"};
     }
 
     /// A user's passkey handle, and their credentials. Byte strings -- the
@@ -483,7 +483,7 @@ public final class SecuritySchema {
             "CREATE TABLE " + table("cn1_webauthn_user") + " (username_key " + key(d) + " NOT NULL PRIMARY KEY, "
                 + "username " + text(d) + ", user_id " + key(d) + " NOT NULL, display_name "
                 + text(d) + ", created_at " + moment(d) + ")",
-            "CREATE UNIQUE INDEX cn1_webauthn_user_id ON " + table("cn1_webauthn_user") + " (user_id)",
+            "CREATE UNIQUE INDEX " + index("cn1_webauthn_user", "id") + " ON " + table("cn1_webauthn_user") + " (user_id)",
             "CREATE TABLE " + table("cn1_webauthn_credential") + " (credential_key " + key(d)
                 + " NOT NULL PRIMARY KEY, credential_id " + text(d) + ", user_id " + key(d)
                 + " NOT NULL, algorithm " + moment(d) + ", public_key " + text(d)
@@ -491,6 +491,6 @@ public final class SecuritySchema {
                 + ", backup_eligible " + flag(d) + ", backup_state " + flag(d) + ", transports "
                 + text(d) + ", label " + text(d) + ", created_at " + moment(d) + ", last_used "
                 + moment(d) + ")",
-            "CREATE INDEX cn1_webauthn_credential_user ON " + table("cn1_webauthn_credential") + " (user_id)"};
+            "CREATE INDEX " + index("cn1_webauthn_credential", "user") + " ON " + table("cn1_webauthn_credential") + " (user_id)"};
     }
 }

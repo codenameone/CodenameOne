@@ -920,6 +920,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int index = model.queryIndex(field);
         int version = model.versionIndex();
         Attribute a = model.attributes()[index];
+        // updatable = false is not checked: as in JPA, it only keeps the column out of
+        // the UPDATE dirty checking writes, and an increment is an explicit statement,
+        // the way a JPQL bulk UPDATE of such a column is.
         if (a.id || a.version || !model.counter(index)) {
             throw new IllegalArgumentException("Counter must be a non-key integral field: " + field);
         }

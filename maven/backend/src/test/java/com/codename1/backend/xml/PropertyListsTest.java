@@ -134,4 +134,17 @@ class PropertyListsTest {
         assertEquals("v", root.childText("i").isEmpty() ? root.children("i").get(1).getText() : "?");
         assertEquals("1", root.child("i").getAttribute("n"));
     }
+
+    @Test
+    void impossibleDatesAreRefusedAndYearZeroFloors() throws Exception {
+        assertThrows(XmlException.class, () -> PropertyLists.parse(
+                "<plist><date>2023-02-29T00:00:00Z</date></plist>"));
+        assertThrows(XmlException.class, () -> PropertyLists.parse(
+                "<plist><date>2024-04-31T00:00:00Z</date></plist>"));
+        assertEquals(951782400000L, ((Date) PropertyLists.parse(
+                "<plist><date>2000-02-29T00:00:00Z</date></plist>")).getTime());
+        // -62167219200000 is 0000-01-01T00:00:00Z
+        assertEquals(-62167219200000L, ((Date) PropertyLists.parse(
+                "<plist><date>0000-01-01T00:00:00Z</date></plist>")).getTime());
+    }
 }

@@ -1691,6 +1691,9 @@ final class BackendJsonCodecs {
     Map<String, String> sources() {
         Map<String, String> out = new LinkedHashMap<String, String>();
         Map<String, String> owners = new LinkedHashMap<String, String>();
+        // First: reading a class in the registry can ask for the codecs of the
+        // classes it holds, and the loop below must see those to write them.
+        String registry = registryWanted ? registrySource() : null;
         for (Dto dto : dtos.values()) {
             if (dto.problem != null || (!dto.write && !dto.read)) {
                 continue;
@@ -1711,7 +1714,7 @@ final class BackendJsonCodecs {
         }
         if (registryWanted) {
             valuesUsed = true;
-            out.put(REGISTRY, registrySource());
+            out.put(REGISTRY, registry);
         }
         if (valuesUsed) {
             out.put(VALUES, valuesSource());

@@ -51,6 +51,16 @@ import java.util.Map;
 final class JdkHttp2 {
     private static final String P = "java.net.http.";
 
+    /// Closes a response body whose read outlived the request's timeout. The
+    /// client's own timeout ends at the response headers, and a blocked read
+    /// checks no clock, so closing the stream is what ends a body that trickles.
+    private static final java.util.concurrent.ScheduledExecutorService DEADLINES =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "cn1-http2-deadline");
+                t.setDaemon(true);
+                return t;
+            });
+
     private JdkHttp2() {
     }
 
@@ -221,6 +231,17 @@ final class JdkHttp2 {
         Object response = call(http, type("HttpClient"), "send",
                 new Class[] {requestType, handlerType}, request, handler);
         InputStream in = (InputStream) call(response, responseType, "body", new Class[0]);
+        java.util.concurrent.atomic.AtomicBoolean expired =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.ScheduledFuture<?> deadline = ceiling <= 0 ? null
+                : DEADLINES.schedule(() -> {
+                    expired.set(true);
+                    try {
+                        in.close();
+                    } catch (IOException ignored) {
+                        // the reader sees the closed stream either way
+                    }
+                }, ceiling, java.util.concurrent.TimeUnit.MILLISECONDS);
         try {
             Object version = call(response, responseType, "version", new Class[0]);
             if (!"HTTP_2".equals(((Enum) version).name())) {
@@ -233,7 +254,7 @@ final class JdkHttp2 {
             byte[] chunk = new byte[8192];
             long total = 0;
             int n;
-            while ((n = in.read(chunk)) > 0) {
+            while ((n = readBody(in, chunk, expired, url, ceiling)) > 0) {
                 total += n;
                 if (total > maxBytes) {
                     throw new IOException("Request to " + Urls.forMessage(url) + " failed: the "
@@ -255,7 +276,30 @@ final class JdkHttp2 {
             }
             return new Web.Result(status, buffer.toByteArray(), null, values, "HTTP/2");
         } finally {
+            if (deadline != null) {
+                deadline.cancel(false);
+            }
             in.close();
+        }
+    }
+
+    private static int readBody(InputStream in, byte[] chunk, java.util.concurrent.atomic.AtomicBoolean expired,
+                                String url, int ceiling) throws IOException {
+        try {
+            int n = in.read(chunk);
+            if (expired.get()) {
+                throw new IOException("closed");
+            }
+            return n;
+        } catch (IOException err) {
+            if (expired.get()) {
+                java.net.SocketTimeoutException timeout = new java.net.SocketTimeoutException(
+                        "Request to " + Urls.forMessage(url) + " timed out after " + ceiling
+                        + "ms reading the response body");
+                timeout.initCause(err);
+                throw timeout;
+            }
+            throw err;
         }
     }
 

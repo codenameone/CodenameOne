@@ -228,9 +228,16 @@ public final class PropertyLists {
                 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 60) {
             throw new XmlException("bad <date> " + s);
         }
+        boolean leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        int length = month == 2 ? (leap ? 29 : 28)
+                : month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31;
+        if (day > length) {
+            throw new XmlException("bad <date> " + s);
+        }
         // Days from the civil calendar (H. Hinnant's algorithm), proleptic Gregorian.
+        // y is -1 for January and February of year 0, so the era floors.
         int y = month <= 2 ? year - 1 : year;
-        int era = y / 400;
+        int era = (y >= 0 ? y : y - 399) / 400;
         int yoe = y - era * 400;
         int mp = (month + 9) % 12;
         int doy = (153 * mp + 2) / 5 + day - 1;

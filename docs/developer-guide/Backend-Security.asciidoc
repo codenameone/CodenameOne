@@ -1634,8 +1634,11 @@ cn1.security.table-prefix=auth_
 cn1.security.table.cn1_users=app_users
 ----
 
-A name must be letters, digits and `_`, optionally after one schema name and a
-dot (`auth.users`). The server refuses to start with anything else. An adopted
+A name must be letters, digits and `_`, at most 48 characters, and must not
+start with a digit. The server refuses to start with anything else. A name is
+never qualified by a schema; to keep the tables in another schema, set the
+connection's search path. Indexes are named after their tables, so two
+applications with different names can share one database. An adopted
 table must have the columns this chapter's stores use. Every store and every
 schema version uses the configured names.
 

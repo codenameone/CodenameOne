@@ -219,8 +219,8 @@ class SecuritySchemaHistoryTest {
                     () -> SecuritySchema.setTableName("cn1_users", "1users"));
             assertThrows(IllegalArgumentException.class,
                     () -> SecuritySchema.setTableName("cn1_users", "a.b.c"));
-            SecuritySchema.setTableName("cn1_users", "auth.users");
-            assertEquals("auth.users", SecuritySchema.table("cn1_users"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> SecuritySchema.setTableName("cn1_users", "auth.users"));
             java.util.Properties bad = new java.util.Properties();
             bad.setProperty(SecuritySchema.TABLE_PREFIX + "cn1_users", "x\"y");
             assertThrows(IllegalArgumentException.class,
