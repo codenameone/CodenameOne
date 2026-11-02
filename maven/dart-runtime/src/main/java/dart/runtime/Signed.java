@@ -25,11 +25,19 @@
 package dart.runtime;
 
 /// A closure that carries its reified Dart signature, for `f is int Function(Object)`.
-/// The transpiler binds such a closure to a generated sub-interface of its Funcs SAM
-/// whose default method answers a constant array, so a closure costs nothing more to
-/// build or call; a closure without it is tested by its arity alone.
+/// The transpiler gives every closure and tear-off a generated marker interface per
+/// signature whose default method answers a constant array -- intersected with the SAM
+/// its consumer holds it by, or through a generated sub-interface of that SAM -- so a
+/// closure costs nothing more to build or call; one without it is tested by arity alone.
 public interface Signed {
     /// The return type's witness followed by each positional parameter's; an entry may be
     /// null where the type could not be named (a type variable), and is then not tested.
     TypeWitness[] $sig();
+
+    /// Whether the closure is a generic function (`T Function<T>(T)`, a generic function's
+    /// tear-off not instantiated by its context), which no non-generic function type is a
+    /// supertype of.
+    default boolean $generic() {
+        return false;
+    }
 }

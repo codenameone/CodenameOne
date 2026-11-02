@@ -166,7 +166,7 @@ public final class JavaEmitter {
         pinMemberTypesToOwnLibraries();
         List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
         if (!closureSignatures.isEmpty()) {
-            pruned.add(closureSignatureFile());
+            pruned.add(closureSignatureFile(pruned));
         }
         // After the pruning, which drops lines: the table pairs final Java lines.
         List<GeneratedFile> mapped = new ArrayList<GeneratedFile>(pruned.size());
@@ -4754,20 +4754,34 @@ public final class JavaEmitter {
      * method reference to one. A generic method, or one with an untyped parameter or
      * return, stays a plain Function as before.
      */
+    /// The type of `this` in class c: c applied to its own type variables.
+    private static TypeRef selfType(ClassDecl c) {
+        TypeRef t = new TypeRef(c.name);
+        for (String tp : c.typeParams) {
+            t.args.add(new TypeRef(tp));
+        }
+        return t;
+    }
+
     private TypeRef tearOffType(MethodDecl m, ClassDecl pc, TypeRef tt) {
         TypeRef f = new TypeRef("Function");
-        if (!m.typeParams.isEmpty() || m.returnType == null || m.params.size() > 5) {
+        if (m.returnType == null || m.params.size() > 5) {
             return f;
         }
+        // A generic method's own type variables are erased to their bounds, as a generic
+        // top-level function's tear-off is: the Java SAM cannot name them here.
+        java.util.List<TypeRef> none = java.util.Collections.<TypeRef>emptyList();
         java.util.List<TypeRef> ps = new ArrayList<TypeRef>();
         for (Param p : m.params) {
             if (p.named || p.optional || p.type == null || p.type.is("var")) {
                 return f;
             }
-            ps.add(asSeenFrom(p.type, m, null, pc, tt));
+            TypeRef pt = asSeenFrom(p.type, m, null, pc, tt);
+            ps.add(m.typeParams.isEmpty() ? pt : substTypeParams(pt, m.typeParams, none));
         }
         f.funcParams = ps;
-        f.funcReturn = asSeenFrom(m.returnType, m, null, pc, tt);
+        TypeRef rt = asSeenFrom(m.returnType, m, null, pc, tt);
+        f.funcReturn = m.typeParams.isEmpty() ? rt : substTypeParams(rt, m.typeParams, none);
         return f;
     }
 
@@ -6131,11 +6145,13 @@ public final class JavaEmitter {
                     ? asyncClosureType((Lambda) v.initializer, v.name, ctx) : null;
             if (v.initializer != null) {
                 // `var f = (int x) => x` / `Object g = (Object o) => ..`: no function type
-                // is imposed, so the local holds the closure by its own SAM and it can be
-                // signed (signClosure).
-                signableClosure = v.initializer instanceof Lambda && (declared == null || declared.is("var")
+                // is imposed, so the local holds the closure by its own SAM, whose type
+                // arguments signClosure spells.
+                ownTypedClosure = v.initializer instanceof Lambda && (declared == null || declared.is("var")
                         || isDynamicType(declared) || declared.is("Function")) ? v.initializer : null;
                 tearOffKeepAll = (declared == null || declared.is("var")) && v.initializer instanceof Ident;
+                ownTypedTearOff = (declared == null || declared.is("var"))
+                        && (v.initializer instanceof Ident || v.initializer instanceof PropertyGet) ? v.initializer : null;
                 // In Java a local is in scope in its own initializer, so a closure parameter
                 // of the same name (`var sink = make((data, sink) => ...)`) is a duplicate
                 // there. Dart cannot read the local before its declaration, so the name is
@@ -6147,6 +6163,7 @@ public final class JavaEmitter {
                             : declared != null && !declared.is("var") ? declared : null, ctx);
                 } finally {
                     ctx.releaseName(v.name);
+                    ownTypedTearOff = null;
                 }
             }
             TypeRef t = asyncFn != null ? asyncFn : declared == null || declared.is("var")
@@ -7931,7 +7948,150 @@ public final class JavaEmitter {
                 return emitExpr(l, expected, ctx);
             }
         }
-        return narrowFullArityValue(e, materializeShort(emitExprRaw(e, expected, ctx)), expected, ctx);
+        Out out = narrowFullArityValue(e, materializeShort(emitExprRaw(e, expected, ctx)), expected, ctx);
+        if (!(e instanceof Lambda) && out != null && out.code != null && (out.code.matches(METHOD_REF)
+                // `new Box()::plain`: an instance tear-off whose receiver is no plain name.
+                || e instanceof PropertyGet && out.code.endsWith("::" + ((PropertyGet) e).name)
+                    && !out.code.startsWith("(")
+                || out.code.matches("\\(\\((dart\\.runtime\\.)?Funcs\\.[^()&]*\\) " + METHOD_REF + "\\)"))) {
+            out = signTearOff(e, out, expected, ctx);
+        }
+        return out;
+    }
+
+    /// A bare method reference, `Owner::name` or `recv.chain::name`.
+    private static final String METHOD_REF = "[A-Za-z_$][A-Za-z0-9_$.]*::[A-Za-z_$][A-Za-z0-9_$]*";
+
+    /// A method reference tear-off (`shout`, `g.greet`) in a context: like a closure, it
+    /// carries its Dart signature (signClosure) -- its declared parameter and return
+    /// types, the context's where a generic function is instantiated by it. Into an
+    /// Object/dynamic/Function slot, which is no functional interface, it is bound to its
+    /// own SAM intersected with the signature marker; into a function-typed one, it goes
+    /// through the signed SAM whose type arguments javac infers. An untyped local's
+    /// initializer is bound as in an Object slot: its declared type is its own.
+    private Out signTearOff(Expr e, Out out, TypeRef expected, Ctx ctx) {
+        TypeRef ft = out.type;
+        if (ft == null || ft.funcParams == null || ft.funcReturn == null || ft.funcNamed != null) {
+            return out;
+        }
+        // An untyped local's initializer (`var t = twice`) has no context: the tear-off's
+        // declared function type is its own, and it is bound to its own SAM intersected with
+        // that signature, as in an Object slot. Any other context-free use (a receiver, an
+        // argument its consumer casts) keeps the type its producer gave it.
+        boolean ownTyped = expected == null && ownTypedTearOff == e;
+        if (expected == null && !ownTyped) {
+            return out;
+        }
+        boolean objectSlot = ownTyped || expected.funcParams == null
+                && (expected.is("Object") || expected.is("Function") || isDynamicType(expected));
+        TypeRef[] ctxSig = null;
+        if (!objectSlot) {
+            ctxSig = expected.funcParams != null ? null : !expected.args.isEmpty()
+                    ? userTypedefSig(expected.name, expected.args) : null;
+            if (expected.funcParams != null) {
+                ctxSig = new TypeRef[expected.funcParams.size() + 1];
+                for (int i = 0; i < expected.funcParams.size(); i++) {
+                    ctxSig[i] = expected.funcParams.get(i);
+                }
+                ctxSig[ctxSig.length - 1] = expected.funcReturn;
+            } else if (ctxSig == null) {
+                ctxSig = substituteTypedefTypeArgs(typedefSig(expected.name), expected.args);
+            }
+            if (ctxSig == null || ctxSig.length != ft.funcParams.size() + 1) {
+                return out;
+            }
+        }
+        String ref = out.code;
+        String castSam = null;
+        if (ref.startsWith("((")) {
+            // Already bound to the SAM its producer chose (a top-level function's tear-off):
+            // in an Object slot that SAM is kept, intersected with the signature; in a
+            // function-typed one the signed SAM takes its type arguments from the target.
+            int close = ref.indexOf(") ");
+            castSam = ref.substring(2, close);
+            ref = ref.substring(close + 2, ref.length() - 1);
+        }
+        reifiedClassNames();
+        if (!functionTypeTested) {
+            // Nothing tests a function type: only an explicit Object slot needs the SAM, a
+            // context-free tear-off keeps the type its producer gave it.
+            if (ownTyped || !objectSlot || castSam != null) {
+                return out;
+            }
+            String ownSam = javaType(ft, false, ctx);
+            return ownSam.contains("Funcs.") ? new Out("((" + ownSam + ") " + out.code + ")", ft) : out;
+        }
+        String ownSam = javaType(ft, false, ctx);
+        boolean generic = isGenericTearOff(e, ctx);
+        TypeRef ret = ft.funcReturn;
+        if (generic && ctxSig != null && isDynamicType(ret)) {
+            ret = ctxSig[ctxSig.length - 1];
+        }
+        StringBuilder sig = new StringBuilder();
+        sig.append(ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
+                : staticWitness(ret == null || isDynamicType(ret) ? null : reifiedArgWitness(ret, ctx)));
+        for (int i = 0; i < ft.funcParams.size(); i++) {
+            TypeRef pt = ft.funcParams.get(i);
+            if (generic && ctxSig != null && (pt == null || isDynamicType(pt))) {
+                pt = ctxSig[i];
+            }
+            sig.append(", ").append(pt == null || isDynamicType(pt) ? "null" : staticWitness(targetArgWitness(pt, ctx)));
+        }
+        String[] signed = signWith(ref, objectSlot ? ft : expected, sig.toString(), generic && objectSlot,
+                false, ctx);
+        if (signed == null) {
+            return objectSlot && castSam == null && ownSam.contains("Funcs.") ? new Out("((" + ownSam + ") " + out.code + ")", ft) : out;
+        }
+        if (castSam != null && objectSlot) {
+            return new Out("((" + castSam + " & " + signed[0] + ") " + ref + ")", out.type);
+        }
+        if (objectSlot) {
+            return new Out("((" + ownSam + " & " + signed[0] + ") " + ref + ")", ft);
+        }
+        return new Out(signed[1], out.type);
+    }
+
+    /// Whether a tear-off names a generic function or method (`identity<T>`), whose
+    /// uninstantiated type is no subtype of any non-generic function type.
+    private boolean isGenericTearOff(Expr e, Ctx ctx) {
+        if (e instanceof Ident) {
+            String name = ((Ident) e).name;
+            // An instance or static method of the current class or one it inherits, else a
+            // top-level function.
+            MethodDecl md = ctx.currentClass != null ? findMethodInHierarchy(ctx.currentClass, name) : null;
+            if (md != null) {
+                return !md.typeParams.isEmpty();
+            }
+            FunctionDecl fn = program.functions.get(name);
+            return fn != null && !fn.typeParams.isEmpty();
+        }
+        if (!(e instanceof PropertyGet)) {
+            return false;
+        }
+        PropertyGet pg = (PropertyGet) e;
+        if (isImportPrefix(pg.target, ctx)) {
+            // `lib.identity`: a top-level function through an import prefix.
+            FunctionDecl fn = program.functions.get(pg.name);
+            return fn != null && !fn.typeParams.isEmpty();
+        }
+        if (pg.target instanceof Ident && ctx.lookup(((Ident) pg.target).name) == null
+                && (ctx.currentClass == null || ctx.currentClass.field(((Ident) pg.target).name) == null)) {
+            ClassDecl owner = programClass(((Ident) pg.target).name, ctx);
+            if (owner != null) {
+                // `Box.keep`: a static method, which Dart does not inherit.
+                MethodDecl md = owner.method(pg.name);
+                return md != null && !md.typeParams.isEmpty();
+            }
+        }
+        // `box.pick`: an instance method of the receiver's static class or a supertype.
+        TypeRef rt = inferExprTypeQuiet(pg.target, ctx);
+        if (rt == null) {
+            // `Box().pick`: a constructed receiver.
+            rt = constructedType(pg.target, ctx);
+        }
+        ClassDecl rc = rt == null ? null : programClass(rt.name, ctx);
+        MethodDecl md = rc == null ? null : findMethodInHierarchy(rc, pg.name);
+        return md != null && !md.typeParams.isEmpty();
     }
 
     /// A tear-off with optional parameters is a SAM of its full arity (see tearOffAdapter),
@@ -7994,7 +8154,7 @@ public final class JavaEmitter {
         }
         String fv = tag + "$f";
         ctx.writer().line("final " + fullRaw + " " + fv + " = (" + fullRaw + ") " + o.code + ";");
-        String call = "((" + fullRaw + ") " + fv + ").call(" + args + ")";
+        String call = "(" + castToBare(fullRaw, fv) + ").call(" + args + ")";
         String code = "((" + sam + ") (" + raw + ") (" + lp + ") -> " + (isVoid ? "{ " + call + "; }" : call) + ")";
         return new Out(code, nt);
     }
@@ -8585,12 +8745,12 @@ public final class JavaEmitter {
             if (c.elseExpr instanceof Lambda && !(c.thenExpr instanceof Lambda)) {
                 String sam = leadingFuncsCast(aCode);
                 if (sam != null) {
-                    bCode = "(" + sam + ") " + bCode;
+                    bCode = castToBare(sam, bCode);
                 }
             } else if (c.thenExpr instanceof Lambda && !(c.elseExpr instanceof Lambda)) {
                 String sam = leadingFuncsCast(bCode);
                 if (sam != null) {
-                    aCode = "(" + sam + ") " + aCode;
+                    aCode = castToBare(sam, aCode);
                 }
             }
             // An arm Java types as Object (a dynamic read, an imprecise stub return, a
@@ -8961,14 +9121,25 @@ public final class JavaEmitter {
                 || !(erased.startsWith("dart.runtime.Funcs.") || erased.startsWith("Funcs."))) {
             return null;
         }
-        String ret = t.funcReturn.is("void") || isDynamicType(t.funcReturn) ? null
-                : reifiedArgWitness(t.funcReturn, ctx);
+        boolean topReturn = t.funcReturn.is("void") || isDynamicType(t.funcReturn)
+                || t.funcReturn.is("Object") && t.funcReturn.nullable;
+        String ret = topReturn ? null : reifiedArgWitness(t.funcReturn, ctx);
         StringBuilder sb = new StringBuilder();
         boolean any = ret != null;
         for (TypeRef p : t.funcParams) {
             String w = targetArgWitness(p, ctx);
             any |= w != null;
             sb.append(", ").append(nullWitness(w));
+        }
+        if (topReturn) {
+            // void, dynamic and Object? are all top: any function of the arity is one, held
+            // by its value SAM or its void one.
+            int dot = erased.lastIndexOf('.') + 1;
+            String arity = erased.substring(dot).replace("VoidFunc", "").replace("Func", "");
+            String valueSam = erased.substring(0, dot) + "Func" + arity;
+            String voidSam = erased.substring(0, dot) + "VoidFunc" + arity;
+            return "dart.runtime.TypeWitness.isTopFunctionOf(" + subject + ", " + valueSam + ".class, " + voidSam
+                    + ".class" + sb + ")";
         }
         if (!any) {
             return null;
@@ -8977,80 +9148,144 @@ public final class JavaEmitter {
                 + sb + ")";
     }
 
-    /// The local initializer signClosure may sign, set by the declaration that emits it.
-    private Expr signableClosure;
+    /// The initializer of a local that imposes no function type (`var f = (int x) => x`),
+    /// set by the declaration that emits it. Nothing gives that closure a target type, so
+    /// its signed SAM names its own type arguments; everywhere else javac infers them.
+    private Expr ownTypedClosure;
     /// Whether some is/as in the program tests a function type: only then do closures carry
     /// their signatures (signClosure).
     private boolean functionTypeTested;
-    /// The generated signed SAM interfaces, by signature key, in creation order.
+    /// The generated signature markers, by signature: {name, witnesses}.
     private final java.util.LinkedHashMap<String, String[]> closureSignatures =
             new java.util.LinkedHashMap<String, String[]>();
+    /// The generated signed SAMs, by SAM and marker: {name, SAM, arity, marker}.
+    private final java.util.LinkedHashMap<String, String[]> signedSams =
+            new java.util.LinkedHashMap<String, String[]>();
+    /// Each closure signClosure signed: {unsigned code, marker, signed code}. A consumer that
+    /// casts the closure to a SAM of its choosing (samCast) casts the unsigned code to that
+    /// SAM intersected with the marker instead.
+    /// Every closure and tear-off signWith signed, by its signed code: {unsigned code,
+    /// marker}, for castTo.
+    private final java.util.HashMap<String, String[]> signedByCode = new java.util.HashMap<String, String[]>();
+    private final java.util.IdentityHashMap<Lambda, String[]> signedClosures =
+            new java.util.IdentityHashMap<Lambda, String[]>();
 
-    /// Binds a closure to a generated sub-interface of its SAM that answers its reified
-    /// signature (dart.runtime.Signed), when the program tests a function type. The
-    /// closure's parameter and return types are Dart's: declared ones, else the context's
-    /// (downward inference), else the arrow body's type. Entries that cannot be named
-    /// statically (a type variable) stay null and untested.
+    /// Gives a closure its reified signature (dart.runtime.Signed) when the program tests
+    /// a function type, without changing the Java type its consumer needs. The signature is
+    /// a marker interface per distinct signature (DartFnSigs.Mn) whose default `$sig()`
+    /// answers one static constant, so a closure costs nothing more to build or call:
+    ///
+    /// - a consumer that casts the closure to a SAM of its own choosing (pinnedHandler, a
+    ///   bound tear-off) casts it to `(SAM & Mn)` instead (samCast), an intersection a
+    ///   lambda implements as it is;
+    /// - anywhere else the closure is passed through `DartFnSigs.sk(..)`, whose parameter is
+    ///   a sub-interface of the context's SAM and the marker; javac infers its type
+    ///   arguments from the target, so they are always the consumer's own.
+    ///
+    /// The closure's parameter and return types are Dart's: declared ones, else the
+    /// context's (downward inference), else the arrow body's type; a void result is
+    /// recorded as void, which no `R Function(..)` but a top R accepts. Entries that cannot
+    /// be named statically (a type variable) stay null and untested.
     private String signClosure(String code, Lambda l, TypeRef expected, TypeRef bodyType, Ctx ctx) {
         reifiedClassNames();
+        boolean own = ownTypedClosure == l;
+        if (own) {
+            ownTypedClosure = null;
+        }
         if (!functionTypeTested) {
             return code;
-        }
-        boolean ownSite = signableClosure == l;
-        if (ownSite) {
-            signableClosure = null;
-        }
-        if (!ownSite || expected != null && !ownTyped(l, expected)) {
-            // A closure in a typed context is held as the SAM its consumer chooses -- the
-            // parameter's, or the void/value one pinnedHandler casts it to after this
-            // returns -- and that choice is made outside this method. A signed sub-interface
-            // picked here from a context type can name another SAM or other type arguments
-            // than the consumer's (VoidFunc1<T> vs Func1<Object, Object>), which javac
-            // rejects. So only a closure whose SAM follows from its own declared type is
-            // signed: the initializer of a local that imposes no function type (the only
-            // site whose Java type follows the closure's own), with no context or one that
-            // is exactly its declared parameters (`Object g = (Object o) => ..`). Even an
-            // own-typed context elsewhere is cast by its consumer to its erased SAM
-            // (VoidFunc2<Object, Object> for an onError slot). A
-            // contextual closure keeps the arity test, which is Dart's answer whenever the
-            // tested type is the context's own.
-            return code;
-        }
-        if (expected == null) {
-            // `var f = (int x) => x`: the closure's own type, from its declared parameters.
-            expected = new TypeRef("Function");
-            expected.funcParams = new ArrayList<TypeRef>();
-            for (Param p : l.params) {
-                if (p.type == null || p.type.is("var")) {
-                    return code;
-                }
-                expected.funcParams.add(p.type);
-            }
-            expected.funcReturn = l.exprBody != null && bodyType != null ? bodyType : TypeRef.DYNAMIC;
-        }
-        if (expected.funcParams == null || expected.funcParams.size() != l.params.size()) {
-            return code;
-        }
-        if (isDynamicType(expected.funcReturn)) {
-            // No return type to hold it by: the SAM is the void or the value one by the body,
-            // the choice pinnedHandler makes when it casts the closure, and a value SAM keeps
-            // the dynamic return it casts to. The signature still records the body's type.
-            boolean value = l.exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(l);
-            if (!value) {
-                TypeRef own = new TypeRef("Function");
-                own.funcParams = expected.funcParams;
-                own.funcReturn = new TypeRef("void");
-                expected = own;
-            }
         }
         for (Param p : l.params) {
             if (p.named || p.optional) {
                 return code;
             }
         }
-        String jt = javaType(expected, false, ctx);
-        if (!(jt.startsWith("dart.runtime.Funcs.") || jt.startsWith("Funcs.")) || jt.indexOf('?') >= 0) {
+        TypeRef[] ctxSig = null;
+        if (expected != null && expected.funcParams != null) {
+            ctxSig = new TypeRef[expected.funcParams.size() + 1];
+            for (int i = 0; i < expected.funcParams.size(); i++) {
+                ctxSig[i] = expected.funcParams.get(i);
+            }
+            ctxSig[ctxSig.length - 1] = expected.funcReturn;
+        } else if (expected != null && !isDynamicType(expected) && !expected.is("Function")
+                && !expected.is("Object")) {
+            ctxSig = !expected.args.isEmpty() ? userTypedefSig(expected.name, expected.args) : null;
+            if (ctxSig == null) {
+                ctxSig = substituteTypedefTypeArgs(typedefSig(expected.name), expected.args);
+            }
+            if (ctxSig == null) {
+                return code;
+            }
+        }
+        if (ctxSig != null && ctxSig.length != l.params.size() + 1) {
             return code;
+        }
+        TypeRef ctxRet = ctxSig != null ? ctxSig[ctxSig.length - 1] : null;
+        boolean value = l.exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(l);
+        // The SAM: the context's, as the consumer's parameter or local declares it; with no
+        // context, the closure's own from its declared parameters, void or value by its
+        // body -- the choice pinnedHandler makes when it casts the closure.
+        TypeRef samType = new TypeRef("Function");
+        samType.funcParams = new ArrayList<TypeRef>();
+        for (int i = 0; i < l.params.size(); i++) {
+            TypeRef pt = l.params.get(i).type;
+            if (ctxSig != null) {
+                samType.funcParams.add(ctxSig[i] != null ? ctxSig[i] : TypeRef.DYNAMIC);
+            } else if (pt == null || pt.is("var")) {
+                samType.funcParams.add(TypeRef.DYNAMIC);
+            } else {
+                samType.funcParams.add(pt);
+            }
+        }
+        if (ctxSig != null) {
+            samType.funcReturn = ctxRet != null ? ctxRet : TypeRef.DYNAMIC;
+        } else {
+            samType.funcReturn = !value ? new TypeRef("void") : l.exprBody != null && bodyType != null
+                    && !bodyType.is("void") ? bodyType : TypeRef.DYNAMIC;
+        }
+        // The recorded signature. A block body with no `return value` returns nothing, though
+        // the value SAM it may be held by returns null for it.
+        boolean returnsValue = l.exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(l);
+        TypeRef ret = ctxRet != null && !isDynamicType(ctxRet) ? ctxRet
+                : !returnsValue ? new TypeRef("void") : l.exprBody != null ? bodyType : null;
+        StringBuilder sig = new StringBuilder();
+        sig.append(ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
+                : staticWitness(ret == null ? null : reifiedArgWitness(ret, ctx)));
+        boolean any = false;
+        for (int i = 0; i < l.params.size(); i++) {
+            TypeRef pt = l.params.get(i).type;
+            if (pt == null || pt.is("var")) {
+                pt = ctxSig != null ? ctxSig[i] : null;
+            }
+            String w = pt == null ? "null" : staticWitness(targetArgWitness(pt, ctx));
+            any |= !"null".equals(w);
+            sig.append(", ").append(w);
+        }
+        boolean generic = false;
+        if (!any && sig.toString().startsWith("null") && (l.typeParams.isEmpty() || ctxSig != null)) {
+            return code;
+        }
+        if (!l.typeParams.isEmpty() && ctxSig == null) {
+            generic = true;
+        }
+        boolean spellArgs = own && expected == null;
+        String[] signed = signWith(code, samType, sig.toString(), generic, spellArgs, ctx);
+        if (signed == null) {
+            return code;
+        }
+        signedClosures.put(l, new String[] {code, signed[0], signed[1]});
+        return signed[1];
+    }
+
+    /// Binds {@code code}, a closure or method reference of the SAM {@code samType} names, to
+    /// the signature {@code sig}: answers {marker, signed code}, or null when the SAM is
+    /// not a Funcs one. The signed code is `DartFnSigs.sk(code)`, whose type arguments javac
+    /// infers from the target unless {@code spellArgs} (a site with no target) spells them.
+    private String[] signWith(String code, TypeRef samType, String sig, boolean generic, boolean spellArgs,
+            Ctx ctx) {
+        String jt = javaType(samType, false, ctx);
+        if (!(jt.startsWith("dart.runtime.Funcs.") || jt.startsWith("Funcs."))) {
+            return null;
         }
         int lt = jt.indexOf('<');
         String head = lt < 0 ? jt : jt.substring(0, lt);
@@ -9074,51 +9309,73 @@ public final class JavaEmitter {
             }
             targs.add(jt.substring(start, jt.length() - 1).trim());
         }
-        TypeRef ret = expected.funcReturn != null && !isDynamicType(expected.funcReturn) ? expected.funcReturn
-                : l.exprBody != null ? bodyType : null;
-        StringBuilder sig = new StringBuilder();
-        sig.append(staticWitness(ret == null || ret.is("void") ? null : reifiedArgWitness(ret, ctx)));
-        boolean any = false;
-        for (int i = 0; i < l.params.size(); i++) {
-            TypeRef pt = l.params.get(i).type;
-            if (pt == null || pt.is("var")) {
-                pt = expected.funcParams.get(i);
-            }
-            String w = staticWitness(targetArgWitness(pt, ctx));
-            any |= !"null".equals(w);
-            sig.append(", ").append(w);
+        if (spellArgs && jt.indexOf('?') >= 0) {
+            return null;
         }
-        if (!any && sig.toString().startsWith("null")) {
-            return code;
+        String mkey = (generic ? "<>" : "") + sig;
+        String[] marker = closureSignatures.get(mkey);
+        if (marker == null) {
+            marker = new String[] {"M" + closureSignatures.size(), sig, String.valueOf(generic)};
+            closureSignatures.put(mkey, marker);
         }
-        String key = head + "|" + targs.size() + "|" + sig;
-        String[] entry = closureSignatures.get(key);
-        if (entry == null) {
-            entry = new String[] {"S" + closureSignatures.size(), head, String.valueOf(targs.size()), sig.toString()};
-            closureSignatures.put(key, entry);
+        String samKey = head + "|" + targs.size() + "|" + marker[0];
+        String[] sam = signedSams.get(samKey);
+        if (sam == null) {
+            sam = new String[] {"S" + signedSams.size(), head, String.valueOf(targs.size()), marker[0]};
+            signedSams.put(samKey, sam);
         }
         StringBuilder call = new StringBuilder(pkg + ".DartFnSigs.");
-        if (!targs.isEmpty()) {
+        if (spellArgs && !targs.isEmpty()) {
             call.append('<').append(String.join(", ", targs)).append('>');
         }
-        return call.append("s").append(entry[0].substring(1)).append("(").append(code).append(")").toString();
+        call.append("s").append(sam[0].substring(1)).append("(").append(code).append(")");
+        signedByCode.put(call.toString(), new String[] {code, pkg + ".DartFnSigs." + marker[0]});
+        return new String[] {pkg + ".DartFnSigs." + marker[0], call.toString()};
     }
 
-    /// Whether a closure's context is its own declared type: every parameter declared,
-    /// positional, and the same type the context names, with no return imposed.
-    private boolean ownTyped(Lambda l, TypeRef expected) {
-        if (expected.funcParams == null || expected.funcParams.size() != l.params.size()
-                || (expected.funcReturn != null && !isDynamicType(expected.funcReturn))) {
-            return false;
+    /// `(sam) closure`, for a consumer that holds a closure by a SAM of its own choosing: a
+    /// closure signClosure signed is cast to that SAM intersected with its signature
+    /// marker, so it is still a lambda of exactly that SAM and still Signed.
+    /// `(type) code`, the one place a cast of a value is written. A closure signClosure signed
+    /// and passed through `DartFnSigs.sk(..)` has no target there to infer its type arguments
+    /// from, so it is cast to the SAM intersected with its signature marker instead:
+    /// `(SAM) (SAM & Mn) closure`, the closure typed by exactly the cast's SAM.
+    private String castTo(String type, String code) {
+        String[] s = signedFor(code);
+        if (s != null && (type.startsWith("Funcs.") || type.startsWith("dart.runtime.Funcs."))) {
+            return "(" + type + ") (" + type + " & " + s[1] + ") " + paren(s[0]);
         }
-        for (int i = 0; i < l.params.size(); i++) {
-            Param p = l.params.get(i);
-            if (p.named || p.optional || p.type == null || p.type.is("var")
-                    || !p.type.toString().equals(String.valueOf(expected.funcParams.get(i)))) {
-                return false;
-            }
+        return "(" + type + ") " + paren(code);
+    }
+
+    /// castTo for a site that writes its operand unparenthesized (a primary, a method
+    /// reference, a lambda the cast applies to): `(type) code`.
+    private String castToBare(String type, String code) {
+        String[] s = signedFor(code);
+        if (s != null && (type.startsWith("Funcs.") || type.startsWith("dart.runtime.Funcs."))) {
+            return "(" + type + ") (" + type + " & " + s[1] + ") " + paren(s[0]);
         }
-        return true;
+        return "(" + type + ") " + code;
+    }
+
+    /// {unsigned code, marker} of a closure or tear-off signWith signed to exactly
+    /// {@code code} (or that code in parentheses), else null.
+    private String[] signedFor(String code) {
+        String[] s = signedByCode.get(code);
+        if (s == null && code.startsWith("(") && outerParenEnclosesAll(code)) {
+            s = signedByCode.get(code.substring(1, code.length() - 1));
+        }
+        return s;
+    }
+
+    private String samCast(Expr src, String code, String sam) {
+        String[] s = src instanceof Lambda ? signedClosures.get(src) : null;
+        if (s != null && s[2].equals(code)) {
+            // The outer plain cast is what a generic consumer infers its type arguments
+            // from; javac does not infer them from an intersection.
+            return "(" + sam + ") (" + sam + " & " + s[1] + ") " + paren(s[0]);
+        }
+        return castTo(sam, code);
     }
 
     /// A witness expression a static initializer can evaluate, or "null".
@@ -9127,13 +9384,23 @@ public final class JavaEmitter {
     }
 
     /// The holder of every signed SAM interface signClosure used.
-    private GeneratedFile closureSignatureFile() {
+    private GeneratedFile closureSignatureFile(List<GeneratedFile> files) {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(pkg).append(";\n\n");
         sb.append("import dart.core.*;\n\n");
         sb.append("/** Closure SAMs carrying their reified Dart signatures (dart.runtime.Signed). */\n");
         sb.append("public final class DartFnSigs {\n    private DartFnSigs() {\n    }\n");
-        for (String[] e : closureSignatures.values()) {
+        for (String[] m : closureSignatures.values()) {
+            sb.append("\n    public interface ").append(m[0]).append(" extends dart.runtime.Signed {\n")
+                    .append("        dart.runtime.TypeWitness[] SIG = {").append(m[1])
+                    .append("};\n\n        @Override\n        default dart.runtime.TypeWitness[] $sig() {\n")
+                    .append("            return SIG;\n        }\n");
+            if (Boolean.parseBoolean(m[2])) {
+                sb.append("\n        @Override\n        default boolean $generic() {\n            return true;\n        }\n");
+            }
+            sb.append("    }\n");
+        }
+        for (String[] e : signedSams.values()) {
             int n = Integer.parseInt(e[2]);
             StringBuilder tp = new StringBuilder();
             for (int i = 0; i < n; i++) {
@@ -9143,15 +9410,41 @@ public final class JavaEmitter {
                 tp.append('>');
             }
             sb.append("\n    public interface ").append(e[0]).append(tp).append(" extends ").append(e[1]).append(tp)
-                    .append(", dart.runtime.Signed {\n        dart.runtime.TypeWitness[] SIG = {").append(e[3])
-                    .append("};\n\n        @Override\n        default dart.runtime.TypeWitness[] $sig() {\n")
-                    .append("            return SIG;\n        }\n    }\n");
+                    .append(", ").append(e[3]).append(" {\n    }\n");
             sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(e[0]).append(tp).append(" s")
                     .append(e[0].substring(1)).append("(").append(e[0]).append(tp).append(" f) {\n")
                     .append("        return f;\n    }\n");
         }
         sb.append("}\n");
-        return new GeneratedFile("DartFnSigs.java", sb.toString());
+        // A witness names its class as the file that signed the closure imports it; the
+        // holder imports each such name the generated files import, when they agree on it.
+        java.util.Map<String, String> fqn = new java.util.HashMap<String, String>();
+        java.util.regex.Pattern imp = java.util.regex.Pattern.compile("(?m)^import ([A-Za-z0-9_$.]+\\.([A-Za-z0-9_$]+));$");
+        for (GeneratedFile g : files) {
+            if (g == null || !g.relativePath.endsWith(".java")) {
+                continue;
+            }
+            java.util.regex.Matcher m = imp.matcher(g.content);
+            while (m.find()) {
+                String prev = fqn.get(m.group(2));
+                fqn.put(m.group(2), prev == null || prev.equals(m.group(1)) ? m.group(1) : "");
+            }
+        }
+        String body = sb.toString();
+        java.util.TreeSet<String> used = new java.util.TreeSet<String>();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?<![A-Za-z0-9_$.])([A-Z][A-Za-z0-9_$]*)\\.class")
+                .matcher(body);
+        while (m.find()) {
+            String f = fqn.get(m.group(1));
+            if (f != null && !f.isEmpty() && !f.startsWith("dart.core.")) {
+                used.add("import " + f + ";\n");
+            }
+        }
+        if (!used.isEmpty()) {
+            int at = body.indexOf("import dart.core.*;\n") + "import dart.core.*;\n".length();
+            body = body.substring(0, at) + String.join("", used) + body.substring(at);
+        }
+        return new GeneratedFile("DartFnSigs.java", body);
     }
 
     /// The class literal a runtime collection check tests one type argument against, or
@@ -10870,7 +11163,7 @@ public final class JavaEmitter {
         // surfaces later, at the first use of the value as a T. A documented limitation
         // (reified generics are not modelled), not a silent wrong answer on the happy path.
         if (isTypeVariable(target, ctx)) {
-            return new Out("((" + jt + ") " + o.code + ")", c.type, true);
+            return new Out("(" + castToBare(jt, o.code) + ")", c.type, true);
         }
         boolean unchecked = target.is("dynamic") || target.is("var")
                 || (target.is("Object") && target.nullable)
@@ -10879,7 +11172,7 @@ public final class JavaEmitter {
                     && o.type.name != null && o.type.name.equals(target.name)
                     && (target.nullable || !o.type.nullable));
         if (unchecked) {
-            return new Out("((" + jt + ") " + o.code + ")", c.type);
+            return new Out("(" + castToBare(jt, o.code) + ")", c.type);
         }
         ctx.importClass("dart.runtime.DartRuntime");
         if (isCoreSet(target) && (o.type == null || !o.type.is("Set"))) {
@@ -12045,7 +12338,8 @@ public final class JavaEmitter {
                 if (ad != null) {
                     return ad;
                 }
-                return new Out((md.isStatic ? javaClassName(cc) : "this") + "::" + n, new TypeRef("Function"));
+                return new Out((md.isStatic ? javaClassName(cc) : "this") + "::" + n,
+                        tearOffType(md, cc, selfType(cc)));
             }
             // field/getter inherited from a program superclass. The declared field is
             // private in the superclass, so reads route through its public get$ accessor;
@@ -12078,7 +12372,7 @@ public final class JavaEmitter {
             }
             MethodDecl inhM = findMethodInHierarchy(cc, n);
             if (inhM != null) {
-                return new Out("this::" + n, new TypeRef("Function"));
+                return new Out("this::" + n, tearOffType(inhM, cc, selfType(cc)));
             }
             // `abstract class M implements Loc { ... line ... }`: a field or getter of an
             // IMPLEMENTED program class is only an abstract member here, reached through
@@ -12214,6 +12508,9 @@ public final class JavaEmitter {
      * a stub function torn off there keeps every parameter, as its Dart type does.
      */
     private boolean tearOffKeepAll;
+    /// The tear-off an untyped local is initialized with (`var t = twice`), which signTearOff
+    /// binds to its own declared function type.
+    private Expr ownTypedTearOff;
 
     /**
      * Whether a bare name in an extension body is in the library's lexical scope, which
@@ -12254,10 +12551,24 @@ public final class JavaEmitter {
             }
         }
         int close = top.code.indexOf(") ", 2);
-        if (close < 0 || !top.code.substring(2, close).equals(have)) {
+        if (close < 0) {
             return top;
         }
-        return new Out("((" + want + ")" + top.code.substring(close + 1), expected);
+        // A signed tear-off is cast to its SAM intersected with its signature marker
+        // (signTearOff), which the retargeted cast keeps.
+        String cast = top.code.substring(2, close);
+        int amp = cast.indexOf(" & ");
+        String marker = amp < 0 ? "" : cast.substring(amp);
+        if (!(amp < 0 ? cast : cast.substring(0, amp)).equals(have)) {
+            return top;
+        }
+        String rest = top.code.substring(close + 1);
+        String inner = " (" + have + " & ";
+        if (amp < 0 && rest.startsWith(inner)) {
+            // samCast's `(SAM) (SAM & marker) closure`: both casts are retargeted.
+            return new Out("((" + want + ") (" + want + " & " + rest.substring(inner.length()), expected);
+        }
+        return new Out("((" + want + marker + ")" + rest, expected);
     }
 
     private boolean lexicalTopLevel(String n, Ctx ctx) {
@@ -13692,7 +14003,7 @@ public final class JavaEmitter {
         if (cc != null && cc.typeParams.contains(bound.name)) {
             return target;
         }
-        return new Out("((" + javaType(bound, true, ctx) + ") " + target.code + ")", bound, target.fromError);
+        return new Out("(" + castToBare(javaType(bound, true, ctx), target.code) + ")", bound, target.fromError);
     }
 
     private Out emitIndexGetOn(Out target, IndexGet ig, Ctx ctx) {
@@ -14088,7 +14399,7 @@ public final class JavaEmitter {
         if (lt <= 0 || jt.equals(javaType(rhs.type, false, ctx))) {
             return v;
         }
-        return "(" + jt.substring(0, lt) + ") " + paren(v);
+        return castTo(jt.substring(0, lt), v);
     }
 
     private Out emitAssign(Assign a, Ctx ctx) {
@@ -16080,7 +16391,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         Out raw = new Out(sb.append(')').toString(), TypeRef.DYNAMIC);
         TypeRef rt = onSuperMemberType(mx, name, getter, -1, ctx);
         if (rt != null && !rt.is("void") && !rt.is("dynamic") && !rt.is("var")) {
-            return new Out("((" + javaType(rt, true, ctx) + ") " + raw.code + ")", rt);
+            return new Out("(" + castToBare(javaType(rt, true, ctx), raw.code) + ")", rt);
         }
         return raw;
     }
@@ -16114,7 +16425,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         Out v = emitExpr(value, vt, ctx);
         String code = "this." + superBridgeName(mx, key) + "(" + v.code + ")";
         if (vt != null && !vt.is("void") && !vt.is("dynamic") && !vt.is("var")) {
-            return new Out("((" + javaType(vt, true, ctx) + ") " + code + ")", vt);
+            return new Out("(" + castToBare(javaType(vt, true, ctx), code) + ")", vt);
         }
         return new Out(code, v.type);
     }
@@ -16771,7 +17082,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 sam = "dart.runtime.Funcs." + (voidBody ? "VoidFunc" : "Func") + l.params.size();
             }
             String code = "((dart.runtime.Funcs.Func1<" + rj + ", " + sam + ">) (" + rj + " "
-                    + l.boundName + ") -> (" + sam + ") " + paren(inner.code) + ").call(" + r.code + ")";
+                    + l.boundName + ") -> " + samCast(l, inner.code, sam) + ").call(" + r.code + ")";
             return new Out(code, inner.type);
         } finally {
             l.boundRecv = recv;
@@ -16803,7 +17114,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 ownSamLambda = savedOwn;
             }
             if (!o.code.startsWith("((")) {
-                return new Out("((" + javaType(own, false, ctx) + ") " + o.code + ")", own);
+                return new Out("(" + samCast(l, o.code, javaType(own, false, ctx)) + ")", own);
             }
             return o;
         }
@@ -17336,7 +17647,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 own.funcReturn = expected == null || expected.is("void") ? TypeRef.DYNAMIC : expected;
                 Out lam = emitLambda(l, own, ctx);
                 String code = lam.code.startsWith("((") ? lam.code
-                        : "((" + javaType(own, false, ctx) + ") " + lam.code + ")";
+                        : "(" + castToBare(javaType(own, false, ctx), lam.code) + ")";
                 String call = fnCall(code, own, c.args, ctx);
                 if (l.body != null && (expected == null || isDynamicType(expected) || expected.is("Object"))) {
                     // No context type to bind the result to (a field-formal or dynamic slot):
@@ -18014,7 +18325,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         && leadingFuncsCast(f.code) == null) {
                     // A bare method reference (`c.bump`, `print`) has no target type in an
                     // Object slot; it takes the functional interface of its own signature.
-                    f = new Out("((" + javaType(f.type, true, ctx) + ") " + f.code + ")", f.type);
+                    f = new Out("(" + castToBare(javaType(f.type, true, ctx), f.code) + ")", f.type);
                 }
                 String argList = c.args.positional.size() > 1
                         ? boxIfPrimitive(emitExpr(c.args.positional.get(1), null, ctx), ctx) : "null";
@@ -18033,8 +18344,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     Out f = emitExpr(c.args.positional.get(0), inlineFuncType0(TypeRef.DYNAMIC), ctx);
                     if (n.equals("microtask")) {
                         ctx.importClass("dart.core.Duration");
-                        return new Out("Future.delayed(Duration.zero, (dart.runtime.Funcs.Func0<Object>) "
-                                + paren(f.code) + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
+                        return new Out("Future.delayed(Duration.zero, " + castTo("dart.runtime.Funcs.Func0<Object>", f.code)
+                                + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
                     }
                     ctx.importClass("dart.core.CoreStatics");
                     return new Out("CoreStatics.futureSync(" + f.code + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
@@ -18121,7 +18432,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         // A variable the context left open was witnessed as Object; seen raw,
                         // the enclosing generic call infers its own from its target again
                         // (`transform`'s R from the `Stream<List<T>>` it returns).
-                        fo = new Out("((" + stubSimpleName(cls, ctx) + ") " + fo.code + ")", fo.type);
+                        fo = new Out("(" + castToBare(stubSimpleName(cls, ctx), fo.code) + ")", fo.type);
                     }
                     return fo;
                 }
@@ -19153,8 +19464,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     cmpType.funcReturn = TypeRef.INT;
                 }
                 String cmp = emitExpr(pos.get(0), cmpType, ctx).code;
-                return new Out(target.code + ".sort((Funcs.Func2<" + et + ", " + et + ", Long>) "
-                        + paren(cmp) + ")", TypeRef.VOID);
+                return new Out(target.code + ".sort(" + castTo("Funcs.Func2<" + et + ", " + et + ", Long>", cmp) + ")", TypeRef.VOID);
             }
             if (n.equals("indexWhere")) {
                 String args = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code;
@@ -19478,7 +19788,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     // A torn-off extension method is a bare lambda with a known signature:
                     // bound to that SAM first, since a lambda cannot be cast to Object.
                     String handler = cb.type.funcParams != null && isBareLambda(cb.code)
-                            ? "(" + javaType(cb.type, true, ctx) + ") " + paren(cb.code) : cb.code;
+                            ? castTo(javaType(cb.type, true, ctx), cb.code) : cb.code;
                     return new Out(target.code + ".onError((Object) " + paren(handler) + ", (Object) "
                             + paren(test) + ")", tt);
                 }
@@ -19507,7 +19817,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
                 if (value) {
                     String fn = action instanceof Lambda
-                            ? "(dart.runtime.Funcs.Func0<Object>) " + paren(cb.code) : cb.code;
+                            ? samCast(action, cb.code, "dart.runtime.Funcs.Func0<Object>") : cb.code;
                     return new Out(target.code + ".whenCompleteFuture(" + fn + ")", tt);
                 }
                 return new Out(target.code + ".whenComplete(" + cb.code + ")", tt);
@@ -19784,8 +20094,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (cmpE != null) {
                 String j = javaType(a0, true, ctx);
-                cmp = "(dart.runtime.Funcs.Func2<" + j + ", " + j + ", Long>) "
-                        + paren(emitExpr(cmpE, inlineFuncType2(a0, a0, TypeRef.INT), ctx).code);
+                cmp = castTo("dart.runtime.Funcs.Func2<" + j + ", " + j + ", Long>",
+                        emitExpr(cmpE, inlineFuncType2(a0, a0, TypeRef.INT), ctx).code);
             }
             return new Out("new " + n + witness + "(" + cmp + ")", type);
         }
@@ -19820,14 +20130,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 ctx.importClass("dart.core.DartCustomMap");
                 String kj = javaType(a0, true, ctx);
                 String vj = javaType(a1, true, ctx);
-                String eq = eqE == null ? "null" : "(dart.runtime.Funcs.Func2<" + kj + ", " + kj + ", Boolean>) "
-                        + paren(emitExpr(eqE, inlineFuncType2(a0, a0, TypeRef.BOOL), ctx).code);
-                String hc = hcE == null ? "null" : "(dart.runtime.Funcs.Func1<" + kj + ", Long>) "
-                        + paren(emitExpr(hcE, inlineFuncType(a0, TypeRef.INT), ctx).code);
+                String eq = eqE == null ? "null" : castTo("dart.runtime.Funcs.Func2<" + kj + ", " + kj + ", Boolean>",
+                        emitExpr(eqE, inlineFuncType2(a0, a0, TypeRef.BOOL), ctx).code);
+                String hc = hcE == null ? "null" : castTo("dart.runtime.Funcs.Func1<" + kj + ", Long>",
+                        emitExpr(hcE, inlineFuncType(a0, TypeRef.INT), ctx).code);
                 TypeRef obj = new TypeRef("Object");
                 obj.nullable = true;
-                String vk = vkE == null ? "null" : "(dart.runtime.Funcs.Func1<Object, Boolean>) "
-                        + paren(emitExpr(vkE, inlineFuncType(obj, TypeRef.BOOL), ctx).code);
+                String vk = vkE == null ? "null" : castTo("dart.runtime.Funcs.Func1<Object, Boolean>",
+                        emitExpr(vkE, inlineFuncType(obj, TypeRef.BOOL), ctx).code);
                 return new Out("new DartCustomMap<" + kj + ", " + vj + ">(" + eq + ", " + hc + ", " + vk + ")",
                         type);
             }
@@ -21095,7 +21405,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         + errorHandlerParam(src.params.get(1), ctx) + ">"
                 : "dart.runtime.Funcs.VoidFunc1<"
                         + (src.params.isEmpty() ? "Object" : errorHandlerParam(src.params.get(0), ctx)) + ">";
-        return "(" + type + ") " + paren(o.code);
+        return castTo(type, o.code);
     }
 
     private String errorHandlerParam(Param p, Ctx ctx) {
@@ -23055,7 +23365,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (value && !forceCast && !ambiguous) {
             return o.code;
         }
-        return "(" + (value ? asValue : asVoid) + ") " + paren(o.code);
+        return samCast(src, o.code, value ? asValue : asVoid);
     }
 
     /** An inline single-parameter function type {@code (param) -> ret}, for typing a lambda arg. */
@@ -23303,7 +23613,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         innerFt.funcReturn = ret;
         return tearOffAdapter(l.params, types, ret, names -> {
             String fn = emitExpr(inner, innerFt, ctx).code;
-            return "((" + javaType(innerFt, false, ctx) + ") " + fn + ").call(" + String.join(", ", names) + ")";
+            return "(" + castToBare(javaType(innerFt, false, ctx), fn) + ").call(" + String.join(", ", names) + ")";
         }, ctx);
     }
 
@@ -23451,7 +23761,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         String sam = javaType(fnType, false, ctx);
         int lt = sam.indexOf('<');
         String raw = lt > 0 ? sam.substring(0, lt) : sam;
-        String rawCall = "((" + raw + ") " + recv + ").call(" + a + ")";
+        String rawCall = "(" + castToBare(raw, recv) + ").call(" + a + ")";
         TypeRef ret = funcResultType(fnType);
         if (raw.contains("VoidFunc") || ret == null || ret.is("void")) {
             return rawCall;
@@ -23538,7 +23848,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return code;
         }
         // the SAM's own type arguments erase a function slot to Object
-        return "((" + javaType(slot, false, ctx) + ") " + code + ")";
+        return "(" + castToBare(javaType(slot, false, ctx), code) + ")";
     }
 
     private TypeRef lambdaSlot(Expr arg, List<TypeRef> slotTypes, int i) {
@@ -24457,7 +24767,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         TypeRef inst = TypeRef.of(tt.name, bounds);
         inst.resolved = tt.resolved;
-        return "((" + javaType(inst, false, ctx) + ") " + paren(code) + ")";
+        return "(" + castTo(javaType(inst, false, ctx), code) + ")";
     }
 
     private static boolean mentionsTypeParam(TypeRef t, List<String> params) {
@@ -24942,6 +25252,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         }
                     }
                     tps = java.util.Collections.<String>emptyList();
+                    if (!md.typeParams.isEmpty() && !hasOptionalParam(md) && md.params.size() <= 5
+                            && md.returnType != null) {
+                        // A generic static method (`Box.keep<T>`) tears off as a generic
+                        // top-level function does: a bare method reference, which takes
+                        // whatever instantiation the context names, typed by the SAM with
+                        // its own type variables erased (signTearOff signs it).
+                        tearOffReturn = null;
+                        java.util.List<TypeRef> none = java.util.Collections.<TypeRef>emptyList();
+                        TypeRef ft = new TypeRef("Function");
+                        ft.funcParams = new ArrayList<TypeRef>();
+                        for (Param fp : md.params) {
+                            ft.funcParams.add(substTypeParams(paramValueType(fp), md.typeParams, none));
+                        }
+                        ft.funcReturn = substTypeParams(md.returnType, md.typeParams, none);
+                        return new Out(javaClassName(pc) + "::" + name, ft);
+                    }
                 }
             }
             if (params != null) {
@@ -25100,7 +25426,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         Out lo = emitExpr(l, ft, ctx);
         // Cast to the typed SAM so the closure is a standalone expression: a list
         // element, a `??` operand or an untyped local has no target type to bind it.
-        return new Out("((" + javaType(ft, false, ctx) + ") " + lo.code + ")", ft);
+        return new Out("(" + samCast(l, lo.code, javaType(ft, false, ctx)) + ")", ft);
     }
 
     private boolean isClassRef(TypeRef t) {
@@ -25239,7 +25565,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
 
     private String funcCast(Out o, TypeRef target, Ctx ctx) {
         if (target != null && isFunctionValued(target)) {
-            return "(" + javaType(target, true, ctx) + ") " + paren(o.code);
+            return castTo(javaType(target, true, ctx), o.code);
         }
         return o.code;
     }
@@ -25271,7 +25597,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && o.type.name.equals(elem.name) && !o.type.args.isEmpty()
                 && !o.type.toString().equals(elem.toString())) {
             String raw = javaType(new TypeRef(elem.name), false, ctx);
-            return "(" + raw + ") " + paren(o.code);
+            return castTo(raw, o.code);
         }
         return coerce(o, elem, ctx);
     }
@@ -25287,7 +25613,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (o.type != null && o.type.funcParams != null && isBareLambda(o.code)
                 && target.funcParams == null && target.funcReturn == null
                 && (target.is("Object") || target.is("Function") || isDynamicType(target))) {
-            return "(" + javaType(o.type, true, ctx) + ") " + paren(o.code);
+            return castTo(javaType(o.type, true, ctx), o.code);
         }
         // A tear-off cast to its own SAM (`(Func1<WebSocket, IOWebSocket>) (p) -> ...`)
         // passed where the callback returns FutureOr or dynamic (`then(IOWebSocket.fromWebSocket)`):
@@ -25306,8 +25632,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 widened.nullable = o.type.nullable;
                 widened.funcReturn = TypeRef.DYNAMIC;
                 String wj = javaType(widened, false, ctx);
-                if (!wj.equals(javaType(o.type, false, ctx))) {
-                    return "((" + wj + ") " + o.code.substring(own.length());
+                String ownSam = javaType(o.type, false, ctx);
+                if (!wj.equals(ownSam)) {
+                    String rest = o.code.substring(own.length());
+                    String signed = "(" + ownSam + " & ";
+                    if (rest.startsWith(signed)) {
+                        // samCast's `(SAM) (SAM & marker) closure`: the intersection is
+                        // widened with the plain cast, or the closure stays the narrower SAM.
+                        return "((" + wj + ") (" + wj + " & " + rest.substring(signed.length());
+                    }
+                    return "((" + wj + ") " + rest;
                 }
             }
         }
@@ -25524,7 +25858,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // a fully concrete target: a type variable is left to Java's own inference.
         if (o.type != null && isDynamicType(o.type) && !isDynamicType(target) && isFullyConcrete(target)
                 && !target.is("void") && o.code.startsWith("Dyn.")) {
-            return "(" + javaType(copyNonNull(target), false, ctx) + ") " + paren(o.code);
+            return castTo(javaType(copyNonNull(target), false, ctx), o.code);
         }
         // `c = v ?? c` with a dynamic `v` (an untyped closure parameter of a
         // `void Function(dynamic)` callback): Dart types the `??` dynamic and downcasts it
@@ -26068,7 +26402,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (programClass(bound.name, ctx) == null && !stubs.isStubClass(bound.name) && !coreBound) {
             return null;
         }
-        return new Out("((" + javaType(bound, true, ctx) + ") " + target.code + ")", bound);
+        return new Out("(" + castToBare(javaType(bound, true, ctx), target.code) + ")", bound);
     }
 
     private MethodDecl findMethodInHierarchy(ClassDecl c, String name) {

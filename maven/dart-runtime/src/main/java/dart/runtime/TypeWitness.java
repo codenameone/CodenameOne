@@ -199,10 +199,35 @@ public final class TypeWitness {
         if (!(f instanceof Signed)) {
             return true;
         }
+        if (((Signed) f).$generic()) {
+            return false;
+        }
         TypeWitness[] sig = ((Signed) f).$sig();
         if (ret != null && sig[0] != null && !isSubtype(sig[0], ret)) {
             return false;
         }
+        for (int i = 0; i < params.length && i + 1 < sig.length; i++) {
+            if (params[i] != null && sig[i + 1] != null && !isSubtype(params[i], sig[i + 1])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// `f is R Function(P0, ..)` with a top R (void, dynamic, Object?): every function of
+    /// the arity has such a result, whether it is held by the value SAM or the void one,
+    /// so only the parameters (contravariantly) and genericity are tested.
+    public static boolean isTopFunctionOf(Object f, Class<?> valueSam, Class<?> voidSam, TypeWitness... params) {
+        if (!valueSam.isInstance(f) && !voidSam.isInstance(f)) {
+            return false;
+        }
+        if (!(f instanceof Signed)) {
+            return true;
+        }
+        if (((Signed) f).$generic()) {
+            return false;
+        }
+        TypeWitness[] sig = ((Signed) f).$sig();
         for (int i = 0; i < params.length && i + 1 < sig.length; i++) {
             if (params[i] != null && sig[i + 1] != null && !isSubtype(params[i], sig[i + 1])) {
                 return false;
