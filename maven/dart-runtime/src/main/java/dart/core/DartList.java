@@ -320,7 +320,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
 
     /// `value is List<X>` (and `Iterable<X>` on a list) for any X with a witness: Dart's
     /// covariant subtype test on the reified argument. A list whose argument nothing
-    /// recorded is tested by its elements, as {@link #isListOf} does.
+    /// recorded is unknown and passes, as an erased test would.
     public static boolean isListOfW(Object value, dart.runtime.TypeWitness target) {
         if (value instanceof dart.collection.ListMixin) {
             dart.collection.ListMixin<?> m = (dart.collection.ListMixin<?>) value;
@@ -337,16 +337,9 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         }
         DartList<?> l = (DartList<?>) value;
         dart.runtime.TypeWitness w = l.elementWitness();
-        if (w != null) {
-            return dart.runtime.TypeWitness.isSubtype(w, target);
-        }
-        int n = l.size();
-        for (int i = 0; i < n; i++) {
-            if (!target.test(l.get(i))) {
-                return false;
-            }
-        }
-        return true;
+        // Nothing recorded the argument: unknown, which is erased's answer. Every
+        // runtime and emitted construction path records one where it can be known.
+        return w == null || dart.runtime.TypeWitness.isSubtype(w, target);
     }
 
     /// `value is List<X>` for an element type X that is a plain class (bool, String,
@@ -866,7 +859,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         for (long i = start; i < end; i++) {
             l.add(get((int) i));
         }
-        return l;
+        return typed(l, elem);
     }
 
     public DartList<E> sublist(long start) {
@@ -1160,7 +1153,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     }
 
     public DartSet<E> toSet() {
-        DartSet<E> s = new DartSet<E>();
+        DartSet<E> s = DartSet.typed(new DartSet<E>(), elementWitness());
         s.addAll(this);
         return s;
     }

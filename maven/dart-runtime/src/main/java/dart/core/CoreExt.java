@@ -68,6 +68,35 @@ public final class CoreExt {
         return (Map<K, V>) m;
     }
 
+    /// `list.cast<R>()` with R's witness: a view whose reads are checked and whose
+    /// reified element type is R. The witness-less overloads above are for callers that
+    /// cannot name R (generic code over an erased type variable).
+    @SuppressWarnings("unchecked")
+    public static <R> DartList<R> cast(DartList<?> l, dart.runtime.TypeWitness r) {
+        return ElementViews.castList((DartList<Object>) l, r);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <R> DartSet<R> cast(DartSet<?> s, dart.runtime.TypeWitness r) {
+        return ElementViews.castSet((DartSet<Object>) s, r);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <K, V> DartMap<K, V> cast(DartMap<?, ?> m, dart.runtime.TypeWitness k, dart.runtime.TypeWitness v) {
+        return ElementViews.castMap((DartMap<Object, Object>) m, k, v);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <R> DartIterable<R> cast(Iterable<?> it, dart.runtime.TypeWitness r) {
+        if (it instanceof DartList) {
+            return DartIterable.wrap(ElementViews.<Object, R>castList((DartList<Object>) it, r));
+        }
+        if (it instanceof DartSet) {
+            return DartIterable.wrap(ElementViews.<Object, R>castSet((DartSet<Object>) it, r));
+        }
+        return ElementViews.castIterable((Iterable<Object>) it, r);
+    }
+
     @SuppressWarnings("unchecked")
     public static <R> DartIterable<R> cast(Iterable<?> it) {
         if (it instanceof DartIterable) {

@@ -40,4 +40,15 @@ public interface Signed {
     default boolean $generic() {
         return false;
     }
+
+    /// How many of the positional parameters are required; -1 when all are.
+    default int $required() {
+        return -1;
+    }
+
+    /// The named parameters' names, whose witnesses follow the positional ones in
+    /// {@link #$sig()}; null when there are none. A required one is written `!name`.
+    default String[] $named() {
+        return null;
+    }
 }

@@ -60,9 +60,137 @@ public final class ElementViews {
         return map == null ? null : new MapView<K, S, T>(map, read);
     }
 
-    /// `iterable`, lazily mapped: an Iterable has no writes to forward.
+    /// `iterable`, lazily mapped: an Iterable has no writes to forward. The Dart object is
+    /// the source, so the view answers the source's element type.
     public static <S, T> DartIterable<T> iterable(Iterable<S> iterable, Funcs.Func1<S, T> read) {
-        return iterable == null ? null : DartIterable.wrap(iterable).map(read);
+        return iterable == null ? null
+                : DartIterable.typed(DartIterable.wrap(iterable).map(read), DartIterable.witnessOf(iterable));
+    }
+
+    /// Dart's `list.cast<T>()`: a live view whose reads are checked against {@code target}
+    /// and whose reified element type is {@code target} (null: a type nothing can name,
+    /// left unchecked and unknown).
+    public static <S, T> DartList<T> castList(DartList<S> list, dart.runtime.TypeWitness target) {
+        return list == null ? null : new ListView<S, T>(list, ElementViews.<S, T>checker(target), target);
+    }
+
+    /// Dart's `map.cast<K, V>()`: values read through the check on {@code value}; the view
+    /// records both target arguments. Keys are not rewritten (a lookup hashes them).
+    public static <K, S, K2, T> DartMap<K2, T> castMap(DartMap<K, S> map, dart.runtime.TypeWitness key,
+            dart.runtime.TypeWitness value) {
+        if (map == null) {
+            return null;
+        }
+        MapView<K, S, T> v = new MapView<K, S, T>(map, ElementViews.<S, T>checker(value));
+        v.keyTarget = key;
+        v.valueTarget = value;
+        @SuppressWarnings("unchecked")
+        DartMap<K2, T> r = (DartMap<K2, T>) (DartMap<?, ?>) v;
+        return r;
+    }
+
+    /// Dart's `set.cast<T>()`: a live view, reads checked against {@code target}.
+    public static <S, T> DartSet<T> castSet(DartSet<S> set, dart.runtime.TypeWitness target) {
+        return set == null ? null : new SetView<S, T>(set, ElementViews.<S, T>checker(target), target);
+    }
+
+    /// Dart's `iterable.cast<T>()`: lazily checked, recording {@code target}.
+    public static <S, T> DartIterable<T> castIterable(Iterable<S> it, dart.runtime.TypeWitness target) {
+        return it == null ? null : DartIterable.typed(DartIterable.wrap(it).map(ElementViews.<S, T>checker(target)),
+                target);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <S, T> Funcs.Func1<S, T> checker(final dart.runtime.TypeWitness target) {
+        return new Funcs.Func1<S, T>() {
+            @Override
+            public T call(S value) {
+                if (target != null && !target.test(value)) {
+                    throw new TypeError("type '" + dart.runtime.DartRuntime.str(dart.runtime.TypeWitness.runtimeType(value))
+                            + "' is not a subtype of type '" + target + "' in type cast");
+                }
+                return (T) value;
+            }
+        };
+    }
+
+    private static final class SetView<S, T> extends DartSet<T> implements MixinView {
+        private final DartSet<S> src;
+        private final Funcs.Func1<S, T> read;
+        private final dart.runtime.TypeWitness target;
+
+        SetView(DartSet<S> src, Funcs.Func1<S, T> read, dart.runtime.TypeWitness target) {
+            this.src = src;
+            this.read = read;
+            this.target = target;
+        }
+
+        @Override
+        public Object source() {
+            return src;
+        }
+
+        @Override
+        public dart.runtime.TypeWitness elementWitness() {
+            return target != null ? target : src.elementWitness();
+        }
+
+        @Override
+        public Object $runtimeType() {
+            return dart.runtime.TypeWitness.of(DartSet.class, false, elementWitness());
+        }
+
+        @Override
+        public int size() {
+            return src.size();
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return src.isEmpty();
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return src.contains(o);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public boolean add(T e) {
+            return src.add((S) e);
+        }
+
+        @Override
+        public boolean remove(Object o) {
+            return src.remove(o);
+        }
+
+        @Override
+        public void clear() {
+            src.clear();
+        }
+
+        @Override
+        public java.util.Iterator<T> iterator() {
+            final java.util.Iterator<S> it = src.iterator();
+            return new java.util.Iterator<T>() {
+                @Override
+                public boolean hasNext() {
+                    return it.hasNext();
+                }
+
+                @Override
+                public T next() {
+                    return read.call(it.next());
+                }
+
+                @Override
+                public void remove() {
+                    it.remove();
+                }
+            };
+        }
     }
 
     /// `future`, its value converted when it completes.
@@ -88,10 +216,24 @@ public final class ElementViews {
         private final DartList<S> src;
         private final Funcs.Func1<S, T> read;
 
+        /// The view's reified element type: a cast's target, else the source's own (a
+        /// primitive-list conversion views the same Dart object).
+        private final dart.runtime.TypeWitness target;
+
         ListView(DartList<S> src, Funcs.Func1<S, T> read) {
+            this(src, read, null);
+        }
+
+        ListView(DartList<S> src, Funcs.Func1<S, T> read, dart.runtime.TypeWitness target) {
             super(true, false);
             this.src = src;
             this.read = read;
+            this.target = target;
+        }
+
+        @Override
+        public dart.runtime.TypeWitness elementWitness() {
+            return target != null ? target : src.elementWitness();
         }
 
         @Override
@@ -146,9 +288,27 @@ public final class ElementViews {
         private final DartMap<K, S> src;
         private final Funcs.Func1<S, T> read;
 
+        private dart.runtime.TypeWitness keyTarget;
+        private dart.runtime.TypeWitness valueTarget;
+
         MapView(DartMap<K, S> src, Funcs.Func1<S, T> read) {
             this.src = src;
             this.read = read;
+        }
+
+        @Override
+        public dart.runtime.TypeWitness keyWitness() {
+            return keyTarget != null ? keyTarget : src.keyWitness();
+        }
+
+        @Override
+        public dart.runtime.TypeWitness valueWitness() {
+            return valueTarget != null ? valueTarget : src.valueWitness();
+        }
+
+        @Override
+        public Object $runtimeType() {
+            return dart.runtime.TypeWitness.of(DartMap.class, false, keyWitness(), valueWitness());
         }
 
         @Override

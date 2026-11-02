@@ -82,47 +82,39 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> implements dart.runtime.R
             // A subclass (a LinkedHashMap, an unmodifiable view) is its own Dart type.
             return getClass();
         }
-        return dart.runtime.TypeWitness.of(_Map.class, false, keyWitness, valueWitness);
+        return dart.runtime.TypeWitness.of(_Map.class, false, keyWitness(), valueWitness());
     }
 
-    /// `value is Map<K, V>`: the covariant test on both reified arguments, the entries
-    /// for an argument nothing recorded. A null target argument is not tested.
+    /// The recorded key type, or null when nothing recorded it.
+    public dart.runtime.TypeWitness keyWitness() {
+        return keyWitness;
+    }
+
+    /// The recorded value type, or null when nothing recorded it.
+    public dart.runtime.TypeWitness valueWitness() {
+        return valueWitness;
+    }
+
+    /// `value is Map<K, V>`: the covariant test on both reified arguments; an argument
+    /// nothing recorded is unknown and passes, as an erased test would. A null target
+    /// argument is not tested.
     public static boolean isMapOf(Object value, dart.runtime.TypeWitness key, dart.runtime.TypeWitness val) {
         if (!(value instanceof java.util.Map)) {
             return false;
         }
-        DartMap<?, ?> m = value instanceof DartMap ? (DartMap<?, ?>) value : null;
-        boolean scanKeys = false;
-        boolean scanValues = false;
-        if (key != null) {
-            if (m != null && m.keyWitness != null) {
-                if (!dart.runtime.TypeWitness.isSubtype(m.keyWitness, key)) {
-                    return false;
-                }
-            } else {
-                scanKeys = true;
-            }
+        if (!(value instanceof DartMap)) {
+            return true;
         }
-        if (val != null) {
-            if (m != null && m.valueWitness != null) {
-                if (!dart.runtime.TypeWitness.isSubtype(m.valueWitness, val)) {
-                    return false;
-                }
-            } else {
-                scanValues = true;
-            }
-        }
-        if (scanKeys || scanValues) {
-            for (Map.Entry<?, ?> e : ((java.util.Map<?, ?>) value).entrySet()) {
-                if (scanKeys && !key.test(e.getKey()) || scanValues && !val.test(e.getValue())) {
-                    return false;
-                }
-            }
-        }
-        return true;
+        DartMap<?, ?> m = (DartMap<?, ?>) value;
+        dart.runtime.TypeWitness kw = m.keyWitness();
+        dart.runtime.TypeWitness vw = m.valueWitness();
+        return (key == null || kw == null || dart.runtime.TypeWitness.isSubtype(kw, key))
+                && (val == null || vw == null || dart.runtime.TypeWitness.isSubtype(vw, val));
     }
 
     private void checkEntry(Object key, Object value) {
+        dart.runtime.TypeWitness keyWitness = keyWitness();
+        dart.runtime.TypeWitness valueWitness = valueWitness();
         if (keyWitness != null && !keyWitness.test(key)) {
             throw new TypeError("type '" + dart.runtime.DartRuntime.str(dart.runtime.TypeWitness.runtimeType(key))
                     + "' is not a subtype of type '" + keyWitness + "' of 'key'");

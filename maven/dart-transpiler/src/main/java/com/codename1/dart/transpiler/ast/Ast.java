@@ -85,6 +85,8 @@ public final class Ast {
         // positional ones follow, then the named ones (names in funcNamed, in order).
         public int funcRequired = -1;
         public List<String> funcNamed;
+        // The named parameters of funcNamed that are `required`; null when none are.
+        public List<String> funcNamedRequired;
 
         public TypeRef(String name) {
             this.name = name;
@@ -324,6 +326,7 @@ public final class Ast {
         public TypeRef aliased;                   // non-null for a plain (non-function) alias
         public int funcRequired = -1;             // see TypeRef.funcRequired
         public List<String> funcNamed;            // see TypeRef.funcNamed
+        public List<String> funcNamedRequired;    // see TypeRef.funcNamedRequired
     }
 
     public static class FieldDecl extends Node {

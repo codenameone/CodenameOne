@@ -406,7 +406,9 @@ public final class AstBuilder {
                 java.util.List<Param> ps = new java.util.ArrayList<Param>();
                 buildParams(fta.formalParameterPart().formalParameterList(), ps);
                 int[] req = {-1};
-                td.funcNamed = shapeFromParams(ps, td.paramTypes, req);
+                @SuppressWarnings("unchecked") List<String>[] rn$ = new List[1];
+        td.funcNamed = shapeFromParams(ps, td.paramTypes, req, rn$);
+        td.funcNamedRequired = rn$[0];
                 td.funcRequired = req[0];
             }
             return td;
@@ -435,7 +437,9 @@ public final class AstBuilder {
                 ? buildTypeNotFunction(ft.typeNotFunction()) : TypeRef.DYNAMIC;
         td.paramTypes = new java.util.ArrayList<TypeRef>();
         int[] req = {-1};
-        td.funcNamed = parameterTypeShape(ft, td.paramTypes, req);
+        @SuppressWarnings("unchecked") List<String>[] rn$ = new List[1];
+        td.funcNamed = parameterTypeShape(ft, td.paramTypes, req, rn$);
+        td.funcNamedRequired = rn$[0];
         td.funcRequired = req[0];
     }
 
@@ -445,7 +449,7 @@ public final class AstBuilder {
      * the required count (-1 when nothing is optional); the named names are returned.
      */
     private List<String> parameterTypeShape(Dart2Parser.FunctionTypeContext ft, List<TypeRef> out,
-            int[] required) {
+            int[] required, List<String>[] requiredNamed) {
         Dart2Parser.FunctionTypeTailsContext tails = ft.functionTypeTails();
         if (tails == null || tails.functionTypeTail() == null) {
             return null;
@@ -471,6 +475,12 @@ public final class AstBuilder {
             Dart2Parser.TypedIdentifierContext ti = n.typedIdentifier();
             out.add(ti.type() != null ? buildType(ti.type()) : TypeRef.DYNAMIC);
             names.add(ti.identifier().getText());
+            if (n.REQUIRED_() != null) {
+                if (requiredNamed[0] == null) {
+                    requiredNamed[0] = new ArrayList<String>();
+                }
+                requiredNamed[0].add(ti.identifier().getText());
+            }
         }
         return names;
     }
@@ -488,7 +498,8 @@ public final class AstBuilder {
     }
 
     /** The same shape as {@link #parameterTypeShape} from a declared parameter list. */
-    private static List<String> shapeFromParams(List<Param> ps, List<TypeRef> out, int[] required) {
+    private static List<String> shapeFromParams(List<Param> ps, List<TypeRef> out, int[] required,
+            List<String>[] requiredNamed) {
         List<String> names = null;
         for (Param p : ps) {
             if (!p.named && !p.optional && p.defaultValue == null) {
@@ -508,6 +519,12 @@ public final class AstBuilder {
                     names = new ArrayList<String>();
                 }
                 names.add(p.name);
+                if (p.required) {
+                    if (requiredNamed[0] == null) {
+                        requiredNamed[0] = new ArrayList<String>();
+                    }
+                    requiredNamed[0].add(p.name);
+                }
             }
         }
         required[0] = req == out.size() ? -1 : req;
@@ -1158,7 +1175,9 @@ public final class AstBuilder {
         List<Param> params = new ArrayList<Param>();
         buildParams(part.formalParameterList(), params);
         int[] req = {-1};
-        t.funcNamed = shapeFromParams(params, t.funcParams, req);
+        @SuppressWarnings("unchecked") List<String>[] rn$ = new List[1];
+        t.funcNamed = shapeFromParams(params, t.funcParams, req, rn$);
+        t.funcNamedRequired = rn$[0];
         t.funcRequired = req[0];
         return t;
     }
@@ -1196,7 +1215,9 @@ public final class AstBuilder {
                 ? buildTypeNotFunction(ft.typeNotFunction()) : TypeRef.DYNAMIC;
         t.funcParams = new java.util.ArrayList<TypeRef>();
         int[] req = {-1};
-        t.funcNamed = parameterTypeShape(ft, t.funcParams, req);
+        @SuppressWarnings("unchecked") List<String>[] rn$ = new List[1];
+        t.funcNamed = parameterTypeShape(ft, t.funcParams, req, rn$);
+        t.funcNamedRequired = rn$[0];
         t.funcRequired = req[0];
     }
 

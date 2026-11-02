@@ -66,25 +66,17 @@ public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified
             // A subclass (a LinkedHashSet, an unmodifiable view) is its own Dart type.
             return getClass();
         }
-        return dart.runtime.TypeWitness.of(_Set.class, false, elem);
+        return dart.runtime.TypeWitness.of(_Set.class, false, elementWitness());
     }
 
-    /// `value is Set<X>`/`Iterable<X>`: the covariant test on the reified argument, the
-    /// elements when nothing recorded it.
+    /// `value is Set<X>`/`Iterable<X>`: the covariant test on the reified argument; one
+    /// nothing recorded is unknown and passes, as an erased test would.
     public static boolean isSetOf(Object value, dart.runtime.TypeWitness target) {
         if (!(value instanceof DartSet)) {
             return false;
         }
-        DartSet<?> s = (DartSet<?>) value;
-        if (s.elem != null) {
-            return dart.runtime.TypeWitness.isSubtype(s.elem, target);
-        }
-        for (Object e : s) {
-            if (!target.test(e)) {
-                return false;
-            }
-        }
-        return true;
+        dart.runtime.TypeWitness w = ((DartSet<?>) value).elementWitness();
+        return w == null || dart.runtime.TypeWitness.isSubtype(w, target);
     }
 
 
@@ -320,7 +312,7 @@ public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified
 
     /** Dart's {@code Set.union(other)} -- elements in either set, same kind as this. */
     public DartSet<E> union(java.util.Set<? extends E> other) {
-        DartSet<E> s = newEmpty();
+        DartSet<E> s = typed(newEmpty(), elementWitness());
         s.addAll(this);
         if (other != null) {
             s.addAll(other);
@@ -529,7 +521,7 @@ public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified
 
     /** Dart's {@code Set.toSet()} -- a copy of the same kind as this set, per the real SDK. */
     public DartSet<E> toSet() {
-        DartSet<E> s = newEmpty();
+        DartSet<E> s = typed(newEmpty(), elementWitness());
         s.addAll(this);
         return s;
     }

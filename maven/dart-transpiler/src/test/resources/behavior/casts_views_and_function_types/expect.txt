@@ -1,0 +1,26 @@
+true
+false
+2
+true
+read checked
+true
+[1, 1]
+true
+false
+true
+false
+1
+true
+true
+false
+false
+(int) => String
+(int) => String
+(int) => String
+true
+(int, {required int k}) => int
+(int, [String]) => int
+true
+false
+true
+true

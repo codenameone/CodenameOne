@@ -2913,37 +2913,56 @@ public final class JavaEmitter {
                 pinToLibrary(f.type, c, 0);
             }
         }
+        // A top-level function's signature too: `a.fa`'s tear-off, read in a library that
+        // sees another `Item`, is typed by the Item its own library declares.
+        for (Library lib : program.libraries) {
+            for (FunctionDecl fn : lib.functions) {
+                pinToLibrary(fn.returnType, lib, fn.typeParams, 0);
+                for (Param p : fn.params) {
+                    pinToLibrary(p.type, lib, fn.typeParams, 0);
+                }
+            }
+            for (FieldDecl f : lib.topLevelVars) {
+                pinToLibrary(f.type, lib, java.util.Collections.<String>emptyList(), 0);
+            }
+        }
     }
 
     private void pinToLibrary(TypeRef st, ClassDecl im, int depth) {
-        if (st == null || depth > 8 || im.ownerLibrary == null) {
+        pinToLibrary(st, im.ownerLibrary, im.typeParams, depth);
+    }
+
+    /// pinToLibrary for any declaration of {@code lib} whose type parameters are
+    /// {@code typeParams} (a top-level function's or variable's types too).
+    private void pinToLibrary(TypeRef st, Library lib, List<String> typeParams, int depth) {
+        if (st == null || depth > 8 || lib == null) {
             return;
         }
-        if (st.resolved == null && st.name != null && !im.typeParams.contains(st.name)
+        if (st.resolved == null && st.name != null && !typeParams.contains(st.name)
                 && (stubs.isStubClass(st.name) || stubs.isStubEnum(st.name))) {
-            ClassDecl wc = program.resolveClass(st.name, im.ownerLibrary);
-            if (wc != null && st.name.equals(wc.name) && classVisibleFrom(wc, im.ownerLibrary)) {
+            ClassDecl wc = program.resolveClass(st.name, lib);
+            if (wc != null && st.name.equals(wc.name) && classVisibleFrom(wc, lib)) {
                 st.resolved = wc;
             }
         } else if (st.resolved == null && st.name != null && st.name.indexOf('.') < 0
-                && !im.typeParams.contains(st.name)) {
+                && !typeParams.contains(st.name)) {
             List<ClassDecl> same = program.classesByName.get(st.name);
             if (same != null && same.size() > 1) {
-                ClassDecl wc = program.resolveClass(st.name, im.ownerLibrary);
-                if (wc != null && st.name.equals(wc.name) && classVisibleFrom(wc, im.ownerLibrary)) {
+                ClassDecl wc = program.resolveClass(st.name, lib);
+                if (wc != null && st.name.equals(wc.name) && classVisibleFrom(wc, lib)) {
                     st.resolved = wc;
                 }
             }
         }
         for (TypeRef a : st.args) {
-            pinToLibrary(a, im, depth + 1);
+            pinToLibrary(a, lib, typeParams, depth + 1);
         }
         if (st.funcParams != null) {
             for (TypeRef a : st.funcParams) {
-                pinToLibrary(a, im, depth + 1);
+                pinToLibrary(a, lib, typeParams, depth + 1);
             }
         }
-        pinToLibrary(st.funcReturn, im, depth + 1);
+        pinToLibrary(st.funcReturn, lib, typeParams, depth + 1);
     }
 
     /**
@@ -7971,7 +7990,7 @@ public final class JavaEmitter {
     /// initializer is bound as in an Object slot: its declared type is its own.
     private Out signTearOff(Expr e, Out out, TypeRef expected, Ctx ctx) {
         TypeRef ft = out.type;
-        if (ft == null || ft.funcParams == null || ft.funcReturn == null || ft.funcNamed != null) {
+        if (ft == null || ft.funcParams == null || ft.funcReturn == null) {
             return out;
         }
         // An untyped local's initializer (`var t = twice`) has no context: the tear-off's
@@ -8038,7 +8057,7 @@ public final class JavaEmitter {
             sig.append(", ").append(pt == null || isDynamicType(pt) ? "null" : staticWitness(targetArgWitness(pt, ctx)));
         }
         String[] signed = signWith(ref, objectSlot ? ft : expected, sig.toString(), generic && objectSlot,
-                false, ctx);
+                false, ft.funcRequired, namedSpec(ft), ctx);
         if (signed == null) {
             return objectSlot && castSam == null && ownSam.contains("Funcs.") ? new Out("((" + ownSam + ") " + out.code + ")", ft) : out;
         }
@@ -9040,6 +9059,12 @@ public final class JavaEmitter {
     /// type, an inferred `dynamic` and every other runtime type stay unknown, which the
     /// tests read as Dart's answer for an unrecorded argument would be erased: true.
     private String reifiedArgWitness(TypeRef el, Ctx ctx) {
+        if (el != null && el != TypeRef.DYNAMIC && el.is("dynamic") && el.funcParams == null) {
+            // A `dynamic` the program wrote or a declaration inferred (`List<dynamic>`,
+            // `[dyn()]`) is a real argument, top but no wildcard: List<dynamic> is no
+            // List<int>. The shared TypeRef.DYNAMIC is the emitter's "not known" instead.
+            return "dart.runtime.TypeWitness.DYNAMIC";
+        }
         if (el == null || el.name == null || el.funcReturn != null || el.funcParams != null
                 || isUnrecordedArg(el)) {
             return null;
@@ -9063,8 +9088,10 @@ public final class JavaEmitter {
         }
         boolean scalar = el.is("int") || el.is("double") || el.is("num") || el.is("String") || el.is("bool")
                 || el.is("Object");
-        boolean programClass = !scalar && program.classes.containsKey(el.name)
-                && appliedCollectionMixin(el.name) == null;
+        // The class as the library reading it resolves the name: `b.Item` and a pinned
+        // member type name their own library's class (resolved), a bare name this one's.
+        ClassDecl elClass = scalar ? null : el.resolved != null ? el.resolved : prefixedOrScopedClass(el.name, ctx);
+        boolean programClass = elClass != null && appliedCollectionMixin(elClass.name) == null;
         if (!scalar && !programClass) {
             return null;
         }
@@ -9072,6 +9099,16 @@ public final class JavaEmitter {
             return witnessOf(el, ctx);
         }
         return "dart.runtime.TypeWitness.of(" + erasedJavaType(copyNonNull(el), ctx) + ".class, " + el.nullable + ")";
+    }
+
+    /// The program class {@code name} names in this library: `b.Item` through its import
+    /// prefix, a bare name through the library's scope.
+    private ClassDecl prefixedOrScopedClass(String name, Ctx ctx) {
+        int dot = name.indexOf('.');
+        if (dot > 0 && ctx.library() != null && ctx.library().importPrefixes.contains(name.substring(0, dot))) {
+            return program.resolveClass(name.substring(dot + 1), ctx.library(), name.substring(0, dot));
+        }
+        return programClass(name, ctx);
     }
 
     /// A target type argument of an is/as test or a function signature: `dynamic` (and
@@ -9117,7 +9154,7 @@ public final class JavaEmitter {
     /// `f is R Function(P..)`: the closure's reified signature (TypeWitness.isFunctionOf);
     /// null when nothing in the signature is testable, which keeps the erased arity test.
     private String functionTest(String subject, TypeRef t, String erased, Ctx ctx) {
-        if (t.funcReturn == null || t.funcParams == null || (t.funcNamed != null && !t.funcNamed.isEmpty())
+        if (t.funcReturn == null || t.funcParams == null
                 || !(erased.startsWith("dart.runtime.Funcs.") || erased.startsWith("Funcs."))) {
             return null;
         }
@@ -9125,27 +9162,18 @@ public final class JavaEmitter {
                 || t.funcReturn.is("Object") && t.funcReturn.nullable;
         String ret = topReturn ? null : reifiedArgWitness(t.funcReturn, ctx);
         StringBuilder sb = new StringBuilder();
-        boolean any = ret != null;
         for (TypeRef p : t.funcParams) {
-            String w = targetArgWitness(p, ctx);
-            any |= w != null;
-            sb.append(", ").append(nullWitness(w));
+            sb.append(", ").append(nullWitness(targetArgWitness(p, ctx)));
         }
-        if (topReturn) {
-            // void, dynamic and Object? are all top: any function of the arity is one, held
-            // by its value SAM or its void one.
-            int dot = erased.lastIndexOf('.') + 1;
-            String arity = erased.substring(dot).replace("VoidFunc", "").replace("Func", "");
-            String valueSam = erased.substring(0, dot) + "Func" + arity;
-            String voidSam = erased.substring(0, dot) + "VoidFunc" + arity;
-            return "dart.runtime.TypeWitness.isTopFunctionOf(" + subject + ", " + valueSam + ".class, " + voidSam
-                    + ".class" + sb + ")";
-        }
-        if (!any) {
-            return null;
-        }
-        return "dart.runtime.TypeWitness.isFunctionOf(" + subject + ", " + erased + ".class, " + nullWitness(ret)
-                + sb + ")";
+        // The SAMs an unsigned function of the target's positional arity is held by.
+        int positional = t.funcParams.size() - (t.funcNamed == null ? 0 : t.funcNamed.size());
+        String base = erased.substring(0, erased.lastIndexOf('.') + 1);
+        List<String> spec = namedSpec(t);
+        String named = spec == null || spec.isEmpty() ? "null"
+                : "new String[] {\"" + String.join("\", \"", spec) + "\"}";
+        return "dart.runtime.TypeWitness.isFunction(" + subject + ", " + base + "Func" + positional + ".class, "
+                + base + "VoidFunc" + positional + ".class, " + topReturn + ", " + nullWitness(ret) + ", "
+                + t.funcRequired + ", " + named + sb + ")";
     }
 
     /// The initializer of a local that imposes no function type (`var f = (int x) => x`),
@@ -9195,10 +9223,24 @@ public final class JavaEmitter {
         if (!functionTypeTested) {
             return code;
         }
-        for (Param p : l.params) {
-            if (p.named || p.optional) {
-                return code;
+        int required = -1;
+        List<String> named = null;
+        for (int i = 0; i < l.params.size(); i++) {
+            Param p = l.params.get(i);
+            if (p.named) {
+                if (named == null) {
+                    named = new ArrayList<String>();
+                }
+                named.add(p.required ? "!" + p.name : p.name);
+            } else if (p.optional && required < 0) {
+                required = i;
             }
+        }
+        if (named != null && required < 0) {
+            required = l.params.size() - named.size();
+        }
+        if (named != null && required == l.params.size() - named.size()) {
+            required = -1;
         }
         TypeRef[] ctxSig = null;
         if (expected != null && expected.funcParams != null) {
@@ -9269,12 +9311,25 @@ public final class JavaEmitter {
             generic = true;
         }
         boolean spellArgs = own && expected == null;
-        String[] signed = signWith(code, samType, sig.toString(), generic, spellArgs, ctx);
+        String[] signed = signWith(code, samType, sig.toString(), generic, spellArgs, required, named, ctx);
         if (signed == null) {
             return code;
         }
         signedClosures.put(l, new String[] {code, signed[0], signed[1]});
         return signed[1];
+    }
+
+    /// A function type's named parameters as the runtime spells them (Signed.$named): a
+    /// required one is `!name`. Null when it has none.
+    private static List<String> namedSpec(TypeRef t) {
+        if (t.funcNamed == null || t.funcNamedRequired == null) {
+            return t.funcNamed;
+        }
+        List<String> out = new ArrayList<String>();
+        for (String n : t.funcNamed) {
+            out.add(t.funcNamedRequired.contains(n) ? "!" + n : n);
+        }
+        return out;
     }
 
     /// Binds {@code code}, a closure or method reference of the SAM {@code samType} names, to
@@ -9283,6 +9338,14 @@ public final class JavaEmitter {
     /// infers from the target unless {@code spellArgs} (a site with no target) spells them.
     private String[] signWith(String code, TypeRef samType, String sig, boolean generic, boolean spellArgs,
             Ctx ctx) {
+        return signWith(code, samType, sig, generic, spellArgs, -1, null, ctx);
+    }
+
+    /// signWith for a function with optional positional ({@code required} of its positional
+    /// parameters are required, -1 when all are) or named parameters ({@code named}, a
+    /// required one as `!name`, whose witnesses follow the positional ones in {@code sig}).
+    private String[] signWith(String code, TypeRef samType, String sig, boolean generic, boolean spellArgs,
+            int required, List<String> named, Ctx ctx) {
         String jt = javaType(samType, false, ctx);
         if (!(jt.startsWith("dart.runtime.Funcs.") || jt.startsWith("Funcs."))) {
             return null;
@@ -9312,10 +9375,13 @@ public final class JavaEmitter {
         if (spellArgs && jt.indexOf('?') >= 0) {
             return null;
         }
-        String mkey = (generic ? "<>" : "") + sig;
+        String namedLit = named == null || named.isEmpty() ? null
+                : "\"" + String.join("\", \"", named) + "\"";
+        String mkey = (generic ? "<>" : "") + sig + "|" + required + "|" + namedLit;
         String[] marker = closureSignatures.get(mkey);
         if (marker == null) {
-            marker = new String[] {"M" + closureSignatures.size(), sig, String.valueOf(generic)};
+            marker = new String[] {"M" + closureSignatures.size(), sig, String.valueOf(generic),
+                    String.valueOf(required), namedLit};
             closureSignatures.put(mkey, marker);
         }
         String samKey = head + "|" + targs.size() + "|" + marker[0];
@@ -9397,6 +9463,14 @@ public final class JavaEmitter {
                     .append("            return SIG;\n        }\n");
             if (Boolean.parseBoolean(m[2])) {
                 sb.append("\n        @Override\n        default boolean $generic() {\n            return true;\n        }\n");
+            }
+            if (!"-1".equals(m[3])) {
+                sb.append("\n        @Override\n        default int $required() {\n            return ").append(m[3])
+                        .append(";\n        }\n");
+            }
+            if (m[4] != null) {
+                sb.append("\n        String[] NAMED = {").append(m[4]).append("};\n\n        @Override\n")
+                        .append("        default String[] $named() {\n            return NAMED;\n        }\n");
             }
             sb.append("    }\n");
         }
@@ -9653,6 +9727,9 @@ public final class JavaEmitter {
         if ((o instanceof PropertyGet && "runtimeType".equals(((PropertyGet) o).name))
                 || (o instanceof Ident && "runtimeType".equals(((Ident) o).name))) {
             runtimeTypeRead = true;
+            // A closure's runtimeType is its Dart signature (`(int) => String`), which only
+            // a signed closure carries.
+            functionTypeTested = true;
         }
         if (o instanceof Ident && ((Ident) o).typeArgs != null && !((Ident) o).typeArgs.isEmpty()
                 && program.classes.containsKey(((Ident) o).name)) {
@@ -12655,6 +12732,12 @@ public final class JavaEmitter {
                         ft.funcNamed = new ArrayList<String>();
                     }
                     ft.funcNamed.add(fp.name);
+                    if (fp.required) {
+                        if (ft.funcNamedRequired == null) {
+                            ft.funcNamedRequired = new ArrayList<String>();
+                        }
+                        ft.funcNamedRequired.add(fp.name);
+                    }
                 }
                 if (fp.defaultValue != null) {
                     defaults = true;
@@ -12927,6 +13010,21 @@ public final class JavaEmitter {
     }
 
     private Out emitPropertyGet(PropertyGet pg, Ctx ctx) {
+        if ("runtimeType".equals(pg.name) && (pg.target instanceof Ident || pg.target instanceof PropertyGet)
+                && ownTypedTearOff == null) {
+            // `f.runtimeType` of a tear-off prints its Dart signature, so the method
+            // reference is held signed by its own type, as a `var` initializer holds it.
+            ownTypedTearOff = pg.target;
+            try {
+                return emitPropertyGet0(pg, ctx);
+            } finally {
+                ownTypedTearOff = null;
+            }
+        }
+        return emitPropertyGet0(pg, ctx);
+    }
+
+    private Out emitPropertyGet0(PropertyGet pg, Ctx ctx) {
         // `ids.map(int.parse)`: a tear-off of the numeric parsers, as the method reference
         // the call form already lowers to (see emitPrimitiveStaticCall).
         if (pg.target instanceof Ident && (pg.name.equals("parse") || pg.name.equals("tryParse"))) {
@@ -12975,7 +13073,10 @@ public final class JavaEmitter {
                 return prim;
             }
         }
-        Out target = emitExprRaw(pg.target, null, ctx);
+        // The receiver of `runtimeType` goes through emitExpr, whose tear-off signing gives
+        // a method reference its Dart signature (see emitPropertyGet).
+        Out target = ownTypedTearOff == pg.target && "runtimeType".equals(pg.name)
+                ? emitExpr(pg.target, null, ctx) : emitExprRaw(pg.target, null, ctx);
         if (pg.nullAware) {
             // a?.b -> lift `$t = a` (materializing any guard a itself carries) and start a
             // new short: the member reads on the non-null $t, and $t being null shorts the
@@ -16155,6 +16256,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         c.funcReturn = substTypeParams(t.funcReturn, names, args);
         c.funcRequired = t.funcRequired;
         c.funcNamed = t.funcNamed;
+        c.funcNamedRequired = t.funcNamedRequired;
         return c;
     }
 
@@ -18976,8 +19078,35 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // (`keys.cast<String>().map((k) => k.length)`) sees R rather than dynamic.
             TypeRef sub = c.typeArgs.get(0);
             ctx.importClass("dart.core.CoreExt");
-            return new Out("CoreExt.<" + javaType(sub, true, ctx) + ">cast(" + target.code + ")",
-                    TypeRef.of(tt.name, sub));
+            // The view records R and checks each read against it, as Dart's CastList does;
+            // an R nothing can name here (an erased type variable) stays unchecked.
+            String w = reifiedArgWitness(sub, ctx);
+            return new Out("CoreExt.<" + javaType(sub, true, ctx) + ">cast(" + target.code
+                    + (w == null ? "" : ", " + w) + ")", TypeRef.of(tt.name, sub));
+        }
+        if (tt.is("List") && !tt.nullable && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 1
+                && (c.typeArgs.get(0).is("int") || c.typeArgs.get(0).is("double"))
+                && !c.typeArgs.get(0).nullable && primitiveListKind(tt) == null) {
+            // `objects.cast<int>()`: the checked view, seen as the primitive list class that
+            // List<int> is here.
+            TypeRef sub = c.typeArgs.get(0);
+            String pk = sub.is("int") ? "Long" : "Double";
+            ctx.importClass("dart.core.CoreExt");
+            return new Out("dart.core.Dart" + pk + "List.view" + pk + "s(CoreExt.<" + javaType(sub, true, ctx)
+                    + ">cast(" + target.code + ", " + reifiedArgWitness(sub, ctx) + "))", TypeRef.of("List", sub));
+        }
+        if (tt.is("Map") && !tt.nullable && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 2
+                && !isPrimitiveLongMap(tt)) {
+            // `map.cast<K, V>()`: a view recording K and V, its values checked on read.
+            TypeRef k = c.typeArgs.get(0);
+            TypeRef v = c.typeArgs.get(1);
+            TypeRef mt = TypeRef.of("Map", k, v);
+            if (!isPrimitiveLongMap(mt)) {
+                ctx.importClass("dart.core.CoreExt");
+                return new Out("CoreExt.<" + javaType(k, true, ctx) + ", " + javaType(v, true, ctx) + ">cast("
+                        + target.code + ", " + nullWitness(reifiedArgWitness(k, ctx)) + ", "
+                        + nullWitness(reifiedArgWitness(v, ctx)) + ")", mt);
+            }
         }
         if (tt.is("Stream") && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 1) {
             // Stream.cast<R>() checks each event, so the runtime takes R as a witness the
@@ -23717,10 +23846,43 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         String body = call.apply(names);
         String lifted = ctx.popWriter();
         ctx.popScope();
-        String code = "((" + sam + ") (" + raw + ") (" + lp + ") -> {\n" + pro + lifted + ind
+        // The adapter is the function value, so it carries the signature (Signed): its
+        // lambda's target is the raw SAM intersected with the marker.
+        String marker = functionTypeTested ? adapterMarker(ordered, otypes, ret, ctx) : null;
+        String code = "((" + sam + ") (" + raw + (marker != null ? " & " + marker : "") + ") (" + lp + ") -> {\n"
+                + pro + lifted + ind
                 + (isVoid ? statementize(body) + ";" : "return " + body + ";") + "\n"
                 + indentStr(ctx.currentIndent()) + "})";
         return new Out(code, ft);
+    }
+
+    /// The signature marker of a tearOffAdapter over {@code ordered} (required, optional
+    /// positional, then named), or null when nothing in it can be named.
+    private String adapterMarker(List<Param> ordered, List<TypeRef> otypes, TypeRef ret, Ctx ctx) {
+        reifiedClassNames();
+        StringBuilder sig = new StringBuilder(ret != null && ret.is("void")
+                ? "dart.runtime.TypeWitness.of(Void.class, true)"
+                : staticWitness(ret == null ? null : reifiedArgWitness(ret, ctx)));
+        int required = -1;
+        List<String> named = null;
+        for (int i = 0; i < ordered.size(); i++) {
+            Param fp = ordered.get(i);
+            if (fp.named) {
+                if (named == null) {
+                    named = new ArrayList<String>();
+                }
+                named.add(fp.required ? "!" + fp.name : fp.name);
+            } else if ((fp.optional || fp.defaultValue != null) && required < 0) {
+                required = i;
+            }
+            TypeRef pt = otypes.get(i);
+            sig.append(", ").append(pt == null || pt.is("var") ? "null" : staticWitness(targetArgWitness(pt, ctx)));
+        }
+        TypeRef samType = new TypeRef("Function");
+        samType.funcParams = new ArrayList<TypeRef>(otypes);
+        samType.funcReturn = ret == null ? TypeRef.DYNAMIC : ret;
+        String[] signed = signWith("x", samType, sig.toString(), false, false, required, named, ctx);
+        return signed == null ? null : signed[0];
     }
 
     /** An omitted optional argument to a function value: see {@link #tearOffAdapter}. */
@@ -25560,6 +25722,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         copy.funcReturn = ft.funcReturn;
         copy.funcRequired = ft.funcRequired;
         copy.funcNamed = ft.funcNamed;
+        copy.funcNamedRequired = ft.funcNamedRequired;
         return copy;
     }
 
@@ -26544,6 +26707,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             f.funcReturn = substTypeVars(t.funcReturn, subst);
             f.funcRequired = t.funcRequired;
             f.funcNamed = t.funcNamed;
+            f.funcNamedRequired = t.funcNamedRequired;
             return f;
         }
         if (t.args.isEmpty()) {
