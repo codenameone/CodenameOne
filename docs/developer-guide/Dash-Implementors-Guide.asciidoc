@@ -77,8 +77,8 @@ image::img/dash-reward-levelup.png["A level up on the reward cards",scaledwidth=
 image::img/dash-scores.png["A level board: the top three framed, each row with points, distance, coins and stars",scaledwidth=30%]
 
 *Quick race* drops the player into a race with whoever is waiting for that level, and
-fills the empty lanes with bots after a few seconds. *Race friends* opens a party with
-a code and a link to share. Everyone in a party can talk: the microphone button
+fills the empty lanes with bots after a few seconds. The *Race friends* button opens a party with
+a code and a link to share. Everyone who joins can talk: the microphone button
 connects each pair of players directly, and a muted player shows as muted to the
 rest. When the host starts, every phone runs the same seed in lockstep, the other
 runners appear in their own lanes, and the result screen ranks the places and pays
@@ -294,12 +294,12 @@ The run follows the map, not just its turns. The street the runner is on sits un
 the score and changes at every corner, a green street sign spans the track where a
 new street begins, and the places along the way -- churches, museums, stations,
 parks, monuments -- stand beside the track with their names on a board as the
-runner passes, and the coach calls them out ("Passing Guildhall."). The minimap in
+runner passes, and the coach calls them out ("Passing Guildhall."). The small map in
 the corner shows how far along the route the runner is.
 
 The places come from OpenStreetMap through the Overpass API: `Landmarks` asks for
-named tourist, historic, religious, station and park features within 70 metres of
-the route, projects each onto the line, keeps them at least 60 metres apart and at
+named tourist, historic, religious, station and park features within 70 meters of
+the route, projects each onto the line, keeps them at least 60 meters apart and at
 most twelve, and adds them to the `CityRoute`. They're part of the route the server
 receives, so they're part of the level and its hash, and the server places the
 same boards:
@@ -314,7 +314,7 @@ The public Overpass server is shared and rate limited. A game with players point
 places: the interface is one method that takes the route's path.
 
 image::img/dash-city-route.png["A route picked on the street map, with the landmarks along it pinned",scaledwidth=30%]
-image::img/dash-city-run.png["The run down Cannon Street: the street name under the score and the route minimap",scaledwidth=30%]
+image::img/dash-city-run.png["The run down Cannon Street: the street name under the score and the route map",scaledwidth=30%]
 image::img/dash-city-result.png["The result of a city run, with the route it followed",scaledwidth=30%]
 image::img/dash-city-landmark.png["A landmark's board beside the track as the runner passes it",scaledwidth=30%]
 
@@ -322,7 +322,7 @@ Before you ship this, point `Routing` at a routing server of your own:
 `Routing.setService(new OsrmRouteService("https://osrm.example.com"))`. The
 default is OSRM's public demo server, which is rate limited, has no service
 guarantee and serves only its car profile, whatever travel mode the request
-asks for. The map data is OpenStreetMap's, whose licence
+asks for. The map data is OpenStreetMap's, whose license
 asks for credit wherever it's shown; the city screen carries that line, and a
 reskin has to keep it.
 
@@ -330,7 +330,7 @@ reskin has to keep it.
 === Engagement and live operations
 
 Players come back for what changes: three quests a day, picked per player from
-`Goals` (run 500 metres, collect 100 coins, win a race...), a daily dash with one
+`Goals` (run 500 meters, collect 100 coins, win a race...), a daily dash with one
 track for everyone and its own board, chests that open over time, a level and
 trophies to climb, achievements, and boards that reset every week. Rivals already
 on the boards from the first run keep a new player company: on a development server
@@ -356,14 +356,14 @@ The operator's side is in the admin console:
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/social/Pipelines.java[tag=dash-pipelines-schedule,indent=0]
 ----
 
-On a phone the console is a list of pages; on a desktop or a tablet it's a side bar
+On a phone the console is a list of pages; on a desktop or a tablet it's a sidebar
 and a page, and the *Promote* tab is shown:
 
 image::img/dash-admin-overview.png["The admin console on a phone: the live numbers and the pages it leads to",scaledwidth=30%]
 image::img/dash-admin-player.png["A flagged player: account, record, wallet, the flag raised automatically and the actions an admin can take",scaledwidth=30%]
 image::img/dash-admin-flags.png["Flagged runs waiting for a decision",scaledwidth=30%]
 image::img/dash-admin-promote.png["Promote on a phone: a broadcast push to a segment and the home spotlight",scaledwidth=30%]
-image::img/dash-desktop-admin-overview.png["The admin console on a desktop: the side bar and the overview page",scaledwidth=70%]
+image::img/dash-desktop-admin-overview.png["The admin console on a desktop: the sidebar and the overview page",scaledwidth=70%]
 image::img/dash-desktop-admin-reports.png["Reports: players, runs and purchases over time",scaledwidth=70%]
 image::img/dash-desktop-admin-query.png["The player query: conditions over what the game knows about each player",scaledwidth=70%]
 image::img/dash-desktop-admin-pipelines.png["Engagement pipelines with their audiences, actions and cool-downs",scaledwidth=70%]
