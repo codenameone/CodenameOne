@@ -87,6 +87,10 @@ public final class Ast {
         public List<String> funcNamed;
         /// A generic function type's own type parameters (`T Function<T>(T)`); null otherwise.
         public List<String> funcTypeParams;
+        /// The generic closure (a generic function literal or local function) a local of
+        /// this type holds, built through SignedFns.generic: a call of the local passes
+        /// its type arguments at run time (SignedFns.instantiate). Null otherwise.
+        public Lambda genericClosure;
         // The named parameters of funcNamed that are `required`; null when none are.
         public List<String> funcNamedRequired;
 

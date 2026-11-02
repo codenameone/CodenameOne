@@ -881,6 +881,10 @@ public final class DartRuntime {
             if (c == Double.class) {
                 return "double";
             }
+            if (c == Number.class) {
+                // num's witness (a type argument `<num>`) is Number, Dart's num.
+                return "num";
+            }
             if (c == Boolean.class) {
                 return "bool";
             }

@@ -6460,6 +6460,23 @@ public final class JavaEmitter {
                 // one with parameters was an error).
                 t = inferredClosureType((Lambda) v.initializer, v.name, ctx);
             }
+            if (v.initializer instanceof Lambda && genericWitnessLambdas.contains(v.initializer)
+                    && (declared == null || declared.is("var"))) {
+                Lambda gl = (Lambda) v.initializer;
+                t = copyNonNull(t);
+                t.nullable = false;
+                if (t.funcParams != null) {
+                    // Its type parameters erase, as they do in the closure's own signature.
+                    List<TypeRef> eps = new ArrayList<TypeRef>();
+                    for (TypeRef pt : t.funcParams) {
+                        eps.add(substTypeParams(pt, gl.typeParams, java.util.Collections.<TypeRef>emptyList()));
+                    }
+                    t.funcParams = eps;
+                    t.funcReturn = substTypeParams(t.funcReturn, gl.typeParams,
+                            java.util.Collections.<TypeRef>emptyList());
+                }
+                t.genericClosure = gl;
+            }
             if (t.is("Function") && t.funcReturn == null && v.initializer instanceof Lambda) {
                 Lambda l = (Lambda) v.initializer;
                 if (l.params.isEmpty()) {
@@ -6945,7 +6962,12 @@ public final class JavaEmitter {
         // Declared with its real signature, so a call of it is typed by its return type
         // (`stopAll().whenComplete(...)` binds statically instead of through Dyn).
         TypeRef expected = funcTypeRef(lf.returnType, lf.params);
-        String jn = ctx.declareShadowSafe(lf.name, funcTypeRef(lf.returnType, lf.params));
+        TypeRef localType = funcTypeRef(lf.returnType, lf.params);
+        if (!lf.typeParams.isEmpty()) {
+            // Built through SignedFns.generic (emitLambdaIn): a call passes its type arguments.
+            localType.genericClosure = l;
+        }
+        String jn = ctx.declareShadowSafe(lf.name, localType);
         if (lf.isSyncStar || lf.isAsyncStar) {
             // A generator's element type comes from its declared Iterable<T>/Stream<T>,
             // which the generator lowering reads from the target's return type.
@@ -9572,6 +9594,14 @@ public final class JavaEmitter {
     /// `f is R Function(P..)`: the closure's reified signature (TypeWitness.isFunctionOf);
     /// null when nothing in the signature is testable, which keeps the erased arity test.
     private String functionTest(String subject, TypeRef t, String erased, Ctx ctx) {
+        if (t.funcReturn == null && t.funcParams == null) {
+            // `f is Fn<String>` with `typedef Fn<T> = T Function(T)`: the function type the
+            // alias denotes at those arguments.
+            TypeRef ft = expandGenericFunctionTypedef(t);
+            if (ft != null) {
+                t = ft;
+            }
+        }
         if (t.funcReturn == null || t.funcParams == null || !isFuncsSamName(erased)) {
             return null;
         }
@@ -10269,6 +10299,11 @@ public final class JavaEmitter {
         // isThrowableType for the matching "Error"/"Exception" bare-name policy.
         if (CORE_ERRORS.containsKey(n) || n.equals("Error") || n.equals("Exception")) {
             return false;
+        }
+        if (ctx != null && ctx.erasedMethodTypeVars != null && ctx.erasedMethodTypeVars.contains(n)) {
+            // A type parameter erased to Object in Java (a generic closure's, see
+            // emitLambdaIn) is still a type variable, whose witness may be in scope.
+            return true;
         }
         String jt = javaType(t, true, ctx);
         return jt.equals(n);
@@ -13620,18 +13655,48 @@ public final class JavaEmitter {
             if (simple) {
                 ft.funcReturn = fn.typeParams.isEmpty() ? fn.returnType
                         : substTypeParams(fn.returnType, fn.typeParams, java.util.Collections.<TypeRef>emptyList());
+                // A generic function its context instantiates (`Fn<int> f = id`): typed, and
+                // so signed, at those type arguments, and handed its witnesses when it takes
+                // them (`List<T> one<T>(T x)` builds a List<T>).
+                List<TypeRef> inst = fn.typeParams.isEmpty() ? null
+                        : contextInstantiation(fn.typeParams, ordered, fn.returnType, tearOffExpected);
+                if (inst != null) {
+                    for (int i = 0; i < ordered.size(); i++) {
+                        ft.funcParams.set(i, substTypeParams(paramValueType(ordered.get(i)), fn.typeParams, inst));
+                    }
+                    ft.funcReturn = substTypeParams(fn.returnType, fn.typeParams, inst);
+                }
+                final String wargs = tearOffWitnessArgs(fn, inst, ctx);
                 String sam = javaType(samAtBoundsRaw(ft, tearOffExpected), false, ctx);
                 if (ft.funcRequired >= 0 && ft.funcRequired < ordered.size()) {
                     // Optional parameters: an adapter restores defaults (see tearOffAdapter).
                     final String lib = Program.libClassName(owner.fileName) + "." + n;
                     Out ad = tearOffAdapter(ordered, ft.funcParams, ft.funcReturn,
-                            names -> lib + "(" + String.join(", ", names) + ")", ctx);
+                            names -> lib + "(" + wargs + String.join(", ", names) + ")", ctx);
                     if (ad != null) {
                         return ad;
                     }
                 }
                 // A typed SAM cast makes the tear-off a standalone expression: a list
                 // element or a `??` operand gives a bare method reference no target type.
+                if (!wargs.isEmpty()) {
+                    // The witnesses are arguments a method reference cannot pass: a closure
+                    // over the function's own parameters.
+                    StringBuilder ps = new StringBuilder();
+                    for (int i = 0; i < ordered.size(); i++) {
+                        ps.append(i == 0 ? "" : ", ").append("$a").append(i);
+                    }
+                    String body = Program.libClassName(owner.fileName) + "." + n + "(" + wargs + ps + ")";
+                    // Generic code builds a boxed list; a List<int>/List<double> result is
+                    // held by the primitive-backed list's SAM, which views it.
+                    String pk = ft.funcReturn != null && ft.funcReturn.is("List")
+                            ? primitiveListKind(ft.funcReturn) : null;
+                    if (pk != null) {
+                        body = (ft.funcReturn.arg(0).is("int") ? "dart.core.DartLongList.viewLongs("
+                                : "dart.core.DartDoubleList.viewDoubles(") + body + ")";
+                    }
+                    ref = "((" + ps + ") -> " + body + ")";
+                }
                 if (!fn.typeParams.isEmpty()) {
                     // A cast would pin the erased Func<Object..>; a bare reference takes
                     // whatever instantiation the context names, and ft types a local.
@@ -17042,6 +17107,30 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return ft;
     }
 
+    /// A generic function typedef with only positional parameters at its type arguments
+    /// (`Fn<String>` for `typedef Fn<T> = T Function(T)`), as the function type it denotes;
+    /// null for anything else.
+    private TypeRef expandGenericFunctionTypedef(TypeRef t) {
+        if (t == null || t.name == null || t.args.isEmpty()) {
+            return null;
+        }
+        Ast.TypedefDecl td = typedefDecl(t.name);
+        if (td == null || td.paramTypes == null || td.returnType == null
+                || td.typeParams.size() != t.args.size() || td.funcNamed != null) {
+            return null;
+        }
+        TypeRef[] sig = userTypedefSig(t.name, t.args);
+        TypeRef ft = new TypeRef("Function");
+        ft.funcParams = new ArrayList<TypeRef>();
+        for (int i = 0; i < sig.length - 1; i++) {
+            ft.funcParams.add(sig[i]);
+        }
+        ft.funcReturn = sig[sig.length - 1];
+        ft.funcRequired = td.funcRequired;
+        ft.nullable = t.nullable;
+        return ft;
+    }
+
     /** A user typedef by name, else a stub library's function typedef. */
     private Ast.TypedefDecl typedefDecl(String name) {
         Ast.TypedefDecl td = program.typedefs.get(name);
@@ -18060,6 +18149,94 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
     }
 
+    /// The type arguments a function type context instantiates a generic function's
+    /// tear-off with -- unified over the parameter types and the return type -- or null when
+    /// the context is no function type or leaves one undetermined.
+    private List<TypeRef> contextInstantiation(List<String> tps, List<Param> params, TypeRef ret, TypeRef expected) {
+        TypeRef ctxFn = expected == null ? null : expected.funcParams != null ? expected
+                : expandFunctionTypedef(expected) != null ? expandFunctionTypedef(expected)
+                : expandGenericFunctionTypedef(expected);
+        if (ctxFn == null || ctxFn.funcParams == null || ctxFn.funcParams.size() != params.size()) {
+            return null;
+        }
+        Map<String, TypeRef> m = new LinkedHashMap<String, TypeRef>();
+        for (int i = 0; i < params.size(); i++) {
+            unifyTypeVars(paramValueType(params.get(i)), ctxFn.funcParams.get(i), tps, m);
+        }
+        if (ret != null && ctxFn.funcReturn != null) {
+            unifyTypeVars(ret, ctxFn.funcReturn, tps, m);
+        }
+        List<TypeRef> out = new ArrayList<TypeRef>();
+        for (String tp : tps) {
+            TypeRef t = m.get(tp);
+            if (t == null || t.is("var")) {
+                return null;
+            }
+            out.add(t);
+        }
+        return out;
+    }
+
+    /// The leading witness arguments (each followed by ", ") a tear-off of the generic
+    /// function {@code fn} passes, at the instantiation {@code inst} (null: unknown); "" when
+    /// it takes none.
+    private String tearOffWitnessArgs(FunctionDecl fn, List<TypeRef> inst, Ctx ctx) {
+        List<String> ws = methodWitnesses(fn);
+        StringBuilder sb = new StringBuilder();
+        for (String n : ws) {
+            int at = fn.typeParams.indexOf(n);
+            String w = inst == null || at < 0 ? null : witnessOf(inst.get(at), ctx);
+            if (w == null && !hardMethodWitness(fn, n)) {
+                w = "(dart.runtime.TypeWitness) null";
+            }
+            if (w == null) {
+                diags.error(fn, "E0142", "Tearing off " + fn.name + " needs its type argument '" + n
+                        + "' at run time (its body uses " + n + " as a value), and no function type"
+                        + " context instantiates it here. Give the tear-off a function type.");
+                w = "null";
+            }
+            sb.append(w).append(", ");
+        }
+        return sb.toString();
+    }
+
+    /// A call of a local holding a generic closure (`w<num>(1)`, `w(1)`): the closure
+    /// instantiated with the call's type arguments, written or inferred from the arguments
+    /// whose parameter is declared as a bare type parameter (`T x`). A type argument that
+    /// is neither is unknown, as for the uninstantiated closure.
+    private String instantiateGenericClosure(String recv, TypeRef local, Call c, Ctx ctx) {
+        Lambda l = local.genericClosure;
+        StringBuilder ws = new StringBuilder();
+        boolean any = false;
+        for (int i = 0; i < l.typeParams.size(); i++) {
+            TypeRef t = c.typeArgs.size() == l.typeParams.size() ? c.typeArgs.get(i) : null;
+            if (t == null) {
+                for (int s = 1; s < l.typeVarSlots.size() && s - 1 < c.args.positional.size(); s++) {
+                    if (l.typeParams.get(i).equals(l.typeVarSlots.get(s))) {
+                        TypeRef at = elementTypeQuiet(c.args.positional.get(s - 1), ctx);
+                        if (at != null && !at.is("var")) {
+                            t = at;
+                            break;
+                        }
+                    }
+                }
+            }
+            String w = t == null ? null : witnessOf(t, ctx);
+            any |= w != null;
+            ws.append(i == 0 ? "" : ", ").append(w == null ? "null" : w);
+        }
+        if (!any) {
+            return recv;
+        }
+        String sam = javaType(local, false, ctx);
+        return "((" + sam + ") dart.runtime.SignedFns.instantiate(" + recv
+                + ", new dart.runtime.TypeWitness[] {" + ws + "}))";
+    }
+
+    /// The generic closures emitted through SignedFns.generic (see emitLambdaIn).
+    private final java.util.Set<Lambda> genericWitnessLambdas =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Lambda, Boolean>());
+
     private Out emitLambdaIn(Lambda l, TypeRef expected, Ctx ctx) {
         if (expected != null && expected.funcParams == null && expected.funcReturn == null
                 && (expected.is("Object") || expected.is("Function") || isDynamicType(expected))) {
@@ -18169,6 +18346,28 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // A break/continue cannot target a loop/switch outside the lambda body.
         List<String> savedBreaks = new ArrayList<String>(ctx.breakTargets);
         ctx.breakTargets.clear();
+        // A generic closure no context instantiates (`var w = <T>(T x) => [x]`, a generic
+        // local function) takes its type arguments at run time: its body is built per
+        // instantiation by SignedFns.generic, with each type parameter's witness the local
+        // `$tw$T` there, and a call passes them (SignedFns.instantiate). In the body a type
+        // parameter erases to Object in Java, and a parameter declared `T x` is a T.
+        boolean genericWitness = !l.typeParams.isEmpty() && l.boundRecv == null
+                && (l.ownSignature || expected == null || expected.funcParams == null
+                    || expected == ownSamContext);
+        java.util.Set<String> savedWitnessLocals = ctx.witnessLocals;
+        java.util.Set<String> savedErasedVars = ctx.erasedMethodTypeVars;
+        java.util.Set<String> savedMethodTps = ctx.methodTypeParams;
+        if (genericWitness) {
+            ctx.witnessLocals = savedWitnessLocals == null ? new HashSet<String>()
+                    : new HashSet<String>(savedWitnessLocals);
+            ctx.witnessLocals.addAll(l.typeParams);
+            ctx.erasedMethodTypeVars = savedErasedVars == null ? new HashSet<String>()
+                    : new HashSet<String>(savedErasedVars);
+            ctx.erasedMethodTypeVars.addAll(l.typeParams);
+            ctx.methodTypeParams = savedMethodTps == null ? new HashSet<String>()
+                    : new HashSet<String>(savedMethodTps);
+            ctx.methodTypeParams.addAll(l.typeParams);
+        }
         ctx.pushScope();
         StringBuilder sig = new StringBuilder("(");
         for (int i = 0; i < l.params.size(); i++) {
@@ -18176,6 +18375,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             TypeRef pt = p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type;
             if (pt.is("dynamic") && sigTypes != null && i < sigTypes.length - 1) {
                 pt = sigTypes[i];
+            }
+            String slot = genericWitness && i + 1 < l.typeVarSlots.size() ? l.typeVarSlots.get(i + 1) : null;
+            if (slot != null && isDynamicType(pt)) {
+                pt = new TypeRef(slot);
             }
             if (i > 0) {
                 sig.append(", ");
@@ -18345,6 +18548,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
         }
         ctx.popScope();
+        ctx.witnessLocals = savedWitnessLocals;
+        ctx.methodTypeParams = savedMethodTps;
         ctx.breakTargets.clear();
         ctx.breakTargets.addAll(savedBreaks);
         ctx.inAsyncBody = outerAsync;
@@ -18359,8 +18564,40 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         lastLambdaReturns = returns;
         runTimeSignedLast = null;
         String signed = signClosure(code, l, expected, exprType, ctx);
+        // The closure's own signature names its type parameters erased (Object in Java).
+        ctx.erasedMethodTypeVars = savedErasedVars;
         String[] rt = runTimeSignedLast;
         runTimeSignedLast = null;
+        if (genericWitness) {
+            // Built once per instantiation; the uninstantiated value (a dynamic call, a call
+            // with nothing to infer) is the one built with unknown witnesses.
+            StringBuilder binds = new StringBuilder();
+            for (int i = 0; i < l.typeParams.size(); i++) {
+                binds.append("dart.runtime.TypeWitness $tw$").append(l.typeParams.get(i))
+                        .append(" = $tws[").append(i).append("]; ");
+            }
+            genericWitnessLambdas.add(l);
+            String built = signed;
+            if (!signed.contains(".DartFnSigs.")) {
+                // An unsigned lambda has no target inside the builder (a cast outside it
+                // does not reach a generic method's inference): its SAM is written here --
+                // the function type the context declares, else its own shape.
+                TypeRef own = expected != null && expected.funcParams != null ? expected : null;
+                if (own == null) {
+                    own = new TypeRef("Function");
+                    own.funcParams = new ArrayList<TypeRef>();
+                    for (int i = 0; i < l.params.size(); i++) {
+                        own.funcParams.add(TypeRef.DYNAMIC);
+                    }
+                    boolean value = l.exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(l);
+                    own.funcReturn = value ? TypeRef.DYNAMIC : new TypeRef("void");
+                }
+                built = "(" + javaType(own, false, ctx) + ") " + signed;
+            }
+            String g = "dart.runtime.SignedFns.generic($tws -> { " + binds + "return " + built + "; }, "
+                    + l.typeParams.size() + ")";
+            return new Out(g, new TypeRef("Function"), FnForm.lambda(g));
+        }
         if (rt != null) {
             return new Out(signed, new TypeRef("Function"), FnForm.runTimeSigned(signed, rt[0], rt[1]));
         }
@@ -18838,6 +19075,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             Ident callee = new Ident();
             callee.name = n;
             String recv = emitIdent(callee, null, ctx).code;
+            if (local.genericClosure != null) {
+                recv = instantiateGenericClosure(recv, local, c, ctx);
+            }
             return new Out(fnCall(recv, local, c.args, ctx), ret);
         }
         // inside an extension body, bare calls probe the receiver first -- but not a
@@ -19650,10 +19890,21 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (ff == null) {
                 ff = findInheritedField(pc, n);
             }
-            if (ff != null && isFunctionValued(ff.type)) {
+            TypeRef ffType = ff == null ? null : ff.type;
+            if (ff != null && !isFunctionValued(ffType) && pc.field(n) == ff
+                    && pc.typeParams.size() == tt.args.size()
+                    && mentionsAny(ffType, new HashSet<String>(pc.typeParams))) {
+                // `Box<int Function(int)> bf; bf.v(1)` with `T v`: the field's type at the
+                // receiver's type arguments, its erased value cast to that function's SAM.
+                ffType = substTypeVars(ffType, paramMap(pc.typeParams, tt.args));
+            }
+            if (ff != null && isFunctionValued(ffType)) {
                 Out fieldRead = emitMemberGet(target, n, c, ctx);
-                return new Out(fnCall(callable(fieldRead), ff.type, c.args, ctx),
-                        funcResultType(ff.type));
+                if (ffType != ff.type) {
+                    fieldRead = new Out("((" + javaType(ffType, false, ctx) + ") " + fieldRead.code + ")", ffType);
+                }
+                return new Out(fnCall(callable(fieldRead), ffType, c.args, ctx),
+                        funcResultType(ffType));
             }
             // invocation of a function-typed getter: `obj.shout(d)` where shout is
             // `String Function(int) get shout` -- read the getter, then invoke its SAM.

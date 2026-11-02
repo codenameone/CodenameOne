@@ -59,6 +59,148 @@ public final class SignedFns {
         public final String[] $named() {
             return named;
         }
+
+        /// For a generic closure (see generic): its type variables as Signed.$typeVars
+        /// gives them, and what builds it for a list of type argument witnesses.
+        private String[] typeVars;
+        private Funcs.Func1<TypeWitness[], ?> instantiator;
+
+        @Override
+        public final boolean $generic() {
+            return instantiator != null;
+        }
+
+        @Override
+        public final String[] $typeVars() {
+            return typeVars;
+        }
+    }
+
+    /// A generic closure (`<T>(T x) => [x]`) whose body reads its type parameters: built by
+    /// {@code instantiator} once per instantiation, from one witness per type parameter
+    /// (null for one that is unknown). The value returned is the closure built with every
+    /// witness unknown -- what a dynamic call, or one with nothing to infer, runs -- and
+    /// carries the signature the built closure was signed with, still generic.
+    @SuppressWarnings("unchecked")
+    public static <F> F generic(Funcs.Func1<TypeWitness[], F> instantiator, int typeParams) {
+        Object f = instantiator.call(new TypeWitness[typeParams]);
+        Signed s = f instanceof Signed ? (Signed) f : null;
+        Base b = wrap(f, s != null ? s.$sig() : unknownSig(f), s != null ? s.$required() : -1,
+                s != null ? s.$named() : null);
+        b.typeVars = s != null ? s.$typeVars() : null;
+        b.instantiator = instantiator;
+        return (F) b;
+    }
+
+    /// {@code f} instantiated with {@code typeArgs} when it is a generic closure built by
+    /// generic(); any other value as it is. The result is no longer generic: each signature
+    /// slot that is a type parameter is that parameter's witness.
+    public static Object instantiate(Object f, TypeWitness[] typeArgs) {
+        if (!(f instanceof Base) || ((Base) f).instantiator == null) {
+            return f;
+        }
+        Base g = (Base) f;
+        TypeWitness[] gsig = g.$sig();
+        TypeWitness[] sig = new TypeWitness[gsig.length];
+        System.arraycopy(gsig, 0, sig, 0, gsig.length);
+        String[] tv = g.typeVars;
+        if (tv != null && tv.length > 0 && tv[0] != null) {
+            for (int i = 0; i < sig.length && i + 1 < tv.length; i++) {
+                int at = typeVarIndex(tv[0], tv[i + 1]);
+                if (at >= 0 && at < typeArgs.length && typeArgs[at] != null) {
+                    sig[i] = typeArgs[at];
+                }
+            }
+        }
+        return wrap(g.instantiator.call(typeArgs), sig, g.$required(), g.$named());
+    }
+
+    /// The position of {@code name} in a `T, U` type parameter list, or -1.
+    private static int typeVarIndex(String names, String name) {
+        if (name == null) {
+            return -1;
+        }
+        int index = 0;
+        int start = 0;
+        while (start <= names.length()) {
+            int comma = names.indexOf(',', start);
+            int end = comma < 0 ? names.length() : comma;
+            if (names.substring(start, end).trim().equals(name)) {
+                return index;
+            }
+            if (comma < 0) {
+                return -1;
+            }
+            index++;
+            start = comma + 1;
+        }
+        return -1;
+    }
+
+    /// A signature that tests nothing, for a closure built unsigned.
+    private static TypeWitness[] unknownSig(Object f) {
+        return new TypeWitness[arity(f) + 1];
+    }
+
+    private static int arity(Object f) {
+        if (f instanceof Funcs.Func0 || f instanceof Funcs.VoidFunc0) {
+            return 0;
+        }
+        if (f instanceof Funcs.Func1 || f instanceof Funcs.VoidFunc1) {
+            return 1;
+        }
+        if (f instanceof Funcs.Func2 || f instanceof Funcs.VoidFunc2) {
+            return 2;
+        }
+        if (f instanceof Funcs.Func3 || f instanceof Funcs.VoidFunc3) {
+            return 3;
+        }
+        if (f instanceof Funcs.Func4 || f instanceof Funcs.VoidFunc4) {
+            return 4;
+        }
+        return 5;
+    }
+
+    /// {@code f}, a closure of any Funcs SAM, signed with {@code sig}.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Base wrap(Object f, TypeWitness[] sig, int required, String[] named) {
+        if (f instanceof Funcs.Func0) {
+            return new F0((Funcs.Func0) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func1) {
+            return new F1((Funcs.Func1) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func2) {
+            return new F2((Funcs.Func2) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func3) {
+            return new F3((Funcs.Func3) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func4) {
+            return new F4((Funcs.Func4) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func5) {
+            return new F5((Funcs.Func5) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc0) {
+            return new V0((Funcs.VoidFunc0) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc1) {
+            return new V1((Funcs.VoidFunc1) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc2) {
+            return new V2((Funcs.VoidFunc2) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc3) {
+            return new V3((Funcs.VoidFunc3) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc4) {
+            return new V4((Funcs.VoidFunc4) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc5) {
+            return new V5((Funcs.VoidFunc5) f, sig, required, named);
+        }
+        throw new IllegalArgumentException("not a closure: " + f);
     }
 
     private static final class F0<R> extends Base implements Funcs.Func0<R> {
