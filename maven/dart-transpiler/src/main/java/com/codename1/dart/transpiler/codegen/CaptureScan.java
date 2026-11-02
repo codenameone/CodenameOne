@@ -64,6 +64,19 @@ final class CaptureScan {
         return boxed;
     }
 
+    /// Every name the body assigns. An async body runs inside a Java lambda (see
+    /// Await.async), so a parameter it reassigns must be boxed even if no closure of
+    /// its own captures it.
+    static Set<String> assignedNames(Block body, Expr exprBody) {
+        CaptureScan scan = new CaptureScan();
+        if (body != null) {
+            scan.walkBlock(body);
+        } else if (exprBody != null) {
+            scan.walkExpr(exprBody);
+        }
+        return scan.assigned;
+    }
+
     static Set<String> boxedLocals(Expr exprBody) {
         CaptureScan scan = new CaptureScan();
         if (exprBody != null) {

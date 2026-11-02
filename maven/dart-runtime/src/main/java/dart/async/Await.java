@@ -44,7 +44,115 @@ public final class Await {
      */
     @SuppressWarnings("unchecked")
     public static Object awaitAny(Object v) {
-        return v instanceof Future ? await$((Future<Object>) v) : v;
+        if (v instanceof Future) {
+            return await$((Future<Object>) v);
+        }
+        // `await 42` yields too: inside a coroutine it suspends like any await.
+        return Coroutine.current() != null ? await$(Future.value(v)) : v;
+    }
+
+    /// An async function's body: {@code return Await.async(() -> { body })}. The body
+    /// runs now, up to its first await; the Future it returns is answered when it
+    /// finishes there, and otherwise one that completes with what the rest of it returns.
+    /// The lowered body already turns its throws into Future.error.
+    @SuppressWarnings("unchecked")
+    public static <F> F async(dart.runtime.Funcs.Func0<F> body) {
+        final Coroutine c = Coroutine.start(body);
+        if (c.isFinished()) {
+            return finish(c);
+        }
+        final Future<Object> pending = new Future<Object>();
+        c.onFinish(new Runnable() {
+            @Override
+            public void run() {
+                Object r;
+                try {
+                    r = finish(c);
+                } catch (RuntimeException e) {
+                    pending.completeError(e);
+                    return;
+                }
+                pending.complete(r);
+            }
+        });
+        return (F) pending;
+    }
+
+    /// The body of an async function or closure whose Future nobody can see
+    /// ({@code void f() async}, {@code onPressed: () async {...}}): it runs now up to its
+    /// first await, and an error it throws -- before or after that await -- is an
+    /// uncaught error of the zone it ran in, never an exception at the call.
+    public static void asyncVoid(final dart.runtime.Funcs.VoidFunc0 body) {
+        final Coroutine c = Coroutine.start(new dart.runtime.Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                body.call();
+                return null;
+            }
+        });
+        if (c.isFinished()) {
+            reportVoid(c);
+            return;
+        }
+        c.onFinish(new Runnable() {
+            @Override
+            public void run() {
+                reportVoid(c);
+            }
+        });
+    }
+
+    private static void reportVoid(Coroutine c) {
+        Throwable t = c.failure();
+        if (t != null) {
+            if (!(t instanceof RuntimeException)) {
+                throwUnchecked(t);
+            }
+            // Reported from the event loop, as Dart reports the unhandled error of the
+            // Future the closure returned: after the code that called it.
+            final Zone z = c.zone();
+            final Throwable err = t;
+            new Timer(null, new dart.runtime.Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    z.handleUncaughtError(dart.runtime.DartRuntime.caught(err), Zone.stackOf(err));
+                }
+            });
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <F> F finish(Coroutine c) {
+        Throwable t = c.failure();
+        if (t != null) {
+            throwUnchecked(t);
+        }
+        return (F) c.result();
+    }
+
+    private static void throwUnchecked(Throwable t) {
+        if (t instanceof RuntimeException) {
+            throw (RuntimeException) t;
+        }
+        if (t instanceof Error) {
+            throw (Error) t;
+        }
+        throw new RuntimeException(t);
+    }
+
+    /// {@code await} of a void expression, already evaluated: only the yield remains.
+    public static void yield$() {
+        if (Coroutine.current() != null) {
+            await$(Future.value(null));
+        }
+    }
+
+    /// {@code await v} of a statically non-Future v: v, once the body has yielded.
+    public static <T> T pass(T v) {
+        if (Coroutine.current() != null) {
+            await$(Future.value(null));
+        }
+        return v;
     }
 
     public static <T> T await$(final Future<T> f) {
@@ -52,6 +160,14 @@ public final class Await {
             throw new dart.core.TypeError("await on null Future");
         }
         f.markHandled();
+        Coroutine co = Coroutine.current();
+        if (co != null) {
+            // Inside an async body started by async(): suspend, so the caller gets its
+            // Future now and this frame resumes from the event loop (see Coroutine).
+            f.driveOnce();
+            co.suspendUntil(f);
+            return f.valueOrThrow();
+        }
         // An await ends Dart's synchronous turn: what a controller queued for delivery
         // runs now, before the frame blocks (see Microtasks).
         Microtasks.drain();
