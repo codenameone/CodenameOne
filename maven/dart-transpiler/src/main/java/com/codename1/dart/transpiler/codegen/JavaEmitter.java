@@ -9175,6 +9175,9 @@ public final class JavaEmitter {
                 // `List<E>.of(src)` parsed as a constructor call (explicit type arguments):
                 // the same copy as List<E>.from, typed by E.
                 if (cc.type.name.equals("List") && cc.ctorName.equals("of")) {
+                    // Checked as List.of (its parameter is Iterable<E>) before it becomes
+                    // the List.from copy, whose parameter is a raw Iterable.
+                    checkDynamicCoreCtorArgs(cc, ctx);
                     cc.ctorName = "from";
                 }
                 // List<E>.generate / .filled / .from -- dart:core intrinsic factories,
@@ -21049,10 +21052,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     return new Out("CoreStatics.futureSync(" + f.code + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
                 }
                 if (n.equals("error")) {
-                    // Future.error(e, stackTrace): the trace travels with the error.
-                    return new Out("Future.error(" + emitExpr(c.args.positional.get(0), null, ctx).code
+                    // Future.error(e, stackTrace): the trace travels with the error. T is
+                    // the context's Future<T>, recorded as the constructor form records it
+                    // (emitFutureNamedCtor), so `is Future<T>` and a catchError recovery
+                    // value are checked against T here too.
+                    TypeRef exp = callExpected(c, ctx);
+                    TypeRef et = exp != null && exp.is("Future") && exp.args.size() == 1 ? exp.arg(0) : null;
+                    if (et != null && (et.is("void") || et.is("Null"))) {
+                        et = null;
+                    }
+                    return new Out(reifyWith("Future.error(" + emitExpr(c.args.positional.get(0), null, ctx).code
                             + (c.args.positional.size() > 1
-                                    ? ", " + emitExpr(c.args.positional.get(1), null, ctx).code : "") + ")",
+                                    ? ", " + emitExpr(c.args.positional.get(1), null, ctx).code : "") + ")", et, ctx),
                             TypeRef.of("Future", TypeRef.DYNAMIC));
                 }
                 if (n.equals("delayed")) {
@@ -21736,44 +21747,74 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** Core-type method table (String / List / Map / int / double). */
-    /// The positional parameter types of the dart:core members the intrinsics below emit by
-    /// hand, as the SDK declares them, in terms of the receiver's own type parameters (E for
-    /// an element, K and V for a map). Only parameters whose type a value can fail are
-    /// listed: an Object?, a Pattern (no Java type names it) or a callback is not. A
-    /// collection parameter (addAll, insertAll, addEntries, writeAll, union) is not listed
-    /// either: its intrinsic checks the argument itself through runtimeArg, which keeps
-    /// the runtime's element-specialized collections whole.
-    private static final Map<String, String[]> CORE_PARAM_TYPES = new java.util.HashMap<String, String[]>();
-    static {
-        String[][] rows = {
-            {"String.endsWith", "String"}, {"String.padLeft", "int", "String"},
-            {"String.padRight", "int", "String"}, {"String.substring", "int", "int"},
-            {"String.codeUnitAt", "int"}, {"String.compareTo", "String"},
-            {"List.add", "E"}, {"List.insert", "int", "E"}, {"List.indexOf", "E", "int"},
-            {"List.lastIndexOf", "E"}, {"List.removeAt", "int"}, {"List.elementAt", "int"},
-            {"List.sublist", "int", "int"}, {"List.getRange", "int", "int"},
-            {"List.removeRange", "int", "int"}, {"List.join", "String"}, {"List.take", "int"}, {"List.skip", "int"},
-            {"Set.add", "E"}, {"Set.elementAt", "int"}, {"Set.join", "String"},
-            {"Iterable.elementAt", "int"}, {"Iterable.take", "int"}, {"Iterable.skip", "int"},
-            {"Iterable.join", "String"},
-            {"StringBuffer.writeCharCode", "int"},
-        };
-        for (String[] r : rows) {
-            CORE_PARAM_TYPES.put(r[0], java.util.Arrays.copyOfRange(r, 1, r.length));
+    /// The positional parameter types of dart:core member {@code member} (a constructor when
+    /// {@code ctor}) of {@code receiver}, read from its declaration: the SDK signatures in
+    /// dartsdk_core.dart ({@link StubRegistry#sdkClasses}) for the types the intrinsics
+    /// lower, else the stub class (DateTime). An inherited member is found through the
+    /// declared supertypes (List's elementAt is Iterable's). The receiver's type arguments
+    /// replace the declaration's type parameters; an entry is null where that leaves a type
+    /// unknown. Null when nothing declares the member.
+    private List<TypeRef> declaredCoreParamTypes(TypeRef receiver, String member, boolean ctor, int depth) {
+        ClassDecl d = stubs.sdkClasses.get(receiver.name);
+        if (d == null) {
+            d = stubs.classes.get(receiver.name);
         }
+        if (d == null || depth > 4) {
+            return null;
+        }
+        Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (int i = 0; i < d.typeParams.size(); i++) {
+            subst.put(d.typeParams.get(i), receiver.args.size() == d.typeParams.size() ? receiver.arg(i) : null);
+        }
+        List<Param> params = null;
+        if (ctor) {
+            for (Ast.CtorDecl cd : d.ctors) {
+                if (member.equals(cd.name)) {
+                    params = cd.params;
+                }
+            }
+        } else {
+            MethodDecl m = d.method(member);
+            if (m != null && !m.isStatic) {
+                params = m.params;
+            }
+        }
+        if (params == null) {
+            if (ctor) {
+                return null;
+            }
+            List<TypeRef> supers = new ArrayList<TypeRef>(d.interfaces);
+            if (d.superclass != null) {
+                supers.add(0, d.superclass);
+            }
+            for (TypeRef sup : supers) {
+                TypeRef bound = substituteTypeParams(sup, subst);
+                if (bound != null && !hasUnknownArg(bound)) {
+                    List<TypeRef> found = declaredCoreParamTypes(bound, member, false, depth + 1);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            return null;
+        }
+        List<TypeRef> out = new ArrayList<TypeRef>();
+        for (Param p : params) {
+            if (!p.named) {
+                TypeRef t = substituteTypeParams(p.type, subst);
+                out.add(t == null || hasUnknownArg(t) ? null : t);
+            }
+        }
+        return out;
     }
 
-    /// One {@link #CORE_PARAM_TYPES} entry, its type parameters bound to the receiver's
-    /// arguments; null where one is unknown.
-    private static TypeRef coreParamType(String decl, TypeRef receiver) {
-        TypeRef e = receiver.args.size() == 1 ? receiver.arg(0) : null;
-        if (decl.equals("int")) {
-            return TypeRef.INT;
+    private static boolean hasUnknownArg(TypeRef t) {
+        for (TypeRef a : t.args) {
+            if (a == null || hasUnknownArg(a)) {
+                return true;
+            }
         }
-        if (decl.equals("String")) {
-            return TypeRef.STRING;
-        }
-        return decl.equals("E") ? e : null;
+        return false;
     }
 
     /// A dynamic argument to a dart:core member whose parameter has a non-dynamic type is
@@ -21784,18 +21825,51 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (tt == null || tt.name == null || programClass(tt.name, ctx) != null) {
             return;
         }
-        String[] decl = CORE_PARAM_TYPES.get(tt.name + "." + c.name);
+        if (!stubs.sdkClasses.containsKey(tt.name) && !isDartCoreStub(tt.name)) {
+            return;
+        }
+        List<TypeRef> decl = declaredCoreParamTypes(tt, c.name, false, 0);
         if (decl == null) {
             return;
         }
-        List<Expr> pos = c.args.positional;
-        for (int i = 0; i < pos.size() && i < decl.length; i++) {
+        checkDynamicArgsAgainst(decl, c.args.positional, ctx);
+    }
+
+    /// A stub class of dart:core itself (DateTime, Duration): its runtime class, the
+    /// stub's declared @JavaName, is in the dart.core package.
+    private boolean isDartCoreStub(String name) {
+        ClassDecl d = stubs.classes.get(name);
+        return d != null && d.javaName != null && d.javaName.startsWith("dart.core.");
+    }
+
+    /// As {@link #checkDynamicCoreArgs}, for a dart:core constructor ({@code Map.from(m)},
+    /// {@code List.of(xs)}) the collection factories emit: {@code cc.type} is the type
+    /// being constructed, its arguments binding the declaration's type parameters.
+    private void checkDynamicCoreCtorArgs(CtorCall cc, Ctx ctx) {
+        if (cc.type == null || cc.ctorName == null || !stubs.sdkClasses.containsKey(cc.type.name)
+                || programClass(cc.type.name, ctx) != null) {
+            return;
+        }
+        List<TypeRef> decl = declaredCoreParamTypes(cc.type, cc.ctorName, true, 0);
+        if (decl != null) {
+            checkDynamicArgsAgainst(decl, cc.args.positional, ctx);
+        }
+    }
+
+    /// Wraps each statically dynamic positional argument in an `as` of its declared
+    /// parameter type. A collection parameter (followedBy, addAll, Map.from) is left to
+    /// the intrinsic, which checks it through {@link #runtimeArg} against the same
+    /// declared type: an `as` would cast to the boxed collection class, which a
+    /// runtime-specialized collection (a List<int> is a DartLongList) is not.
+    private void checkDynamicArgsAgainst(List<TypeRef> decl, List<Expr> pos, Ctx ctx) {
+        for (int i = 0; i < pos.size() && i < decl.size(); i++) {
             Expr a = pos.get(i);
             if (a instanceof Lambda || a instanceof Ast.AsCast) {
                 continue;
             }
-            TypeRef pt = coreParamType(decl[i], tt);
-            if (pt == null || isDynamicType(pt) || !typeVarsInScope(pt, ctx)
+            TypeRef pt = decl.get(i);
+            if (pt == null || pt.is("Object") || isDynamicType(pt) || pt.funcParams != null
+                    || pt.is("Function") || !typeVarsInScope(pt, ctx)
                     || pt.is("Iterable") || pt.is("List") || pt.is("Set") || pt.is("Map")) {
                 continue;
             }
@@ -22545,7 +22619,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".expand(" + f.code + ")", TypeRef.of("Iterable", out));
             }
             if (n.equals("followedBy")) {
-                return new Out(target.code + ".followedBy(" + coreArg(pos.get(0), null, ctx).code + ")",
+                // Iterable<E> followedBy(Iterable<E> other): a dynamic argument is Dart's
+                // implicit downcast to Iterable<E>.
+                return new Out(target.code + ".followedBy("
+                        + runtimeArg(pos.get(0), TypeRef.of("Iterable", elem != null ? elem : TypeRef.DYNAMIC), ctx).code + ")",
                         TypeRef.of("Iterable", elem));
             }
             if (n.equals("take") || n.equals("skip")) {
@@ -22873,6 +22950,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private Out emitListFactory(CtorCall cc, TypeRef expected, Ctx ctx) {
+        checkDynamicCoreCtorArgs(cc, ctx);
         TypeRef listType = cc.type;
         boolean implicitDynamic = listType.args.size() == 1 && isDynamicType(listType.arg(0));
         if (listType.args.isEmpty() || implicitDynamic) {
@@ -23439,6 +23517,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private Out emitCoreCollectionFactory(CtorCall cc, TypeRef expected, Ctx ctx) {
+        checkDynamicCoreCtorArgs(cc, ctx);
         String name = cc.type.name;
         String ctor = cc.ctorName;
         List<Expr> pos = cc.args.positional;
@@ -23447,6 +23526,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             TypeRef kt = cc.type.args.isEmpty() ? TypeRef.DYNAMIC : cc.type.arg(0);
             TypeRef vt = cc.type.args.size() < 2 ? TypeRef.DYNAMIC : cc.type.arg(1);
             String witness = ".<" + javaType(kt, true, ctx) + ", " + javaType(vt, true, ctx) + ">";
+            if (ctor.equals("from") && pos.size() == 1 && cc.args.named.isEmpty() && cc.type.args.size() == 2
+                    && isConcreteType(kt) && !isDynamicType(kt) && isConcreteType(vt) && !isDynamicType(vt)
+                    && typeVarsInScope(cc.type, ctx) && !isPrimitiveLongMap(cc.type) && staticallyDynamic(pos.get(0), ctx)) {
+                // Map<K, V>.from(Map other) with a dynamic source: Dart casts every key to K
+                // and value to V as it copies, so `<String, dynamic>{'a': [1]}` is no
+                // Map<String, List<int>> source; checked as Set<E>.from checks elements.
+                String src = emitExpr(pos.get(0), null, ctx).code;
+                return new Out("DartMap" + witness + "fromChecked(" + src + ", "
+                        + erasedJavaType(copyNonNull(kt), ctx) + ".class, " + kt.nullable + ", "
+                        + erasedJavaType(copyNonNull(vt), ctx) + ".class, " + vt.nullable + ")", cc.type);
+            }
             if (ctor.equals("unmodifiable") && !isPrimitiveLongMap(cc.type)) {
                 // Map.unmodifiable / UnmodifiableMapView: every write throws UnsupportedError.
                 String src = emitExpr(pos.get(0), null, ctx).code;

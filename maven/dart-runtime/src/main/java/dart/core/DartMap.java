@@ -367,6 +367,33 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> implements dart.runtime.R
         return m;
     }
 
+    /// Dart's {@code Map<K, V>.from(other)} with a concrete K and V and a dynamic source:
+    /// every key is checked against K and every value against V as it is copied, and a
+    /// source that is no Map is a TypeError.
+    @SuppressWarnings("unchecked")
+    public static <K, V> DartMap<K, V> fromChecked(Object other, Class<?> keyType, boolean keyNullable,
+            Class<?> valueType, boolean valueNullable) {
+        if (!(other instanceof Map)) {
+            throw new TypeError("type '" + (other == null ? "Null" : other.getClass().getName())
+                    + "' is not a subtype of type 'Map<dynamic, dynamic>'");
+        }
+        DartMap<K, V> m = new DartMap<>();
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) other).entrySet()) {
+            checkEntryPart(e.getKey(), keyType, keyNullable);
+            checkEntryPart(e.getValue(), valueType, valueNullable);
+            m.put((K) e.getKey(), (V) e.getValue());
+        }
+        return m;
+    }
+
+    private static void checkEntryPart(Object v, Class<?> type, boolean nullable) {
+        if (v == null ? !nullable : !type.isInstance(v)) {
+            String n = type.getName();
+            throw new TypeError("type '" + (v == null ? "Null" : v.getClass().getName())
+                    + "' is not a subtype of type '" + n.substring(n.lastIndexOf('.') + 1) + "'");
+        }
+    }
+
     /// Dart's {@code Map.unmodifiable(other)} and {@code UnmodifiableMapView(other)}: a
     /// copy every write to which throws UnsupportedError, as Dart's does.
     public static <K, V> DartMap<K, V> unmodifiable(Map<?, ?> other) {
