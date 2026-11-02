@@ -35,6 +35,7 @@ SVGs are self-contained so the website and the PDF build render them alike.
 
 import argparse
 import json
+import re
 import math
 import os
 
@@ -47,14 +48,16 @@ COLORS = {
 }
 # The budgeted Codename One arm is named "<CN1>, <n> MB budget"; it takes a lighter
 # shade of the same blue so the two runs of one binary read as one runtime.
-BUDGETED_COLOR = "#8ab4f8"
+# A budget under 64 MB, if one is passed, gets the lighter second shade.
+BUDGETED_COLORS = ["#8ab4f8", "#c6dafc"]
 
 
 def color(arm):
     if arm in COLORS:
         return COLORS[arm]
-    if arm.startswith("Codename One Python,"):
-        return BUDGETED_COLOR
+    m = re.match(r"Codename One Python, (\d+) MB budget", arm)
+    if m:
+        return BUDGETED_COLORS[0 if int(m.group(1)) >= 64 else 1]
     return MUTED
 
 
@@ -171,9 +174,9 @@ def tradeoff(fl, title):
     o.append('<text x="%.1f" y="%d" font-size="12" fill="%s" text-anchor="middle">%s</text>'
              % (left + pw / 2, height - 10, TEXT, "physical footprint after load"))
     cn1 = [p for p in pts if p[0].startswith("Codename One Python")]
-    if len(cn1) == 2:
+    for p0, p1 in zip(cn1, cn1[1:]):
         o.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-dasharray="4 3"/>'
-                 % (X(cn1[0][1]), Y(cn1[0][2]), X(cn1[1][1]), Y(cn1[1][2]), COLORS["Codename One Python"]))
+                 % (X(p0[1]), Y(p0[2]), X(p1[1]), Y(p1[2]), COLORS["Codename One Python"]))
     for n, m, r in pts:
         o.append('<circle cx="%.1f" cy="%.1f" r="6" fill="%s"/>' % (X(m), Y(r), color(n)))
         anchor = "end" if X(m) > left + pw * 0.7 else "start"

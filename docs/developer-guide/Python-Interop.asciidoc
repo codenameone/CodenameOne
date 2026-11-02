@@ -404,13 +404,17 @@ grow instead: memory the machine isn't using earns nothing, and the speed it
 buys is real. That's a choice the runtime makes because the memory is there,
 not a size it needs.
 
-*Codename One, 128 MB budget* is the same executable given a memory limit of
-128 MB, the way a container or a small cloud instance would give it one. With
-a budget, the collector stops spending memory for speed: it keeps the heap
-tight, and paces allocation so the process stays inside the limit. The trade
-flips, and the program gives back some speed to use less memory.
+*Codename One, 128 MB budget* is the same executable given
+a memory limit, the way a container, a small cloud instance or a phone would
+give it one. With a budget, the collector stops spending memory for speed: it
+keeps the heap tight, and paces allocation so the process stays inside the
+limit. The budget is a hard cap, not a target: when the limit is near, a
+thread that needs memory waits for the collector rather than going over. The
+trade flips, and the program gives back some speed to use less memory.
 
-Both still come out ahead.
+Collecting garbage has a cost, and at high throughput it shows: under a
+budget, more of the CPU goes to the collector instead of the program. The
+server figures below make that visible.
 
 ==== Startup
 

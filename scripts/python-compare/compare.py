@@ -85,7 +85,7 @@ def flask_size(exe):
     return sum(du_mb(d) for d in out)
 
 
-def kernel_rows(arms, cn1_dir, budget):
+def kernel_rows(arms, cn1_dir, budgets):
     rows = []
     for k in KERNEL_NAMES:
         row = {"kernel": k}
@@ -94,8 +94,9 @@ def kernel_rows(arms, cn1_dir, budget):
             row[name] = (best_ms(out), rss)
         out, wall, rss = timed([os.path.join(cn1_dir, k, k)])
         row[CN1] = (best_ms(out), rss)
-        out, wall, rss = timed([os.path.join(cn1_dir, k, k)], env=budget_env(budget))
-        row[cn1_budgeted(budget)] = (best_ms(out), rss)
+        for budget in budgets:
+            out, wall, rss = timed([os.path.join(cn1_dir, k, k)], env=budget_env(budget))
+            row[cn1_budgeted(budget)] = (best_ms(out), rss)
         rows.append(row)
     return rows
 
@@ -163,9 +164,15 @@ def server_row(cmd, env=None):
         # keep-alive off, the same for every server.
         target = "http://127.0.0.1:%d/fib/30" % PORT
         subprocess.run(["ab", "-q", "-n", "2000", "-c", "8", target], capture_output=True)
-        out = subprocess.run(["ab", "-q", "-s", "30", "-t", str(LOAD_SECONDS), "-n", "100000000",
-                              "-c", "8", target], capture_output=True, text=True).stdout
-        rps = float(re.search(r"Requests per second:\s+([\d.]+)", out).group(1))
+        res = subprocess.run(["ab", "-q", "-s", "30", "-t", str(LOAD_SECONDS), "-n", "100000000",
+                              "-c", "8", target], capture_output=True, text=True)
+        out = res.stdout
+        m = re.search(r"Requests per second:\s+([\d.]+)", out)
+        if m is None:
+            raise RuntimeError("ab failed against %s (budget %s): %s"
+                               % (cmd, (env or {}).get("CN1_SIMULATE_PROC_MEMORY_LIMIT", "none"),
+                                  (res.stderr or out).strip()[-300:]))
+        rps = float(m.group(1))
         p99 = re.search(r"\s99%\s+(\d+)", out)
         loaded_rss = rss_of(p.pid)
         loaded, peak = footprint_of(p.pid)
@@ -189,8 +196,8 @@ def main():
     ap.add_argument("--cn1-kernels", required=True)
     ap.add_argument("--cn1-hello", help="native binary of hello.py, for the startup row")
     ap.add_argument("--cn1-server", required=True)
-    ap.add_argument("--budget-mb", type=int, default=128,
-                    help="per-process memory budget for the second Codename One arm")
+    ap.add_argument("--budget-mb", default="128",
+                    help="comma-separated per-process memory budgets; each adds a Codename One arm")
     ap.add_argument("--out")
     ap.add_argument("--json", help="the measurements, for render_charts.py --compare")
     a = ap.parse_args()
@@ -199,8 +206,9 @@ def main():
         arms.append(("PyPy", a.pypy))
     if a.graalpy:
         arms.append(("GraalPy", a.graalpy))
-    CN1B = cn1_budgeted(a.budget_mb)
-    names = [n for n, _ in arms] + [CN1, CN1B]
+    budgets = [int(b) for b in a.budget_mb.split(",") if b.strip()]
+    CN1BS = [cn1_budgeted(b) for b in budgets]
+    names = [n for n, _ in arms] + [CN1] + CN1BS
     lines = []
     w = lines.append
     w("# Codename One Python vs %s\n" % ", ".join(n for n, _ in arms))
@@ -230,7 +238,7 @@ def main():
     w("")
 
     w("## Two ways to run the same binary\n")
-    w("Every Codename One row appears twice. **%s** is the binary as it ships, on a "
+    w("Every Codename One row appears more than once. **%s** is the binary as it ships, on a "
       "machine with memory to spare. Its collector is adaptive: while it has CPU to spare "
       "it holds the heap near the live set, and when collecting starts to cost the "
       "program throughput it lets the heap grow instead, because unused memory buys "
@@ -238,13 +246,13 @@ def main():
       "per-process memory budget, the way iOS limits every app and a container limits a "
       "server. Then memory is the scarce resource and the trade flips: the heap is held "
       "tight however busy the collector is, and the program pays in collections, not "
-      "memory.\n" % (CN1, CN1B))
+      "memory.\n" % (CN1, "** and **".join(CN1BS)))
     w("Memory is **physical footprint**, what the kernel meters a process by and what a "
       "budget is measured in, for every runtime alike.\n")
     w("## CPU kernels (fastest of the kernel's rounds, ms; peak footprint MB)\n")
     w("| kernel | " + " | ".join("%s ms | %s MB" % (n, n) for n in names) + " |")
     w("|---|" + "---:|---:|" * len(names))
-    for r in kernel_rows(arms, a.cn1_kernels, a.budget_mb):
+    for r in kernel_rows(arms, a.cn1_kernels, budgets):
         data["kernels"][r["kernel"]] = {n: {"ms": r[n][0], "rss_mb": r[n][1]} for n in names}
         w("| %s | " % r["kernel"] + " | ".join("%.1f | %.1f" % r[n] for n in names) + " |")
     w("")
@@ -260,7 +268,8 @@ def main():
       % SETTLE_SECONDS)
     w("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     servers = [(n, [exe, SERVER_APP], None) for n, exe in arms if has_flask(exe)]
-    servers += [(CN1, [a.cn1_server], None), (CN1B, [a.cn1_server], budget_env(a.budget_mb))]
+    servers += [(CN1, [a.cn1_server], None)]
+    servers += [(cn1_budgeted(b), [a.cn1_server], budget_env(b)) for b in budgets]
     for n, exe in arms:
         if not has_flask(exe):
             w("| %s | (Flask not installed) | | | | | | | |" % n)
@@ -271,14 +280,17 @@ def main():
     w("")
     fl = data["flask"]
     if "CPython" in fl:
-        free, held, cp = fl[CN1], fl[CN1B], fl["CPython"]
+        free, cp = fl[CN1], fl["CPython"]
         w("Unconstrained, the server spends memory for speed: %.0f MB after load at "
-          "%.0f requests a second. Under the %d MB budget it gives that speed back for "
-          "memory, %.0f MB at %.0f requests a second -- %.0f%% of the unconstrained "
-          "throughput and still %.0f times CPython's, which serves %.0f a second in "
-          "%.0f MB.\n" % (free["loaded_mb"], free["rps"], a.budget_mb, held["loaded_mb"],
-                          held["rps"], 100.0 * held["rps"] / free["rps"],
-                          held["rps"] / cp["rps"], cp["rps"], cp["loaded_mb"]))
+          "%.0f requests a second. CPython serves %.0f a second in %.0f MB.\n"
+          % (free["loaded_mb"], free["rps"], cp["rps"], cp["loaded_mb"]))
+        for b in budgets:
+            held = fl[cn1_budgeted(b)]
+            w("- Under a %d MB budget: %.0f MB after load, %.0f MB at peak, %.0f requests "
+              "a second -- %.0f%% of the unconstrained throughput, %.0f times CPython's."
+              % (b, held["loaded_mb"], held["peak_mb"], held["rps"],
+                 100.0 * held["rps"] / free["rps"], held["rps"] / cp["rps"]))
+        w("")
 
     w("## What you deploy\n")
     w("| | size MB | what |")
@@ -291,7 +303,8 @@ def main():
           % (n, du_mb(home) + extra, home, extra))
     w("| " + CN1 + " | %.1f | one self-contained executable, Flask included |" % du_mb(a.cn1_server))
     w("")
-    data["deploy"][CN1] = data["deploy"][CN1B] = du_mb(a.cn1_server)
+    for n in [CN1] + CN1BS:
+        data["deploy"][n] = du_mb(a.cn1_server)
     if a.json:
         import json
         with open(a.json, "w") as f:

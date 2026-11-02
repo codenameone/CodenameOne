@@ -642,52 +642,90 @@ static long cn1ProcessHeadroom(void) {
     return -1;          // this platform has no per-process limit
 }
 
+// Whether this process runs under a memory budget (a real per-process limit, or the
+// simulated one). For code outside this file that only needs the yes/no.
+int cn1ProcessHasMemoryBudget(void) {
+    return cn1ProcessHeadroom() >= 0;
+}
+
 // Bytes admitted for dirtying but not yet reflected in phys_footprint; see
-// cn1PacingTryAdmit. Declared here rather than beside the rest of the pacing state
-// because collectThreadResources, far above it, has to be able to hand a claim back.
+// cn1PacingTryAdmit.
+//
+// ONE PROCESS-WIDE CLAIM, STAMPED WITH THE GC EPOCH IT BELONGS TO. A claim covers the
+// window between allocating a block and writing to it, which is invisible to
+// phys_footprint, and a collection boundary is a sound expiry point: a block allocated
+// before it has either been written (so phys_footprint counts it and the claim would
+// double-charge) or is garbage (so the sweep reclaimed it and the claim is meaningless).
+// Every pacing park requests a collection, so under pressure boundaries arrive
+// continuously and the accumulation stays small.
+//
+// Claims used to be kept per thread in a __thread counter, released at that thread's
+// next check after a boundary. A virtual thread breaks that: it yields inside the wait
+// and can be admitted on another host pthread, and a host that then goes idle never
+// checks again, so its share of the global stayed charged for good. Under a 64MB budget
+// a Flask server leaked claims until no admission could succeed, and every request
+// crawled at one page per two barren collections. With the epoch packed beside the bytes
+// in one word, expiry is a property of the counter itself: the first reader after a
+// boundary sees a stale epoch and rebases, whichever thread it is.
+//
+// NOT held for live-but-untouched blocks past the boundary, deliberately. A never-written
+// array is not footprint at all, so reserving for it would charge the process for memory
+// that does not exist and throttle every allocator for the life of the app -- an
+// unbounded over-reservation traded for a bounded under-reservation.
+//
+// A claim is held for the cycle it was made in AND the one after it. Expiring at the
+// first boundary sounds equivalent and is not: under budget pressure cycles run back to
+// back, tens of milliseconds apart, and a thread fills a page it was admitted for over
+// longer than that. A single-boundary claim let a 64MB Flask server peak at 72MB.
+//
+// Layout: [epoch:16][previous cycle:24][this cycle:24], byte counts in KB, so one CAS
+// updates the whole thing and no thread has to be around to hand anything back.
+#define CN1_PACING_CLAIM_FIELD ((1LL << 24) - 1)
 static _Atomic long long cn1PacingClaimed = 0;
-// This thread's outstanding claim. __thread rather than a ThreadLocalData field, matching
-// cn1LowMemoryParkStampMs: zero-initialized per thread with no malloc'd-not-zeroed trap.
-static __thread long long cn1MyPacingClaim = 0;
 
-// GC epoch this thread's claim belongs to; see cn1PacingExpireThreadClaim.
-static __thread int cn1MyPacingClaimEpoch = 0;
+static long long cn1PacingClaimPack(int epoch, long long prevKb, long long curKb) {
+    if(prevKb > CN1_PACING_CLAIM_FIELD) {
+        prevKb = CN1_PACING_CLAIM_FIELD;
+    }
+    if(curKb > CN1_PACING_CLAIM_FIELD) {
+        curKb = CN1_PACING_CLAIM_FIELD;
+    }
+    return ((long long)(epoch & 0xFFFF) << 48) | (prevKb << 24) | curKb;
+}
 
-static void cn1PacingReleaseThreadClaim(void) {
-    if(cn1MyPacingClaim != 0) {
-        atomic_fetch_sub_explicit(&cn1PacingClaimed, cn1MyPacingClaim,
-                                  memory_order_relaxed);
-        cn1MyPacingClaim = 0;
+// Rebase a packed claim onto GC epoch `epoch`: the buckets it still stands for there.
+static void cn1PacingClaimRebase(long long packed, int epoch, long long* prevKb, long long* curKb) {
+    int age = (epoch - (int)((packed >> 48) & 0xFFFF)) & 0xFFFF;
+    long long p = (packed >> 24) & CN1_PACING_CLAIM_FIELD;
+    long long c = packed & CN1_PACING_CLAIM_FIELD;
+    if(age == 0) {
+        *prevKb = p;
+        *curKb = c;
+    } else if(age == 1) {
+        *prevKb = c;
+        *curKb = 0;
+    } else {
+        *prevKb = 0;
+        *curKb = 0;
     }
 }
 
-// Drop this thread's accumulated claim once a collection boundary has passed.
-//
-// A claim covers the window between allocating a block and writing to it, which is
-// invisible to phys_footprint. The tempting release point is the thread's NEXT check --
-// "by now it must have written the last one" -- but that is not something Java
-// guarantees: `a = new byte[32MB]; b = new byte[32MB];` allocates both before touching
-// either, and releasing a's claim while allocating b hands back a reservation for pages
-// that are still absent from the footprint. So claims ACCUMULATE within a cycle window
-// instead, which over-counts a thread holding several untouched blocks -- and
-// over-counting is the safe direction, since it only paces harder.
-//
-// A cycle boundary is a sound expiry point: a block allocated before it has either been
-// written (so phys_footprint counts it and the claim would double-charge) or is garbage
-// (so the sweep reclaimed it and the claim is meaningless). Every pacing park requests a
-// collection, so under pressure boundaries arrive continuously and the accumulation
-// stays small.
-// NOT held for live-but-untouched blocks, deliberately. A never-written array is not
-// footprint at all, so reserving for it past the boundary would charge the process for
-// memory that does not exist and throttle every allocator for the life of the app --
-// an unbounded over-reservation traded for a bounded under-reservation. Dirtying an
-// old block also never reaches the allocator, so no expiry policy could catch it; live
-// headroom paces on the next allocation once those pages are really written.
-static void cn1PacingExpireThreadClaim(void) {
-    int epochNow = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
-    if(cn1MyPacingClaimEpoch != epochNow) {
-        cn1PacingReleaseThreadClaim();
-        cn1MyPacingClaimEpoch = epochNow;
+static long long cn1PacingClaimKb(long long bytes) {
+    return (bytes + 1023) >> 10;
+}
+
+static void cn1PacingAddClaim(long long bytes) {
+    long long cur = atomic_load_explicit(&cn1PacingClaimed, memory_order_relaxed);
+    for(;;) {
+        int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+        long long p, c;
+        cn1PacingClaimRebase(cur, epoch, &p, &c);
+        long long next = cn1PacingClaimPack(epoch, p, c + cn1PacingClaimKb(bytes));
+        if(atomic_compare_exchange_weak_explicit(&cn1PacingClaimed, &cur, next,
+                                                 memory_order_acq_rel,
+                                                 memory_order_relaxed)) {
+            return;
+        }
     }
 }
 
@@ -2603,14 +2641,6 @@ void collectThreadResources(struct ThreadLocalData *current)
     cn1BibopRetireThreadPages(current);
     // LEVER A: flush any unaccounted per-thread bytes into the global GC trigger.
     CN1_BIBOP_FLUSH_BYTES(current);
-    // Release this thread's pacing claim. A claim is normally handed back at the
-    // thread's NEXT allocation check, so a thread that is admitted and then exits would
-    // never return it -- and unlike a thread that merely goes idle, there is nothing
-    // left to hand it back later. Allocator-thread churn would accumulate phantom
-    // reservations until admission could never succeed and every allocator paced its
-    // full budget on every check. Runs on the dying thread, so the __thread claim is
-    // reachable here, same as the pages and bytes above.
-    cn1PacingReleaseThreadClaim();
 #endif
     if(current->utf8Buffer != 0) {
         free(current->utf8Buffer);
@@ -7956,6 +7986,7 @@ static int cn1GcCycleTick(void) {
 #endif
 }
 
+static _Atomic int cn1PacingBudgetWaiters = 0;
 static void cn1RequestGcFromParkedThread(void) {
     atomic_store_explicit(&cn1GcNativeGcRequest, 1, memory_order_release);
 }
@@ -8110,6 +8141,12 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
     }
 #endif
 
+    // A thread waiting on the process budget needs the next cycle now, and it cannot
+    // notify us (it is parked, see cn1RequestGcFromParkedThread). Only a budgeted process
+    // ever has such a waiter, so an unconstrained one never takes this branch.
+    if(atomic_load_explicit(&cn1PacingBudgetWaiters, memory_order_relaxed) > 0) {
+        return 0;
+    }
     if(forced) {
         // A request was made and consuming it must never drop this thread to the LONG idle.
         // The code replaced here read
@@ -10852,22 +10889,64 @@ static long long cn1PacingHeadroomMargin(long procHeadroom) {
 }
 
 static JAVA_BOOLEAN cn1PacingTryAdmit(long headroom, long long need, long long pendingBytes) {
-    long long claimed = atomic_load_explicit(&cn1PacingClaimed, memory_order_relaxed);
+    long long cur = atomic_load_explicit(&cn1PacingClaimed, memory_order_relaxed);
     for(;;) {
+        int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+        long long prevKb, curKb;
+        cn1PacingClaimRebase(cur, epoch, &prevKb, &curKb);
+        long long claimed = (prevKb + curKb) << 10;
         if((long long)headroom - claimed < need) {
             return JAVA_FALSE;
         }
-        if(atomic_compare_exchange_weak_explicit(&cn1PacingClaimed, &claimed,
-                                                 claimed + pendingBytes,
+        if(atomic_compare_exchange_weak_explicit(&cn1PacingClaimed, &cur,
+                                                 cn1PacingClaimPack(epoch, prevKb,
+                                                                    curKb + cn1PacingClaimKb(pendingBytes)),
                                                  memory_order_acq_rel,
                                                  memory_order_relaxed)) {
-            cn1MyPacingClaim += pendingBytes;
             return JAVA_TRUE;
         }
-        // claimed was reloaded by the failed exchange; re-test against the new total.
+        // cur was reloaded by the failed exchange; re-test against the new total.
     }
 }
 
+// The size class a BiBOP budget wait is for, or -1. See the resident exit in
+// cn1PacingPark.
+static __thread int cn1PacingBibopClass = -1;
+
+// A BARREN VERDICT LOWERS THE MARGIN, BY HALVES. The margin keeps a quarter of the budget
+// free so a burst cannot outrun the collector to the limit. But when collections are
+// returning nothing, the live set (plus the fragmentation it leaves) is simply that big,
+// and holding the margin made every fresh page cost two full barren collections: a
+// Flask server under a 64MB budget sat 10MB under the limit, 6MB inside the margin, and
+// served a request every few seconds, because the one thread allocating held a lock the
+// rest were waiting on. So a wait that ends barren records half the headroom it saw as
+// the margin to use instead: the process may grow by half of what is left, then must
+// prove the heap barren again, and each proof halves what remains -- the footprint
+// approaches the budget and does not cross it. Never below CN1_PACING_BARREN_MARGIN_MIN,
+// which covers the pages threads hold in flight between checks. It expires after
+// CN1_PACING_BARREN_VERDICT_MS, and a wait that sees a cycle return memory clears it, so
+// a heap that becomes collectible again gets the full margin back.
+#ifndef CN1_PACING_BARREN_MARGIN_MIN
+#define CN1_PACING_BARREN_MARGIN_MIN (2LL * 1024 * 1024)
+#endif
+#ifndef CN1_PACING_BARREN_VERDICT_MS
+#define CN1_PACING_BARREN_VERDICT_MS 2000
+#endif
+static _Atomic long long cn1PacingBarrenMargin = 0;     // 0: no verdict
+static _Atomic long long cn1PacingBarrenVerdictMs = 0;
+
+static long long cn1PacingEffectiveMargin(long procHeadroom) {
+    long long margin = cn1PacingHeadroomMargin(procHeadroom);
+    long long barren = atomic_load_explicit(&cn1PacingBarrenMargin, memory_order_relaxed);
+    if(barren > 0 && barren < margin) {
+        long long at = atomic_load_explicit(&cn1PacingBarrenVerdictMs, memory_order_relaxed);
+        if((long long)cn1MonotonicMillis() - at < CN1_PACING_BARREN_VERDICT_MS) {
+            return barren;
+        }
+        atomic_store_explicit(&cn1PacingBarrenMargin, 0, memory_order_relaxed);
+    }
+    return margin;
+}
 static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendingBytes) {
     if(get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
         return;
@@ -11017,12 +11096,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // still needs a shared reservation: without one, N mutators all read the same
     // headroom before any of them dirties anything and each independently concludes it
     // fits. cn1PacingClaimed carries those in-flight blocks so every thread sees what the
-    // others are about to spend.
-    //
-    // Release this thread's previous claim first: by the time it allocates again, the
-    // earlier block has been written and the kernel has counted it, so holding the claim
-    // any longer would double-charge it.
-    cn1PacingExpireThreadClaim();
+    // others are about to spend, until the next collection boundary.
     // THE MARGIN SCALES DOWN WITH A SMALL BUDGET. A fixed 64MB was sized against
     // ceilings of a gigabyte or more, and below about 256MB it is no longer a margin but
     // most of the budget: under 128MB a process was refused everything past 64MB, so a
@@ -11031,7 +11105,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // extension, whose limit can be below 128MB, is in the same place. A quarter of the
     // budget keeps the same proportion the 64MB had at 256MB, so every budget of 256MB
     // or more is admitted exactly as before.
-    long long need = pendingBytes + cn1PacingHeadroomMargin(procHeadroom);
+    long long need = pendingBytes + cn1PacingEffectiveMargin(procHeadroom);
     if(cn1PacingTraceOn()) {
         atomic_fetch_add_explicit(&cn1PacingBoundedChecks, 1, memory_order_relaxed);
         long seen = atomic_load_explicit(&cn1PacingMinHeadroom, memory_order_relaxed);
@@ -11093,10 +11167,16 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     CN1_STALL_T0(__stallBudget);
     threadStateData->threadActive = JAVA_FALSE;
+    atomic_fetch_add_explicit(&cn1PacingBudgetWaiters, 1, memory_order_relaxed);
     int spins = 0;
     int lastEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
     int barrenCycles = 0;
     long bestHeadroom = procHeadroom;
+    // spins counts milliseconds waited, not loop passes: a virtual thread's pass is a
+    // yield, which returns at once when nothing else on its host is runnable.
+    long long parkStartMs = (long long)cn1MonotonicMillis();
+    long long lastPollMs = parkStartMs;
+    int lastRequestSpin = -CN1_PACING_GC_REQUEST_SPINS;
     while(spins < CN1_PACING_MAX_WAIT_SPINS &&
           barrenCycles < CN1_PACING_BARREN_CYCLES &&
           get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
@@ -11104,15 +11184,32 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         // parked thread allocates nothing, so isHighFrequencyGC() goes false and the
         // collector drops to its 30s idle wait -- and we would then sit out the whole
         // budget waiting for reclamation nobody was doing.
-        if((spins % CN1_PACING_GC_REQUEST_SPINS) == 0) {
+        if(spins - lastRequestSpin >= CN1_PACING_GC_REQUEST_SPINS) {
+            lastRequestSpin = spins;
             // NOT java_lang_System_gc__: this thread is parked, and that call enters a Java
             // monitor. See cn1RequestGcFromParkedThread.
             cn1RequestGcFromParkedThread();
         }
         atomic_store_explicit(&cn1PacingLastParkMs, (long long)cn1MonotonicMillis(),
                               memory_order_relaxed);
-        usleep((JAVA_INT)CN1_PACING_WAIT_SLEEP_US);
-        spins++;
+        // A VIRTUAL THREAD YIELDS ITS HOST INSTEAD OF SLEEPING ON IT. usleep here blocked
+        // the host pthread, so every other virtual thread on that host was stranded
+        // mid-run: the collector waited 250ms for each to reach a safepoint, force-stopped
+        // it, failed to capture its roots, and threw the whole sweep away. Under a 64MB
+        // budget a Flask server lost a sweep every second or so that way, so the waits
+        // here really were barren, and it served 200 requests a second where 128MB served
+        // 23,000. The volume park above yields for the same reason. Budget and epoch are
+        // still read at most once a millisecond, so a host with nothing else to run does
+        // not spend the wait in task_info.
+        if(!cn1VirtualThreadYieldIfVirtual()) {
+            usleep((JAVA_INT)CN1_PACING_WAIT_SLEEP_US);
+        }
+        long long nowMs = (long long)cn1MonotonicMillis();
+        if(nowMs == lastPollMs) {
+            continue;
+        }
+        lastPollMs = nowMs;
+        spins = (int)(nowMs - parkStartMs);
         long headroomNow = cn1ProcessHeadroom();
         if(headroomNow < 0) {
             break;                       // budget disappeared under us; nothing to honour
@@ -11133,12 +11230,32 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         int epochNow = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
         if(epochNow != lastEpoch) {
             lastEpoch = epochNow;
+            // A COLLECTION THAT REFILLED THE POOLS ENDS A PAGE WAIT. Freed slots land on
+            // pages the process already holds, so a cycle can reclaim plenty and still
+            // leave the footprint -- the only thing headroom measures -- where it was.
+            // Waiting on headroom alone then counted every such cycle barren, and the
+            // thread gave up and took a FRESH page: a Flask server under a 64MB budget
+            // grew to 77MB that way. A resident page of the class it wants (or an empty
+            // one) costs the footprint nothing, so the wait is over.
+            int ci = cn1PacingBibopClass;
+            if(ci >= 0 && (__atomic_load_n(&bibopPartialPool[ci], __ATOMIC_RELAXED) != 0
+                           || __atomic_load_n(&bibopFreePool, __ATOMIC_RELAXED) != 0)) {
+                admitted = JAVA_TRUE;
+                break;
+            }
             if(headroomNow > bestHeadroom + CN1_PACING_PROGRESS_EPSILON) {
                 bestHeadroom = headroomNow;
                 barrenCycles = 0;        // still returning memory; keep waiting
-            } else {
+                atomic_store_explicit(&cn1PacingBarrenMargin, 0, memory_order_relaxed);
+            } else if((long long)headroomNow > CN1_PACING_BARREN_MARGIN_MIN) {
                 barrenCycles++;          // a whole cycle bought nothing
             }
+            // else: THE BUDGET IS A HARD CAP. A barren wait used to give up and take a
+            // fresh page whatever the headroom, so a burst could run the process past its
+            // budget -- on iOS, past the point where the system kills it. With
+            // no more than the in-flight cushion left, the thread keeps waiting for a
+            // cycle to free something; the backstop (CN1_PACING_MAX_WAIT_SPINS) remains
+            // for a live set that really is larger than the budget.
         }
     }
     // Proceeding here rather than failing the allocation is deliberate: ParparVM has no
@@ -11152,9 +11269,21 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // thread's admission test for the window before the kernel counts it. Claiming only
     // on the success path would leave exactly the over-admission the claim exists to
     // prevent, in the case where memory is tightest.
+    atomic_fetch_sub_explicit(&cn1PacingBudgetWaiters, 1, memory_order_relaxed);
+    if(!admitted && barrenCycles >= CN1_PACING_BARREN_CYCLES) {
+        long headroomNow = cn1ProcessHeadroom();
+        if(headroomNow >= 0) {
+            long long half = (long long)headroomNow / 2;
+            if(half < CN1_PACING_BARREN_MARGIN_MIN) {
+                half = CN1_PACING_BARREN_MARGIN_MIN;
+            }
+            atomic_store_explicit(&cn1PacingBarrenMargin, half, memory_order_relaxed);
+            atomic_store_explicit(&cn1PacingBarrenVerdictMs, (long long)cn1MonotonicMillis(),
+                                  memory_order_relaxed);
+        }
+    }
     if(!admitted && pendingBytes > 0) {
-        atomic_fetch_add_explicit(&cn1PacingClaimed, pendingBytes, memory_order_relaxed);
-        cn1MyPacingClaim += pendingBytes;
+        cn1PacingAddClaim(pendingBytes);
     }
     // Honour a stop-the-world before resuming, exactly like every other park here: the
     // loop above can exit while a mark is still running and the collector believes this
@@ -11163,13 +11292,13 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     CN1_STALL_ADD(__stallBudget, CN1_STALL_PACING_BUDGET, threadStateData);
 }
 
-static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
+static int cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE, int ci) {
     // LEVER A: flush this thread's plain-add byte accumulator into the global atomic
     // (once per page-acquire). No-op only with -DCN1_DISABLE_DEATOMIC_BYTES.
     CN1_BIBOP_FLUSH_BYTES(threadStateData);
     cn1BibopUpdateThreadPolicy(threadStateData);
     if(constantPoolObjects == 0) {
-        return;
+        return 0;
     }
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
     // Without conservative roots, a thread inside a native-allocation bracket
@@ -11180,7 +11309,7 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // native (e.g. StringBuilder.toString): the GC thread then slept its idle
     // wait while dead pages accumulated into the GB range.
     if(threadStateData->nativeAllocationMode) {
-        return;
+        return 0;
     }
 #endif
     // GC SAFEPOINT (once per page-acquire): a thread allocating ONLY small BiBOP
@@ -11236,9 +11365,28 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
         }
     }
 #ifndef CN1_BIBOP_NO_PACING
-    // 0 pending: a BiBOP thread dirties at most one CN1_BIBOP_PAGE_SIZE page before its
-    // next page-acquire check, which the interval reservation already covers.
-    cn1PacingPark(threadStateData, CN1_PACE_BIBOP, 0);
+    // ONLY A PAGE THAT CAN RAISE THE FOOTPRINT WAITS ON THE BUDGET. Without a budget
+    // this is the volume pacing it always was, on every page-acquire. With one, a size
+    // class that has a partial page skips the wait: that page is resident, so refilling
+    // it costs the process nothing. Pacing those too made a Flask server under a 64MB
+    // budget wait out two barren collections for every page it took -- 200 requests a
+    // second where 128MB served 23,000. The pool is read without the lock, so returning
+    // 1 means only "looked resident"; cn1BibopAcquirePage confirms it.
+    // ONE PAGE PENDING, NOT ZERO. The page is admitted while still untouched, so the
+    // footprint does not show it yet, and a thread owns a page per size class and fills
+    // them over many checks -- eight request threads held 15MB of admitted, not yet
+    // counted pages, and a 64MB process peaked at 77MB. The claim covers that window
+    // until the next collection boundary. (Without a budget pendingBytes is unused.)
+    if(cn1ProcessHeadroom() < 0
+       || __atomic_load_n(&bibopPartialPool[ci], __ATOMIC_RELAXED) == 0) {
+        cn1PacingBibopClass = ci;
+        cn1PacingPark(threadStateData, CN1_PACE_BIBOP, CN1_BIBOP_PAGE_SIZE);
+        cn1PacingBibopClass = -1;
+        return 0;
+    }
+    return 1;
+#else
+    return 0;
 #endif
 }
 
@@ -11400,7 +11548,7 @@ static inline void cn1BibopOwnPage(CN1BibopPage* np) {
 #endif
 }
 
-static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
+static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci, int mayPace) {
     pthread_mutex_lock(&bibopMutex);
     CN1BibopPage* old = CN1_BIBOP_CUR(threadStateData)[ci];
     if(old != 0) {
@@ -11417,6 +11565,23 @@ static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
         CN1_BIBOP_CUR(threadStateData)[ci] = 0;
     }
     CN1BibopPage* np = bibopPartialPool[ci];
+#ifndef CN1_BIBOP_NO_PACING
+    // cn1BibopMaybeGc skipped the budget wait because this class had a partial page,
+    // but another thread may have taken it since. If neither a partial page nor an
+    // empty resident one (the free pool; released pages are in bibopReleasedPool) is
+    // left, the page about to be handed out adds to the footprint, so wait now --
+    // otherwise the skip would turn into an unpaced fresh page. mayPace is never set
+    // without a budget.
+    if(np == 0 && mayPace && bibopFreePool == 0) {
+        pthread_mutex_unlock(&bibopMutex);
+        cn1PacingBibopClass = ci;
+        cn1PacingPark(threadStateData, CN1_PACE_BIBOP, CN1_BIBOP_PAGE_SIZE);
+        cn1PacingBibopClass = -1;
+        mayPace = 0;
+        pthread_mutex_lock(&bibopMutex);
+        np = bibopPartialPool[ci];
+    }
+#endif
     if(np != 0) {
         bibopPartialPool[ci] = np->nextPool;
     } else if(bibopFreePool != 0) {
@@ -12262,8 +12427,8 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
         if(p != 0) {
             cn1BibopAccountBump(threadStateData, p);
         }
-        cn1BibopMaybeGc(threadStateData);
-        p = cn1BibopAcquirePage(threadStateData, ci);
+        int mayPace = cn1BibopMaybeGc(threadStateData, ci);
+        p = cn1BibopAcquirePage(threadStateData, ci, mayPace);
         if(p == 0) {
             return 0; // out of pages -> legacy heap path
         }
