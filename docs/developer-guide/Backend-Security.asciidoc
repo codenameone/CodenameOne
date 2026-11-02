@@ -1630,8 +1630,7 @@ of all of them. The per-table setting wins:
 
 [source,properties]
 ----
-cn1.security.table-prefix=auth_
-cn1.security.table.cn1_users=app_users
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-tables,indent=0]
 ----
 
 A name must be letters, digits and `_`, at most 48 characters, and must not
