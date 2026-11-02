@@ -112,6 +112,11 @@ architecture from either host.
 and folding identical functions (`/OPT:ICF`). Set `true` to keep debug symbols (a
 `.pdb` next to the exe) so a native crash address can be symbolized while you are
 developing. Optimizations stay on in either case.
+
+|windows.xbox
+|Experimental. `true`/`false` (default `false`). Builds a UWP app for an Xbox in Developer Mode
+instead of a desktop `.exe`, packaged as an `.msix`. See
+<<xbox-developer-mode>>. Can't be combined with `windows.msix`.
 |===
 
 The full cross-platform build-hints reference is in the
@@ -176,6 +181,57 @@ before the cutoff.
 NOTE: `osslsigncode` must be on the build host's `PATH` (or set `CN1_OSSLSIGNCODE`
 to its location). If signing is requested but the certificate or tool is missing,
 the build fails with a clear message rather than shipping an unsigned exe by surprise.
+
+[[xbox-developer-mode]]
+=== Xbox in Developer Mode
+
+WARNING: This target is *experimental*. It's a first step toward gaming consoles
+(see <<gaming-consoles>>), and its build hint, behaviour and packaging can change.
+Continuous integration checks that the package installs and starts on Windows;
+it hasn't been verified on a console.
+
+An Xbox console switched to Developer Mode runs apps you sideload onto it, with no
+store submission and no publisher program. The console accepts UWP apps only, so
+`windows.xbox=true` builds the same native port as a UWP app:
+
+* The app runs inside the Windows app container on a `CoreWindow`, rendering
+through Direct2D into a Direct3D swap chain. It still runs on a Windows desktop,
+which is the quickest place to try a build.
+* The controller drives the UI. The D-pad and left stick move focus, *A* fires,
+and *B* is the back key, so `Display.getGameAction()` and the back command work
+without code for the controller.
+* `Display.getDisplaySafeArea()` reports the region the console keeps clear of TV
+overscan; lay out important content inside it.
+* The result is `<MainClass>.msix`, signed. Without a signing certificate the build
+creates a self-signed development certificate whose subject is the package
+publisher, and writes it beside the package as `<MainClass>-dev.cer`. Set
+`windows.msix.publisher` and `windows.msix.pfx` to sign with your own.
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/working-with-windows.properties[tag=working-with-windows-properties-002,indent=0]
+----
+
+Features that need a desktop report unsupported in this build: secondary windows,
+menus, the tray, native widgets and text editors, file dialogs, the clipboard,
+printing, the camera, audio recording and the share sheet. Files live in the app's
+local folder, which is the only file system root.
+
+==== Installing on the console
+
+. On the console, install the *Dev Home* app and switch to Developer Mode as
+Microsoft describes, then turn on *Remote Access* (Device Portal) in Dev Home.
+. Open the Device Portal address Dev Home shows (`https://<console address>:11443`)
+in a browser on the same network.
+. Under *Home*, select *Add* and pick the `.msix`. When asked for a certificate,
+pick the `.cer` that came with it.
+. The app appears in Dev Home's list and among the console's games and apps; launch it from
+either.
+
+To try the package on a Windows desktop first, trust the certificate (import the
+`.cer` into *Local Machine* > *Trusted People*), then install the package with
+`Add-AppxPackage <MainClass>.msix` in PowerShell, with Developer Mode enabled in
+Windows settings.
 
 === Native Windows vs. the desktop (JVM) app vs. the jar
 

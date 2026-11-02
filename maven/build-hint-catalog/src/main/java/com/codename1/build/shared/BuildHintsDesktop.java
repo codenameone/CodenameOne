@@ -437,6 +437,19 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .platform("windows"));
 
+        h.add(new Hint("windows.xbox")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("windows")
+                .doc("Native Windows port only, experimental. true/false (defaults to false). Builds a UWP app for Xbox "
+                        + "Developer Mode instead of a desktop `.exe`: the app runs in the app container on a "
+                        + "CoreWindow, the gamepad drives navigation, and the result is an `.msix` to install "
+                        + "through the console's Device Portal. Without a signing certificate a self-signed "
+                        + "development one is generated and shipped beside the package as `<main class>-dev.cer`. "
+                        + "Desktop-only features (secondary windows, menus, native widgets, file dialogs, "
+                        + "printing, the camera) report unsupported. Cannot be combined with `windows.msix`."));
+
         h.add(new Hint("windows.sdkRoot")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)

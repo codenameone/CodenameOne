@@ -1,0 +1,9 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::backend-beans-library-dependency[]
+<dependency>
+  <groupId>com.example</groupId>
+  <artifactId>notelib-backend</artifactId>
+  <version>1.0</version>
+</dependency>
+// end::backend-beans-library-dependency[]
