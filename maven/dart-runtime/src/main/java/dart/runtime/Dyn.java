@@ -723,6 +723,19 @@ public final class Dyn {
         if (a == null) {
             a = NONE;
         }
+        if (f instanceof Signed && ((Signed) f).$named() == null && !((Signed) f).$generic()) {
+            // A dynamic call checks each argument against the closure's own parameter
+            // type, as Dart does: `(f as dynamic)('s')` on an `(int x) => ..` is a
+            // TypeError, not a ClassCastException from inside the body.
+            TypeWitness[] sig = ((Signed) f).$sig();
+            for (int i = 0; sig != null && i < a.length && i + 1 < sig.length; i++) {
+                TypeWitness pw = sig[i + 1];
+                if (pw != null && !pw.test(a[i])) {
+                    throw new dart.core.TypeError("type '" + DartRuntime.typeName(a[i])
+                            + "' is not a subtype of the parameter type of this closure");
+                }
+            }
+        }
         switch (a.length) {
             case 0:
                 if (f instanceof Funcs.Func0) {

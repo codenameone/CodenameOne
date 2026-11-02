@@ -306,6 +306,93 @@ public final class TypeWitness {
         return topReturn || ret == null || sig[0] == null || isSubtype(sig[0], ret);
     }
 
+    /// Dart's checked cast of a value to a non-generic function type (`dyn as void
+    /// Function(int)`, and the implicit downcast a write of a dynamic value into a
+    /// function-typed field, local or argument is). The test is {@link #isFunction}, so a
+    /// signed closure is judged by its reified signature -- parameters contravariant, the
+    /// return covariant -- and an unsigned Java lambda by its functional interface. A value
+    /// that passes is handed over in the slot's Java shape {@code target}: a `(num x) {}`
+    /// closure is held as a Func1 but a `void Function(int)` slot is a VoidFunc1, so it is
+    /// wrapped to call through {@link Dyn#invoke}. A failure is a TypeError.
+    public static Object asFunction(Object f, Class<?> target, boolean nullable, String dartType,
+            Class<?> valueSam, Class<?> voidSam, boolean topReturn, TypeWitness ret, int required,
+            String[] named, TypeWitness... params) {
+        if (f == null) {
+            if (nullable) {
+                return null;
+            }
+        } else if (isFunction(f, valueSam, voidSam, topReturn, ret, required, named, params)) {
+            return target.isInstance(f) ? f : adaptFunction(f, target);
+        }
+        throw new dart.core.TypeError("type '" + DartRuntime.typeName(f) + "' is not a subtype of type '"
+                + dartType + "' in type cast");
+    }
+
+    /// An argument of a generic function whose type variable has a self-referential bound
+    /// (`T extends Comparable<T>`), entered instantiated at {@code w}: the instantiation
+    /// itself must satisfy the bound, which the emitter decided from the type model as the
+    /// classes in {@code satisfying} (num is a Comparable<num>; int, a Comparable<num>, is
+    /// no Comparable<int>). Then {@code v} is tested against {@code w}. Either failure is a
+    /// TypeError.
+    public static <T> T checkedSelfBound(T v, TypeWitness w, String bound, Class<?>... satisfying) {
+        boolean ok = false;
+        for (Class<?> c : satisfying) {
+            if (c == w.type()) {
+                ok = true;
+                break;
+            }
+        }
+        if (!ok) {
+            throw new dart.core.TypeError("type '" + w + "' is not a subtype of type '" + bound
+                    + "' of the type variable's bound");
+        }
+        return DartRuntime.checkedArg(v, w);
+    }
+
+    private static Object adaptFunction(final Object f, Class<?> target) {
+        if (target == Funcs.Func0.class) {
+            return (Funcs.Func0<Object>) () -> Dyn.invoke(f);
+        }
+        if (target == Funcs.Func1.class) {
+            return (Funcs.Func1<Object, Object>) (a) -> Dyn.invoke(f, a);
+        }
+        if (target == Funcs.Func2.class) {
+            return (Funcs.Func2<Object, Object, Object>) (a, b) -> Dyn.invoke(f, a, b);
+        }
+        if (target == Funcs.Func3.class) {
+            return (Funcs.Func3<Object, Object, Object, Object>) (a, b, c) -> Dyn.invoke(f, a, b, c);
+        }
+        if (target == Funcs.Func4.class) {
+            return (Funcs.Func4<Object, Object, Object, Object, Object>) (a, b, c, d) -> Dyn.invoke(f, a, b, c, d);
+        }
+        if (target == Funcs.Func5.class) {
+            return (Funcs.Func5<Object, Object, Object, Object, Object, Object>) (a, b, c, d, e) ->
+                    Dyn.invoke(f, a, b, c, d, e);
+        }
+        if (target == Funcs.VoidFunc0.class) {
+            return (Funcs.VoidFunc0) () -> Dyn.invoke(f);
+        }
+        if (target == Funcs.VoidFunc1.class) {
+            return (Funcs.VoidFunc1<Object>) (a) -> Dyn.invoke(f, a);
+        }
+        if (target == Funcs.VoidFunc2.class) {
+            return (Funcs.VoidFunc2<Object, Object>) (a, b) -> Dyn.invoke(f, a, b);
+        }
+        if (target == Funcs.VoidFunc3.class) {
+            return (Funcs.VoidFunc3<Object, Object, Object>) (a, b, c) -> Dyn.invoke(f, a, b, c);
+        }
+        if (target == Funcs.VoidFunc4.class) {
+            return (Funcs.VoidFunc4<Object, Object, Object, Object>) (a, b, c, d) -> Dyn.invoke(f, a, b, c, d);
+        }
+        if (target == Funcs.VoidFunc5.class) {
+            return (Funcs.VoidFunc5<Object, Object, Object, Object, Object>) (a, b, c, d, e) ->
+                    Dyn.invoke(f, a, b, c, d, e);
+        }
+        // A slot typed by an interface outside the canonical shapes: the value passed the
+        // Dart test, so it is handed over as it is.
+        return f;
+    }
+
     /// `f is R Function<T0..Tn>(P..)`, a generic function type: only a generic closure with
     /// as many type parameters and the same positional arity is one. A slot of the target
     /// that is its i-th type parameter ({@code slotVars}: return first, then each

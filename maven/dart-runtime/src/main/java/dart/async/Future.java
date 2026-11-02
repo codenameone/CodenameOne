@@ -201,6 +201,33 @@ public class Future<T> {
         });
     }
 
+    /**
+     * Dart's unnamed {@code Future(computation)} constructor: the computation runs
+     * in a later timer event, as {@code Future.delayed(Duration.zero, computation)}
+     * does. A computation that returns a future makes this one follow it, and one
+     * that throws completes it with that error.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Future<T> create(final Funcs.Func0<? extends Object> computation) {
+        return (Future<T>) (Future<?>) delayed(dart.core.Duration.zero, new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                return computation.call();
+            }
+        });
+    }
+
+    /** {@link #create(Funcs.Func0)} for a computation with a statement body. */
+    public static <T> Future<T> create(final Funcs.VoidFunc0 computation) {
+        return create(new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                computation.call();
+                return null;
+            }
+        });
+    }
+
     public static Future<Object> delayed(dart.core.Duration duration, final Funcs.Func0<Object> computation) {
         final Future<Object> f = new Future<Object>();
         // Dart treats a negative delay as zero. Passed through, it reached
@@ -255,6 +282,21 @@ public class Future<T> {
      * {@code Future.wait(fs).catchError(...)} never got a future to install
      * its handler on.
      */
+    /**
+     * The result of {@link #wait} with its list reified at the element type Dart
+     * infers from the inputs ({@code Future.wait(<Future<int>>[..])} completes with a
+     * {@code List<int>}); the values themselves are unchanged.
+     */
+    public static Future<DartList<Object>> typedList(Future<DartList<Object>> f,
+            final dart.runtime.TypeWitness elem) {
+        return f.<DartList<Object>>then(new Funcs.Func1<DartList<Object>, Object>() {
+            @Override
+            public Object call(DartList<Object> l) {
+                return DartList.typed(l, elem);
+            }
+        });
+    }
+
     public static Future<DartList<Object>> wait(Iterable<?> futures) {
         return wait(futures, false, null);
     }
