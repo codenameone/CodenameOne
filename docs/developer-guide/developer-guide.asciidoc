@@ -170,6 +170,10 @@ include::Bastion-Users-Guide.asciidoc[]
 
 include::Bastion-Implementors-Guide.asciidoc[]
 
+include::Pulse-Users-Guide.asciidoc[]
+
+include::Pulse-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

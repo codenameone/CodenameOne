@@ -21,9 +21,9 @@ alone, and the library also has to appear in the workflow's trigger paths.
 Each of those rules exists because dropping it lets something claim coverage
 it does not have: a matrix over "lib:" in an unrelated packaging job, a
 packaging job sitting in the same file as a real native check, or a library
-the workflow never fires for. The trigger paths are read per trigger, since a
-library listed under push but not pull_request is compiled only after it has
-already merged. Jobs and triggers are separated by indentation rather than
+the workflow never fires for. The library has to be in the pull_request paths,
+since anything later compiles it only after it has already merged, and the
+workflow has to run nightly on master, which replaces a push trigger. Jobs and triggers are separated by indentation rather than
 with a YAML parser, so this keeps running wherever python3 does.
 
 The Android half needs no registry: check-cn1lib-android-api.py enumerates
@@ -61,10 +61,15 @@ def libraries_with_ios_sources():
 
 
 JOB_START = re.compile(r'^  ([A-Za-z_][\w.\-]*):\s*$')
-# The triggers a change to a library has to run under. push alone would mean
-# the break is found after it merged; pull_request alone leaves master
-# unguarded against anything that lands another way.
-REQUIRED_TRIGGERS = ('pull_request', 'push')
+# A change to a library has to run the check on its pull request: anything
+# later means the break is found after it merged. Master is guarded by the
+# nightly schedule instead of a push trigger (nightly-watchdog.yml files an
+# issue when it fails), which also catches a break that reaches the library
+# through shared code no paths filter lists.
+REQUIRED_TRIGGERS = ('pull_request',)
+# The nightly's exact schedule (nightly-watchdog.yml reads the same one);
+# commented-out lines do not count.
+NIGHTLY = re.compile(r"^\s*-\s*cron:\s*['\"]11 0 \* \* \*['\"]", re.M)
 
 
 def jobs(text):
@@ -121,7 +126,7 @@ def triggers_for(text, lib):
     for trigger in REQUIRED_TRIGGERS:
         if entry not in indented_block(on_block, trigger + ':', 2):
             return False
-    return True
+    return bool(NIGHTLY.search(indented_block(on_block, 'schedule:', 2)))
 
 
 def compiles_cn1lib_natives(body):

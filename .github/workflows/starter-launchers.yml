@@ -1,8 +1,17 @@
 name: Starter launchers
 on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
-    paths: ['maven/cn1app-archetype/src/main/resources/archetype-resources/**', 'scripts/test-starter-launchers.py', 'scripts/sync-initializr-launchers.py', 'scripts/tests/**', 'scripts/initializr/common/src/main/**', 'maven/build-engine/src/main/resources/com/codename1/project/templates/gradle/**', '.github/workflows/starter-launchers.yml']
+    paths:
+      - 'scripts/test-starter-launchers.py'
+      - 'scripts/sync-initializr-launchers.py'
+      - '.github/workflows/starter-launchers.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '11 0 * * *'
+
 permissions:
   contents: read
 concurrency:
