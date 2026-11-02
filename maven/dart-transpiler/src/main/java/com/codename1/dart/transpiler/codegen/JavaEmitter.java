@@ -1502,11 +1502,22 @@ public final class JavaEmitter {
                 body.append("    private ");
             }
             boolean lazyInit = isLateLazyInstance(f, c);
-            if ((f.isFinal || f.isConst) && f.initializer != null && !lazyInit) {
+            if (!lazyInit && initializerNeedsClassWitness(f, c)) {
+                // Its value depends on a class type parameter's witness, which the
+                // constructor stores AFTER Java's field initializers run: it is assigned by
+                // $fieldInit$ (see emitWitnessFieldInits), called right after the store.
+                body.append(jt).append(' ').append(f.name).append(";\n");
+            } else if ((f.isFinal || f.isConst) && f.initializer != null && !lazyInit) {
                 body.append("final ");
             }
-            body.append(jt).append(' ').append(f.name);
-            if (lazyInit) {
+            if (!lazyInit && initializerNeedsClassWitness(f, c)) {
+                // declaration already written above
+            } else {
+                body.append(jt).append(' ').append(f.name);
+            }
+            if (!lazyInit && initializerNeedsClassWitness(f, c)) {
+                // assigned in $fieldInit$
+            } else if (lazyInit) {
                 ctx.pushWriter(3);
                 Out init = emitExpr(f.initializer, ft, ctx);
                 String lifted = ctx.popWriter();
@@ -1607,6 +1618,7 @@ public final class JavaEmitter {
         for (CtorDecl ct : c.ctors) {
             body.append(emitCtor(c, ct, ctx));
         }
+        body.append(emitWitnessFieldInits(c, ctx));
         if (implicitWitnessCtor) {
             // The implicit constructor, which takes (and passes on) the hidden witnesses.
             body.append("    public ").append(javaClassName(c)).append('(')
@@ -4191,6 +4203,9 @@ public final class JavaEmitter {
             sb.append("        ").append(javaClassName(c)).append(" $self = new ").append(javaClassName(c)).append("(($NamedCtor) null);\n");
             for (String tw : witnessParams(c)) {
                 sb.append("        $self.").append(witnessField(c, tw)).append(" = $tw$").append(tw).append(";\n");
+            }
+            if (hasWitnessFieldInits(c)) {
+                sb.append("        $self.").append(witnessFieldInitName(c)).append("();\n");
             }
             sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
             sb.append("        return $self;\n    }\n\n");
@@ -6869,7 +6884,15 @@ public final class JavaEmitter {
                     // body captures a distinct value per pass. The Java loop variable is
                     // reassigned by the update clause (not effectively final), so emit a
                     // per-iteration final alias and route body references through it.
-                    if (forVarDart$ != null && CaptureScan.readInLambda(f$.body, forVarDart$)) {
+                    String cell = null;
+                    if (forVarDart$ != null && CaptureScan.assignedInLambda(f$.body, forVarDart$)) {
+                        // A closure writes the variable: this pass gets its own mutable
+                        // cell, copied back for the update clause even when the body
+                        // continues, as Dart copies the per-iteration binding forward.
+                        cell = boxPerIterationLoopVar(forVarDart$, forVarType$, forVarJava$, ctx);
+                        ctx.writer().line("try {");
+                        ctx.indent(1);
+                    } else if (forVarDart$ != null && CaptureScan.readInLambda(f$.body, forVarDart$)) {
                         String alias = ctx.declareShadowSafe(forVarDart$, forVarType$);
                         ctx.writer().line("final " + javaType(forVarType$, false, ctx) + " " + alias
                                 + " = " + forVarJava$ + ";");
@@ -6877,6 +6900,12 @@ public final class JavaEmitter {
                     ctx.pushBreakTarget(null);
                     emitStatement(unwrapBlock(f$.body), ctx);
                     ctx.popBreakTarget();
+                    if (cell != null) {
+                        ctx.indent(-1);
+                        ctx.writer().line("} finally {");
+                        ctx.writer().line("    " + forVarJava$ + " = " + cell + ".v;");
+                        ctx.writer().line("}");
+                    }
                 }
             });
             ctx.popScope();
@@ -9179,7 +9208,7 @@ public final class JavaEmitter {
                 // e.g. `Future<void>.delayed(Duration(...), () { ... })`. Routed to the
                 // dart.async.Future statics; the element type witness is dropped (erased).
                 if (cc.type.name.equals("Future")) {
-                    Out future = emitFutureNamedCtor(cc, ctx);
+                    Out future = emitFutureNamedCtor(cc, expected, ctx);
                     if (future != null) {
                         return future;
                     }
@@ -10061,9 +10090,29 @@ public final class JavaEmitter {
         // body -- the choice pinnedHandler makes when it casts the closure.
         TypeRef samType = new TypeRef("Function");
         samType.funcParams = new ArrayList<TypeRef>();
+        // A positional parameter declared wider than the context's (`void Function(int) vf =
+        // (num n) => ..`) is held by a SAM of its own declared type, viewed as the context's
+        // through the raw SAM: Dart reifies the closure's own signature, so a dynamic call
+        // with a double reaches the body instead of failing the Java bridge's cast to Long.
+        boolean ownWider = false;
+        if (ctxSig != null && l.typeParams.isEmpty()) {
+            for (int i = 0; i < l.params.size(); i++) {
+                Param p = l.params.get(i);
+                TypeRef pt = p.type;
+                if (!p.named && pt != null && !pt.is("var") && ctxSig[i] != null
+                        && !javaType(pt, true, ctx).equals(javaType(ctxSig[i], true, ctx))
+                        && declaredWiderParam(ctxSig[i], pt) && pt.args.isEmpty()
+                        && pt.funcParams == null) {
+                    ownWider = true;
+                }
+            }
+        }
+        TypeRef ctxSamType = null;
         for (int i = 0; i < l.params.size(); i++) {
             TypeRef pt = l.params.get(i).type;
-            if (ctxSig != null) {
+            if (ownWider && pt != null && !pt.is("var")) {
+                samType.funcParams.add(pt);
+            } else if (ctxSig != null) {
                 samType.funcParams.add(ctxSig[i] != null ? ctxSig[i] : TypeRef.DYNAMIC);
             } else if (pt == null || pt.is("var")) {
                 samType.funcParams.add(TypeRef.DYNAMIC);
@@ -10142,10 +10191,29 @@ public final class JavaEmitter {
             }
             typeVars = tv.toString();
         }
+        if (ownWider) {
+            ctxSamType = new TypeRef("Function");
+            ctxSamType.funcParams = new ArrayList<TypeRef>();
+            for (int i = 0; i < l.params.size(); i++) {
+                ctxSamType.funcParams.add(ctxSig[i] != null ? ctxSig[i] : TypeRef.DYNAMIC);
+            }
+            ctxSamType.funcReturn = samType.funcReturn;
+            spellArgs = true;
+        }
         String[] signed = signWith(code, samType, sig.toString(), generic, spellArgs, required, named, typeVars,
                 ctx);
         if (signed == null) {
             return code;
+        }
+        if (ctxSamType != null) {
+            String ctxJt = functionSam(ctxSamType, ctx);
+            String ownJt = functionSam(samType, ctx);
+            if (ctxJt == null || ownJt == null || ownJt.indexOf('?') >= 0) {
+                return code;
+            }
+            int lt = ownJt.indexOf('<');
+            String raw = qualifiedFuncsSam(lt < 0 ? ownJt : ownJt.substring(0, lt));
+            return "((" + ctxJt + ") (" + raw + ") " + signed[1] + ")";
         }
         signedClosures.put(l, new String[] {code, signed[0], signed[1]});
         return signed[1];
@@ -12777,6 +12845,9 @@ public final class JavaEmitter {
         for (String n : own ? witnessParams(c) : java.util.Collections.<String>emptyList()) {
             w.line(self + "." + witnessField(c, n) + " = $tw$" + n + ";");
         }
+        if (own && hasWitnessFieldInits(c)) {
+            w.line(self + "." + witnessFieldInitName(c) + "();");
+        }
         if (parentToo) {
             ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
             if (sup != null && !witnessParams(sup).isEmpty()) {
@@ -12785,8 +12856,117 @@ public final class JavaEmitter {
                 for (int i = 0; i < sw.size(); i++) {
                     w.line(self + "." + witnessField(sup, sw.get(i)) + " = " + parts.get(i) + ";");
                 }
+                if (hasWitnessFieldInits(sup)) {
+                    w.line(self + "." + witnessFieldInitName(sup) + "();");
+                }
             }
         }
+    }
+
+    /// The method that runs a class's witness-dependent field initializers. Named per
+    /// class so a subclass's never overrides its superclass's.
+    private String witnessFieldInitName(ClassDecl c) {
+        return "$fieldInit$" + javaClassName(c);
+    }
+
+    private boolean hasWitnessFieldInits(ClassDecl c) {
+        for (FieldDecl f : c.fields) {
+            if (!f.isStatic && !isLateLazyInstance(f, c) && initializerNeedsClassWitness(f, c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether an instance field's initializer needs one of the class's type witnesses:
+    /// its declared type (the initializer's context type) or any type, type literal or
+    /// closure signature inside the initializer names a witnessed class type parameter.
+    /// Dart runs field initializers before the initializer list and the super call; they
+    /// cannot read `this`, so the witness is the only thing they can observe, and running
+    /// them right after the witness is stored is indistinguishable from Dart's order.
+    private boolean initializerNeedsClassWitness(FieldDecl f, ClassDecl c) {
+        if (f.isStatic || f.initializer == null) {
+            return false;
+        }
+        List<String> names = witnessParams(c);
+        if (names.isEmpty()) {
+            return false;
+        }
+        return mentionsTypeParams(f.type, names)
+                || astMentionsTypeParams(f.initializer, names, new java.util.IdentityHashMap<Object, Boolean>());
+    }
+
+    private static boolean astMentionsTypeParams(Object n, List<String> names,
+            java.util.IdentityHashMap<Object, Boolean> seen) {
+        if (n == null || seen.put(n, Boolean.TRUE) != null) {
+            return false;
+        }
+        if (n instanceof TypeRef) {
+            return mentionsTypeParams((TypeRef) n, names);
+        }
+        if (n instanceof java.util.Collection) {
+            for (Object o : (java.util.Collection<?>) n) {
+                if (astMentionsTypeParams(o, names, seen)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (n instanceof java.util.Map) {
+            return astMentionsTypeParams(((java.util.Map<?, ?>) n).values(), names, seen);
+        }
+        Class<?> k = n.getClass();
+        if (k.getDeclaringClass() != com.codename1.dart.transpiler.ast.Ast.class
+                || n instanceof ClassDecl || n instanceof com.codename1.dart.transpiler.ast.Ast.EnumDecl
+                || n instanceof FieldDecl || n instanceof MethodDecl || n instanceof CtorDecl
+                || n instanceof com.codename1.dart.transpiler.ast.Ast.FunctionDecl
+                || n instanceof com.codename1.dart.transpiler.ast.Ast.TypedefDecl
+                || n instanceof com.codename1.dart.transpiler.ast.Ast.Library) {
+            return false;
+        }
+        if (n instanceof com.codename1.dart.transpiler.ast.Ast.Ident
+                && names.contains(((com.codename1.dart.transpiler.ast.Ast.Ident) n).name)) {
+            return true;
+        }
+        for (Class<?> cl = k; cl != null && cl != Object.class; cl = cl.getSuperclass()) {
+            for (java.lang.reflect.Field fld : cl.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(fld.getModifiers()) || fld.getType().isPrimitive()
+                        || fld.getType() == String.class) {
+                    continue;
+                }
+                try {
+                    if (astMentionsTypeParams(fld.get(n), names, seen)) {
+                        return true;
+                    }
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The `$fieldInit$` method of a class: its witness-dependent field initializers, in
+    /// declaration order.
+    private String emitWitnessFieldInits(ClassDecl c, Ctx ctx) {
+        if (!hasWitnessFieldInits(c)) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("    protected final void ").append(witnessFieldInitName(c)).append("() {\n");
+        for (FieldDecl f : c.fields) {
+            if (f.isStatic || isLateLazyInstance(f, c) || !initializerNeedsClassWitness(f, c)) {
+                continue;
+            }
+            TypeRef ft = fieldType(f, ctx);
+            ctx.pushWriter(2);
+            Out init = emitExpr(f.initializer, ft, ctx);
+            String lifted = ctx.popWriter();
+            sb.append(lifted);
+            sb.append("        this.").append(f.name).append(" = ").append(coerce(init, ft, ctx)).append(";\n");
+        }
+        sb.append("    }\n\n");
+        return sb.toString();
     }
 
     /**
@@ -13603,8 +13783,9 @@ public final class JavaEmitter {
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
-                        aliasCapturedLoopVar(f.init, f.body, ctx);
+                        String cell = aliasCapturedLoopVar(f.init, f.body, ctx);
                         emitListElementInto(list$, f.body, elem$, ctx);
+                        copyBackLoopVarCell(f.init, cell, ctx);
                     }
                 });
             }
@@ -13618,18 +13799,45 @@ public final class JavaEmitter {
     /// A collection-for's C-style loop variable read by a closure in the element: Dart
     /// binds it fresh each iteration, and the Java one is reassigned by the update, so
     /// the element reads a per-iteration final alias (as a for statement does).
-    private void aliasCapturedLoopVar(Stmt init, Expr body, Ctx ctx) {
+    /// When a closure in the element also WRITES the variable, the pass gets a mutable
+    /// cell instead (Dart's per-iteration binding), and the name of that cell is returned
+    /// so the caller writes the returned copy-back statement after the element; null otherwise.
+    private String aliasCapturedLoopVar(Stmt init, Expr body, Ctx ctx) {
         if (!(init instanceof VarDeclStmt)) {
-            return;
+            return null;
         }
         String name = ((VarDeclStmt) init).name;
-        if (!CaptureScan.readInLambda(body, name)) {
-            return;
-        }
         TypeRef t = ctx.lookup(name);
         String java = ctx.javaNameOf(name);
+        if (CaptureScan.assignedInLambda(body, name)) {
+            return java + " = " + boxPerIterationLoopVar(name, t, java, ctx) + ".v;";
+        }
+        if (!CaptureScan.readInLambda(body, name)) {
+            return null;
+        }
         String alias = ctx.declareShadowSafe(name, t);
         ctx.writer().line("final " + javaType(t, false, ctx) + " " + alias + " = " + java + ";");
+        return null;
+    }
+
+    /// Copies a collection-for pass's loop-variable cell back into the Java loop variable
+    /// the update clause advances (the statement aliasCapturedLoopVar answered). An
+    /// element has no continue, so a plain line suffices.
+    private void copyBackLoopVarCell(Stmt init, String copyBack, Ctx ctx) {
+        if (copyBack != null) {
+            ctx.writer().line(copyBack);
+        }
+    }
+
+    /// Declares this pass's mutable cell for a C-style loop variable a closure writes,
+    /// initialized from the Java loop variable, and routes the body's references to it.
+    private String boxPerIterationLoopVar(String name, TypeRef t, String java, Ctx ctx) {
+        String holder = refHolder(t, ctx);
+        String cell = ctx.declareShadowSafe(name, t);
+        ctx.markBoxed(cell);
+        ctx.writer().line("final " + holder + " " + cell + " = new " + holder.split("<")[0]
+                + (holder.startsWith("Ref<") ? "<>" : "") + "(" + java + ");");
+        return cell;
     }
 
     private Out emitSetLit(SetLit s, TypeRef expected, Ctx ctx) {
@@ -13770,8 +13978,9 @@ public final class JavaEmitter {
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
-                        aliasCapturedLoopVar(f.init, f.body, ctx);
+                        String cell = aliasCapturedLoopVar(f.init, f.body, ctx);
                         emitSetElementInto(set$, f.body, elem$, ctx);
+                        copyBackLoopVarCell(f.init, cell, ctx);
                     }
                 });
             }
@@ -14019,8 +14228,9 @@ public final class JavaEmitter {
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
-                        aliasCapturedLoopVar(f.init, f.body, ctx);
+                        String cell = aliasCapturedLoopVar(f.init, f.body, ctx);
                         emitMapElementInto(map$, f.body, kt$, vt$, ctx);
+                        copyBackLoopVarCell(f.init, cell, ctx);
                     }
                 });
             }
@@ -19615,7 +19825,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // List/Set is no DartIterable, so the arrow body returns its live view. The
                 // element is left to the SAM when the slot names a type variable this code
                 // cannot spell (the callee's own T).
-                o = new Out(paren(o.code) + ".asIterable()", lambdaReturn);
+                // Typed by the body's own element (`[e, e]` is an Iterable<int> even in an
+                // Iterable<R> slot), so a caller reading the closure's static return type
+                // (Stream.expand's R) sees it.
+                o = new Out(paren(o.code) + ".asIterable()", o.type.args.size() == 1
+                        ? TypeRef.of("Iterable", o.type.arg(0)) : lambdaReturn);
             }
             String lifted = ctx.popWriter();
             exprType = o.type;
@@ -20101,10 +20315,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (target.type == null || target.type.is("dynamic") || target.type.is("Object")) {
                 // `(f)()` on a dynamic value: no functional interface to call through.
-                ctx.importClass("dart.runtime.Dyn");
-                String a = plainArgs(c.args, ctx);
-                return new Out("Dyn.invoke(" + target.code + (a.isEmpty() ? "" : ", " + a) + ")",
-                        TypeRef.DYNAMIC);
+                return new Out(dynInvokeCode(target.code, c.args, ctx), TypeRef.DYNAMIC);
             }
             return new Out(fnCall(callable(target), target.type, c.args, ctx), TypeRef.DYNAMIC);
         }
@@ -20295,7 +20506,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 callType = inst.type;
                 ret = withInnerGenericClosure(ret, local.genericClosure);
             }
-            if (isDynamicType(local) && local.funcParams == null && c.args.named.isEmpty()) {
+            if (isDynamicType(local) && local.funcParams == null) {
                 // `d<String>('z')`, `d(true)` on a dynamic local: Dart's dynamic invocation,
                 // the arity resolved at run time. Written type arguments instantiate a
                 // generic closure (SignedFns.instantiate); without them it runs with the
@@ -20309,9 +20520,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     recv = "dart.runtime.SignedFns.instantiate(" + recv + ", new dart.runtime.TypeWitness[] {"
                             + String.join(", ", ws) + "})";
                 }
-                ctx.importClass("dart.runtime.Dyn");
-                String da = plainArgs(c.args, ctx);
-                return new Out("Dyn.invoke(" + recv + (da.isEmpty() ? "" : ", " + da) + ")", TypeRef.DYNAMIC);
+                return new Out(dynInvokeCode(recv, c.args, ctx), TypeRef.DYNAMIC);
             }
             return new Out(fnCall(recv, callType, c.args, ctx), ret);
         }
@@ -20599,9 +20808,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             callee.col = c.col;
             Out v = emitIdent(callee, null, ctx);
             if (v.type == null || v.type.is("dynamic") || v.type.is("Object")) {
-                ctx.importClass("dart.runtime.Dyn");
-                String a = plainArgs(c.args, ctx);
-                return new Out("Dyn.invoke(" + v.code + (a.isEmpty() ? "" : ", " + a) + ")", TypeRef.DYNAMIC);
+                return new Out(dynInvokeCode(v.code, c.args, ctx), TypeRef.DYNAMIC);
             }
             return new Out(fnCall(callable(v), v.type, c.args, ctx),
                     isFunctionValued(v.type) ? funcResultType(v.type) : TypeRef.DYNAMIC);
@@ -20699,14 +20906,29 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
 
     private Out emitMethodCallOn(Out target, Call c, Ctx ctx) {
         Out out = emitMethodCallOnTarget(target, c, ctx);
-        if (out == null || out.fromError || out.shortGuard != null || target == null || target.type == null || !c.name.equals("map")
+        if (out == null || out.fromError || out.shortGuard != null || target == null || target.type == null || !(c.name.equals("map") || c.name.equals("expand"))
                 || c.args.positional.size() != 1 || asyncReifiedClass(target.type, ctx) == null
                 || !target.type.is("Stream") || out.type == null || !out.type.is("Stream")) {
             return out;
         }
-        // Stream.map<R>: the mapped stream records R, the explicit type argument or else
-        // the closure's static return type, which the call's own type carries.
+        // Stream.map<R> / Stream.expand<R>: the derived stream records R, the explicit type
+        // argument or else the one the closure's static return type (R, or Iterable<R> for
+        // expand) infers, which the call's own type carries.
         TypeRef r = c.typeArgs.size() == 1 ? c.typeArgs.get(0) : out.type.args.size() == 1 ? out.type.arg(0) : null;
+        if (c.name.equals("expand") && c.typeArgs.isEmpty() && c.args.positional.get(0) instanceof Lambda) {
+            // The stub's Iterable<R> parameter does not infer R from the closure (it binds
+            // R to the Iterable itself); the closure's static return type, an Iterable<R>
+            // (the closure is the last lambda emitted for this call), says what R is.
+            TypeRef cr = lastLambdaExprType;
+            if (cr == null && lastLambdaReturns != null && lastLambdaReturns.size() == 1) {
+                cr = lastLambdaReturns.get(0);
+            }
+            if (cr != null && ITERABLE_LIKE.contains(cr.name) && cr.args.size() == 1
+                    && !isTypeVariable(cr.arg(0), ctx)) {
+                r = cr.arg(0);
+                out = new Out(out.code, TypeRef.of("Stream", r), out.fromError);
+            }
+        }
         String w = r == null || isDynamicType(r) ? null : reifiedArgWitness(r, ctx);
         return w == null ? out : new Out("dart.async.Stream.reify(" + out.code + ", " + w + ")", out.type);
     }
@@ -22865,7 +23087,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return new Out(inferred ? reifyWith(made, vt, ctx) : made, TypeRef.of("Future", vt));
     }
 
-    private Out emitFutureNamedCtor(CtorCall cc, Ctx ctx) {
+    private Out emitFutureNamedCtor(CtorCall cc, TypeRef expected, Ctx ctx) {
         ctx.importClass("dart.async.Future");
         String ctor = cc.ctorName;
         List<Expr> pos = cc.args.positional;
@@ -22887,8 +23109,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     TypeRef.of("Future", v.type));
         }
         if (ctor.equals("error")) {
-            return new Out("Future.error(" + emitExpr(pos.get(0), null, ctx).code
-                    + (pos.size() > 1 ? ", " + emitExpr(pos.get(1), null, ctx).code : "") + ")",
+            // Future<T>.error(e): T is the written type argument, else the context's
+            // Future<T>; recorded, so `is Future<T>` holds and a catchError handler's
+            // recovery value is checked against T, as Dart checks it.
+            TypeRef et = !cc.type.args.isEmpty() ? cc.type.arg(0)
+                    : expected != null && expected.is("Future") && expected.args.size() == 1 ? expected.arg(0) : null;
+            if (et != null && (et.is("void") || et.is("Null"))) {
+                et = null;
+            }
+            return new Out(reifyWith("Future.error(" + emitExpr(pos.get(0), null, ctx).code
+                    + (pos.size() > 1 ? ", " + emitExpr(pos.get(1), null, ctx).code : "") + ")", et, ctx),
                     TypeRef.of("Future", TypeRef.DYNAMIC));
         }
         return null;
@@ -25903,6 +26133,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return new TypeRef("Object");
     }
 
+    /// Whether a closure parameter declared {@code declared} is strictly wider than the
+    /// context's {@code ctxParam}: num over int or double, Object over anything, or a
+    /// program supertype.
+    private boolean declaredWiderParam(TypeRef ctxParam, TypeRef declared) {
+        if (ctxParam.name == null || declared.name == null || ctxParam.name.equals(declared.name)) {
+            return false;
+        }
+        if (declared.is("num")) {
+            return ctxParam.is("int") || ctxParam.is("double");
+        }
+        return declared.is("Object") || isSubtypeName(ctxParam.name, declared.name);
+    }
+
     private boolean isSubtypeName(String sub, String sup) {
         if (sub == null || sup == null) {
             return false;
@@ -26935,6 +27178,31 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // an Object slot (a stub's `{Object? reviver}`) still needs a functional
         // interface for the closure: Function gives it the SAM of its arity
         return t != null && isFunctionValued(t) ? t : new TypeRef("Function");
+    }
+
+    /// A dynamic invocation of a function value: `Dyn.invoke(f, positional..)`, or, with
+    /// named arguments, `Dyn.invokeNamed` with the names and values beside the positional
+    /// ones, which the runtime matches against the closure's reified named parameters.
+    private String dynInvokeCode(String recv, Args args, Ctx ctx) {
+        ctx.importClass("dart.runtime.Dyn");
+        String a = plainArgs(args, ctx);
+        if (args.named.isEmpty()) {
+            return "Dyn.invoke(" + recv + (a.isEmpty() ? "" : ", " + a) + ")";
+        }
+        StringBuilder names = new StringBuilder();
+        StringBuilder vals = new StringBuilder();
+        for (int i = 0; i < args.named.size(); i++) {
+            NamedArg na = args.named.get(i);
+            if (i > 0) {
+                names.append(", ");
+                vals.append(", ");
+            }
+            names.append(quote(na.name));
+            vals.append(na.value instanceof Lambda ? dynamicCallClosureArg((Lambda) na.value, ctx)
+                    : emitExpr(na.value, null, ctx).code);
+        }
+        return "Dyn.invokeNamed(" + recv + ", new Object[] {" + a + "}, new String[] {" + names
+                + "}, new Object[] {" + vals + "})";
     }
 
     private String plainArgs(Args args, Ctx ctx) {

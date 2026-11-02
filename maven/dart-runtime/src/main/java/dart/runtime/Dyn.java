@@ -717,6 +717,62 @@ public final class Dyn {
         return invoke(f, a);
     }
 
+    /// A dynamic call with named arguments (`dynamic f = ({required int a}) => ..;
+    /// f(a: 1)`). A closure with named parameters is a positional SAM whose named
+    /// parameters follow the positional ones in the order its signature names them
+    /// ($named), so each argument is placed by name, an omitted one passed as the
+    /// omitted-argument marker for the adapter's default, and each checked against its
+    /// reified parameter type: a mismatch is a TypeError and an unknown name or a
+    /// missing required one a NoSuchMethodError, as in Dart.
+    public static Object invokeNamed(Object f, Object[] positional, String[] names, Object[] values) {
+        if (!(f instanceof Signed) || ((Signed) f).$named() == null || ((Signed) f).$generic()) {
+            throw noSuch(f, "call");
+        }
+        Signed sf = (Signed) f;
+        String[] declared = sf.$named();
+        TypeWitness[] sig = sf.$sig();
+        int posCount = sig.length - 1 - declared.length;
+        int req = sf.$required();
+        if (positional.length > posCount || positional.length < (req >= 0 ? Math.min(req, posCount) : posCount)) {
+            throw noSuch(f, "call");
+        }
+        Object[] a = new Object[sig.length - 1];
+        for (int i = 0; i < a.length; i++) {
+            a[i] = i < positional.length ? positional[i] : DartRuntime.absent();
+        }
+        for (int k = 0; k < names.length; k++) {
+            int at = -1;
+            for (int j = 0; j < declared.length; j++) {
+                if (bareName(declared[j]).equals(names[k])) {
+                    at = posCount + j;
+                    break;
+                }
+            }
+            if (at < 0) {
+                throw noSuch(f, "call");
+            }
+            a[at] = values[k];
+        }
+        for (int j = 0; j < declared.length; j++) {
+            // A required named parameter is recorded as "!name" ($named).
+            if (declared[j].startsWith("!") && a[posCount + j] == DartRuntime.absent()) {
+                throw noSuch(f, "call");
+            }
+        }
+        for (int i = 0; i < a.length; i++) {
+            TypeWitness pw = sig[i + 1];
+            if (pw != null && a[i] != DartRuntime.absent() && !pw.test(a[i])) {
+                throw new dart.core.TypeError("type '" + DartRuntime.typeName(a[i])
+                        + "' is not a subtype of the parameter type of this closure");
+            }
+        }
+        return invoke(f, a);
+    }
+
+    private static String bareName(String declared) {
+        return declared.startsWith("!") ? declared.substring(1) : declared;
+    }
+
     /** Calls a function value whose static type is dynamic or Function. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Object invoke(Object f, Object... a) {

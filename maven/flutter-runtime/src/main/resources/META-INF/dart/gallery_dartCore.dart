@@ -98,7 +98,7 @@ class BigInt implements Comparable<BigInt> {
 // --- dart:core : DateTime --------------------------------------------------
 
 @JavaName('dart.core.DateTime')
-class DateTime {
+class DateTime implements Comparable<DateTime> {
   // Dart's own defaults, stated. Without them an omitted month or day is filled
   // with the type's zero, so DateTime(2024) reached the runtime as month 0, day 0
   // -- indistinguishable from DateTime(2024, 3, 0), which Dart defines as the last

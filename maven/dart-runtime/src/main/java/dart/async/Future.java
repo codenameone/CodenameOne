@@ -635,7 +635,7 @@ public class Future<T> {
             public void run() {
                 if (error != null) {
                     try {
-                        next.complete(onError.call(DartRuntime.caught(error)));
+                        next.complete(recoveryValue(onError.call(DartRuntime.caught(error))));
                     } catch (Throwable t) {
                         next.completeError(t);
                     }
@@ -708,6 +708,19 @@ public class Future<T> {
         return catchError(onError, (Object) null);
     }
 
+    /// A value-returning catchError handler's result, checked against this future's
+    /// recorded T: Dart's `Future<int>.error(e).catchError((e) => 'x')` fails with an
+    /// ArgumentError, since the recovered future must still complete with a T. A future
+    /// that recorded no T accepts any value, as before.
+    private Object recoveryValue(Object v) {
+        dart.runtime.TypeWitness w = typeArg;
+        if (w != null && !w.test(v)) {
+            throw dart.core.ArgumentError.value(v, "onError",
+                    "The error handler of Future.catchError must return a value of the future's type");
+        }
+        return v;
+    }
+
     /** {@code catchError(onError, test: ...)} -- value-handler form. */
     public Future<Object> catchError(final Funcs.Func1<Object, Object> onError, final Object test) {
         final Future<Object> next = new Future<Object>();
@@ -726,7 +739,7 @@ public class Future<T> {
                             next.completeError(error);
                             return;
                         }
-                        next.complete(onError.call(DartRuntime.caught(error)));
+                        next.complete(recoveryValue(onError.call(DartRuntime.caught(error))));
                     } catch (Throwable t) {
                         next.completeError(t);
                     }

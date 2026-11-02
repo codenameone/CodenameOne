@@ -43,6 +43,8 @@ final class CaptureScan {
 
     private final Set<String> assigned = new HashSet<String>();
     private final Set<String> referencedInLambda = new HashSet<String>();
+    /** Names assigned (=, op=, ++, --) from inside a closure. */
+    private final Set<String> assignedInLambda = new HashSet<String>();
     private final Set<String> allReferenced = new HashSet<String>();
     /** Names called as {@code name(..)} where the result is used (not an expression statement). */
     private final Set<String> valueCalls = new HashSet<String>();
@@ -82,6 +84,23 @@ final class CaptureScan {
         CaptureScan scan = new CaptureScan();
         scan.walkExpr(body);
         return scan.referencedInLambda.contains(name);
+    }
+
+    /**
+     * True when a closure within {@code body} assigns {@code name}. A C-style loop
+     * variable written that way cannot be a final per-iteration copy: each pass gets
+     * its own mutable cell, whose value the update clause then continues from.
+     */
+    static boolean assignedInLambda(Expr body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkExpr(body);
+        return scan.assignedInLambda.contains(name);
+    }
+
+    static boolean assignedInLambda(Stmt body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkStmt(body);
+        return scan.assignedInLambda.contains(name);
     }
 
     static boolean readInLambda(Stmt body, String name) {
@@ -244,6 +263,9 @@ final class CaptureScan {
             Assign a = (Assign) e;
             if (a.lhs instanceof Ident) {
                 assigned.add(((Ident) a.lhs).name);
+                if (lambdaDepth > 0) {
+                    assignedInLambda.add(((Ident) a.lhs).name);
+                }
             }
             walkExpr(a.lhs);
             walkExpr(a.rhs);
@@ -251,6 +273,9 @@ final class CaptureScan {
             IncDec i = (IncDec) e;
             if (i.operand instanceof Ident) {
                 assigned.add(((Ident) i.operand).name);
+                if (lambdaDepth > 0) {
+                    assignedInLambda.add(((Ident) i.operand).name);
+                }
             }
             walkExpr(i.operand);
         } else if (e instanceof Lambda) {

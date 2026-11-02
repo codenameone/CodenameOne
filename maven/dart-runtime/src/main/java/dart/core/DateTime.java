@@ -37,7 +37,8 @@ import java.util.TimeZone;
  * instants a microsecond apart compared equal, differed by zero, and a
  * sub-millisecond Duration added nothing.</p>
  */
-public class DateTime {
+@SuppressWarnings("rawtypes")
+public class DateTime implements Comparable {
 
     // Not final: Dart lets a program class extend DateTime, and a subclass's named
     // constructor (`: super.fromMillisecondsSinceEpoch(ms)`) is its marker constructor
@@ -644,6 +645,21 @@ public class DateTime {
 
     public long compareTo(DateTime other) {
         return epochMicros < other.epochMicros ? -1 : (epochMicros > other.epochMicros ? 1 : 0);
+    }
+
+    /**
+     * DateTime is a {@code Comparable<DateTime>} in Dart, so it must be assignable
+     * where Dart's {@code Comparable} maps (java.lang.Comparable). Dart's own
+     * compareTo above answers a Dart int (long), so the Java contract is this
+     * overload; it rejects a non-DateTime as Dart's covariant parameter check does.
+     */
+    @Override
+    public int compareTo(Object other) {
+        if (!(other instanceof DateTime)) {
+            throw new TypeError("type '" + (other == null ? "Null" : other.getClass().getName())
+                    + "' is not a subtype of type 'DateTime'");
+        }
+        return (int) compareTo((DateTime) other);
     }
 
     /** The underlying instant as a {@link java.util.Date} (used by DateFormat). */
