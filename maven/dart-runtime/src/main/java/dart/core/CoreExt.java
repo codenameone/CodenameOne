@@ -127,7 +127,7 @@ public final class CoreExt {
         }
         checkRange(l, start, end);
         ArrayList<E> src = new ArrayList<E>();
-        for (E e : from) {
+        for (E e : DartList.checkedSource(l, from)) {
             src.add(e);
         }
         int len = (int) (end - start);
@@ -167,7 +167,7 @@ public final class CoreExt {
 
     public static <E> void setAll(java.util.List<E> l, long index, Iterable<? extends E> from) {
         ArrayList<E> src = new ArrayList<E>();
-        for (E e : from) {
+        for (E e : DartList.checkedSource(l, from)) {
             src.add(e);
         }
         RangeError.checkValueInInterval(index, 0, l.size(), "index");

@@ -364,7 +364,7 @@ public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified
     public void addAllIterable(Iterable<? extends E> elements) {
         checkWritable();
         if (elements != null) {
-            for (E e : elements) {
+            for (E e : DartList.checkedSource(elementWitness(), elements)) {
                 add(e);
             }
         }

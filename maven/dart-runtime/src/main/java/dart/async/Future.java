@@ -42,6 +42,25 @@ import java.util.List;
  */
 public class Future<T> {
 
+    /// The type argument the construction named (`Future<int>.value(1)` is a
+    /// `Future<int>`), which `is Future<X>` and `as Future<X>` read; null when nothing
+    /// recorded it, which those tests take as unknown.
+    private dart.runtime.TypeWitness typeArg;
+
+    /// The recorded type argument, or null.
+    public final dart.runtime.TypeWitness typeArgWitness() {
+        return typeArg;
+    }
+
+    /// Records {@code w} as {@code f}'s type argument and answers {@code f}; the emitter
+    /// wraps a construction whose type argument it knows. A null witness records nothing.
+    public static <F extends Future<?>> F reify(F f, dart.runtime.TypeWitness w) {
+        if (f != null && w != null) {
+            ((Future<?>) f).typeArg = w;
+        }
+        return f;
+    }
+
     private final Object lock = new Object();
     private boolean done;
     /// Set while this future waits on another it was completed WITH. It counts

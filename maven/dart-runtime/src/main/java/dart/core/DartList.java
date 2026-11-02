@@ -339,6 +339,46 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         }
     }
 
+    /// The covariant entry check of an `Iterable<E>` argument (`addAll`, `insertAll`,
+    /// `setAll`, `setRange`, a Set's `addAll`) on a list or set reified with element
+    /// witness {@code w}, made before anything is written, so a failing call leaves the
+    /// receiver as it was, as Dart's does. An iterable that recorded its own element type
+    /// is tested by it (`List<num> l = <int>[]; l.addAll(<num>[3])` fails although 3 is an
+    /// int, as in Dart); an unrecorded one by each element. Answers the elements to write,
+    /// copied when they had to be walked, so a lazy iterable is never run twice; or
+    /// {@code from} itself when nothing is recorded.
+    @SuppressWarnings("unchecked")
+    public static <E> Iterable<? extends E> checkedSource(dart.runtime.TypeWitness w, Iterable<? extends E> from) {
+        if (w == null || from == null) {
+            return from;
+        }
+        dart.runtime.TypeWitness own = from instanceof DartList ? ((DartList<?>) from).elementWitness()
+                : from instanceof DartSet ? ((DartSet<?>) from).elementWitness()
+                : from instanceof DartIterable ? ((DartIterable<?>) from).elementWitness() : null;
+        if (own != null) {
+            if (!dart.runtime.TypeWitness.isSubtype(own, w)) {
+                throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(from))
+                        + "' is not a subtype of type 'Iterable<" + w + ">' of 'iterable'");
+            }
+            return from;
+        }
+        java.util.ArrayList<E> copy = new java.util.ArrayList<E>();
+        for (E e : from) {
+            if (!w.test(e)) {
+                throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                        + "' is not a subtype of type '" + w + "' of 'value'");
+            }
+            copy.add(e);
+        }
+        return copy;
+    }
+
+    /// {@link #checkedSource} for any list receiver: a DartList's own element witness, or
+    /// nothing recorded.
+    public static <E> Iterable<? extends E> checkedSource(java.util.List<E> l, Iterable<? extends E> from) {
+        return l instanceof DartList ? checkedSource(((DartList<E>) l).elementWitness(), from) : from;
+    }
+
     /// `value is List<X>` (and `Iterable<X>` on a list) for any X with a witness: Dart's
     /// covariant subtype test on the reified argument. A list whose argument nothing
     /// recorded is unknown and passes, as an erased test would.
@@ -614,7 +654,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         checkGrowable("insertAll");
         RangeError.checkValueInInterval(index, 0, size(), "index");
         java.util.ArrayList<E> copy = new java.util.ArrayList<E>();
-        for (E e : elements) {
+        for (E e : checkedSource(elementWitness(), elements)) {
             copy.add(e);
         }
         int at = (int) index;
@@ -690,6 +730,9 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     /** Dart's List.addAll — named distinctly because java.util.List.addAll(Collection) makes the overload ambiguous. */
     public void addAllIterable(Iterable<? extends E> elements) {
         checkGrowable("addAll");
+        if (elements != this) {
+            elements = checkedSource(elementWitness(), elements);
+        }
         if (elements == this) {
             // list.addAll(list) duplicates the ORIGINAL elements in Dart. Iterating
             // this list while appending to it never ends here: the storage is the

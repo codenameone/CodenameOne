@@ -292,6 +292,21 @@ public final class StreamController<T> implements StreamSink<T> {
         return theStream;
     }
 
+    /// The type argument the construction named, held by its stream (which is a
+    /// `Stream<X>` of the same X); null when nothing recorded it.
+    public dart.runtime.TypeWitness typeArgWitness() {
+        return theStream.typeArgWitness();
+    }
+
+    /// Records {@code w} as {@code c}'s type argument, and so its stream's, and answers
+    /// {@code c}. A null witness records nothing.
+    public static <C extends StreamController<?>> C reify(C c, dart.runtime.TypeWitness w) {
+        if (c != null) {
+            Stream.reify(((StreamController<?>) c).theStream, w);
+        }
+        return c;
+    }
+
     /** True once any subscriber is listening to {@link #stream()}. */
     public boolean hasListener() {
         return theStream.hasListeners();

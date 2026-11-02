@@ -372,6 +372,11 @@ public final class TypeWitness {
     public static final int SET = 1;
     public static final int MAP = 2;
     public static final int ITERABLE = 3;
+    /// `Stream<X>`, `Future<X>` and `StreamController<X>`: read through the type argument
+    /// the construction recorded (Stream.reify, Future.reify, StreamController.reify).
+    public static final int STREAM = 4;
+    public static final int FUTURE = 5;
+    public static final int STREAM_CONTROLLER = 6;
 
     /// `v is List<X>`/`Set<X>`/`Map<K, V>`/`Iterable<X>` with reified arguments: the
     /// erased class first, then the arguments the collection recorded (its elements where
@@ -389,6 +394,20 @@ public final class TypeWitness {
             case MAP:
                 return erased.isInstance(v) && (!(v instanceof java.util.Map)
                         || dart.core.DartMap.isMapOf(v, a0, a1));
+            case STREAM:
+            case FUTURE:
+            case STREAM_CONTROLLER: {
+                if (!erased.isInstance(v)) {
+                    return false;
+                }
+                // Nothing recorded the argument (a stream or future some runtime path made):
+                // unknown, which keeps the erased answer, as for a collection.
+                TypeWitness w = v instanceof dart.async.Stream ? ((dart.async.Stream<?>) v).typeArgWitness()
+                        : v instanceof dart.async.Future ? ((dart.async.Future<?>) v).typeArgWitness()
+                        : v instanceof dart.async.StreamController
+                                ? ((dart.async.StreamController<?>) v).typeArgWitness() : null;
+                return a0 == null || w == null || isSubtype(w, a0);
+            }
             default:
                 if (a0 != null && (v instanceof dart.core.DartList || v instanceof dart.collection.ListMixin)) {
                     return dart.core.DartList.isListOfW(v, a0);

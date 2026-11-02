@@ -92,6 +92,25 @@ import java.util.List;
  */
 public class Stream<T> {
 
+    /// The type argument the construction named (`StreamController<Event>().stream` is a
+    /// `Stream<Event>`), which `is Stream<X>` and `as Stream<X>` read; null when nothing
+    /// recorded it, which those tests take as unknown.
+    private dart.runtime.TypeWitness typeArg;
+
+    /// The recorded type argument, or null.
+    public final dart.runtime.TypeWitness typeArgWitness() {
+        return typeArg;
+    }
+
+    /// Records {@code w} as {@code s}'s type argument and answers {@code s}; the emitter
+    /// wraps a construction whose type argument it knows. A null witness records nothing.
+    public static <S extends Stream<?>> S reify(S s, dart.runtime.TypeWitness w) {
+        if (s != null && w != null) {
+            ((Stream<?>) s).typeArg = w;
+        }
+        return s;
+    }
+
     /// Headless, an async* body runs on a thread of its own (see AsyncStar), so a
     /// listen() or cancel() from that thread races the isolate thread delivering
     /// events. Unguarded, the snapshot copy in emit() read a half-grown ArrayList

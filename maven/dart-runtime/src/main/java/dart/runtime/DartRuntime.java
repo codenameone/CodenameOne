@@ -823,6 +823,18 @@ public final class DartRuntime {
         }
     }
 
+    /// The entry of a generic function called with no type arguments whose variable's
+    /// default (its bound with the function's variables read as dynamic, {@code dflt})
+    /// does not satisfy the bound instantiated at that default ({@code bound}): Dart's
+    /// instantiate-to-bound fails, so the call is a TypeError whatever its arguments. A
+    /// self-referential `T extends Comparable<T>` is the case: `Comparable<dynamic>` is no
+    /// `Comparable<Comparable<dynamic>>`. The transpiler decides that from the type model;
+    /// this only throws. Declared to answer a witness so it can stand where one is read.
+    public static TypeWitness boundNotSatisfied(String dflt, String bound) {
+        throw new TypeError("type '" + dflt + "' is not a subtype of type '" + bound
+                + "' of the type variable's bound");
+    }
+
     /// The caller-side check of an argument for a generic-covariant parameter (`void
     /// take(T x)` called through a `D<num>` that is an `E extends D<int>`): {@code v}
     /// tested against the receiver's witness {@code w}, then answered with its own static
