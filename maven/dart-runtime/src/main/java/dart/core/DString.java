@@ -357,6 +357,20 @@ public final class DString {
         return p instanceof String ? split(s, (String) p) : split(s, (RegExp) p);
     }
 
+    /** {@code replaceFirst} with a dynamic {@code Pattern} argument. */
+    public static String replaceFirst(String s, Object from, String to) {
+        return replaceFirst(s, from, to, 0);
+    }
+
+    /** {@code replaceFirst(from, to, startIndex)} with a dynamic {@code Pattern} argument. */
+    public static String replaceFirst(String s, Object from, String to, long startIndex) {
+        Object p = pattern(from);
+        if (p instanceof String) {
+            return replaceFirst(s, (String) p, to, startIndex);
+        }
+        return replaceFirst(s, (RegExp) p, to, startIndex);
+    }
+
     /** {@code replaceAll} with a dynamic {@code Pattern} argument. */
     public static String replaceAll(String s, Object from, String to) {
         Object p = pattern(from);

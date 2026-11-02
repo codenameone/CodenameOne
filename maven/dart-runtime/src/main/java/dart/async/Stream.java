@@ -104,6 +104,17 @@ public class Stream<T> {
 
     /// Records {@code w} as {@code s}'s type argument and answers {@code s}; the emitter
     /// wraps a construction whose type argument it knows. A null witness records nothing.
+    /// Records {@code w} as {@code s}'s type argument unless one is recorded already, and
+    /// answers it. The emitter calls it on the result of a call whose static type is
+    /// Stream<X>: a stream a member or a function value made without recording X takes the
+    /// declared X, and one that recorded its own (narrower) X keeps it.
+    public static <S extends Stream<?>> S reifyUnknown(S s, dart.runtime.TypeWitness w) {
+        if (s != null && w != null && ((Stream<?>) s).typeArg == null) {
+            ((Stream<?>) s).typeArg = w;
+        }
+        return s;
+    }
+
     public static <S extends Stream<?>> S reify(S s, dart.runtime.TypeWitness w) {
         if (s != null && w != null) {
             ((Stream<?>) s).typeArg = w;
@@ -553,6 +564,102 @@ public class Stream<T> {
     public final Stream<T> where(final Funcs.Func1<T, Boolean> test) {
         // A filtered stream has the source's element type, and records it.
         return reify(filtered(test), typeArg);
+    }
+
+    /// Dart's {@code timeout(timeLimit)}: a TimeoutException error each time
+    /// {@code timeLimit} passes with no event.
+    public final Stream<T> timeout(dart.core.Duration timeLimit) {
+        return timeout(timeLimit, null);
+    }
+
+    /// Dart's {@code timeout(timeLimit, onTimeout: (sink) {...})}: each time
+    /// {@code timeLimit} passes between events (counted from the listen), the output's
+    /// sink is handed to {@code onTimeout} -- or, with none, a TimeoutException is added
+    /// to it. Every event of this stream restarts the count; closing the sink ends the
+    /// output and cancels this stream.
+    public final Stream<T> timeout(final dart.core.Duration timeLimit,
+            final Funcs.VoidFunc1<? super StreamSink<T>> onTimeout) {
+        final Stream<T> upstream = this;
+        final StreamController<T> out = new StreamController<T>();
+        final Timer[] timer = new Timer[1];
+        final StreamSubscription<?>[] sub = new StreamSubscription<?>[1];
+        final Funcs.VoidFunc0[] arm = new Funcs.VoidFunc0[1];
+        final Funcs.VoidFunc0 stop = new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (timer[0] != null) {
+                    timer[0].cancel();
+                    timer[0] = null;
+                }
+            }
+        };
+        arm[0] = new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                stop.call();
+                timer[0] = new Timer(timeLimit, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        timer[0] = null;
+                        if (onTimeout == null) {
+                            out.addError(new TimeoutException("No stream event", timeLimit));
+                        } else {
+                            onTimeout.call(out);
+                        }
+                        if (out.isClosed()) {
+                            if (sub[0] != null) {
+                                sub[0].cancel();
+                                sub[0] = null;
+                            }
+                        } else {
+                            arm[0].call();
+                        }
+                    }
+                });
+            }
+        };
+        out.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                arm[0].call();
+                sub[0] = upstream.listen(new Funcs.VoidFunc1<T>() {
+                    @Override
+                    public void call(T v) {
+                        if (!out.isClosed()) {
+                            arm[0].call();
+                            out.add(v);
+                        }
+                    }
+                }, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        if (!out.isClosed()) {
+                            arm[0].call();
+                            out.addError(e);
+                        }
+                    }
+                }, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        stop.call();
+                        if (!out.isClosed()) {
+                            out.close();
+                        }
+                    }
+                });
+            }
+        });
+        out.onCancel(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                stop.call();
+                if (sub[0] != null) {
+                    sub[0].cancel();
+                    sub[0] = null;
+                }
+            }
+        });
+        return reify(out.stream(), typeArg);
     }
 
     private Stream<T> filtered(final Funcs.Func1<T, Boolean> test) {

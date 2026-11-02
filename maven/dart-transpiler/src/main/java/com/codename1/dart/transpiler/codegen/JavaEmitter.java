@@ -3777,13 +3777,21 @@ public final class JavaEmitter {
             return checked + "." + (t.is("int") ? "longValue()" : "doubleValue()");
         }
         String erased = erasedJavaType(t, ctx);
-        if (t.funcReturn != null && t.funcParams != null && isFuncsSamName(erased)
-                && (t.funcTypeParams == null || t.funcTypeParams.isEmpty())) {
+        // A function typedef (`Listener<T>`) is tested as the function type it names.
+        TypeRef ft = t;
+        if (t.funcReturn == null) {
+            TypeRef x = t.args.isEmpty() ? expandFunctionTypedef(t) : expandGenericFunctionTypedef(t);
+            if (x != null) {
+                ft = x; // nullability is t's, passed to asFunction below
+            }
+        }
+        if (ft.funcReturn != null && ft.funcParams != null && isFuncsSamName(erased)
+                && (ft.funcTypeParams == null || ft.funcTypeParams.isEmpty())) {
             // A function-typed field or parameter: the closure's reified signature is
             // tested, as `as R Function(P)` tests it (TypeWitness.asFunction).
             return "((" + javaType(boxType(t), true, ctx) + ") dart.runtime.TypeWitness.asFunction(" + raw + ", "
                     + erased + ".class, " + t.nullable + ", " + quote(t.toString()) + ", "
-                    + functionWitnessArgs(t, ctx) + "))";
+                    + functionWitnessArgs(ft, ctx) + "))";
         }
         checked = "dart.runtime.DartRuntime.as(" + raw + ", " + erased + ".class, " + t.nullable + ", "
                 + quote(t.toString()) + ")";
@@ -7797,6 +7805,27 @@ public final class JavaEmitter {
                 }
             }
         }
+        if (e instanceof Call && ((Call) e).target == null && ((Call) e).name != null
+                && ctx.lookup(((Call) e).name) == null
+                && (ctx.currentClass == null || ctx.currentClass.method(((Call) e).name) == null)) {
+            // A bare call of a top-level function answers what the function declares, read
+            // from its declaration: `jsonDecode(s)` is dynamic, so `Set<String>.from(...)`
+            // downcasts it to an Iterable first.
+            String n = ((Call) e).name;
+            FunctionDecl fd = functionInLibrary(ctx.library(), n);
+            if (fd == null) {
+                fd = libraryStubFunction(n, ctx);
+            }
+            if (fd == null) {
+                fd = stubs.functions.get(n);
+            }
+            // Only a dynamic declaration answers here: the callers read null as "not
+            // known", and their own paths type every other call when they emit it.
+            if (fd != null && !fd.isGetter && fd.typeParams.isEmpty()
+                    && (fd.returnType == null || fd.returnType.is("var") || fd.returnType.is("dynamic"))) {
+                return TypeRef.DYNAMIC;
+            }
+        }
         return null;
     }
 
@@ -8309,6 +8338,11 @@ public final class JavaEmitter {
         /// reference, a closure, either one signed or cast to a SAM), else null. Signing and
         /// casting decisions read this instead of the Java text.
         final FnForm fn;
+        /// A closure's static return type as Dart infers it, from an arrow body's type or a
+        /// block's return statements (Future of the flattened value for an async closure);
+        /// null when unknown or when this is no closure. Kept apart from {@code type}, whose
+        /// function shape decides the SAM the closure is emitted against.
+        TypeRef closureReturn;
 
         Out(String code, TypeRef type) {
             this(code, type, false, null);
@@ -8460,18 +8494,51 @@ public final class JavaEmitter {
         Call c = (Call) e;
         return c.target == null && c.name != null && !c.nullAware && ctx.lookup(c.name) == null
                 && !program.functions.containsKey(c.name) && programClass(c.name, ctx) == null
-                && (c.name.equals("Stream") || c.name.equals("Future") || c.name.equals("StreamController"));
+                && (c.name.equals("Stream") || c.name.equals("Future") || c.name.equals("StreamController")
+                        || c.name.equals("Completer"));
     }
 
     /// The construction emitExprRaw is emitting, so its reifying wrapper runs once.
     private Expr reifyingCtor;
+
+    /// {@code future} with {@code t} recorded as its type argument (Future.reify); unchanged
+    /// when t is unknown, dynamic or no witness can name it.
+    private String reifyWith(String future, TypeRef t, Ctx ctx) {
+        if (t == null || (isDynamicType(t) && !t.is("Object")) || !typeVarsInScope(t, ctx)) {
+            return future;
+        }
+        String w = reifiedArgWitness(t, ctx);
+        return w == null ? future : "dart.async.Future.reify(" + future + ", " + w + ")";
+    }
+
+    /// The call emitExprRaw is emitting, so its reifying wrapper runs once.
+    private Expr reifyingCall;
+
+    /// {@code out} with the X of its static Future<X> / Stream<X> recorded where the
+    /// result recorded none (Future.reifyUnknown). Dynamic, Object and FutureOr say
+    /// nothing about the value and record nothing, nor does an X no witness can name.
+    private Out reifyCallResult(Out out, Ctx ctx) {
+        if (out == null || out.fromError || out.shortGuard != null || out.type == null || out.type.nullable
+                || out.type.args.size() != 1) {
+            return out;
+        }
+        String cls = asyncReifiedClass(out.type, ctx);
+        if (cls == null || !(cls.equals("Future") || cls.equals("Stream")) || isDynamicType(out.type.arg(0))) {
+            return out;
+        }
+        String w = reifiedArgWitness(out.type.arg(0), ctx);
+        if (w == null) {
+            return out;
+        }
+        return new Out("dart.async." + cls + ".reifyUnknown(" + out.code + ", " + w + ")", out.type);
+    }
 
     private String asyncReifiedClass(TypeRef t, Ctx ctx) {
         if (t == null || t.args.size() != 1 || t.resolved != null || programClass(t.name, ctx) != null) {
             return null;
         }
         return t.is("Stream") ? "Stream" : t.is("Future") ? "Future"
-                : t.is("StreamController") ? "StreamController" : null;
+                : t.is("StreamController") ? "StreamController" : t.is("Completer") ? "Completer" : null;
     }
 
     /// `StreamController<Event>()`, `Future<int>.value(1)`: the construction records its
@@ -8491,6 +8558,14 @@ public final class JavaEmitter {
         String w = reifiedArgWitness(t.arg(0), ctx);
         if (w == null) {
             return out;
+        }
+        if (out.type != null && out.type.args.isEmpty() && t == written && typeVarsInScope(t, ctx)) {
+            // A generic factory (`StreamController<Event>.broadcast()`) whose emission
+            // reports the raw class: the written type is the static one. The explicit
+            // type argument on reify target-types the factory, so the result is
+            // StreamController<Event> as a receiver too, not StreamController<Object>.
+            return new Out("dart.async." + cls + ".<" + javaType(t, true, ctx) + ">reify(" + out.code + ", " + w + ")",
+                    t);
         }
         return new Out("dart.async." + cls + ".reify(" + out.code + ", " + w + ")", out.type);
     }
@@ -8789,6 +8864,19 @@ public final class JavaEmitter {
                 return reifyAsyncConstruction(written, made, ctx);
             } finally {
                 reifyingCtor = saved;
+            }
+        }
+        if (e != reifyingCall && e instanceof Call) {
+            // A call whose static type is Future<X> or Stream<X> -- a dart:async member
+            // (then, expand, asyncMap, Future.wait, Stream.fromIterable...), an async
+            // function or a function value -- records X on the result unless it recorded
+            // its own: the static type is the one the type model gives the call.
+            Expr saved = reifyingCall;
+            reifyingCall = e;
+            try {
+                return reifyCallResult(emitExprRaw(e, expected, ctx), ctx);
+            } finally {
+                reifyingCall = saved;
             }
         }
         if (e instanceof IntLit) {
@@ -13054,9 +13142,12 @@ public final class JavaEmitter {
             codes.add(elementCode(o, elem, ctx));
             if (inferred == null) {
                 inferred = o.type;
-            } else if (o.type == null || inferred.name == null || !inferred.name.equals(o.type.name)) {
+            } else if (o.type == null || inferred.name == null || !inferred.name.equals(o.type.name)
+                    || !inferred.args.toString().equals(o.type.args.toString())) {
                 // `[1, 2.5, 'x', null]`: elements that disagree make a List<dynamic>
                 // (Dart would say List<Object?>), never a list of the first one's type.
+                // The type arguments count too: `[[1, 2], [1.5, 2.5]]` holds a List<int>
+                // and a List<double>, which are different Java list classes.
                 mixed = true;
             }
         }
@@ -13512,6 +13603,7 @@ public final class JavaEmitter {
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
+                        aliasCapturedLoopVar(f.init, f.body, ctx);
                         emitListElementInto(list$, f.body, elem$, ctx);
                     }
                 });
@@ -13521,6 +13613,23 @@ public final class JavaEmitter {
         }
         Out o = emitExpr(e, elem, ctx);
         w.line(list + ".add(" + coerce(o, elem, ctx) + ");");
+    }
+
+    /// A collection-for's C-style loop variable read by a closure in the element: Dart
+    /// binds it fresh each iteration, and the Java one is reassigned by the update, so
+    /// the element reads a per-iteration final alias (as a for statement does).
+    private void aliasCapturedLoopVar(Stmt init, Expr body, Ctx ctx) {
+        if (!(init instanceof VarDeclStmt)) {
+            return;
+        }
+        String name = ((VarDeclStmt) init).name;
+        if (!CaptureScan.readInLambda(body, name)) {
+            return;
+        }
+        TypeRef t = ctx.lookup(name);
+        String java = ctx.javaNameOf(name);
+        String alias = ctx.declareShadowSafe(name, t);
+        ctx.writer().line("final " + javaType(t, false, ctx) + " " + alias + " = " + java + ";");
     }
 
     private Out emitSetLit(SetLit s, TypeRef expected, Ctx ctx) {
@@ -13661,6 +13770,7 @@ public final class JavaEmitter {
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
+                        aliasCapturedLoopVar(f.init, f.body, ctx);
                         emitSetElementInto(set$, f.body, elem$, ctx);
                     }
                 });
@@ -13909,6 +14019,7 @@ public final class JavaEmitter {
                 }
                 emitCForLoop(initCode, f.condition, f.updates, ctx, new Runnable() {
                     public void run() {
+                        aliasCapturedLoopVar(f.init, f.body, ctx);
                         emitMapElementInto(map$, f.body, kt$, vt$, ctx);
                     }
                 });
@@ -19383,6 +19494,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         List<TypeRef> outerReturns = ctx.lambdaReturns;
         List<TypeRef> returns = new ArrayList<TypeRef>();
         TypeRef exprType = null;
+        TypeRef asyncArrow = null;
         if ((l.isAsyncStar || l.isSyncStar) && l.body != null) {
             // A generator closure: the lambda returns the generator, whose body is a nested
             // lambda fed the AsyncStar.Sink (async*) or the result list (sync*), as a
@@ -19424,8 +19536,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         + body + ind + "    })";
             }
         } else if (asyncValue) {
+            lastAsyncArrowValue = null;
             code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
                     + indentStr(ctx.currentIndent()) + "}";
+            asyncArrow = l.exprBody != null ? lastAsyncArrowValue : null;
         } else if (l.body != null) {
             // `on<E>((event, emit) { emit(s); })`: a block that returns nothing, passed where
             // the function type returns dynamic -- a value-returning Funcs.FuncN in Java.
@@ -19596,12 +19710,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     + l.typeParams.size() + ")";
             return new Out(g, new TypeRef("Function"), FnForm.lambda(g));
         }
+        Out made;
         if (rt != null) {
-            return new Out(signed, new TypeRef("Function"), FnForm.runTimeSigned(signed, rt[0], rt[1]));
+            made = new Out(signed, new TypeRef("Function"), FnForm.runTimeSigned(signed, rt[0], rt[1]));
+        } else {
+            String[] rec = signedClosures.get(l);
+            made = new Out(signed, new TypeRef("Function"), rec != null && rec[2].equals(signed)
+                    ? FnForm.lambda(rec[0]).signed(rec[1]) : FnForm.lambda(signed));
         }
-        String[] rec = signedClosures.get(l);
-        return new Out(signed, new TypeRef("Function"), rec != null && rec[2].equals(signed)
-                ? FnForm.lambda(rec[0]).signed(rec[1]) : FnForm.lambda(signed));
+        made.closureReturn = closureStaticReturn(l, exprType, returns, asyncArrow);
+        return made;
     }
 
     /**
@@ -19640,6 +19758,32 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * so a throw becomes the Future's error. Returns the body text at one indent past the
      * current one.
      */
+    /// The flattened value type emitAsyncLambdaBody inferred for the async arrow closure it
+    /// emitted last, else null.
+    private TypeRef lastAsyncArrowValue;
+
+    /// Dart's flatten: the X of Future<X> / FutureOr<X>, else the type itself.
+    private static TypeRef flattenFutureType(TypeRef t) {
+        if (t != null && (t.is("Future") || t.is("FutureOr")) && t.args.size() == 1) {
+            return t.arg(0);
+        }
+        return t;
+    }
+
+    /// A closure's static return type, as Dart infers it with no context: the arrow body's
+    /// type or the one type every `return` yields, as Future<flatten(T)> for an async closure.
+    private TypeRef closureStaticReturn(Lambda l, TypeRef exprType, List<TypeRef> returns, TypeRef asyncArrow) {
+        if (l.isSyncStar || l.isAsyncStar) {
+            return null;
+        }
+        TypeRef r = l.isAsync && l.exprBody != null && asyncArrow != null ? asyncArrow
+                : l.exprBody != null ? exprType : iifeReturnType(returns);
+        if (r == null || r.is("var") || isDynamicType(r)) {
+            return null;
+        }
+        return l.isAsync ? TypeRef.of("Future", flattenFutureType(r)) : r;
+    }
+
     private String emitAsyncLambdaBody(Lambda l, TypeRef futureType, Ctx ctx) {
         ctx.pushWriter(ctx.currentIndent() + 1);
         Ctx.Writer w = ctx.writer();
@@ -19654,7 +19798,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         } else {
             TypeRef inner = futureType.arg(0);
             Out o = emitExpr(l.exprBody, isDynamicType(inner) ? null : inner, ctx);
-            w.line("return " + asyncReturnValue(o, inner, ctx) + ";");
+            String ret = asyncReturnValue(o, inner, ctx);
+            TypeRef own = isDynamicType(inner) ? flattenFutureType(o.type) : null;
+            lastAsyncArrowValue = null;
+            if (own != null && isConcreteType(own) && !own.is("void") && !own.is("Null")) {
+                // No context names the closure's Future type: Dart infers Future<flatten(T)>
+                // from the arrow body, so `(() async => 'x')() is Future<int>` is false.
+                ret = reifyAsyncResult(ret, TypeRef.of("Future", own), ctx);
+                lastAsyncArrowValue = own;
+            }
+            w.line("return " + ret + ";");
         }
         ctx.indent(-1);
         w.line("} catch (RuntimeException " + err + ") {");
@@ -19706,7 +19859,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private String reifyAsyncResult(String future, TypeRef rt, Ctx ctx) {
-        if (rt == null || !rt.is("Future") || rt.args.size() != 1 || isDynamicType(rt.arg(0))) {
+        // Object is a real type argument here: `Future<Object> f() async => 3` is no
+        // Future<int>, so it is recorded like any other.
+        if (rt == null || !rt.is("Future") || rt.args.size() != 1 || rt.arg(0) == null
+                || (isDynamicType(rt.arg(0)) && !rt.arg(0).is("Object"))) {
             return future;
         }
         String w = reifiedArgWitness(rt.arg(0), ctx);
@@ -20091,7 +20247,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (!c.name.equals("parse") && !c.name.equals("tryParse")) {
             return null;
         }
-        String arg = emitExpr(c.args.positional.get(0), TypeRef.STRING, ctx).code;
+        String arg = coreArg(c.args.positional.get(0), TypeRef.STRING, ctx).code;
         boolean nullable = c.name.equals("tryParse");
         ctx.importClass("dart.core.DString");
         TypeRef t = new TypeRef(isInt ? "int" : "double");
@@ -20102,7 +20258,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // int.parse('ff', radix: 16) failed as a decimal number.
             for (NamedArg na : c.args.named) {
                 if (na.name.equals("radix")) {
-                    arg += ", " + emitExpr(na.value, TypeRef.INT, ctx).code;
+                    arg += ", " + coreArg(na.value, TypeRef.INT, ctx).code;
                 }
             }
         }
@@ -20679,9 +20835,27 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
                 if (n.equals("delayed")) {
                     String dur = emitExpr(c.args.positional.get(0), new TypeRef("Duration"), ctx).code;
-                    String comp = c.args.positional.size() > 1
-                            ? emitExpr(c.args.positional.get(1), null, ctx).code : null;
-                    return new Out("Future.delayed(" + dur + (comp != null ? ", " + comp : "") + ")",
+                    Out compO = c.args.positional.size() > 1 ? emitExpr(c.args.positional.get(1), null, ctx) : null;
+                    String comp = compO == null ? null : compO.code;
+                    // Future<T>.delayed(d, computation): T is the written type argument or the
+                    // computation's static return type, recorded on the future it makes.
+                    TypeRef rt = c.typeArgs.size() == 1 ? c.typeArgs.get(0)
+                            : compO != null && compO.type != null && compO.type.funcReturn != null
+                                    ? compO.type.funcReturn
+                            : compO != null ? flattenFutureType(compO.closureReturn) : null;
+                    if (rt != null && (rt.is("void") || rt.is("Null"))) {
+                        rt = null;
+                    }
+                    return new Out(reifyWith("Future.delayed(" + dur + (comp != null ? ", " + comp : "") + ")", rt, ctx),
+                            TypeRef.of("Future", TypeRef.DYNAMIC));
+                }
+                if (n.equals("any") && c.args.positional.size() == 1) {
+                    // Future.any(Iterable<Future<T>>): the first to complete, a Future<T>.
+                    Out l = emitExpr(c.args.positional.get(0), null, ctx);
+                    TypeRef inT = l.type != null && (l.type.is("List") || l.type.is("Iterable"))
+                            && l.type.args.size() == 1 && l.type.arg(0) != null && l.type.arg(0).is("Future")
+                            && l.type.arg(0).args.size() == 1 ? l.type.arg(0).arg(0) : null;
+                    return new Out(reifyWith("Future.any(" + l.code + ")", inT, ctx),
                             TypeRef.of("Future", TypeRef.DYNAMIC));
                 }
                 if (n.equals("value")) {
@@ -20727,8 +20901,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                             && l.type.args.size() == 1 && l.type.arg(0) != null && l.type.arg(0).is("Future")
                             && l.type.arg(0).args.size() == 1 ? l.type.arg(0).arg(0) : null;
                     if (inT != null && !isDynamicType(inT) && isFullyConcrete(inT) && typeVarsInScope(inT, ctx)) {
-                        return new Out("Future.typedList(Future.wait(" + args + "), "
-                                + staticWitness(inT, true, ctx) + ")",
+                        // ... and the Future records List<T>.
+                        return new Out(reifyWith("Future.typedList(Future.wait(" + args + "), "
+                                + staticWitness(inT, true, ctx) + ")", TypeRef.of("List", inT), ctx),
                                 TypeRef.of("Future", TypeRef.of("List", TypeRef.DYNAMIC)));
                     }
                     return new Out("Future.wait(" + args + ")",
@@ -21415,14 +21590,81 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
     }
 
-    /// Whether {@code e}'s static type is dynamic: a name declared or inferred so, or an
-    /// index into such a value (`[]` is no Object member, so it answers dynamic).
+    /// An argument of the runtime method an intrinsic emits. {@code param} is the Java
+    /// parameter type of that method as the intrinsic passes it (the type it asks
+    /// {@link #emitExpr} to produce), so it is the type the argument must have for the
+    /// emitted call to compile. A statically dynamic argument is Dart's implicit downcast to
+    /// it, made an explicit `as`: a mismatch is the TypeError Dart throws at the call. A
+    /// double parameter stands for Dart's num here (clamp, the arithmetic members), so the
+    /// check is against num and the intrinsic's own conversion makes it a double. Callbacks
+    /// are left alone: the intrinsics adapt a dynamic function value themselves.
+    private Out coreArg(Expr a, TypeRef param, Ctx ctx) {
+        if (param != null && !(a instanceof Lambda) && !(a instanceof Ast.AsCast)
+                && param.funcParams == null && !param.is("Function") && !isDynamicType(param)
+                && !param.is("Object") && typeVarsInScope(param, ctx) && staticallyDynamic(a, ctx)) {
+            Ast.AsCast cast = new Ast.AsCast();
+            cast.operand = a;
+            cast.type = param.is("double") && !param.nullable ? new TypeRef("num") : param;
+            cast.line = a.line;
+            cast.col = a.col;
+            cast.file = a.file;
+            return emitExpr(cast, param, ctx);
+        }
+        return emitExpr(a, param, ctx);
+    }
+
+    /// An `Iterable<Object?>` parameter of a runtime method that takes any Java Iterable
+    /// (Set.containsAll): a dynamic argument is checked against Iterable itself, which every
+    /// runtime collection is, so a list passes where the DartIterable class `as Iterable`
+    /// names would not.
+    private Out iterableArg(Expr a, Ctx ctx) {
+        Out o = emitExpr(a, null, ctx);
+        if (!staticallyDynamic(a, ctx)) {
+            return o;
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        return new Out("((Iterable) DartRuntime.as(" + o.code + ", Iterable.class, false, \"Iterable\"))",
+                new TypeRef("Iterable"));
+    }
+
+    /// Whether {@code e}'s static type is dynamic: a name declared or inferred so, an index
+    /// into such a value (`[]` is no Object member, so it answers dynamic), or an operator,
+    /// method or getter applied to one -- dispatched dynamically, so dynamic too, except
+    /// the Object members whose static type Dart keeps (toString, hashCode, runtimeType)
+    /// and the operators that always answer bool.
     private boolean staticallyDynamic(Expr e, Ctx ctx) {
         while (e instanceof ParenExpr) {
             e = ((ParenExpr) e).inner;
         }
         if (e instanceof IndexGet) {
             return staticallyDynamic(((IndexGet) e).target, ctx);
+        }
+        if (e instanceof Ast.Binary) {
+            Ast.Binary b = (Ast.Binary) e;
+            String op = b.op;
+            if (op.equals("==") || op.equals("!=") || op.equals("&&") || op.equals("||") || op.equals("??")) {
+                return false;
+            }
+            return staticallyDynamic(b.left, ctx);
+        }
+        if (e instanceof Ast.Unary) {
+            Ast.Unary u = (Ast.Unary) e;
+            return !u.op.equals("!") && staticallyDynamic(u.operand, ctx);
+        }
+        if (e instanceof Call && ((Call) e).target == null) {
+            // A function declared to answer dynamic (jsonDecode, a program function).
+            TypeRef t = inferExprTypeQuiet(e, ctx);
+            return t != null && t.is("dynamic");
+        }
+        if (e instanceof Call) {
+            Call c = (Call) e;
+            return c.target != null && !c.nullAware && c.name != null && !c.name.equals("toString")
+                    && !c.name.equals("noSuchMethod") && staticallyDynamic(c.target, ctx);
+        }
+        if (e instanceof PropertyGet) {
+            PropertyGet pg = (PropertyGet) e;
+            return !pg.nullAware && !pg.name.equals("hashCode") && !pg.name.equals("runtimeType")
+                    && staticallyDynamic(pg.target, ctx);
         }
         if (!(e instanceof Ident)) {
             return false;
@@ -21485,6 +21727,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         TypeRef.of("Future", TypeRef.of("List", tt.arg(0))));
             }
         }
+        if (tt.is("Stream") && n.equals("timeout") && pos.size() == 1 && c.args.named.size() <= 1
+                && (c.args.named.isEmpty() || c.args.named.get(0).name.equals("onTimeout"))) {
+            // Stream<T>.timeout(timeLimit, {onTimeout}): onTimeout is a
+            // void Function(EventSink<T>), EventSink being the runtime's StreamSink.
+            TypeRef elem = tt.args.size() == 1 ? tt.arg(0) : TypeRef.DYNAMIC;
+            String dur = emitExpr(pos.get(0), new TypeRef("Duration"), ctx).code;
+            String cb = "";
+            if (!c.args.named.isEmpty()) {
+                TypeRef ft = new TypeRef("Function");
+                ft.funcParams = new ArrayList<TypeRef>();
+                ft.funcParams.add(TypeRef.of("StreamSink", elem));
+                ft.funcReturn = TypeRef.VOID;
+                cb = ", " + emitExpr(c.args.named.get(0).value, ft, ctx).code;
+            }
+            return new Out(target.code + ".timeout(" + dur + cb + ")", TypeRef.of("Stream", elem));
+        }
         if (tt.is("Stream") && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 1) {
             // Stream.cast<R>() checks each event, so the runtime takes R as a witness the
             // way whereType does; an erased type variable has none and stays unchecked.
@@ -21520,13 +21778,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (n.equals("contains")) {
                 // contains(pattern, startIndex): the start was dropped, so the search
                 // always began at 0.
-                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
+                String start = pos.size() > 1 ? ", " + coreArg(pos.get(1), TypeRef.INT, ctx).code : "";
                 return new Out("DString.contains(" + target.code + ", "
-                        + emitExpr(pos.get(0), null, ctx).code + start + ")", TypeRef.BOOL);
+                        + coreArg(pos.get(0), null, ctx).code + start + ")", TypeRef.BOOL);
             }
             if (n.equals("split")) {
                 return new Out("DString.split(" + target.code + ", "
-                        + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.of("List", TypeRef.STRING));
+                        + coreArg(pos.get(0), null, ctx).code + ")", TypeRef.of("List", TypeRef.STRING));
             }
             if (n.equals("indexOf")) {
                 String args = target.code;
@@ -21538,27 +21796,27 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (n.equals("lastIndexOf")) {
                 // Unlowered, it reached Java's String.lastIndexOf: an int result, no
                 // RegExp pattern, and a long start that did not compile.
-                String args = target.code + ", " + emitExpr(pos.get(0), null, ctx).code;
+                String args = target.code + ", " + coreArg(pos.get(0), null, ctx).code;
                 if (pos.size() > 1) {
-                    args += ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code;
+                    args += ", " + coreArg(pos.get(1), TypeRef.INT, ctx).code;
                 }
                 return new Out("DString.lastIndexOf(" + args + ")", TypeRef.INT);
             }
             if (n.equals("replaceFirst")) {
                 // Unresolved before: DString's overloads were never reached.
-                String start = pos.size() > 2 ? ", " + emitExpr(pos.get(2), TypeRef.INT, ctx).code : "";
+                String start = pos.size() > 2 ? ", " + coreArg(pos.get(2), TypeRef.INT, ctx).code : "";
                 return new Out("DString.replaceFirst(" + target.code + ", "
-                        + emitExpr(pos.get(0), null, ctx).code + ", "
-                        + emitExpr(pos.get(1), null, ctx).code + start + ")", TypeRef.STRING);
+                        + coreArg(pos.get(0), null, ctx).code + ", "
+                        + coreArg(pos.get(1), TypeRef.STRING, ctx).code + start + ")", TypeRef.STRING);
             }
             if (n.equals("replaceAll")) {
                 return new Out("DString.replaceAll(" + target.code + ", "
-                        + emitExpr(pos.get(0), null, ctx).code + ", "
-                        + emitExpr(pos.get(1), null, ctx).code + ")", TypeRef.STRING);
+                        + coreArg(pos.get(0), null, ctx).code + ", "
+                        + coreArg(pos.get(1), TypeRef.STRING, ctx).code + ")", TypeRef.STRING);
             }
             if (n.equals("codeUnitAt")) {
                 return new Out("DString.codeUnitAt(" + target.code + ", "
-                        + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.INT);
+                        + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.INT);
             }
             if (n.equals("padLeft") || n.equals("padRight")) {
                 String args = target.code;
@@ -21569,7 +21827,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (n.equals("compareTo")) {
                 return new Out("DString.compareTo(" + target.code + ", "
-                        + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.INT);
+                        + coreArg(pos.get(0), null, ctx).code + ")", TypeRef.INT);
             }
             if (n.equals("toUpperCase") || n.equals("toLowerCase")) {
                 // Through the runtime, not Java's String methods: those follow the
@@ -21586,19 +21844,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // A RegExp (any non-String Pattern) has no Java String.startsWith: it goes
                 // through the runtime's prefix match. startsWith(pattern, index): the index
                 // was once dropped, so 'abc'.startsWith('b', 1) answered false.
-                Out pat = emitExpr(pos.get(0), null, ctx);
+                Out pat = coreArg(pos.get(0), null, ctx);
                 boolean plain = pat.type != null && pat.type.is("String");
                 if (plain && pos.size() == 1) {
                     return new Out(target.code + ".startsWith(" + pat.code + ")", TypeRef.BOOL);
                 }
                 ctx.importClass("dart.core.DString");
-                String idx = pos.size() > 1 ? emitExpr(pos.get(1), TypeRef.INT, ctx).code : "0L";
+                String idx = pos.size() > 1 ? coreArg(pos.get(1), TypeRef.INT, ctx).code : "0L";
                 return new Out("DString.startsWith(" + target.code + ", " + (plain ? "" : "(Object) ")
                         + pat.code + ", " + idx + ")", TypeRef.BOOL);
             }
             if (n.equals("startsWith") || n.equals("endsWith")) {
                 return new Out(target.code + "." + n + "("
-                        + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.BOOL);
+                        + coreArg(pos.get(0), null, ctx).code + ")", TypeRef.BOOL);
             }
             if (n.equals("toString")) {
                 return new Out(target.code, TypeRef.STRING);
@@ -21608,7 +21866,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // num.compareTo across representations: an int against a double compares
             // exactly, -0.0 orders below 0, NaN above everything. Unresolved before.
             ctx.importClass("dart.core.DartComparable");
-            Out other = emitExpr(pos.get(0), null, ctx);
+            // num.compareTo(num other): a dynamic argument is downcast to num.
+            Out other = coreArg(pos.get(0), new TypeRef("num"), ctx);
             return new Out("DartComparable.compare(" + boxNumber(new Out(target.code, tt)) + ", "
                     + boxNumber(other) + ")", TypeRef.INT);
         }
@@ -21619,12 +21878,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (n.equals("toStringAsFixed")) {
                 ctx.importClass("dart.runtime.DartRuntime");
                 return new Out("DartRuntime.toStringAsFixed(" + paren(target.code) + ", "
-                        + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
+                        + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
             }
             if (n.equals("toRadixString")) {
                 ctx.importClass("dart.runtime.DartRuntime");
                 return new Out("DartRuntime.toRadixString(" + target.code + ", "
-                        + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
+                        + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
             }
             if (n.equals("toDouble")) {
                 return new Out("((double) " + paren(target.code) + ")", TypeRef.DOUBLE);
@@ -21638,8 +21897,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (n.equals("clamp")) {
                 // ArgumentError for lower > upper, as Dart; nested min/max answered a value.
                 ctx.importClass("dart.runtime.DartRuntime");
-                String lo = emitExpr(pos.get(0), TypeRef.INT, ctx).code;
-                String hi = emitExpr(pos.get(1), TypeRef.INT, ctx).code;
+                String lo = coreArg(pos.get(0), TypeRef.INT, ctx).code;
+                String hi = coreArg(pos.get(1), TypeRef.INT, ctx).code;
                 return new Out("DartRuntime.clamp(" + target.code + ", " + lo + ", " + hi + ")", TypeRef.INT);
             }
         }
@@ -21664,7 +21923,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (n.equals("toStringAsFixed")) {
                 return new Out("DartRuntime.toStringAsFixed(" + paren(target.code) + ", "
-                        + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
+                        + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
             }
             // toInt, floor and ceil refuse NaN and the infinities with UnsupportedError,
             // as Dart does; a Java cast made NaN 0 and saturated the infinities.
@@ -21699,8 +21958,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out("Math.abs(" + target.code + ")", TypeRef.DOUBLE);
             }
             if (n.equals("clamp")) {
-                String lo = emitExpr(pos.get(0), TypeRef.DOUBLE, ctx).code;
-                String hi = emitExpr(pos.get(1), TypeRef.DOUBLE, ctx).code;
+                String lo = coreArg(pos.get(0), TypeRef.DOUBLE, ctx).code;
+                String hi = coreArg(pos.get(1), TypeRef.DOUBLE, ctx).code;
                 return new Out("DartRuntime.clamp(((double) " + paren(target.code) + "), " + lo + ", "
                         + hi + ")", TypeRef.DOUBLE);
             }
@@ -21708,7 +21967,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (tt.is("List") || tt.is("Iterable") || tt.is("Set")) {
             TypeRef elem = tt.arg(0);
             if (n.equals("add")) {
-                Out v = emitExpr(pos.get(0), elem, ctx);
+                Out v = coreArg(pos.get(0), elem, ctx);
                 String pk = primitiveListKind(tt);
                 if (pk != null) {
                     return new Out(target.code + ".add" + pk + "(" + coerce(v, elem, ctx) + ")", TypeRef.VOID);
@@ -21739,7 +21998,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // end operations are the List ones at index 0 / the end.
             if (tt.is("List") && (n.equals("addLast") || n.equals("addFirst")) && pos.size() == 1) {
                 if (n.equals("addFirst")) {
-                    return new Out(target.code + ".insert(0L, " + coerce(emitExpr(pos.get(0), elem, ctx), elem, ctx) + ")",
+                    return new Out(target.code + ".insert(0L, " + coerce(coreArg(pos.get(0), elem, ctx), elem, ctx) + ")",
                             TypeRef.VOID);
                 }
                 Call add = new Call();
@@ -21755,50 +22014,50 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".removeAt(0L)", elem);
             }
             if (n.equals("insert")) {
-                return new Out(target.code + ".insert(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code
-                        + ", " + emitExpr(pos.get(1), elem, ctx).code + ")", TypeRef.VOID);
+                return new Out(target.code + ".insert(" + coreArg(pos.get(0), TypeRef.INT, ctx).code
+                        + ", " + coreArg(pos.get(1), elem, ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("insertAll") && tt.is("List")) {
-                return new Out(target.code + ".insertAll(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code
+                return new Out(target.code + ".insertAll(" + coreArg(pos.get(0), TypeRef.INT, ctx).code
                         + ", " + runtimeArg(pos.get(1), elem != null && !isDynamicType(elem)
                                 ? TypeRef.of("Iterable", elem) : null, ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("removeAt")) {
-                return new Out(target.code + ".removeAt(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")", elem);
+                return new Out(target.code + ".removeAt(" + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")", elem);
             }
             if (n.equals("removeLast") && pos.isEmpty()) {
                 // DartList has it; only this table lacked it, so the call was E0137.
                 return new Out(target.code + ".removeLast()", elem);
             }
             if (n.equals("remove")) {
-                Out v = emitExpr(pos.get(0), null, ctx);
+                Out v = coreArg(pos.get(0), null, ctx);
                 return new Out(target.code + ".removeValue(" + boxIfPrimitive(v, ctx) + ")", TypeRef.BOOL);
             }
             if (n.equals("contains")) {
-                Out v = emitExpr(pos.get(0), null, ctx);
+                Out v = coreArg(pos.get(0), null, ctx);
                 return new Out(target.code + ".contains(" + boxIfPrimitive(v, ctx) + ")", TypeRef.BOOL);
             }
             if (n.equals("indexOf")) {
-                Out v = emitExpr(pos.get(0), null, ctx);
+                Out v = coreArg(pos.get(0), null, ctx);
                 // indexOf(element, start): the start was dropped, so a scan from an
                 // offset began again at 0.
-                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
+                String start = pos.size() > 1 ? ", " + coreArg(pos.get(1), TypeRef.INT, ctx).code : "";
                 return new Out(target.code + ".indexOfDart(" + boxIfPrimitive(v, ctx) + start + ")", TypeRef.INT);
             }
             if (n.equals("lastIndexOf")) {
                 // Was unlowered: it reached Java's lastIndexOf, which compares with the
                 // wrappers' equals (1 never matched 1.0) and has no start at all.
-                Out v = emitExpr(pos.get(0), null, ctx);
-                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
+                Out v = coreArg(pos.get(0), null, ctx);
+                String start = pos.size() > 1 ? ", " + coreArg(pos.get(1), TypeRef.INT, ctx).code : "";
                 return new Out(target.code + ".lastIndexOfDart(" + boxIfPrimitive(v, ctx) + start + ")", TypeRef.INT);
             }
             if (n.equals("join")) {
-                String sep = pos.isEmpty() ? "\"\"" : emitExpr(pos.get(0), null, ctx).code;
+                String sep = pos.isEmpty() ? "\"\"" : coreArg(pos.get(0), null, ctx).code;
                 return new Out(target.code + ".join(" + sep + ")", TypeRef.STRING);
             }
             if (n.equals("map")) {
                 TypeRef fx = elementLambda(elem, TypeRef.DYNAMIC);
-                Out f = emitExpr(pos.get(0), fx, ctx);
+                Out f = coreArg(pos.get(0), fx, ctx);
                 if (fx == null) {
                     // a dynamic element still takes a one-argument callback
                     f = narrowFullArityValue(pos.get(0), f, inlineFuncType(TypeRef.DYNAMIC, TypeRef.DYNAMIC), ctx);
@@ -21828,7 +22087,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".map(" + f.code + ")", TypeRef.of("Iterable", mapped));
             }
             if (n.equals("where")) {
-                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
+                Out f = coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 return new Out(target.code + ".where(" + f.code + ")", TypeRef.of("Iterable", elem));
             }
             if (n.equals("whereType")) {
@@ -21888,7 +22147,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         TypeRef.of("Iterable", sub != null ? sub : TypeRef.DYNAMIC));
             }
             if (n.equals("forEach")) {
-                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.VOID), ctx);
+                Out f = coreArg(pos.get(0), elementLambda(elem, TypeRef.VOID), ctx);
                 return new Out(target.code + ".forEachDart(" + f.code + ")", TypeRef.VOID);
             }
             if (n.equals("toList")) {
@@ -21897,7 +22156,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 String growable = null;
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("growable")) {
-                        growable = emitExpr(na.value, TypeRef.BOOL, ctx).code;
+                        growable = coreArg(na.value, TypeRef.BOOL, ctx).code;
                     }
                 }
                 // A Dart List<int>/List<double> variable has Java type Dart{Long,Double}List, but
@@ -21923,11 +22182,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".clear()", TypeRef.VOID);
             }
             if (n.equals("any") || n.equals("every")) {
-                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
+                Out f = coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 return new Out(target.code + "." + n + "(" + f.code + ")", TypeRef.BOOL);
             }
             if (n.equals("fold")) {
-                Out init = emitExpr(pos.get(0), null, ctx);
+                Out init = coreArg(pos.get(0), null, ctx);
                 // The combiner is (R, E) -> R with R the seed's type, so its result is
                 // coerced to R: `fold(0.0, (num sum, int e) => sum + e)` computes a num
                 // and must hand back the double the seed made R.
@@ -21941,7 +22200,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     combineType.funcParams.add(elem != null ? elem : TypeRef.DYNAMIC);
                     combineType.funcReturn = seed;
                 }
-                Out combine = emitExpr(pos.get(1), combineType != null || pos.get(1) instanceof Lambda
+                Out combine = coreArg(pos.get(1), combineType != null || pos.get(1) instanceof Lambda
                         ? combineType : inlineFuncType2(null, elem, null), ctx);
                 // The generic result R is inferred from the (boxed) seed; unbox it
                 // back to a primitive when the seed is numeric so it flows straight
@@ -21952,11 +22211,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(unboxPrimitiveResult(call, r), r);
             }
             if (n.equals("firstWhere")) {
-                Out test = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
+                Out test = coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 String orElse = "null";
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("orElse")) {
-                        orElse = emitExpr(na.value, na.value instanceof Lambda ? null
+                        orElse = coreArg(na.value, na.value instanceof Lambda ? null
                                 : inlineFuncType0(elem != null ? elem : TypeRef.DYNAMIC), ctx).code;
                     }
                 }
@@ -21964,7 +22223,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(unboxPrimitiveResult(call, elem), elem);
             }
             if (n.equals("elementAt")) {
-                String call = target.code + ".elementAt(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")";
+                String call = target.code + ".elementAt(" + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")";
                 return new Out(unboxPrimitiveResult(call, elem), elem);
             }
             if (n.equals("sort")) {
@@ -21984,38 +22243,38 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     cmpType.funcRequired = 2;
                     cmpType.funcReturn = TypeRef.INT;
                 }
-                Out cmp = emitExpr(pos.get(0), cmpType, ctx);
+                Out cmp = coreArg(pos.get(0), cmpType, ctx);
                 return new Out(target.code + ".sort(" + castTo("Funcs.Func2<" + et + ", " + et + ", Long>", cmp) + ")", TypeRef.VOID);
             }
             if (n.equals("indexWhere")) {
-                String args = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code;
+                String args = coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code;
                 if (pos.size() > 1) {
-                    args += ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code;
+                    args += ", " + coreArg(pos.get(1), TypeRef.INT, ctx).code;
                 }
                 return new Out(target.code + ".indexWhere(" + args + ")", TypeRef.INT);
             }
             if (n.equals("lastIndexWhere")) {
-                String start = pos.size() > 1 ? ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code : "";
+                String start = pos.size() > 1 ? ", " + coreArg(pos.get(1), TypeRef.INT, ctx).code : "";
                 return new Out(target.code + ".lastIndexWhere("
-                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + start + ")",
+                        + coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + start + ")",
                         TypeRef.INT);
             }
             if (n.equals("removeWhere")) {
                 return new Out(target.code + ".removeWhere("
-                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
+                        + coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
                         TypeRef.VOID);
             }
             if (n.equals("retainWhere")) {
                 return new Out(target.code + ".retainWhere("
-                        + emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
+                        + coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx).code + ")",
                         TypeRef.VOID);
             }
             if (n.equals("lastWhere")) {
-                Out test = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
+                Out test = coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 String orElse = "null";
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("orElse")) {
-                        orElse = emitExpr(na.value, na.value instanceof Lambda ? null
+                        orElse = coreArg(na.value, na.value instanceof Lambda ? null
                                 : inlineFuncType0(elem != null ? elem : TypeRef.DYNAMIC), ctx).code;
                     }
                 }
@@ -22023,11 +22282,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(unboxPrimitiveResult(call, elem), elem);
             }
             if (n.equals("singleWhere")) {
-                Out test = emitExpr(pos.get(0), null, ctx);
+                Out test = coreArg(pos.get(0), null, ctx);
                 String orElse = "null";
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("orElse")) {
-                        orElse = emitExpr(na.value, na.value instanceof Lambda ? null
+                        orElse = coreArg(na.value, na.value instanceof Lambda ? null
                                 : inlineFuncType0(elem != null ? elem : TypeRef.DYNAMIC), ctx).code;
                     }
                 }
@@ -22042,14 +22301,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // A closure keeps the untyped form it had: its own SAM is what it is cast to.
                 TypeRef combine = elem != null && !isDynamicType(elem) ? inlineFuncType2(elem, elem, elem)
                         : pos.get(0) instanceof Lambda ? null : inlineFuncType2(null, null, null);
-                String call = target.code + ".reduce(" + emitExpr(pos.get(0), combine, ctx).code + ")";
+                String call = target.code + ".reduce(" + coreArg(pos.get(0), combine, ctx).code + ")";
                 return new Out(unboxPrimitiveResult(call, elem), elem);
             }
             if (n.equals("expand")) {
                 // The callback's parameter is the element (`entries.expand((e) => ...)` reads
                 // e.key, e.value typed); its result stays dynamic for the SAM, and the
                 // element type of what it returns, when it says, types the expansion.
-                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.DYNAMIC), ctx);
+                Out f = coreArg(pos.get(0), elementLambda(elem, TypeRef.DYNAMIC), ctx);
                 TypeRef out = TypeRef.DYNAMIC;
                 if (pos.get(0) instanceof Lambda) {
                     TypeRef r = lastLambdaExprType;
@@ -22064,20 +22323,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".expand(" + f.code + ")", TypeRef.of("Iterable", out));
             }
             if (n.equals("followedBy")) {
-                return new Out(target.code + ".followedBy(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                return new Out(target.code + ".followedBy(" + coreArg(pos.get(0), null, ctx).code + ")",
                         TypeRef.of("Iterable", elem));
             }
             if (n.equals("take") || n.equals("skip")) {
-                return new Out(target.code + "." + n + "(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code + ")",
+                return new Out(target.code + "." + n + "(" + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")",
                         TypeRef.of("Iterable", elem));
             }
             if (n.equals("takeWhile") || n.equals("skipWhile")) {
-                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
+                Out f = coreArg(pos.get(0), elementLambda(elem, TypeRef.BOOL), ctx);
                 return new Out(target.code + "." + n + "(" + f.code + ")", TypeRef.of("Iterable", elem));
             }
             if (n.equals("getRange")) {
-                String args = emitExpr(pos.get(0), TypeRef.INT, ctx).code + ", "
-                        + emitExpr(pos.get(1), TypeRef.INT, ctx).code;
+                String args = coreArg(pos.get(0), TypeRef.INT, ctx).code + ", "
+                        + coreArg(pos.get(1), TypeRef.INT, ctx).code;
                 return new Out(target.code + ".getRange(" + args + ")", TypeRef.of("Iterable", elem));
             }
             if (n.equals("asMap")) {
@@ -22096,50 +22355,50 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".toSet()", TypeRef.of("Set", elem));
             }
             if (tt.is("Set") && n.equals("difference")) {
-                return new Out(target.code + ".difference(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
+                return new Out(target.code + ".difference(" + mixinSetArg(coreArg(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
             }
             if (tt.is("Set") && n.equals("intersection")) {
-                return new Out(target.code + ".intersection(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
+                return new Out(target.code + ".intersection(" + mixinSetArg(coreArg(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
             }
             if (tt.is("Set") && n.equals("union")) {
-                return new Out(target.code + ".union(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
+                return new Out(target.code + ".union(" + mixinSetArg(coreArg(pos.get(0), tt, ctx), "Set", ctx) + ")", tt);
             }
             if (tt.is("Set") && n.equals("containsAll")) {
-                return new Out(target.code + ".containsAll(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")",
+                return new Out(target.code + ".containsAll(" + mixinSetArg(iterableArg(pos.get(0), ctx), "Set", ctx) + ")",
                         TypeRef.BOOL);
             }
             if (tt.is("Set") && n.equals("removeAll")) {
                 // DartSet.removeAll(Iterable) already existed; only this table lacked a
                 // case for it, so the call fell through to the generic E0137 error.
-                return new Out(target.code + ".removeAll(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Iterable", ctx) + ")",
+                return new Out(target.code + ".removeAll(" + mixinSetArg(coreArg(pos.get(0), null, ctx), "Iterable", ctx) + ")",
                         TypeRef.VOID);
             }
             if (tt.is("Set") && n.equals("retainAll")) {
-                return new Out(target.code + ".retainAll(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                return new Out(target.code + ".retainAll(" + coreArg(pos.get(0), null, ctx).code + ")",
                         TypeRef.VOID);
             }
         }
         if (tt.is("Map")) {
             if (n.equals("containsKey")) {
-                Out v = emitExpr(pos.get(0), null, ctx);
+                Out v = coreArg(pos.get(0), null, ctx);
                 return new Out(target.code + ".containsKey(" + boxIfPrimitive(v, ctx) + ")", TypeRef.BOOL);
             }
             if (n.equals("containsValue")) {
                 // Boxed through Object so a primitive argument picks containsValue(Object),
                 // which compares with Dart's ==; unresolved before.
-                Out v = emitExpr(pos.get(0), null, ctx);
+                Out v = coreArg(pos.get(0), null, ctx);
                 return new Out(target.code + ".containsValue((Object) " + paren(v.code) + ")", TypeRef.BOOL);
             }
             if (n.equals("remove")) {
-                Out v = emitExpr(pos.get(0), null, ctx);
+                Out v = coreArg(pos.get(0), null, ctx);
                 return new Out(target.code + ".removeDart(" + boxIfPrimitive(v, ctx) + ")", boxType(tt.arg(1)));
             }
             if (n.equals("forEach")) {
-                Out f = emitExpr(pos.get(0), mapEntryCallbackType(tt, TypeRef.VOID), ctx);
+                Out f = coreArg(pos.get(0), mapEntryCallbackType(tt, TypeRef.VOID), ctx);
                 return new Out(target.code + ".forEachDart(" + f.code + ")", TypeRef.VOID);
             }
             if (n.equals("putIfAbsent")) {
-                Out k = emitExpr(pos.get(0), null, ctx);
+                Out k = coreArg(pos.get(0), tt.args.size() == 2 ? tt.arg(0) : null, ctx);
                 // `V Function()`: the closure's literal builds the map's value type, so
                 // `() => []` on a Map<K, List<int>> makes a DartLongList.
                 TypeRef ifAbsentType = null;
@@ -22148,7 +22407,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     ifAbsentType.funcParams = new ArrayList<TypeRef>();
                     ifAbsentType.funcReturn = tt.arg(1);
                 }
-                Out f = emitExpr(pos.get(1), ifAbsentType, ctx);
+                Out f = coreArg(pos.get(1), ifAbsentType, ctx);
                 return new Out(target.code + ".putIfAbsentDart(" + boxIfPrimitive(k, ctx) + ", " + f.code + ")",
                         boxType(tt.arg(1)));
             }
@@ -22166,10 +22425,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (n.equals("removeWhere")) {
                 return new Out(target.code + ".removeWhere("
-                        + emitExpr(pos.get(0), mapEntryCallbackType(tt, TypeRef.BOOL), ctx).code + ")", TypeRef.VOID);
+                        + coreArg(pos.get(0), mapEntryCallbackType(tt, TypeRef.BOOL), ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("update")) {
-                Out k = emitExpr(pos.get(0), null, ctx);
+                Out k = coreArg(pos.get(0), null, ctx);
                 // `V Function(V)` and `V Function()`: the closures' parameters are the map's
                 // value type, so `(e) => MapEntry(key, f(e.value))` reads e's members.
                 TypeRef vt = tt.args.size() == 2 && typeVarsInScope(tt.arg(1), ctx)
@@ -22185,11 +22444,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     absentType.funcParams = new ArrayList<TypeRef>();
                     absentType.funcReturn = vt;
                 }
-                Out upd = emitExpr(pos.get(1), updType, ctx);
+                Out upd = coreArg(pos.get(1), updType, ctx);
                 String ifAbsent = "null";
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("ifAbsent")) {
-                        ifAbsent = emitExpr(na.value, absentType, ctx).code;
+                        ifAbsent = coreArg(na.value, absentType, ctx).code;
                     }
                 }
                 return new Out(target.code + ".update(" + boxIfPrimitive(k, ctx) + ", " + upd.code
@@ -22283,7 +22542,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".then(" + cbCode + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
             }
             if (n.equals("catchError")) {
-                Out cb = emitExpr(pos.get(0), null, ctx);
+                Out cb = coreArg(pos.get(0), null, ctx);
                 // `(error, stackTrace) { .. }` is the two-argument handler shape: pinned to a
                 // one-argument SAM it was "incompatible parameter types in lambda expression"
                 boolean twoArg = pos.get(0) instanceof Lambda && ((Lambda) pos.get(0)).params.size() == 2;
@@ -22501,7 +22760,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         if (cc.ctorName.equals("from")) {
             // A program IterableBase/SetBase object is no Java Iterable: its live bridge.
-            String src = mixinIterableCode(emitExpr(pos.get(0), null, ctx));
+            // Set.from(Iterable elements): a dynamic source is downcast to Iterable first.
+            String src = mixinIterableCode(iterableArg(pos.get(0), ctx));
             // Each element is checked against a concrete element type, as Dart does
             // (the primitive lists check their own); dynamic, Object and type variables
             // accept anything and keep the plain copy.
@@ -22590,8 +22850,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && !f.type.funcReturn.is("FutureOr") && typeVarsInScope(f.type.funcReturn, ctx)) {
             t = f.type.funcReturn;
         }
+        boolean inferred = false;
+        if (t == null && f.closureReturn != null) {
+            // A closure computation: T is its own static return type, flattened (Dart's
+            // `Future(() => 1)` is a Future<int>), recorded on the future it makes.
+            TypeRef cr = flattenFutureType(f.closureReturn);
+            if (cr != null && isConcreteType(cr) && !cr.is("void") && !cr.is("Null") && typeVarsInScope(cr, ctx)) {
+                t = cr;
+                inferred = true;
+            }
+        }
         TypeRef vt = t != null ? t : TypeRef.DYNAMIC;
-        return new Out("Future.<" + javaType(vt, true, ctx) + ">create(" + f.code + ")", TypeRef.of("Future", vt));
+        String made = "Future.<" + javaType(vt, true, ctx) + ">create(" + f.code + ")";
+        return new Out(inferred ? reifyWith(made, vt, ctx) : made, TypeRef.of("Future", vt));
     }
 
     private Out emitFutureNamedCtor(CtorCall cc, Ctx ctx) {
@@ -22600,8 +22871,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         List<Expr> pos = cc.args.positional;
         if (ctor.equals("delayed")) {
             String dur = emitExpr(pos.get(0), new TypeRef("Duration"), ctx).code;
-            String comp = pos.size() > 1 ? emitExpr(pos.get(1), null, ctx).code : null;
-            return new Out("Future.delayed(" + dur + (comp != null ? ", " + comp : "") + ")",
+            Out compO = pos.size() > 1 ? emitExpr(pos.get(1), null, ctx) : null;
+            String comp = compO != null ? compO.code : null;
+            TypeRef rt = !cc.type.args.isEmpty() ? cc.type.arg(0)
+                    : compO != null ? flattenFutureType(compO.closureReturn) : null;
+            if (rt != null && (rt.is("void") || rt.is("Null"))) {
+                rt = null;
+            }
+            return new Out(reifyWith("Future.delayed(" + dur + (comp != null ? ", " + comp : "") + ")", rt, ctx),
                     TypeRef.of("Future", TypeRef.DYNAMIC));
         }
         if (ctor.equals("value")) {
@@ -23023,9 +23300,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (ctor.equals("identity")) {
                 return new Out("DartSet" + witness + "identity()", cc.type);
             }
+            if (ctor.equals("from") && isConcreteType(et) && !isDynamicType(et)) {
+                // Set<E>.from(Iterable elements) checks each element against E, as List.from
+                // does; its source may be dynamic (`Set<String>.from(jsonDecode(s))`).
+                String src = mixinIterableCode(iterableArg(pos.get(0), ctx));
+                String jt = javaType(copyNonNull(et), true, ctx);
+                String raw = jt.indexOf('<') >= 0 ? jt.substring(0, jt.indexOf('<')) : jt;
+                return new Out("DartSet" + witness + "fromChecked(" + src + ", " + raw + ".class, " + et.nullable
+                        + ")", cc.type);
+            }
             if (ctor.equals("of") || ctor.equals("from")) {
                 // `Set<T>.of(this)` in a program SetBase class: the object's live bridge.
-                String src = mixinIterableCode(emitExpr(pos.get(0), null, ctx));
+                String src = mixinIterableCode(ctor.equals("from") ? iterableArg(pos.get(0), ctx)
+                        : emitExpr(pos.get(0), null, ctx));
                 return new Out("DartSet" + witness + "from(" + src + ")", cc.type);
             }
             if (ctor.equals("castFrom") && !pos.isEmpty()) {
@@ -23078,7 +23365,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     break;
                 }
             }
-            sb.append(match == null ? "0L" : emitExpr(match, TypeRef.INT, ctx).code);
+            sb.append(match == null ? "0L" : coreArg(match, TypeRef.INT, ctx).code);
         }
         sb.append(')');
         return new Out(sb.toString(), new TypeRef("Duration"));
@@ -26160,6 +26447,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             Expr a = args.positional.get(i);
             TypeRef expect = null;
             if (a instanceof Lambda) {
+                // Typed from its own declaration and body, as an argument to a dynamic
+                // function value is: `(Object o) => print(o)` is a void closure, so it
+                // binds to a void SAM, not to Func1 whose value the body cannot supply.
+                sb.append(dynamicCallClosureArg((Lambda) a, ctx));
+                continue;
+            }
+            if (a instanceof Lambda) {
                 expect = new TypeRef("Function");
                 expect.funcParams = new ArrayList<TypeRef>();
                 for (int k = 0; k < ((Lambda) a).params.size(); k++) {
@@ -26579,7 +26873,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 sb.append(", ");
             }
             sb.append(i < args.positional.size()
-                    ? slotArg(args.positional.get(i), lambdaSlot(args.positional.get(i), slotTypes, i), ctx)
+                    ? valueArg(args.positional.get(i), slotTypes, i, ctx)
                     : omittedArg(slotTypes, i, ctx));
         }
         if (named != null) {
@@ -26594,10 +26888,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     }
                 }
                 sb.append(v == null ? omittedArg(slotTypes, positionalSlots + named.indexOf(nm), ctx)
-                        : slotArg(v, lambdaSlot(v, slotTypes, positionalSlots + named.indexOf(nm)), ctx));
+                        : valueArg(v, slotTypes, positionalSlots + named.indexOf(nm), ctx));
             }
         }
         return sb.toString();
+    }
+
+    /// One argument to a function value. A statically dynamic argument is Dart's implicit
+    /// downcast to the slot's parameter type (`T Function(Map<String, dynamic>) f; f(e)`
+    /// with a dynamic `e`), so it compiles against the SAM's parameter and a mismatch is a
+    /// TypeError at the call.
+    private String valueArg(Expr arg, List<TypeRef> slotTypes, int i, Ctx ctx) {
+        TypeRef slot = slotTypes != null && i < slotTypes.size() ? slotTypes.get(i) : null;
+        if (!(arg instanceof Lambda) && slot != null && staticallyDynamic(arg, ctx)) {
+            return coreArg(arg, slot, ctx).code;
+        }
+        return slotArg(arg, lambdaSlot(arg, slotTypes, i), ctx);
     }
 
     /**
@@ -28767,6 +29073,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 TypeRef el = target.arg(0);
                 call = "dart.runtime.DartRuntime.asListOf((Object) " + paren(o.code) + ", "
                         + elementClassLiteral(el, ctx) + ", " + (el != null && el.nullable) + ", "
+                        + target.nullable + ", " + quote(target.toString()) + ")";
+            } else if (target.is("Map") && target.args.size() == 2
+                    && (elementClassLiteral(target.arg(0), ctx).equals("null") && !isDynamicType(target.arg(0))
+                        || elementClassLiteral(target.arg(1), ctx).equals("null") && !isDynamicType(target.arg(1)))
+                    && collectionTestArgs(target, ctx) != null) {
+                // A key or value no class literal names (`Map<String, List<int>>`): tested by
+                // the witnesses, which see its type arguments, so a decoded map whose values
+                // are List<dynamic> is the TypeError Dart reports. asMapOf could not check it.
+                String[] ca = collectionTestArgs(target, ctx);
+                call = "dart.runtime.TypeWitness.checkCast((Object) " + paren(o.code) + ", " + ca[0] + ", "
+                        + erasedJavaType(target, ctx) + ".class, " + ca[1] + ", " + ca[2] + ", "
                         + target.nullable + ", " + quote(target.toString()) + ")";
             } else if (target.is("Map") && target.args.size() == 2) {
                 call = "dart.runtime.DartRuntime.asMapOf((Object) " + paren(o.code) + ", "

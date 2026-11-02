@@ -45,6 +45,15 @@ public final class DartComparable {
         if (a instanceof Comparable) {
             return ((Comparable) a).compareTo(b);
         }
+        if (a instanceof DateTime) {
+            // DateTime is a Comparable<DateTime> in Dart, but its Java compareTo answers a
+            // Dart int (long), so the class is no java.lang.Comparable.
+            if (!(b instanceof DateTime)) {
+                throw new TypeError("type '" + (b == null ? "Null" : b.getClass().getName())
+                        + "' is not a subtype of type 'DateTime'");
+            }
+            return ((DateTime) a).compareTo((DateTime) b);
+        }
         throw new TypeError("type '" + (a == null ? "Null" : a.getClass().getName())
                 + "' is not a subtype of type 'Comparable'");
     }

@@ -78,6 +78,12 @@ final class CaptureScan {
      * update clause, so a closure that captures it needs a per-iteration
      * effectively-final copy (Dart binds the loop variable fresh each pass).
      */
+    static boolean readInLambda(Expr body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkExpr(body);
+        return scan.referencedInLambda.contains(name);
+    }
+
     static boolean readInLambda(Stmt body, String name) {
         CaptureScan scan = new CaptureScan();
         scan.walkStmt(body);

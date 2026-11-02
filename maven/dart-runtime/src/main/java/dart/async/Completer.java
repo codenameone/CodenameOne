@@ -30,6 +30,16 @@ public class Completer<T> {
 
     private final Future<T> future = new Future<T>();
 
+    /// Records {@code w} as the type argument of {@code c}'s future: `Completer<String>()`
+    /// makes a Future<String>. The emitter wraps a construction whose T it knows; a null
+    /// witness records nothing.
+    public static <C extends Completer<?>> C reify(C c, dart.runtime.TypeWitness w) {
+        if (c != null) {
+            Future.reify(((Completer<?>) c).future, w);
+        }
+        return c;
+    }
+
     public Future<T> future() {
         return future;
     }

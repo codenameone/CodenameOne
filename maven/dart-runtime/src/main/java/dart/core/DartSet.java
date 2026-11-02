@@ -259,6 +259,26 @@ public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified
         return s;
     }
 
+    /// Dart's {@code Set<E>.from(iterable)} with a concrete E: each element is checked
+    /// against E, and a source that is no Iterable (a dynamic one) is a TypeError.
+    @SuppressWarnings("unchecked")
+    public static <E> DartSet<E> fromChecked(Object source, Class<?> type, boolean nullable) {
+        if (!(source instanceof Iterable)) {
+            throw new TypeError("type '" + (source == null ? "Null" : source.getClass().getName())
+                    + "' is not a subtype of type 'Iterable'");
+        }
+        DartSet<E> s = new DartSet<>();
+        for (Object e : (Iterable<?>) source) {
+            if (e == null ? !nullable : !type.isInstance(e)) {
+                String n = type.getName();
+                throw new TypeError("type '" + (e == null ? "Null" : e.getClass().getName())
+                        + "' is not a subtype of type '" + n.substring(n.lastIndexOf('.') + 1) + "'");
+            }
+            s.add((E) e);
+        }
+        return s;
+    }
+
     /** Dart's {@code Set.from(iterable)} / {@code Set.of(iterable)} — copy elements. */
     public static <E> DartSet<E> from(Iterable<? extends E> elements) {
         DartSet<E> s = new DartSet<>();

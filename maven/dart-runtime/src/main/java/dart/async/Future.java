@@ -54,6 +54,17 @@ public class Future<T> {
 
     /// Records {@code w} as {@code f}'s type argument and answers {@code f}; the emitter
     /// wraps a construction whose type argument it knows. A null witness records nothing.
+    /// Records {@code w} as {@code f}'s type argument unless one is recorded already, and
+    /// answers it. The emitter calls it on the result of a call whose static type is
+    /// Future<X>: a future a member or a function value made without recording X takes the
+    /// declared X, and one that recorded its own (narrower) X keeps it.
+    public static <F extends Future<?>> F reifyUnknown(F f, dart.runtime.TypeWitness w) {
+        if (f != null && w != null && ((Future<?>) f).typeArg == null) {
+            ((Future<?>) f).typeArg = w;
+        }
+        return f;
+    }
+
     public static <F extends Future<?>> F reify(F f, dart.runtime.TypeWitness w) {
         if (f != null && w != null) {
             ((Future<?>) f).typeArg = w;
@@ -151,6 +162,34 @@ public class Future<T> {
             errorHandled = true;
             return done ? error : null;
         }
+    }
+
+    /// Dart's {@code Future.any}: completes with the outcome of the first of
+    /// {@code futures} to complete, value or error; the later ones are ignored.
+    public static <T> Future<T> any(Iterable<? extends Future<? extends T>> futures) {
+        final Future<T> result = new Future<T>();
+        final boolean[] settled = new boolean[1];
+        for (Future<? extends T> f : futures) {
+            @SuppressWarnings("unchecked")
+            Future<T> ft = (Future<T>) f;
+            ft.then(new Funcs.Func1<T, Object>() {
+                public Object call(T v) {
+                    if (!settled[0]) {
+                        settled[0] = true;
+                        result.complete(v);
+                    }
+                    return null;
+                }
+            }).catchError(new Funcs.VoidFunc1<Object>() {
+                public void call(Object e) {
+                    if (!settled[0]) {
+                        settled[0] = true;
+                        result.completeError(e);
+                    }
+                }
+            });
+        }
+        return result;
     }
 
     /** An already-completed future. */
