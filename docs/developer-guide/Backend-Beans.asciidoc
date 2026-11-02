@@ -440,8 +440,8 @@ needs, so a project needs no copy of its own:
 * On the client, `com.codename1.appkit.Net` adapts a generated client call to a
   pair of success and failure callbacks, `Skeleton` is a loading placeholder,
   and `Chart` draws a small bar chart with its `Meter`.
-* On the server, `com.codename1.appkit.server.Caller` answers who is signed in
-  and which roles they hold, `Text` validates and trims request fields, and
+* On the server, `com.codename1.appkit.server.Caller` reports the signed-in
+  user and their roles, `Text` validates and trims request fields, and
   `Grants` ends a user's other sessions. `AccountSecurity` builds the password
   encoder, the user store and the registered client a sign-in flow needs.
   None of these is a bean of its own: the kit wires nothing into a server
