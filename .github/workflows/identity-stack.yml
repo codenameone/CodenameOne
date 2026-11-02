@@ -21,60 +21,27 @@ name: Identity stack
 #                      the build cloud.
 
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch: {}
   pull_request:
     branches: [ master ]
     paths:
-      - 'scripts/ci/retry.sh'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/webauthn/**'
-      - 'CodenameOne/src/com/codename1/io/Oauth2.java'
-      - 'CodenameOne/src/com/codename1/io/AccessToken.java'
-      - 'CodenameOne/src/com/codename1/social/**'
-      - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
-      - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
-      - 'Ports/iOSPort/nativeSources/CN1WebAuthn.*'
-      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.h'
-      - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
-      - 'Ports/iOSPort/src/com/codename1/io/webauthn/**'
-      - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
-      - 'Ports/Android/src/com/codename1/io/oidc/**'
-      - 'Ports/Android/src/com/codename1/io/webauthn/**'
-      - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
-      - 'maven/core-unittests/src/test/java/com/codename1/io/oidc/**'
-      - 'maven/core-unittests/src/test/java/com/codename1/io/webauthn/**'
-      - 'maven/core-unittests/src/test/java/com/codename1/io/Oauth2*'
-      - 'maven/core-unittests/src/test/java/com/codename1/social/**'
-      - 'Samples/samples/UniversalSignInDemo/**'
-      - 'docs/developer-guide/Authentication-And-Identity.asciidoc'
-      - '.github/workflows/identity-stack.yml'
-  push:
-    branches: [ master ]
-    paths:
-      - 'scripts/ci/retry.sh'
-      - 'CodenameOne/src/com/codename1/io/oidc/**'
-      - 'CodenameOne/src/com/codename1/io/webauthn/**'
-      - 'CodenameOne/src/com/codename1/io/Oauth2.java'
       - 'CodenameOne/src/com/codename1/social/**'
       - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
       - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
       - 'Ports/iOSPort/nativeSources/CN1WebAuthn.*'
       - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
       - 'Ports/iOSPort/src/com/codename1/io/webauthn/**'
-      - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
       - 'Ports/Android/src/com/codename1/io/oidc/**'
       - 'Ports/Android/src/com/codename1/io/webauthn/**'
-      - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
-      - 'maven/core-unittests/src/test/java/com/codename1/io/oidc/**'
-      - 'maven/core-unittests/src/test/java/com/codename1/io/webauthn/**'
       - 'Samples/samples/UniversalSignInDemo/**'
       - '.github/workflows/identity-stack.yml'
+  schedule:
+    - cron: '0 0 * * *'
 
 permissions:
   contents: read

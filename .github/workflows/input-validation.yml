@@ -14,27 +14,17 @@ name: Input validation gesture suite
 # scripts/input-validation-app/README.adoc for the "not yet covered" list.
 
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     paths:
       - '.github/workflows/input-validation.yml'
       - 'scripts/input-validation-app/**'
       - 'scripts/ios/keyboard-peer-tests/**'
-      - 'Ports/iOSPort/nativeSources/CN1MacWindows.m'
-      - 'scripts/lib/xcode.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'CodenameOne/src/com/codename1/ui/Component.java'
-      - 'CodenameOne/src/com/codename1/ui/Form.java'
-      - 'CodenameOne/src/com/codename1/ui/Button.java'
-      - 'Ports/iOSPort/nativeSources/CN1TapGestureRecognizer.m'
-      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
-  push:
-    branches: [ master ]
-    paths:
-      - '.github/workflows/input-validation.yml'
-      - 'scripts/input-validation-app/**'
-      - 'scripts/lib/xcode.sh'
-      - 'scripts/build-ios-app.sh'
   workflow_dispatch: {}
+  schedule:
+    - cron: '0 0 * * *'
 
 env:
   # A method the translator culled as unreachable is still emitted as a stub,

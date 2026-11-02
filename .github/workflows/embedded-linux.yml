@@ -16,28 +16,18 @@
 name: Embedded Linux
 
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - 'Ports/LinuxPort/**'
-      - 'CodenameOne/src/**'
-      - 'vm/ByteCodeTranslator/src/**'
-      - 'vm/JavaAPI/src/**'
-      - 'maven/linux/**'
-      - 'scripts/embedded/**'
-      - 'vm/backend/**'
-      - '.github/workflows/embedded-linux.yml'
   pull_request:
     paths:
       - 'Ports/LinuxPort/**'
-      - 'CodenameOne/src/**'
-      - 'vm/ByteCodeTranslator/src/**'
-      - 'vm/JavaAPI/src/**'
       - 'maven/linux/**'
       - 'scripts/embedded/**'
-      - 'vm/backend/**'
       - '.github/workflows/embedded-linux.yml'
+  schedule:
+    - cron: '0 0 * * *'
 
 concurrency:
   group: embedded-linux-${{ github.ref }}

@@ -13,19 +13,11 @@ name: Health (Health Connect) integration
 # the desugared library -- which changes behaviour for unrelated tests. The
 # shared conformance suite must keep running at the framework's normal floor.
 'on':
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/health-android.yml'
       - 'CodenameOne/src/com/codename1/health/**'
       - 'CodenameOne/src/com/codename1/impl/health/**'
@@ -35,34 +27,10 @@ name: Health (Health Connect) integration
       - 'maven/build-engine/src/main/resources/com/codename1/builders/health/**'
       - 'maven/build-engine/src/main/java/com/codename1/builders/HealthManifestFragments.java'
       - 'maven/build-engine/src/main/java/com/codename1/builders/HealthListenerBindings.java'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
       - 'scripts/hellocodenameone/health-smoke/**'
-  push:
-    branches:
-      - master
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/health-android.yml'
-      - 'CodenameOne/src/com/codename1/health/**'
-      - 'CodenameOne/src/com/codename1/impl/health/**'
-      - 'Ports/Android/src/com/codename1/impl/android/AndroidHealth*.java'
-      - 'Ports/Android/src/com/codename1/impl/android/HealthConnectDelegate.java'
-      - 'Ports/Android/src/com/codename1/health/**'
-      - 'maven/build-engine/src/main/resources/com/codename1/builders/health/**'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/HealthManifestFragments.java'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/HealthListenerBindings.java'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
-      - 'scripts/hellocodenameone/health-smoke/**'
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

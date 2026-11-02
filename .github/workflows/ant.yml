@@ -1,16 +1,18 @@
 name: Java CI
 
 on:
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - 'CodenameOneDesigner/**'
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     branches:
       - master
-    paths-ignore:
-      - 'CodenameOneDesigner/**'
+    paths:
+      - 'maven/integration-tests/**'
+      - '.github/workflows/ant.yml'
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

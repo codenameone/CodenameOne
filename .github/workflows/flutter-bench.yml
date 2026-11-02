@@ -13,15 +13,11 @@ name: Flutter benchmark
 # wiring breaks this workflow too instead of passing unnoticed.
 
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     paths:
-      - 'maven/flutter-runtime/**'
-      - 'maven/dart-transpiler/**'
-      - 'maven/dart-runtime/**'
-      - 'maven/codenameone-maven-plugin/**'
-      # The builders the plugin runs live here since the build engine split out.
-      - 'maven/build-engine/**'
-      - 'maven/cn1app-archetype/**'
       - 'scripts/flutter-bench/**'
       # The regression gate's rules and CPU detection are the ParparVM gate's own
       # (flutter_baseline.py runs vm/selfhost/perf_baseline.py with its own layout).
@@ -31,7 +27,7 @@ on:
   schedule:
     # Nightly, so port status carries a current number and the PR runs have a
     # trend to sit against rather than a single point.
-    - cron: '0 3 * * *'
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       platforms:

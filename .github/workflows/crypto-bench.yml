@@ -28,41 +28,26 @@ permissions:
   contents: read
 
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch:
   pull_request:
     branches:
       - master
     paths:
-      - 'CodenameOne/src/com/codename1/security/**'
-      - 'CodenameOne/src/com/codename1/crypto/**'
       - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
       - 'vm/ByteCodeTranslator/src/cn1_crypto_gpu*'
       - 'scripts/crypto-gpu/**'
       - 'Ports/JavaScriptPort/src/main/webapp/js/cn1_crypto_gpu.js'
-      - 'Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/HTML5CryptoEngine.java'
       - 'scripts/crypto-bench/**'
       - 'scripts/crypto-kernels/**'
       - 'Ports/Android/crypto-jni/**'
       - 'maven/build-engine/src/main/resources/com/codename1/builders/android-crypto/**'
       - 'scripts/check-android-crypto-kernels.sh'
       - '.github/workflows/crypto-bench.yml'
-  push:
-    branches:
-      - master
-    paths:
-      - 'CodenameOne/src/com/codename1/security/**'
-      - 'CodenameOne/src/com/codename1/crypto/**'
-      - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
-      - 'vm/ByteCodeTranslator/src/cn1_crypto_gpu*'
-      - 'scripts/crypto-gpu/**'
-      - 'Ports/JavaScriptPort/src/main/webapp/js/cn1_crypto_gpu.js'
-      - 'Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/HTML5CryptoEngine.java'
-      - 'scripts/crypto-bench/**'
-      - 'scripts/crypto-kernels/**'
-      - 'Ports/Android/crypto-jni/**'
-      - 'maven/build-engine/src/main/resources/com/codename1/builders/android-crypto/**'
-      - 'scripts/check-android-crypto-kernels.sh'
-      - '.github/workflows/crypto-bench.yml'
+  schedule:
+    - cron: '0 0 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}

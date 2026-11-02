@@ -25,60 +25,19 @@ name: Gradle build smoke
 # the floor Gradle projects support and the current LTS, and on both the Gradle
 # the wrapper pins and the oldest one the plugin supports.
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     branches: [ master ]
     paths:
-      - 'scripts/ci/apt-get-install.sh'
-      - 'Ports/JavaSE/**'
       - 'maven/codenameone-gradle-plugin/**'
       - 'maven/codenameone-gradle-plugin-marker/**'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'maven/css-compiler/**'
-      - 'maven/css-cli/**'
-      - 'maven/build-engine/**'
-      - 'maven/dart-transpiler/**'
-      - 'maven/dart-runtime/**'
-      - 'maven/flutter-runtime/**'
-      - 'maven/project-model/**'
-      - 'maven/cn1app-archetype/**'
-      - 'maven/backend/**'
-      - 'maven/pom.xml'
-      - 'maven/javase/**'
       - 'maven/integration-tests/gradle-*.sh'
-      - 'maven/integration-tests/inc/**'
-      - 'scripts/settings/**'
-      - 'scripts/initializr/common/src/main/java/com/codename1/initializr/model/**'
-      - 'scripts/tests/GenerateInitializr.java'
-      - 'scripts/tests/generate-initializr-fixtures.py'
-      - 'scripts/initializr/common/src/main/resources/**'
       - '.github/workflows/gradle-smoke.yml'
-  push:
-    branches: [ master ]
-    paths:
-      - 'scripts/ci/apt-get-install.sh'
-      - 'Ports/JavaSE/**'
-      - 'maven/codenameone-gradle-plugin/**'
-      - 'maven/codenameone-gradle-plugin-marker/**'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'maven/css-compiler/**'
-      - 'maven/css-cli/**'
-      - 'maven/build-engine/**'
-      - 'maven/dart-transpiler/**'
-      - 'maven/dart-runtime/**'
-      - 'maven/flutter-runtime/**'
-      - 'maven/project-model/**'
-      - 'maven/cn1app-archetype/**'
-      - 'maven/backend/**'
-      - 'maven/pom.xml'
-      - 'maven/javase/**'
-      - 'maven/integration-tests/gradle-*.sh'
-      - 'maven/integration-tests/inc/**'
-      - 'scripts/settings/**'
-      - 'scripts/initializr/common/src/main/java/com/codename1/initializr/model/**'
-      - 'scripts/tests/GenerateInitializr.java'
-      - 'scripts/tests/generate-initializr-fixtures.py'
-      - 'scripts/initializr/common/src/main/resources/**'
-      - '.github/workflows/gradle-smoke.yml'
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

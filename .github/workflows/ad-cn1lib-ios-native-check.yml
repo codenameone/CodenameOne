@@ -13,6 +13,9 @@ name: Ad cn1lib iOS native check
 # AdMobCallback entry point) do not have to resolve.
 
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch:
   pull_request:
     branches: [master]
@@ -21,23 +24,11 @@ on:
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
       - 'scripts/check-admob-ios-link.sh'
-      - 'vm/ByteCodeTranslator/**'
-      - 'vm/pom.xml'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
       - 'scripts/ci/select-cn1lib-checks.py'
       - 'scripts/ci/check-ios-cn1lib.py'
-  push:
-    branches: [master]
-    paths:
-      - 'maven/cn1-admob/**'
-      - 'maven/cn1-applovin/**'
-      - 'maven/cn1-unity-levelplay/**'
-      - 'scripts/check-admob-ios-link.sh'
-      - 'vm/ByteCodeTranslator/**'
-      - 'vm/pom.xml'
-      - '.github/workflows/ad-cn1lib-ios-native-check.yml'
-      - 'scripts/ci/select-cn1lib-checks.py'
-      - 'scripts/ci/check-ios-cn1lib.py'
+  schedule:
+    - cron: '0 0 * * *'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

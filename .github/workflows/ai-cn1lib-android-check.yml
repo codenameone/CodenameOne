@@ -7,6 +7,9 @@ name: AI cn1lib Android native check
 # workflow is a fast static gate.
 
 on:
+  # Nightly at 00:00 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   workflow_dispatch:
   pull_request:
     branches: [master]
@@ -14,11 +17,8 @@ on:
       - 'maven/cn1-ai-**'
       - 'scripts/gen-ai-cn1libs.py'
       - '.github/workflows/ai-cn1lib-android-check.yml'
-  push:
-    branches: [master]
-    paths:
-      - 'maven/cn1-ai-**'
-      - 'scripts/gen-ai-cn1libs.py'
+  schedule:
+    - cron: '0 0 * * *'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
