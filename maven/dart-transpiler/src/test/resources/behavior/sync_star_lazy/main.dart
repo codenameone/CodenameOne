@@ -70,7 +70,7 @@ class Box {
 extension Pairs on List<int> {
   Iterable<(int, int)> pairs() sync* {
     for (var i = 0; i + 1 < length; i += 2) {
-      final (int a, int b) = (this[i], this[i + 1]);
+      final (a, b) = (this[i], this[i + 1]);
       yield (a, b);
     }
   }

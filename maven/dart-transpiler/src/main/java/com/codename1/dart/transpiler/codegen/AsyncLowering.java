@@ -101,6 +101,8 @@ final class AsyncLowering {
 
     /// The frame being emitted, read by JavaEmitter's hooks (Ctx.frame).
     static final class Frame {
+        /// The body's normalizer, for statements the lowering synthesizes (case guards).
+        AsyncAnf anf;
         String name;
         String label;
         boolean isVoid;
@@ -155,7 +157,8 @@ final class AsyncLowering {
             for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
                 for (Field f : k.getDeclaredFields()) {
                     // Args is no Node: a call's arguments hold awaits too.
-                    if (!Modifier.isStatic(f.getModifiers()) && (Node.class.isAssignableFrom(f.getType())
+                    if (!Modifier.isStatic(f.getModifiers()) && !"inferFrom".equals(f.getName())
+                            && (Node.class.isAssignableFrom(f.getType())
                             || List.class.isAssignableFrom(f.getType()) || f.getType() == Args.class)) {
                         f.setAccessible(true);
                         fs.add(f);
@@ -362,12 +365,10 @@ final class AsyncLowering {
             if (hasAwait(sw.subject)) {
                 return false;
             }
+            // A guard that awaits, or a case binding variables for a body that awaits, is
+            // lowered case by case into states (lowerSwitchStates).
             for (SwitchCase c : sw.cases) {
-                if (hasAwait(c.guard)) {
-                    return false;
-                }
-                if (hasAwait(c.body) && (c.pattern != null && !(c.pattern instanceof ConstantPattern)
-                        || !listOk(c.body))) {
+                if (hasAwait(c.body) && !listOk(c.body)) {
                     return false;
                 }
             }
@@ -455,16 +456,18 @@ final class AsyncLowering {
             return false;
         }
         final JavaEmitter.Ctx nctx = ctx;
-        body = new AsyncAnf(params, body, new java.util.function.Predicate<String>() {
+        AsyncAnf anf = new AsyncAnf(params, body, new java.util.function.Predicate<String>() {
             @Override
             public boolean test(String n) {
                 return em.namesNoValue(n, nctx);
             }
-        }).normalize(body);
+        });
+        body = anf.normalize(body);
         if (!lowerable(body)) {
             return false;
         }
         Frame f = new Frame();
+        f.anf = anf;
         f.name = ctx.newTemp();
         f.label = f.name + "sm";
         f.isVoid = isVoid;
@@ -1077,6 +1080,10 @@ final class AsyncLowering {
             open(f, exit, ctx);
             return;
         }
+        if (s instanceof SwitchStmt && needsStates((SwitchStmt) s)) {
+            lowerSwitchStates((SwitchStmt) s, f, ctx);
+            return;
+        }
         if (s instanceof SwitchStmt) {
             SwitchStmt sw = (SwitchStmt) s;
             int exit = newState(f);
@@ -1321,6 +1328,221 @@ final class AsyncLowering {
     /// subject, the match and the guard run in one state; the bindings are frame fields
     /// (patternBinding), so the then-branch reads them in whatever state it resumes in.
     /// AsyncAnf has already moved an await of the subject or the guard out of the test.
+    /// Whether a switch statement holding an await must be lowered case by case: a guard
+    /// awaits, a case binding variables has a body that awaits, or a case is the target of
+    /// a labeled continue. The other shape stays a Java switch whose awaiting bodies move
+    /// to states of their own.
+    private static boolean needsStates(SwitchStmt sw) {
+        for (SwitchCase c : sw.cases) {
+            if (hasAwait(c.guard) || c.labels != null
+                    || hasAwait(c.body) && c.pattern != null && !(c.pattern instanceof ConstantPattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// A switch statement as states: every case is a test state, tried in order, whose
+    /// pattern binds into frame fields and whose guard may suspend; a match jumps to the
+    /// case's body state. An empty case shares the body of the next case that has one, as
+    /// Dart's fall-through does. `break` leaves for the exit state and `continue l` jumps
+    /// to the body of the case labeled `l`. A body that falls off its end leaves the switch.
+    private void lowerSwitchStates(SwitchStmt sw, Frame f, JavaEmitter.Ctx ctx) {
+        JavaEmitter.Ctx.Writer w = ctx.writer();
+        int exit = newState(f);
+        int n = sw.cases.size();
+        int[] tests = new int[n];
+        int[] bodies = new int[n];
+        for (int i = 0; i < n; i++) {
+            tests[i] = newState(f);
+            bodies[i] = newState(f);
+        }
+        int[] target = new int[n];
+        int shared = exit;
+        for (int i = n - 1; i >= 0; i--) {
+            if (!sw.cases.get(i).body.isEmpty()) {
+                shared = bodies[i];
+            }
+            target[i] = shared;
+        }
+        JavaEmitter.Out subj = em.emitExpr(sw.subject, null, ctx);
+        TypeRef st = subj.type != null ? subj.type : TypeRef.DYNAMIC;
+        String sf = field(f, em.javaType(st, true, ctx), "s" + exit);
+        w.line(sf + " = " + subj.code + ";");
+        int pushed = 0;
+        for (int i = 0; i < n; i++) {
+            SwitchCase c = sw.cases.get(i);
+            if (c.labels != null) {
+                f.targets.add(new Target(f.fins.size(), LABEL, c.labels, exit, target[i]));
+                pushed++;
+            }
+        }
+        f.targets.add(new Target(f.fins.size(), SWITCH, null, exit, -1));
+        // A body shared by several cases reads the variables every one of them binds (Dart
+        // requires each to bind it with the same type): one frame field per such variable,
+        // assigned by whichever case matched, read by the body. sharedNames[i] holds the
+        // names for every case of a group of two or more, the case with the body included.
+        List<Set<String>> sharedNames = new ArrayList<Set<String>>();
+        for (int i = 0; i < n; i++) {
+            sharedNames.add(null);
+        }
+        for (int start = 0; start < n; ) {
+            int end = start;
+            while (end < n - 1 && sw.cases.get(end).body.isEmpty()) {
+                end++;
+            }
+            if (end > start) {
+                Set<String> common = null;
+                for (int k = start; k <= end; k++) {
+                    Set<String> names = new java.util.LinkedHashSet<String>();
+                    if (sw.cases.get(k).pattern != null && !sw.cases.get(k).isDefault) {
+                        patternNames(sw.cases.get(k).pattern, names);
+                    }
+                    if (common == null) {
+                        common = names;
+                    } else {
+                        common.retainAll(names);
+                    }
+                }
+                for (int k = start; k <= end; k++) {
+                    sharedNames.set(k, common);
+                }
+            }
+            start = end + 1;
+        }
+        Map<String, String> sharedRefs = new HashMap<String, String>();
+        Map<String, TypeRef> sharedTypes = new HashMap<String, TypeRef>();
+        for (int i = 0; i < n; i++) {
+            SwitchCase c = sw.cases.get(i);
+            int next = i + 1 < n ? tests[i + 1] : exit;
+            open(f, tests[i], ctx);
+            // A case's variables are visible to its guard and to its own body; a body
+            // shared by several cases sees none of them.
+            boolean own = !c.body.isEmpty() && (i == 0 || !sw.cases.get(i - 1).body.isEmpty());
+            ctx.pushScope();
+            if (c.isDefault || c.pattern == null) {
+                jump(f, target[i], ctx);
+            } else {
+                int guard = hasAwait(c.guard) ? newState(f) : -1;
+                w.line("{");
+                ctx.indent(1);
+                List<String> binds = new ArrayList<String>();
+                String cond;
+                f.patternFields = true;
+                try {
+                    cond = em.patternTest(c.pattern, sf, st, ctx, binds);
+                } finally {
+                    f.patternFields = false;
+                }
+                w.line("if (" + cond + ") {");
+                ctx.indent(1);
+                for (String b : binds) {
+                    w.line(b);
+                }
+                if (sharedNames.get(i) != null) {
+                    for (String name : sharedNames.get(i)) {
+                        Ident vi = new Ident();
+                        vi.at(c.file, c.line, c.col);
+                        vi.name = name;
+                        JavaEmitter.Out vo = em.emitExpr(vi, null, ctx);
+                        String key = target[i] + "$" + name;
+                        String ref = sharedRefs.get(key);
+                        if (ref == null) {
+                            TypeRef vt = vo.type != null ? vo.type : TypeRef.DYNAMIC;
+                            ref = field(f, em.javaType(vt, true, ctx), "sv" + target[i] + "$" + JavaEmitter.javaIdent(name));
+                            sharedRefs.put(key, ref);
+                            sharedTypes.put(key, vt);
+                        }
+                        w.line(ref + " = " + vo.code + ";");
+                    }
+                }
+                if (guard >= 0) {
+                    w.line(jumpCode(f, guard));
+                } else if (c.guard != null) {
+                    JavaEmitter.Out g = em.dynCondition(em.emitExpr(c.guard, TypeRef.BOOL, ctx), ctx);
+                    w.line("if (" + g.code + ") {");
+                    w.line("    " + jumpCode(f, target[i]));
+                    w.line("}");
+                } else {
+                    w.line(jumpCode(f, target[i]));
+                }
+                ctx.indent(-1);
+                w.line("}");
+                ctx.indent(-1);
+                w.line("}");
+                w.line(jumpCode(f, next));
+                f.closed = true;
+                if (guard >= 0) {
+                    open(f, guard, ctx);
+                    VarDeclStmt g = new VarDeclStmt();
+                    g.at(c.guard.file, c.guard.line, c.guard.col);
+                    g.name = "$guard" + guard;
+                    g.type = TypeRef.BOOL;
+                    g.isFinal = true;
+                    g.initializer = c.guard;
+                    lowerList(f.anf.normalizeStatements(Collections.<Stmt>singletonList(g)), f, ctx);
+                    Ident gi = new Ident();
+                    gi.at(c.guard.file, c.guard.line, c.guard.col);
+                    gi.name = g.name;
+                    test(gi, target[i], next, f, ctx);
+                }
+            }
+            if (!own) {
+                ctx.popScope();
+                ctx.pushScope();
+                if (!c.body.isEmpty() && sharedNames.get(i) != null) {
+                    for (String name : sharedNames.get(i)) {
+                        String key = target[i] + "$" + name;
+                        if (sharedRefs.containsKey(key)) {
+                            ctx.declareAs(name, sharedTypes.get(key), sharedRefs.get(key));
+                        }
+                    }
+                }
+            }
+            if (!c.body.isEmpty()) {
+                open(f, bodies[i], ctx);
+                lowerList(c.body, f, ctx);
+                jump(f, exit, ctx);
+            }
+            ctx.popScope();
+        }
+        f.targets.remove(f.targets.size() - 1);
+        for (int k = 0; k < pushed; k++) {
+            f.targets.remove(f.targets.size() - 1);
+        }
+        open(f, exit, ctx);
+    }
+
+    /// The variables a pattern binds (wildcards aside).
+    private static void patternNames(Object n, Set<String> out) {
+        if (n instanceof VariablePattern) {
+            VariablePattern v = (VariablePattern) n;
+            if (!v.wildcard && v.name != null && !"_".equals(v.name)) {
+                out.add(v.name);
+            }
+        }
+        if (n instanceof List) {
+            for (Object x : (List<?>) n) {
+                patternNames(x, out);
+            }
+            return;
+        }
+        if (n instanceof PatternField) {
+            patternNames(((PatternField) n).pattern, out);
+            return;
+        }
+        if (!(n instanceof Pattern)) {
+            return;
+        }
+        for (Field fl : nodeFields(n.getClass())) {
+            try {
+                patternNames(fl.get(n), out);
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
     private void lowerIfCase(IfStmt i, Frame f, JavaEmitter.Ctx ctx) {
         JavaEmitter.Ctx.Writer w = ctx.writer();
         int then = newState(f);

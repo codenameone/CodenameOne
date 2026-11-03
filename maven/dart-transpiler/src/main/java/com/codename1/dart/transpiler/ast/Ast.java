@@ -571,6 +571,9 @@ public final class Ast {
         public TypeRef elementType;               // nullable
         public List<Expr> elements = new ArrayList<Expr>();
         public boolean isConst;
+        /** Set by the async lowering on the empty literal it fills element by element: the
+         *  original elements, which the element type is inferred from as it would have been. */
+        public List<Expr> inferFrom;
     }
 
     public static class MapLit extends Expr {
@@ -583,11 +586,17 @@ public final class Ast {
         public List<Expr> elements = new ArrayList<Expr>();
         public boolean structured;
         public boolean isConst;
+        /** Set by the async lowering on the empty literal it fills entry by entry: the
+         *  original elements, which the key and value types are inferred from. */
+        public List<Expr> inferFrom;
     }
     public static class SetLit extends Expr {
         public TypeRef elementType;               // nullable
         public List<Expr> elements = new ArrayList<Expr>();  // plain / spread / if / for
         public boolean isConst;
+        /** Set by the async lowering on the empty literal it fills element by element: the
+         *  original elements, which the element type is inferred from as it would have been. */
+        public List<Expr> inferFrom;
     }
 
     public static class Ident extends Expr {
@@ -806,6 +815,8 @@ public final class Ast {
         public Expr guard;                        // optional `when` guard
         public List<Stmt> body = new ArrayList<Stmt>();
         public boolean isDefault;
+        /** Labels on the case ({@code again: case ...}), the targets of {@code continue again;}; null when none. */
+        public List<String> labels;
     }
 
     /** A `switch (e) { p when g => v, _ => v }` expression. */

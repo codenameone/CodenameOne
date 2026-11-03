@@ -1579,6 +1579,7 @@ public final class AstBuilder {
                 c.guard = buildExpr(cc.guardedPattern().expr());
             }
             addStatements(cc.statements(), c.body);
+            c.labels = caseLabels(cc.label());
             sw.cases.add(c);
         }
         if (ctx.defaultCase() != null) {
@@ -1586,9 +1587,21 @@ public final class AstBuilder {
             pos(c, ctx.defaultCase());
             c.isDefault = true;
             addStatements(ctx.defaultCase().statements(), c.body);
+            c.labels = caseLabels(ctx.defaultCase().label());
             sw.cases.add(c);
         }
         return sw;
+    }
+
+    private static List<String> caseLabels(List<Dart2Parser.LabelContext> ls) {
+        if (ls == null || ls.isEmpty()) {
+            return null;
+        }
+        List<String> out = new ArrayList<String>();
+        for (Dart2Parser.LabelContext l : ls) {
+            out.add(l.identifier().getText());
+        }
+        return out;
     }
 
     private void addStatements(Dart2Parser.StatementsContext ctx, List<Stmt> out) {

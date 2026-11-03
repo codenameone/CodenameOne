@@ -88,6 +88,12 @@ final class AsyncAnf {
         }
     }
 
+    /// Normalizes statements the lowering synthesizes while it runs (a case guard that
+    /// awaits), with this instance's temp numbering so their temps never collide.
+    List<Stmt> normalizeStatements(List<Stmt> in) {
+        return list(in);
+    }
+
     Block normalize(Block b) {
         Block c = copy(b);
         c.statements = list(b.statements);
@@ -357,9 +363,8 @@ final class AsyncAnf {
             }
             c.cases = new ArrayList<SwitchCase>();
             for (SwitchCase k : sw.cases) {
-                if (AsyncLowering.hasAwait(k.guard)) {
-                    return null;
-                }
+                // A guard that awaits stays as written: it runs after its pattern binds,
+                // so the lowering normalizes it in the case's own test state.
                 SwitchCase kc = copy(k);
                 kc.body = list(k.body);
                 c.cases.add(kc);
@@ -604,6 +609,9 @@ final class AsyncAnf {
             }
             return c;
         }
+        if ((e instanceof ListLit || e instanceof SetLit) && awaitingControlElement(collectionElements(e))) {
+            return buildCollection(e, pre);
+        }
         if (e instanceof ListLit) {
             ListLit c = copy((ListLit) e);
             c.elements = elements(c.elements, pre);
@@ -636,6 +644,9 @@ final class AsyncAnf {
             SetLit c = copy((SetLit) e);
             c.elements = elements(c.elements, pre);
             return c.elements == null ? null : c;
+        }
+        if (e instanceof MapLit && ((MapLit) e).structured && awaitingControlElement(((MapLit) e).elements)) {
+            return buildCollection(e, pre);
         }
         if (e instanceof MapLit) {
             return map((MapLit) e, pre);
@@ -863,6 +874,138 @@ final class AsyncAnf {
             out.named.add(nc);
         }
         return out;
+    }
+
+    private static List<Expr> collectionElements(Expr e) {
+        if (e instanceof MapLit) {
+            return ((MapLit) e).elements;
+        }
+        return e instanceof ListLit ? ((ListLit) e).elements : ((SetLit) e).elements;
+    }
+
+    /// Whether an if or for element of a collection literal awaits.
+    private static boolean awaitingControlElement(List<Expr> els) {
+        for (Expr x : els) {
+            if ((x instanceof IfElement || x instanceof ForElement) && AsyncLowering.hasAwait(x)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// A list or set literal whose if or for element awaits, built the way Dart evaluates
+    /// it: an empty literal of the element type the emitter infers from the original
+    /// elements (inferFrom), then every element added in order by statements -- an if
+    /// element as an if statement, a for element as a loop -- normalized like any others,
+    /// so their awaits split into states. A map literal is built the same way, its
+    /// entries assigned in order (`t[key] = value`).
+    private Expr buildCollection(Expr lit, List<Stmt> pre) {
+        List<Expr> els = collectionElements(lit);
+        Expr empty;
+        if (lit instanceof MapLit) {
+            MapLit c = copy((MapLit) lit);
+            c.elements = new ArrayList<Expr>();
+            c.inferFrom = c.keyType == null ? els : null;
+            empty = c;
+        } else if (lit instanceof ListLit) {
+            ListLit c = copy((ListLit) lit);
+            c.elements = new ArrayList<Expr>();
+            c.inferFrom = c.elementType == null ? els : null;
+            empty = c;
+        } else {
+            SetLit c = copy((SetLit) lit);
+            c.elements = new ArrayList<Expr>();
+            c.inferFrom = c.elementType == null ? els : null;
+            empty = c;
+        }
+        String t = temp();
+        VarDeclStmt d = at(new VarDeclStmt(), lit);
+        d.name = t;
+        d.type = TypeRef.VAR;
+        d.isFinal = true;
+        d.initializer = empty;
+        pre.add(d);
+        List<Stmt> adds = new ArrayList<Stmt>();
+        for (Expr x : els) {
+            adds.add(addElement(t, x));
+        }
+        for (Stmt s : adds) {
+            stmt(s, pre);
+        }
+        return ident(t, lit);
+    }
+
+    private Stmt addElement(String t, Expr x) {
+        if (x instanceof IfElement) {
+            IfElement i = (IfElement) x;
+            IfStmt s = at(new IfStmt(), x);
+            s.condition = i.condition;
+            s.thenStmt = addElement(t, i.thenElement);
+            s.elseStmt = i.elseElement == null ? null : addElement(t, i.elseElement);
+            return s;
+        }
+        if (x instanceof ForElement) {
+            ForElement f = (ForElement) x;
+            if (f.iterable != null) {
+                ForInStmt s = at(new ForInStmt(), x);
+                s.varType = f.varType;
+                s.varName = f.varName;
+                s.pattern = f.pattern;
+                s.iterable = f.iterable;
+                s.body = addElement(t, f.body);
+                return s;
+            }
+            ForStmt s = at(new ForStmt(), x);
+            s.init = f.init;
+            s.condition = f.condition;
+            s.updates = f.updates;
+            s.body = addElement(t, f.body);
+            return s;
+        }
+        if (x instanceof MapEntry) {
+            IndexGet ig = at(new IndexGet(), x);
+            ig.target = ident(t, x);
+            ig.index = ((MapEntry) x).key;
+            Assign a = at(new Assign(), x);
+            a.lhs = ig;
+            a.op = "=";
+            a.rhs = ((MapEntry) x).value;
+            ExprStmt s = at(new ExprStmt(), x);
+            s.expr = a;
+            return s;
+        }
+        if (x instanceof SpreadElement && ((SpreadElement) x).nullAware) {
+            // `...?e`: e evaluated once, its elements added unless it is null.
+            String n = temp();
+            VarDeclStmt d = at(new VarDeclStmt(), x);
+            d.name = n;
+            d.type = TypeRef.VAR;
+            d.isFinal = true;
+            d.initializer = ((SpreadElement) x).expr;
+            Binary notNull = at(new Binary(), x);
+            notNull.left = ident(n, x);
+            notNull.op = "!=";
+            notNull.right = at(new NullLit(), x);
+            SpreadElement plain = copy((SpreadElement) x);
+            plain.nullAware = false;
+            plain.expr = ident(n, x);
+            List<Stmt> l = new ArrayList<Stmt>();
+            l.add(d);
+            l.add(ifStmt(notNull, addElement(t, plain), null, x));
+            return block(l, x);
+        }
+        Call c = at(new Call(), x);
+        c.target = ident(t, x);
+        if (x instanceof SpreadElement) {
+            c.name = "addAll";
+            c.args.positional.add(((SpreadElement) x).expr);
+        } else {
+            c.name = "add";
+            c.args.positional.add(x);
+        }
+        ExprStmt s = at(new ExprStmt(), x);
+        s.expr = c;
+        return s;
     }
 
     private List<Expr> elements(List<Expr> els, List<Stmt> pre) {
@@ -1309,7 +1452,8 @@ final class AsyncAnf {
         List<Field> fs = new ArrayList<Field>();
         for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
             for (Field f : k.getDeclaredFields()) {
-                if (!Modifier.isStatic(f.getModifiers()) && (Node.class.isAssignableFrom(f.getType())
+                if (!Modifier.isStatic(f.getModifiers()) && !"inferFrom".equals(f.getName())
+                            && (Node.class.isAssignableFrom(f.getType())
                         || List.class.isAssignableFrom(f.getType()))) {
                     f.setAccessible(true);
                     fs.add(f);

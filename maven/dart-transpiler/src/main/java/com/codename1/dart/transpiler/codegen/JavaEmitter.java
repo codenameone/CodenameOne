@@ -8436,6 +8436,11 @@ public final class JavaEmitter {
     }
 
     private TypeRef inferExprTypeQuiet(Expr e, Ctx ctx) {
+        if (e instanceof AwaitExpr) {
+            // `await f` has the type f's Future completes with (flattened, as Dart does).
+            TypeRef ft = inferExprTypeQuiet(((AwaitExpr) e).operand, ctx);
+            return ft != null && (ft.is("Future") || ft.is("FutureOr")) && ft.args.size() == 1 ? ft.arg(0) : ft;
+        }
         // `this` in an extension is the on-type (`Iterable<T>`): a generic call such as
         // `lastBy(this, key)` binds its type parameter from it rather than to Object.
         if (e instanceof ThisExpr && ctx.extensionSelfType != null) {
@@ -8651,7 +8656,12 @@ public final class JavaEmitter {
         if (p instanceof VariablePattern) {
             VariablePattern v = (VariablePattern) p;
             if (v.wildcard) {
-                return "true";
+                // `String _` still tests the type; only a bare `_` matches everything.
+                if (v.type == null || isDynamicType(v.type) || v.type.is("Object") && v.type.nullable) {
+                    return "true";
+                }
+                String check = instanceofCheck(subj, v.type, ctx);
+                return v.type.nullable ? "(" + subj + " == null || " + check + ")" : check;
             }
             // An unqualified identifier pattern whose name is a constant of the enum being
             // switched over is a CONSTANT pattern in Dart, not a variable binding (e.g.
@@ -8865,13 +8875,23 @@ public final class JavaEmitter {
             String cn = registerRecordShape(positional.size(), namedNames);
             String cast = "((" + cn + ") " + subj + ")";
             String cond = subj + " instanceof " + cn;
+            // A subject statically typed as this record shape gives each field its static
+            // type, so an untyped `final (a, b) = (x, y)` binds `a` and `b` as the record's
+            // component types rather than as dynamic.
+            boolean typed = subjType != null && cn.equals(subjType.name)
+                    && subjType.args.size() == positional.size() + named.size();
+            if (typed) {
+                cast = "((" + javaType(subjType, true, ctx) + ") " + subj + ")";
+            }
             for (int i = 0; i < positional.size(); i++) {
+                TypeRef ft = typed ? recordComponentType(subjType, "$" + (i + 1)) : TypeRef.DYNAMIC;
                 cond = joinAnd(cond, patternMatch(positional.get(i).pattern,
-                        cast + ".$" + (i + 1) + "()", TypeRef.DYNAMIC, ctx, binds));
+                        cast + ".$" + (i + 1) + "()", ft, ctx, binds));
             }
             for (PatternField f : named) {
+                TypeRef ft = typed ? recordComponentType(subjType, f.name) : TypeRef.DYNAMIC;
                 cond = joinAnd(cond, patternMatch(f.pattern,
-                        cast + "." + f.name + "()", TypeRef.DYNAMIC, ctx, binds));
+                        cast + "." + f.name + "()", ft, ctx, binds));
             }
             return cond;
         }
@@ -14139,6 +14159,9 @@ public final class JavaEmitter {
     private Out emitListLit(ListLit l, TypeRef expected, Ctx ctx) {
         ctx.importClass("dart.core.DartList");
         TypeRef elem = l.elementType;
+        if (elem == null && l.inferFrom != null && (expected == null || !expected.is("List") || expected.args.isEmpty())) {
+            elem = structuredElementTypeQuiet(l.inferFrom, ctx);
+        }
         if (expected != null && expected.args.isEmpty() && isTypeVariable(expected, ctx)
                 && !typeVarsInScope(expected, ctx)) {
             // A stub parameter's own type variable left unbound (`Sink<T>.add(T)`): no
@@ -14394,6 +14417,10 @@ public final class JavaEmitter {
             if (st == null) {
                 st = fieldOfTypedReceiverQuiet(((SpreadElement) e).expr, ctx);
             }
+            if (st == null && (se instanceof ParenExpr || se instanceof AwaitExpr)) {
+                // `...?(await maybe())`: what the awaited Future completes with.
+                st = elementTypeQuiet(se, ctx);
+            }
             if (st == null && se instanceof PropertyGet) {
                 // `[...map.entries]` / keys / values: the view's element type comes from the map's.
                 PropertyGet pg = (PropertyGet) se;
@@ -14499,6 +14526,14 @@ public final class JavaEmitter {
         if (e instanceof ListLit) {
             return inferExprTypeQuiet(e, ctx);
         }
+        if (e instanceof AwaitExpr) {
+            // `await f`: the type the operand's Future completes with.
+            TypeRef ft = elementTypeQuiet(((AwaitExpr) e).operand, ctx);
+            if (ft == null) {
+                ft = topLevelCallReturnTypeQuiet(((AwaitExpr) e).operand, ctx);
+            }
+            return ft != null && (ft.is("Future") || ft.is("FutureOr")) && ft.args.size() == 1 ? ft.arg(0) : ft;
+        }
         return null;
     }
 
@@ -14509,6 +14544,27 @@ public final class JavaEmitter {
      * what lets {@link #programClassLub} see the elements of {@code [Text(' '), anchor(i)]}:
      * {@code inferExprTypeQuiet} only knows identifiers, so the literal was a List of Object.
      */
+    /// The declared return type of a call to a non-generic top-level function
+    /// (`later(x)` declared `Future<int> later(int v)`), or null: a local of that name,
+    /// a type argument, a generic function or an undeclared return type is not typed here.
+    private TypeRef topLevelCallReturnTypeQuiet(Expr e, Ctx ctx) {
+        if (!(e instanceof Call)) {
+            return null;
+        }
+        Call c = (Call) e;
+        if (c.target != null || c.name == null || !c.typeArgs.isEmpty() || c.nullAware
+                || ctx.lookup(c.name) != null || program.functions.get(c.name) == null) {
+            return null;
+        }
+        Library owner = program.resolveFunctionOwner(c.name, ctx.library(), null);
+        FunctionDecl fn = owner == null ? null : functionInLibrary(owner, c.name);
+        if (fn == null || !fn.typeParams.isEmpty() || fn.returnType == null || fn.returnType.is("var")
+                || containsDynamic(fn.returnType)) {
+            return null;
+        }
+        return fn.returnType;
+    }
+
     private TypeRef programCallTypeQuiet(Expr e, Ctx ctx) {
         ClassDecl made = null;
         if (e instanceof CtorCall) {
@@ -14725,6 +14781,9 @@ public final class JavaEmitter {
     private Out emitSetLit(SetLit s, TypeRef expected, Ctx ctx) {
         ctx.importClass("dart.core.DartSet");
         TypeRef elem = s.elementType;
+        if (elem == null && s.inferFrom != null && (expected == null || !expected.is("Set") || expected.args.isEmpty())) {
+            elem = structuredElementTypeQuiet(s.inferFrom, ctx);
+        }
         if (elem == null && expected != null && expected.is("Set") && !expected.args.isEmpty()) {
             elem = expected.arg(0);
         }
@@ -14895,7 +14954,7 @@ public final class JavaEmitter {
             // Collection if/for/spread in a map literal: build into a DartMap with conditional/looped put().
             ctx.importClass("dart.core.DartMap");
             if (k == null) {
-                TypeRef[] kv = structuredMapTypes(m, ctx);
+                TypeRef[] kv = m.inferFrom != null ? inferredMapTypes(m.inferFrom, ctx) : structuredMapTypes(m, ctx);
                 if (kv != null) {
                     k = kv[0];
                     v = kv[1];
@@ -14970,6 +15029,91 @@ public final class JavaEmitter {
     /// every top-level element is an entry of a plain literal key/value or a spread of a
     /// Map and all of them agree on simple (non-generic) types; otherwise null, and the
     /// map stays dynamic as before.
+    /// The key and value types of the map literal the async lowering fills entry by entry,
+    /// inferred from its original elements: entries, spreads, and the if and for elements
+    /// around them (a for element's variable bound to the iterable's element type, as
+    /// elementTypeQuiet binds it). Null when any part cannot be typed or two disagree.
+    private TypeRef[] inferredMapTypes(List<Expr> els, Ctx ctx) {
+        List<TypeRef[]> found = new ArrayList<TypeRef[]>();
+        if (!collectMapTypes(els, found, ctx)) {
+            return null;
+        }
+        TypeRef k = null;
+        TypeRef v = null;
+        for (TypeRef[] kv : found) {
+            TypeRef ek = kv[0];
+            TypeRef ev = kv[1];
+            if (ek == null || ev == null || ek.name == null || ev.name == null
+                    || !ek.args.isEmpty() || !ev.args.isEmpty() || ek.funcParams != null || ev.funcParams != null
+                    || isDynamicType(ek) || isDynamicType(ev)) {
+                return null;
+            }
+            if (k == null) {
+                k = copyNonNull(ek);
+                v = copyNonNull(ev);
+            } else if (!k.name.equals(ek.name) || !v.name.equals(ev.name)) {
+                return null;
+            }
+        }
+        return k == null ? null : new TypeRef[] {k, v};
+    }
+
+    private boolean collectMapTypes(List<Expr> els, List<TypeRef[]> found, Ctx ctx) {
+        for (Expr e : els) {
+            if (e instanceof MapEntry) {
+                found.add(new TypeRef[] {mapPartTypeQuiet(((MapEntry) e).key, ctx),
+                        mapPartTypeQuiet(((MapEntry) e).value, ctx)});
+            } else if (e instanceof SpreadElement) {
+                TypeRef t = inferExprTypeQuiet(((SpreadElement) e).expr, ctx);
+                if (t == null || !t.is("Map") || t.args.size() != 2) {
+                    return false;
+                }
+                found.add(new TypeRef[] {t.arg(0), t.arg(1)});
+            } else if (e instanceof IfElement) {
+                IfElement i = (IfElement) e;
+                if (!collectMapTypes(java.util.Collections.singletonList(i.thenElement), found, ctx)
+                        || i.elseElement != null
+                        && !collectMapTypes(java.util.Collections.singletonList(i.elseElement), found, ctx)) {
+                    return false;
+                }
+            } else if (e instanceof ForElement && ((ForElement) e).pattern == null) {
+                ForElement f = (ForElement) e;
+                ctx.pushScope();
+                try {
+                    if (f.varName != null) {
+                        TypeRef it = inferExprTypeQuiet(f.iterable, ctx);
+                        TypeRef et = f.varType != null && !f.varType.is("var") ? f.varType
+                                : it != null && (it.is("List") || it.is("Iterable") || it.is("Set"))
+                                && it.args.size() == 1 ? it.arg(0) : null;
+                        if (et == null || isDynamicType(et)) {
+                            return false;
+                        }
+                        ctx.declare(f.varName, et);
+                    }
+                    if (!collectMapTypes(java.util.Collections.singletonList(f.body), found, ctx)) {
+                        return false;
+                    }
+                } finally {
+                    ctx.popScope();
+                }
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private TypeRef mapPartTypeQuiet(Expr e, Ctx ctx) {
+        TypeRef t = literalElementType(e, ctx);
+        if (t == null) {
+            t = inferExprTypeQuiet(e, ctx);
+        }
+        if (t == null) {
+            t = elementTypeQuiet(e, ctx);
+        }
+        return t;
+    }
+
     private TypeRef[] structuredMapTypes(MapLit m, Ctx ctx) {
         TypeRef k = null;
         TypeRef v = null;
