@@ -12494,6 +12494,24 @@ public final class JavaEmitter {
 
     /// Dart's least upper bound of two inferred argument types, for the cases a witness can
     /// tell apart: equal types, a subtype of the other, the numbers, and Object otherwise.
+    /// The running upper bound of a map literal's entry types: equal types stay, anything
+    /// with dynamic is dynamic, and otherwise Dart's upper bound (int and double are num).
+    private TypeRef entryLub(TypeRef a, TypeRef b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+        if (isUnrecordedArg(a) || isUnrecordedArg(b)) {
+            return TypeRef.DYNAMIC;
+        }
+        if (a.toString().equals(b.toString())) {
+            return a;
+        }
+        if (copyNonNull(a).toString().equals(copyNonNull(b).toString())) {
+            return a.nullable ? a : b;
+        }
+        return upperBound(a, b);
+    }
+
     private TypeRef upperBound(TypeRef a, TypeRef b) {
         boolean nullable = a.nullable || b.nullable || a.is("Null") || b.is("Null");
         TypeRef r;
@@ -14222,9 +14240,23 @@ public final class JavaEmitter {
         List<String> codes = new ArrayList<String>();
         TypeRef inferred = null;
         boolean mixed = false;
+        TypeRef lub = null;
+        boolean lubKnown = elem == null;
         for (Expr e : l.elements) {
             Out o = emitExpr(e, elem, ctx);
             codes.add(elementCode(o, elem, ctx));
+            if (lubKnown) {
+                if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
+                    lubKnown = false;
+                } else if (lub != null && lub.name != null && lub.name.equals(o.type.name)
+                        && !lub.args.toString().equals(o.type.args.toString())) {
+                    // `[[1, 2], ['a']]`: Dart's bound is List<Object>, which this cannot
+                    // name element by element; the list stays dynamic, as before.
+                    lubKnown = false;
+                } else {
+                    lub = entryLub(lub, o.type);
+                }
+            }
             if (inferred == null) {
                 inferred = o.type;
             } else if (o.type == null || inferred.name == null || !inferred.name.equals(o.type.name)
@@ -14235,6 +14267,12 @@ public final class JavaEmitter {
                 // and a List<double>, which are different Java list classes.
                 mixed = true;
             }
+        }
+        if (elem == null && mixed && lubKnown && lub != null
+                && (lub.is("Object") || lub.is("num"))) {
+            // `[[1], {'x': [2]}]`, `[1, 2.5]`: elements of known, different types make a list
+            // of their upper bound (List<Object>, List<num>), as Dart infers it.
+            elem = lub;
         }
         if (elem == null) {
             elem = mixed || inferred == null ? TypeRef.DYNAMIC : inferred;
@@ -14501,6 +14539,10 @@ public final class JavaEmitter {
             // unknown, the list was a List<dynamic> where a List<int> was required.
             ForElement f = (ForElement) e;
             TypeRef it = inferExprTypeQuiet(f.iterable, ctx);
+            if (it == null) {
+                // `for (var i in [1, 2])`: the literal's own type.
+                it = untypedLiteralType(f.iterable, ctx);
+            }
             TypeRef et = f.varType != null && !f.varType.is("var") ? f.varType
                     : it != null && (it.is("List") || it.is("Iterable") || it.is("Set")) && it.args.size() == 1
                     ? it.arg(0) : null;
@@ -14517,8 +14559,25 @@ public final class JavaEmitter {
             }
         }
         if (e instanceof ForElement && ((ForElement) e).varName == null && ((ForElement) e).pattern == null) {
-            // A classic `for (var i = 0; ...) ...[..]`: what the body yields.
-            return elementTypeQuiet(((ForElement) e).body, ctx);
+            // A classic `for (var i = 0; ...) ...[..]`: what the body yields, with the
+            // loop variable typed as its declaration (or its initializer) says.
+            ForElement f = (ForElement) e;
+            if (f.init instanceof VarDeclStmt) {
+                VarDeclStmt d = (VarDeclStmt) f.init;
+                TypeRef vt = d.type != null && !d.type.is("var") ? d.type
+                        : d.initializer == null ? null : elementTypeQuiet(d.initializer, ctx);
+                if (vt == null || isDynamicType(vt)) {
+                    return null;
+                }
+                ctx.pushScope();
+                try {
+                    ctx.declare(d.name, vt);
+                    return elementTypeQuiet(f.body, ctx);
+                } finally {
+                    ctx.popScope();
+                }
+            }
+            return elementTypeQuiet(f.body, ctx);
         }
         if (e instanceof CtorCall || e instanceof Call) {
             return programCallTypeQuiet(e, ctx);
@@ -14547,6 +14606,16 @@ public final class JavaEmitter {
     /// The declared return type of a call to a non-generic top-level function
     /// (`later(x)` declared `Future<int> later(int v)`), or null: a local of that name,
     /// a type argument, a generic function or an undeclared return type is not typed here.
+    /// Whether {@code e} is a bare call of a top-level function the program declares.
+    boolean isProgramFunctionCall(Expr e, Ctx ctx) {
+        if (!(e instanceof Call)) {
+            return false;
+        }
+        Call c = (Call) e;
+        return c.target == null && c.name != null && !c.nullAware && ctx.lookup(c.name) == null
+                && program.functions.get(c.name) != null;
+    }
+
     private TypeRef topLevelCallReturnTypeQuiet(Expr e, Ctx ctx) {
         if (!(e instanceof Call)) {
             return null;
@@ -14558,9 +14627,15 @@ public final class JavaEmitter {
         }
         Library owner = program.resolveFunctionOwner(c.name, ctx.library(), null);
         FunctionDecl fn = owner == null ? null : functionInLibrary(owner, c.name);
-        if (fn == null || !fn.typeParams.isEmpty() || fn.returnType == null || fn.returnType.is("var")
-                || containsDynamic(fn.returnType)) {
+        if (fn == null || fn.returnType == null || fn.returnType.is("var") || containsDynamic(fn.returnType)) {
             return null;
+        }
+        if (!fn.typeParams.isEmpty()) {
+            // `f(1)` of `Future<T> f<T>(T x)`: the return with T bound from the arguments,
+            // as the call itself is emitted; unknown when an argument cannot bind it.
+            TypeRef bound = bindMethodTypeParams(fn.returnType, fn, c, ctx);
+            return bound == null || containsDynamic(bound) || mentionsAnyTypeParam(bound, fn.typeParams)
+                    ? null : bound;
         }
         return fn.returnType;
     }
@@ -14988,17 +15063,27 @@ public final class JavaEmitter {
         }
         ctx.importClass("dart.core.DartMap");
         List<String> parts = new ArrayList<String>();
+        List<Out> kos = new ArrayList<Out>();
+        List<Out> vos = new ArrayList<Out>();
+        boolean inferK = k == null;
+        boolean inferV = v == null;
         for (int i = 0; i < m.keys.size(); i++) {
             Out ko = emitExpr(m.keys.get(i), k, ctx);
             Out vo = emitExpr(m.values.get(i), v, ctx);
-            if (k == null) {
-                k = ko.type;
+            kos.add(ko);
+            vos.add(vo);
+            // `{'k': 1, 'j': 2.5}`: each type argument is the upper bound of its entries'
+            // (num here), as Dart infers it, not the first entry's.
+            if (inferK) {
+                k = entryLub(k, ko.type);
             }
-            if (v == null) {
-                v = vo.type;
+            if (inferV) {
+                v = entryLub(v, vo.type);
             }
-            parts.add(entryCode(ko, k, ctx));
-            parts.add(entryCode(vo, v, ctx));
+        }
+        for (int i = 0; i < kos.size(); i++) {
+            parts.add(entryCode(kos.get(i), k, ctx));
+            parts.add(entryCode(vos.get(i), v, ctx));
         }
         // A type witness lets `of` infer K,V from the declared/inferred entry types (the
         // Object... varargs otherwise erase them to Object, breaking downstream `.idx` reads).
@@ -25789,7 +25874,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return null;
         }
         if (t.funcParams == null && subst.containsKey(t.name) && t.args.isEmpty()) {
-            return subst.get(t.name);
+            TypeRef r = subst.get(t.name);
+            if (t.nullable && r != null && !r.nullable && !isUnrecordedArg(r)) {
+                // `T?` with T = int is `int?`: the substitution keeps the written `?`.
+                r = copyNonNull(r);
+                r.nullable = true;
+            }
+            return r;
         }
         TypeRef out = new TypeRef(t.name);
         out.nullable = t.nullable;
@@ -27168,6 +27259,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     ? TypeRef.of("List", ((ListLit) bare).elementType)
                     : bare instanceof ListLit || bare instanceof SetLit ? untypedLiteralType(bare, ctx)
                     : inferExprTypeQuiet(bare, ctx);
+            if (at == null) {
+                // `f(1)` / `f('a')` of `Future<T> f<T>(T x)`: a literal argument binds T
+                // to the literal's own type, as Dart's inference does.
+                at = literalElementType(bare, ctx);
+            }
+            if (at == null) {
+                // `f(i * 10)`, `f(await g())`: arithmetic and awaits typed as a literal's
+                // elements are.
+                at = elementTypeQuiet(bare, ctx);
+            }
             TypeRef found = unifyTypeParam(p, prm.type, at);
             if (found != null && !isDynamicType(found) && !found.is("var")) {
                 return found;

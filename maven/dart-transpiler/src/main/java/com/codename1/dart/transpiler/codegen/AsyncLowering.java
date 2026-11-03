@@ -1757,9 +1757,24 @@ final class AsyncLowering {
         }
         String pk = JavaEmitter.primitiveListKind(boxed);
         if (pk != null) {
-            return new JavaEmitter.Out("dart.core.Dart" + pk + "List.as" + pk + "s(" + v + ")", boxed);
+            return new JavaEmitter.Out("dart.core.Dart" + pk + "List.as" + pk + "s(" + v + ")", staticType(inner, ot == null || ot.nullable || !ot.is("Future") || f.resumeExpected != null
+                || f.resumeAwait == null || !em.isProgramFunctionCall(f.resumeAwait.operand, ctx)));
         }
-        return new JavaEmitter.Out("((" + em.javaType(boxed, true, ctx) + ") " + v + ")", boxed);
+        return new JavaEmitter.Out("((" + em.javaType(boxed, true, ctx) + ") " + v + ")", staticType(inner, ot == null || ot.nullable || !ot.is("Future") || f.resumeExpected != null
+                || f.resumeAwait == null || !em.isProgramFunctionCall(f.resumeAwait.operand, ctx)));
+    }
+
+    /// The static type of a resumed `await`: the boxed Java type the value is cast to, but
+    /// with the Dart nullability of what the Future completes with -- `await f(1)` of a
+    /// `Future<int>` is an `int`, and a literal holding it is a `List<int>`, not `List<int?>`.
+    /// Nullable as before whenever the awaited operand may itself be null (`Future<int>?`),
+    /// is not a plain Future, the slot's declared type stands in for it, or the operand is
+    /// not a call of a program top-level function -- a stub's `Future<T?>` reaches here
+    /// with its `?` already dropped, so only a program declaration's type is trusted.
+    private TypeRef staticType(TypeRef inner, boolean keepBoxed) {
+        TypeRef t = em.boxType(inner);
+        t.nullable = keepBoxed || inner.nullable;
+        return t;
     }
 
     /// A local declared among the statements split into states: a field of the frame.
