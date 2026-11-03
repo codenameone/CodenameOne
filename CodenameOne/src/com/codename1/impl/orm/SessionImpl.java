@@ -1010,7 +1010,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                         throw new PersistenceException("A @Temporal(TIMESTAMP) field needs DATETIME(3) on MySQL, "
                                 + "not " + a.declaredType + ": " + model.table() + "." + a.column);
                     }
-                    statement.append(columnType(model, i)).append(a.nullable && !a.id ? "" : " NOT NULL");
+                    statement.append(columnType(model, i)).append(collateClause(a))
+                            .append(a.nullable && !a.id ? "" : " NOT NULL");
                 }
             }
             if (!attrs[model.idIndex()].generated) {
@@ -1169,6 +1170,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int end = declaration.indexOf(" PRIMARY KEY");
         return end < 0 ? sql.columnType(attr.kind) : declaration.substring(0, end).replace(" NOT NULL", "");
     }
+    /// ` COLLATE <name>` for a `@Column(collation)` field, else empty.
+    /// PostgreSQL names a collation as an identifier, which folds unquoted.
+    private String collateClause(Attribute attr) {
+        if (attr.collation == null) {
+            return "";
+        }
+        return " COLLATE " + ("postgresql".equals(sql.dialect()) ? q(attr.collation) : attr.collation);
+    }
+    /// Whether a found collation is the declared one. The PostgreSQL describe
+    /// prefixes a nondeterministic one, which is part of what was declared.
+    /// SQLite reports a collation for key columns only; an unknown one passes.
+    static boolean declaredCollation(String declared, String found) {
+        if (found == null) {
+            return true;
+        }
+        String name = found.startsWith("nondeterministic ") ? found.substring(17) : found;
+        return declared.equalsIgnoreCase(name) || declared.equalsIgnoreCase(found);
+    }
     /// The native column of a @Temporal field. DATETIME rather than TIMESTAMP on
     /// MySQL: its TIMESTAMP ends in 2038 and, unless explicit_defaults_for_timestamp
     /// is on, gives the first such column an ON UPDATE CURRENT_TIMESTAMP that
@@ -1221,9 +1240,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return false;
         }
         if (attr.temporal == Attribute.TEMPORAL_TIMESTAMP && family == 5
-                && temporalKind(found) == Attribute.TEMPORAL_TIMESTAMP && fractionDigits(found) < 3) {
+                && temporalKind(found) == Attribute.TEMPORAL_TIMESTAMP && fractionDigits(found) < 3
+                && (attr.declaredType == null || fractionDigits(attr.declaredType) > fractionDigits(found))) {
             // The converter writes milliseconds; DATETIME or TIMESTAMP(0)
             // rounds them away, so a value does not read back as written.
+            // Declaring the coarser type, as `@Column(type = "DATETIME")`,
+            // accepts that: the converter truncates to it (see Values).
             return false;
         }
         if (family == 4 && binaryCapacity(found) < binaryCapacity(expected)) {
@@ -1397,7 +1419,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 // read back, so adopting such a schema keeps its semantics.
                 boolean distinct = attr.id || uniqueIndexed(model, attr);
                 String role = attr.id ? "Identifier " : "Unique column ";
-                if (distinct && attr.kind == Attribute.TEXT && found.length > 5
+                if (attr.collation != null && found.length > 5 && !declaredCollation(attr.collation, (String) found[5])) {
+                    errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
+                            name + " uses collation " + found[5] + ", not the declared " + attr.collation));
+                }
+                // A declared collation is the application's choice of key
+                // equality, as in Hibernate.
+                if (distinct && attr.kind == Attribute.TEXT && found.length > 5 && attr.collation == null
                         && !distinctKeyCollation((String) found[5])) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
                             role + name + " uses collation " + found[5]
@@ -1486,7 +1514,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int[] ids = model.idIndexes();
         for (int i = 0; i < names.length; i++) {
             Attribute id = model.attributes()[ids[i]];
-            expected.add(new Attribute("", names[i], id.kind, primary, false, false, false, id.declaredType));
+            expected.add(new Attribute("", names[i], id.kind, primary, false, false, false, id.declaredType, 0,
+                    true, true, id.collation));
         }
     }
     /// `element` is the value column of an element collection, null
@@ -1512,7 +1541,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // SQLite lets a composite primary key column hold NULL, so only its
             // NOT NULL flag says the column is required there.
             boolean required = ((Number) found[2]).intValue() != 0 || primary && !"sqlite".equals(sql.dialect());
-            if (attr.id && attr.kind == Attribute.TEXT && found.length > 5 && !distinctKeyCollation((String) found[5])) {
+            if (attr.collation != null && found.length > 5 && !declaredCollation(attr.collation, (String) found[5])) {
+                errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
+                        "Collection column " + name + " uses collation " + found[5] + ", not the declared "
+                        + attr.collation));
+            }
+            if (attr.id && attr.kind == Attribute.TEXT && found.length > 5 && attr.collation == null
+                    && !distinctKeyCollation((String) found[5])) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
                         "Collection key " + name + " uses collation " + found[5]
                         + ", which folds case or pads; keys need a case-sensitive NO PAD collation"));
@@ -3343,7 +3378,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 int end = keyType.indexOf(" PRIMARY KEY");
                 type = end < 0 ? sql.columnType(attr.kind) : keyType.substring(0, end).replace(" NOT NULL", "");
             }
-            statement.append(q(names[i])).append(' ').append(type).append(" NOT NULL");
+            // A foreign key compares as the key it names, so it takes its collation.
+            statement.append(q(names[i])).append(' ').append(type).append(collateClause(attr)).append(" NOT NULL");
         }
     }
     String keyCondition(EntityModel model, String alias) {

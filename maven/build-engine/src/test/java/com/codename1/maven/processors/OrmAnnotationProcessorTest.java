@@ -127,6 +127,49 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
+    /// `@Column(collation)` reaches the DDL and the schema report: a NOCASE key
+    /// on SQLite treats "ABC" and "abc" as one key, and validates instead of
+    /// being refused as a case-folding key. A `@Temporal` field declared as a
+    /// plain `DATETIME` is accepted too.
+    @Test
+    public void declaredCollationAndCoarseTemporal() throws Exception {
+        declaredCollation(false);
+        declaredCollation(true);
+    }
+    private void declaredCollation(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("collated.Code","package collated; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Code { @Id(autoIncrement=false) @Column(collation=\"NOCASE\") public String code; @Temporal(TemporalType.TIMESTAMP) @Column(type=\"DATETIME\") public java.util.Date at; }");
+        sources.put("collated.Check","package collated; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
+            + "s.createTables(); if(!s.schemaReport().getIssues().isEmpty()) throw new AssertionError(\"report \"+s.schemaReport().getIssues()); s.validateSchema(); "
+            + "s.beginTransaction(); Code a=new Code(); a.code=\"ABC\"; a.at=new java.util.Date(1000); s.persist(a); s.commitTransaction(); s.clear(); "
+            + "if(s.find(Code.class,\"ABC\").at.getTime()!=1000) throw new AssertionError(\"temporal\"); "
+            + "boolean refused=false; try { s.beginTransaction(); Code b=new Code(); b.code=\"abc\"; s.persist(b); s.commitTransaction(); } catch(RuntimeException e) { refused=true; s.rollbackTransaction(); } "
+            + "if(!refused) throw new AssertionError(\"NOCASE key took a second spelling\"); } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try { loader.loadClass("collated.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// A collation is spliced into DDL, so the processor refuses anything but a name.
+    @Test
+    public void collationMustBeAName() throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("badcollation.Code","package badcollation; import com.codename1.annotations.*; @Entity public class Code { @Id(autoIncrement=false) @Column(collation=\"NOCASE; DROP TABLE x\") public String code; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,Collections.<String>emptyList());
+        assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("@Column(collation) must be letters"));
+        assertTrue(OrmAnnotationProcessor.collationName("utf8mb4_0900_ai_ci"));
+        assertFalse(OrmAnnotationProcessor.collationName("en-x-icu"));
+    }
+
     /// `@Column(insertable = false, updatable = false)` is a column only the
     /// application's own statement writes: a compare-and-swap claim sets it, and
     /// neither the insert nor a later save of the entity overwrites it. `@Lob` is
@@ -1436,8 +1479,8 @@ public class OrmAnnotationProcessorTest {
     public void temporalFieldsRejectAColumnTypeThatCannotHoldThem() throws Exception {
         String[][] cases={{"TIMESTAMP","BIGINT","false"},{"TIMESTAMP","DATE","false"},{"DATE","TIMESTAMP(3)","false"},{"DATE","varchar(20)","false"},
             {"TIMESTAMP","TIMESTAMP(3)","true"},{"TIMESTAMP","datetime(3)","true"},{"TIMESTAMP","TIMESTAMPTZ","true"},{"DATE","date","true"},{"DATE","TEXT","true"},
-            // Milliseconds survive only with three fractional digits.
-            {"TIMESTAMP","TIMESTAMP(0)","false"},{"TIMESTAMP","DATETIME","false"},{"TIMESTAMP","datetime(6)","true"},{"TIMESTAMP","TIMESTAMP","true"}};
+            // A declared coarser type opts in to losing the milliseconds.
+            {"TIMESTAMP","TIMESTAMP(0)","true"},{"TIMESTAMP","DATETIME","true"},{"TIMESTAMP","datetime(6)","true"},{"TIMESTAMP","TIMESTAMP","true"}};
         for(String[] c:cases) {
             File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
             sources.put("temporaltype.Entry","package temporaltype; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.Date; "

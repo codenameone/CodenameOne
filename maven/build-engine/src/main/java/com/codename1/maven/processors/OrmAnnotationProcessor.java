@@ -568,6 +568,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 nullable = col.getBoolOrDefault("nullable", true);
                 pf.insertable = col.getBoolOrDefault("insertable", true);
                 pf.updatable = col.getBoolOrDefault("updatable", true);
+                String collation = col.getString("collation");
+                if (collation != null && collation.length() > 0) {
+                    if (!collationName(collation)) {
+                        // Spliced into DDL as it is.
+                        ctx.error(cls, "@Column(collation) must be letters, digits and underscores: "
+                                + pf.fieldName + " declares \"" + collation + "\"");
+                    }
+                    pf.collation = collation;
+                }
                 if ((!pf.insertable || !pf.updatable) && (f.getAnnotation(ID_DESC) != null || pf.version)) {
                     ctx.error(cls, "@Column(insertable/updatable=false) cannot be used on an @Id or @Version field: " + pf.fieldName);
                 }
@@ -1172,6 +1181,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return out.toString().toLowerCase(java.util.Locale.ROOT);
     }
 
+    /// Whether a `@Column(collation)` name is safe to splice into DDL.
+    static boolean collationName(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_')) {
+                return false;
+            }
+        }
+        return name.length() > 0;
+    }
     /// The java.time field types the ORM maps, by descriptor, to the simple name
     /// JavaTimeConverter's nested converters start with.
     private static final java.util.Map<String,String> JAVA_TIME_TYPES=new java.util.HashMap<String,String>();
@@ -1190,12 +1209,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if("text".equals(token)) return true;
         if(temporal==1) return "date".equals(token);
         if(!"timestamp".equals(token) && !"timestamptz".equals(token) && !"datetime".equals(token)) return false;
-        // The converter writes milliseconds, so the column has to keep three
-        // fractional digits: MySQL's DATETIME defaults to none, PostgreSQL's
-        // TIMESTAMP to six.
-        java.util.regex.Matcher precision=java.util.regex.Pattern.compile("\\(\\s*(\\d+)\\s*\\)").matcher(type);
-        int digits=precision.find() ? Integer.parseInt(precision.group(1)) : "datetime".equals(token) ? 0 : 6;
-        return digits>=3;
+        // The converter writes milliseconds. A coarser type -- MySQL's DATETIME
+        // keeps none -- is the developer's explicit choice to lose them, as
+        // Hibernate allows, and the engine rounds on write.
+        return true;
     }
 
     private static boolean lowerOrDigit(char c) { return Character.isLowerCase(c) || Character.isDigit(c); }
@@ -1546,8 +1563,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
               .append(", ").append(f.isId).append(", ").append(f.isId && f.autoIncrement)
               .append(", ").append(f.nullable).append(", ").append(f.version).append(", ")
               .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"")
-              .append(f.temporal==0 && f.insertable && f.updatable?"":", "+f.temporal)
-              .append(f.insertable && f.updatable?"":", "+f.insertable+", "+f.updatable).append(")")
+              .append(f.temporal==0 && f.insertable && f.updatable && f.collation==null?"":", "+f.temporal)
+              .append(f.insertable && f.updatable && f.collation==null?"":", "+f.insertable+", "+f.updatable)
+              .append(f.collation==null?"":", \""+f.collation+"\"").append(")")
               .append(i + 1 < ec.fields.size() ? ",\n" : "\n");
         }
         sb.append("  };\n  public Class<").append(ec.binaryName).append("> type() { return ")
@@ -3179,6 +3197,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         boolean unique;
         /// @Column(insertable/updatable); both true unless the developer said otherwise.
         boolean insertable = true, updatable = true;
+        /// @Column(collation), or null.
+        String collation;
         RelationField relation;
         int relationPart;
         PropertyTypeKind kind;

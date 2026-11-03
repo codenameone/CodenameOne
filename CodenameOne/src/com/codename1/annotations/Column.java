@@ -70,4 +70,16 @@ public @interface Column {
     /// A change made to the field alone is ignored: it neither writes the column
     /// nor marks the entity dirty.
     boolean updatable() default true;
+    /// The collation of the column, appended to its DDL as `COLLATE <name>`
+    /// (quoted on PostgreSQL), and the one the schema report then holds an
+    /// existing column to instead of requiring a case-sensitive key collation.
+    /// Letters, digits and underscores only, as `utf8mb4_0900_ai_ci` on MySQL,
+    /// `NOCASE` on SQLite or a collation created on PostgreSQL.
+    ///
+    /// A case-insensitive collation on a key makes the database treat `"A"` and
+    /// `"a"` as one key. The session's identity cache still compares ids with
+    /// `String.equals`, so look an entity up by the spelling it is stored with:
+    /// another one finds the row but loads a second instance of it. Hibernate
+    /// has the same caveat.
+    String collation() default "";
 }
