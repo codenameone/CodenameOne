@@ -28,6 +28,7 @@ import com.codename1.dart.transpiler.ast.Ast.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -40,22 +41,27 @@ import java.util.Set;
 /// `&&`, `||`, `??`, `?:`, `?.`, `??=` and null-aware cascades become if statements, so
 /// a right-hand side runs only when Dart would run it. Conditions of while, do and for
 /// that await become `while (true)` loops that test at the top (do and for through a
-/// first-pass flag, so `continue` still reaches the test and the update).
+/// first-pass flag, so `continue` still reaches the test and the update); a for loop whose
+/// header awaits stays a for loop, its condition and updates as statements
+/// (ForStmt.conditionStmts / updateStmts), so each pass keeps its own loop variable.
+/// `a?.b.c(await x)` skips the whole chain, the await included, when `a` is null.
 ///
 /// The pass reads the AST only and never changes it: what it rewrites is copied, and a
 /// statement it does not handle is returned as it was, for lowerable() to judge. Shapes
 /// left alone: an await inside a collection if/for element (or after one), a null-aware
 /// assignment target, a switch expression, a record literal, a `when` guard, an if-case
-/// subject, `await for` and try statements. Positional arguments are taken to precede
-/// named ones. A receiver that is a name the body does not declare (a type, an import
-/// prefix, a field or a top-level) is not copied ahead of an await, so a field read as a
-/// receiver is read after the awaits among the arguments.
+/// subject and `await for`. Arguments are evaluated in source order, named ones among
+/// the positional. A receiver is copied ahead of a later await unless reading it
+/// evaluates nothing: `this`, a type or an import prefix (JavaEmitter.namesNoValue).
 final class AsyncAnf {
     private final Set<String> locals = new HashSet<String>();
     private final Set<String> tempNames = new HashSet<String>();
     private int temps;
+    /// Whether a name, unqualified, reads no value: a type or an import prefix.
+    private final java.util.function.Predicate<String> noValue;
 
-    AsyncAnf(List<Param> params, Block body) {
+    AsyncAnf(List<Param> params, Block body, java.util.function.Predicate<String> noValue) {
+        this.noValue = noValue;
         for (Param p : params) {
             locals.add(p.name);
         }
@@ -242,33 +248,37 @@ final class AsyncAnf {
                 c.body = branch(f.body);
                 return c;
             }
+            // The loop stays a for loop, so every pass has its own loop variable; the
+            // lowering runs conditionStmts at the head and updateStmts after the pass.
             List<Stmt> outer = new ArrayList<Stmt>();
-            if (f.init != null) {
-                stmt(f.init, outer);
+            ForStmt c = copy(f);
+            if (f.init != null && AsyncLowering.hasAwait(f.init)) {
+                List<Stmt> l = new ArrayList<Stmt>();
+                stmt(f.init, l);
+                c.init = l.remove(l.size() - 1);
+                outer.addAll(l);
             }
-            String first = temp();
-            outer.add(decl(first, TypeRef.of("bool"), bool(false, f), f));
-            List<Stmt> upd = new ArrayList<Stmt>();
-            for (Expr u : f.updates) {
-                stmt(exprStmt(u, f), upd);
-            }
-            List<Stmt> body = new ArrayList<Stmt>();
-            body.add(ifStmt(ident(first, f), block(upd, f), null, f));
-            body.add(assign(ident(first, f), bool(true, f), f));
-            if (f.condition != null) {
-                Expr ce = expr(f.condition, body);
-                if (ce == null) {
+            if (AsyncLowering.hasAwait(f.condition)) {
+                List<Stmt> cp = new ArrayList<Stmt>();
+                c.condition = expr(f.condition, cp);
+                if (c.condition == null) {
                     return null;
                 }
-                body.add(breakUnless(ce, f));
+                c.conditionStmts = cp;
             }
-            body.add(blockOf(branch(f.body), f));
-            WhileStmt w = new WhileStmt();
-            w.at(f.file, f.line, f.col);
-            w.labels = f.labels;
-            w.condition = bool(true, f);
-            w.body = block(body, f);
-            outer.add(w);
+            if (AsyncLowering.hasAwait(f.updates)) {
+                List<Stmt> up = new ArrayList<Stmt>();
+                for (Expr u : f.updates) {
+                    stmt(exprStmt(u, f), up);
+                }
+                c.updates = new ArrayList<Expr>();
+                c.updateStmts = up;
+            }
+            c.body = branch(f.body);
+            if (outer.isEmpty()) {
+                return c;
+            }
+            outer.add(c);
             return block(outer, f);
         }
         if (s instanceof ForInStmt) {
@@ -282,6 +292,19 @@ final class AsyncAnf {
                 return null;
             }
             c.body = branch(f.body);
+            return c;
+        }
+        if (s instanceof TryStmt) {
+            TryStmt t = (TryStmt) s;
+            TryStmt c = copy(t);
+            c.tryBlock = normalize(t.tryBlock);
+            c.catches = new ArrayList<CatchClause>();
+            for (CatchClause k : t.catches) {
+                CatchClause kc = copy(k);
+                kc.body = normalize(k.body);
+                c.catches.add(kc);
+            }
+            c.finallyBlock = t.finallyBlock == null ? null : normalize(t.finallyBlock);
             return c;
         }
         if (s instanceof SwitchStmt) {
@@ -382,6 +405,10 @@ final class AsyncAnf {
             b.add(assign(ident(t, e), tb, e));
             pre.add(ifStmt(cond, block(a, e), block(b, e), e));
             return ident(t, e);
+        }
+        Expr link = shortLink(e);
+        if (link != null) {
+            return shorted(e, link, pre);
         }
         if (e instanceof Call) {
             return call((Call) e, pre);
@@ -529,6 +556,112 @@ final class AsyncAnf {
         return c;
     }
 
+    // ------------------------------------------------------------------
+    // Null-shorting: `a?.b.c(await x)` skips the whole chain, the await too
+    // ------------------------------------------------------------------
+
+    private static Expr receiver(Expr e) {
+        if (e instanceof Call) {
+            return ((Call) e).target;
+        }
+        if (e instanceof PropertyGet) {
+            return ((PropertyGet) e).target;
+        }
+        if (e instanceof IndexGet) {
+            return ((IndexGet) e).target;
+        }
+        if (e instanceof NotNullAssert) {
+            // `a?.b!.c()`: a `!` is a selector of the chain the null shorts.
+            return ((NotNullAssert) e).operand;
+        }
+        return null;
+    }
+
+    private static boolean nullAwareLink(Expr e) {
+        return e instanceof Call && ((Call) e).nullAware && ((Call) e).target != null
+                || e instanceof PropertyGet && ((PropertyGet) e).nullAware;
+    }
+
+    /// Whether the links of {@code e}'s selector chain from {@code e} down to {@code x},
+    /// x's receiver excluded, await.
+    private static boolean awaitAbove(Expr e, Expr x) {
+        boolean own = e instanceof Call && AsyncLowering.hasAwait(((Call) e).args)
+                || e instanceof IndexGet && AsyncLowering.hasAwait(((IndexGet) e).index);
+        if (e == x) {
+            return own;
+        }
+        return own || awaitAbove(receiver(e), x);
+    }
+
+    /// The null-aware link below {@code e} in its selector chain whose null skips an await
+    /// after it, else null. A null-aware call that is {@code e} itself is call()'s.
+    private static Expr shortLink(Expr e) {
+        for (Expr x = receiver(e); x != null; x = receiver(x)) {
+            if (nullAwareLink(x) && awaitAbove(e, x)) {
+                return x;
+            }
+        }
+        return null;
+    }
+
+    private Expr replaceLink(Expr e, Expr x, Expr rep) {
+        if (e == x) {
+            return rep;
+        }
+        if (e instanceof Call) {
+            Call c = copy((Call) e);
+            c.target = replaceLink(c.target, x, rep);
+            return c;
+        }
+        if (e instanceof PropertyGet) {
+            PropertyGet c = copy((PropertyGet) e);
+            c.target = replaceLink(c.target, x, rep);
+            return c;
+        }
+        if (e instanceof NotNullAssert) {
+            NotNullAssert c = copy((NotNullAssert) e);
+            c.operand = replaceLink(c.operand, x, rep);
+            return c;
+        }
+        IndexGet c = copy((IndexGet) e);
+        c.target = replaceLink(c.target, x, rep);
+        return c;
+    }
+
+    private Expr shorted(Expr e, Expr x, List<Stmt> pre) {
+        Expr tg = expr(receiver(x), pre);
+        if (tg == null) {
+            return null;
+        }
+        String r = temp();
+        pre.add(decl(r, null, tg, e));
+        String t = temp();
+        pre.add(decl(t, TypeRef.of("dynamic"), null, e));
+        NotNullAssert nn = new NotNullAssert();
+        nn.at(e.file, e.line, e.col);
+        nn.operand = ident(r, e);
+        Expr xc;
+        if (x instanceof Call) {
+            Call c = copy((Call) x);
+            c.nullAware = false;
+            c.target = nn;
+            xc = c;
+        } else {
+            PropertyGet c = copy((PropertyGet) x);
+            c.nullAware = false;
+            c.target = nn;
+            xc = c;
+        }
+        List<Stmt> inner = new ArrayList<Stmt>();
+        Expr v = expr(replaceLink(e, x, xc), inner);
+        if (v == null) {
+            return null;
+        }
+        inner.add(assign(ident(t, e), v, e));
+        pre.add(ifStmt(binary(ident(r, e), "!=", nul(e), e), block(inner, e), null, e));
+        return ident(t, e);
+    }
+
     private Args args(Args a, List<Stmt> pre, List<Expr> lead, boolean keepLead) {
         return args(a, pre, lead, keepLead, new ArrayList<Expr>());
     }
@@ -540,13 +673,37 @@ final class AsyncAnf {
         for (NamedArg n : a.named) {
             all.add(n.value);
         }
-        boolean[] keep = new boolean[all.size()];
-        for (int i = 0; i < lead.size(); i++) {
-            keep[i] = keepLead;
+        // Dart evaluates the arguments in source order, named ones among the positional.
+        List<Integer> order = new ArrayList<Integer>();
+        for (int i = 0; i < all.size(); i++) {
+            order.add(Integer.valueOf(i));
         }
-        Expr[] k = kids(pre, keep, all.toArray(new Expr[0]));
-        if (k == null) {
+        final List<Expr> src = all;
+        final int leads = lead.size();
+        Collections.sort(order.subList(leads, order.size()), new java.util.Comparator<Integer>() {
+            @Override
+            public int compare(Integer x, Integer y) {
+                Expr ex = src.get(x.intValue());
+                Expr ey = src.get(y.intValue());
+                if (ex == null || ey == null || ex.line != ey.line) {
+                    return ex == null || ey == null ? 0 : Integer.compare(ex.line, ey.line);
+                }
+                return Integer.compare(ex.col, ey.col);
+            }
+        });
+        Expr[] sorted = new Expr[all.size()];
+        boolean[] keep = new boolean[all.size()];
+        for (int i = 0; i < sorted.length; i++) {
+            sorted[i] = all.get(order.get(i).intValue());
+            keep[i] = i < leads && keepLead;
+        }
+        Expr[] ks = kids(pre, keep, sorted);
+        if (ks == null) {
             return null;
+        }
+        Expr[] k = new Expr[ks.length];
+        for (int i = 0; i < ks.length; i++) {
+            k[order.get(i).intValue()] = ks[i];
         }
         int j = 0;
         for (int i = 0; i < lead.size(); i++) {
@@ -875,17 +1032,19 @@ final class AsyncAnf {
         return ident(t, at);
     }
 
-    /// A receiver naming a type, an import prefix or a member of this or an enclosing
-    /// class: none of them is a value the body declares, so it is not copied ahead.
+    /// A receiver naming a type or an import prefix: reading it evaluates nothing, so it
+    /// is not copied ahead. A field, a getter or a top-level variable is a value read
+    /// before the awaits that follow it, so it is.
     private boolean staticRef(Expr e) {
         if (e instanceof ThisExpr || e instanceof SuperExpr) {
             return true;
         }
         if (e instanceof Ident) {
-            return !locals.contains(((Ident) e).name) && !isTemp(e);
+            return !locals.contains(((Ident) e).name) && !isTemp(e) && noValue.test(((Ident) e).name);
         }
-        if (e instanceof PropertyGet && !((PropertyGet) e).nullAware) {
-            return staticRef(((PropertyGet) e).target) && !AsyncLowering.hasAwait(e);
+        if (e instanceof PropertyGet && !((PropertyGet) e).nullAware && ((PropertyGet) e).target instanceof Ident) {
+            // `prefix.Type`: both names read no value. `Type.field` and `prefix.topLevel` do.
+            return staticRef(((PropertyGet) e).target) && noValue.test(((PropertyGet) e).name);
         }
         return false;
     }

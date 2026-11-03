@@ -481,6 +481,12 @@ public final class Ast {
         public Expr condition;                    // nullable
         public List<Expr> updates = new ArrayList<Expr>();
         public Stmt body;
+        /// Set only by the async lowering's normal form (AsyncAnf) when the header awaits:
+        /// the statements that compute {@code condition} at the head of every pass, and the
+        /// statements that replace {@code updates}. The loop stays a for loop, so each pass
+        /// keeps its own loop variable.
+        public List<Stmt> conditionStmts;
+        public List<Stmt> updateStmts;
     }
 
     public static class ForInStmt extends Stmt {

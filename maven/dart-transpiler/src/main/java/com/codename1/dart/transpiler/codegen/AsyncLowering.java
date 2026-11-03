@@ -51,12 +51,15 @@ import java.util.Set;
 /// The shapes lowered are chosen from the AST alone (lowerable): an await that is a
 /// whole expression statement, a local's initializer, the right-hand side of a plain
 /// assignment to a name, or a returned value; and if, while, do, for, for-in, switch,
-/// labels, break, continue and return around them. Anything else -- an await inside a
-/// larger expression, a try statement or a pattern holding an await, `await for`, a
-/// local function, a late local or a pattern declaration among the statements that are
-/// split into states -- keeps the existing emission for the whole body.
+/// labels, break, continue, return and try/catch/finally around them (see lowerTry; a
+/// try statement without an await stays a Java try inside one state). AsyncAnf has
+/// already moved every other await out of its expression. Anything else -- a pattern
+/// holding an await, `await for`, a local function, a late local or a pattern
+/// declaration among the statements that are split into states -- keeps the existing
+/// emission for the whole body.
 final class AsyncLowering {
     private final JavaEmitter em;
+
 
     AsyncLowering(JavaEmitter em) {
         this.em = em;
@@ -72,13 +75,28 @@ final class AsyncLowering {
         final List<String> labels;
         final int brk;
         final int cont;
+        /// How many finally blocks enclose the target: a jump from inside more runs them.
+        final int fins;
 
-        Target(int kind, List<String> labels, int brk, int cont) {
+        Target(int fins, int kind, List<String> labels, int brk, int cont) {
+            this.fins = fins;
             this.kind = kind;
             this.labels = labels == null ? Collections.<String>emptyList() : labels;
             this.brk = brk;
             this.cont = cont;
         }
+    }
+
+    /// A finally block being lowered: its state, and the fields of the pending completion
+    /// the block ends with -- how the try was left ({@code c}: NEXT 0, RETURN 1 with the
+    /// value in {@code v}, RETHROW 2 with the throwable in {@code v}, JUMP 3 to the state in
+    /// {@code j}) -- and the jumps that left through it, each {state, enclosing finallies}.
+    private static final class Fin {
+        int state;
+        String c;
+        String v;
+        String j;
+        final List<int[]> jumps = new ArrayList<int[]>();
     }
 
     /// The frame being emitted, read by JavaEmitter's hooks (Ctx.frame).
@@ -99,6 +117,16 @@ final class AsyncLowering {
         final List<Set<String>> loopCaps = new ArrayList<Set<String>>();
         /// Per-iteration variables: Dart name to {field, type, holder class}.
         final Map<String, Object[]> cells = new HashMap<String, Object[]>();
+        /// The finally blocks enclosing the statement being lowered, innermost last.
+        final List<Fin> fins = new ArrayList<Fin>();
+        /// Locals no later state reads, declared as Java locals (lowerList).
+        final Set<Stmt> stateLocals = Collections.newSetFromMap(new IdentityHashMap<Stmt, Boolean>());
+        /// What a throw in each state does: an index into handlers, absent for none.
+        final Map<Integer, Integer> stateHandler = new HashMap<Integer, Integer>();
+        /// Handler code, run with the throwable in `<frame>t`; it ends with a jump.
+        final List<String> handlers = new ArrayList<String>();
+        /// The handler of the states being opened, -1 for none.
+        int handler = -1;
         AwaitExpr resumeAwait;
         JavaEmitter.Out resumeOperand;
         TypeRef resumeExpected;
@@ -271,8 +299,22 @@ final class AsyncLowering {
         }
         if (s instanceof ForStmt) {
             ForStmt f = (ForStmt) s;
-            return (f.init == null || !hasAwait(f.init)) && !hasAwait(f.condition)
-                    && !hasAwait(f.updates) && branchOk(f.body);
+            return (f.init == null || !hasAwait(f.init) || listOk(Collections.singletonList(f.init)))
+                    && !hasAwait(f.condition) && !hasAwait(f.updates)
+                    && (f.conditionStmts == null || listOk(f.conditionStmts))
+                    && (f.updateStmts == null || listOk(f.updateStmts)) && branchOk(f.body);
+        }
+        if (s instanceof TryStmt) {
+            TryStmt t = (TryStmt) s;
+            if (!listOk(t.tryBlock.statements) || t.finallyBlock != null && !listOk(t.finallyBlock.statements)) {
+                return false;
+            }
+            for (CatchClause c : t.catches) {
+                if (!listOk(c.body.statements)) {
+                    return false;
+                }
+            }
+            return true;
         }
         if (s instanceof ForInStmt) {
             ForInStmt f = (ForInStmt) s;
@@ -348,7 +390,13 @@ final class AsyncLowering {
         if (body == null || !hasAwait(body.statements)) {
             return false;
         }
-        body = new AsyncAnf(params, body).normalize(body);
+        final JavaEmitter.Ctx nctx = ctx;
+        body = new AsyncAnf(params, body, new java.util.function.Predicate<String>() {
+            @Override
+            public boolean test(String n) {
+                return em.namesNoValue(n, nctx);
+            }
+        }).normalize(body);
         if (!lowerable(body)) {
             return false;
         }
@@ -415,11 +463,38 @@ final class AsyncLowering {
         }
         w.line(f.name + ".body = () -> {");
         w.line("    " + f.label + ": for (;;) {");
+        boolean guarded = !f.handlers.isEmpty();
+        if (guarded) {
+            // A throw in a state inside a lowered try goes where that state's region says.
+            w.line("    try {");
+        }
         w.line("        switch (" + f.name + ".state) {");
         w.raw(cases);
         w.line("            default:");
         w.line("                throw new IllegalStateException(\"async frame state \" + " + f.name + ".state);");
         w.line("        }");
+        if (guarded) {
+            String t = f.name + "t";
+            w.line("    } catch (Throwable " + t + ") {");
+            w.line("        switch (" + f.name + ".state) {");
+            for (int h = 0; h < f.handlers.size(); h++) {
+                StringBuilder labels = new StringBuilder();
+                for (Map.Entry<Integer, Integer> e : f.stateHandler.entrySet()) {
+                    if (e.getValue().intValue() == h) {
+                        labels.append("case ").append(e.getKey()).append(": ");
+                    }
+                }
+                if (labels.length() > 0) {
+                    w.line("            " + labels + "{");
+                    w.line("                " + f.handlers.get(h).replace("$T", t));
+                    w.line("            }");
+                }
+            }
+            w.line("            default:");
+            w.line("                throw " + t + ";");
+            w.line("        }");
+            w.line("    }");
+        }
         w.line("    }");
         w.line("};");
         if (isVoid) {
@@ -533,12 +608,71 @@ final class AsyncLowering {
         w.line("case " + k + ": {");
         ctx.indent(1);
         f.closed = false;
+        if (f.handler >= 0) {
+            f.stateHandler.put(Integer.valueOf(k), Integer.valueOf(f.handler));
+        }
     }
 
     private void lowerList(List<Stmt> list, Frame f, JavaEmitter.Ctx ctx) {
-        for (Stmt s : list) {
+        lowerList(list, null, f, ctx);
+    }
+
+    /// {@code after}: what reads the list's locals once it has run (a loop condition).
+    private void lowerList(List<Stmt> list, Expr after, Frame f, JavaEmitter.Ctx ctx) {
+        for (int i = 0; i < list.size(); i++) {
+            Stmt s = list.get(i);
+            if (s instanceof VarDeclStmt && !hasAwait(s) && javacTyped((VarDeclStmt) s)) {
+                int split = i + 1;
+                while (split < list.size() && !hasAwait(list.get(split))) {
+                    split++;
+                }
+                String name = ((VarDeclStmt) s).name;
+                if (!mentions(list.subList(split, list.size()), name)
+                        && (split == list.size() || !mentions(after, name))) {
+                    f.stateLocals.add(s);
+                }
+            }
             lower(s, f, ctx);
         }
+    }
+
+    /// An untyped local that outside a frame may be a Java `var`, typed by javac.
+    private static boolean javacTyped(VarDeclStmt v) {
+        return v.initializer != null && !(v.initializer instanceof Lambda) && (v.type == null || v.type.is("var"));
+    }
+
+    /// Whether {@code n} names {@code name}, closures included.
+    private static boolean mentions(Object n, String name) {
+        if (n instanceof List) {
+            for (Object o : (List<?>) n) {
+                if (mentions(o, name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (n instanceof Args) {
+            return mentions(((Args) n).positional, name) || mentions(((Args) n).named, name);
+        }
+        if (n instanceof NamedArg) {
+            return mentions(((NamedArg) n).value, name);
+        }
+        if (!(n instanceof Node)) {
+            return false;
+        }
+        if (n instanceof Ident && name.equals(((Ident) n).name)) {
+            return true;
+        }
+        try {
+            for (Field f : nodeFields(n.getClass())) {
+                if (mentions(f.get(n), name)) {
+                    return true;
+                }
+            }
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(e);
+        }
+        return false;
     }
 
     private void lowerBranch(Stmt s, Frame f, JavaEmitter.Ctx ctx) {
@@ -562,6 +696,12 @@ final class AsyncLowering {
             for (VarDeclStmt d : ((VarDeclGroup) s).decls) {
                 lower(d, f, ctx);
             }
+            return;
+        }
+        if (s instanceof VarDeclStmt && !hasAwait(s) && f.stateLocals.contains(s)) {
+            // Used only before the next state: a Java local, declared as outside a frame,
+            // so javac still infers what the Dart-side inference left dynamic.
+            em.emitStatement(s, ctx);
             return;
         }
         if (s instanceof VarDeclStmt && !hasAwait(s)) {
@@ -589,7 +729,7 @@ final class AsyncLowering {
         boolean loop = s instanceof WhileStmt || s instanceof ForStmt || s instanceof ForInStmt;
         if (s.labels != null && !loop) {
             int exit = newState(f);
-            f.targets.add(new Target(LABEL, s.labels, exit, -1));
+            f.targets.add(new Target(f.fins.size(), LABEL, s.labels, exit, -1));
             List<String> labels = s.labels;
             s.labels = null;
             try {
@@ -612,6 +752,13 @@ final class AsyncLowering {
                 expected = ((VarDeclStmt) s).type;
             } else if (s instanceof ReturnStmt && !f.isVoid && !em.isDynamicType(f.valueType)) {
                 expected = f.valueType;
+            } else if (s instanceof ExprStmt && unparen(((ExprStmt) s).expr) instanceof Assign
+                    && unparen(((Assign) unparen(((ExprStmt) s).expr)).lhs) instanceof Ident
+                    && ctx.lookup(((Ident) unparen(((Assign) unparen(((ExprStmt) s).expr)).lhs)).name) != null) {
+                // `x = await f()` to a local: the local's declared type, as for a declaration
+                // (the operand's may name a same-named type of another library).
+                TypeRef lt = ctx.lookup(((Ident) unparen(((Assign) unparen(((ExprStmt) s).expr)).lhs)).name);
+                expected = em.isDynamicType(lt) ? null : lt;
             } else if (s instanceof ExprStmt && unparen(((ExprStmt) s).expr) instanceof Assign
                     && !(unparen(((Assign) unparen(((ExprStmt) s).expr)).lhs) instanceof Ident)) {
                 // `o.p = await open()`: the slot's type infers the callee's witness.
@@ -675,7 +822,7 @@ final class AsyncLowering {
                 test(wh.condition, body, exit, f, ctx);
                 open(f, body, ctx);
             }
-            f.targets.add(new Target(LOOP, s.labels, exit, head));
+            f.targets.add(new Target(f.fins.size(), LOOP, s.labels, exit, head));
             f.loopCaps.add(CaptureScan.lambdaRefs(wh.body));
             lowerBranch(wh.body, f, ctx);
             f.loopCaps.remove(f.loopCaps.size() - 1);
@@ -701,11 +848,14 @@ final class AsyncLowering {
             int next = newState(f);
             int exit = newState(f);
             open(f, head, ctx);
+            if (fs.conditionStmts != null) {
+                lowerList(fs.conditionStmts, fs.condition, f, ctx);
+            }
             if (fs.condition != null) {
                 test(fs.condition, body, exit, f, ctx);
             }
             open(f, body, ctx);
-            f.targets.add(new Target(LOOP, s.labels, exit, next));
+            f.targets.add(new Target(f.fins.size(), LOOP, s.labels, exit, next));
             lowerBranch(fs.body, f, ctx);
             f.targets.remove(f.targets.size() - 1);
             open(f, next, ctx);
@@ -718,6 +868,9 @@ final class AsyncLowering {
             }
             for (Expr u : fs.updates) {
                 em.emitDiscardedValue(u, ctx);
+            }
+            if (fs.updateStmts != null) {
+                lowerList(fs.updateStmts, f, ctx);
             }
             jump(f, head, ctx);
             f.loopCaps.remove(f.loopCaps.size() - 1);
@@ -749,7 +902,7 @@ final class AsyncLowering {
                 String v = declareField(f, ctx, fi.varName, elem, jt);
                 w.line(v + " = (" + jt + ") " + it + ".next();");
             }
-            f.targets.add(new Target(LOOP, s.labels, exit, head));
+            f.targets.add(new Target(f.fins.size(), LOOP, s.labels, exit, head));
             lowerBranch(fi.body, f, ctx);
             f.targets.remove(f.targets.size() - 1);
             f.loopCaps.remove(f.loopCaps.size() - 1);
@@ -787,7 +940,7 @@ final class AsyncLowering {
                 copy.cases.add(cc);
                 moved.add(new Object[] {Integer.valueOf(k), c});
             }
-            f.targets.add(new Target(SWITCH, null, exit, -1));
+            f.targets.add(new Target(f.fins.size(), SWITCH, null, exit, -1));
             registerEscapes(copy, 0, 0, new HashSet<String>(), f);
             w.line("if (true) {");
             ctx.indent(1);
@@ -806,7 +959,177 @@ final class AsyncLowering {
             open(f, exit, ctx);
             return;
         }
+        if (s instanceof TryStmt) {
+            lowerTry((TryStmt) s, f, ctx);
+            return;
+        }
         throw new IllegalStateException("not lowerable: " + s.getClass().getSimpleName());
+    }
+
+    private static int addHandler(Frame f, String code) {
+        f.handlers.add(code);
+        return f.handlers.size() - 1;
+    }
+
+    private static String field(Frame f, String javaType, String suffix) {
+        String n = f.name + suffix;
+        f.fields.add(javaType + " " + n + ";");
+        return f.name + "." + n;
+    }
+
+    /// A try statement holding an await. The try block's states hand a throw to the catch
+    /// dispatch, the dispatch's and the catch bodies' to the finally block (as a pending
+    /// rethrow), and the finally block's to whatever encloses the statement. Every way out
+    /// of the try and catch parts that has a finally block goes through it: falling off
+    /// the end, return, break and continue record a pending completion and enter it, and
+    /// it ends by carrying that completion out, through the next finally when there is one.
+    private void lowerTry(TryStmt t, Frame f, JavaEmitter.Ctx ctx) {
+        JavaEmitter.Ctx.Writer w = ctx.writer();
+        int exit = newState(f);
+        int saved = f.handler;
+        Fin fin = null;
+        int outerHandler = saved;
+        if (t.finallyBlock != null) {
+            fin = new Fin();
+            fin.state = newState(f);
+            fin.c = field(f, "int", "c" + fin.state);
+            fin.v = field(f, "Object", "v" + fin.state);
+            fin.j = field(f, "int", "j" + fin.state);
+            outerHandler = addHandler(f, fin.v + " = $T; " + fin.c + " = 2; " + jumpCode(f, fin.state));
+        }
+        int dispatch = -1;
+        String ex = null;
+        int tryHandler = outerHandler;
+        if (!t.catches.isEmpty()) {
+            dispatch = newState(f);
+            ex = field(f, "Throwable", "x" + dispatch);
+            tryHandler = addHandler(f, ex + " = $T; " + jumpCode(f, dispatch));
+        }
+        if (fin != null) {
+            f.fins.add(fin);
+        }
+        f.handler = tryHandler;
+        open(f, newState(f), ctx);
+        lowerBranch(t.tryBlock, f, ctx);
+        leaveTry(fin, exit, f, ctx);
+        f.handler = outerHandler;
+        if (dispatch >= 0) {
+            open(f, dispatch, ctx);
+            ctx.importClass("dart.runtime.DartRuntime");
+            List<Object[]> clauses = new ArrayList<Object[]>();
+            boolean catchAll = false;
+            for (CatchClause cc : t.catches) {
+                Object[] m = em.catchMatch(cc, ex, ctx);
+                int k = newState(f);
+                clauses.add(new Object[] {Integer.valueOf(k), cc, m});
+                if (m[0] == null) {
+                    jump(f, k, ctx);
+                    catchAll = true;
+                    break;
+                }
+                w.line("if (" + m[0] + ") {");
+                w.line("    " + jumpCode(f, k));
+                w.line("}");
+            }
+            if (!catchAll) {
+                w.line("throw DartRuntime.rethrow(" + ex + ");");
+                f.closed = true;
+            }
+            for (Object[] c : clauses) {
+                CatchClause cc = (CatchClause) c[1];
+                Object[] m = (Object[]) c[2];
+                open(f, ((Integer) c[0]).intValue(), ctx);
+                ctx.pushScope();
+                String var = declareField(f, ctx, cc.exceptionVar != null ? cc.exceptionVar : "$e", (TypeRef) m[3],
+                        (String) m[1]);
+                w.line(var + " = " + m[2] + ";");
+                if (cc.stackVar != null) {
+                    String st = declareField(f, ctx, cc.stackVar, new TypeRef("StackTrace"), "dart.core.StackTrace");
+                    w.line(st + " = dart.core.StackTrace.ofThrown(" + ex + ");");
+                }
+                String outerRethrow = ctx.rethrowTarget;
+                ctx.rethrowTarget = ex;
+                try {
+                    lowerList(cc.body.statements, f, ctx);
+                } finally {
+                    ctx.rethrowTarget = outerRethrow;
+                }
+                ctx.popScope();
+                leaveTry(fin, exit, f, ctx);
+            }
+        }
+        f.handler = saved;
+        if (fin != null) {
+            f.fins.remove(f.fins.size() - 1);
+            open(f, fin.state, ctx);
+            ctx.pushScope();
+            lowerList(t.finallyBlock.statements, f, ctx);
+            ctx.popScope();
+            if (!f.closed) {
+                // A throw in the finally block replaced the pending completion; else it runs.
+                w.line("switch (" + fin.c + ") {");
+                w.line("    case 1: {");
+                ctx.indent(2);
+                if (f.fins.isEmpty()) {
+                    w.line(f.isVoid ? f.name + ".complete(null);" : f.name + ".resolve(" + fin.v + ");");
+                    w.line("return;");
+                } else {
+                    Fin out = f.fins.get(f.fins.size() - 1);
+                    w.line(out.v + " = " + fin.v + "; " + out.c + " = 1; " + jumpCode(f, out.state));
+                }
+                ctx.indent(-2);
+                w.line("    }");
+                w.line("    case 2:");
+                w.line("        throw (Throwable) " + fin.v + ";");
+                if (!fin.jumps.isEmpty()) {
+                    w.line("    case 3:");
+                    w.line("        switch (" + fin.j + ") {");
+                    Set<Integer> seen = new HashSet<Integer>();
+                    for (int[] jmp : new ArrayList<int[]>(fin.jumps)) {
+                        if (!seen.add(Integer.valueOf(jmp[0]))) {
+                            continue;
+                        }
+                        w.line("            case " + jmp[0] + ":");
+                        w.line("                " + leave(f, jmp[1], jmp[0]));
+                    }
+                    w.line("            default:");
+                    w.line("                throw new IllegalStateException(\"finally jump \" + " + fin.j + ");");
+                    w.line("        }");
+                }
+                w.line("    default:");
+                w.line("        break;");
+                w.line("}");
+            }
+        }
+        open(f, exit, ctx);
+    }
+
+    /// The end of a try block or a catch body: to the finally block, else past the try.
+    private static void leaveTry(Fin fin, int exit, Frame f, JavaEmitter.Ctx ctx) {
+        if (f.closed) {
+            return;
+        }
+        if (fin != null) {
+            ctx.writer().line(fin.c + " = 0;");
+            jump(f, fin.state, ctx);
+        } else {
+            jump(f, exit, ctx);
+        }
+    }
+
+    /// A jump to state {@code k}, enclosed by {@code depth} finally blocks, from where the
+    /// lowering is: through the innermost finally block it leaves, else straight there.
+    private static String leave(Frame f, int depth, int k) {
+        if (f.fins.size() > depth) {
+            Fin fin = f.fins.get(f.fins.size() - 1);
+            fin.jumps.add(new int[] {k, depth});
+            return fin.c + " = 3; " + fin.j + " = " + k + "; " + jumpCode(f, fin.state);
+        }
+        return jumpCode(f, k);
+    }
+
+    private static String escape(Frame f, Target t, int k) {
+        return leave(f, t.fins, k);
     }
 
     private void test(Expr cond, int yes, int no, Frame f, JavaEmitter.Ctx ctx) {
@@ -856,6 +1179,13 @@ final class AsyncLowering {
     JavaEmitter.Out resumeValue(JavaEmitter.Ctx ctx) {
         Frame f = ctx.frame;
         TypeRef ot = f.resumeOperand.type;
+        if (ot != null && !ot.is("Future") && !ot.is("FutureOr")) {
+            // A program class implementing Future<T> awaits to a T, as Future<T> does.
+            TypeRef sup = em.asSuper(ot, "Future", 0);
+            if (sup != null && sup.is("Future")) {
+                ot = sup;
+            }
+        }
         String v = f.name + ".value()";
         if (ot != null && ot.is("void")) {
             return new JavaEmitter.Out(v, TypeRef.VOID);
@@ -901,7 +1231,8 @@ final class AsyncLowering {
         }
         String code = init != null ? (jt.equals("dart.runtime.Funcs.VoidFunc0") ? init.code : em.coerce(init, t, ctx))
                 : em.zeroValue(t);
-        if (init != null && jt.indexOf('<') > 0 && !(v.initializer instanceof Lambda)) {
+        if (init != null && jt.indexOf('<') > 0 && !(v.initializer instanceof Lambda)
+                && (v.type == null || v.type.is("var")) && em.containsDynamic(t)) {
             // A `var` inferred as Stream<Object> holding a Stream<Long>: generics are erased.
             code = "(" + jt + ") (Object) (" + code + ")";
         }
@@ -917,24 +1248,29 @@ final class AsyncLowering {
     void emitReturn(ReturnStmt r, JavaEmitter.Ctx ctx) {
         Frame f = ctx.frame;
         JavaEmitter.Ctx.Writer w = ctx.writer();
-        if (r.value == null) {
-            w.line(f.name + ".complete(null);");
-        } else if (f.isVoid) {
+        String value = null;
+        if (r.value != null && f.isVoid) {
             em.emitDiscardedValue(r.value, ctx);
-            w.line(f.name + ".complete(null);");
-        } else {
+        } else if (r.value != null) {
             TypeRef inner = f.valueType;
             JavaEmitter.Out o = em.emitExpr(r.value, em.isDynamicType(inner) ? null : inner, ctx);
             if (o.type != null && o.type.is("void")) {
                 w.line(o.code + ";");
-                w.line(f.name + ".complete(null);");
             } else {
                 boolean future = o.type != null && (o.type.is("Future") || o.type.is("FutureOr"))
                         || em.isDynamicType(inner) || em.isDynamicType(o.type) || inner.is("void");
-                String code = future ? o.code : em.coerce(o, inner, ctx);
-                w.line(f.name + ".resolve((Object) (" + code + "));");
+                value = "(Object) (" + (future ? o.code : em.coerce(o, inner, ctx)) + ")";
             }
         }
+        if (!f.fins.isEmpty()) {
+            // Leaving a try that has a finally block: the block runs first, then returns.
+            Fin fin = f.fins.get(f.fins.size() - 1);
+            w.line(fin.v + " = " + (value == null ? "null" : value) + ";");
+            w.line(fin.c + " = 1;");
+            w.line(jumpCode(f, fin.state));
+            return;
+        }
+        w.line(value == null ? f.name + ".complete(null);" : f.name + ".resolve(" + value + ");");
         w.line("return;");
     }
 
@@ -956,7 +1292,7 @@ final class AsyncLowering {
             if (!f.jumps.containsKey(b) && (b.label == null ? breakables == 0 : !labels.contains(b.label))) {
                 Target t = find(f, b.label, false);
                 if (t != null) {
-                    f.jumps.put(b, jumpCode(f, t.brk));
+                    f.jumps.put(b, escape(f, t, t.brk));
                 }
             }
         } else if (s instanceof ContinueStmt) {
@@ -964,7 +1300,7 @@ final class AsyncLowering {
             if (c.label == null ? loops == 0 : !labels.contains(c.label)) {
                 Target t = find(f, c.label, true);
                 if (t != null) {
-                    f.jumps.put(c, jumpCode(f, t.cont));
+                    f.jumps.put(c, escape(f, t, t.cont));
                 }
             }
         } else if (s instanceof Block) {

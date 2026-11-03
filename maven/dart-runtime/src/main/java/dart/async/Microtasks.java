@@ -119,6 +119,13 @@ final class Microtasks {
         }
     }
 
+    /// Timer events on the isolate thread's stack right now. Each is still counted in
+    /// pendingTimers until it returns, so a runUntilIdle() called from inside one (an
+    /// async body resumed by a timer that then runs the loop nested, as native code
+    /// answering a channel call does) waited for its own event to end: a deadlock
+    /// whenever the resumption happened to arrive by timer rather than by microtask.
+    private static int runningTimerEvents;
+
     static void timerStarted() {
         synchronized (LOCK) {
             pendingTimers++;
@@ -140,9 +147,15 @@ final class Microtasks {
             EVENTS.addLast(new Runnable() {
                 @Override
                 public void run() {
+                    synchronized (LOCK) {
+                        runningTimerEvents++;
+                    }
                     try {
                         r.run();
                     } finally {
+                        synchronized (LOCK) {
+                            runningTimerEvents--;
+                        }
                         timerEnded();
                     }
                 }
@@ -247,7 +260,7 @@ final class Microtasks {
             drain();
             synchronized (LOCK) {
                 if (idleLocked()) {
-                    if (pendingTimers <= 0 && runningFrames <= 0) {
+                    if (pendingTimers - runningTimerEvents <= 0 && runningFrames <= 0) {
                         return;
                     }
                     try {

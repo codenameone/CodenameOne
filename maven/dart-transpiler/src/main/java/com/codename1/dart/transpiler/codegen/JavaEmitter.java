@@ -13210,7 +13210,7 @@ public final class JavaEmitter {
     }
 
     /** {@code t} as its program supertype named {@code name}, or t itself. */
-    private TypeRef asSuper(TypeRef t, String name, int depth) {
+    TypeRef asSuper(TypeRef t, String name, int depth) {
         if (t == null || name == null || name.equals(t.name) || depth > 8) {
             return t;
         }
@@ -15568,6 +15568,25 @@ public final class JavaEmitter {
     }
 
     /** Whether {@code target} is an {@code import '...' as name} prefix, not a value. */
+    /// Whether {@code n}, read where {@code ctx} is, names a type or an import prefix rather
+    /// than a value: reading it evaluates nothing. A local, a field of this class or its
+    /// superclasses and a top-level variable are values.
+    boolean namesNoValue(String n, Ctx ctx) {
+        Ident id = new Ident();
+        id.name = n;
+        if (isImportPrefix(id, ctx)) {
+            return true;
+        }
+        if (ctx.lookup(n) != null || program.topLevelVars.containsKey(n)
+                || ctx.currentClass != null && (ctx.currentClass.field(n) != null
+                        || findInheritedField(ctx.currentClass, n) != null)) {
+            return false;
+        }
+        return program.classes.containsKey(n) || program.enums.containsKey(n) || program.typedefs.containsKey(n)
+                || stubs.isStubClass(n) || stubs.isStubEnum(n) || CORE_STATIC_RECEIVERS.contains(n)
+                || n.equals("Future") || n.equals("Duration") || n.equals("Iterable");
+    }
+
     private boolean isImportPrefix(Expr target, Ctx ctx) {
         return target instanceof Ident
                 && ctx.lookup(((Ident) target).name) == null
@@ -18738,6 +18757,78 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * and must be matched by ITS type and bound as itself, and a filtered clause that
      * rethrew from its own Java catch skipped every clause after it.
      */
+    /// How a catch clause matches the Java throwable named {@code caught}: the test (null
+    /// for a clause that takes everything), the Java type and value its variable is
+    /// bound to, and its Dart type. Shared by the catch chain and the async lowering.
+    Object[] catchMatch(CatchClause cc, String caught, Ctx ctx) {
+        TypeRef on = cc.onType;
+        if (on != null && on.name != null && on.name.indexOf('.') > 0) {
+            // `on io.WebSocketException`: resolved through the prefix's library first
+            // (javaType strips the prefix and marks a runtime type), as every other
+            // type position is, so the tests below see the base name.
+            javaType(on, true, ctx);
+        }
+        String test;
+        String bindType;
+        String bindValue;
+        TypeRef varType;
+        if (on == null || on.is("Object") || on.is("dynamic")) {
+            test = null;
+            bindType = "Object";
+            bindValue = "DartRuntime.caught(" + caught + ")";
+            varType = TypeRef.DYNAMIC;
+        } else if (on.is("Error") && on.args.isEmpty()) {
+            test = "DartRuntime.isDartError(" + caught + ")";
+            bindType = "Object";
+            bindValue = caught;
+            varType = TypeRef.DYNAMIC;
+        } else if (on.is("Exception") && on.args.isEmpty()) {
+            test = "DartRuntime.isDartException(" + caught + ")";
+            bindType = "Object";
+            bindValue = caught;
+            varType = TypeRef.DYNAMIC;
+        } else if (isThrowableType(on)) {
+            String jt;
+            String coreError = CORE_ERRORS.get(on.name);
+            if (coreError != null) {
+                ctx.importClass(coreError);
+                jt = coreError.substring(coreError.lastIndexOf('.') + 1);
+            } else {
+                jt = javaType(on, true, ctx);
+            }
+            test = caught + " instanceof " + jt;
+            // `on Box<int>` checks the type arguments too, as `is Box<int>` does.
+            String reified = reifiedIsCheck(caught, false, on, ctx);
+            if (reified != null) {
+                test = reified;
+            }
+            bindType = jt;
+            bindValue = "(" + jt + ") " + caught;
+            varType = on;
+            if (on.is("ConcurrentModificationError")) {
+                // Maps and sets iterate with Java's iterators, which report a change
+                // during iteration as java.util.ConcurrentModificationException; it is
+                // the same Dart error, so the clause takes both.
+                // Bound as the Dart error in both cases, so `e is ConcurrentModificationError`
+                // holds and e has that type's API.
+                test = "(" + test + " || " + caught + " instanceof java.util.ConcurrentModificationException)";
+                bindValue = "DartRuntime.asConcurrentModificationError(" + caught + ")";
+            }
+        } else {
+            // A thrown value that is not an exception: matched by its own type.
+            ctx.importClass("dart.core.DartThrown");
+            String jt = javaType(on, true, ctx);
+            String value = "((DartThrown) " + caught + ").value()";
+            String reified = reifiedIsCheck(value, false, on, ctx);
+            test = caught + " instanceof DartThrown && "
+                    + (reified != null ? reified : value + " instanceof " + jt);
+            bindType = jt;
+            bindValue = "(" + jt + ") " + value;
+            varType = on;
+        }
+        return new Object[] {test, bindType, bindValue, varType};
+    }
+
     private void emitCatchChain(List<CatchClause> catches, Ctx ctx) {
         Ctx.Writer w = ctx.writer();
         ctx.importClass("dart.runtime.DartRuntime");
@@ -18747,71 +18838,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         boolean first = true;
         boolean catchAll = false;
         for (CatchClause cc : catches) {
-            TypeRef on = cc.onType;
-            if (on != null && on.name != null && on.name.indexOf('.') > 0) {
-                // `on io.WebSocketException`: resolved through the prefix's library first
-                // (javaType strips the prefix and marks a runtime type), as every other
-                // type position is, so the tests below see the base name.
-                javaType(on, true, ctx);
-            }
-            String test;
-            String bindType;
-            String bindValue;
-            TypeRef varType;
-            if (on == null || on.is("Object") || on.is("dynamic")) {
-                test = null;
-                bindType = "Object";
-                bindValue = "DartRuntime.caught(" + caught + ")";
-                varType = TypeRef.DYNAMIC;
-            } else if (on.is("Error") && on.args.isEmpty()) {
-                test = "DartRuntime.isDartError(" + caught + ")";
-                bindType = "Object";
-                bindValue = caught;
-                varType = TypeRef.DYNAMIC;
-            } else if (on.is("Exception") && on.args.isEmpty()) {
-                test = "DartRuntime.isDartException(" + caught + ")";
-                bindType = "Object";
-                bindValue = caught;
-                varType = TypeRef.DYNAMIC;
-            } else if (isThrowableType(on)) {
-                String jt;
-                String coreError = CORE_ERRORS.get(on.name);
-                if (coreError != null) {
-                    ctx.importClass(coreError);
-                    jt = coreError.substring(coreError.lastIndexOf('.') + 1);
-                } else {
-                    jt = javaType(on, true, ctx);
-                }
-                test = caught + " instanceof " + jt;
-                // `on Box<int>` checks the type arguments too, as `is Box<int>` does.
-                String reified = reifiedIsCheck(caught, false, on, ctx);
-                if (reified != null) {
-                    test = reified;
-                }
-                bindType = jt;
-                bindValue = "(" + jt + ") " + caught;
-                varType = on;
-                if (on.is("ConcurrentModificationError")) {
-                    // Maps and sets iterate with Java's iterators, which report a change
-                    // during iteration as java.util.ConcurrentModificationException; it is
-                    // the same Dart error, so the clause takes both.
-                    // Bound as the Dart error in both cases, so `e is ConcurrentModificationError`
-                    // holds and e has that type's API.
-                    test = "(" + test + " || " + caught + " instanceof java.util.ConcurrentModificationException)";
-                    bindValue = "DartRuntime.asConcurrentModificationError(" + caught + ")";
-                }
-            } else {
-                // A thrown value that is not an exception: matched by its own type.
-                ctx.importClass("dart.core.DartThrown");
-                String jt = javaType(on, true, ctx);
-                String value = "((DartThrown) " + caught + ").value()";
-                String reified = reifiedIsCheck(value, false, on, ctx);
-                test = caught + " instanceof DartThrown && "
-                        + (reified != null ? reified : value + " instanceof " + jt);
-                bindType = jt;
-                bindValue = "(" + jt + ") " + value;
-                varType = on;
-            }
+            Object[] m = catchMatch(cc, caught, ctx);
+            String test = (String) m[0];
+            String bindType = (String) m[1];
+            String bindValue = (String) m[2];
+            TypeRef varType = (TypeRef) m[3];
             if (test == null) {
                 w.line(first ? "{" : "} else {");
                 catchAll = true;
@@ -30074,7 +30105,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return t != null && (t.is("int") || t.is("double"));
     }
 
-    private boolean containsDynamic(TypeRef t) {
+    boolean containsDynamic(TypeRef t) {
         if (t == null || t.is("dynamic")) {
             return true;
         }
@@ -30092,6 +30123,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         TypeRef c = TypeRef.of(t.name, t.args.toArray(new TypeRef[0]));
         c.nullable = true;
+        // The copy names the same type: javaType strips an import prefix in place
+        // (`io.WebSocket` -> `WebSocket`) and leaves which library it meant only in
+        // runtimeOnly/resolved, so dropping them re-resolved the bare name against the
+        // current library (a frame's resume cast then named another library's class).
+        c.runtimeOnly = t.runtimeOnly;
+        c.resolved = t.resolved;
         c.funcParams = t.funcParams;
         c.funcReturn = t.funcReturn;
         c.funcTypeParams = t.funcTypeParams;
@@ -30104,6 +30141,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         TypeRef c = TypeRef.of(t.name, t.args.toArray(new TypeRef[0]));
         c.nullable = false;
+        c.runtimeOnly = t.runtimeOnly;
+        c.resolved = t.resolved;
         // An inline function type keeps its signature (in boxType too): without it a
         // callback read through `a?.f` lost its return type, and a value-returning
         // `?.call()` was emitted as a statement that dropped the value.
