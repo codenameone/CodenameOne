@@ -110,7 +110,8 @@ public final class Dyn {
         if (name.equals("runtimeType")) {
             // The reified type (`List<dynamic>`, a generic class's arguments), as a typed
             // receiver's `runtimeType` answers it; a bare class token loses the arguments.
-            return o == null ? null : TypeWitness.runtimeType(o);
+            // `null.runtimeType` is Null, a Type like any other.
+            return TypeWitness.runtimeType(o);
         }
         if (o instanceof DynamicObject) {
             Object v = ((DynamicObject) o).noSuchMethod(dart.core.Invocation.getter(name));

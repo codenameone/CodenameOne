@@ -959,6 +959,10 @@ public final class DartRuntime {
             if (c == Boolean.class) {
                 return "bool";
             }
+            if (c == Void.class) {
+                // The runtime type of null (TypeWitness.runtimeType), and Null's witness.
+                return "Null";
+            }
             if (c == dart.core.DartList.class) {
                 return "List";
             }

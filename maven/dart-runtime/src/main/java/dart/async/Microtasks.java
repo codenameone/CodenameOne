@@ -154,13 +154,18 @@ final class Microtasks {
     /// queue, so equal deadlines keep their creation order there too.
     static TimerEntry scheduleTimer(long ms, Runnable task) {
         long delay = Math.max(0L, ms);
+        // Asked before the deadline is read: the first timer of a run loads the Display
+        // class here, which took longer than a short timer's whole delay. Read first,
+        // that load made `Timer(10ms, a)` overdue before main() had even reached the
+        // next line, and it fired ahead of a zero timer main() created after it.
+        boolean display = com.codename1.ui.Display.isInitialized();
         TimerEntry e;
         synchronized (LOCK) {
             e = new TimerEntry(nowMs() + delay, timerSeq++, task);
             TIMERS.add(e);
             LOCK.notifyAll();
         }
-        if (com.codename1.ui.Display.isInitialized()) {
+        if (display) {
             e.wake = Timers.schedule(delay, WAKE);
         }
         return e;

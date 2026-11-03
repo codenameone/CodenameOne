@@ -10644,6 +10644,14 @@ public final class JavaEmitter {
             return any ? sb.append(")").toString()
                     : "dart.runtime.TypeWitness.of(" + cls + ".class, " + el.nullable + ")";
         }
+        if (el.is("Null") && el.args.isEmpty()) {
+            // `[null]` is a List<Null>: Null's own witness, which only null satisfies.
+            return "dart.runtime.TypeWitness.NULL";
+        }
+        if (el.is("Object") && el.nullable && el.args.isEmpty()) {
+            // `<Object?>[]` prints as written; it tests as any nullable Object witness.
+            return "dart.runtime.TypeWitness.OBJECT_NULLABLE";
+        }
         boolean scalar = el.is("int") || el.is("double") || el.is("num") || el.is("String") || el.is("bool")
                 || el.is("Object");
         // The class as the library reading it resolves the name: `b.Item` and a pinned
@@ -13341,6 +13349,7 @@ public final class JavaEmitter {
             }
         } else {
             int pos = 0;
+            List<String> nullBound = new ArrayList<String>();
             for (Param p : params) {
                 Expr a = null;
                 if (p.named) {
@@ -13366,6 +13375,11 @@ public final class JavaEmitter {
                 }
                 if (a != null && !(a instanceof Lambda)) {
                     TypeRef at = elementTypeQuiet(a, ctx);
+                    if (at == null) {
+                        // `wrap([1])`: an untyped collection literal binds T to its own
+                        // inferred type, List<int>.
+                        at = untypedLiteralType(a, ctx);
+                    }
                     if ((at == null || at.is("dynamic")) && a instanceof Call && ((Call) a).target == null
                             && ((Call) a).name != null && program.classes.containsKey(((Call) a).name)) {
                         // An unannotated construction: its class, with what was written.
@@ -13373,6 +13387,16 @@ public final class JavaEmitter {
                         at.args.addAll(((Call) a).typeArgs);
                     }
                     unifyThroughSupers(p.type, at, tps, m, 0);
+                    if (a instanceof NullLit && p.type != null && !p.type.nullable && p.type.args.isEmpty()
+                            && tps.contains(p.type.name)) {
+                        nullBound.add(p.type.name);
+                    }
+                }
+            }
+            for (String nb : nullBound) {
+                if (!m.containsKey(nb)) {
+                    // `wrap(null)` of `List<T> wrap<T>(T x)`: only null binds T, so it is Null.
+                    m.put(nb, new TypeRef("Null"));
                 }
             }
             if (expected != null && ret != null) {
@@ -13572,6 +13596,10 @@ public final class JavaEmitter {
     private String witnessOf(TypeRef t, Ctx ctx) {
         if (t == null) {
             return null;
+        }
+        if (t.is("Null") && t.args.isEmpty() && t.funcReturn == null) {
+            // `wrap(null)` binds T to Null, whose witness only null satisfies.
+            return "dart.runtime.TypeWitness.NULL";
         }
         if (t.args.isEmpty() && t.funcReturn == null) {
             String w = witnessFor(t.name, ctx);
@@ -14275,7 +14303,14 @@ public final class JavaEmitter {
                 mixed = true;
             }
         }
-        if (elem == null && mixed && lubKnown && lub != null
+        if (elem == null && lubKnown && lub != null && lub.nullable && lub.args.isEmpty()
+                && lub.funcParams == null && inferred != null && !inferred.nullable
+                && (lub.is("Object") || lub.is("num") || lub.name.equals(inferred.name)
+                    || inferred.is("Null"))) {
+            // `[1, null]`, `[x, null]`: the upper bound of T and Null is T?, so the list is a
+            // List<int?> (no List<int>), boxed rather than primitive-backed.
+            elem = lub;
+        } else if (elem == null && mixed && lubKnown && lub != null
                 && (lub.is("Object") || lub.is("num"))) {
             // `[[1], {'x': [2]}]`, `[1, 2.5]`: elements of known, different types make a list
             // of their upper bound (List<Object>, List<num>), as Dart infers it.
@@ -14351,7 +14386,14 @@ public final class JavaEmitter {
             } else if (!common.toString().equals(t.toString())) {
                 // `[Text(' '), Element('a', [])]`: Dart's element type is the least upper
                 // bound, here their common program supertype Node.
-                common = programClassLub(common, t);
+                TypeRef pl = programClassLub(common, t);
+                if (pl == null && common.args.isEmpty() && t.args.isEmpty()
+                        && common.funcParams == null && t.funcParams == null) {
+                    // `[...ints, ...doubles]`, `[for (var i in a) i, if (c) 'x']`: the upper
+                    // bound of the elements' types (num, Object, T?), as Dart infers it.
+                    pl = upperBound(common, t);
+                }
+                common = pl;
                 if (common == null) {
                     return null;
                 }
@@ -14502,7 +14544,15 @@ public final class JavaEmitter {
                 return a;
             }
             TypeRef b = elementTypeQuiet(i.elseElement, ctx);
+            if (b != null && !a.toString().equals(b.toString()) && a.args.isEmpty() && b.args.isEmpty()
+                    && a.funcParams == null && b.funcParams == null && !isDynamicType(a) && !isDynamicType(b)) {
+                // `if (c) 1 else 2.5`: the branches' upper bound, num.
+                return upperBound(a, b);
+            }
             return b != null && a.toString().equals(b.toString()) ? a : null;
+        }
+        if (e instanceof NullLit) {
+            return TypeRef.NULL;
         }
         if (e instanceof IntLit) {
             return TypeRef.INT;

@@ -46,6 +46,10 @@ public final class TypeWitness {
     /// other nullable Object witness; the plain `of(Object.class, true)` prints `Object`.
     public static final TypeWitness OBJECT_NULLABLE = new TypeWitness(Object.class, true, null);
 
+    /// Dart's `Null` as a recorded type argument (`[null]` is a List<Null>): only null is
+    /// an instance, and it prints as `Null`, never `Null?`.
+    public static final TypeWitness NULL = new TypeWitness(Void.class, true, null);
+
     private final Class<?> type;
     private final boolean nullable;
     /// The witnesses of a program generic class's own type arguments
@@ -242,6 +246,10 @@ public final class TypeWitness {
         }
         if (actual == DYNAMIC) {
             return false;
+        }
+        if (actual == NULL) {
+            // Null is a subtype of every nullable type, and of no other.
+            return target.nullable;
         }
         if (actual.nullable && !target.nullable) {
             return false;
@@ -628,7 +636,7 @@ public final class TypeWitness {
         if (this == OBJECT_NULLABLE) {
             return "Object?";
         }
-        if (nullable && type != Object.class) {
+        if (nullable && type != Object.class && type != Void.class) {
             sb.append('?');
         }
         return sb.toString();
