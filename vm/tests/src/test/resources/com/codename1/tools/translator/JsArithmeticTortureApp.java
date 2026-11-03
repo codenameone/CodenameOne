@@ -259,6 +259,7 @@ public class JsArithmeticTortureApp {
         p("fArg", fusedAsArgument());
         p("fCatch", fusedCatchEscape(0) + "|" + fusedCatchEscape(1));
         p("divZero", divisionByZero(0) + "|" + divisionByZero(1));
+        p("foldNull", foldedGetterOnNull(null) + "|" + foldedGetterOnNull(new Held(5)));
         p("fHash", ("h" + idi(12345) + ":" + idi(-1)).hashCode());
 
         // identity
@@ -358,6 +359,22 @@ public class JsArithmeticTortureApp {
         try { r += 7L / lz; } catch (ArithmeticException e) { r += "l/"; }
         try { r += 7L % lz; } catch (ArithmeticException e) { r += "l%"; }
         return r;
+    }
+
+    static final class Held {
+        private final int v;
+        Held(int v) { this.v = v; }
+        int getV() { return v; }
+    }
+
+    static String foldedGetterOnNull(Held h) {
+        // The trivial getter is folded into a field read; on null it must still
+        // throw NullPointerException, not a host error no Java handler catches.
+        try {
+            return "v" + h.getV();
+        } catch (NullPointerException e) {
+            return "npe";
+        }
     }
 
     static String fusedCatchEscape(int fail) {

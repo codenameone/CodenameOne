@@ -5031,7 +5031,7 @@ final class JavascriptMethodGenerator {
             return appendStraightLineTypeInstruction(out, (TypeInstruction) instruction, ctx);
         }
         if (instruction instanceof Field) {
-            return appendStraightLineFieldInstruction(out, (Field) instruction, ctx);
+            return appendStraightLineFieldInstruction(out, (Field) instruction, ctx, false);
         }
         if (instruction instanceof Invoke) {
             return appendStraightLineInvokeInstruction(out, (Invoke) instruction, instructions, index, ctx);
@@ -5754,7 +5754,8 @@ final class JavascriptMethodGenerator {
         return "_primClass(\"" + token + "\")";
     }
 
-    private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx) {
+    private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx,
+                                                             boolean folded) {
         String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
         String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
@@ -5789,6 +5790,12 @@ final class JavascriptMethodGenerator {
             }
             case Opcodes.GETFIELD: {
                 String target = ctx.pop();
+                // A folded getter replaced an invoke, and an invoke on null throws a
+                // Java NPE; a bare property read would throw a JS TypeError instead,
+                // which no Java catch for NullPointerException sees.
+                if (folded && !"__cn1ThisObject".equals(target)) {
+                    target = "_nn(" + target + ")";
+                }
                 out.append("  ").append(ctx.push(target + "[\"" + propertyName + "\"]")).append(";\n");
                 return true;
             }
@@ -5903,7 +5910,7 @@ final class JavascriptMethodGenerator {
         }
         Field folded = jsInlinableFieldAccess(invoke);
         if (folded != null) {
-            return appendStraightLineFieldInstruction(out, folded, ctx);
+            return appendStraightLineFieldInstruction(out, folded, ctx, true);
         }
         String declaredOwner = invoke.getOwner();
         String directOwner = resolveDirectInvokeOwner(invoke);
