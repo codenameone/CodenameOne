@@ -10831,6 +10831,11 @@ public final class JavaEmitter {
             return "dart.runtime.TypeWitness.DYNAMIC";
         }
         TypeRef fnAlias = el == null ? null : nonGenericFunctionTypedef(el);
+        if (fnAlias == null && el != null && el.funcReturn == null && el.funcParams == null) {
+            // `<Fn<int>>[]` for `typedef Fn<T> = T Function(T, {int? n})`: the function type
+            // the alias denotes at those arguments.
+            fnAlias = expandGenericFunctionTypedef(el);
+        }
         if (fnAlias != null) {
             // `<F>[f]` for `typedef F = int Function(String, {int? b})`: the list's element
             // type is the function type F names, witnessed as it is written inline.
@@ -11162,7 +11167,14 @@ public final class JavaEmitter {
         TypeRef ret = ctxRet != null && !isDynamicType(ctxRet) ? ctxRet
                 : !returnsValue ? new TypeRef("void") : l.exprBody != null ? bodyType : null;
         StringBuilder sig = new StringBuilder();
-        String retWitness = ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
+        // With no context return (or a top one), Dart infers a synchronous block body that
+        // returns no value as returning Null: `(int x) {}` is an `(int) => Null`, no
+        // `void Function(int)`; only a void context makes it void.
+        boolean inferredNull = (ctxRet == null || isDynamicType(ctxRet) || ctxRet.is("Object"))
+                && l.exprBody == null && !l.isAsync && !l.isSyncStar && !l.isAsyncStar
+                && !returnsValue;
+        String retWitness = inferredNull ? "dart.runtime.TypeWitness.NULL"
+                : ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
                 // No context return and an expression body of static type dynamic: Dart infers the
                 // return dynamic, which is no int (`(x) => x * 2` is no int Function(int)).
                 : (ctxRet == null || isDynamicType(ctxRet)) && l.exprBody != null && returnsValue && ret != null && isDynamicType(ret)
@@ -20185,7 +20197,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return ft;
     }
 
-    /// A generic function typedef with only positional parameters at its type arguments
+    /// A generic function typedef at its type arguments
     /// (`Fn<String>` for `typedef Fn<T> = T Function(T)`), as the function type it denotes;
     /// null for anything else.
     private TypeRef expandGenericFunctionTypedef(TypeRef t) {
@@ -20194,7 +20206,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         Ast.TypedefDecl td = typedefDecl(t.name);
         if (td == null || td.paramTypes == null || td.returnType == null
-                || td.typeParams.size() != t.args.size() || td.funcNamed != null) {
+                || td.typeParams.size() != t.args.size()) {
             return null;
         }
         TypeRef[] sig = userTypedefSig(t.name, t.args);
@@ -20205,6 +20217,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         ft.funcReturn = sig[sig.length - 1];
         ft.funcRequired = td.funcRequired;
+        // named parameters follow the positional ones in paramTypes, names in funcNamed
+        ft.funcNamed = td.funcNamed;
+        ft.funcNamedRequired = td.funcNamedRequired;
         ft.nullable = t.nullable;
         return ft;
     }
@@ -29456,11 +29471,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ret = TypeRef.DYNAMIC;
         }
         innerFt.funcReturn = ret;
-        return tearOffAdapter(l.params, types, ret, names -> {
-            String fn = callable(emitExpr(inner, innerFt, ctx));
-            return "(" + castToBare(javaType(innerFt, false, ctx), fn) + ").call(" + String.join(", ", names) + ")";
-        }, ctx);
+        // `(int x, {String? s}) {}` with no void context returns Null, as signClosure records
+        // for a closure without optional parameters; the adapter is what carries its signature.
+        boolean savedNullReturn = adapterNullReturn;
+        adapterNullReturn = (expected == null || expected.funcReturn == null && expected.funcParams == null
+                && typedefSig(expected.name) == null || expected.funcReturn != null
+                && (isDynamicType(expected.funcReturn) || expected.funcReturn.is("Object")))
+                && l.exprBody == null && !l.isAsync && !l.isSyncStar && !l.isAsyncStar && !returnsValue(l.body);
+        try {
+            return tearOffAdapter(l.params, types, ret, names -> {
+                String fn = callable(emitExpr(inner, innerFt, ctx));
+                return "(" + castToBare(javaType(innerFt, false, ctx), fn) + ").call(" + String.join(", ", names) + ")";
+            }, ctx);
+        } finally {
+            adapterNullReturn = savedNullReturn;
+        }
     }
+
+    /// Set while optionalParamLambda builds the adapter of a block-bodied closure whose
+    /// inferred return is Null; adapterMarker records that return.
+    private boolean adapterNullReturn;
 
     /** Parameters in SAM order: required positional, optional positional, then named. */
     private static List<Param> orderedParams(List<Param> params) {
@@ -29494,6 +29524,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      */
     private Out tearOffAdapter(List<Param> params, List<TypeRef> types, TypeRef ret,
             java.util.function.Function<List<String>, String> call, Ctx ctx) {
+        // this adapter's own, never one built while emitting its body
+        boolean nullReturn = adapterNullReturn;
+        adapterNullReturn = false;
         List<Param> ordered = new ArrayList<Param>();
         List<TypeRef> otypes = new ArrayList<TypeRef>();
         int required = 0;
@@ -29564,7 +29597,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         ctx.popScope();
         // The adapter is the function value, so it carries the signature (Signed): its
         // lambda's target is the raw SAM intersected with the marker.
+        adapterNullReturn = nullReturn;
         String marker = functionTypeTested ? adapterMarker(ordered, otypes, ret, ctx) : null;
+        adapterNullReturn = false;
         String code = "((" + sam + ") (" + raw + (marker != null ? " & " + marker : "") + ") (" + lp + ") -> {\n"
                 + pro + lifted + ind
                 + (isVoid ? statementize(body) + ";" : "return " + body + ";") + "\n"
@@ -29576,7 +29611,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// positional, then named), or null when nothing in it can be named.
     private String adapterMarker(List<Param> ordered, List<TypeRef> otypes, TypeRef ret, Ctx ctx) {
         reifiedClassNames();
-        StringBuilder sig = new StringBuilder(ret != null && ret.is("void")
+        boolean nullReturn = adapterNullReturn;
+        adapterNullReturn = false; // only this adapter, not one nested in the body
+        StringBuilder sig = new StringBuilder(nullReturn ? "dart.runtime.TypeWitness.NULL"
+                : ret != null && ret.is("void")
                 ? "dart.runtime.TypeWitness.of(Void.class, true)"
                 : staticWitness(ret, true, ctx));
         int required = -1;

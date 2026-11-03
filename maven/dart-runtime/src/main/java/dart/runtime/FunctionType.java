@@ -103,7 +103,9 @@ public final class FunctionType {
     }
 
     private static String str(TypeWitness w) {
-        return w == null ? "dynamic" : w.type() == Void.class ? "void" : w.toString();
+        // TypeWitness.NULL shares void's class; it is Null, the return Dart infers for a
+        // block-bodied closure with no context that returns no value.
+        return w == null ? "dynamic" : w == TypeWitness.NULL ? "Null" : w.type() == Void.class ? "void" : w.toString();
     }
 
     @Override
@@ -219,6 +221,9 @@ public final class FunctionType {
         boolean bd = b == null || b == TypeWitness.DYNAMIC;
         if (ad || bd) {
             return ad == bd;
+        }
+        if ((a == TypeWitness.NULL) != (b == TypeWitness.NULL)) {
+            return false; // Null and void share a class but are two types
         }
         return a.toString().equals(b.toString()) && TypeWitness.isSubtype(a, b) && TypeWitness.isSubtype(b, a);
     }

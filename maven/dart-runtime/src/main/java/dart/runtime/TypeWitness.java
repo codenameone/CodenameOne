@@ -159,7 +159,7 @@ public final class TypeWitness {
         if (derived != null) {
             for (int i = 0; i < derived.size(); i++) {
                 TypeWitness d = derived.get(i);
-                if (d.args.length == 1 && d.args[0] == a0) {
+                if (d.args.length == 1 && sameArg(d.args[0], a0)) {
                     return d;
                 }
             }
@@ -171,7 +171,7 @@ public final class TypeWitness {
         if (derived != null) {
             for (int i = 0; i < derived.size(); i++) {
                 TypeWitness d = derived.get(i);
-                if (d.args.length == 2 && d.args[0] == a0 && d.args[1] == a1) {
+                if (d.args.length == 2 && sameArg(d.args[0], a0) && sameArg(d.args[1], a1)) {
                     return d;
                 }
             }
@@ -184,11 +184,18 @@ public final class TypeWitness {
             return false;
         }
         for (int i = 0; i < a.length; i++) {
-            if (a[i] != b[i]) {
+            if (!sameArg(a[i], b[i])) {
                 return false;
             }
         }
         return true;
+    }
+
+    /// Whether two type-argument witnesses are one type. Interned witnesses are compared by
+    /// identity; a function type's is built per evaluation, so `List<void Function(int)>`
+    /// spelled twice (or once through a typedef) must match by signature to be one Type.
+    private static boolean sameArg(TypeWitness a, TypeWitness b) {
+        return a == b || a != null && b != null && a.fnSig != null && a.equals(b);
     }
 
     private TypeWitness derive(TypeWitness[] args) {
