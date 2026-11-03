@@ -9609,6 +9609,16 @@ public final class JavaEmitter {
             // Not overridden here, `super.m` is the very method `this.m` names, and equal to
             // it; otherwise it is the inherited one, keyed apart from the override.
             key = overridden ? "super:" + superDeclarer(ctx.currentClass, name, 0) + "." + name : name;
+            if (forcedSuper != null && forcedSuper.type != null && forcedSuper.type.name != null) {
+                // A mixin's `super.m`, emitted in the applying class's bridge or forwarder:
+                // the step of the linearization the bridge calls declares it -- the previous
+                // mixin (`M1.super`), or the superclass chain (`super`) -- never the class's
+                // own last mixin, which is what `super.m` written in the class reaches.
+                ClassDecl fd = program.classes.get(forcedSuper.type.name);
+                String decl = fd == null ? forcedSuper.type.name
+                        : forcedSuper.code.equals("super") ? declarerFrom(fd, name) : fd.name;
+                key = "super:" + decl + "." + name;
+            }
         } else if (recv.endsWith(".this")) {
             return out;
         }
@@ -9791,6 +9801,17 @@ public final class JavaEmitter {
             }
         }
         return false;
+    }
+
+    /// The class whose concrete {@code name} an instance of {@code d} runs: {@code d} itself
+    /// when it declares one, else what its own `super.name` reaches.
+    private String declarerFrom(ClassDecl d, String name) {
+        for (MethodDecl md : d.methods) {
+            if (name.equals(md.name) && !md.isStatic && !md.isAbstract) {
+                return d.name;
+            }
+        }
+        return superDeclarer(d, name, 0);
     }
 
     private String superDeclarer(ClassDecl c, String name, int depth) {
@@ -10030,6 +10051,25 @@ public final class JavaEmitter {
             String q = bare.substring(0, bare.indexOf("::"));
             if (ctx.lookup(q) != null) {
                 return out;
+            }
+            int amp = cast.indexOf(" & ");
+            if (amp > 0) {
+                // `(Funcs.FuncN<..> & DartFnSigs.Mk) C::f`: made as the signed SAM that is both
+                // (`DartFnSigs.sK`), the view a signed slot holds the function by. One object
+                // then serves every view, so the function hashes alike however it is held
+                // (Object, a typedef, Function), as its views already compare equal.
+                String samPart = cast.substring(0, amp);
+                java.util.regex.Matcher mm = MARKER_CAST.matcher(cast.substring(amp + 3));
+                java.util.regex.Matcher sf = FUNCS_SAM.matcher(samPart);
+                if (mm.matches() && sf.matches()) {
+                    int lt = samPart.indexOf('<');
+                    String samHead = lt < 0 ? samPart : samPart.substring(0, lt);
+                    String targs = lt < 0 ? "" : samPart.substring(lt);
+                    int n = Integer.parseInt(sf.group(2)) + (sf.group(1) != null ? 0 : 1);
+                    String num = signedSamFor(samHead, n, mm.group(2))[0].substring(1);
+                    return new Out("DartRuntime.canonTearOff(\"" + bare + "\", \"s" + num + "\", "
+                            + mm.group(1) + "." + targs + "s" + num + "(" + bare + "))", out.type, out.fn);
+                }
             }
             return new Out("DartRuntime.canonTearOff(\"" + bare + "\", \"" + cast + "\", " + out.code + ")", out.type, out.fn);
         }
@@ -22062,17 +22102,30 @@ public final class JavaEmitter {
      */
     private String previousMixinDeclaring(ClassDecl c, int mi, String key, Ctx ctx) {
         boolean getter = key.startsWith("get$");
-        String n = getter ? key.substring(4) : key;
+        // `set$x`: a setter bridge reaches the previous mixin's setter, as a getter bridge
+        // reaches its getter; looked up as a method it was never found and the bridge fell
+        // through to the superclass's (possibly abstract) setter.
+        boolean setter = key.startsWith("set$");
+        String n = getter || setter ? key.substring(4) : key;
         for (int j = mi - 1; j >= 0; j--) {
             ClassDecl o = program.resolveClass(c.mixins.get(j).name, ctx.library());
             if (o == null || !o.isMixin) {
                 continue;
             }
-            MethodDecl d = getter ? o.getter(n) : o.method(n);
+            MethodDecl d = getter ? o.getter(n) : setter ? mixinSetter(o, n) : o.method(n);
             if (d != null && !d.isAbstract && !d.isStatic) {
                 String raw = javaClassType(c.mixins.get(j), ctx);
                 int lt = raw.indexOf('<');
                 return lt > 0 ? raw.substring(0, lt) : raw;
+            }
+        }
+        return null;
+    }
+
+    private static MethodDecl mixinSetter(ClassDecl o, String n) {
+        for (MethodDecl m : o.methods) {
+            if (m.name.equals(n) && m.isSetter) {
+                return m;
             }
         }
         return null;
@@ -31158,6 +31211,12 @@ public final class JavaEmitter {
      */
     private String fnCall(String recv, TypeRef fnType, Args args, Ctx ctx) {
         if (fnType != null && fnType.is("Function") && fnType.funcParams == null && fnType.funcReturn == null
+                && !args.named.isEmpty() && !recv.contains("->")) {
+            // `Function nf = c.named; nf(a: 3)`: no SAM to call, and the named arguments are
+            // matched at run time against the value's reified parameters.
+            return dynInvokeCode(recv, args, ctx);
+        }
+        if (fnType != null && fnType.is("Function") && fnType.funcParams == null && fnType.funcReturn == null
                 && args.named.isEmpty() && !recv.contains("->")) {
             // (A closure invoked in place keeps its own path below.)
             // A bare `Function` (`Object apply(Function f, a) => f(a)`) is an Object in Java,
@@ -32846,7 +32905,9 @@ public final class JavaEmitter {
                         }
                     }
                     tps = java.util.Collections.<String>emptyList();
-                    if (!md.typeParams.isEmpty() && !hasOptionalParam(md) && md.params.size() <= 5
+                    // A non-generic one too: as a method reference it is canonicalized by the
+                    // function it names, as a top-level function is, so `C.st == C.st`.
+                    if (!hasOptionalParam(md) && md.params.size() <= 5
                             && md.returnType != null) {
                         // A generic static method (`Box.keep<T>`) tears off as a generic
                         // top-level function does: a bare method reference, which takes
