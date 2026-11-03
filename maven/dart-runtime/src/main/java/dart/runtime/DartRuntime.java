@@ -974,7 +974,13 @@ public final class DartRuntime {
             if (c == dart.core.DartDoubleList.class) {
                 return "List<double>";
             }
-            return c.getSimpleName();
+            String sn = c.getSimpleName();
+            if (c.isInterface() && sn.length() > 2 && sn.endsWith("$I")) {
+                // A class other classes implement is witnessed by its generated interface,
+                // `I$I` (the transpiler's suffix); its Dart name is the class's.
+                return sn.substring(0, sn.length() - 2);
+            }
+            return sn;
         }
         return v.toString();
     }

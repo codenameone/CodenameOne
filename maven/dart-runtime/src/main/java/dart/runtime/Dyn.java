@@ -458,7 +458,7 @@ public final class Dyn {
             case "containsKey": case "containsValue": case "remove": case "addAll": case "forEach": case "add":
             case "removeAt": case "sort": case "map": case "where": case "any": case "every":
             case "reduce": case "expand": case "join": case "elementAt": case "skip": case "take": case "endsWith":
-            case "split": case "codeUnitAt": case "compareTo": case "toStringAsFixed":
+            case "split": case "codeUnitAt": case "compareTo": case "toStringAsFixed": case "remainder":
                 return 1;
             case "putIfAbsent": case "insert": case "indexOf": case "sublist": case "firstWhere": case "fold":
             case "substring": case "replaceAll": case "padLeft": case "clamp": case "contains": case "startsWith":
@@ -817,6 +817,19 @@ public final class Dyn {
             case "compareTo":
                 // Dart's total order: NaN after everything, -0.0 before 0.0
                 return Long.valueOf(dart.core.DartComparable.compare(n, num(arg(a, 0))));
+            case "remainder": {
+                // Java's % is Dart's remainder (truncated, the dividend's sign); an int
+                // divisor of zero throws, as the int operator does.
+                Number o = num(arg(a, 0));
+                if (!dbl && !(o instanceof Double || o instanceof Float)) {
+                    long r = o.longValue();
+                    if (r == 0) {
+                        throw new dart.core.UnsupportedError("IntegerDivisionByZeroException");
+                    }
+                    return Long.valueOf(n.longValue() % r);
+                }
+                return Double.valueOf(d % o.doubleValue());
+            }
             case "clamp": {
                 Number lo = num(arg(a, 0));
                 Number hi = num(arg(a, 1));

@@ -10157,6 +10157,11 @@ public final class JavaEmitter {
                     return new Out("DartRuntime." + fn + "(" + o.code + ")", TypeRef.DYNAMIC);
                 }
             }
+            if (u.op.equals("-") && o.type != null && o.type.is("num")) {
+                // `-(c ? 7 : 2.0)`: a num is a Java Number; negated on the value, keeping its kind.
+                ctx.importClass("dart.runtime.DartRuntime");
+                return new Out("((Number) DartRuntime.dynNegate(" + o.code + "))", o.type);
+            }
             if (u.op.equals("-") && o.type != null && o.type.is("Duration")
                     && !program.classes.containsKey("Duration")) {
                 // Duration's unary minus, under the mangled name (see emitBinary).
@@ -10326,6 +10331,8 @@ public final class JavaEmitter {
             // and narrowing the dynamic arm to the other arm's type would be wrong.
             aCode = downcastArm(a, aCode, expected, ctx);
             bCode = downcastArm(b, bCode, expected, ctx);
+            aCode = covariantArm(a, aCode, t, ctx);
+            bCode = covariantArm(b, bCode, t, ctx);
             // A tear-off arm signed in an Object slot is bound to its own SAM intersected with
             // its marker; javac types the ternary by that intersection, which converts to no
             // other functional interface ("bad type in conditional expression"). With a
@@ -10692,8 +10699,12 @@ public final class JavaEmitter {
             // class of its own (an unresolved or synthetic type): unknown.
             return null;
         }
-        if (programClass && el.args.isEmpty()) {
-            return witnessOf(el, ctx);
+        if (programClass) {
+            // `List<Box<num>>`: a generic program class's witness carries its arguments.
+            String pw = witnessOf(el, ctx);
+            if (pw != null || el.args.isEmpty()) {
+                return pw;
+            }
         }
         return "dart.runtime.TypeWitness.of(" + erasedJavaType(copyNonNull(el), ctx) + ".class, " + el.nullable + ")";
     }
@@ -12554,6 +12565,11 @@ public final class JavaEmitter {
             java.util.Arrays.asList("List", "Set", "Iterable", "Map", "Future", "FutureOr", "Stream"));
 
     private TypeRef upperBound(TypeRef a, TypeRef b) {
+        // The ONE upper bound every inference site uses -- conditionals, list, set and map
+        // literals, generic-call arguments -- so they cannot answer differently.
+        if (a.toString().equals(b.toString())) {
+            return a;
+        }
         boolean nullable = a.nullable || b.nullable || a.is("Null") || b.is("Null");
         TypeRef r;
         if (a.is("Null")) {
@@ -12565,10 +12581,13 @@ public final class JavaEmitter {
         } else if ((a.is("int") || a.is("double") || a.is("num")) && (b.is("int") || b.is("double") || b.is("num"))) {
             r = new TypeRef("num");
         } else if (a.name != null && a.name.equals(b.name) && a.args.size() == b.args.size()
-                && a.funcParams == null && b.funcParams == null && COVARIANT_CORE_GENERICS.contains(a.name)
+                && a.funcParams == null && b.funcParams == null
+                && (COVARIANT_CORE_GENERICS.contains(a.name) || isProgramClassDecl(lubClass(a)))
                 && !containsDynamic(a) && !containsDynamic(b)) {
             // Dart's upper bound of two instances of one covariant core generic is that
             // generic over the arguments' bound: `[[1], ['a']]` is a List<List<Object>>.
+            // Every Dart class is covariant in its type parameters, so a program generic
+            // takes the same rule: `c ? Box<int>(1) : Box<num>(2)` is a Box<num>.
             r = new TypeRef(a.name);
             for (int i = 0; i < a.args.size(); i++) {
                 r.args.add(upperBound(a.arg(i), b.arg(i)));
@@ -14117,6 +14136,18 @@ public final class JavaEmitter {
             }
             return new Out("(" + castToBare(jt, o) + ")", target);
         }
+        if (target.name != null && target.name.startsWith("Rec$") && target.funcReturn == null
+                && target.funcParams == null) {
+            // `o as (int, int)`: every record shape is one Java class whatever its field
+            // types, so the erased class test would pass `(1, 'a')`. The structural witness
+            // `is` uses checks each field and throws the cast's TypeError on a mismatch.
+            String rw = recordWitness(target, ctx);
+            if (rw != null) {
+                Out checked = new Out("dart.runtime.DartRuntime.asWitness(" + o.code + ", " + rw + ")",
+                        TypeRef.DYNAMIC);
+                return new Out("(" + castToBare(jt, checked) + ")", target);
+            }
+        }
         ctx.importClass("dart.runtime.DartRuntime");
         if (isCoreSet(target) && (o.type == null || !o.type.is("Set"))) {
             // `x as Set<T>` accepts a program SetBase/SetMixin object, viewed live as a Set.
@@ -14398,21 +14429,21 @@ public final class JavaEmitter {
             // `[1, null]`, `[x, null]`: the upper bound of T and Null is T?, so the list is a
             // List<int?> (no List<int>), boxed rather than primitive-backed.
             elem = lub;
-        } else if (elem == null && mixed && lubKnown && lub != null
-                && (lub.is("Object") || lub.is("num"))) {
-            // `[[1], {'x': [2]}]`, `[1, 2.5]`: elements of known, different types make a list
-            // of their upper bound (List<Object>, List<num>), as Dart infers it.
-            elem = lub;
-        } else if (elem == null && mixed && lubKnown && lub != null && !lub.args.isEmpty()
-                && COVARIANT_CORE_GENERICS.contains(lub.name) && !containsDynamic(lub)
+        } else if (elem == null && mixed && lubKnown && lub != null && !containsDynamic(lub)
                 && typeVarsInScope(lub, ctx)) {
-            // `[[1], ['a']]` is a List<List<Object>>. Its elements are different Java
-            // classes (a DartLongList, a DartList<String>) that Java generics call unrelated;
-            // a Dart List is covariant, so each is viewed as the bound through Object.
+            // Elements of known, different types make a list of their upper bound, as Dart
+            // infers it and as the set and map literals and the conditional do (upperBound):
+            // `[1, 2.5]` a List<num>, `[Q1(), Q2()]` a List<P>, `[[1], ['a']]` a
+            // List<List<Object>>, `[Box<int>(1), Box<num>(1)]` a List<Box<num>>.
             elem = lub;
-            String jt = javaType(elem, true, ctx);
-            for (int i = 0; i < codes.size(); i++) {
-                codes.set(i, "(" + jt + ") (Object) (" + codes.get(i) + ")");
+            if (!lub.args.isEmpty()) {
+                // Generic elements are different Java parameterizations (a DartLongList, a
+                // DartList<String>; a Box<Long>) that Java generics call unrelated; a Dart
+                // generic is covariant, so each is viewed as the bound through Object.
+                String jt = javaType(elem, true, ctx);
+                for (int i = 0; i < codes.size(); i++) {
+                    codes.set(i, "(" + jt + ") (Object) (" + codes.get(i) + ")");
+                }
             }
         }
         if (elem == null) {
@@ -14472,19 +14503,13 @@ public final class JavaEmitter {
             if (common == null) {
                 common = t;
             } else if (!common.toString().equals(t.toString())) {
-                // `[Text(' '), Element('a', [])]`: Dart's element type is the least upper
-                // bound, here their common program supertype Node.
-                TypeRef pl = programClassLub(common, t);
-                if (pl == null && common.args.isEmpty() && t.args.isEmpty()
-                        && common.funcParams == null && t.funcParams == null) {
-                    // `[...ints, ...doubles]`, `[for (var i in a) i, if (c) 'x']`: the upper
-                    // bound of the elements' types (num, Object, T?), as Dart infers it.
-                    pl = upperBound(common, t);
-                }
-                common = pl;
-                if (common == null) {
+                // `[Text(' '), Element('a', [])]`, `[...ints, ...doubles]`,
+                // `[Box<int>(1), Box<num>(1)]`: Dart's least upper bound (Node, num,
+                // Box<num>), the one the conditional and the set and map literals use.
+                if (common.funcParams != null || t.funcParams != null) {
                     return null;
                 }
+                common = upperBound(common, t);
             }
         }
         return dynamicElement ? TypeRef.DYNAMIC : common;
@@ -14662,7 +14687,7 @@ public final class JavaEmitter {
                 return a;
             }
             TypeRef b = elementTypeQuiet(i.elseElement, ctx);
-            if (b != null && !a.toString().equals(b.toString()) && a.args.isEmpty() && b.args.isEmpty()
+            if (b != null && !a.toString().equals(b.toString())
                     && a.funcParams == null && b.funcParams == null && !isDynamicType(a) && !isDynamicType(b)) {
                 // `if (c) 1 else 2.5`: the branches' upper bound, num.
                 return upperBound(a, b);
@@ -14770,9 +14795,9 @@ public final class JavaEmitter {
             // (int?), as for an if element with an else.
             TypeRef a = elementTypeQuiet(((Conditional) e).thenExpr, ctx);
             TypeRef b = a == null ? null : elementTypeQuiet(((Conditional) e).elseExpr, ctx);
-            if (a != null && b != null && a.args.isEmpty() && b.args.isEmpty() && a.funcParams == null
+            if (a != null && b != null && a.funcParams == null
                     && b.funcParams == null && !isDynamicType(a) && !isDynamicType(b)) {
-                return a.toString().equals(b.toString()) ? a : upperBound(a, b);
+                return upperBound(a, b);
             }
             return null;
         }
@@ -18343,6 +18368,11 @@ public final class JavaEmitter {
             ctx.importClass("dart.runtime.DartRuntime");
             Out rhs = emitExpr(a.rhs, lhs.type, ctx);
             String fn = a.op.equals("~/=") ? "tdiv" : "mod";
+            if ((lhs.type != null && lhs.type.is("num")) || (rhs.type != null && rhs.type.is("num"))) {
+                // `n ~/= 3` on a num (a Java Number): dispatched on the values.
+                return new Out(lcode + " = (Number) DartRuntime.dynBinary(\"" + a.op.substring(0, a.op.length() - 1)
+                        + "\", " + lcode + ", " + rhs.code + ")", lhs.type);
+            }
             return new Out(lcode + " = DartRuntime." + fn + "(" + lcode + ", " + rhs.code + ")", lhs.type);
         }
         if (ctx.postfixAssign == a && a.rhs instanceof IntLit && (a.op.equals("+=") || a.op.equals("-="))) {
@@ -18496,7 +18526,10 @@ public final class JavaEmitter {
             return boxType(a);
         }
         if (a.name.equals(b.name)) {
-            return a;
+            // `c ? Box<int>(1) : Box<num>(2)` is a Box<num>: same class, the arguments' bound.
+            return !a.args.isEmpty() && a.args.size() == b.args.size() && a.funcParams == null
+                    && b.funcParams == null && !containsDynamic(a) && !containsDynamic(b)
+                    ? upperBound(a, b) : a;
         }
         if (expected != null && !expected.is("var") && !expected.is("dynamic")) {
             return expected;
@@ -18528,6 +18561,20 @@ public final class JavaEmitter {
             }
         }
         return anc != null ? anc : new TypeRef("Object");
+    }
+
+    /// An arm of one generic class whose arguments are narrower than the conditional's
+    /// upper bound (`Box<int>` in a `Box<num>` conditional). Dart generics are covariant
+    /// and Java's are not, so javac rejects the ternary; both erase to one class, and the
+    /// arm is viewed as the bound through Object.
+    private String covariantArm(Out arm, String code, TypeRef t, Ctx ctx) {
+        if (t == null || t.args.isEmpty() || arm.type == null || t.funcParams != null
+                || arm.type.funcParams != null || t.name == null || !t.name.equals(arm.type.name)
+                || copyNonNull(arm.type).toString().equals(copyNonNull(t).toString())) {
+            return code;
+        }
+        String jt = declarableType(t, false, ctx);
+        return jt == null ? code : "((" + jt + ") (Object) " + paren(code) + ")";
     }
 
     /** Whether {@code sub} reaches {@code sup} through superclasses, interfaces or mixins. */
@@ -19264,6 +19311,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         if (b.op.equals("~/")) {
             ctx.importClass("dart.runtime.DartRuntime");
+            if ((l.type != null && l.type.is("num")) || (r.type != null && r.type.is("num"))) {
+                // A num operand (`(c ? 7 : 2.0) ~/ 2`) is a Java Number: dispatched on the
+                // values, int ~/ int on longs and anything with a double on doubles.
+                return new Out("((Number) DartRuntime.dynBinary(\"~/\", " + l.code + ", " + r.code
+                        + ")).longValue()", TypeRef.INT);
+            }
             return new Out("DartRuntime.tdiv(" + l.code + ", " + r.code + ")", TypeRef.INT);
         }
         if (b.op.equals("%")) {
@@ -19316,7 +19369,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if ((l.type != null && l.type.is("num")) || (r.type != null && r.type.is("num"))) {
             boolean lok = l.type != null && (isNumeric(l.type) || l.type.is("num"));
             boolean rok = r.type != null && (isNumeric(r.type) || r.type.is("num"));
-            boolean arith = b.op.equals("+") || b.op.equals("-") || b.op.equals("*") || b.op.equals("/");
+            boolean arith = b.op.equals("+") || b.op.equals("-") || b.op.equals("*") || b.op.equals("/")
+                    || b.op.equals("%");
             boolean cmp = b.op.equals("<") || b.op.equals(">") || b.op.equals("<=") || b.op.equals(">=");
             if (lok && rok && (arith || cmp)) {
                 // Dispatched on the VALUES, as Dart does: an int held in a num stays an
@@ -23819,6 +23873,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 String hi = coreArg(pos.get(1), TypeRef.INT, ctx).code;
                 return new Out("DartRuntime.clamp(" + target.code + ", " + lo + ", " + hi + ")", TypeRef.INT);
             }
+        }
+        if (tt.is("num") && (n.equals("abs") && pos.isEmpty() || n.equals("remainder") && pos.size() == 1
+                || n.equals("clamp") && pos.size() == 2)) {
+            // `(c ? 7 : 2.0).abs()`: a num is a boxed Long or Double, and these answer the
+            // receiver's own kind (an int stays an int), so they dispatch on the value.
+            StringBuilder args = new StringBuilder();
+            for (int i = 0; i < pos.size(); i++) {
+                Out ao = coreArg(pos.get(i), new TypeRef("num"), ctx);
+                args.append(i > 0 ? ", " : "").append(boxIfPrimitive(ao, ctx));
+            }
+            return new Out("((Number) dart.runtime.Dyn.call(" + target.code + ", \"" + n + "\", new Object[] {"
+                    + args + "}))", new TypeRef("num"));
         }
         if (tt.is("num") && pos.isEmpty()) {
             // A value typed only `num` -- `(json['id'] as num).toInt()`, the shape
