@@ -167,7 +167,9 @@ public class OrmAnnotationProcessorTest {
         ProcessorContext ctx=runProcessor(classes,Collections.<String>emptyList());
         assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("@Column(collation) must be letters"));
         assertTrue(OrmAnnotationProcessor.collationName("utf8mb4_0900_ai_ci"));
-        assertFalse(OrmAnnotationProcessor.collationName("en-x-icu"));
+        assertTrue(OrmAnnotationProcessor.collationName("en-x-icu"));
+        assertFalse(OrmAnnotationProcessor.collationName("en x"));
+        assertFalse(OrmAnnotationProcessor.collationName("a\"b"));
     }
 
     /// `@Column(insertable = false, updatable = false)` is a column only the

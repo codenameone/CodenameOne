@@ -572,7 +572,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 if (collation != null && collation.length() > 0) {
                     if (!collationName(collation)) {
                         // Spliced into DDL as it is.
-                        ctx.error(cls, "@Column(collation) must be letters, digits and underscores: "
+                        ctx.error(cls, "@Column(collation) must be letters, digits, underscores and hyphens: "
                                 + pf.fieldName + " declares \"" + collation + "\"");
                     }
                     pf.collation = collation;
@@ -1181,11 +1181,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return out.toString().toLowerCase(java.util.Locale.ROOT);
     }
 
-    /// Whether a `@Column(collation)` name is safe to splice into DDL.
+    /// Whether a `@Column(collation)` name is safe to splice into DDL. A
+    /// hyphen is allowed for ICU names (`und-x-icu`); such a name is emitted
+    /// quoted.
     static boolean collationName(String name) {
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
-            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_')) {
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-')) {
                 return false;
             }
         }

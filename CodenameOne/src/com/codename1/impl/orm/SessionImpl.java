@@ -1176,17 +1176,26 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (attr.collation == null) {
             return "";
         }
-        return " COLLATE " + ("postgresql".equals(sql.dialect()) ? q(attr.collation) : attr.collation);
+        // A hyphenated name (PostgreSQL's ICU collations, "und-x-icu") is
+        // only valid quoted; every engine takes a quoted collation name.
+        return " COLLATE " + ("postgresql".equals(sql.dialect()) || attr.collation.indexOf('-') >= 0
+                ? q(attr.collation) : attr.collation);
     }
     /// Whether a found collation is the declared one. The PostgreSQL describe
     /// prefixes a nondeterministic one, which is part of what was declared.
-    /// SQLite reports a collation for key columns only; an unknown one passes.
-    static boolean declaredCollation(String declared, String found) {
+    /// PostgreSQL reports no collation for a column that uses its type's
+    /// default, which is the collation named "default" and matches only that;
+    /// its names are quoted identifiers, so case matters. SQLite reports a
+    /// collation for key columns only, so there an unknown one passes.
+    static boolean declaredCollation(String declared, String found, boolean postgresql) {
         if (found == null) {
-            return true;
+            return !postgresql || "default".equals(declared);
         }
         String name = found.startsWith("nondeterministic ") ? found.substring(17) : found;
-        return declared.equalsIgnoreCase(name) || declared.equalsIgnoreCase(found);
+        if (postgresql) {
+            return declared.equals(name);
+        }
+        return declared.equalsIgnoreCase(name);
     }
     /// The native column of a @Temporal field. DATETIME rather than TIMESTAMP on
     /// MySQL: its TIMESTAMP ends in 2038 and, unless explicit_defaults_for_timestamp
@@ -1419,7 +1428,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 // read back, so adopting such a schema keeps its semantics.
                 boolean distinct = attr.id || uniqueIndexed(model, attr);
                 String role = attr.id ? "Identifier " : "Unique column ";
-                if (attr.collation != null && found.length > 5 && !declaredCollation(attr.collation, (String) found[5])) {
+                if (attr.collation != null && found.length > 5 && !declaredCollation(attr.collation, (String) found[5], "postgresql".equals(sql.dialect()))) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
                             name + " uses collation " + found[5] + ", not the declared " + attr.collation));
                 }
@@ -1542,7 +1551,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // SQLite lets a composite primary key column hold NULL, so only its
             // NOT NULL flag says the column is required there.
             boolean required = ((Number) found[2]).intValue() != 0 || primary && !"sqlite".equals(sql.dialect());
-            if (attr.collation != null && found.length > 5 && !declaredCollation(attr.collation, (String) found[5])) {
+            if (attr.collation != null && found.length > 5 && !declaredCollation(attr.collation, (String) found[5], "postgresql".equals(sql.dialect()))) {
                 errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, table, attr.column,
                         "Collection column " + name + " uses collation " + found[5] + ", not the declared "
                         + attr.collation));
