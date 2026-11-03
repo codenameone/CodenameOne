@@ -49,6 +49,7 @@ public final class StreamController<T> implements StreamSink<T> {
 
     private Object onListenHandler;
     private Object onCancelHandler;
+    private Future<Object> cancelResult;
     private boolean closed;
     private Future<Object> closeFuture;
 
@@ -61,7 +62,29 @@ public final class StreamController<T> implements StreamSink<T> {
 
         @Override
         protected void onNoListeners() {
-            Stream.deliverVoid(onCancelHandler);
+            Object h = onCancelHandler;
+            if (h instanceof dart.runtime.Funcs.Func0 && !(h instanceof dart.runtime.Funcs.VoidFunc0)) {
+                // onCancel: () => future -- cancel() completes when it does.
+                try {
+                    Object r = ((dart.runtime.Funcs.Func0<?>) h).call();
+                    if (r instanceof Future) {
+                        @SuppressWarnings("unchecked")
+                        Future<Object> f = (Future<Object>) r;
+                        cancelResult = f;
+                    }
+                } catch (Throwable t) {
+                    Stream.reportUncaught(t);
+                }
+            } else {
+                Stream.deliverVoid(h);
+            }
+        }
+
+        @Override
+        Future<Object> takeCancelResult() {
+            Future<Object> r = cancelResult;
+            cancelResult = null;
+            return r;
         }
 
         @Override

@@ -1334,6 +1334,21 @@ public final class JavaEmitter {
         String v = ctx.newTemp();
         String starWitness = null;
         if (m.isAsyncStar) {
+            TypeRef selem = rt.is("Stream") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            ctx.methodReturnType = TypeRef.VOID;
+            ctx.inAsyncBody = true;
+            ctx.syncStarElem = selem;
+            ctx.beginBodyCaptures(m.body, null);
+            ctx.pushScope();
+            boolean starFrame = asyncLowering.tryEmitStar(m.params, m.body, selem,
+                    isDynamicType(selem) ? null : reifiedArgWitness(selem, ctx), ctx);
+            ctx.popScope();
+            ctx.syncStarElem = savedElem;
+            ctx.inAsyncBody = savedAsync;
+            ctx.methodReturnType = savedRt;
+            if (starFrame) {
+                return true;
+            }
             ctx.importClass("dart.async.AsyncStar");
             TypeRef elem = rt.is("Stream") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
             String ej = javaType(elem, true, ctx);
@@ -6519,6 +6534,27 @@ public final class JavaEmitter {
                 }
             }
         }
+        if (m.isAsyncStar && !m.isSetter && m.body != null) {
+            // async* as a resumable frame (AsyncLowering): the method returns its stream.
+            TypeRef selem = rt.is("Stream") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            ctx.methodReturnType = TypeRef.VOID;
+            ctx.inAsyncBody = true;
+            TypeRef savedStarElem = ctx.syncStarElem;
+            ctx.syncStarElem = selem;
+            boolean starFrame = asyncLowering.tryEmitStar(m.params, m.body, selem,
+                    isDynamicType(selem) ? null : reifiedArgWitness(selem, ctx), ctx);
+            ctx.syncStarElem = savedStarElem;
+            if (starFrame) {
+                sb.append(ctx.popWriter());
+                sb.append("    }\n\n");
+                ctx.popScope();
+                ctx.methodReturnType = null;
+                ctx.inAsyncBody = false;
+                return sb.toString();
+            }
+            ctx.methodReturnType = rt;
+            ctx.inAsyncBody = false;
+        }
         if (m.isAsyncStar && !m.isSetter) {
             // async* generator. As for sync*, the body moves into a helper, here taking the
             // generator's AsyncStar.Sink: `yield x` -> sink.yield$(x), `yield* s` ->
@@ -6889,6 +6925,13 @@ public final class JavaEmitter {
      * already lowers (compound, ++, ??=), and that a closure captures as it is.
      */
     private void emitLateLocal(VarDeclStmt v, Ctx ctx) {
+        emitLateLocal(v, ctx, null);
+    }
+
+    /// {@code frameField}, when given, makes the holder a field of the async frame being
+    /// emitted: it is handed the holder's Java type and the local's type and answers the field reference
+    /// (already bound to the Dart name), which then reads as a late local does.
+    void emitLateLocal(VarDeclStmt v, Ctx ctx, java.util.function.BiFunction<String, TypeRef, String> frameField) {
         Ctx.Writer w = ctx.writer();
         TypeRef declared = v.type != null && !v.type.is("var") ? v.type : null;
         String init = "null";
@@ -6918,6 +6961,13 @@ public final class JavaEmitter {
         }
         ctx.importClass("dart.runtime." + holder);
         String jt = holder.equals("LateLocal") ? "LateLocal<" + javaType(t, true, ctx) + ">" : holder;
+        if (frameField != null) {
+            String ref = frameField.apply(jt, t);
+            ctx.markLate(ref);
+            w.line(ref + " = new " + holder + (holder.equals("LateLocal") ? "<>" : "")
+                    + "(" + quote(v.name) + ", " + v.isFinal + ", " + init + ");");
+            return;
+        }
         String jn = ctx.declareLate(v.name, t);
         w.line("final " + jt + " " + jn + " = new " + holder + (holder.equals("LateLocal") ? "<>" : "")
                 + "(" + quote(v.name) + ", " + v.isFinal + ", " + init + ");");
@@ -20575,7 +20625,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // handler answering Future<dynamic>) returns the frame's Future instead.
             TypeRef samReturn = sigTypes != null && sigTypes.length > 0 ? sigTypes[sigTypes.length - 1] : null;
             boolean voidSam = samReturn == null || samReturn.is("void");
-            if (!(l.isAsync && asyncLowering.tryEmit(l.params, l.body, voidSam, null, null, ctx))) {
+            // An async* closure runs as an AsyncStarFrame its body returns the stream of.
+            boolean starFrame = async && asyncLowering.tryEmitStar(l.params, l.body, elem,
+                    isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx), ctx);
+            if (!starFrame && !(l.isAsync && asyncLowering.tryEmit(l.params, l.body, voidSam, null, null, ctx))) {
                 emitBodyStatements(l.params, l.body, ctx);
             }
             ctx.lambdaReturns = outerReturns;
@@ -20586,7 +20639,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             String ind = indentStr(ctx.currentIndent());
             // What an untyped closure local infers its SAM from: the generator's type.
             exprType = TypeRef.of(async ? "Stream" : "Iterable", elem);
-            if (async) {
+            if (starFrame) {
+                code = head + " -> {\n" + body + ind + "}";
+            } else if (async) {
                 ctx.importClass("dart.async.AsyncStar");
                 code = head + " -> AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + target
                         + ") -> {\n" + body + ind + "    })";
@@ -32202,6 +32257,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             renameScopes.get(renameScopes.size() - 1).put(name, javaName);
             lateLocals.add(javaName);
             return javaName;
+        }
+
+        void markLate(String javaName) {
+            lateLocals.add(javaName);
         }
 
         boolean isLate(String javaName) {

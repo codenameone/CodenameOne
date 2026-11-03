@@ -96,7 +96,7 @@ public abstract class AsyncFrame<T> implements Runnable {
                 } else {
                     $v = f.completedValue();
                 }
-                if (queued) {
+                if (queued || f.resumeInline) {
                     AsyncFrame.this.run();
                 } else {
                     Microtasks.schedule(AsyncFrame.this);

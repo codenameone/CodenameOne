@@ -89,6 +89,10 @@ public class Future<T> {
 
     /// Set once cn1Drive() has run, so a program subclass is driven at most once.
     private boolean driven;
+    /// A future completed the way Dart's StreamIterator completes moveNext() (an
+    /// internal synchronous completion): an await on it resumes inside the completion
+    /// rather than a microtask later.
+    boolean resumeInline;
 
     /// Also the constructor of a program class declared {@code implements Future<T>}:
     /// it extends this class, and its inherited state is completed by {@link #cn1Drive}.

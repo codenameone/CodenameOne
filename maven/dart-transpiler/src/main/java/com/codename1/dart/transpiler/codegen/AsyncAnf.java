@@ -180,6 +180,21 @@ final class AsyncAnf {
             }
             return block(new ArrayList<Stmt>(), s);
         }
+        if (s instanceof YieldStmt) {
+            // An async* yield is a suspension point of its own: its value is computed,
+            // awaits and all, before the yield.
+            YieldStmt y = (YieldStmt) s;
+            Expr e = expr(y.value, pre);
+            if (e == null) {
+                return null;
+            }
+            if (AsyncLowering.hasAwait(e)) {
+                e = force(e, pre, s);
+            }
+            YieldStmt c = copy(y);
+            c.value = e;
+            return c;
+        }
         if (s instanceof ReturnStmt) {
             if (AsyncLowering.statementAwait(s) != null) {
                 return s;

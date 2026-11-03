@@ -104,6 +104,10 @@ final class AsyncLowering {
         String name;
         String label;
         boolean isVoid;
+        /// async*: the element type yields coerce to, else null.
+        TypeRef starElem;
+        /// The frame's Java element type argument; null when erased to Object.
+        String starJava;
         TypeRef valueType;
         int states = 1;
         boolean closed;
@@ -179,7 +183,7 @@ final class AsyncLowering {
         if (!(n instanceof Node) || n instanceof Lambda || n instanceof LocalFunc) {
             return false;
         }
-        if (n instanceof AwaitExpr || n instanceof ForInStmt && ((ForInStmt) n).isAwait) {
+        if (n instanceof AwaitExpr || n instanceof ForInStmt && ((ForInStmt) n).isAwait || n instanceof YieldStmt) {
             return true;
         }
         try {
@@ -253,15 +257,16 @@ final class AsyncLowering {
 
     private static boolean listOk(List<Stmt> list) {
         for (Stmt st : list) {
-            boolean known = st instanceof ExprStmt || st instanceof VarDeclStmt && !((VarDeclStmt) st).isLate
+            boolean known = st instanceof ExprStmt
+                    || st instanceof VarDeclStmt && !(((VarDeclStmt) st).isLate && hasAwait(st))
                     || st instanceof IfStmt || st instanceof WhileStmt || st instanceof ForStmt
                     || st instanceof ForInStmt || st instanceof ReturnStmt || st instanceof BreakStmt
                     || st instanceof ContinueStmt || st instanceof SwitchStmt || st instanceof TryStmt
-                    || st instanceof Block || st instanceof RethrowStmt;
+                    || st instanceof Block || st instanceof RethrowStmt || st instanceof YieldStmt;
             if (st instanceof VarDeclGroup) {
                 known = true;
                 for (VarDeclStmt d : ((VarDeclGroup) st).decls) {
-                    known &= !d.isLate;
+                    known &= !(d.isLate && hasAwait(d));
                 }
             }
             if (!known || !stmtOk(st)) {
@@ -277,6 +282,9 @@ final class AsyncLowering {
         }
         if (s instanceof Block) {
             return listOk(((Block) s).statements);
+        }
+        if (s instanceof YieldStmt) {
+            return !hasAwait(((YieldStmt) s).value);
         }
         if (s instanceof ExprStmt || s instanceof VarDeclStmt || s instanceof ReturnStmt) {
             return statementAwait(s) != null;
@@ -318,7 +326,7 @@ final class AsyncLowering {
         }
         if (s instanceof ForInStmt) {
             ForInStmt f = (ForInStmt) s;
-            return !f.isAwait && f.pattern == null && !hasAwait(f.iterable) && branchOk(f.body);
+            return f.pattern == null && !hasAwait(f.iterable) && branchOk(f.body);
         }
         if (s instanceof SwitchStmt) {
             SwitchStmt sw = (SwitchStmt) s;
@@ -387,7 +395,20 @@ final class AsyncLowering {
     /// body has no await or a shape this stage does not lower.
     boolean tryEmit(List<Param> params, Block body, boolean isVoid, TypeRef valueType, TypeRef rt,
             JavaEmitter.Ctx ctx) {
-        if (body == null || !hasAwait(body.statements)) {
+        return emitFrame(params, body, isVoid, valueType, rt, null, null, ctx);
+    }
+
+    /// An async* body as an AsyncStarFrame, written as `return <its stream>;`.
+    /// {@code witness} reifies the stream's element type (null: none). False, with
+    /// nothing written, for a body shape this stage does not lower.
+    boolean tryEmitStar(List<Param> params, Block body, TypeRef elem, String witness, JavaEmitter.Ctx ctx) {
+        return body != null && emitFrame(params, body, true, null, null, elem == null ? TypeRef.DYNAMIC : elem,
+                witness, ctx);
+    }
+
+    private boolean emitFrame(List<Param> params, Block body, boolean isVoid, TypeRef valueType, TypeRef rt,
+            TypeRef starElem, String starWitness, JavaEmitter.Ctx ctx) {
+        if (body == null || starElem == null && !hasAwait(body.statements)) {
             return false;
         }
         final JavaEmitter.Ctx nctx = ctx;
@@ -404,6 +425,10 @@ final class AsyncLowering {
         f.name = ctx.newTemp();
         f.label = f.name + "sm";
         f.isVoid = isVoid;
+        f.starElem = starElem;
+        if (starElem != null && !em.isDynamicType(starElem) && em.typeVarsInScope(starElem, ctx)) {
+            f.starJava = em.javaType(em.boxType(starElem), true, ctx);
+        }
         f.valueType = valueType == null ? TypeRef.DYNAMIC : valueType;
         collectReturns(body.statements, f.returns);
         List<String> paramCopies = new ArrayList<String>();
@@ -451,7 +476,8 @@ final class AsyncLowering {
         // erased return) or declared FutureOr: the Future converts to it unchecked.
         boolean erased = !isVoid && (!em.typeVarsInScope(f.valueType, ctx) || ctx.asyncReturnWidened
                 || rt != null && !rt.is("Future"));
-        String cls = isVoid ? "dart.async.LambdaVoidFrame"
+        String cls = starElem != null ? "dart.async.AsyncStarFrame<" + (f.starJava == null ? "Object" : f.starJava) + ">"
+                : isVoid ? "dart.async.LambdaVoidFrame"
                 : "dart.async.LambdaFrame<" + (erased ? "Object" : em.javaType(em.boxType(f.valueType), true, ctx)) + ">";
         w.line("var " + f.name + " = new " + cls + "() {");
         for (String fd : f.fields) {
@@ -497,7 +523,11 @@ final class AsyncLowering {
         }
         w.line("    }");
         w.line("};");
-        if (isVoid) {
+        if (starElem != null) {
+            String stream = (f.starJava == null ? "(dart.async.Stream) " : "") + f.name + ".stream()";
+            w.line("return " + (starWitness == null ? stream
+                    : "dart.async.Stream.reify(" + stream + ", " + starWitness + ")") + ";");
+        } else if (isVoid) {
             w.line(f.name + ".start();");
         } else {
             String start = (erased ? "(dart.async.Future) " : "") + f.name + ".start()";
@@ -698,6 +728,18 @@ final class AsyncLowering {
             }
             return;
         }
+        if (s instanceof VarDeclStmt && ((VarDeclStmt) s).isLate && !hasAwait(s) && !f.stateLocals.contains(s)) {
+            // A late local living across states: its LateLocal holder is a frame field,
+            // so reads keep their checks and a lazy initializer still runs on first read.
+            final VarDeclStmt v = (VarDeclStmt) s;
+            em.emitLateLocal(v, ctx, new java.util.function.BiFunction<String, TypeRef, String>() {
+                @Override
+                public String apply(String jt, TypeRef t) {
+                    return declareField(f, ctx, v.name, t, jt);
+                }
+            });
+            return;
+        }
         if (s instanceof VarDeclStmt && !hasAwait(s) && f.stateLocals.contains(s)) {
             // Used only before the next state: a Java local, declared as outside a frame,
             // so javac still infers what the Dart-side inference left dynamic.
@@ -876,6 +918,32 @@ final class AsyncLowering {
             f.loopCaps.remove(f.loopCaps.size() - 1);
             ctx.popScope();
             open(f, exit, ctx);
+            return;
+        }
+        if (s instanceof YieldStmt) {
+            YieldStmt y = (YieldStmt) s;
+            int k = newState(f);
+            if (y.star) {
+                JavaEmitter.Out o = em.emitExpr(y.value, null, ctx);
+                w.line(f.name + ".yieldAll((Object) (" + o.code + "), " + k + ");");
+            } else {
+                JavaEmitter.Out o = em.emitExpr(y.value, em.isDynamicType(f.starElem) ? null : f.starElem, ctx);
+                w.line(f.name + ".yield$(" + (f.starJava == null ? "(Object) (" + o.code + ")"
+                        : em.coerce(o, f.starElem, ctx)) + ", " + k + ");");
+            }
+            w.line("return;");
+            f.closed = true;
+            open(f, k, ctx);
+            // Cancelled while suspended here: leave as `return;` does, finally blocks first.
+            w.line("if (" + f.name + ".cancelled()) {");
+            ctx.indent(1);
+            emitReturn(new ReturnStmt(), ctx);
+            ctx.indent(-1);
+            w.line("}");
+            return;
+        }
+        if (s instanceof ForInStmt && ((ForInStmt) s).isAwait) {
+            lowerAwaitFor((ForInStmt) s, f, ctx);
             return;
         }
         if (s instanceof ForInStmt) {
@@ -1065,43 +1133,126 @@ final class AsyncLowering {
             ctx.pushScope();
             lowerList(t.finallyBlock.statements, f, ctx);
             ctx.popScope();
-            if (!f.closed) {
-                // A throw in the finally block replaced the pending completion; else it runs.
-                w.line("switch (" + fin.c + ") {");
-                w.line("    case 1: {");
-                ctx.indent(2);
-                if (f.fins.isEmpty()) {
-                    w.line(f.isVoid ? f.name + ".complete(null);" : f.name + ".resolve(" + fin.v + ");");
-                    w.line("return;");
-                } else {
-                    Fin out = f.fins.get(f.fins.size() - 1);
-                    w.line(out.v + " = " + fin.v + "; " + out.c + " = 1; " + jumpCode(f, out.state));
-                }
-                ctx.indent(-2);
-                w.line("    }");
-                w.line("    case 2:");
-                w.line("        throw (Throwable) " + fin.v + ";");
-                if (!fin.jumps.isEmpty()) {
-                    w.line("    case 3:");
-                    w.line("        switch (" + fin.j + ") {");
-                    Set<Integer> seen = new HashSet<Integer>();
-                    for (int[] jmp : new ArrayList<int[]>(fin.jumps)) {
-                        if (!seen.add(Integer.valueOf(jmp[0]))) {
-                            continue;
-                        }
-                        w.line("            case " + jmp[0] + ":");
-                        w.line("                " + leave(f, jmp[1], jmp[0]));
-                    }
-                    w.line("            default:");
-                    w.line("                throw new IllegalStateException(\"finally jump \" + " + fin.j + ");");
-                    w.line("        }");
-                }
-                w.line("    default:");
-                w.line("        break;");
-                w.line("}");
-            }
+            finallyTail(fin, f, ctx);
         }
         open(f, exit, ctx);
+    }
+
+    /// `await for (v in s) body` as Dart desugars it: a StreamIterator stepped with
+    /// non-blocking awaits on moveNext(), inside a finally that cancels the subscription
+    /// when the loop is left early (break, return, a throw) and only then. A loop the
+    /// stream ended has nothing to cancel and so no extra suspension, as in Dart.
+    private void lowerAwaitFor(ForInStmt fi, Frame f, JavaEmitter.Ctx ctx) {
+        JavaEmitter.Ctx.Writer w = ctx.writer();
+        JavaEmitter.Out iter = em.emitExpr(fi.iterable, null, ctx);
+        TypeRef elem = fi.varType != null && !fi.varType.is("var") ? fi.varType
+                : iter.type != null && iter.type.is("Stream") && iter.type.arg(0) != null ? iter.type.arg(0)
+                : TypeRef.DYNAMIC;
+        String itName = f.name + "it" + f.states;
+        String it = f.name + "." + itName;
+        f.fields.add("dart.async.StreamIterator<Object> " + itName + ";");
+        w.line(it + " = new dart.async.StreamIterator<Object>((dart.async.Stream<Object>) (Object) ("
+                + iter.code + "));");
+        int exit = newState(f);
+        int saved = f.handler;
+        Fin fin = new Fin();
+        fin.state = newState(f);
+        fin.c = field(f, "int", "c" + fin.state);
+        fin.v = field(f, "Object", "v" + fin.state);
+        fin.j = field(f, "int", "j" + fin.state);
+        int handler = addHandler(f, fin.v + " = $T; " + fin.c + " = 2; " + jumpCode(f, fin.state));
+        f.fins.add(fin);
+        f.handler = handler;
+        int head = newState(f);
+        int done = newState(f);
+        open(f, head, ctx);
+        int k = newState(f);
+        w.line(f.name + ".await(" + it + ".moveNext(), " + k + ");");
+        w.line("return;");
+        f.closed = true;
+        open(f, k, ctx);
+        w.line("if (!((java.lang.Boolean) " + f.name + ".value()).booleanValue()) {");
+        w.line("    " + jumpCode(f, done));
+        w.line("}");
+        ctx.pushScope();
+        String jt = em.javaType(elem, true, ctx);
+        f.loopCaps.add(CaptureScan.lambdaRefs(fi.body));
+        if (isCell(f, fi.varName)) {
+            declareCell(f, ctx, fi.varName, elem, "(" + jt + ") " + it + ".current()");
+        } else {
+            String v = declareField(f, ctx, fi.varName, elem, jt);
+            w.line(v + " = (" + jt + ") " + it + ".current();");
+        }
+        // A break leaves through the finally; continue stays inside it.
+        int brk = newState(f);
+        f.targets.add(new Target(f.fins.size(), LOOP, fi.labels, brk, head));
+        lowerBranch(fi.body, f, ctx);
+        f.targets.remove(f.targets.size() - 1);
+        f.loopCaps.remove(f.loopCaps.size() - 1);
+        ctx.popScope();
+        jump(f, head, ctx);
+        open(f, brk, ctx);
+        w.line(fin.c + " = 0;");
+        jump(f, fin.state, ctx);
+        // The stream ended: past the loop without the finally (nothing to cancel).
+        open(f, done, ctx);
+        jump(f, exit, ctx);
+        f.handler = saved;
+        f.fins.remove(f.fins.size() - 1);
+        open(f, fin.state, ctx);
+        int resumed = newState(f);
+        w.line("if (" + it + ".isActive()) {");
+        w.line("    " + f.name + ".await(" + it + ".cancel(), " + resumed + ");");
+        w.line("    return;");
+        w.line("}");
+        int after = newState(f);
+        jump(f, after, ctx);
+        open(f, resumed, ctx);
+        w.line(f.name + ".value();");
+        jump(f, after, ctx);
+        open(f, after, ctx);
+        finallyTail(fin, f, ctx);
+        open(f, exit, ctx);
+    }
+
+    /// After a finally block: the pending completion it interrupted carries on.
+    private static void finallyTail(Fin fin, Frame f, JavaEmitter.Ctx ctx) {
+        JavaEmitter.Ctx.Writer w = ctx.writer();
+        if (!f.closed) {
+            // A throw in the finally block replaced the pending completion; else it runs.
+            w.line("switch (" + fin.c + ") {");
+            w.line("    case 1: {");
+            ctx.indent(2);
+            if (f.fins.isEmpty()) {
+                w.line(f.isVoid ? f.name + ".complete(null);" : f.name + ".resolve(" + fin.v + ");");
+                w.line("return;");
+            } else {
+                Fin out = f.fins.get(f.fins.size() - 1);
+                w.line(out.v + " = " + fin.v + "; " + out.c + " = 1; " + jumpCode(f, out.state));
+            }
+            ctx.indent(-2);
+            w.line("    }");
+            w.line("    case 2:");
+            w.line("        throw (Throwable) " + fin.v + ";");
+            if (!fin.jumps.isEmpty()) {
+                w.line("    case 3:");
+                w.line("        switch (" + fin.j + ") {");
+                Set<Integer> seen = new HashSet<Integer>();
+                for (int[] jmp : new ArrayList<int[]>(fin.jumps)) {
+                    if (!seen.add(Integer.valueOf(jmp[0]))) {
+                        continue;
+                    }
+                    w.line("            case " + jmp[0] + ":");
+                    w.line("                " + leave(f, jmp[1], jmp[0]));
+                }
+                w.line("            default:");
+                w.line("                throw new IllegalStateException(\"finally jump \" + " + fin.j + ");");
+                w.line("        }");
+            }
+            w.line("    default:");
+            w.line("        break;");
+            w.line("}");
+        }
     }
 
     /// The end of a try block or a catch body: to the finally block, else past the try.

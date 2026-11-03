@@ -799,6 +799,13 @@ public class Stream<T> {
      * installs, and reporting an error must never itself throw a new one --
      * that would be exactly the failure this method exists to prevent.</p>
      */
+    /// What the source's cancel hook answered for the cancel just made (a controller's
+    /// onCancel returning a Future, an async* body still running its finally blocks):
+    /// {@code subscription.cancel()} completes with it, as in Dart. Null: nothing.
+    Future<Object> takeCancelResult() {
+        return null;
+    }
+
     static void reportUncaught(Throwable t) {
         if (Zone.current != Zone.root) {
             // A listener runs in its own zone, whose handler (runZonedGuarded's
@@ -824,7 +831,8 @@ public class Stream<T> {
         @Override
         public Future<Object> cancel() {
             cancelSub(sub);
-            return Future.value(null);
+            Future<Object> r = takeCancelResult();
+            return r != null ? r : Future.value(null);
         }
 
         @Override
