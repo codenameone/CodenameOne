@@ -318,12 +318,16 @@ class FormFieldState<T> extends State<Widget> {
 // Persists a form field's value on save — Flutter's `FormFieldSetter<T>` typedef
 // (`void Function(T? newValue)`). A SAM the transpiler binds closures to.
 @JavaName('com.codename1.flutter.widgets.FormFieldSetter')
-class FormFieldSetter<T> {}
+class FormFieldSetter<T> {
+  external void call(T? newValue);
+}
 
 // Validates a form field's value — Flutter's `FormFieldValidator<T>` typedef
 // (`String? Function(T? value)`). A SAM the transpiler binds closures to.
 @JavaName('com.codename1.flutter.widgets.FormFieldValidator')
-class FormFieldValidator<T> {}
+class FormFieldValidator<T> {
+  external String? call(T? value);
+}
 
 // A grouping of form fields that validate/save together — Flutter's `Form`.
 @JavaName('com.codename1.flutter.widgets.Form')

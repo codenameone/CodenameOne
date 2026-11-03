@@ -275,7 +275,9 @@ class OpenContainer extends Widget {
 // `CloseContainerBuilder` (`Widget Function(BuildContext, VoidCallback)`). A SAM
 // the transpiler binds closures to; new_gallery's _OpenContainerWrapper stores one.
 @JavaName('com.codename1.flutter.animations.CloseContainerBuilder')
-class CloseContainerBuilder {}
+class CloseContainerBuilder {
+  external Widget call(BuildContext context, VoidCallback openContainer);
+}
 
 // ======================================================================
 // navigation — DialogRoute

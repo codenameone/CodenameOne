@@ -9644,8 +9644,13 @@ public final class JavaEmitter {
                 if (expected != null && expected.funcParams == null && !(expected.is("Object")
                         || expected.is("Function") || isDynamicType(expected))) {
                     String w = callbackTearOff(expected);
-                    return w == null ? out : letTearOff(letRecv, self, new Out(w + "(" + head + bare + ")",
-                            out.type, out.fn), ctx);
+                    if (w == null) {
+                        return out;
+                    }
+                    Out tw = new Out(w + "(" + head + bare + ")", out.type, out.fn);
+                    // The let is cast to the interface: in a one-element list literal's
+                    // varargs slot javac would otherwise infer an array for it.
+                    return letRecv == null ? tw : letTearOff(letRecv, self, tw, ctx, javaType(expected, true, ctx));
                 }
                 if (expected != null && expected.funcParams != null) {
                     return out;
@@ -9751,6 +9756,10 @@ public final class JavaEmitter {
     /// {@code letRecv} evaluated once and bound to {@code self}; {@code v} itself when the
     /// receiver was a name.
     private Out letTearOff(String letRecv, String self, Out v, Ctx ctx) {
+        return letTearOff(letRecv, self, v, ctx, null);
+    }
+
+    private Out letTearOff(String letRecv, String self, Out v, Ctx ctx, String castTo) {
         if (letRecv == null) {
             return v;
         }
@@ -9758,7 +9767,7 @@ public final class JavaEmitter {
         // Cast, so the value's type comes from the body alone: a let in an Object or varargs
         // slot otherwise fails javac's inference.
         java.util.regex.Matcher tm = LET_VALUE_TYPE.matcher(v.code);
-        String t = tm.find() ? tm.group(1) : null;
+        String t = castTo != null ? castTo : tm.find() ? tm.group(1) : null;
         return new Out((t != null ? "((" + t + ") " : "(") + "TearOff.let(" + letRecv + ", " + self + " -> " + v.code
                 + "))", v.type, v.fn);
     }
@@ -9819,12 +9828,21 @@ public final class JavaEmitter {
     /// class mapped to a Java callback interface whose `call` the stub declares
     /// (`external void call(DragStartDetails details)`); null for any other type.
     private String callbackTearOff(TypeRef expected) {
-        if (expected.name == null || program.classes.containsKey(expected.name) || !expected.args.isEmpty()) {
+        if (expected.name == null || program.classes.containsKey(expected.name)) {
             return null;
         }
         ClassDecl sc = stubs.classes.get(expected.name);
-        if (sc == null || sc.javaName == null || !sc.typeParams.isEmpty()) {
+        if (sc == null || sc.javaName == null || !expected.args.isEmpty() && expected.args.size() != sc.typeParams.size()) {
             return null;
+        }
+        // A generic interface (`FormFieldSetter<T>`) gets a generic tear-off class whose
+        // type arguments javac infers from the slot, as it does for the method reference.
+        java.util.Set<String> tvs = new java.util.LinkedHashSet<String>();
+        for (String tp : sc.typeParams) {
+            if (tp.indexOf(' ') >= 0) {
+                return null;
+            }
+            tvs.add(tp);
         }
         MethodDecl call = null;
         for (MethodDecl md : sc.methods) {
@@ -9841,19 +9859,23 @@ public final class JavaEmitter {
         }
         StringBuilder ps = new StringBuilder();
         for (Param p : call.params) {
-            String j = callbackJavaType(p.type);
+            String j = callbackJavaType(p.type, tvs);
             if (j == null || p.named || p.optional) {
                 return null;
             }
             ps.append(ps.length() > 0 ? "," : "").append(j);
         }
-        String ret = call.returnType == null || call.returnType.is("void") ? "void" : callbackJavaType(call.returnType);
+        String ret = call.returnType == null || call.returnType.is("void") ? "void" : callbackJavaType(call.returnType, tvs);
         if (ret == null) {
             return null;
         }
         String[] w = callbackTearOffs.get(sc.javaName);
         if (w == null) {
-            w = new String[] {sc.javaName, "C" + callbackTearOffs.size(), ps.toString(), ret};
+            StringBuilder tp = new StringBuilder();
+            for (String v : tvs) {
+                tp.append(tp.length() > 0 ? ", " : "").append(v);
+            }
+            w = new String[] {sc.javaName, "C" + callbackTearOffs.size(), ps.toString(), ret, tp.toString()};
             callbackTearOffs.put(sc.javaName, w);
         }
         return pkg + ".DartFnSigs.c" + w[1].substring(1);
@@ -9861,12 +9883,33 @@ public final class JavaEmitter {
 
     /// A callback parameter's Java type, fully qualified: a stub class's Java name, or a
     /// core value type; null for anything else, whose Java spelling the interface may not share.
-    private String callbackJavaType(TypeRef t) {
-        if (t == null || t.name == null || !t.args.isEmpty() || t.funcParams != null) {
+    private String callbackJavaType(TypeRef t, java.util.Set<String> typeVars) {
+        if (t == null || t.name == null || t.funcParams != null) {
             return null;
+        }
+        if (typeVars.contains(t.name) && t.args.isEmpty()) {
+            return t.name;
+        }
+        if (!t.args.isEmpty()) {
+            // `List<CustomPainterSemantics>`: the runtime list, its arguments boxed.
+            if (!t.is("List") || program.classes.containsKey("List") || t.args.size() != 1) {
+                return null;
+            }
+            String a = callbackJavaType(t.args.get(0), typeVars);
+            String b = a == null ? null : boxedCallbackType(a);
+            return b == null ? null : "dart.core.DartList<" + b + ">";
+        }
+        if (t.is("VoidCallback") && !program.classes.containsKey(t.name) && !stubs.classes.containsKey(t.name)) {
+            return "dart.runtime.Funcs.VoidFunc0";
         }
         if (t.is("bool")) {
             return t.nullable ? "java.lang.Boolean" : "boolean";
+        }
+        if (t.is("int")) {
+            return t.nullable ? "java.lang.Integer" : "int";
+        }
+        if (t.is("double")) {
+            return t.nullable ? "java.lang.Double" : "double";
         }
         if (t.is("String")) {
             return "java.lang.String";
@@ -9879,6 +9922,19 @@ public final class JavaEmitter {
         }
         ClassDecl sc = stubs.classes.get(t.name);
         return sc != null && sc.javaName != null && sc.typeParams.isEmpty() ? sc.javaName : null;
+    }
+
+    private static String boxedCallbackType(String j) {
+        if ("boolean".equals(j)) {
+            return "java.lang.Boolean";
+        }
+        if ("int".equals(j)) {
+            return "java.lang.Integer";
+        }
+        if ("double".equals(j)) {
+            return "java.lang.Double";
+        }
+        return "void".equals(j) ? null : j;
     }
 
     private String[] signedSamByName(String n) {
@@ -12619,15 +12675,19 @@ public final class JavaEmitter {
                 as.append(i == 0 ? "" : ", ").append("a").append(i);
             }
             String num = w[1].substring(1);
-            sb.append("\n    public static final class ").append(w[1]).append(" extends dart.runtime.TearOff implements ")
-                    .append(w[0]).append(" {\n        private final ").append(w[0]).append(" f;\n\n        ")
-                    .append(w[1]).append("(Object recv, String key, ").append(w[0])
+            String tps = w[4].isEmpty() ? "" : "<" + w[4] + ">";
+            String it = w[0] + tps;
+            sb.append("\n    public static final class ").append(w[1]).append(tps)
+                    .append(" extends dart.runtime.TearOff implements ")
+                    .append(it).append(" {\n        private final ").append(it).append(" f;\n\n        ")
+                    .append(w[1]).append("(Object recv, String key, ").append(it)
                     .append(" f) {\n            super(recv, key);\n            this.f = f;\n        }\n\n")
                     .append("        @Override\n        public ").append(w[3]).append(" call(").append(ps)
                     .append(") {\n            ").append("void".equals(w[3]) ? "" : "return ").append("f.call(")
                     .append(as).append(");\n        }\n    }\n");
-            sb.append("\n    public static ").append(w[0]).append(" c").append(num).append("(Object recv, String key, ")
-                    .append(w[0]).append(" f) {\n        return new ").append(w[1]).append("(recv, key, f);\n    }\n");
+            sb.append("\n    public static ").append(tps.isEmpty() ? "" : tps + " ").append(it).append(" c").append(num)
+                    .append("(Object recv, String key, ").append(it).append(" f) {\n        return new ").append(w[1])
+                    .append(tps.isEmpty() ? "" : "<>").append("(recv, key, f);\n    }\n");
         }
         sb.append("}\n");
         // A witness names its class as the file that signed the closure imports it; the
@@ -13569,6 +13629,12 @@ public final class JavaEmitter {
         return sb.toString();
     }
 
+    /// paramBelow, or {@code hi} is Object, which every non-null type is below.
+    private boolean paramBelowOrObject(TypeRef lo, TypeRef hi) {
+        return hi.is("Object") && !program.classes.containsKey("Object") && !lo.is("dynamic")
+                || paramBelow(lo, hi);
+    }
+
     /// Whether parameter type {@code lo} is a (non-generic) subtype of {@code hi}.
     private boolean paramBelow(TypeRef lo, TypeRef hi) {
         return hi.is("num") && (lo.is("int") || lo.is("double")) || isSubtypeName(lo.name, hi.name);
@@ -13593,7 +13659,11 @@ public final class JavaEmitter {
             List<String> bn = b.funcNamed == null ? java.util.Collections.<String>emptyList() : b.funcNamed;
             int apos = a.funcParams.size() - an.size();
             int bpos = b.funcParams.size() - bn.size();
-            if (apos != bpos || apos < 0 || a.funcRequired != b.funcRequired) {
+            // funcRequired -1 is "not recorded" (a tear-off's type), which is every
+            // positional parameter required: `-1` against `1` is one shape, not two.
+            int areq = a.funcRequired < 0 ? apos : a.funcRequired;
+            int breq = b.funcRequired < 0 ? bpos : b.funcRequired;
+            if (apos != bpos || apos < 0 || areq != breq) {
                 return fn;
             }
             // `({int a})` and `({int a, int b})` bound to `({int a}) => ..`, the named
@@ -13634,6 +13704,15 @@ public final class JavaEmitter {
                     // `int Function(int)` and `num Function(num)`: a parameter is bounded
                     // by the lower of the two, `num Function(int)`, as Dart's bound is.
                     fn.funcParams.add(paramBelow(pa, pb) ? pa : pb);
+                } else if (pa.args.isEmpty() && pb.args.isEmpty() && pa.funcParams == null && pb.funcParams == null
+                        && pa.nullable != pb.nullable && !pa.is("Null") && !pb.is("Null")
+                        && (paramBelowOrObject(pa, pb) || paramBelowOrObject(pb, pa))) {
+                    // `String? Function(String?)` and `void Function(Object)`: the lower bound
+                    // of String? and Object is String, the lower name made non-null where
+                    // either side refuses null, as Dart's bound is (`void Function(String)`).
+                    TypeRef lo = new TypeRef(paramBelowOrObject(pa, pb) ? pa.name : pb.name);
+                    lo.nullable = false;
+                    fn.funcParams.add(lo);
                 } else {
                     TypeRef bare = new TypeRef("Function");
                     bare.nullable = fn.nullable;
@@ -13644,7 +13723,7 @@ public final class JavaEmitter {
                 fn.funcNamed = named;
                 fn.funcNamedRequired = namedReq.isEmpty() ? null : namedReq;
             }
-            fn.funcRequired = a.funcRequired;
+            fn.funcRequired = a.funcRequired < 0 ? b.funcRequired : a.funcRequired;
             fn.funcReturn = a.funcReturn.is("void") || b.funcReturn.is("void") ? TypeRef.VOID
                     : upperBound(a.funcReturn, b.funcReturn);
             return fn;
@@ -15718,7 +15797,10 @@ public final class JavaEmitter {
             }
             if (common == null) {
                 common = t;
-            } else if (!common.toString().equals(t.toString())) {
+            } else if (!fnShape(common).equals(fnShape(t))) {
+                // Compared by shape: two function types print alike (`Function`), so
+                // `[o.tag, o.note]` (`String? Function(String?)`, `void Function(Object)`)
+                // read as one and the list took the first's type, which the second is not.
                 // `[Text(' '), Element('a', [])]`, `[...ints, ...doubles]`,
                 // `[Box<int>(1), Box<num>(1)]`: Dart's least upper bound (Node, num,
                 // Box<num>), the one the conditional and the set and map literals use.
