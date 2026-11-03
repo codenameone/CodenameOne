@@ -20,16 +20,14 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/// Reading XML on the server: a streaming pull parser, a small element tree and
-/// an Apple property list reader.
+/// Reading Apple property lists on the server.
 ///
-/// [XmlPullParser] is the parser everything else is built on; [XmlElement] is a
-/// tree for documents small enough to hold in memory; [PropertyLists] reads XML
-/// property lists, including the one inside a signed provisioning profile.
-///
-/// All three are safe for untrusted input by construction. A document type
-/// declaration is skipped and never interpreted, so no external entity is ever
-/// resolved and no entity is ever expanded beyond the five XML predefines and
-/// numeric character references; nesting depth is capped. There is no switch
-/// that turns either protection off.
+/// [PropertyLists] reads XML property lists, including the one inside a signed
+/// provisioning profile. XML itself is parsed by the shared
+/// `com.codename1.xml.XMLParser`, the same parser the client uses, in strict
+/// mode: a document type declaration is skipped and never interpreted, so no
+/// external entity is ever resolved and no entity is ever expanded beyond the
+/// five XML predefines and numeric character references; nesting depth is
+/// capped; and a document that is not well formed is a
+/// `com.codename1.xml.XMLParseException`.
 package com.codename1.backend.xml;

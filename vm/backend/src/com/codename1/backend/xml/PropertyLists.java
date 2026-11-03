@@ -23,6 +23,14 @@
 package com.codename1.backend.xml;
 
 import com.codename1.backend.Base64;
+import com.codename1.xml.Element;
+import com.codename1.xml.XMLParseException;
+import com.codename1.xml.XMLParser;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -59,9 +67,9 @@ import java.util.Map;
 /// signature is not verified. Binary property lists (`bplist00`) are not
 /// supported and are reported as such.
 ///
-/// Parsing goes through [XmlPullParser], so a document type declaration is never
-/// interpreted and nesting is bounded: a hostile plist cannot fetch a URL,
-/// expand entities or exhaust the stack.
+/// Parsing goes through the shared [XMLParser] in strict mode, so a document
+/// type declaration is never interpreted and nesting is bounded: a hostile
+/// plist cannot fetch a URL, expand entities or exhaust the stack.
 public final class PropertyLists {
     private PropertyLists() {
     }
@@ -72,41 +80,45 @@ public final class PropertyLists {
     ///
     /// #### Throws
     ///
-    /// - `XmlException`: when no XML plist is found, the data is a binary plist,
+    /// - `XMLParseException`: when no XML plist is found, the data is a binary plist,
     ///   or the plist is malformed (an unknown element, a `<dict>` key with no
     ///   value, an integer that does not parse).
-    public static Object parse(byte[] data) throws XmlException {
+    public static Object parse(byte[] data) {
         if (data == null) {
-            throw new XmlException("no data");
+            throw new XMLParseException("no data");
         }
         if (startsWith(data, 0, "bplist")) {
-            throw new XmlException("binary property lists are not supported");
+            throw new XMLParseException("binary property lists are not supported");
         }
         int first = 0;
         while (first < data.length && isSpace(data[first])) {
             first++;
         }
         boolean bom = startsWithBom(data, first);
-        XmlElement root;
-        if (bom || (first < data.length && data[first] == '<')) {
-            root = XmlElement.parse(data);
-        } else {
-            byte[] xml = extractXml(data);
+        byte[] xml = data;
+        if (!bom && (first >= data.length || data[first] != '<')) {
+            xml = extractXml(data);
             if (xml == null) {
-                throw new XmlException("no XML property list found");
+                throw new XMLParseException("no XML property list found");
             }
-            root = XmlElement.parse(xml);
         }
-        return fromDocument(root);
+        try {
+            return fromDocument(parseXml(new InputStreamReader(new ByteArrayInputStream(xml), "UTF-8")));
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException("UTF-8 is not supported"); //NOPMD PreserveStackTrace - UTF-8 is always present; there is nothing to preserve
+        }
     }
 
     /// Parses an XML property list held in a string.
     ///
     /// #### Throws
     ///
-    /// - `XmlException`: when the plist is malformed.
-    public static Object parse(String xml) throws XmlException {
-        return fromDocument(XmlElement.parse(xml));
+    /// - `XMLParseException`: when the plist is malformed.
+    public static Object parse(String xml) {
+        if (xml == null) {
+            throw new XMLParseException("no data");
+        }
+        return fromDocument(parseXml(new StringReader(xml)));
     }
 
     /// Finds the XML property list embedded in binary data and answers its bytes,
@@ -138,59 +150,98 @@ public final class PropertyLists {
         return out;
     }
 
-    private static Object fromDocument(XmlElement root) throws XmlException {
-        if (!"plist".equals(root.getName())) {
+    /// Parses strictly: well formed or an exception, no entity expansion, the
+    /// default nesting cap.
+    private static Element parseXml(Reader in) {
+        XMLParser parser = new XMLParser();
+        parser.setStrict(true);
+        Element root = parser.parse(in);
+        if (root == null) {
+            throw new XMLParseException("no root element");
+        }
+        return root;
+    }
+
+    /// The element children of `e`, in order; the whitespace between them is
+    /// not a value.
+    private static List<Element> elements(Element e) {
+        List<Element> out = new ArrayList<Element>();
+        int count = e.getNumChildren();
+        for (int i = 0; i < count; i++) {
+            Element c = e.getChildAt(i);
+            if (!c.isTextElement()) {
+                out.add(c);
+            }
+        }
+        return out;
+    }
+
+    /// The character data of `e`, its text and CDATA children joined as written.
+    private static String text(Element e) {
+        StringBuilder b = new StringBuilder();
+        int count = e.getNumChildren();
+        for (int i = 0; i < count; i++) {
+            Element c = e.getChildAt(i);
+            if (c.isTextElement()) {
+                b.append(c.getText());
+            }
+        }
+        return b.toString();
+    }
+
+    private static Object fromDocument(Element root) {
+        if (!"plist".equals(root.getTagName())) {
             return value(root);
         }
-        List<XmlElement> kids = root.getChildren();
+        List<Element> kids = elements(root);
         if (kids.size() != 1) {
-            throw new XmlException("<plist> must hold exactly one value, found " + kids.size());
+            throw new XMLParseException("<plist> must hold exactly one value, found " + kids.size());
         }
         return value(kids.get(0));
     }
 
-    private static Object value(XmlElement e) throws XmlException {
-        String n = e.getName();
+    private static Object value(Element e) {
+        String n = e.getTagName();
         if ("dict".equals(n)) {
             Map<String, Object> map = new LinkedHashMap<String, Object>();
-            List<XmlElement> kids = e.getChildren();
+            List<Element> kids = elements(e);
             int count = kids.size();
             for (int i = 0; i < count; i += 2) {
-                XmlElement key = kids.get(i);
-                if (!"key".equals(key.getName())) {
-                    throw new XmlException("expected <key> in <dict>, found <" + key.getName() + ">");
+                Element key = kids.get(i);
+                if (!"key".equals(key.getTagName())) {
+                    throw new XMLParseException("expected <key> in <dict>, found <" + key.getTagName() + ">");
                 }
                 if (i + 1 >= count) {
-                    throw new XmlException("<key>" + key.getText() + "</key> has no value");
+                    throw new XMLParseException("<key>" + text(key) + "</key> has no value");
                 }
-                map.put(key.getText(), value(kids.get(i + 1)));
+                map.put(text(key), value(kids.get(i + 1)));
             }
             return map;
         }
         if ("array".equals(n)) {
             List<Object> list = new ArrayList<Object>();
-            for (XmlElement c : e.getChildren()) {
+            for (Element c : elements(e)) {
                 list.add(value(c));
             }
             return list;
         }
         if ("string".equals(n)) {
-            return e.getText();
+            return text(e);
         }
         if ("integer".equals(n)) {
-            String t = e.getText().trim();
+            String t = text(e).trim();
             try {
                 return Long.valueOf(Long.parseLong(t));
             } catch (NumberFormatException ex) {
-                throw new XmlException("bad <integer> " + t, ex);
+                throw new XMLParseException("bad <integer> " + t); //NOPMD PreserveStackTrace - the shared exception has no cause constructor (CLDC); the message names the value
             }
         }
         if ("real".equals(n)) {
-            String t = e.getText().trim();
+            String t = text(e).trim();
             try {
                 return Double.valueOf(Double.parseDouble(t));
             } catch (NumberFormatException ex) {
-                throw new XmlException("bad <real> " + t, ex);
+                throw new XMLParseException("bad <real> " + t); //NOPMD PreserveStackTrace - the shared exception has no cause constructor (CLDC); the message names the value
             }
         }
         if ("true".equals(n)) {
@@ -200,23 +251,23 @@ public final class PropertyLists {
             return Boolean.FALSE;
         }
         if ("data".equals(n)) {
-            byte[] bytes = Base64.decode(stripWhitespace(e.getText()));
+            byte[] bytes = Base64.decode(stripWhitespace(text(e)));
             if (bytes == null) {
-                throw new XmlException("bad base64 in <data>");
+                throw new XMLParseException("bad base64 in <data>");
             }
             return bytes;
         }
         if ("date".equals(n)) {
-            return parseDate(e.getText().trim());
+            return parseDate(text(e).trim());
         }
-        throw new XmlException("unknown property list element <" + n + ">");
+        throw new XMLParseException("unknown property list element <" + n + ">");
     }
 
     /// Parses the one form plists write, `yyyy-MM-ddTHH:mm:ssZ`, as UTC.
-    private static Date parseDate(String s) throws XmlException {
+    private static Date parseDate(String s) {
         if (s.length() != 20 || s.charAt(4) != '-' || s.charAt(7) != '-' || s.charAt(10) != 'T'
                 || s.charAt(13) != ':' || s.charAt(16) != ':' || s.charAt(19) != 'Z') {
-            throw new XmlException("bad <date> " + s);
+            throw new XMLParseException("bad <date> " + s);
         }
         int year = digits(s, 0, 4);
         int month = digits(s, 5, 2);
@@ -226,13 +277,13 @@ public final class PropertyLists {
         int second = digits(s, 17, 2);
         if (year < 0 || month < 1 || month > 12 || day < 1 || day > 31
                 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 60) {
-            throw new XmlException("bad <date> " + s);
+            throw new XMLParseException("bad <date> " + s);
         }
         boolean leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
         int length = month == 2 ? (leap ? 29 : 28)
                 : month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31;
         if (day > length) {
-            throw new XmlException("bad <date> " + s);
+            throw new XMLParseException("bad <date> " + s);
         }
         // Days from the civil calendar (H. Hinnant's algorithm), proleptic Gregorian.
         // y is -1 for January and February of year 0, so the era floors.

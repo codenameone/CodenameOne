@@ -22,8 +22,12 @@
  */
 package com.codename1.backend.xml;
 
+import com.codename1.xml.Element;
+import com.codename1.xml.XMLParseException;
+import com.codename1.xml.XMLParser;
 import org.junit.jupiter.api.Test;
 
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
@@ -93,7 +97,7 @@ class PropertyListsTest {
     void externalEntityIsNeverExpanded() {
         String xxe = "<?xml version=\"1.0\"?><!DOCTYPE plist [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">"
                 + "<!ENTITY a \"]>\">]><plist><string>&xxe;</string></plist>";
-        XmlException e = assertThrows(XmlException.class, () -> PropertyLists.parse(xxe));
+        XMLParseException e = assertThrows(XMLParseException.class, () -> PropertyLists.parse(xxe));
         assertTrue(e.getMessage().contains("undefined entity"), e.getMessage());
     }
 
@@ -103,43 +107,63 @@ class PropertyListsTest {
         for (int i = 0; i < 10000; i++) {
             b.append("<array>");
         }
-        XmlException e = assertThrows(XmlException.class, () -> PropertyLists.parse(b.toString()));
+        XMLParseException e = assertThrows(XMLParseException.class, () -> PropertyLists.parse(b.toString()));
         assertTrue(e.getMessage().contains("nested deeper"), e.getMessage());
     }
 
     @Test
-    void malformedInputIsAnXmlException() {
-        assertThrows(XmlException.class, () -> PropertyLists.parse("<plist><dict><key>a</key></dict></plist>"));
-        assertThrows(XmlException.class, () -> PropertyLists.parse("<plist><integer>x</integer></plist>"));
-        assertThrows(XmlException.class, () -> PropertyLists.parse("<plist><string>a</plist>"));
-        assertThrows(XmlException.class, () -> PropertyLists.parse("bplist00xyz".getBytes(StandardCharsets.UTF_8)));
+    void malformedInputIsAnXmlParseException() {
+        assertThrows(XMLParseException.class, () -> PropertyLists.parse("<plist><dict><key>a</key></dict></plist>"));
+        assertThrows(XMLParseException.class, () -> PropertyLists.parse("<plist><integer>x</integer></plist>"));
+        assertThrows(XMLParseException.class, () -> PropertyLists.parse("<plist><string>a</plist>"));
+        assertThrows(XMLParseException.class, () -> PropertyLists.parse("bplist00xyz".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
-    void pullParserEvents() throws Exception {
-        XmlPullParser p = XmlPullParser.of("<a x='1' y=\"&lt;\"><b/>t</a>");
-        assertEquals(XmlPullParser.START_ELEMENT, p.next());
-        assertEquals("a", p.getName());
-        assertEquals("1", p.getAttributeValue("x"));
-        assertEquals("<", p.getAttributeValue("y"));
-        assertEquals(XmlPullParser.START_ELEMENT, p.next());
-        assertEquals(XmlPullParser.END_ELEMENT, p.next());
-        assertEquals("b", p.getName());
-        assertEquals(XmlPullParser.TEXT, p.next());
-        assertEquals("t", p.getText());
-        assertEquals(XmlPullParser.END_ELEMENT, p.next());
-        assertEquals(XmlPullParser.END_DOCUMENT, p.next());
-        XmlElement root = XmlElement.parse("<r><i n='1'/><j/><i n='2'>v</i></r>");
+    void sharedParserEventsAndElementHelpers() throws Exception {
+        final StringBuilder events = new StringBuilder();
+        XMLParser p = new XMLParser() {
+            @Override
+            protected boolean startTag(String tag) {
+                events.append('<').append(tag);
+                return true;
+            }
+
+            @Override
+            protected void attribute(String tag, String name, String value) {
+                events.append(' ').append(name).append('=').append(value);
+            }
+
+            @Override
+            protected void endTag(String tag) {
+                events.append("</").append(tag).append('>');
+            }
+
+            @Override
+            protected void textElement(String text) {
+                events.append('[').append(text).append(']');
+            }
+        };
+        p.setStrict(true);
+        p.eventParser(new StringReader("<a x='1' y=\"&lt;\"><b/>t</a>"));
+        assertEquals("<a x=1 y=<<b</b>[t]</a>", events.toString());
+
+        XMLParser dom = new XMLParser();
+        dom.setStrict(true);
+        Element root = dom.parse(new StringReader("<r><i n='1'/><j/><i n='2'> v </i></r>"));
         assertEquals(2, root.children("i").size());
-        assertEquals("v", root.childText("i").isEmpty() ? root.children("i").get(1).getText() : "?");
+        assertEquals("", root.childText("i"));
+        assertNull(root.childText("missing"));
+        assertNull(root.child("missing"));
         assertEquals("1", root.child("i").getAttribute("n"));
+        assertEquals("2", root.children("i").get(1).getAttribute("n"));
     }
 
     @Test
     void impossibleDatesAreRefusedAndYearZeroFloors() throws Exception {
-        assertThrows(XmlException.class, () -> PropertyLists.parse(
+        assertThrows(XMLParseException.class, () -> PropertyLists.parse(
                 "<plist><date>2023-02-29T00:00:00Z</date></plist>"));
-        assertThrows(XmlException.class, () -> PropertyLists.parse(
+        assertThrows(XMLParseException.class, () -> PropertyLists.parse(
                 "<plist><date>2024-04-31T00:00:00Z</date></plist>"));
         assertEquals(951782400000L, ((Date) PropertyLists.parse(
                 "<plist><date>2000-02-29T00:00:00Z</date></plist>")).getTime());

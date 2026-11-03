@@ -20,26 +20,24 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.backend.xml;
+package com.codename1.xml;
 
-import java.io.IOException;
-
-/// Thrown when a document is not well-formed XML, uses a construct this parser
-/// refuses (an entity it does not know, nesting past the limit), or is not the
-/// structure a reader such as [PropertyLists] expects.
+/// Thrown by an [XMLParser] in strict mode (see [XMLParser#setStrict(boolean)])
+/// when the document is not well formed, nests deeper than
+/// [XMLParser#setMaxDepth(int)], or references an entity the parser does not
+/// define.
 ///
-/// The message names the problem and, where one is known, the character offset
-/// in the decoded document.
-public class XmlException extends IOException {
-    private static final long serialVersionUID = 1L;
-
-    /// An exception with the given message.
-    public XmlException(String message) {
+/// It extends `IllegalArgumentException`, which is what the parser has always
+/// thrown when a [ParserCallback] asks it to stop, so code that catches that
+/// keeps working.
+@com.codename1.impl.SharedWithBackend
+public class XMLParseException extends IllegalArgumentException {
+    /// Creates the exception with the description of what is wrong.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: the description
+    public XMLParseException(String message) {
         super(message);
-    }
-
-    /// An exception with the given message, caused by `cause`.
-    public XmlException(String message, Throwable cause) {
-        super(message, cause);
     }
 }
