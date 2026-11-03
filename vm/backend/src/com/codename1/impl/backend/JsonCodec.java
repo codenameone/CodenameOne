@@ -252,30 +252,11 @@ public final class JsonCodec {
             return;
         }
         long millis = value.getTime();
-        // Floored by hand: vm/JavaAPI's Math has no floorDiv.
-        long days = millis / 86400000L;
-        if (millis % 86400000L < 0) {
-            days--;
-        }
+        long days = CivilTime.floorDiv(millis, 86400000L);
         long ms = millis - days * 86400000L;
-        // civil_from_days, Howard Hinnant's algorithm; the inverse of daysFromCivil.
-        long z = days + 719468;
-        long era = (z >= 0 ? z : z - 146096) / 146097;
-        long doe = z - era * 146097;
-        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-        long y = yoe + era * 400;
-        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        long mp = (5 * doy + 2) / 153;
-        long d = doy - (153 * mp + 2) / 5 + 1;
-        long m = mp < 10 ? mp + 3 : mp - 9;
-        if (m <= 2) {
-            y++;
-        }
         StringBuilder sb = new StringBuilder(24);
         sb.append('"');
-        pad(sb, y, 4).append('-');
-        pad(sb, m, 2).append('-');
-        pad(sb, d, 2).append('T');
+        CivilTime.appendDate(sb, days, '-').append('T');
         pad(sb, ms / 3600000L, 2).append(':');
         pad(sb, ms / 60000L % 60, 2).append(':');
         pad(sb, ms / 1000L % 60, 2).append('.');
@@ -284,15 +265,7 @@ public final class JsonCodec {
     }
 
     private static StringBuilder pad(StringBuilder sb, long v, int width) {
-        if (v < 0) {
-            sb.append('-');
-            v = -v;
-        }
-        String digits = Long.toString(v);
-        for (int i = digits.length(); i < width; i++) {
-            sb.append('0');
-        }
-        return sb.append(digits);
+        return CivilTime.pad(sb, v, width);
     }
 
     private static String describe(Object got) {
@@ -527,21 +500,10 @@ public final class JsonCodec {
     }
 
     private static int daysIn(int year, int month) {
-        if (month == 2) {
-            boolean leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-            return leap ? 29 : 28;
-        }
-        return month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31;
+        return CivilTime.daysInMonth(year, month);
     }
 
-    /// Days from 1970-01-01 to the given proleptic Gregorian date; Howard
-    /// Hinnant's algorithm, which needs no calendar class.
     private static long daysFromCivil(int year, int month, int day) {
-        int y = month <= 2 ? year - 1 : year;
-        int era = (y >= 0 ? y : y - 399) / 400;
-        int yoe = y - era * 400;
-        int doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
-        int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        return era * 146097L + doe - 719468;
+        return CivilTime.daysFromCivil(year, month, day);
     }
 }

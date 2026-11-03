@@ -524,11 +524,7 @@ public final class CronSchedule {
     }
 
     static long floorDiv(long value, long divisor) {
-        long q = value / divisor;
-        if ((value % divisor != 0) && ((value < 0) != (divisor < 0))) {
-            q--;
-        }
-        return q;
+        return CivilTime.floorDiv(value, divisor);
     }
 
     static long floorMod(long value, long divisor) {
@@ -536,40 +532,17 @@ public final class CronSchedule {
     }
 
     static int daysInMonth(int year, int month) {
-        switch (month) {
-            case 2:
-                boolean leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-                return leap ? 29 : 28;
-            case 4:
-            case 6:
-            case 9:
-            case 11:
-                return 30;
-            default:
-                return 31;
-        }
+        return CivilTime.daysInMonth(year, month);
     }
 
     static long daysFromCivil(int y, int m, int d) {
-        int adjusted = y - (m <= 2 ? 1 : 0);
-        long era = (adjusted >= 0 ? adjusted : adjusted - 399) / 400;
-        int yoe = (int) (adjusted - era * 400);
-        int doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
-        int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        return era * 146097L + doe - 719468L;
+        return CivilTime.daysFromCivil(y, m, d);
     }
 
     static int[] civilFromDays(long z) {
-        long shifted = z + 719468L;
-        long era = (shifted >= 0 ? shifted : shifted - 146096) / 146097;
-        long doe = shifted - era * 146097;
-        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-        long y = yoe + era * 400;
-        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        long mp = (5 * doy + 2) / 153;
-        long d = doy - (153 * mp + 2) / 5 + 1;
-        long m = mp + (mp < 10 ? 3 : -9);
-        return new int[] {(int) (y + (m <= 2 ? 1 : 0)), (int) m, (int) d};
+        int[] out = new int[3];
+        CivilTime.civilFromDays(z, out);
+        return out;
     }
 
     @Override
