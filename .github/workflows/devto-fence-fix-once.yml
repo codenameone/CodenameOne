@@ -1,0 +1,22 @@
+# One-shot repair: strip Hugo code-fence attributes from articles already on
+# dev.to. Runs on pushes to this PR's branch only; delete before merging.
+name: dev.to fence attribute repair (one-shot)
+on:
+  push:
+    branches: [devto-fence-attributes]
+    paths: ['.github/workflows/devto-fence-fix-once.yml', 'scripts/website/fix_devto_fence_attributes.py']
+permissions:
+  contents: read
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Repair dev.to articles
+        working-directory: scripts/website
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+        run: python3 fix_devto_fence_attributes.py --apply
