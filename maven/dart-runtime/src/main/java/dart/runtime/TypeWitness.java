@@ -594,11 +594,11 @@ public final class TypeWitness {
     /// The Type value of {@code c} with the given argument witnesses: the class itself when
     /// no argument is known, the interned witness otherwise.
     public static Object typeValue(Class<?> c, TypeWitness a0) {
-        return a0 == null ? c : of(c, false, a0);
+        return a0 == null ? DartRuntime.genericArity(c, 1) : of(c, false, a0);
     }
 
     public static Object typeValue(Class<?> c, TypeWitness a0, TypeWitness a1) {
-        return a0 == null && a1 == null ? c : of(c, false, a0, a1);
+        return a0 == null && a1 == null ? DartRuntime.genericArity(c, 2) : of(c, false, a0, a1);
     }
 
     public static Object typeValue(Class<?> c, TypeWitness... args) {
@@ -607,7 +607,8 @@ public final class TypeWitness {
                 return of(c, false, args);
             }
         }
-        return c;
+        // Every argument dynamic: the bare class, which prints them (`Holder<dynamic>`).
+        return DartRuntime.genericArity(c, args.length);
     }
 
     /// The Type value of a type variable whose witness is {@code w} (`T` as an expression).
@@ -615,7 +616,7 @@ public final class TypeWitness {
         if (w == null) {
             return Object.class;
         }
-        if (w.args == null && (!w.nullable || w.type == Object.class)) {
+        if (w.args == null && w.fnSig == null && (!w.nullable || w.type == Object.class)) {
             // `dynamic` (and Object?) is Object's class, as a `dynamic` literal is:
             // erasure cannot tell them apart, and `T == dynamic` compares the two.
             return w.type;
@@ -639,6 +640,11 @@ public final class TypeWitness {
             return new FunctionType((Signed) o);
         }
         return o == null ? Void.class : o.getClass();
+    }
+
+    private static boolean voidSam(Class<?> c) {
+        return c == Funcs.VoidFunc0.class || c == Funcs.VoidFunc1.class || c == Funcs.VoidFunc2.class
+                || c == Funcs.VoidFunc3.class || c == Funcs.VoidFunc4.class || c == Funcs.VoidFunc5.class;
     }
 
     /// The Dart spelling of this type: `Box<int>`, `int?`, `Map<String, Box<int>?>`.
@@ -667,7 +673,17 @@ public final class TypeWitness {
             rb.append(')');
             return nullable ? rb.append('?').toString() : rb.toString();
         }
-        StringBuilder sb = new StringBuilder(DartRuntime.str(type));
+        if (fnSig != null) {
+            // A function type (a typedef used as a value): `(String) => int`. The return
+            // slot of a void function is untested, so the void interface says it.
+            StringBuilder fb = new StringBuilder("(");
+            for (int i = 1; i < fnSig.length; i++) {
+                fb.append(i > 1 ? ", " : "").append(fnSig[i] == null ? "dynamic" : fnSig[i].toString());
+            }
+            fb.append(") => ").append(voidSam(type) ? "void" : fnSig[0] == null ? "dynamic" : fnSig[0].toString());
+            return nullable ? "(" + fb + ")?" : fb.toString();
+        }
+        StringBuilder sb = new StringBuilder(args == null ? DartRuntime.str(type) : DartRuntime.className(type));
         // A primitive-backed list class already names its element type (`List<int>`).
         if (args != null && type != dart.core.DartLongList.class && type != dart.core.DartDoubleList.class) {
             sb.append('<');

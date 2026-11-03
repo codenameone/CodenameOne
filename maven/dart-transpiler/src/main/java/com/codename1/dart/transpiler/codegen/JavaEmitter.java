@@ -2238,6 +2238,12 @@ public final class JavaEmitter {
             body.append("    static {\n        dart.runtime.DartRuntime.dartName(").append(javaClassName(c))
                     .append(".class, \"").append(c.name).append("\");\n    }\n\n");
         }
+        if (!c.isMixin && c.extensionOn == null && c.enumOf == null && !c.typeParams.isEmpty()) {
+            // A generic class's Type with no reified arguments prints them as dynamic
+            // (`Holder<dynamic>`), so the runtime learns how many it declares.
+            body.append("    static {\n        dart.runtime.DartRuntime.genericArity(").append(javaClassName(c))
+                    .append(".class, ").append(c.typeParams.size()).append(");\n    }\n\n");
+        }
         // Dart 3 sealed -> Java sealed: a sealed class with subtypes lists them in a permits clause and
         // its direct subtypes are marked non-sealed. Falls back to a plain abstract class when the
         // hierarchy has no subtypes (a permits-less sealed class is illegal in Java).
@@ -12324,6 +12330,11 @@ public final class JavaEmitter {
             lit.args.addAll(((Ident) o).typeArgs);
             noteReifiedType(lit);
         }
+        if (o instanceof Ident && program.typedefs.containsKey(((Ident) o).name)
+                && program.typedefs.get(((Ident) o).name).aliased != null) {
+            // A typedef as a value (`IntHolder` for Holder<int>) is the aliased type literal.
+            noteReifiedType(program.typedefs.get(((Ident) o).name).aliased);
+        }
         if (o instanceof List) {
             for (Object e : (List<?>) o) {
                 if (e instanceof TypeRef) {
@@ -15508,6 +15519,10 @@ public final class JavaEmitter {
     /// implicit downcast (coerce), `{'a': null as dynamic}` into a Map<String, int> a
     /// TypeError; anything else keeps its code, a function value cast to its SAM.
     private String entryCode(Out o, TypeRef t, Ctx ctx) {
+        if (o.type != null && isClassRef(o.type)) {
+            // A type literal entry (`{Holder<int>: 'h'}`) is its Type value.
+            return classLiteral(o, ctx);
+        }
         return dynamicIntoTyped(o, t) ? elementCode(o, t, ctx) : funcCast(o, t, ctx);
     }
 
@@ -16105,6 +16120,11 @@ public final class JavaEmitter {
         tearOffKeepAll = false;
         if (top != null) {
             return retargetTearOff(top, expected, ctx);
+        }
+        // A typedef used as a value (`print(Alias)`) is the type it aliases.
+        Out alias = ctx.lookup(n) == null ? typedefLiteral(id, ctx) : null;
+        if (alias != null) {
+            return alias;
         }
         // A type parameter used as a value (`Type get type => T`, `T == int`): its witness.
         String tw = witnessFor(n, ctx);
@@ -20162,6 +20182,46 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         ft.funcRequired = td.funcRequired;
         ft.nullable = t.nullable;
         return ft;
+    }
+
+    /// The value of the typedef {@code id} names, used as a type literal: the aliased class
+    /// type as its own literal would be, or the function type's witness. Type arguments
+    /// left off a generic typedef are dynamic, as Dart instantiates to bounds. Null when
+    /// {@code id} names no program typedef.
+    private Out typedefLiteral(Ident id, Ctx ctx) {
+        Ast.TypedefDecl td = program.typedefs.get(id.name);
+        if (td == null) {
+            return null;
+        }
+        Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (int i = 0; i < td.typeParams.size(); i++) {
+            subst.put(td.typeParams.get(i), id.typeArgs != null && i < id.typeArgs.size()
+                    ? id.typeArgs.get(i) : TypeRef.DYNAMIC);
+        }
+        if (td.aliased != null) {
+            TypeRef t = substituteTypeParams(td.aliased, subst);
+            if (t.funcReturn == null && !t.name.startsWith("Rec$")) {
+                TypeRef ref = classRef(t.name);
+                ref.args.get(0).args.addAll(t.args);
+                return new Out(t.name, ref);
+            }
+            String w = witnessOf(t, ctx);
+            return w == null ? null : new Out("dart.runtime.TypeWitness.value(" + w + ")", new TypeRef("Type"));
+        }
+        if (td.returnType == null || td.paramTypes == null) {
+            return null;
+        }
+        TypeRef ft = new TypeRef("Function");
+        ft.funcParams = new ArrayList<TypeRef>();
+        for (TypeRef p : td.paramTypes) {
+            ft.funcParams.add(substituteTypeParams(p, subst));
+        }
+        ft.funcReturn = substituteTypeParams(td.returnType, subst);
+        ft.funcRequired = td.funcRequired;
+        ft.funcNamed = td.funcNamed;
+        ft.funcNamedRequired = td.funcNamedRequired;
+        String w = witnessOf(ft, ctx);
+        return w == null ? null : new Out("dart.runtime.TypeWitness.value(" + w + ")", new TypeRef("Type"));
     }
 
     /** A user typedef by name, else a stub library's function typedef. */
@@ -30988,6 +31048,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             return "dart.runtime.TypeWitness.typeValue(" + jt + ".class" + reifiedArgWitnesses(lit, ctx) + ")";
         }
+        if (!lit.args.isEmpty() && program.resolveClass(dartName, ctx.library()) == null) {
+            // A core generic type as a value (`Map<String, int>`): its witness, which names
+            // the arguments and is interned, so two such literals compare equal.
+            String w = witnessOf(copyNonNull(lit), ctx);
+            if (w != null) {
+                return "dart.runtime.TypeWitness.value(" + w + ")";
+            }
+        }
         String jt = javaType(new TypeRef(dartName), true, ctx);
         int lt = jt.indexOf('<');
         String raw = lt >= 0 ? jt.substring(0, lt) : jt;
@@ -31001,9 +31069,21 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // does not run the class's static initialiser, which is where the Dart name is
             // recorded, so `print(Color)` before any instance printed MainColor. The name is
             // recorded here, at the literal, as well.
-            return "dart.runtime.DartRuntime.dartName(" + raw + ".class, \"" + dartName + "\")";
+            return rawGenericLiteral("dart.runtime.DartRuntime.dartName(" + raw + ".class, \"" + dartName + "\")",
+                    dartName, ctx);
         }
-        return raw + ".class";
+        return rawGenericLiteral(raw + ".class", dartName, ctx);
+    }
+
+    /// A raw literal of a generic program class (`Holder`) is the class with dynamic
+    /// arguments, printed `Holder<dynamic>`. A class literal runs no static initialiser,
+    /// so the type-parameter count is recorded where the literal is written.
+    private String rawGenericLiteral(String lit, String dartName, Ctx ctx) {
+        ClassDecl c = program.resolveClass(dartName, ctx.library());
+        if (c == null || c.typeParams.isEmpty() || c.isMixin || c.extensionOn != null || c.enumOf != null) {
+            return lit;
+        }
+        return "dart.runtime.DartRuntime.genericArity(" + lit + ", " + c.typeParams.size() + ")";
     }
 
     private TypeRef classRef(String className) {
@@ -32332,7 +32412,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     String boxIfPrimitive(Out o, Ctx ctx) {
-        // Java autoboxing covers long/double/boolean -> Long/Double/Boolean
+        // Java autoboxing covers long/double/boolean -> Long/Double/Boolean. A type literal
+        // (`Holder` as a map key) is a class reference until it becomes its Type value.
+        if (o.type != null && isClassRef(o.type)) {
+            return classLiteral(o, ctx);
+        }
         return o.code;
     }
 

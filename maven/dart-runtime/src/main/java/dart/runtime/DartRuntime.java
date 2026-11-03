@@ -781,6 +781,68 @@ public final class DartRuntime {
         return c;
     }
 
+    /// The type-parameter counts of the transpiled generic classes, so a Type that is the
+    /// bare class (all arguments dynamic) prints them.
+    private static final java.util.HashMap<Class<?>, Integer> GENERIC_ARITY = new java.util.HashMap<Class<?>, Integer>();
+
+    /// Records that the transpiled class {@code c} declares {@code arity} type parameters.
+    /// Answers {@code c}, so a type literal can record it where it is written.
+    public static <T> Class<T> genericArity(Class<T> c, int arity) {
+        GENERIC_ARITY.put(c, Integer.valueOf(arity));
+        return c;
+    }
+
+    /// The Dart name of the class {@code c} alone, without type arguments.
+    static String className(Class<?> c) {
+        // A Dart Type (`runtimeType`, a type witness) is a Class here; Dart prints the
+        // bare Dart type name, which for the boxed core types is not the Java one.
+        if (c == Long.class || c == Integer.class) {
+            return "int";
+        }
+        if (c == Double.class) {
+            return "double";
+        }
+        if (c == Number.class) {
+            // num's witness (a type argument `<num>`) is Number, Dart's num.
+            return "num";
+        }
+        if (c == Boolean.class) {
+            return "bool";
+        }
+        if (c == Void.class) {
+            // The runtime type of null (TypeWitness.runtimeType), and Null's witness.
+            return "Null";
+        }
+        if (c == dart.core.DartList.class) {
+            return "List";
+        }
+        if (c == dart.core.DartMap.class) {
+            return "Map";
+        }
+        if (c == dart.core.DartSet.class) {
+            return "Set";
+        }
+        // The primitive-backed lists are how List<int> and List<double> are held, so
+        // their class stands for that whole type (a type argument's witness).
+        if (c == dart.core.DartLongList.class) {
+            return "List<int>";
+        }
+        if (c == dart.core.DartDoubleList.class) {
+            return "List<double>";
+        }
+        String dn = DART_NAMES.get(c);
+        if (dn != null) {
+            return dn;
+        }
+        String sn = c.getSimpleName();
+        if (c.isInterface() && sn.length() > 2 && sn.endsWith("$I")) {
+            // A class other classes implement is witnessed by its generated interface,
+            // `I$I` (the transpiler's suffix); its Dart name is the class's.
+            return sn.substring(0, sn.length() - 2);
+        }
+        return sn;
+    }
+
     public static String typeName(Object o) {
         if (o == null) {
             return "Null";
@@ -957,47 +1019,18 @@ public final class DartRuntime {
             return own.equals(e.name()) ? e.getDeclaringClass().getSimpleName() + "." + own : own;
         }
         if (v instanceof Class<?> c) {
-            // A Dart Type (`runtimeType`, a type witness) is a Class here; Dart prints the
-            // bare Dart type name, which for the boxed core types is not the Java one.
-            if (c == Long.class || c == Integer.class) {
-                return "int";
+            String n = className(c);
+            Integer arity = GENERIC_ARITY.get(c);
+            if (arity == null) {
+                return n;
             }
-            if (c == Double.class) {
-                return "double";
+            // A generic class with no reified arguments is the class with dynamic ones:
+            // Dart prints the raw literal `Holder` as `Holder<dynamic>`.
+            StringBuilder sb = new StringBuilder(n).append('<');
+            for (int i = 0; i < arity; i++) {
+                sb.append(i == 0 ? "dynamic" : ", dynamic");
             }
-            if (c == Number.class) {
-                // num's witness (a type argument `<num>`) is Number, Dart's num.
-                return "num";
-            }
-            if (c == Boolean.class) {
-                return "bool";
-            }
-            if (c == Void.class) {
-                // The runtime type of null (TypeWitness.runtimeType), and Null's witness.
-                return "Null";
-            }
-            if (c == dart.core.DartList.class) {
-                return "List";
-            }
-            // The primitive-backed lists are how List<int> and List<double> are held, so
-            // their class stands for that whole type (a type argument's witness).
-            if (c == dart.core.DartLongList.class) {
-                return "List<int>";
-            }
-            if (c == dart.core.DartDoubleList.class) {
-                return "List<double>";
-            }
-            String dn = DART_NAMES.get(c);
-            if (dn != null) {
-                return dn;
-            }
-            String sn = c.getSimpleName();
-            if (c.isInterface() && sn.length() > 2 && sn.endsWith("$I")) {
-                // A class other classes implement is witnessed by its generated interface,
-                // `I$I` (the transpiler's suffix); its Dart name is the class's.
-                return sn.substring(0, sn.length() - 2);
-            }
-            return sn;
+            return sb.append('>').toString();
         }
         return v.toString();
     }
