@@ -387,7 +387,39 @@ public final class DartRuntime {
         if (a instanceof Number && b instanceof Number) {
             return numEq((Number) a, (Number) b);
         }
+        if (a instanceof BoundTearOff && b instanceof BoundTearOff && a != b) {
+            Object[] ka = BOUND_TEAR_OFFS.get(a);
+            Object[] kb = BOUND_TEAR_OFFS.get(b);
+            return ka != null && kb != null && ka[0] == kb[0] && ka[1].equals(kb[1]);
+        }
         return a == null ? b == null : a.equals(b);
+    }
+
+    /// Receiver and method name of each live instance-method tear-off, keyed by the
+    /// tear-off itself (a lambda, so its hashCode and equals are identity's).
+    private static final java.util.Map<Object, Object[]> BOUND_TEAR_OFFS = new java.util.WeakHashMap<Object, Object[]>();
+
+    /// One object per top-level or static function tear-off (keyed by the code that
+    /// makes it), since Dart makes `identical(f, f)` true for those.
+    private static final java.util.Map<String, Object> CANON_TEAR_OFFS = new java.util.HashMap<String, Object>();
+
+    /// {@code made} as the canonical tear-off for {@code key}: the first one made is kept.
+    @SuppressWarnings("unchecked")
+    public static <T> T canonTearOff(String key, T made) {
+        Object c = CANON_TEAR_OFFS.get(key);
+        if (c == null) {
+            CANON_TEAR_OFFS.put(key, made);
+            return made;
+        }
+        return (T) c;
+    }
+
+    /// The tear-off {@code make} builds from {@code recv}, recorded as method {@code name}
+    /// of that receiver so that eq answers Dart's `==` for it (see BoundTearOff).
+    public static <T, F> F boundTearOff(T recv, String name, Funcs.Func1<T, F> make) {
+        F f = make.call(recv);
+        BOUND_TEAR_OFFS.put(f, new Object[] {recv, name});
+        return f;
     }
 
     /**

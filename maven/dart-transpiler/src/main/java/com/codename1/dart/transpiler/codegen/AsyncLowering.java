@@ -766,6 +766,10 @@ final class AsyncLowering {
         if (n instanceof Ident && name.equals(((Ident) n).name)) {
             return true;
         }
+        // `f(1)` calling a local function value names the local as the callee.
+        if (n instanceof Call && ((Call) n).target == null && name.equals(((Call) n).name)) {
+            return true;
+        }
         try {
             for (Field f : nodeFields(n.getClass())) {
                 if (mentions(f.get(n), name)) {

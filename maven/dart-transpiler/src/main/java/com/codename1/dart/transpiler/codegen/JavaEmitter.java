@@ -2754,7 +2754,7 @@ public final class JavaEmitter {
             "dart.collection.ListMixin", "dart.collection.MapMixin", "dart.collection.SetMixin",
             "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase",
             "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.DartEnumComparable", "dart.core.MixinView", "dart.core.Record",
-            "dart.runtime.DynamicObject", "dart.runtime.Reified", "dart.runtime.Signed", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
+            "dart.runtime.BoundTearOff", "dart.runtime.DynamicObject", "dart.runtime.Reified", "dart.runtime.Signed", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
 
     /** The fully qualified dart-runtime class a rendered Java type name refers to, or null. */
     private static String runtimeFqcn(String javaRaw, Ctx ctx) {
@@ -7308,10 +7308,14 @@ public final class JavaEmitter {
                 // held in a scope of its own while the initializer is emitted: such a
                 // parameter is renamed, and the scope is gone before the local is declared.
                 ctx.holdName(v.name);
+                TypeRef condFn = declared == null || declared.is("var") ? conditionalClosureType(v, ctx) : null;
                 try {
-                    init = emitExpr(v.initializer, asyncFn != null ? asyncFn
+                    init = emitExpr(v.initializer, asyncFn != null ? asyncFn : condFn != null ? condFn
                             : declared != null && !declared.is("var") && !plainFunctionClosure(declared, v)
                                     ? declared : null, ctx);
+                    if (condFn != null && init != null && !init.fromError) {
+                        init = new Out(init.code, condFn, init.fn);
+                    }
                 } finally {
                     ctx.releaseName(v.name);
                 }
@@ -9484,6 +9488,66 @@ public final class JavaEmitter {
         if (!(e instanceof Lambda) && out != null && out.fn != null && out.fn.kind == FnKind.METHOD_REF
                 && out.fn.marker == null && !out.fn.doubleCast) {
             out = signTearOff(e, out, expected, ctx);
+            // A bound tear-off only where the value is held as an Object (`Object o = l.add`):
+            // boundTearOff's result type is inferred, and a consumer wanting another SAM
+            // (`where(seen.add)`) then fails inference where the plain reference compiled.
+            out = identifyTearOff(e, out, expected != null && expected.funcParams == null
+                    && (expected.is("Object") || expected.is("Function") || isDynamicType(expected)), ctx);
+        }
+        return out;
+    }
+
+    private static final java.util.regex.Pattern STATIC_TEAR_OFF = java.util.regex.Pattern.compile(
+            "(?:[a-z_$][\\w$]*\\.)*[A-Z][\\w$]*::[\\w$]+");
+    private static final java.util.regex.Pattern BOUND_TEAR_OFF = java.util.regex.Pattern.compile(
+            "\\((.+)\\)::([\\w$]+)");
+
+    /// Gives a signed tear-off Dart's identity. A top-level or static function torn off
+    /// is one object however often it is torn off (`identical(f, f)`), so the value is
+    /// canonicalized by its code, which names the function and the SAM it is held by. An
+    /// instance-method tear-off is a new object each time, but `==` to another tear-off of
+    /// the same method from the same receiver: it is tagged with BoundTearOff and its
+    /// receiver and name are recorded, which DartRuntime.eq compares. Only the shape
+    /// `((Sam) bare)` is rewritten; any other form is left as it is, and then compares by
+    /// identity, as before.
+    /// An operand of `==` or identical(), which take Object: a tear-off still bare (its
+    /// context gave it no type) is bound to its own SAM there, since a method reference
+    /// cannot be an Object, and given its identity.
+    private Out objectOperand(Expr e, Out o, Ctx ctx) {
+        if (o == null || o.fn == null || o.fn.kind != FnKind.METHOD_REF || !o.code.equals(o.fn.bare)
+                || o.type == null || o.type.funcParams == null || o.type.funcReturn == null
+                || functionSamProbe(o.type, ctx) == null) {
+            return o;
+        }
+        return identifyTearOff(e, samCastOut(functionSam(o.type, ctx), o.fn, o.type), true, ctx);
+    }
+
+    private Out identifyTearOff(Expr e, Out out, boolean bound, Ctx ctx) {
+        if (out == null || out.fn == null || out.fromError || out.code.indexOf('"') >= 0) {
+            return out;
+        }
+        String bare = out.fn.bare;
+        if (bare == null || !out.code.startsWith("((") || !out.code.endsWith(") " + bare + ")")) {
+            return out;
+        }
+        String cast = out.code.substring(2, out.code.length() - bare.length() - 3);
+        if (cast.indexOf("->") >= 0) {
+            return out;
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        if (STATIC_TEAR_OFF.matcher(bare).matches()) {
+            String q = bare.substring(0, bare.indexOf("::"));
+            if (ctx.lookup(q) != null) {
+                return out;
+            }
+            return new Out("DartRuntime.canonTearOff(\"" + out.code + "\", " + out.code + ")", out.type, out.fn);
+        }
+        java.util.regex.Matcher m = BOUND_TEAR_OFF.matcher(bare);
+        if (bound && e instanceof PropertyGet && m.matches() && !"this".equals(m.group(1)) && !"super".equals(m.group(1))) {
+            String r = ctx.newTemp();
+            return new Out("DartRuntime.boundTearOff(" + m.group(1) + ", \"" + m.group(2) + "\", " + r
+                    + " -> ((" + cast + " & dart.runtime.BoundTearOff) (" + r + ")::" + m.group(2) + "))",
+                    out.type, out.fn);
         }
         return out;
     }
@@ -18223,7 +18287,23 @@ public final class JavaEmitter {
         if ((tt.is("List") || tt.is("Set")) && COLLECTION_TEAR_OFFS.contains(name)
                 || tt.is("Map") && (name.equals("containsKey") || name.equals("containsValue")
                         || name.equals("remove"))) {
-            return new Out("(" + target.code + ")::" + name, new TypeRef("Function"), FnForm.methodRef("(" + target.code + ")::" + name));
+            // Typed as Dart declares the member, so an Object slot (`Object o = l.add`,
+            // `l.add == l.add`) binds it to that SAM rather than to no interface at all.
+            TypeRef ft = new TypeRef("Function");
+            TypeRef elem = tt.args.isEmpty() ? TypeRef.DYNAMIC : tt.arg(0);
+            ft.funcParams = new ArrayList<TypeRef>();
+            if (tt.is("Map")) {
+                ft.funcParams.add(TypeRef.DYNAMIC);
+                ft.funcReturn = name.equals("remove") ? (tt.args.size() > 1 ? tt.arg(1) : TypeRef.DYNAMIC) : TypeRef.BOOL;
+            } else if (name.equals("add") || name.equals("addAll")) {
+                ft.funcParams.add(name.equals("add") ? elem : TypeRef.of("Iterable", elem));
+                // Set.add answers whether the element was new; List.add and addAll are void.
+                ft.funcReturn = tt.is("Set") && name.equals("add") ? TypeRef.BOOL : new TypeRef("void");
+            } else {
+                ft.funcParams.add(TypeRef.DYNAMIC);
+                ft.funcReturn = TypeRef.BOOL;
+            }
+            return new Out("(" + target.code + ")::" + name, ft, FnForm.methodRef("(" + target.code + ")::" + name));
         }
         TypeRef coreUp = programClass(tt.name, ctx) != null
                 ? coreAncestor(programClass(tt.name, ctx), new HashSet<ClassDecl>()) : null;
@@ -20051,6 +20131,8 @@ public final class JavaEmitter {
             if (r.type != null && isClassRef(r.type)) {
                 r = new Out(classLiteral(r, ctx), new TypeRef("Type"));
             }
+            l = objectOperand(b.left, l, ctx);
+            r = objectOperand(b.right, r, ctx);
             String eq = "DartRuntime.eq(" + l.code + ", " + boxIfPrimitive(r, ctx) + ")";
             return new Out(b.op.equals("==") ? eq : "!" + eq, TypeRef.BOOL);
         }
@@ -22775,6 +22857,54 @@ public final class JavaEmitter {
         return ret == null || ret.is("Null") || ret.is("var") || ret.is("void") ? TypeRef.DYNAMIC : ret;
     }
 
+    /// `var f = c ? (int x) => 'p$x' : (int x) => 'n$x';`: a conditional choosing between two
+    /// closures of one arity is typed by them, so both branches are emitted
+    /// against that SAM -- a Java conditional of lambdas has no type of its own, and
+    /// `Object f = (c ? a : b)` does not compile. Null for any other initializer.
+    /// Parameters are typed as both closures declare them (dynamic where they differ).
+    private TypeRef conditionalClosureType(VarDeclStmt v, Ctx ctx) {
+        Expr init = v.initializer;
+        while (init instanceof ParenExpr) {
+            init = ((ParenExpr) init).inner;
+        }
+        if (!(init instanceof Conditional)) {
+            return null;
+        }
+        Expr a = ((Conditional) init).thenExpr;
+        Expr b = ((Conditional) init).elseExpr;
+        while (a instanceof ParenExpr) {
+            a = ((ParenExpr) a).inner;
+        }
+        while (b instanceof ParenExpr) {
+            b = ((ParenExpr) b).inner;
+        }
+        if (!(a instanceof Lambda) || !(b instanceof Lambda) || ((Lambda) a).isAsync || ((Lambda) b).isAsync
+                || ((Lambda) a).isSyncStar || ((Lambda) b).isSyncStar || ((Lambda) a).isAsyncStar || ((Lambda) b).isAsyncStar
+                || ((Lambda) a).params.size() != ((Lambda) b).params.size()
+                || !((Lambda) a).typeParams.isEmpty() || !((Lambda) b).typeParams.isEmpty()) {
+            return null;
+        }
+        for (int i = 0; i < ((Lambda) a).params.size(); i++) {
+            Param pa = ((Lambda) a).params.get(i);
+            Param pb = ((Lambda) b).params.get(i);
+            if (pa.named || pb.named || pa.optional || pb.optional) {
+                return null;
+            }
+        }
+        TypeRef t = new TypeRef("Function");
+        t.funcParams = new ArrayList<TypeRef>();
+        for (int i = 0; i < ((Lambda) a).params.size(); i++) {
+            TypeRef x = ((Lambda) a).params.get(i).type;
+            TypeRef y = ((Lambda) b).params.get(i).type;
+            t.funcParams.add(x != null && y != null && !x.is("var") && x.toString().equals(y.toString())
+                    ? x : TypeRef.DYNAMIC);
+        }
+        // The result is dynamic: a closure's own result type is known only once its body is
+        // emitted, and both bodies must be emitted against the one SAM chosen here.
+        t.funcReturn = TypeRef.DYNAMIC;
+        return t;
+    }
+
     private TypeRef inferredClosureType(Lambda l, String name, Ctx ctx) {
         TypeRef fn = new TypeRef("Function");
         fn.funcParams = new ArrayList<TypeRef>();
@@ -23498,8 +23628,8 @@ public final class JavaEmitter {
         // dart:core identical(a, b): unresolved before, so any use failed the build.
         if (n.equals("identical") && c.args.positional.size() == 2 && !program.functions.containsKey(n)) {
             ctx.importClass("dart.runtime.DartRuntime");
-            Out a = emitExpr(c.args.positional.get(0), null, ctx);
-            Out b = emitExpr(c.args.positional.get(1), null, ctx);
+            Out a = objectOperand(c.args.positional.get(0), emitExpr(c.args.positional.get(0), null, ctx), ctx);
+            Out b = objectOperand(c.args.positional.get(1), emitExpr(c.args.positional.get(1), null, ctx), ctx);
             // Object parameters: a primitive long/double/bool argument autoboxes.
             return new Out("DartRuntime.identical(" + a.code + ", " + b.code + ")", TypeRef.BOOL);
         }
