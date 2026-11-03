@@ -444,7 +444,7 @@ public final class CoreExt {
 
     public static long remainder(long v, long other) {
         if (other == 0) {
-            throw new UnsupportedError("Result of truncating division is Infinity: " + v + " ~/ 0");
+            throw new IntegerDivisionByZeroException();
         }
         return v % other;
     }

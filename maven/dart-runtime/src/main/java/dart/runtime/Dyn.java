@@ -824,7 +824,7 @@ public final class Dyn {
                 if (!dbl && !(o instanceof Double || o instanceof Float)) {
                     long r = o.longValue();
                     if (r == 0) {
-                        throw new dart.core.UnsupportedError("IntegerDivisionByZeroException");
+                        throw new dart.core.IntegerDivisionByZeroException();
                     }
                     return Long.valueOf(n.longValue() % r);
                 }
@@ -833,10 +833,15 @@ public final class Dyn {
             case "clamp": {
                 Number lo = num(arg(a, 0));
                 Number hi = num(arg(a, 1));
-                if (d < lo.doubleValue()) {
+                // num.clamp: ordered by compareTo (NaN greatest), and the operand that wins
+                // is answered as it is -- 1.5.clamp(2, 3) is the int 2.
+                if (Double.compare(lo.doubleValue(), hi.doubleValue()) > 0) {
+                    throw new dart.core.ArgumentError(DartRuntime.str(lo));
+                }
+                if (Double.compare(d, lo.doubleValue()) < 0) {
                     return lo;
                 }
-                return d > hi.doubleValue() ? hi : n;
+                return Double.compare(d, hi.doubleValue()) > 0 ? hi : n;
             }
             case "toString":
                 return DartRuntime.str(n);

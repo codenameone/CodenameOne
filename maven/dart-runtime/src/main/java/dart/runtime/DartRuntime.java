@@ -813,8 +813,8 @@ public final class DartRuntime {
      * than left to the JVM: ParparVM answers 0 for an integer division or remainder by
      * zero instead of throwing, so the device would have printed 0 where Dart throws.
      */
-    private static dart.core.UnsupportedError integerDivisionByZero() {
-        return new dart.core.UnsupportedError("IntegerDivisionByZeroException");
+    private static dart.core.IntegerDivisionByZeroException integerDivisionByZero() {
+        return new dart.core.IntegerDivisionByZeroException();
     }
 
     /**

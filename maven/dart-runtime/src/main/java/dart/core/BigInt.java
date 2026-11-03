@@ -410,7 +410,7 @@ public final class BigInt implements Comparable<BigInt> {
 
     private int[][] divRem(BigInt o) {
         if (o.signum == 0) {
-            throw new UnsupportedError("Division by zero");
+            throw new IntegerDivisionByZeroException();
         }
         return divMag(mag, o.mag);
     }

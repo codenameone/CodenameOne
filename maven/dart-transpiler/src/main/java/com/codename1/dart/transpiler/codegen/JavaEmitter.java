@@ -19707,6 +19707,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         CORE_ERRORS.put("ArgumentError", "dart.core.ArgumentError");
         CORE_ERRORS.put("FormatException", "dart.core.FormatException");
         CORE_ERRORS.put("UnsupportedError", "dart.core.UnsupportedError");
+        CORE_ERRORS.put("IntegerDivisionByZeroException", "dart.core.IntegerDivisionByZeroException");
         CORE_ERRORS.put("UnimplementedError", "dart.core.UnimplementedError");
         CORE_ERRORS.put("RangeError", "dart.core.RangeError");
         CORE_ERRORS.put("IndexError", "dart.core.IndexError");
@@ -23556,6 +23557,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// double parameter stands for Dart's num here (clamp, the arithmetic members), so the
     /// check is against num and the intrinsic's own conversion makes it a double. Callbacks
     /// are left alone: the intrinsics adapt a dynamic function value themselves.
+    /// True when a statically known type is exactly the non-null core [kind] (int or double).
+    private static boolean isNonNullKind(TypeRef t, String kind) {
+        return t != null && t.is(kind) && !t.nullable;
+    }
+
+    /// Dart's num.clamp on a boxed receiver: dispatched on the values, so the operand that
+    /// wins comes back as it is, a Long or a Double.
+    private Out numClamp(String boxedTarget, Out lo, Out hi, Ctx ctx) {
+        return new Out("((Number) dart.runtime.Dyn.call(" + boxedTarget + ", \"clamp\", new Object[] {"
+                + boxIfPrimitive(lo, ctx) + ", " + boxIfPrimitive(hi, ctx) + "}))", new TypeRef("num"));
+    }
+
     private Out coreArg(Expr a, TypeRef param, Ctx ctx) {
         if (param != null && !(a instanceof Lambda) && !(a instanceof Ast.AsCast)
                 && param.funcParams == null && !param.is("Function") && !isDynamicType(param)
@@ -23866,12 +23879,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (n.equals("abs")) {
                 return new Out("Math.abs(" + target.code + ")", TypeRef.INT);
             }
-            if (n.equals("clamp")) {
+            if (n.equals("clamp") && pos.size() == 2) {
                 // ArgumentError for lower > upper, as Dart; nested min/max answered a value.
                 ctx.importClass("dart.runtime.DartRuntime");
-                String lo = coreArg(pos.get(0), TypeRef.INT, ctx).code;
-                String hi = coreArg(pos.get(1), TypeRef.INT, ctx).code;
-                return new Out("DartRuntime.clamp(" + target.code + ", " + lo + ", " + hi + ")", TypeRef.INT);
+                Out lo = coreArg(pos.get(0), new TypeRef("num"), ctx);
+                Out hi = coreArg(pos.get(1), new TypeRef("num"), ctx);
+                if (!isNonNullKind(lo.type, "int") || !isNonNullKind(hi.type, "int")) {
+                    // Dart's int.clamp is int only for int bounds; otherwise it is num.clamp,
+                    // answering whichever operand wins unchanged in kind (5.clamp(0.0, 10) is
+                    // the int 5, 5.clamp(0, 2.5) the double 2.5).
+                    return numClamp(boxIfPrimitive(target, ctx), lo, hi, ctx);
+                }
+                return new Out("DartRuntime.clamp(" + target.code + ", " + lo.code + ", " + hi.code + ")",
+                        TypeRef.INT);
             }
         }
         if (tt.is("num") && (n.equals("abs") && pos.isEmpty() || n.equals("remainder") && pos.size() == 1
@@ -23941,11 +23961,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (n.equals("abs")) {
                 return new Out("Math.abs(" + target.code + ")", TypeRef.DOUBLE);
             }
-            if (n.equals("clamp")) {
-                String lo = coreArg(pos.get(0), TypeRef.DOUBLE, ctx).code;
-                String hi = coreArg(pos.get(1), TypeRef.DOUBLE, ctx).code;
-                return new Out("DartRuntime.clamp(((double) " + paren(target.code) + "), " + lo + ", "
-                        + hi + ")", TypeRef.DOUBLE);
+            if (n.equals("clamp") && pos.size() == 2) {
+                Out lo = coreArg(pos.get(0), new TypeRef("num"), ctx);
+                Out hi = coreArg(pos.get(1), new TypeRef("num"), ctx);
+                if (!isNonNullKind(lo.type, "double") || !isNonNullKind(hi.type, "double")) {
+                    // num.clamp with an int bound: 1.5.clamp(2, 3) is the int 2, as in Dart.
+                    return numClamp("Double.valueOf(" + target.code + ")", lo, hi, ctx);
+                }
+                return new Out("DartRuntime.clamp(((double) " + paren(target.code) + "), " + lo.code + ", "
+                        + hi.code + ")", TypeRef.DOUBLE);
             }
         }
         if (tt.is("List") || tt.is("Iterable") || tt.is("Set")) {
