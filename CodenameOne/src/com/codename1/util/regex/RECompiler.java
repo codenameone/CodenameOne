@@ -1131,6 +1131,13 @@ public class RECompiler {
                 paren = 2;
                 idx += 3;
                 ret = node(RE.OP_OPEN_CLUSTER, 0);
+            } else if (idx + 2 < len && pattern.charAt(idx + 1) == '?'
+                    && (pattern.charAt(idx + 2) == '=' || pattern.charAt(idx + 2) == '!')) {
+                // (?=...) and (?!...): lookahead; the opdata is patched below to the
+                // offset of the matching OP_LOOKEND.
+                paren = pattern.charAt(idx + 2) == '=' ? 3 : 4;
+                idx += 3;
+                ret = node(paren == 3 ? RE.OP_LOOKAHEAD : RE.OP_NEGLOOKAHEAD, 0);
             } else {
                 paren = 1;
                 idx++;
@@ -1171,6 +1178,9 @@ public class RECompiler {
             }
             if (paren == 1) {
                 end = node(RE.OP_CLOSE, closeParens);
+            } else if (paren > 2) {
+                end = node(RE.OP_LOOKEND, 0);
+                instruction[ret + RE.offsetOpdata] = (char) (end - ret);
             } else {
                 end = node(RE.OP_CLOSE_CLUSTER, 0);
             }

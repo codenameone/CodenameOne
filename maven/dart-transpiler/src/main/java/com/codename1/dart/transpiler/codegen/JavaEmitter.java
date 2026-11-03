@@ -21888,6 +21888,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out("dart.runtime.Dyn.apply(" + boxIfPrimitive(f, ctx) + ", " + argList + ", "
                         + namedMap + ")", TypeRef.DYNAMIC);
             }
+            if (isRuntimeQueueName(cls, false) && !stubs.isStubClass(cls)
+                    && (n.equals("of") || n.equals("from"))) {
+                // `Queue.of(xs)`, `ListQueue<int>.from(xs)`: List's factory, marked a queue.
+                Out q = emitCoreStaticCall("List", c, ctx);
+                if (q != null) {
+                    return asQueue(q);
+                }
+            }
             Out coreStatic = emitCoreStaticCall(cls, c, ctx);
             if (coreStatic != null) {
                 return coreStatic;
@@ -24153,6 +24161,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// @param runtime the name came through a {@code dart:} import prefix, so a program
     ///                class of the same name is not the one meant
     private Out emitCollectionClassCtor(Call c, String n, boolean runtime, Ctx ctx) {
+        Out o = emitCollectionClassCtorImpl(c, n, runtime, ctx);
+        return o != null && isRuntimeQueueName(n, runtime) ? asQueue(o) : o;
+    }
+
+    /// dart:collection's Queue classes are a List here (AstBuilder.collectionAlias), marked
+    /// so they print as Dart's queues do, `{0, 1, 2}`, rather than as a list.
+    private boolean isRuntimeQueueName(String n, boolean runtime) {
+        return (n.equals("Queue") || n.equals("ListQueue") || n.equals("DoubleLinkedQueue"))
+                && (runtime || !program.classes.containsKey(n));
+    }
+
+    private static Out asQueue(Out o) {
+        return new Out("dart.core.DartList.asQueue(" + o.code + ")", o.type);
+    }
+
+    private Out emitCollectionClassCtorImpl(Call c, String n, boolean runtime, Ctx ctx) {
         String alias = com.codename1.dart.transpiler.parser.AstBuilder.collectionAlias(n);
         if (alias.equals(n) || (!runtime && program.classes.containsKey(n)) || stubs.isStubClass(n)) {
             return null;
@@ -24259,7 +24283,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /** dart:core type names that only ever appear as the receiver of a static member here. */
     private static final java.util.Set<String> CORE_STATIC_RECEIVERS = new java.util.HashSet<String>(
             java.util.Arrays.asList("List", "Map", "Set", "String", "bool", "int", "double", "num",
-                    "RangeError", "ArgumentError", "IndexError"));
+                    "RangeError", "ArgumentError", "IndexError",
+                    // dart:collection's queues, for `Queue.of(xs)` (see isRuntimeQueueName)
+                    "Queue", "ListQueue", "DoubleLinkedQueue"));
 
     private String posArg(Call c, int i, TypeRef t, Ctx ctx) {
         return i < c.args.positional.size() ? emitExpr(c.args.positional.get(i), t, ctx).code : "null";

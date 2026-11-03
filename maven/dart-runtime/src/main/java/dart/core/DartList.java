@@ -672,7 +672,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
     public E removeLast() {
         checkGrowable("removeLast");
         if (size() == 0) {
-            throw new RangeError("RangeError (index): Invalid value: Valid value range is empty: -1");
+            throw RangeError.range(-1, Long.valueOf(0), Long.valueOf(-1), "index", null);
         }
         return remove(size() - 1);
     }
@@ -1208,20 +1208,33 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         return s;
     }
 
+    /// Set on a list that stands for a dart:collection Queue (ListQueue,
+    /// DoubleLinkedQueue), which Dart prints as an iterable, {@code {0, 1, 2}}.
+    private boolean queue;
+
+    /// Marks {@code l} as a Queue for toString; the transpiler wraps each Queue it
+    /// constructs in this.
+    public static <L extends java.util.List<?>> L asQueue(L l) {
+        if (l instanceof DartList) {
+            ((DartList<?>) l).queue = true;
+        }
+        return l;
+    }
+
     @Override
     public String toString() {
         if (!DartRuntime.beginFormat(this)) {
-            return "[...]";
+            return queue ? "{...}" : "[...]";
         }
         try {
-            StringBuilder sb = new StringBuilder("[");
+            StringBuilder sb = new StringBuilder(queue ? "{" : "[");
             for (int i = 0; i < size(); i++) {
                 if (i > 0) {
                     sb.append(", ");
                 }
                 sb.append(DartRuntime.str(get(i)));
             }
-            return sb.append("]").toString();
+            return sb.append(queue ? "}" : "]").toString();
         } finally {
             DartRuntime.endFormat(this);
         }

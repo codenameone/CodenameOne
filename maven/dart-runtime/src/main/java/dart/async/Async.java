@@ -56,6 +56,13 @@ public final class Async {
     /// Runs every queued microtask now, on the calling thread: what the end of main()
     /// is to Dart. FlutterRegistry calls it after main, and so do the headless runners
     /// and tests. Off the EDT of a live Display it does nothing (the EDT drains).
+    /// Runs what is queued for the isolate's thread now -- microtasks and any timer that
+    /// has already fired -- without waiting for pending timers, as one turn of Dart's
+    /// event loop does. {@link #runMicrotasks()} instead runs until nothing is pending.
+    public static void drainMicrotasks() {
+        Microtasks.drain();
+    }
+
     public static void runMicrotasks() {
         Microtasks.runUntilIdle();
     }

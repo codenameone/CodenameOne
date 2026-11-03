@@ -34,7 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// A future completed WITH another future waits for it and adopts its outcome,
-/// the way Dart's FutureOr completion does.
+/// the way Dart's FutureOr completion does. A callback registered on a future that has
+/// already completed runs from the microtask queue, as in Dart, so each check drains it
+/// first.
 public class FutureAdoptionTest {
 
     @Test
@@ -47,9 +49,12 @@ public class FutureAdoptionTest {
             }
         });
         // Still waiting: the value is not the inner Future object.
+        Async.runMicrotasks();
         assertFalse(chained.isDone(), "the chain must wait for the returned future");
         inner.complete("fetched");
+        Async.runMicrotasks();
         assertTrue(chained.isDone());
+        Async.runMicrotasks();
         assertEquals("fetched", chained.valueOrThrow());
     }
 
@@ -63,6 +68,7 @@ public class FutureAdoptionTest {
             }
         });
         inner.completeError(new IllegalStateException("fetch failed"));
+        Async.runMicrotasks();
         RuntimeException thrown = assertThrows(RuntimeException.class, chained::valueOrThrow);
         assertEquals("fetch failed", thrown.getMessage());
     }
@@ -77,6 +83,7 @@ public class FutureAdoptionTest {
                 return Future.value((Object) "recovered");
             }
         });
+        Async.runMicrotasks();
         assertEquals("recovered", recovered.valueOrThrow());
     }
 
@@ -84,6 +91,7 @@ public class FutureAdoptionTest {
     public void completingTwiceWhileAdoptingIsRefused() {
         Completer<Object> c = new Completer<Object>();
         c.complete(new Completer<Object>().future());
+        Async.runMicrotasks();
         assertThrows(dart.core.StateError.class, () -> c.complete("again"));
     }
 
@@ -91,13 +99,16 @@ public class FutureAdoptionTest {
     public void aFutureCompletedWithItselfFailsInsteadOfHanging() {
         Future<Object> f = new Future<Object>();
         f.complete(f);
+        Async.runMicrotasks();
         assertTrue(f.isDone());
+        Async.runMicrotasks();
         assertThrows(RuntimeException.class, f::valueOrThrow);
     }
 
     @Test
     public void plainValuesAreUnchanged() {
         Future<Object> f = Future.value((Object) "v");
+        Async.runMicrotasks();
         assertSame("v", f.getNow());
     }
 
@@ -112,8 +123,11 @@ public class FutureAdoptionTest {
                 ran[0] = true;
             }
         });
+        Async.runMicrotasks();
         assertTrue(ran[0]);
+        Async.runMicrotasks();
         assertTrue(recovered.isDone());
+        Async.runMicrotasks();
         assertEquals(null, recovered.valueOrThrow(), "recovered with null, not rethrown");
     }
 
@@ -127,6 +141,7 @@ public class FutureAdoptionTest {
                 throw new IllegalArgumentException("handler failed");
             }
         });
+        Async.runMicrotasks();
         RuntimeException thrown = assertThrows(RuntimeException.class, chained::valueOrThrow);
         assertEquals("handler failed", thrown.getMessage());
     }
@@ -134,17 +149,20 @@ public class FutureAdoptionTest {
     @Test
     public void whenCompleteCarriesTheOutcomeUnlessTheActionThrows() {
         Future<Object> ok = Future.value((Object) "v");
-        assertEquals("v", ok.whenComplete(new Funcs.VoidFunc0() {
+        Future<Object> carried = ok.whenComplete(new Funcs.VoidFunc0() {
             @Override
             public void call() {
             }
-        }).valueOrThrow());
+        });
+        Async.runMicrotasks();
+        assertEquals("v", carried.valueOrThrow());
         Future<Object> cleanupFailed = ok.whenComplete(new Funcs.VoidFunc0() {
             @Override
             public void call() {
                 throw new IllegalStateException("cleanup failed");
             }
         });
+        Async.runMicrotasks();
         RuntimeException thrown = assertThrows(RuntimeException.class, cleanupFailed::valueOrThrow);
         assertEquals("cleanup failed", thrown.getMessage());
     }
@@ -165,7 +183,9 @@ public class FutureAdoptionTest {
             Async.runMicrotasks();
             Thread.sleep(5);
         }
+        Async.runMicrotasks();
         assertTrue(f.isDone(), "a negative delay must not leave the future pending forever");
+        Async.runMicrotasks();
         assertEquals("done", f.valueOrThrow());
     }
 
@@ -185,7 +205,9 @@ public class FutureAdoptionTest {
                 return e instanceof IllegalArgumentException;
             }
         });
+        Async.runMicrotasks();
         assertFalse(ran[0], "the handler must not run for an error its test rejects");
+        Async.runMicrotasks();
         RuntimeException thrown = assertThrows(RuntimeException.class, chained::valueOrThrow);
         assertEquals("unrelated", thrown.getMessage());
     }
@@ -205,6 +227,7 @@ public class FutureAdoptionTest {
                 return e instanceof IllegalArgumentException;
             }
         });
+        Async.runMicrotasks();
         assertEquals("recovered", chained.valueOrThrow());
     }
 
@@ -222,13 +245,18 @@ public class FutureAdoptionTest {
         inputs.add(a.future());
         inputs.add(b.future());
         Future<dart.core.DartList<Object>> all = Future.wait(inputs);
+        Async.runMicrotasks();
         assertFalse(all.isDone(), "wait must hand back a future, not block on its inputs");
         b.complete("second");
+        Async.runMicrotasks();
         assertFalse(all.isDone());
         a.complete("first");
         dart.core.DartList<Object> values = all.valueOrThrow();
+        Async.runMicrotasks();
         assertEquals(2, values.size());
+        Async.runMicrotasks();
         assertEquals("first", values.get(0), "values keep input order, not completion order");
+        Async.runMicrotasks();
         assertEquals("second", values.get(1));
     }
 
@@ -253,14 +281,18 @@ public class FutureAdoptionTest {
         });
         final IllegalStateException boom = new IllegalStateException("boom");
         bad.completeError(boom);
+        Async.runMicrotasks();
         assertFalse(handled.isDone(), "Dart's default waits for every input before reporting the error");
         ok.complete("fine");
+        Async.runMicrotasks();
         assertEquals("handled", handled.valueOrThrow());
+        Async.runMicrotasks();
         assertSame(boom, caught[0]);
     }
 
     @Test
     public void waitOnNothingCompletesWithAnEmptyList() {
+        Async.runMicrotasks();
         assertEquals(0, Future.wait(new java.util.ArrayList<Future<?>>()).valueOrThrow().size());
     }
 
@@ -271,9 +303,12 @@ public class FutureAdoptionTest {
         Completer<Object> c = new Completer<Object>();
         Completer<Object> inner = new Completer<Object>();
         c.complete(inner.future());
+        Async.runMicrotasks();
         assertTrue(c.isCompleted(), "complete(pendingFuture) has been called, so it is completed");
+        Async.runMicrotasks();
         assertThrows(dart.core.StateError.class, () -> c.complete("again"));
         inner.complete("v");
+        Async.runMicrotasks();
         assertEquals("v", c.future().valueOrThrow());
     }
 
@@ -308,6 +343,7 @@ public class FutureAdoptionTest {
                 return "handled";
             }
         });
+        Async.runMicrotasks();
         assertEquals("handled", handled.valueOrThrow());
 
         final IllegalArgumentException fromOnValue = new IllegalArgumentException("onValue");
@@ -322,6 +358,7 @@ public class FutureAdoptionTest {
                 return "not me";
             }
         });
+        Async.runMicrotasks();
         assertSame(fromOnValue, assertThrows(IllegalArgumentException.class, escaped::valueOrThrow));
     }
 
@@ -334,9 +371,12 @@ public class FutureAdoptionTest {
                 return cleanup.future();
             }
         });
+        Async.runMicrotasks();
         assertFalse(done.isDone(), "the outcome waits for the cleanup");
         cleanup.complete(null);
+        Async.runMicrotasks();
         assertTrue(done.isDone());
+        Async.runMicrotasks();
         assertEquals("result", done.valueOrThrow());
     }
 
@@ -350,6 +390,7 @@ public class FutureAdoptionTest {
             }
         });
         cleanup.completeError(new IllegalStateException("cleanup failed"));
+        Async.runMicrotasks();
         RuntimeException thrown = assertThrows(RuntimeException.class, done::valueOrThrow);
         assertEquals("cleanup failed", thrown.getMessage());
     }
@@ -368,7 +409,9 @@ public class FutureAdoptionTest {
                 throw new IllegalArgumentException("predicate");
             }
         });
+        Async.runMicrotasks();
         assertTrue(handled.isDone(), "the returned future completes");
+        Async.runMicrotasks();
         RuntimeException thrown = assertThrows(RuntimeException.class, handled::valueOrThrow);
         assertEquals("predicate", thrown.getMessage());
     }

@@ -838,33 +838,10 @@ public class Future<T> {
         }
     }
 
-    /**
-     * Runs {@code r} when this future settles -- AT ONCE, on the calling thread, when it
-     * already has. {@link #runAll} likewise runs the listeners inline on the completing
-     * thread.
-     *
-     * <p>This is a KNOWN, DELIBERATE divergence from Dart, which queues every
-     * then/catchError/whenComplete callback on the microtask queue: there,
-     * {@code Future.value(1).then((_) => events.add('future')); events.add('sync');}
-     * records sync first; here it records future first. The behavior case
-     * {@code dart_review_round24} pins the current order so a change to it is a
-     * decision, not an accident.</p>
-     *
-     * <p>Why not a microtask queue: it is only correct together with the await it would
-     * have to interleave with, and await is not a continuation here. This runtime is the
-     * blocking-await model (see the class comment and {@link Await}): an async body runs
-     * to completion inside the call, and {@code await} parks the frame in invokeAndBlock
-     * rather than returning to an event loop. Deferring callbacks alone would make them
-     * run AFTER await continuations that Dart runs after them, so ordering would merely be
-     * wrong differently; and every blocking await, plus the end of a headless main, would
-     * have to drain the queue re-entrantly from inside the parked frame, while a headless
-     * program (tests, plain JVM) has no event loop to drain it at all -- a then() at the
-     * end of main would never run. It would also move every completion in the Flutter
-     * frame pipeline (FutureBuilder, route results, image and localization loads) one
-     * serial call later on device, which nothing here can verify headlessly. Dart's
-     * ordering arrives with a continuation-passing lowering of await, which replaces
-     * this model rather than patching it.</p>
-     */
+    /// Registers a completion listener. As in Dart, a listener added to a future that has
+    /// already completed does not run inside the call: it is queued on the microtask queue,
+    /// so {@code Future.value(1).then(f); print('sync');} prints sync first. A listener
+    /// added before completion runs when the future settles.
     void onComplete(Runnable r) {
         // A listener runs in the zone it was registered in, not the one that
         // happens to complete the future.
@@ -882,8 +859,20 @@ public class Future<T> {
             }
         }
         if (immediate) {
-            r.run();
+            Microtasks.schedule(r);
         }
+    }
+
+    /// The future an {@code await v} waits on: v itself when it is a Future, else a
+    /// future already completed with v ({@code await 42}, {@code await null}).
+    @SuppressWarnings("unchecked")
+    public static Future<Object> awaitable(Object v) {
+        if (v instanceof Future) {
+            return (Future<Object>) v;
+        }
+        Future<Object> f = new Future<Object>();
+        f.settle(v);
+        return f;
     }
 
     /// Completes with {@code v}, or -- when {@code v} is itself a Future --

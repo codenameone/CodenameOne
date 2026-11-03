@@ -121,7 +121,7 @@ public class RangeError extends ArgumentError {
      */
     public static long checkValidIndex(long index, long length) {
         if (index < 0 || index >= length) {
-            throw new RangeError("RangeError (index): Invalid value: Not in inclusive range 0.." + (length - 1) + ": " + index);
+            throw range(index, Long.valueOf(0), Long.valueOf(length - 1), "index", null);
         }
         return index;
     }
@@ -154,7 +154,7 @@ public class RangeError extends ArgumentError {
     }
 
     public static void indexError(long index, long length) {
-        throw new RangeError("RangeError (index): Invalid value: Not in inclusive range 0.." + (length - 1) + ": " + index);
+        throw range(index, Long.valueOf(0), Long.valueOf(length - 1), "index", null);
     }
 
     public static long checkValueInInterval(long value, long minValue, long maxValue, String name) {
@@ -168,16 +168,14 @@ public class RangeError extends ArgumentError {
     /// and, when given, `start <= end <= length`. Answers the effective end.
     public static long checkValidRange(long start, Long end, long length) {
         if (start < 0 || start > length) {
-            throw new RangeError("RangeError (start): Invalid value: Not in inclusive range 0.."
-                    + length + ": " + start);
+            throw range(start, Long.valueOf(0), Long.valueOf(length), "start", null);
         }
         if (end == null) {
             return length;
         }
         long e = end.longValue();
         if (e < start || e > length) {
-            throw new RangeError("RangeError (end): Invalid value: Not in inclusive range "
-                    + start + ".." + length + ": " + e);
+            throw range(e, Long.valueOf(start), Long.valueOf(length), "end", null);
         }
         return e;
     }
