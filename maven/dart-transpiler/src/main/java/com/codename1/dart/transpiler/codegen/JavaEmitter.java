@@ -9442,6 +9442,19 @@ public final class JavaEmitter {
             return new FnForm(FnKind.LAMBDA, code, null, null, false, false);
         }
 
+        /// This tear-off as the value valueTearOff built.
+        FnForm asValue() {
+            FnForm f = new FnForm(kind, bare, sam, marker, signedCall, doubleCast, runTime);
+            f.isValue = true;
+            return f;
+        }
+
+        /// Set on the form of a bound tear-off valueTearOff already built: an object that
+        /// is its SAM and marker, so recastSigned casts it rather than binding {@code bare}
+        /// afresh, which would drop its equality. Overload choice still sees the method
+        /// reference ({@code kind}), which is what it was written from.
+        boolean isValue;
+
         /// This value cast to {@code sam}, intersected with {@code marker} when non-null.
         FnForm castTo(String sam, String marker, boolean doubleCast) {
             return new FnForm(kind, bare, sam, marker, false, doubleCast, runTime);
@@ -9504,6 +9517,19 @@ public final class JavaEmitter {
             // Signed by its marker where it was made (`Object o = c.m`): still a value.
             out = valueTearOff(e, out, expected, ctx);
         }
+        if (!(e instanceof Lambda) && out != null && out.fn != null && out.fn.kind == FnKind.METHOD_REF
+                && out.fn.marker != null && out.fn.doubleCast && out.fn.sam != null && !out.fromError) {
+            // samCast's `(SAM) (SAM & marker) ref` (a typed collection element, say): the
+            // signed value is built from the inner cast, rebuilt from the form rather than
+            // read back from text, and the outer plain cast javac infers from is kept.
+            FnForm f = out.fn;
+            Out inner = new Out("((" + f.sam + " & " + f.marker + ") " + f.bare + ")", out.type,
+                    f.castTo(f.sam, f.marker, false));
+            Out v = valueTearOff(e, inner, expected, ctx);
+            if (v != inner) {
+                out = new Out("((" + f.sam + ") " + v.code + ")", v.type, v.fn);
+            }
+        }
         if (out != null && !out.fromError && out.fn == null && expected != null && expected.funcParams != null
                 && (expected.funcTypeParams == null || expected.funcTypeParams.isEmpty()) && out.type != null
                 && out.type.funcTypeParams != null && !out.type.funcTypeParams.isEmpty()) {
@@ -9533,6 +9559,11 @@ public final class JavaEmitter {
     /// twice, so only a receiver that is a name or a field path is rewritten; any other
     /// stays a method reference and compares by identity.
     private Out valueTearOff(Expr e, Out out, TypeRef expected, Ctx ctx) {
+        Out v = valueTearOffOf(e, out, expected, ctx);
+        return v == out || v == null || v.fn == null ? v : new Out(v.code, v.type, v.fn.asValue());
+    }
+
+    private Out valueTearOffOf(Expr e, Out out, TypeRef expected, Ctx ctx) {
         if (out == null || out.fn == null || out.fromError || out.code.indexOf('"') >= 0
                 || !(e instanceof Ident || e instanceof PropertyGet) || out.fn.bare == null) {
             return out;
@@ -9656,19 +9687,7 @@ public final class JavaEmitter {
                 String samHead = lt < 0 ? samPart : samPart.substring(0, lt);
                 String targs = lt < 0 ? "" : samPart.substring(lt);
                 int n = Integer.parseInt(sf.group(2)) + (sf.group(1) != null ? 0 : 1);
-                String plain = samHead.substring(samHead.lastIndexOf("Funcs."));
-                String[] sam = null;
-                for (String[] cand : signedSams.values()) {
-                    if (cand[3].equals(mm.group(2)) && cand[2].equals(String.valueOf(n))
-                            && cand[1].endsWith(plain) && (cand[1].length() == plain.length()
-                            || cand[1].charAt(cand[1].length() - plain.length() - 1) == '.')) {
-                        sam = cand;
-                    }
-                }
-                if (sam == null) {
-                    sam = new String[] {"S" + signedSams.size(), samHead, String.valueOf(n), mm.group(2)};
-                    signedSams.put(samHead + "|" + n + "|" + mm.group(2), sam);
-                }
+                String[] sam = signedSamFor(samHead, n, mm.group(2));
                 String num = sam[0].substring(1);
                 return letTearOff(letRecv, self, new Out(mm.group(1) + ".b" + num + "(" + head + "(("
                         + mm.group(1) + ".S" + num + targs + ") " + bare + "))", out.type, out.fn), ctx);
@@ -9693,6 +9712,29 @@ public final class JavaEmitter {
         }
         return out;
     }
+
+    /// The signed SAM that is both {@code samHead} (a `Funcs.FuncN`/`VoidFuncN`, {@code n}
+    /// type arguments) and marker {@code marker} (`Mk`), registered on first use.
+    private String[] signedSamFor(String samHead, int n, String marker) {
+        String plain = samHead.substring(samHead.lastIndexOf("Funcs."));
+        String[] sam = null;
+        for (String[] cand : signedSams.values()) {
+            if (cand[3].equals(marker) && cand[2].equals(String.valueOf(n))
+                    && cand[1].endsWith(plain) && (cand[1].length() == plain.length()
+                    || cand[1].charAt(cand[1].length() - plain.length() - 1) == '.')) {
+                sam = cand;
+            }
+        }
+        if (sam == null) {
+            sam = new String[] {"S" + signedSams.size(), samHead, String.valueOf(n), marker};
+            signedSams.put(samHead + "|" + n + "|" + marker, sam);
+        }
+        return sam;
+    }
+
+    /// Set by methodTearOffAdapter for the tearOffAdapter it calls: {receiver code, method
+    /// key}, so the adapter is itself the tear-off's value (equal by receiver and method).
+    private String[] adapterTearOffKey;
 
     private static final java.util.regex.Pattern MARKER_CAST = java.util.regex.Pattern.compile(
             "((?:[\\w$]+\\.)*DartFnSigs)\\.(M\\d+)");
@@ -10460,6 +10502,10 @@ public final class JavaEmitter {
         if (e instanceof SuperExpr) {
             String member = ctx.superMember;
             ctx.superMember = null;
+            if (forcedSuper != null) {
+                // a synthesized forwarder or bridge names the linearization step it calls
+                return forcedSuper;
+            }
             Out viaMixin = superThroughMixin(member, ctx);
             if (viaMixin != null) {
                 return viaMixin;
@@ -12027,6 +12073,12 @@ public final class JavaEmitter {
         FnForm f = o.fn;
         if (f == null || f.marker == null || "Object".equals(type) || "java.lang.Object".equals(type)) {
             return null;
+        }
+        if (f.isValue) {
+            // the value class is the SAM and the marker already; rebinding bare would drop
+            // it. Through Object: the slot may be another instantiation of the same erased
+            // SAM (`void Function(num)` held as `void Function(int)`), as Dart allows.
+            return "(" + type + ") (Object) " + paren(o.code);
         }
         if (isFuncsSamName(type)) {
             return "(" + type + ") (" + type + " & " + f.marker + ") " + paren(f.bare);
@@ -19478,6 +19530,10 @@ public final class JavaEmitter {
         Out lhsOnce = null;
         if (a.lhs instanceof PropertyGet) {
             PropertyGet pg = (PropertyGet) a.lhs;
+            if (pg.target instanceof SuperExpr) {
+                // `super.x = v` resolves along the linearization like a read of `super.x`
+                ctx.superMember = pg.name;
+            }
             Out tgt = emitExpr(pg.target, null, ctx);
             if (tgt.type != null && (stubs.isStubClass(tgt.type.name) || tgt.type.is("State"))) {
                 Ast.MethodDecl setter = stubs.findSetter(tgt.type.name, pg.name);
@@ -21775,7 +21831,18 @@ public final class JavaEmitter {
                     }
                 }
                 mm.exprBody = call;
-                String code = emitMethodLike(mm, ctx, false);
+                String raw = javaClassType(mref, ctx);
+                int lt = raw.indexOf('<');
+                raw = lt > 0 ? raw.substring(0, lt) : raw;
+                // the forwarder calls exactly this mixin's default
+                Out savedSuper = forcedSuper;
+                forcedSuper = new Out(raw + ".super", mref);
+                String code;
+                try {
+                    code = emitMethodLike(mm, ctx, false);
+                } finally {
+                    forcedSuper = savedSuper;
+                }
                 // another pass (two plain mixins declaring one method) may already have copied
                 // the last mixin's body into the class under the same Java signature
                 int hs = code.indexOf("public ");
@@ -21783,20 +21850,7 @@ public final class JavaEmitter {
                 if (he > hs && body.indexOf(code.substring(hs, he)) >= 0) {
                     continue;
                 }
-                String raw = javaClassType(mref, ctx);
-                int lt = raw.indexOf('<');
-                raw = lt > 0 ? raw.substring(0, lt) : raw;
-                // the body was emitted as a plain super access; aim it at the mixin's default
-                int sp = he < 0 ? -1 : code.indexOf("super.", he);
-                if (sp < 0) {
-                    continue;
-                }
-                if (code.startsWith(raw + ".", sp - raw.length() - 1)) {
-                    // the super access already names the mixin (`M.super.$index(i)`)
-                    body.append(code);
-                    continue;
-                }
-                body.append(code, 0, sp).append(raw).append('.').append(code.substring(sp));
+                body.append(code);
             }
         }
     }
@@ -21961,6 +22015,9 @@ public final class JavaEmitter {
                 }
                 ctx.pushScope();
                 ctx.pushWriter(2);
+                // Dart's linearization: the mixin applied before this one is the super, or
+                // the superclass when none is -- never the class's own last mixin
+                forcedSuper = new Out(prev != null ? prev + ".super" : "super", c.superclass);
                 Expr call;
                 boolean setter = e.getKey().startsWith("set$") && e.getValue() == 1;
                 if (e.getValue() < 0) {
@@ -21991,6 +22048,7 @@ public final class JavaEmitter {
                     ExprStmt st = new ExprStmt();
                     st.expr = as;
                     emitStatement(st, ctx);
+                    forcedSuper = null;
                     ctx.writer().line("return " + id.name + ";");
                     String inner = ctx.popWriter();
                     ctx.popScope();
@@ -22019,11 +22077,7 @@ public final class JavaEmitter {
                     call = cl;
                 }
                 Out o = emitExpr(call, null, ctx);
-                int sp = prev == null ? -1 : o.code.indexOf("super.");
-                if (sp >= 0) {
-                    // Dart's linearization: the mixin applied before this one is the super
-                    o = new Out(o.code.substring(0, sp) + prev + "." + o.code.substring(sp), o.type, o.fromError);
-                }
+                forcedSuper = null;
                 if (o.type != null && o.type.is("void")) {
                     ctx.writer().line(o.code + ";");
                     ctx.writer().line("return null;");
@@ -22052,19 +22106,23 @@ public final class JavaEmitter {
             return null;
         }
         if (c.superclass != null) {
-            // `class X extends B with M`: a member M declares and B does not is M's, which
-            // Java reaches as the interface's default method; anything else stays `super`.
-            ClassDecl last = program.classes.get(c.mixins.get(c.mixins.size() - 1).name);
-            String owner = superDeclarer(c, member, 0);
-            ClassDecl od = program.classes.get(owner);
-            // Only where the superclass chain lacks the member: a mixin's own `super.m` in
-            // a forwarder is the mixin-super bridge's, and a member both declare still
-            // resolves to the superclass's here (see the report on `on` mixins).
-            ClassDecl sd = program.classes.get(c.superclass.name);
-            if (od == null || !od.isMixin || last == null || sd == null || classHasMember(sd, member)) {
-                return null;
+            // `class X extends B with M1, M2`: Dart's linearization is B, M1, M2, so the
+            // last mixin declaring the member is the super -- even when B declares it too,
+            // since a mixin's member sits above the superclass's. Java reaches it as that
+            // interface's default method. Forwarders and bridges, which call a specific
+            // step of the linearization, set forcedSuper instead and never get here.
+            for (int i = c.mixins.size() - 1; i >= 0; i--) {
+                ClassDecl mx = program.resolveClass(c.mixins.get(i).name, c.ownerLibrary);
+                if (mx == null) {
+                    // a runtime mixin: leave the access to Java's own resolution
+                    return null;
+                }
+                if (!declaresConcrete(mx, member)) {
+                    continue;
+                }
+                return mx.isMixin ? new Out(javaClassName(mx) + ".super", c.mixins.get(i)) : null;
             }
-            return new Out(javaClassName(od) + ".super", new TypeRef(od.name));
+            return null;
         }
         for (int i = c.mixins.size() - 1; i >= 0; i--) {
             TypeRef mixRef = c.mixins.get(i);
@@ -22091,6 +22149,26 @@ public final class JavaEmitter {
         }
         return null;
     }
+
+    /** Whether mixin {@code mx} itself declares a non-abstract instance member {@code member}. */
+    private static boolean declaresConcrete(ClassDecl mx, String member) {
+        if (mx.field(member) != null) {
+            return true;
+        }
+        for (MethodDecl md : mx.methods) {
+            if (member.equals(md.name) && !md.isStatic && !md.isAbstract) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The receiver every `super` resolves to while a synthesized mixin forwarder or super
+     * bridge is emitted: the exact linearization step it calls ({@code M.super}, or the
+     * superclass's plain {@code super}). Null while ordinary source is emitted.
+     */
+    private Out forcedSuper;
 
     /** Dart identifiers that are Java reserved words; escaped with a trailing underscore. */
     private static final java.util.Set<String> JAVA_KEYWORDS = new java.util.HashSet<String>(java.util.Arrays.asList(
@@ -30631,6 +30709,9 @@ public final class JavaEmitter {
         }
         final List<Param> ordered = orderedParams(md.params);
         final Ctx c = ctx;
+        // a bound tear-off is a value keyed by its receiver and method; a static one
+        // (no receiver) is a constant reference already
+        adapterTearOffKey = recv != null && !md.isStatic ? new String[] {recv, name} : null;
         return tearOffAdapter(md.params, types, retType, names -> {
             Call call = new Call().at(pos.file, pos.line, pos.col);
             call.name = name;
@@ -30814,6 +30895,8 @@ public final class JavaEmitter {
         // this adapter's own, never one built while emitting its body
         boolean nullReturn = adapterNullReturn;
         adapterNullReturn = false;
+        String[] tearKey = adapterTearOffKey;
+        adapterTearOffKey = null;
         List<Param> ordered = new ArrayList<Param>();
         List<TypeRef> otypes = new ArrayList<TypeRef>();
         int required = 0;
@@ -30904,10 +30987,32 @@ public final class JavaEmitter {
         adapterNullReturn = nullReturn;
         String marker = functionTypeTested ? adapterMarker(ordered, otypes, ret, ctx) : null;
         adapterNullReturn = false;
-        String code = "((" + sam + ") (" + raw + (marker != null ? " & " + marker : "") + ") (" + lp + ") -> {\n"
-                + pro + lifted + ind
+        String lambda = "(" + lp + ") -> {\n" + pro + lifted + ind
                 + (isVoid ? statementize(body) + ";" : "return " + body + ";") + "\n"
-                + indentStr(ctx.currentIndent()) + "})";
+                + indentStr(ctx.currentIndent()) + "}";
+        String code = "((" + sam + ") (" + raw + (marker != null ? " & " + marker : "") + ") " + lambda + ")";
+        java.util.regex.Matcher rawSam = FUNCS_SAM.matcher(raw);
+        if (tearKey != null && SIMPLE_RECEIVER.matcher(tearKey[0]).matches() && tearKey[1].matches("[\\w$]+")
+                && rawSam.matches()) {
+            // A bound method's adapter is the tear-off's value (valueTearOff): equal to every
+            // other tear-off of that method from that receiver. Signed, it is the signed SAM's
+            // own value class, so the marker survives on the value.
+            String head = tearKey[0] + ", \"" + tearKey[1] + "\", ";
+            int n = ordered.size() + (rawSam.group(1) != null ? 0 : 1);
+            java.util.regex.Matcher mm = marker != null ? MARKER_CAST.matcher(marker) : null;
+            if (mm != null && mm.matches()) {
+                String[] ss = signedSamFor(raw, n, mm.group(2));
+                String num = ss[0].substring(1);
+                // through Object: bK's type arguments would otherwise be inferred from the
+                // raw lambda, not the slot's SAM
+                code = "((" + sam + ") (Object) " + mm.group(1) + ".b" + num + "(" + head + "(" + mm.group(1) + ".S" + num
+                        + ") " + lambda + "))";
+            } else if (marker == null) {
+                ctx.importClass("dart.runtime.TearOff");
+                code = "((" + sam + ") TearOff." + (rawSam.group(1) != null ? "v" : "f") + rawSam.group(2) + "("
+                        + head + "(" + raw + ") " + lambda + "))";
+            }
+        }
         return new Out(code, ft);
     }
 
