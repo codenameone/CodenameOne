@@ -3159,6 +3159,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-03T01:01:16+00:00"
+      },
+      "devto": {
+        "id": 4971503,
+        "url": "https://dev.to/codenameone/more-of-the-java-api-and-an-experiment-with-unity-games-4ae6",
+        "syndicated_at": "2026-11-03T20:24:06+00:00"
       }
     }
   }
