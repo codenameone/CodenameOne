@@ -60,6 +60,9 @@ public final class TypeWitness {
 
     /// Dart's function subtyping for a function-type witness ({@link #function}), or null.
     private Tester tester;
+    /// A record type's shape: the named fields' names (sorted), null for any other type.
+    private String[] recordNamed;
+    private int recordPositional;
     private TypeWitness[] fnSig;
 
     private TypeWitness(Class<?> type, boolean nullable, TypeWitness[] args) {
@@ -196,6 +199,17 @@ public final class TypeWitness {
         return of(w.type, true, w.args);
     }
 
+    /// A record type, `(int, {String name})`: {@code type} is the generated record class of
+    /// that shape, {@code fields} the field types' witnesses, positional ones first. The
+    /// test is structural -- each field of the value against its type -- as Dart's is.
+    public static TypeWitness record(Class<?> type, boolean nullable, int positional, String[] named,
+            TypeWitness... fields) {
+        TypeWitness w = of(type, nullable, fields);
+        w.recordPositional = positional;
+        w.recordNamed = named;
+        return w;
+    }
+
     /// The type arguments' witnesses of a parameterized witness, or null.
     TypeWitness[] args() {
         return args;
@@ -213,6 +227,18 @@ public final class TypeWitness {
         }
         if (tester != null) {
             return tester.test(value);
+        }
+        if (recordNamed != null) {
+            if (!type.isInstance(value) || !(value instanceof dart.core.Record)) {
+                return false;
+            }
+            dart.core.Record r = (dart.core.Record) value;
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] != null && !args[i].test(r.$field(i))) {
+                    return false;
+                }
+            }
+            return true;
         }
         if (args != null && args.length > 0) {
             // A core collection's witness with element arguments (`List<String>`): the
@@ -620,6 +646,26 @@ public final class TypeWitness {
     public String toString() {
         if (this == DYNAMIC) {
             return "dynamic";
+        }
+        if (recordNamed != null) {
+            StringBuilder rb = new StringBuilder("(");
+            for (int i = 0; i < args.length; i++) {
+                if (i > 0) {
+                    rb.append(", ");
+                }
+                if (i == recordPositional) {
+                    rb.append('{');
+                }
+                rb.append(args[i] == null ? "dynamic" : args[i].toString());
+                if (i >= recordPositional) {
+                    rb.append(' ').append(recordNamed[i - recordPositional]);
+                }
+            }
+            if (args.length > recordPositional) {
+                rb.append('}');
+            }
+            rb.append(')');
+            return nullable ? rb.append('?').toString() : rb.toString();
         }
         StringBuilder sb = new StringBuilder(DartRuntime.str(type));
         // A primitive-backed list class already names its element type (`List<int>`).

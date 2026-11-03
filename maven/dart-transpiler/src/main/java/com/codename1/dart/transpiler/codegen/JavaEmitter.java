@@ -628,7 +628,14 @@ public final class JavaEmitter {
         if (total > 0) {
             sb.append('<').append(tp).append('>');
         }
-        sb.append('(').append(comps).append(") implements dart.runtime.Reified {\n");
+        sb.append('(').append(comps).append(") implements dart.runtime.Reified, dart.core.Record {\n");
+        // The fields a record type's witness tests, positional first (TypeWitness.record).
+        sb.append("    @Override\n    public Object $field(int $i) {\n        switch ($i) {\n");
+        for (int i = 0; i < total; i++) {
+            String comp = i < s.positional ? "$" + (i + 1) : s.named.get(i - s.positional);
+            sb.append("            case ").append(i).append(": return ").append(comp).append(";\n");
+        }
+        sb.append("            default: throw new IndexOutOfBoundsException(String.valueOf($i));\n        }\n    }\n\n");
         // A record's runtimeType is the record type of its fields' runtime types:
         // `(null, 1, x: null)` is a `(Null, int, {Null x})`.
         sb.append("    @Override\n    public Object $runtimeType() {\n");
@@ -685,7 +692,7 @@ public final class JavaEmitter {
             first = false;
             Out o = emitExpr(f.value, null, ctx);
             args.append(boxIfPrimitive(o, ctx));
-            t.args.add(boxType(o.type));
+            t.args.add(recordFieldType(o.type));
         }
         for (RecordField f : named) {
             if (!first) {
@@ -694,7 +701,7 @@ public final class JavaEmitter {
             first = false;
             Out o = emitExpr(f.value, null, ctx);
             args.append(boxIfPrimitive(o, ctx));
-            t.args.add(boxType(o.type));
+            t.args.add(recordFieldType(o.type));
         }
         return new Out("new " + cn + (r.fields.isEmpty() ? "(" : "<>(") + args + ")", t);
     }
@@ -2622,7 +2629,7 @@ public final class JavaEmitter {
             "dart.async.StreamTransformer", "dart.async.StreamSink", "dart.collection.IterableMixin",
             "dart.collection.ListMixin", "dart.collection.MapMixin", "dart.collection.SetMixin",
             "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase",
-            "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.DartEnumComparable", "dart.core.MixinView",
+            "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.DartEnumComparable", "dart.core.MixinView", "dart.core.Record",
             "dart.runtime.DynamicObject", "dart.runtime.Reified", "dart.runtime.Signed", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
 
     /** The fully qualified dart-runtime class a rendered Java type name refers to, or null. */
@@ -10254,8 +10261,8 @@ public final class JavaEmitter {
             TypeRef t = conditionalType(a.type, b.type, expected);
             boolean mixedNumeric = a.type != null && b.type != null
                     && ((a.type.is("int") && b.type.is("double")) || (a.type.is("double") && b.type.is("int")))
-                    && expected != null
-                    && (expected.is("Object") || expected.is("num") || expected.is("dynamic"));
+                    && (expected == null || expected.is("var") || expected.is("Object") || expected.is("num")
+                    || expected.is("dynamic"));
             if (la.lifts() || lb.lifts()) {
                 // An arm lifted statements: they belong to that arm alone, so the
                 // conditional becomes an if/else assigning a temp.
@@ -10449,6 +10456,11 @@ public final class JavaEmitter {
             if (t.type.is("Null")) {
                 // `x is Null` holds only for null; it mapped to Object, which is the opposite.
                 check = subject + " == null";
+            } else if (t.type.name != null && t.type.name.startsWith("Rec$") && t.type.funcReturn == null
+                    && witnessOf(t.type, ctx) != null) {
+                // `o is (int, String)`: a record type is structural, so the shape's class is
+                // not enough -- the witness tests each field of the value against its type.
+                check = witnessOf(t.type, ctx) + ".test((Object) " + paren(o.code) + ")";
             } else if ((t.type.is("Error") || t.type.is("Exception")) && t.type.args.isEmpty()
                     && !t.type.nullable && program.resolveClass(t.type.name, ctx.library()) == null) {
                 // dart:core's Error and Exception are not Java's: every Dart error and
@@ -10640,6 +10652,10 @@ public final class JavaEmitter {
                 || isUnrecordedArg(el)) {
             return null;
         }
+        if (el.name.startsWith("Rec$")) {
+            // `[(1, 'a')]` is a List<(int, String)>: the record type's structural witness.
+            return isTypeVariable(el, ctx) ? null : recordWitness(el, ctx);
+        }
         if (el.args.isEmpty() && isTypeVariable(el, ctx)) {
             String w = witnessFor(el.name, ctx);
             return w == null ? null : el.nullable ? "dart.runtime.TypeWitness.nullable(" + w + ")" : w;
@@ -10688,7 +10704,7 @@ public final class JavaEmitter {
     /// Comparable and a Pattern, any closure a Function, an enum constant an Enum) are not.
     private boolean hasJavaClass(TypeRef el, Ctx ctx) {
         if (el.is("Function") || el.is("Comparable") || el.is("Pattern") || el.is("Null") || el.is("Never")
-                || el.is("void") || el.is("Record") || el.is("Enum") || el.is("Type")
+                || el.is("void") || el.is("Enum") || el.is("Type")
                 || el.is("Iterator")) {
             return false;
         }
@@ -12558,7 +12574,9 @@ public final class JavaEmitter {
                 r.args.add(upperBound(a.arg(i), b.arg(i)));
             }
         } else {
-            r = new TypeRef("Object");
+            // Two interface types: the deepest unique common supertype, else Object.
+            TypeRef pl = programClassLub(copyNonNull(a), copyNonNull(b));
+            r = pl != null ? pl : new TypeRef("Object");
         }
         if (nullable && !r.nullable) {
             r = copyNonNull(r);
@@ -13652,6 +13670,9 @@ public final class JavaEmitter {
         if (isTypeVariable(t, ctx)) {
             return null;
         }
+        if (t.name != null && t.name.startsWith("Rec$") && t.funcReturn == null) {
+            return recordWitness(t, ctx);
+        }
         boolean nullable = t.nullable || t.is("dynamic") || t.is("var") || t.is("Null")
                 || t.is("void");
         if (t.funcReturn != null && t.funcParams != null) {
@@ -13672,6 +13693,31 @@ public final class JavaEmitter {
             nested = ", " + coll[1] + (t.args.size() > 1 ? ", " + coll[2] : "");
         }
         return "dart.runtime.TypeWitness.of(" + erasedJavaType(t, ctx) + ".class, " + nullable + nested + ")";
+    }
+
+    /// The witness of record type {@code t} (`(int, {String name})`), testing each field
+    /// structurally and printing as Dart does; null when a field type has no witness.
+    private String recordWitness(TypeRef t, Ctx ctx) {
+        ensureRecordShape(t.name);
+        RecordShape s = recordShapes.get(t.name);
+        if (s == null || t.args.size() != s.positional + s.named.size()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder("dart.runtime.TypeWitness.record(").append(pkg).append('.')
+                .append(t.name).append(".class, ").append(t.nullable).append(", ").append(s.positional)
+                .append(", new String[] {");
+        for (int i = 0; i < s.named.size(); i++) {
+            sb.append(i > 0 ? ", " : "").append('"').append(s.named.get(i)).append('"');
+        }
+        sb.append('}');
+        for (TypeRef a : t.args) {
+            String w = isUnrecordedArg(a) ? "dart.runtime.TypeWitness.DYNAMIC" : witnessOf(a, ctx);
+            if (w == null) {
+                return null;
+            }
+            sb.append(", ").append(w);
+        }
+        return sb.append(')').toString();
     }
 
     /**
@@ -14445,9 +14491,11 @@ public final class JavaEmitter {
     }
 
     /**
-     * The nearest common program supertype of two non-generic program class types, as Dart's
-     * upper bound picks it when it is unique at its depth; null when there is none or the
-     * choice is ambiguous.
+     * Dart's upper bound of two non-generic program class types (the interface-type rule):
+     * of the supertypes the two share, the deepest -- by the longest path from Object --
+     * when exactly one has that depth. Null when there is none or the deepest is a tie
+     * (`Sq` and `Ci` both `extends Shape with Tag`: Shape and Tag tie, the bound is Object),
+     * which a caller answers with Object.
      */
     private TypeRef programClassLub(TypeRef a, TypeRef b) {
         if (!a.args.isEmpty() || !b.args.isEmpty() || a.funcParams != null || b.funcParams != null) {
@@ -14458,19 +14506,19 @@ public final class JavaEmitter {
         if (ca == null || cb == null) {
             return null;
         }
-        java.util.Map<ClassDecl, Integer> da = supertypeDepths(ca);
-        java.util.Map<ClassDecl, Integer> db = supertypeDepths(cb);
+        java.util.Set<ClassDecl> sa = supertypeDepths(ca).keySet();
+        java.util.Set<ClassDecl> sb = supertypeDepths(cb).keySet();
+        java.util.Map<ClassDecl, Integer> memo = new java.util.HashMap<ClassDecl, Integer>();
         ClassDecl best = null;
         int bestDepth = -1;
         boolean tie = false;
-        for (java.util.Map.Entry<ClassDecl, Integer> en : da.entrySet()) {
-            if (!db.containsKey(en.getKey()) || !en.getKey().typeParams.isEmpty()) {
+        for (ClassDecl k : sa) {
+            if (!sb.contains(k) || !k.typeParams.isEmpty()) {
                 continue;
             }
-            int d = Math.max(en.getValue(), db.get(en.getKey()));
-            int depth = -d;
-            if (best == null || depth > bestDepth) {
-                best = en.getKey();
+            int depth = dartTypeDepth(k, memo, 0);
+            if (depth > bestDepth) {
+                best = k;
                 bestDepth = depth;
                 tie = false;
             } else if (depth == bestDepth) {
@@ -14484,6 +14532,38 @@ public final class JavaEmitter {
         out.resolved = best;
         out.nullable = a.nullable || b.nullable;
         return out;
+    }
+
+    /// The length of the longest supertype path from Object to {@code c}: 1 for a class
+    /// whose only supertypes are outside the program.
+    private int dartTypeDepth(ClassDecl c, java.util.Map<ClassDecl, Integer> memo, int guard) {
+        Integer known = memo.get(c);
+        if (known != null) {
+            return known;
+        }
+        memo.put(c, 1);
+        int d = 1;
+        if (guard < 64) {
+            for (TypeRef st : directSupertypes(c)) {
+                ClassDecl sc = superDeclOf(c, st);
+                if (sc != null && sc != c) {
+                    d = Math.max(d, dartTypeDepth(sc, memo, guard + 1) + 1);
+                }
+            }
+        }
+        memo.put(c, d);
+        return d;
+    }
+
+    /// The superclass, the mixins and the interfaces {@code k} declares.
+    private static List<TypeRef> directSupertypes(ClassDecl k) {
+        List<TypeRef> sups = new ArrayList<TypeRef>();
+        if (k.superclass != null) {
+            sups.add(k.superclass);
+        }
+        sups.addAll(k.mixins);
+        sups.addAll(k.interfaces);
+        return sups;
     }
 
     private ClassDecl lubClass(TypeRef t) {
@@ -14502,11 +14582,7 @@ public final class JavaEmitter {
         work.add(c);
         for (int i = 0; i < work.size() && i < 256; i++) {
             ClassDecl k = work.get(i);
-            List<TypeRef> sups = new ArrayList<TypeRef>(k.interfaces);
-            if (k.superclass != null) {
-                sups.add(0, k.superclass);
-            }
-            for (TypeRef st : sups) {
+            for (TypeRef st : directSupertypes(k)) {
                 ClassDecl sc = superDeclOf(k, st);
                 if (sc != null && !out.containsKey(sc)) {
                     out.put(sc, out.get(k) + 1);
@@ -15014,6 +15090,10 @@ public final class JavaEmitter {
                 && (lub.name.equals(inferred.name) || inferred.is("Null"))) {
             // `{null, 1}`, `{1, null}`: as for a list, the upper bound of T and Null is T?,
             // so the set is a Set<int?>.
+            elem = lub;
+        } else if (elem == null && lubKnown && lub != null) {
+            // `{1, 2.0}` is a Set<num>, `{Sq(), Ci()}` a Set of their upper bound: Dart's
+            // element type is the elements' upper bound, as a list literal's is.
             elem = lub;
         }
         if (elem == null) {
@@ -18420,6 +18500,21 @@ public final class JavaEmitter {
         }
         if (expected != null && !expected.is("var") && !expected.is("dynamic")) {
             return expected;
+        }
+        if ((a.is("int") || a.is("double") || a.is("num")) && (b.is("int") || b.is("double") || b.is("num"))
+                && a.args.isEmpty() && b.args.isEmpty()) {
+            // `c ? 1 : 2.0` is a num, as Dart's upper bound of int and double is.
+            TypeRef n = new TypeRef("num");
+            n.nullable = a.nullable || b.nullable;
+            return n;
+        }
+        if (lubClass(a) != null && lubClass(b) != null && a.args.isEmpty() && b.args.isEmpty()
+                && a.funcParams == null && b.funcParams == null && isProgramClassDecl(lubClass(a))
+                && isProgramClassDecl(lubClass(b))) {
+            // Two program classes: Dart's upper bound, which is Object when the deepest
+            // shared supertypes tie (Shape and the mixin Tag), not the superclass chains' meet.
+            TypeRef pl = upperBound(a, b);
+            return pl;
         }
         TypeRef anc = commonAncestor(a.name, b.name);
         if (anc == null || anc.is("Object")) {
@@ -27366,6 +27461,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
 
     private TypeRef inferTypeParamFromArgs(String p, List<Param> params, Args args, Ctx ctx) {
         int pi = 0;
+        TypeRef direct = null;
         for (Ast.Param prm : params) {
             if (prm.named) {
                 continue;
@@ -27398,8 +27494,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             TypeRef found = unifyTypeParam(p, prm.type, at);
             if (found != null && !isDynamicType(found) && !found.is("var")) {
-                return found;
+                if (!prm.type.is(p) || !prm.type.args.isEmpty() || prm.type.funcParams != null) {
+                    return found;
+                }
+                // `both<T>(T a, T b)` called with `(Sq(), Ci())`: every argument in a bare T
+                // position constrains T, which is their upper bound -- the same binding the
+                // call's witness gets, so the static return type agrees with it.
+                direct = direct == null ? found : entryLub(direct, found);
             }
+        }
+        if (direct != null) {
+            return direct;
         }
         // Named arguments bind too (`fromHandlers(handleData: typedField)`); a closure
         // literal is still left to the call's expected type, as above.
@@ -30676,6 +30781,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
         }
         return false;
+    }
+
+    /// A record literal's field type: the value's own static type -- `(1, 'a')` is an
+    /// `(int, String)`, not `(int?, String?)` -- as a boxed copy, since a record component
+    /// is a reference in Java. Only a field whose value is nullable keeps the `?`.
+    private TypeRef recordFieldType(TypeRef t) {
+        TypeRef c = boxType(t);
+        if (t != null && !t.nullable && !isDynamicType(t) && !t.is("Null") && !t.is("var")) {
+            c.nullable = false;
+        }
+        return c;
     }
 
     TypeRef boxType(TypeRef t) {

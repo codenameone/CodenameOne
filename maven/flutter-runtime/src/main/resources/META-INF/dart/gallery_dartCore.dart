@@ -44,6 +44,11 @@ abstract class Comparable<T> {
   external int compareTo(T other);
 }
 
+// Every record (`(1, 'a')`, `(x: 1)`) is a Record; the generated record classes implement
+// dart.core.Record, so `o is Record` holds for any of them and nothing else.
+@JavaName('dart.core.Record')
+abstract class Record {}
+
 // --- dart:core : BigInt ----------------------------------------------------
 
 // Arbitrary-precision integers, implemented in dart.core.BigInt (no
