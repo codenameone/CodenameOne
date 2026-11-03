@@ -85,7 +85,7 @@ public abstract class Animation<T> implements Listenable {
 
     public void removeListener(Funcs.VoidFunc0 listener) {
         boolean had = hasAnyListeners();
-        listeners.remove(listener);
+        dart.runtime.DartRuntime.removeEq(listeners, listener);
         if (had && !hasAnyListeners()) {
             didStopListening();
         }
@@ -103,7 +103,7 @@ public abstract class Animation<T> implements Listenable {
 
     public void removeStatusListener(Funcs.VoidFunc1<AnimationStatus> listener) {
         boolean had = hasAnyListeners();
-        statusListeners.remove(listener);
+        dart.runtime.DartRuntime.removeEq(statusListeners, listener);
         if (had && !hasAnyListeners()) {
             didStopListening();
         }

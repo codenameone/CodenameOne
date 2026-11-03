@@ -9493,8 +9493,48 @@ public final class JavaEmitter {
             // (`where(seen.add)`) then fails inference where the plain reference compiled.
             out = identifyTearOff(e, out, expected != null && expected.funcParams == null
                     && (expected.is("Object") || expected.is("Function") || isDynamicType(expected)), ctx);
+            if (expected != null && (expected.funcParams != null
+                    || expected.name != null && typedefDecl(expected.name) != null)) {
+                out = identifySignedTearOff(e, out, ctx);
+            }
         }
         return out;
+    }
+
+    private static final java.util.regex.Pattern SIGNED_TEAR_OFF = java.util.regex.Pattern.compile(
+            "((?:[\\w$]+\\.)*DartFnSigs\\.s\\d+)\\((.+)::([\\w$]+)\\)");
+
+    /// The tear-off a function-typed parameter or slot receives, `DartFnSigs.sk(recv::m)`
+    /// (`addListener(_onTick)`, `removeListener(c.tick)`, `stream.listen(got.add)`), given
+    /// Dart's equality: a bound one is made through DartRuntime.boundTearOff, so the
+    /// `removeListener` that follows an `addListener` finds the listener by `==`, and a
+    /// static or top-level one is canonicalized by the function it names, so it stays
+    /// identical to the same function held as any other type. The SAM is still the one sk
+    /// produces: the reference is made inside the lambda, against the receiver passed in,
+    /// so the call's target type (a generic `where(seen.add)` included) still decides it.
+    private Out identifySignedTearOff(Expr e, Out out, Ctx ctx) {
+        if (out == null || out.fromError || out.code.indexOf('"') >= 0
+                || !(e instanceof Ident || e instanceof PropertyGet)) {
+            return out;
+        }
+        java.util.regex.Matcher m = SIGNED_TEAR_OFF.matcher(out.code);
+        if (!m.matches() || m.group(2).indexOf("::") >= 0 || m.group(2).indexOf("->") >= 0) {
+            return out;
+        }
+        String recv = m.group(2);
+        String name = m.group(3);
+        if (recv.equals("super") || name.equals("new")) {
+            return out;
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        if (STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null) {
+            String sam = m.group(1).substring(m.group(1).lastIndexOf('.') + 1);
+            return new Out("DartRuntime.canonTearOff(\"" + recv + "::" + name + "\", \"" + sam + "\", "
+                    + out.code + ")", out.type, out.fn);
+        }
+        String r = ctx.newTemp();
+        return new Out("DartRuntime.boundTearOff(" + recv + ", \"" + name + "\", " + r + " -> "
+                + m.group(1) + "(" + r + "::" + name + "))", out.type, out.fn);
     }
 
     private static final java.util.regex.Pattern STATIC_TEAR_OFF = java.util.regex.Pattern.compile(
@@ -9540,7 +9580,7 @@ public final class JavaEmitter {
             if (ctx.lookup(q) != null) {
                 return out;
             }
-            return new Out("DartRuntime.canonTearOff(\"" + out.code + "\", " + out.code + ")", out.type, out.fn);
+            return new Out("DartRuntime.canonTearOff(\"" + bare + "\", \"" + cast + "\", " + out.code + ")", out.type, out.fn);
         }
         java.util.regex.Matcher m = BOUND_TEAR_OFF.matcher(bare);
         if (bound && e instanceof PropertyGet && m.matches() && !"this".equals(m.group(1)) && !"super".equals(m.group(1))) {
@@ -22899,9 +22939,25 @@ public final class JavaEmitter {
             t.funcParams.add(x != null && y != null && !x.is("var") && x.toString().equals(y.toString())
                     ? x : TypeRef.DYNAMIC);
         }
-        // The result is dynamic: a closure's own result type is known only once its body is
-        // emitted, and both bodies must be emitted against the one SAM chosen here.
-        t.funcReturn = TypeRef.DYNAMIC;
+        // The result is what both bodies yield, as Dart's upper bound of the two closure types
+        // has it (`String Function(int)`): each expression body is typed speculatively first
+        // (lambdaBodyType, which emits into a discarded writer), since both must then be
+        // emitted against the one SAM chosen here. Two numeric results meet at num. A block
+        // body, or bodies of unrelated types, leave it dynamic; the closures are still each
+        // signed with their own result, so an `is` test answers as Dart does either way.
+        TypeRef ra = lambdaBodyType((Lambda) a, ctx);
+        TypeRef rb = lambdaBodyType((Lambda) b, ctx);
+        TypeRef ret = TypeRef.DYNAMIC;
+        if (ra != null && rb != null && !ra.is("void") && !ra.is("Null") && ra.funcParams == null
+                && rb.funcParams == null) {
+            if (ra.toString().equals(rb.toString())) {
+                ret = ra;
+            } else if ((ra.is("int") || ra.is("double") || ra.is("num")) && (rb.is("int") || rb.is("double") || rb.is("num"))
+                    && !ra.nullable && !rb.nullable) {
+                ret = new TypeRef("num");
+            }
+        }
+        t.funcReturn = ret;
         return t;
     }
 
