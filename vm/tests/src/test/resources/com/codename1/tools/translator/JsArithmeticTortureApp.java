@@ -362,9 +362,10 @@ public class JsArithmeticTortureApp {
     }
 
     static final class Held {
-        private final int v;
+        private int v;
         Held(int v) { this.v = v; }
         int getV() { return v; }
+        void setV(int v) { this.v = v; }
     }
 
     static String foldedGetterOnNull(Held h) {
@@ -373,7 +374,16 @@ public class JsArithmeticTortureApp {
         try {
             return "v" + h.getV();
         } catch (NullPointerException e) {
-            return "npe";
+            return "npe" + foldedSetterOnNull(h);
+        }
+    }
+
+    static String foldedSetterOnNull(Held h) {
+        try {
+            h.setV(1);
+            return "set";
+        } catch (NullPointerException e) {
+            return "Snpe";
         }
     }
 

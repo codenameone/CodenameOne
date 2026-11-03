@@ -964,7 +964,7 @@ class JavascriptRuntimeSemanticsTest {
         WorkerRunResult result = translateAndRunFixture(config, "JsArithmeticTortureApp.java", "JsArithmeticTortureApp");
 
         // The JVM's answer: FNV-1a over 8209 result lines, xor the line count.
-        assertEquals(-669059985, result.result,
+        assertEquals(415757853, result.result,
                 "long/int/string results must match the JVM line for line. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");

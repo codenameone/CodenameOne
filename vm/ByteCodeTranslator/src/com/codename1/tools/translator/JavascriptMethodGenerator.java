@@ -5793,7 +5793,7 @@ final class JavascriptMethodGenerator {
                 // A folded getter replaced an invoke, and an invoke on null throws a
                 // Java NPE; a bare property read would throw a JS TypeError instead,
                 // which no Java catch for NullPointerException sees.
-                if (folded && !"__cn1ThisObject".equals(target)) {
+                if (folded) {
                     target = "_nn(" + target + ")";
                 }
                 out.append("  ").append(ctx.push(target + "[\"" + propertyName + "\"]")).append(";\n");
@@ -5802,6 +5802,10 @@ final class JavascriptMethodGenerator {
             case Opcodes.PUTFIELD: {
                 String value = ctx.pop();
                 String target = ctx.pop();
+                if (folded) {
+                    // Same as the folded getter above: a Java NPE, not a TypeError.
+                    target = "_nn(" + target + ")";
+                }
                 out.append(ctx.flushPendingFieldReads());
                 out.append("  ").append(target).append("[\"").append(propertyName).append("\"] = ").append(value).append(";\n");
                 return true;
@@ -5903,7 +5907,8 @@ final class JavascriptMethodGenerator {
         // target monomorphic and reads its RAW body -- JS bodies are never
         // rewritten in place, so the verdict cannot depend on emission order. The
         // field op has the call's exact stack effect and dereferences the same
-        // receiver, so a null receiver still throws.
+        // receiver; the receiver goes through _nn so a null one throws a Java
+        // NullPointerException rather than a JS TypeError.
         int builderKind = ctx.builderKind(invoke);
         if (builderKind != 0) {
             return appendFusedBuilderInvoke(out, builderKind, ctx);
