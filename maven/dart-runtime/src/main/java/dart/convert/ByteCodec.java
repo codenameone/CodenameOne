@@ -137,24 +137,24 @@ public class ByteCodec extends Converter<Object, Object> implements Codec {
      */
     @Override
     public dart.async.Stream<Object> bind(final dart.async.Stream<Object> source) {
-        // AsyncStar.over: subscribed inside listen() (a broadcast source's next event is
-        // not lost) and source errors forwarded without ending the stream, as Dart's do.
-        return dart.async.AsyncStar.over(source, new dart.runtime.Funcs.VoidFunc2<dart.async.StreamIterator<Object>,
-                dart.async.AsyncStar.Sink<Object>>() {
+        // Forward: subscribed inside listen() (a broadcast source's next event is not
+        // lost), source errors forwarded without ending the stream, as Dart's are.
+        return dart.async.Forward.bind(source, new dart.runtime.Funcs.Func0<dart.async.Forward<Object, Object>>() {
             @Override
-            public void call(dart.async.StreamIterator<Object> it, dart.async.AsyncStar.Sink<Object> sink) {
-                byte[] carry = new byte[0];
-                // Only the BOM at the very start of the stream is dropped; one opening a
-                // later chunk is a real U+FEFF in the middle of the text.
-                boolean atStart = true;
-                // Base64 works in whole groups -- three bytes encode to four characters --
-                // so a chunk's incomplete group is carried into the next one and finished
-                // only when the stream closes; per-chunk padding would corrupt the output.
-                boolean b64 = kind == BASE64 || kind == BASE64_URL;
-                StringBuilder textCarry = new StringBuilder();
-                try {
-                    while (it.next()) {
-                        Object chunk = it.current();
+            public dart.async.Forward<Object, Object> call() {
+                return new dart.async.Forward<Object, Object>() {
+                    private byte[] carry = new byte[0];
+                    // Only the BOM at the very start of the stream is dropped; one opening a
+                    // later chunk is a real U+FEFF in the middle of the text.
+                    private boolean atStart = true;
+                    // Base64 works in whole groups -- three bytes encode to four characters --
+                    // so a chunk's incomplete group is carried into the next one and finished
+                    // only when the stream closes; per-chunk padding would corrupt the output.
+                    private final boolean b64 = kind == BASE64 || kind == BASE64_URL;
+                    private final StringBuilder textCarry = new StringBuilder();
+
+                    @Override
+                    protected void data(Object chunk) {
                         if (b64 && chunk instanceof String) {
                             textCarry.append((String) chunk);
                             // Padding only ends the input, so text holding '=' waits for the end.
@@ -162,9 +162,9 @@ public class ByteCodec extends Converter<Object, Object> implements Codec {
                             if (cut > 0) {
                                 String head = textCarry.substring(0, cut);
                                 textCarry.delete(0, cut);
-                                sink.yield$(convert(head));
+                                add(convert(head));
                             }
-                            continue;
+                            return;
                         }
                         if (b64) {
                             byte[] in = bytesOf(chunk);
@@ -177,13 +177,13 @@ public class ByteCodec extends Converter<Object, Object> implements Codec {
                             if (cut > 0) {
                                 byte[] head = new byte[cut];
                                 System.arraycopy(all, 0, head, 0, cut);
-                                sink.yield$(base64(head, kind == BASE64_URL));
+                                add(base64(head, kind == BASE64_URL));
                             }
-                            continue;
+                            return;
                         }
                         if (kind != UTF8 || chunk instanceof String) {
-                            sink.yield$(convert(chunk));
-                            continue;
+                            add(convert(chunk));
+                            return;
                         }
                         byte[] in = bytesOf(chunk);
                         byte[] all = new byte[carry.length + in.length];
@@ -197,27 +197,31 @@ public class ByteCodec extends Converter<Object, Object> implements Codec {
                         if (cut > 0) {
                             // Strict as decode() is: Java's decoder would substitute U+FFFD.
                             checkUtf8(head, head.length);
-                            sink.yield$(text(head, atStart));
+                            add(text(head, atStart));
                             atStart = false;
                         }
                     }
-                    if (b64) {
-                        if (textCarry.length() > 0) {
-                            sink.yield$(convert(textCarry.toString()));
+
+                    @Override
+                    protected void done() {
+                        if (b64) {
+                            if (textCarry.length() > 0) {
+                                add(convert(textCarry.toString()));
+                            }
+                            if (carry.length > 0) {
+                                add(base64(carry, kind == BASE64_URL));
+                            }
+                            close();
+                            return;
                         }
                         if (carry.length > 0) {
-                            sink.yield$(base64(carry, kind == BASE64_URL));
+                            // An incomplete sequence left at the end of the stream is malformed.
+                            checkUtf8(carry, carry.length);
+                            add(text(carry, atStart));
                         }
-                        return;
+                        close();
                     }
-                    if (carry.length > 0) {
-                        // An incomplete sequence left at the end of the stream is malformed.
-                        checkUtf8(carry, carry.length);
-                        sink.yield$(text(carry, atStart));
-                    }
-                } finally {
-                    it.cancel();
-                }
+                };
             }
         });
     }
