@@ -9497,8 +9497,137 @@ public final class JavaEmitter {
                     || expected.name != null && typedefDecl(expected.name) != null)) {
                 out = identifySignedTearOff(e, out, ctx);
             }
+            out = valueTearOff(e, out, expected, ctx);
+        }
+        if (out != null && !out.fromError && out.fn == null && expected != null && expected.funcParams != null
+                && (expected.funcTypeParams == null || expected.funcTypeParams.isEmpty()) && out.type != null
+                && out.type.funcTypeParams != null && !out.type.funcTypeParams.isEmpty()) {
+            // `int Function(int) gi = gid(c)`, a generic function value (`T Function<T>(T)`)
+            // in a slot of one of its instantiations: erased, the instantiation is the same
+            // function, seen through the slot's SAM.
+            String sam = functionSamProbe(expected, ctx);
+            if (sam != null) {
+                out = new Out("((" + functionSam(expected, ctx) + ") (Object) " + paren(out.code) + ")", expected);
+            }
         }
         return out;
+    }
+
+    private static final java.util.regex.Pattern FUNCS_SAM = java.util.regex.Pattern.compile(
+            "(?:[\\w$]+\\.)*Funcs\\.(Void)?Func([0-5])(?:<.*>)?");
+    private static final java.util.regex.Pattern SIMPLE_RECEIVER = java.util.regex.Pattern.compile(
+            "[A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*");
+
+    /// An instance-method tear-off as a value: `c.tick` is `TearOff.v0(c, "tick", c::tick)`
+    /// (or a signed SAM's `DartFnSigs.bK`), an object implementing the SAM it is held as and
+    /// BoundTearOff, whose equals and hashCode are Dart's `==`: the same receiver, by
+    /// identity, and the same method. So a typed local, a field, a return, a typedef
+    /// parameter, a Set or Map key and a List.remove all agree with eq, and nothing is
+    /// recorded on the side. A super tear-off of an overridden method is keyed by the
+    /// superclass (`super:Base.m`), so it is not equal to the override. The receiver is evaluated
+    /// twice, so only a receiver that is a name or a field path is rewritten; any other
+    /// stays a method reference and compares by identity.
+    private Out valueTearOff(Expr e, Out out, TypeRef expected, Ctx ctx) {
+        if (out == null || out.fn == null || out.fromError || out.code.indexOf('"') >= 0
+                || !(e instanceof Ident || e instanceof PropertyGet) || out.fn.bare == null) {
+            return out;
+        }
+        String bare = out.fn.bare;
+        int at = bare.lastIndexOf("::");
+        if (at <= 0) {
+            return out;
+        }
+        String recv = bare.substring(0, at);
+        String name = bare.substring(at + 2);
+        if (recv.startsWith("(") && recv.endsWith(")")) {
+            recv = recv.substring(1, recv.length() - 1);
+        }
+        if (name.equals("new") || !name.matches("[\\w$]+") || !SIMPLE_RECEIVER.matcher(recv).matches()
+                || STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null) {
+            return out;
+        }
+        String key = name;
+        String self = recv;
+        if (recv.equals("super")) {
+            if (ctx.currentClass == null) {
+                return out;
+            }
+            self = "this";
+            boolean overridden = false;
+            for (MethodDecl md : ctx.currentClass.methods) {
+                overridden |= name.equals(md.name) && !md.isStatic;
+            }
+            // Not overridden here, `super.m` is the very method `this.m` names, and equal to
+            // it; otherwise it is the inherited one, keyed apart from the override.
+            key = overridden ? "super:" + (ctx.currentClass.superclass != null ? ctx.currentClass.superclass.name
+                    : "Object") + "." + name : name;
+        } else if (recv.endsWith(".super") || recv.endsWith(".this")) {
+            return out;
+        }
+        String head = self + ", \"" + key + "\", ";
+        java.util.regex.Matcher sm = SIGNED_TEAR_OFF.matcher(out.code);
+        if (sm.matches() && sm.group(3).equals(name) && (sm.group(2).equals(bare.substring(0, at)))) {
+            String holder = sm.group(1);
+            int dot = holder.lastIndexOf(".s");
+            String[] sam = signedSamByName("S" + holder.substring(dot + 2));
+            if (sam == null || !FUNCS_SAM.matcher(sam[1]).matches()) {
+                return out;
+            }
+            return new Out(holder.substring(0, dot) + ".b" + holder.substring(dot + 2) + "(" + head + bare + ")",
+                    out.type, out.fn);
+        }
+        String cast = null;
+        String code = out.code;
+        if (code.equals(bare)) {
+            TypeRef t = expected != null && (expected.funcParams != null
+                    || expected.name != null && typedefSig(expected.name) != null) ? expected : null;
+            String samT = t != null ? functionSamProbe(t, ctx) : null;
+            if (samT == null) {
+                // An Object, dynamic or Function slot, or none: the method's own function type.
+                // A slot of any other type (a stub's own callback interface) keeps the
+                // reference, whose target type javac gives it.
+                if (expected != null && (expected.funcParams != null || !(expected.is("Object")
+                        || expected.is("Function") || isDynamicType(expected)))) {
+                    return out;
+                }
+                if (out.type == null || out.type.funcParams == null || out.type.funcReturn == null) {
+                    return out;
+                }
+                cast = functionSamProbe(out.type, ctx);
+                if (cast == null) {
+                    return out;
+                }
+                cast = functionSam(out.type, ctx);
+                samT = cast;
+            }
+            java.util.regex.Matcher fm = FUNCS_SAM.matcher(samT);
+            if (!fm.matches()) {
+                return out;
+            }
+            ctx.importClass("dart.runtime.TearOff");
+            return new Out("TearOff." + (fm.group(1) != null ? "v" : "f") + fm.group(2) + "(" + head
+                    + (cast != null ? "(" + cast + ") " + bare : bare) + ")", out.type, out.fn);
+        }
+        if (code.startsWith("((") && code.endsWith(") " + bare + ")")) {
+            cast = code.substring(2, code.length() - bare.length() - 3);
+            java.util.regex.Matcher fm = FUNCS_SAM.matcher(cast);
+            if (cast.indexOf("->") >= 0 || !fm.matches()) {
+                return out;
+            }
+            ctx.importClass("dart.runtime.TearOff");
+            return new Out("TearOff." + (fm.group(1) != null ? "v" : "f") + fm.group(2) + "(" + head
+                    + "(" + cast + ") " + bare + ")", out.type, out.fn);
+        }
+        return out;
+    }
+
+    private String[] signedSamByName(String n) {
+        for (String[] e : signedSams.values()) {
+            if (e[0].equals(n)) {
+                return e;
+            }
+        }
+        return null;
     }
 
     private static final java.util.regex.Pattern SIGNED_TEAR_OFF = java.util.regex.Pattern.compile(
@@ -9532,15 +9661,12 @@ public final class JavaEmitter {
             return new Out("DartRuntime.canonTearOff(\"" + recv + "::" + name + "\", \"" + sam + "\", "
                     + out.code + ")", out.type, out.fn);
         }
-        String r = ctx.newTemp();
-        return new Out("DartRuntime.boundTearOff(" + recv + ", \"" + name + "\", " + r + " -> "
-                + m.group(1) + "(" + r + "::" + name + "))", out.type, out.fn);
+        // An instance-method tear-off: valueTearOff.
+        return out;
     }
 
     private static final java.util.regex.Pattern STATIC_TEAR_OFF = java.util.regex.Pattern.compile(
             "(?:[a-z_$][\\w$]*\\.)*[A-Z][\\w$]*::[\\w$]+");
-    private static final java.util.regex.Pattern BOUND_TEAR_OFF = java.util.regex.Pattern.compile(
-            "\\((.+)\\)::([\\w$]+)");
 
     /// Gives a signed tear-off Dart's identity. A top-level or static function torn off
     /// is one object however often it is torn off (`identical(f, f)`), so the value is
@@ -9554,13 +9680,22 @@ public final class JavaEmitter {
     /// context gave it no type) is bound to its own SAM there, since a method reference
     /// cannot be an Object, and given its identity.
     private Out objectOperand(Expr e, Out o, Ctx ctx) {
+        if (o != null && o.fn == null && o.type != null && o.type.funcParams != null && o.type.funcReturn != null
+                && BARE_LAMBDA.matcher(o.code).matches() && functionSamProbe(o.type, ctx) != null) {
+            // A closure (an extension tear-off, say) is no Object either until it has a SAM.
+            return new Out("((" + functionSam(o.type, ctx) + ") " + o.code + ")", o.type);
+        }
         if (o == null || o.fn == null || o.fn.kind != FnKind.METHOD_REF || !o.code.equals(o.fn.bare)
                 || o.type == null || o.type.funcParams == null || o.type.funcReturn == null
                 || functionSamProbe(o.type, ctx) == null) {
             return o;
         }
-        return identifyTearOff(e, samCastOut(functionSam(o.type, ctx), o.fn, o.type), true, ctx);
+        return valueTearOff(e, identifyTearOff(e, samCastOut(functionSam(o.type, ctx), o.fn, o.type), true, ctx),
+                null, ctx);
     }
+
+    private static final java.util.regex.Pattern BARE_LAMBDA = java.util.regex.Pattern.compile(
+            "(?s)(?:\\([\\w$, ]*\\)|[\\w$]+) -> .*");
 
     private Out identifyTearOff(Expr e, Out out, boolean bound, Ctx ctx) {
         if (out == null || out.fn == null || out.fromError || out.code.indexOf('"') >= 0) {
@@ -9582,13 +9717,7 @@ public final class JavaEmitter {
             }
             return new Out("DartRuntime.canonTearOff(\"" + bare + "\", \"" + cast + "\", " + out.code + ")", out.type, out.fn);
         }
-        java.util.regex.Matcher m = BOUND_TEAR_OFF.matcher(bare);
-        if (bound && e instanceof PropertyGet && m.matches() && !"this".equals(m.group(1)) && !"super".equals(m.group(1))) {
-            String r = ctx.newTemp();
-            return new Out("DartRuntime.boundTearOff(" + m.group(1) + ", \"" + m.group(2) + "\", " + r
-                    + " -> ((" + cast + " & dart.runtime.BoundTearOff) (" + r + ")::" + m.group(2) + "))",
-                    out.type, out.fn);
-        }
+        // An instance-method tear-off: valueTearOff.
         return out;
     }
 
@@ -12184,6 +12313,31 @@ public final class JavaEmitter {
             sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(e[0]).append(tp).append(" s")
                     .append(e[0].substring(1)).append("(").append(e[0]).append(tp).append(" f) {\n")
                     .append("        return f;\n    }\n");
+            java.util.regex.Matcher fm = FUNCS_SAM.matcher(e[1]);
+            if (fm.matches()) {
+                // The value of an instance-method tear-off held as this SAM (valueTearOff).
+                boolean isVoid = fm.group(1) != null;
+                int arity = Integer.parseInt(fm.group(2));
+                String num = e[0].substring(1);
+                StringBuilder ps = new StringBuilder();
+                StringBuilder as = new StringBuilder();
+                for (int i = 0; i < arity; i++) {
+                    ps.append(i == 0 ? "" : ", ").append("T").append(i).append(" a").append(i);
+                    as.append(i == 0 ? "" : ", ").append("a").append(i);
+                }
+                String st = e[0] + tp;
+                sb.append("\n    public static final class B").append(num).append(tp)
+                        .append(" extends dart.runtime.TearOff implements ").append(st).append(" {\n")
+                        .append("        private final ").append(st).append(" f;\n\n")
+                        .append("        B").append(num).append("(Object recv, String key, ").append(st)
+                        .append(" f) {\n            super(recv, key);\n            this.f = f;\n        }\n\n")
+                        .append("        @Override\n        public ").append(isVoid ? "void" : "T" + arity)
+                        .append(" call(").append(ps).append(") {\n            ").append(isVoid ? "" : "return ")
+                        .append("f.call(").append(as).append(");\n        }\n    }\n");
+                sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(st).append(" b").append(num)
+                        .append("(Object recv, String key, ").append(st).append(" f) {\n        return new B")
+                        .append(num).append(n > 0 ? "<>" : "").append("(recv, key, f);\n    }\n");
+            }
         }
         sb.append("}\n");
         // A witness names its class as the file that signed the closure imports it; the
@@ -18319,7 +18473,8 @@ public final class JavaEmitter {
         // reaches here with nothing declaring it.
         if (name.equals("hashCode") && tt != null && !isClassRef(tt)) {
             ctx.importClass("dart.runtime.DartRuntime");
-            return new Out("DartRuntime.hashCodeOf(" + target.code + ")", TypeRef.INT);
+            Out h = posNode instanceof PropertyGet ? objectOperand(((PropertyGet) posNode).target, target, ctx) : target;
+            return new Out("DartRuntime.hashCodeOf(" + h.code + ")", TypeRef.INT);
         }
         // A collection method torn off as a callback -- `stream.listen(seen.add)`,
         // `ids.where(allowed.contains)`. The runtime collections declare these under the

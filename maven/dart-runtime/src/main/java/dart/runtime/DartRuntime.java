@@ -365,10 +365,9 @@ public final class DartRuntime {
         // One top-level or static function seen through two function types is two Java
         // objects (one per SAM), but one Dart function: identical, see canonTearOff.
         if (isTearOffCandidate(a) && isTearOffCandidate(b)) {
-            Object[] ka = TEAR_OFF_KEYS.get(a);
-            Object[] kb = TEAR_OFF_KEYS.get(b);
-            if (ka != null && kb != null && ka[0] == STATIC_FUNCTION && kb[0] == STATIC_FUNCTION) {
-                return ka[1].equals(kb[1]);
+            String ka = CANON_FUNCTIONS.get(a);
+            if (ka != null && ka.equals(CANON_FUNCTIONS.get(b))) {
+                return true;
             }
         }
         if (a instanceof Long && b instanceof Long) {
@@ -396,64 +395,50 @@ public final class DartRuntime {
         if (a instanceof Number && b instanceof Number) {
             return numEq((Number) a, (Number) b);
         }
+        // An instance-method tear-off is a TearOff, whose equals is Dart's `==`; only the
+        // views of one static function need the canonical names below.
         if (a != b && isTearOffCandidate(a) && isTearOffCandidate(b)) {
-            Object[] ka = TEAR_OFF_KEYS.get(a);
-            Object[] kb = TEAR_OFF_KEYS.get(b);
-            if (ka != null && kb != null) {
-                return ka[0] == kb[0] && ka[1].equals(kb[1]);
+            String ka = CANON_FUNCTIONS.get(a);
+            if (ka != null && ka.equals(CANON_FUNCTIONS.get(b))) {
+                return true;
             }
         }
         return a == null ? b == null : a.equals(b);
     }
 
-    /// The function behind each tear-off value made by canonTearOff or boundTearOff: the
-    /// receiver (STATIC_FUNCTION for a top-level or static one) and the method name, keyed
-    /// by the value itself. The values are lambdas, whose hashCode and equals are identity's;
-    /// the map holds them weakly, so a listener nobody keeps goes with its entry.
-    private static final java.util.Map<Object, Object[]> TEAR_OFF_KEYS = new java.util.WeakHashMap<Object, Object[]>();
-
-    /// Stands in TEAR_OFF_KEYS for the receiver of a function that has none.
-    private static final Object STATIC_FUNCTION = new Object();
-
     /// One object per top-level or static function and SAM it is held by, since Dart makes
     /// `identical(f, f)` true for those.
     private static final java.util.Map<String, Object> CANON_TEAR_OFFS = new java.util.HashMap<String, Object>();
 
-    /// Only a tear-off made here can be in TEAR_OFF_KEYS, and each is a signed SAM or carries
-    /// BoundTearOff: the test keeps every other comparison (two lists, say) from hashing
-    /// its operands into the map.
+    /// The function each canonical tear-off in CANON_TEAR_OFFS names, by identity. Both maps
+    /// hold one entry per function and SAM, and no receiver: a static function has none.
+    private static final java.util.Map<Object, String> CANON_FUNCTIONS = new java.util.IdentityHashMap<Object, String>();
+
+    /// Keeps the commonest comparisons, and every one in a program that tears off no static
+    /// function, out of CANON_FUNCTIONS.
     private static boolean isTearOffCandidate(Object o) {
-        return o instanceof Signed || o instanceof BoundTearOff;
+        return o != null && !(o instanceof Number) && !(o instanceof String) && !CANON_FUNCTIONS.isEmpty();
     }
 
     /// {@code made} as the canonical tear-off of function {@code fn} held as SAM {@code view}:
     /// the first one made for that pair is kept. Java gives each SAM its own object, so the
     /// views of one function differ; each is recorded under {@code fn}, which identical and
-    /// eq compare, so all of them stay one Dart function.
+    /// eq compare (CANON_FUNCTIONS), so all of them stay one Dart function.
     @SuppressWarnings("unchecked")
     public static <T> T canonTearOff(String fn, String view, T made) {
         String key = fn + '|' + view;
         Object c = CANON_TEAR_OFFS.get(key);
         if (c == null) {
             CANON_TEAR_OFFS.put(key, made);
-            TEAR_OFF_KEYS.put(made, new Object[] {STATIC_FUNCTION, fn});
+            CANON_FUNCTIONS.put(made, fn);
             return made;
         }
         return (T) c;
     }
 
-    /// The tear-off {@code make} builds from {@code recv}, recorded as method {@code name}
-    /// of that receiver so that eq answers Dart's `==` for it: two tear-offs of one method
-    /// from one receiver are equal whichever function type each is held as. They stay
-    /// distinct objects, as Dart's are (`identical(o.m, o.m)` is false).
-    public static <T, F> F boundTearOff(T recv, String name, Funcs.Func1<T, F> make) {
-        F f = make.call(recv);
-        TEAR_OFF_KEYS.put(f, new Object[] {recv, name});
-        return f;
-    }
-
     /// Removes the first element of {@code list} that is Dart {@code ==} to {@code value}:
-    /// a Java list's own remove compares with equals, which is identity for a tear-off.
+    /// a tear-off (TearOff) already answers that through equals, but a number does not
+    /// (`1 == 1.0`), and the views of one static function are equal only to eq.
     public static boolean removeEq(java.util.List<?> list, Object value) {
         for (int i = 0; i < list.size(); i++) {
             if (eq(list.get(i), value)) {

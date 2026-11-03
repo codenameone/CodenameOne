@@ -1,0 +1,8 @@
+set 1
+map 1
+eq true hash true ident false
+list 0
+super true base
+mixin true
+holder true
+loop 0

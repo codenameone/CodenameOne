@@ -20,6 +20,7 @@ import com.codename1.flutter.widgets.Row;
 import com.codename1.flutter.material.Scaffold;
 import com.codename1.flutter.widgets.SizedBox;
 import com.codename1.flutter.State;
+import dart.runtime.TearOff;
 import com.codename1.flutter.widgets.Text;
 import com.codename1.flutter.material.TextButton;
 import com.codename1.flutter.Widget;
@@ -53,10 +54,10 @@ public class _DemoPageState extends State<DemoPage> {
         var $t4 = new Row();
         $t4.mainAxisAlignment(MainAxisAlignment.spaceEvenly);
         var $t5 = new ElevatedButton();
-        $t5.onPressed(this::_addItem);
+        $t5.onPressed(TearOff.v0(this, "_addItem", this::_addItem));
         $t5.child(new Text("Add"));
         var $t6 = new OutlinedButton();
-        $t6.onPressed(this::_clear);
+        $t6.onPressed(TearOff.v0(this, "_clear", this::_clear));
         $t6.child(new Text("Clear"));
         var $t7 = new TextButton();
         $t7.onPressed(() -> {
@@ -108,5 +109,5 @@ public class _DemoPageState extends State<DemoPage> {
         });
     }
 
-    static final String $cn1DartLines = "main.dart\n46:36,64:55,66:56,75:69,95:91,97:92,103:97,105:98,107:99";
+    static final String $cn1DartLines = "main.dart\n47:36,65:55,67:56,76:69,96:91,98:92,104:97,106:98,108:99";
 }

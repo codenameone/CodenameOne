@@ -12,6 +12,7 @@ import com.codename1.flutter.Icons;
 import com.codename1.flutter.MainAxisAlignment;
 import com.codename1.flutter.material.Scaffold;
 import com.codename1.flutter.State;
+import dart.runtime.TearOff;
 import com.codename1.flutter.widgets.Text;
 import com.codename1.flutter.material.Theme;
 import com.codename1.flutter.Widget;
@@ -52,12 +53,12 @@ public class _MyHomePageState extends State<MyHomePage> {
         $t2.child($t3);
         $t0.body($t2);
         var $t5 = new FloatingActionButton();
-        $t5.onPressed(this::_incrementCounter);
+        $t5.onPressed(TearOff.v0(this, "_incrementCounter", this::_incrementCounter));
         $t5.tooltip("Increment");
         $t5.child(new Icon(Icons.add()));
         $t0.floatingActionButton($t5);
         return $t0;
     }
 
-    static final String $cn1DartLines = "main.dart\n32:36,34:37,41:43";
+    static final String $cn1DartLines = "main.dart\n33:36,35:37,42:43";
 }

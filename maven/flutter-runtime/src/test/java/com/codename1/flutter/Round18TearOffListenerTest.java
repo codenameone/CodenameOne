@@ -26,8 +26,7 @@ package com.codename1.flutter;
 import com.codename1.flutter.foundation.ChangeNotifier;
 import com.codename1.flutter.foundation.ValueNotifier;
 
-import dart.runtime.BoundTearOff;
-import dart.runtime.DartRuntime;
+import dart.runtime.TearOff;
 import dart.runtime.Funcs;
 
 import org.junit.jupiter.api.Test;
@@ -35,7 +34,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /// `addListener(_onTick)` then `removeListener(_onTick)`: the transpiler makes each
-/// tear-off a new object, equal to the other by Dart's `==` (DartRuntime.boundTearOff),
+/// tear-off a new object, equal to the other by Dart's `==` (dart.runtime.TearOff),
 /// so the notifiers must remove by that `==`, not by Java identity.
 class Round18TearOffListenerTest {
 
@@ -48,7 +47,7 @@ class Round18TearOffListenerTest {
     }
 
     static Funcs.VoidFunc0 tearOff(Ticker t) {
-        return DartRuntime.boundTearOff(t, "tick", r -> (Funcs.VoidFunc0 & BoundTearOff) r::tick);
+        return TearOff.v0(t, "tick", t::tick);
     }
 
     static final class Model implements ChangeNotifier {

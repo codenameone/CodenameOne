@@ -23,10 +23,15 @@
  */
 package dart.runtime;
 
-/// Marks an instance-method tear-off (`list.add` as a value). Dart makes two tear-offs of
-/// the same method from the same receiver `==` but not identical; a Java method reference
-/// is neither, so DartRuntime.boundTearOff records the receiver and the name of each
-/// value carrying this marker, and DartRuntime.eq compares those. The marker keeps that
-/// lookup off every other comparison.
+/// An instance-method tear-off (`list.add` as a value). Dart makes two tear-offs of the
+/// same method from the same receiver `==` (and of equal hashCode) but not identical. The
+/// transpiler emits each one as a TearOff value carrying its receiver and a key naming the
+/// method, so Java's own equals and hashCode answer Dart's `==`: a List.remove, HashSet or
+/// HashMap needs no help, and nothing is recorded anywhere else.
 public interface BoundTearOff {
+    /// The object the method was torn off from.
+    Object receiver();
+
+    /// The method torn off: its name, or `super:Class.name` for a super tear-off.
+    String key();
 }

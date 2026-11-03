@@ -1,0 +1,15 @@
+set len 1 contains true
+map len 1 val 2
+list after remove 0
+x==tk(c) true identical false
+hash eq true
+diff recv false
+generic true
+generic view 4
+super true base vs m false
+mixin true 1
+ext false
+views true 1
+str 0 true
+cond 4
+cond2 6
