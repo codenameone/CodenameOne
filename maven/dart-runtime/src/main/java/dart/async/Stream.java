@@ -1702,6 +1702,29 @@ public class Stream<T> {
         });
     }
 
+    /** Dart's {@code single}: a StateError when the stream is empty or has a second element. */
+    public final Future<T> single() {
+        final java.util.List<T> seen = new java.util.ArrayList<T>(2);
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                seen.add(v);
+                return Boolean.valueOf(seen.size() < 2);
+            }
+        }, new Funcs.Func0<T>() {
+            @Override
+            public T call() {
+                if (seen.isEmpty()) {
+                    throw new dart.core.StateError("No element");
+                }
+                if (seen.size() > 1) {
+                    throw new dart.core.StateError("Too many elements");
+                }
+                return seen.get(0);
+            }
+        });
+    }
+
     /** Dart's {@code last}: a StateError when the stream is empty. */
     public final Future<T> last() {
         final java.util.List<T> seen = new java.util.ArrayList<T>(1);

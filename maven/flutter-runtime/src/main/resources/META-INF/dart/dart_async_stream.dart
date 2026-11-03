@@ -90,6 +90,7 @@ abstract class Stream<T> {
   external Future<bool> get isEmpty;
   external Future<T> get first;
   external Future<T> get last;
+  external Future<T> get single;
   external Future<T> firstWhere(bool Function(T element) test, {Object? orElse});
   external Future<bool> any(bool Function(T element) test);
   external Future<bool> every(bool Function(T) test);

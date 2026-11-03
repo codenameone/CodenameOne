@@ -6712,9 +6712,10 @@ public final class JavaEmitter {
         // throw surfaces as one (DartRuntime.asError wraps non-exceptions), and
         // a VM error such as a stack overflow is not turned into a value.
         // An async body with an await runs as a resumable frame (AsyncLowering).
-        boolean lowered = m.body != null && m.isAsync
+        boolean lowered = (m.body != null || AsyncLowering.hasAwait(m.exprBody)) && m.isAsync
                 && (asyncFuture || rt.is("void"))
-                && asyncLowering.tryEmit(m.params, m.body, !asyncFuture,
+                && asyncLowering.tryEmit(m.params, m.body != null ? m.body
+                        : AsyncLowering.arrowAsBlock(m.exprBody, !asyncFuture), !asyncFuture,
                         asyncFuture && !rt.args.isEmpty() ? rt.arg(0) : null, asyncFuture ? rt : null, ctx);
         String asyncErr = null;
         if (!lowered && asyncFuture && (m.body != null || m.exprBody != null)) {
@@ -6789,9 +6790,10 @@ public final class JavaEmitter {
         ctx.inAsyncBody = m.isAsync;
         boolean asyncFuture = m.isAsync && (rt.is("Future") || rt.is("FutureOr"));
         // An async body with an await runs as a resumable frame (AsyncLowering).
-        boolean lowered = m.body != null && m.isAsync
+        boolean lowered = (m.body != null || AsyncLowering.hasAwait(m.exprBody)) && m.isAsync
                 && (asyncFuture || rt.is("void"))
-                && asyncLowering.tryEmit(m.params, m.body, !asyncFuture,
+                && asyncLowering.tryEmit(m.params, m.body != null ? m.body
+                        : AsyncLowering.arrowAsBlock(m.exprBody, !asyncFuture), !asyncFuture,
                         asyncFuture && !rt.args.isEmpty() ? rt.arg(0) : null, asyncFuture ? rt : null, ctx);
         String asyncErr = null;
         if (!lowered && asyncFuture && (m.body != null || m.exprBody != null)) {
@@ -7661,7 +7663,11 @@ public final class JavaEmitter {
             // Built through SignedFns.generic (emitLambdaIn): a call passes its type arguments.
             localType.genericClosure = l;
         }
-        String jn = ctx.declareShadowSafe(lf.name, localType);
+        // In an async frame the function is a frame field, so the states after the one
+        // declaring it still call it (a Java local would end with its state's block).
+        boolean inFrame = ctx.frame != null && ctx.frame.localFunc == lf;
+        String jn = inFrame ? asyncLowering.frameField(lf.name, localType, samType, ctx)
+                : ctx.declareShadowSafe(lf.name, localType);
         if (lf.isSyncStar || lf.isAsyncStar) {
             // A generator's element type comes from its declared Iterable<T>/Stream<T>,
             // which the generator lowering reads from the target's return type.
@@ -7670,6 +7676,12 @@ public final class JavaEmitter {
                 expected.funcParams.add(paramValueType(p));
             }
             expected.funcReturn = lf.returnType;
+        }
+        if (inFrame) {
+            // A field is read when called, so a recursive body needs no Ref here.
+            Out init = emitExpr(l, expected, ctx);
+            ctx.writer().line(jn + " = " + init.code + ";");
+            return;
         }
         if (CaptureScan.mentions(lf.body, lf.exprBody, lf.name)) {
             // A local function that calls itself (Tarjan's strongConnect, a recursive

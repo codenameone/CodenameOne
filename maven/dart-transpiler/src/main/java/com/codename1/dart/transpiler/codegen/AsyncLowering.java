@@ -104,6 +104,8 @@ final class AsyncLowering {
         String name;
         String label;
         boolean isVoid;
+        /// The local function being declared as a frame field (JavaEmitter.emitLocalFunc).
+        LocalFunc localFunc;
         /// async*: the element type yields coerce to, else null.
         TypeRef starElem;
         /// The frame's Java element type argument; null when erased to Object.
@@ -250,6 +252,27 @@ final class AsyncLowering {
                 && ((StringLit) e).parts.size() <= 1 && !hasAwait(e);
     }
 
+    /// An arrow body `=> e` as the block `{ return e; }` (`{ e; }` for a void one), so an
+    /// arrow that awaits is lowered through the frame like a block body instead of
+    /// blocking its thread on the await.
+    static Block arrowAsBlock(Expr e, boolean isVoid) {
+        Block b = new Block();
+        b.at(e.file, e.line, e.col);
+        Stmt s;
+        if (isVoid) {
+            ExprStmt es = new ExprStmt();
+            es.expr = e;
+            s = es;
+        } else {
+            ReturnStmt r = new ReturnStmt();
+            r.value = e;
+            s = r;
+        }
+        s.at(e.file, e.line, e.col);
+        b.statements.add(s);
+        return b;
+    }
+
     /// Whether the body can be lowered; see the class comment for the shapes.
     static boolean lowerable(Block body) {
         return listOk(body.statements);
@@ -262,7 +285,8 @@ final class AsyncLowering {
                     || st instanceof IfStmt || st instanceof WhileStmt || st instanceof ForStmt
                     || st instanceof ForInStmt || st instanceof ReturnStmt || st instanceof BreakStmt
                     || st instanceof ContinueStmt || st instanceof SwitchStmt || st instanceof TryStmt
-                    || st instanceof Block || st instanceof RethrowStmt || st instanceof YieldStmt;
+                    || st instanceof Block || st instanceof RethrowStmt || st instanceof YieldStmt
+                    || st instanceof LocalFunc;
             if (st instanceof VarDeclGroup) {
                 known = true;
                 for (VarDeclStmt d : ((VarDeclGroup) st).decls) {
@@ -596,6 +620,11 @@ final class AsyncLowering {
         }
     }
 
+    /// A frame field for the local function the frame is declaring, its reference returned.
+    String frameField(String dartName, TypeRef t, String javaType, JavaEmitter.Ctx ctx) {
+        return declareField(ctx.frame, ctx, dartName, t, javaType);
+    }
+
     private static String declareField(Frame f, JavaEmitter.Ctx ctx, String dartName, TypeRef t, String javaType) {
         // Prefixed: a bare `state`, `future` or `body` would hide the frame's own members.
         String base = "l$" + JavaEmitter.javaIdent(dartName);
@@ -753,6 +782,17 @@ final class AsyncLowering {
                 em.emitStatement(s, ctx);
             } finally {
                 f.fieldDecl = null;
+            }
+            restore(snap, ctx);
+            return;
+        }
+        if (s instanceof LocalFunc) {
+            f.localFunc = (LocalFunc) s;
+            List<Object[]> snap = snapshot(s, f, ctx);
+            try {
+                em.emitStatement(s, ctx);
+            } finally {
+                f.localFunc = null;
             }
             restore(snap, ctx);
             return;
@@ -1400,7 +1440,9 @@ final class AsyncLowering {
         Frame f = ctx.frame;
         JavaEmitter.Ctx.Writer w = ctx.writer();
         String value = null;
-        if (r.value != null && f.isVoid) {
+        if (r.value != null && (f.isVoid || f.valueType.is("void") && unparen(r.value) == f.resumeAwait)) {
+            // `return await x;` (`=> await x`) in a Future<void> body: the awaited value is
+            // dropped, and a resumed void value is no Java statement of its own.
             em.emitDiscardedValue(r.value, ctx);
         } else if (r.value != null) {
             TypeRef inner = f.valueType;
