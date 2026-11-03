@@ -23,6 +23,7 @@
 package com.codename1.backend.security.crypto;
 
 import com.codename1.backend.Crypto;
+import com.codename1.security.Hash;
 import java.io.UnsupportedEncodingException;
 
 /// The hexadecimal SHA-256 of a value, unsalted and in one round. Registered as
@@ -36,20 +37,12 @@ import java.io.UnsupportedEncodingException;
 /// [#matches(CharSequence, String)] compares in constant time and accepts upper
 /// or lower case hexadecimal, and [#upgradeEncoding(String)] is always true.
 public final class Sha256HexPasswordEncoder implements PasswordEncoder {
-    private static final char[] DIGITS = "0123456789abcdef".toCharArray();
-
     @Override
     public String encode(CharSequence rawPassword) {
         if (rawPassword == null) {
             throw new IllegalArgumentException("rawPassword cannot be null");
         }
-        byte[] digest = Crypto.sha256(utf8(rawPassword.toString()));
-        char[] out = new char[digest.length * 2];
-        for (int iter = 0 ; iter < digest.length ; iter++) {
-            out[iter * 2] = DIGITS[(digest[iter] >> 4) & 0xf];
-            out[iter * 2 + 1] = DIGITS[digest[iter] & 0xf];
-        }
-        return new String(out);
+        return Hash.toHex(Crypto.sha256(utf8(rawPassword.toString())));
     }
 
     @Override
