@@ -10830,6 +10830,12 @@ public final class JavaEmitter {
             // List<int>. The shared TypeRef.DYNAMIC is the emitter's "not known" instead.
             return "dart.runtime.TypeWitness.DYNAMIC";
         }
+        TypeRef fnAlias = el == null ? null : nonGenericFunctionTypedef(el);
+        if (fnAlias != null) {
+            // `<F>[f]` for `typedef F = int Function(String, {int? b})`: the list's element
+            // type is the function type F names, witnessed as it is written inline.
+            el = fnAlias;
+        }
         if (el != null && el.funcReturn != null && el.funcParams != null && !isUnrecordedArg(el)) {
             // `List<int Function(int)>`: the function witness, with its signature, so the
             // argument compares by function subtyping. Null where none can be formed.
@@ -13897,9 +13903,11 @@ public final class JavaEmitter {
     }
 
     /** The witness of the type {@code t} written at a construction site, or null. */
-    /// The trailing signature argument of a function witness: ", new TypeWitness[] {ret,
-    /// p0, ..}" over the positional parameters, a slot null where it is dynamic, void or a
-    /// type variable; "" for a function with named parameters, which is not compared.
+    /// The trailing signature arguments of a function witness: ", new TypeWitness[] {ret,
+    /// p0, ..}" over every parameter (positional, then named), a slot null where it is
+    /// dynamic, void or a type variable; then, for a function type with optional or named
+    /// parameters, the required positional count and the named parameters' names ('!'
+    /// marking a required one), so the Type prints and compares as Dart's does.
     private String functionWitness(TypeRef t, boolean nullable, Ctx ctx) {
         String erased = erasedJavaType(t, ctx);
         String test = functionTest("$twf", t, erased, ctx);
@@ -13908,13 +13916,25 @@ public final class JavaEmitter {
     }
 
     private String functionSigWitnesses(TypeRef t, Ctx ctx) {
-        if (t.funcNamed != null && !t.funcNamed.isEmpty()) {
-            return "";
-        }
         StringBuilder sb = new StringBuilder(", new dart.runtime.TypeWitness[] {");
         sb.append(sigSlotWitness(t.funcReturn, ctx));
         for (TypeRef p : t.funcParams) {
             sb.append(", ").append(sigSlotWitness(p, ctx));
+        }
+        sb.append("}");
+        boolean named = t.funcNamed != null && !t.funcNamed.isEmpty();
+        if (!named && t.funcRequired < 0) {
+            return sb.toString();
+        }
+        sb.append(", ").append(t.funcRequired);
+        if (!named) {
+            return sb.append(", null").toString();
+        }
+        sb.append(", new String[] {");
+        for (int i = 0; i < t.funcNamed.size(); i++) {
+            String n = t.funcNamed.get(i);
+            boolean req = t.funcNamedRequired != null && t.funcNamedRequired.contains(n);
+            sb.append(i > 0 ? ", \"" : "\"").append(req ? "!" : "").append(n).append('"');
         }
         return sb.append("}").toString();
     }
@@ -13950,6 +13970,11 @@ public final class JavaEmitter {
         }
         if (t.name != null && t.name.startsWith("Rec$") && t.funcReturn == null) {
             return recordWitness(t, ctx);
+        }
+        if (t != TypeRef.DYNAMIC && t.is("dynamic") && t.args.isEmpty() && t.funcParams == null) {
+            // A `dynamic` the program wrote (`Holder<dynamic>()`) is Dart's dynamic, which
+            // prints as such and makes the type equal its raw form; as reifiedArgWitness has it.
+            return "dart.runtime.TypeWitness.DYNAMIC";
         }
         boolean nullable = t.nullable || t.is("dynamic") || t.is("var") || t.is("Null")
                 || t.is("void");
@@ -20222,6 +20247,40 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         ft.funcNamedRequired = td.funcNamedRequired;
         String w = witnessOf(ft, ctx);
         return w == null ? null : new Out("dart.runtime.TypeWitness.value(" + w + ")", new TypeRef("Type"));
+    }
+
+    /// The function type a non-generic program function typedef named by {@code t} stands
+    /// for, nullable as {@code t} is; null when {@code t} names none.
+    private TypeRef nonGenericFunctionTypedef(TypeRef t) {
+        if (t.name == null || !t.args.isEmpty() || t.funcReturn != null || t.funcParams != null) {
+            return null;
+        }
+        Ast.TypedefDecl td = program.typedefs.get(t.name);
+        if (td == null || !td.typeParams.isEmpty()) {
+            return null;
+        }
+        TypeRef ft;
+        if (td.aliased != null) {
+            if (td.aliased.funcReturn == null || td.aliased.funcParams == null) {
+                return null;
+            }
+            ft = copyNonNull(td.aliased);
+            ft.funcRequired = td.aliased.funcRequired;
+            ft.funcNamed = td.aliased.funcNamed;
+            ft.funcNamedRequired = td.aliased.funcNamedRequired;
+        } else {
+            if (td.returnType == null || td.paramTypes == null) {
+                return null;
+            }
+            ft = new TypeRef("Function");
+            ft.funcParams = new ArrayList<TypeRef>(td.paramTypes);
+            ft.funcReturn = td.returnType;
+            ft.funcRequired = td.funcRequired;
+            ft.funcNamed = td.funcNamed;
+            ft.funcNamedRequired = td.funcNamedRequired;
+        }
+        ft.nullable = t.nullable;
+        return ft;
     }
 
     /** A user typedef by name, else a stub library's function typedef. */

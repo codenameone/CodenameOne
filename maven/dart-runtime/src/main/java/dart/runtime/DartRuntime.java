@@ -785,6 +785,16 @@ public final class DartRuntime {
     /// bare class (all arguments dynamic) prints them.
     private static final java.util.HashMap<Class<?>, Integer> GENERIC_ARITY = new java.util.HashMap<Class<?>, Integer>();
 
+    static {
+        // The core generic types: their raw literals (`List`, `Map`) print `List<dynamic>`.
+        GENERIC_ARITY.put(dart.core.DartList.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.core.DartSet.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.core.DartIterable.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.core.DartMap.class, Integer.valueOf(2));
+        GENERIC_ARITY.put(dart.async.Future.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.async.Stream.class, Integer.valueOf(1));
+    }
+
     /// Records that the transpiled class {@code c} declares {@code arity} type parameters.
     /// Answers {@code c}, so a type literal can record it where it is written.
     public static <T> Class<T> genericArity(Class<T> c, int arity) {
@@ -821,6 +831,9 @@ public final class DartRuntime {
         }
         if (c == dart.core.DartSet.class) {
             return "Set";
+        }
+        if (c == dart.core.DartIterable.class) {
+            return "Iterable";
         }
         // The primitive-backed lists are how List<int> and List<double> are held, so
         // their class stands for that whole type (a type argument's witness).

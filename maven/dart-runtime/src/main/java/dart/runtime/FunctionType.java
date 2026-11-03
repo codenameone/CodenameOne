@@ -34,6 +34,15 @@ public final class FunctionType {
     /// A generic closure's type parameter names (Signed.$typeVars), or null.
     private final String[] typeVars;
 
+    /// A function type's Type from a function-type witness's signature (no type
+    /// parameters): see TypeWitness's function factory for the layout.
+    FunctionType(TypeWitness[] sig, int required, String[] named) {
+        this.sig = sig;
+        this.required = required;
+        this.named = named;
+        this.typeVars = null;
+    }
+
     FunctionType(Signed s) {
         this.sig = s.$sig();
         this.required = s.$required();
@@ -152,10 +161,18 @@ public final class FunctionType {
         if (this == o) {
             return true;
         }
+        if (o instanceof TypeWitness) {
+            // A function type's literal (a typedef) against a closure's runtimeType.
+            FunctionType w = ((TypeWitness) o).functionType();
+            return w != null && equals(w);
+        }
         if (!(o instanceof FunctionType)) {
             return false;
         }
         FunctionType f = (FunctionType) o;
+        if ((typeVars == null) != (f.typeVars == null)) {
+            return false;
+        }
         if (f.sig.length != sig.length || f.requiredPositional() != requiredPositional()
                 || f.namedCount() != namedCount()) {
             return false;

@@ -1,0 +1,41 @@
+Late<dynamic>
+Late2<int>
+true
+Holder<dynamic>
+Pair<dynamic, dynamic>
+Holder<int>
+List<dynamic>
+Map<dynamic, dynamic>
+Set<dynamic>
+Iterable<dynamic>
+Future<dynamic>
+Stream<dynamic>
+true
+true
+true
+true
+false
+true
+List<int>
+Holder<int>
+(String, {int? b, required String c}) => int
+([int]) => int
+(String, [int?, double]) => int
+({int x, String? y}) => void
+true
+false
+true
+true
+false
+true
+false
+true
+true
+true
+true
+true
+false
+List<(String, {int? b, required String c}) => int>
+List<(([int]) => int)?>
+1
+true

@@ -64,6 +64,13 @@ public final class TypeWitness {
     private String[] recordNamed;
     private int recordPositional;
     private TypeWitness[] fnSig;
+    /// A function type's required positional parameter count, -1 when all positional
+    /// ones are required; and its named parameters' names in declaration order (a
+    /// required one prefixed with '!'), null when it has none. Laid out as FunctionType
+    /// reads a closure's signature: fnSig holds the return, the positional parameters,
+    /// then the named ones.
+    private int fnRequired = -1;
+    private String[] fnNamed;
 
     private TypeWitness(Class<?> type, boolean nullable, TypeWitness[] args) {
         this.type = type;
@@ -94,6 +101,18 @@ public final class TypeWitness {
     public static TypeWitness function(Class<?> sam, boolean nullable, Tester tester, TypeWitness[] sig) {
         TypeWitness w = function(sam, nullable, tester);
         w.fnSig = sig;
+        return w;
+    }
+
+    /// {@link #function(Class, boolean, Tester, TypeWitness[])} for a function type with
+    /// optional positional or named parameters: {@code required} positional ones are
+    /// required (-1 when all are), and {@code named} names the trailing slots of
+    /// {@code sig} ('!' marks a required one).
+    public static TypeWitness function(Class<?> sam, boolean nullable, Tester tester, TypeWitness[] sig,
+            int required, String[] named) {
+        TypeWitness w = function(sam, nullable, tester, sig);
+        w.fnRequired = required;
+        w.fnNamed = named;
         return w;
     }
 
@@ -191,7 +210,7 @@ public final class TypeWitness {
             return w;
         }
         if (w.tester != null) {
-            return function(w.type, true, w.tester, w.fnSig);
+            return function(w.type, true, w.tester, w.fnSig, w.fnRequired, w.fnNamed);
         }
         if (w.args == null) {
             return of(w.type, true);
@@ -283,7 +302,8 @@ public final class TypeWitness {
         if (!target.type.isAssignableFrom(actual.type)) {
             return false;
         }
-        if (target.fnSig != null && actual.fnSig != null && target.fnSig.length == actual.fnSig.length) {
+        if (target.fnSig != null && actual.fnSig != null && target.fnSig.length == actual.fnSig.length
+                && target.fnNamed == null && actual.fnNamed == null) {
             // Return covariant, parameters contravariant.
             if (!isSubtype(actual.fnSig[0], target.fnSig[0])) {
                 return false;
@@ -621,7 +641,72 @@ public final class TypeWitness {
             // erasure cannot tell them apart, and `T == dynamic` compares the two.
             return w.type;
         }
-        return w;
+        return rawIfDynamic(w);
+    }
+
+    /// A generic type whose arguments are all dynamic is the raw class's Type, as the raw
+    /// literal is: Dart's `Holder == Holder<dynamic>` and `<dynamic>[].runtimeType == List`
+    /// are true, and the class prints its arguments (`Holder<dynamic>`).
+    private static Object rawIfDynamic(TypeWitness w) {
+        if (w.args == null || w.nullable || w.fnSig != null || w.recordNamed != null || w.args.length == 0
+                || w.type == dart.core.DartLongList.class || w.type == dart.core.DartDoubleList.class) {
+            return w;
+        }
+        for (int i = 0; i < w.args.length; i++) {
+            if (w.args[i] != null && w.args[i] != DYNAMIC) {
+                return w;
+            }
+        }
+        return DartRuntime.genericArity(w.type, w.args.length);
+    }
+
+    /// Function-type witnesses are built per evaluation, so two spellings of one function
+    /// type (a typedef and its inline form) compare by signature, as Dart's Types do.
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (fnSig == null) {
+            return false;
+        }
+        if (o instanceof FunctionType) {
+            // A closure's runtimeType against the function type's literal.
+            return !nullable && o.equals(signature());
+        }
+        if (!(o instanceof TypeWitness)) {
+            return false;
+        }
+        TypeWitness t = (TypeWitness) o;
+        return t.fnSig != null && t.nullable == nullable && voidSam(t.type) == voidSam(type)
+                && signature().equals(t.signature());
+    }
+
+    @Override
+    public int hashCode() {
+        if (fnSig == null) {
+            return System.identityHashCode(this);
+        }
+        // As FunctionType hashes, since the two compare equal.
+        int h = signature().hashCode();
+        return nullable ? h + 7 : h;
+    }
+
+    /// Dart prints a void function's return as void; its return slot is untested (null).
+    private static final TypeWitness VOID_RETURN = new TypeWitness(Void.class, true, null);
+
+    /// The signature of a non-nullable function-type witness, null for any other.
+    FunctionType functionType() {
+        return fnSig == null || nullable ? null : signature();
+    }
+
+    private FunctionType signature() {
+        TypeWitness[] sig = fnSig;
+        if (voidSam(type)) {
+            sig = sig.clone();
+            sig[0] = VOID_RETURN;
+        }
+        return new FunctionType(sig, fnRequired, fnNamed);
     }
 
     /// Dart's runtimeType of {@code o}: a reified generic instance answers its arguments.
@@ -632,7 +717,8 @@ public final class TypeWitness {
             return runtimeType(((dart.core.MixinView) o).source());
         }
         if (o instanceof Reified) {
-            return ((Reified) o).$runtimeType();
+            Object t = ((Reified) o).$runtimeType();
+            return t instanceof TypeWitness ? rawIfDynamic((TypeWitness) t) : t;
         }
         if (o instanceof Signed) {
             // A generic closure too: FunctionType prints its type parameters, renamed in
@@ -674,14 +760,10 @@ public final class TypeWitness {
             return nullable ? rb.append('?').toString() : rb.toString();
         }
         if (fnSig != null) {
-            // A function type (a typedef used as a value): `(String) => int`. The return
-            // slot of a void function is untested, so the void interface says it.
-            StringBuilder fb = new StringBuilder("(");
-            for (int i = 1; i < fnSig.length; i++) {
-                fb.append(i > 1 ? ", " : "").append(fnSig[i] == null ? "dynamic" : fnSig[i].toString());
-            }
-            fb.append(") => ").append(voidSam(type) ? "void" : fnSig[0] == null ? "dynamic" : fnSig[0].toString());
-            return nullable ? "(" + fb + ")?" : fb.toString();
+            // A function type (a typedef used as a value): `(String, {int? b}) => int`,
+            // spelled as a closure's runtimeType is.
+            String fb = signature().toString();
+            return nullable ? "(" + fb + ")?" : fb;
         }
         StringBuilder sb = new StringBuilder(args == null ? DartRuntime.str(type) : DartRuntime.className(type));
         // A primitive-backed list class already names its element type (`List<int>`).
