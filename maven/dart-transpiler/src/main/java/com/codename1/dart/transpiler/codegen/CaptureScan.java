@@ -54,6 +54,13 @@ final class CaptureScan {
     private CaptureScan() {
     }
 
+    /// The names closures within {@code s} reference.
+    static Set<String> lambdaRefs(Stmt s) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkStmt(s);
+        return scan.referencedInLambda;
+    }
+
     static Set<String> boxedLocals(Block body) {
         CaptureScan scan = new CaptureScan();
         if (body != null) {

@@ -6677,7 +6677,7 @@ public final class JavaEmitter {
         // a VM error such as a stack overflow is not turned into a value.
         // An async body with an await runs as a resumable frame (AsyncLowering).
         boolean lowered = m.body != null && m.isAsync
-                && (asyncFuture && rt.is("Future") && !ctx.asyncReturnWidened || rt.is("void"))
+                && (asyncFuture || rt.is("void"))
                 && asyncLowering.tryEmit(m.params, m.body, !asyncFuture,
                         asyncFuture && !rt.args.isEmpty() ? rt.arg(0) : null, asyncFuture ? rt : null, ctx);
         String asyncErr = null;
@@ -6754,7 +6754,7 @@ public final class JavaEmitter {
         boolean asyncFuture = m.isAsync && (rt.is("Future") || rt.is("FutureOr"));
         // An async body with an await runs as a resumable frame (AsyncLowering).
         boolean lowered = m.body != null && m.isAsync
-                && (asyncFuture && rt.is("Future") && !ctx.asyncReturnWidened || rt.is("void"))
+                && (asyncFuture || rt.is("void"))
                 && asyncLowering.tryEmit(m.params, m.body, !asyncFuture,
                         asyncFuture && !rt.args.isEmpty() ? rt.arg(0) : null, asyncFuture ? rt : null, ctx);
         String asyncErr = null;
@@ -31133,7 +31133,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** Java holder class for a boxed captured local of the given type. */
-    private String refHolder(TypeRef t, Ctx ctx) {
+    String refHolder(TypeRef t, Ctx ctx) {
         if (t.is("int") && !t.nullable) {
             ctx.importClass("dart.runtime.RefLong");
             return "RefLong";

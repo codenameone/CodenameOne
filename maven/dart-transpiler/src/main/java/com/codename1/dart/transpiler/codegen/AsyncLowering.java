@@ -95,6 +95,10 @@ final class AsyncLowering {
         final Set<Stmt> returns = Collections.newSetFromMap(new IdentityHashMap<Stmt, Boolean>());
         final List<Target> targets = new ArrayList<Target>();
         VarDeclStmt fieldDecl;
+        /// What closures reference in each split loop being lowered, innermost last.
+        final List<Set<String>> loopCaps = new ArrayList<Set<String>>();
+        /// Per-iteration variables: Dart name to {field, type, holder class}.
+        final Map<String, Object[]> cells = new HashMap<String, Object[]>();
         AwaitExpr resumeAwait;
         JavaEmitter.Out resumeOperand;
         TypeRef resumeExpected;
@@ -112,8 +116,9 @@ final class AsyncLowering {
             fs = new ArrayList<Field>();
             for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
                 for (Field f : k.getDeclaredFields()) {
+                    // Args is no Node: a call's arguments hold awaits too.
                     if (!Modifier.isStatic(f.getModifiers()) && (Node.class.isAssignableFrom(f.getType())
-                            || List.class.isAssignableFrom(f.getType()))) {
+                            || List.class.isAssignableFrom(f.getType()) || f.getType() == Args.class)) {
                         f.setAccessible(true);
                         fs.add(f);
                     }
@@ -136,6 +141,12 @@ final class AsyncLowering {
                 }
             }
             return false;
+        }
+        if (n instanceof Args) {
+            return hasAwait(((Args) n).positional) || hasAwait(((Args) n).named);
+        }
+        if (n instanceof NamedArg) {
+            return hasAwait(((NamedArg) n).value);
         }
         if (!(n instanceof Node) || n instanceof Lambda || n instanceof LocalFunc) {
             return false;
@@ -172,10 +183,11 @@ final class AsyncLowering {
     }
 
     /// The await a statement-level shape suspends on, else null.
-    private static AwaitExpr statementAwait(Stmt s) {
+    static AwaitExpr statementAwait(Stmt s) {
         if (s instanceof ExprStmt) {
             Expr e = unparen(((ExprStmt) s).expr);
-            if (e instanceof Assign && "=".equals(((Assign) e).op) && unparen(((Assign) e).lhs) instanceof Ident) {
+            if (e instanceof Assign && "=".equals(((Assign) e).op) && (unparen(((Assign) e).lhs) instanceof Ident
+                    || simpleTarget(unparen(((Assign) e).lhs)))) {
                 return plainAwait(((Assign) e).rhs);
             }
             return plainAwait(e);
@@ -187,6 +199,23 @@ final class AsyncLowering {
             return plainAwait(((ReturnStmt) s).value);
         }
         return null;
+    }
+
+    /// `a.b` or `a[i]` over names and literals: what AsyncAnf leaves ahead of an awaited
+    /// assignment, its parts already evaluated into locals.
+    private static boolean simpleTarget(Expr lhs) {
+        if (lhs instanceof PropertyGet && !((PropertyGet) lhs).nullAware) {
+            return simplePart(((PropertyGet) lhs).target);
+        }
+        if (lhs instanceof IndexGet) {
+            return simplePart(((IndexGet) lhs).target) && simplePart(((IndexGet) lhs).index);
+        }
+        return false;
+    }
+
+    private static boolean simplePart(Expr e) {
+        return e instanceof Ident || e instanceof ThisExpr || e instanceof IntLit || e instanceof StringLit
+                && ((StringLit) e).parts.size() <= 1 && !hasAwait(e);
     }
 
     /// Whether the body can be lowered; see the class comment for the shapes.
@@ -217,9 +246,6 @@ final class AsyncLowering {
     private static boolean stmtOk(Stmt s) {
         if (s == null || !hasAwait(s)) {
             return true;
-        }
-        if (s.labels != null && s instanceof SwitchStmt) {
-            return false;
         }
         if (s instanceof Block) {
             return listOk(((Block) s).statements);
@@ -319,7 +345,11 @@ final class AsyncLowering {
     /// body has no await or a shape this stage does not lower.
     boolean tryEmit(List<Param> params, Block body, boolean isVoid, TypeRef valueType, TypeRef rt,
             JavaEmitter.Ctx ctx) {
-        if (body == null || !hasAwait(body.statements) || !lowerable(body)) {
+        if (body == null || !hasAwait(body.statements)) {
+            return false;
+        }
+        body = new AsyncAnf(params, body).normalize(body);
+        if (!lowerable(body)) {
             return false;
         }
         Frame f = new Frame();
@@ -369,7 +399,10 @@ final class AsyncLowering {
         JavaEmitter.Ctx.Writer w = ctx.writer();
         // A closure's Future type can name the callee's type variables, which are not in
         // scope here; the frame is then a Future<Object>, handed over raw.
-        boolean erased = !isVoid && !em.typeVarsInScope(f.valueType, ctx);
+        // So is a body whose Java signature is wider than its Dart Future (a pinned or
+        // erased return) or declared FutureOr: the Future converts to it unchecked.
+        boolean erased = !isVoid && (!em.typeVarsInScope(f.valueType, ctx) || ctx.asyncReturnWidened
+                || rt != null && !rt.is("Future"));
         String cls = isVoid ? "dart.async.LambdaVoidFrame"
                 : "dart.async.LambdaFrame<" + (erased ? "Object" : em.javaType(em.boxType(f.valueType), true, ctx)) + ">";
         w.line("var " + f.name + " = new " + cls + "() {");
@@ -396,6 +429,66 @@ final class AsyncLowering {
             w.line("return " + (rt != null && !erased ? em.reifyAsyncResult(start, rt, ctx) : start) + ";");
         }
         return true;
+    }
+
+    private static boolean isCell(Frame f, String name) {
+        for (Set<String> caps : f.loopCaps) {
+            if (caps.contains(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// A local of a split loop that a closure captures: the field holds a cell, and every
+    /// pass declares a new one, so a closure keeps the variable of the pass that made it.
+    private void declareCell(Frame f, JavaEmitter.Ctx ctx, String name, TypeRef t, String init) {
+        String holder = em.refHolder(t, ctx);
+        String raw = holder.startsWith("Ref<") ? "Ref<>" : holder;
+        String ref = declareField(f, ctx, name, t, holder);
+        ctx.markBoxed(ref);
+        f.cells.put(name, new Object[] {ref, t, raw});
+        ctx.writer().line(ref + " = new " + raw + "(" + init + ");");
+    }
+
+    private static List<VarDeclStmt> initDecls(Stmt init) {
+        List<VarDeclStmt> out = new ArrayList<VarDeclStmt>();
+        if (init instanceof VarDeclStmt) {
+            out.add((VarDeclStmt) init);
+        } else if (init instanceof VarDeclGroup) {
+            out.addAll(((VarDeclGroup) init).decls);
+        }
+        return out;
+    }
+
+    /// Before a statement whose closures capture per-iteration variables: each cell is
+    /// copied to a Java local the closures capture, so a later pass's cell is not theirs.
+    private static List<Object[]> snapshot(Stmt s, Frame f, JavaEmitter.Ctx ctx) {
+        List<Object[]> undo = new ArrayList<Object[]>();
+        if (f.cells.isEmpty()) {
+            return undo;
+        }
+        for (String name : CaptureScan.lambdaRefs(s)) {
+            Object[] c = f.cells.get(name);
+            if (c == null || !((String) c[0]).equals(ctx.javaNameOf(name))) {
+                continue;
+            }
+            String local = ctx.newTemp();
+            ctx.writer().line("var " + local + " = " + c[0] + ";");
+            ctx.declareAs(name, (TypeRef) c[1], local);
+            ctx.markBoxed(local);
+            undo.add(c);
+            undo.add(new Object[] {name});
+        }
+        return undo;
+    }
+
+    private static void restore(List<Object[]> undo, JavaEmitter.Ctx ctx) {
+        for (int i = 0; i < undo.size(); i += 2) {
+            Object[] c = undo.get(i);
+            ctx.declareAs((String) undo.get(i + 1)[0], (TypeRef) c[1], (String) c[0]);
+            ctx.markBoxed((String) c[0]);
+        }
     }
 
     private static String declareField(Frame f, JavaEmitter.Ctx ctx, String dartName, TypeRef t, String javaType) {
@@ -473,18 +566,22 @@ final class AsyncLowering {
         }
         if (s instanceof VarDeclStmt && !hasAwait(s)) {
             f.fieldDecl = (VarDeclStmt) s;
+            List<Object[]> snap = snapshot(s, f, ctx);
             try {
                 em.emitStatement(s, ctx);
             } finally {
                 f.fieldDecl = null;
             }
+            restore(snap, ctx);
             return;
         }
         if (!hasAwait(s)) {
             registerEscapes(s, 0, 0, new HashSet<String>(), f);
             w.line("if (true) {");
             ctx.indent(1);
+            List<Object[]> snap = snapshot(s, f, ctx);
             em.emitStatement(s, ctx);
+            restore(snap, ctx);
             ctx.indent(-1);
             w.line("}");
             return;
@@ -515,8 +612,15 @@ final class AsyncLowering {
                 expected = ((VarDeclStmt) s).type;
             } else if (s instanceof ReturnStmt && !f.isVoid && !em.isDynamicType(f.valueType)) {
                 expected = f.valueType;
+            } else if (s instanceof ExprStmt && unparen(((ExprStmt) s).expr) instanceof Assign
+                    && !(unparen(((Assign) unparen(((ExprStmt) s).expr)).lhs) instanceof Ident)) {
+                // `o.p = await open()`: the slot's type infers the callee's witness.
+                TypeRef lt = em.emitExpr(unparen(((Assign) unparen(((ExprStmt) s).expr)).lhs), null, ctx).type;
+                expected = lt == null || em.isDynamicType(lt) ? null : lt;
             }
+            List<Object[]> snap = snapshot(s, f, ctx);
             suspend(aw, expected, f, ctx);
+            restore(snap, ctx);
             f.resumeAwait = aw;
             f.resumeExpected = expected;
             f.fieldDecl = s instanceof VarDeclStmt ? (VarDeclStmt) s : null;
@@ -572,7 +676,9 @@ final class AsyncLowering {
                 open(f, body, ctx);
             }
             f.targets.add(new Target(LOOP, s.labels, exit, head));
+            f.loopCaps.add(CaptureScan.lambdaRefs(wh.body));
             lowerBranch(wh.body, f, ctx);
+            f.loopCaps.remove(f.loopCaps.size() - 1);
             f.targets.remove(f.targets.size() - 1);
             if (wh.isDo) {
                 open(f, head, ctx);
@@ -586,6 +692,7 @@ final class AsyncLowering {
         if (s instanceof ForStmt) {
             ForStmt fs = (ForStmt) s;
             ctx.pushScope();
+            f.loopCaps.add(CaptureScan.lambdaRefs(s));
             if (fs.init != null) {
                 lower(fs.init, f, ctx);
             }
@@ -602,10 +709,18 @@ final class AsyncLowering {
             lowerBranch(fs.body, f, ctx);
             f.targets.remove(f.targets.size() - 1);
             open(f, next, ctx);
+            // Dart's next pass gets its own variable, holding the value this one ended with.
+            for (VarDeclStmt d : initDecls(fs.init)) {
+                Object[] c = f.cells.get(d.name);
+                if (c != null && ((String) c[0]).equals(ctx.javaNameOf(d.name))) {
+                    w.line(c[0] + " = new " + c[2] + "(" + c[0] + ".v);");
+                }
+            }
             for (Expr u : fs.updates) {
                 em.emitDiscardedValue(u, ctx);
             }
             jump(f, head, ctx);
+            f.loopCaps.remove(f.loopCaps.size() - 1);
             ctx.popScope();
             open(f, exit, ctx);
             return;
@@ -627,11 +742,17 @@ final class AsyncLowering {
             w.line("}");
             ctx.pushScope();
             String jt = em.javaType(elem, true, ctx);
-            String v = declareField(f, ctx, fi.varName, elem, jt);
-            w.line(v + " = (" + jt + ") " + it + ".next();");
+            f.loopCaps.add(CaptureScan.lambdaRefs(fi.body));
+            if (isCell(f, fi.varName)) {
+                declareCell(f, ctx, fi.varName, elem, "(" + jt + ") " + it + ".next()");
+            } else {
+                String v = declareField(f, ctx, fi.varName, elem, jt);
+                w.line(v + " = (" + jt + ") " + it + ".next();");
+            }
             f.targets.add(new Target(LOOP, s.labels, exit, head));
             lowerBranch(fi.body, f, ctx);
             f.targets.remove(f.targets.size() - 1);
+            f.loopCaps.remove(f.loopCaps.size() - 1);
             ctx.popScope();
             jump(f, head, ctx);
             open(f, exit, ctx);
@@ -754,7 +875,7 @@ final class AsyncLowering {
             inner = f.resumeExpected;
         }
         TypeRef boxed = em.boxType(inner);
-        if (em.isDynamicType(boxed)) {
+        if (em.isDynamicType(boxed) || !em.typeVarsInScope(boxed, ctx)) {
             return new JavaEmitter.Out(v, TypeRef.DYNAMIC);
         }
         String pk = JavaEmitter.primitiveListKind(boxed);
@@ -767,6 +888,10 @@ final class AsyncLowering {
     /// A local declared among the statements split into states: a field of the frame.
     void emitFieldLocal(VarDeclStmt v, TypeRef t, JavaEmitter.Out init, JavaEmitter.Ctx ctx) {
         Frame f = ctx.frame;
+        if (!em.typeVarsInScope(t, ctx)) {
+            // Inferred from a callee's signature, its type variables are not in scope here.
+            t = TypeRef.DYNAMIC;
+        }
         String jt;
         if (t.is("Function") && t.funcReturn == null && v.initializer instanceof Lambda
                 && ((Lambda) v.initializer).params.isEmpty()) {
@@ -776,6 +901,14 @@ final class AsyncLowering {
         }
         String code = init != null ? (jt.equals("dart.runtime.Funcs.VoidFunc0") ? init.code : em.coerce(init, t, ctx))
                 : em.zeroValue(t);
+        if (init != null && jt.indexOf('<') > 0 && !(v.initializer instanceof Lambda)) {
+            // A `var` inferred as Stream<Object> holding a Stream<Long>: generics are erased.
+            code = "(" + jt + ") (Object) (" + code + ")";
+        }
+        if (!jt.equals("dart.runtime.Funcs.VoidFunc0") && isCell(f, v.name)) {
+            declareCell(f, ctx, v.name, t, code);
+            return;
+        }
         String ref = declareField(f, ctx, v.name, t, jt);
         ctx.writer().line(ref + " = " + code + ";");
     }

@@ -1,0 +1,94 @@
+side a
+eval b
+side c
+6
+side l
+eval r
+side m
+20
+eval arg
+eval named
+10
+side e0
+eval e1
+side e2
+[0, 1, 2]
+side k
+eval v
+{k1: 2}
+eval s1
+side s2
+{1, 2}
+side i1
+eval i2
+side i3
+interp 1 2 3
+eval c1
+side c2
+eval c3
+[1, 2] 3
+eval recv
+1
+false
+flag and2
+true
+true
+flag or2
+true
+have
+maybe nn2
+yes
+side c
+eval then
+1
+side c2
+eval else2
+2
+null
+eval called
+1
+flag cond
+yes
+eval rhs
+[1, 12, 3]
+eval n
+maybe label
+5 set
+eval mul
+6
+eval top
+3
+flag if
+if body
+eval w0
+eval w1
+eval w2
+while 2
+eval d1
+eval d2
+eval d3
+do 3
+eval f0
+for 0
+eval f1
+for 1
+eval f2
+in 4
+in 5
+eval sw
+two
+for 0
+for 1
+for 2
+in a
+in b
+while 0
+while 10
+count 100
+count 101
+eval fo
+8
+eval lab
+three before
+flag leave
+after labeled switch
