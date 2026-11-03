@@ -12512,6 +12512,9 @@ public final class JavaEmitter {
         return upperBound(a, b);
     }
 
+    private static final java.util.Set<String> COVARIANT_CORE_GENERICS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("List", "Set", "Iterable", "Map", "Future", "FutureOr", "Stream"));
+
     private TypeRef upperBound(TypeRef a, TypeRef b) {
         boolean nullable = a.nullable || b.nullable || a.is("Null") || b.is("Null");
         TypeRef r;
@@ -12523,6 +12526,15 @@ public final class JavaEmitter {
             r = a;
         } else if ((a.is("int") || a.is("double") || a.is("num")) && (b.is("int") || b.is("double") || b.is("num"))) {
             r = new TypeRef("num");
+        } else if (a.name != null && a.name.equals(b.name) && a.args.size() == b.args.size()
+                && a.funcParams == null && b.funcParams == null && COVARIANT_CORE_GENERICS.contains(a.name)
+                && !containsDynamic(a) && !containsDynamic(b)) {
+            // Dart's upper bound of two instances of one covariant core generic is that
+            // generic over the arguments' bound: `[[1], ['a']]` is a List<List<Object>>.
+            r = new TypeRef(a.name);
+            for (int i = 0; i < a.args.size(); i++) {
+                r.args.add(upperBound(a.arg(i), b.arg(i)));
+            }
         } else {
             r = new TypeRef("Object");
         }
@@ -14248,11 +14260,6 @@ public final class JavaEmitter {
             if (lubKnown) {
                 if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
                     lubKnown = false;
-                } else if (lub != null && lub.name != null && lub.name.equals(o.type.name)
-                        && !lub.args.toString().equals(o.type.args.toString())) {
-                    // `[[1, 2], ['a']]`: Dart's bound is List<Object>, which this cannot
-                    // name element by element; the list stays dynamic, as before.
-                    lubKnown = false;
                 } else {
                     lub = entryLub(lub, o.type);
                 }
@@ -14273,6 +14280,17 @@ public final class JavaEmitter {
             // `[[1], {'x': [2]}]`, `[1, 2.5]`: elements of known, different types make a list
             // of their upper bound (List<Object>, List<num>), as Dart infers it.
             elem = lub;
+        } else if (elem == null && mixed && lubKnown && lub != null && !lub.args.isEmpty()
+                && COVARIANT_CORE_GENERICS.contains(lub.name) && !containsDynamic(lub)
+                && typeVarsInScope(lub, ctx)) {
+            // `[[1], ['a']]` is a List<List<Object>>. Its elements are different Java
+            // classes (a DartLongList, a DartList<String>) that Java generics call unrelated;
+            // a Dart List is covariant, so each is viewed as the bound through Object.
+            elem = lub;
+            String jt = javaType(elem, true, ctx);
+            for (int i = 0; i < codes.size(); i++) {
+                codes.set(i, "(" + jt + ") (Object) (" + codes.get(i) + ")");
+            }
         }
         if (elem == null) {
             elem = mixed || inferred == null ? TypeRef.DYNAMIC : inferred;
@@ -14606,16 +14624,6 @@ public final class JavaEmitter {
     /// The declared return type of a call to a non-generic top-level function
     /// (`later(x)` declared `Future<int> later(int v)`), or null: a local of that name,
     /// a type argument, a generic function or an undeclared return type is not typed here.
-    /// Whether {@code e} is a bare call of a top-level function the program declares.
-    boolean isProgramFunctionCall(Expr e, Ctx ctx) {
-        if (!(e instanceof Call)) {
-            return false;
-        }
-        Call c = (Call) e;
-        return c.target == null && c.name != null && !c.nullAware && ctx.lookup(c.name) == null
-                && program.functions.get(c.name) != null;
-    }
-
     private TypeRef topLevelCallReturnTypeQuiet(Expr e, Ctx ctx) {
         if (!(e instanceof Call)) {
             return null;
@@ -27915,7 +27923,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (params != null && args != null) {
             int i = params.indexOf(t.name);
             if (i >= 0 && i < args.size()) {
-                return args.get(i);
+                TypeRef a = args.get(i);
+                if (t.nullable && a != null && !a.nullable && t.args.isEmpty()) {
+                    // `T?` with T = bool is `bool?`: a stub's `Future<T?> showDialog<T>`
+                    // keeps the written `?` through the substitution.
+                    a = copyNonNull(a);
+                    a.nullable = true;
+                }
+                return a;
             }
         }
         if (t.args.isEmpty()) {

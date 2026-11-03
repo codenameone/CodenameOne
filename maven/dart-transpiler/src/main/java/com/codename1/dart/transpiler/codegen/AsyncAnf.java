@@ -60,6 +60,12 @@ final class AsyncAnf {
     /// Whether a name, unqualified, reads no value: a type or an import prefix.
     private final java.util.function.Predicate<String> noValue;
 
+    /// The declared type an async body's `return` completes with (the T of Future<T>), or
+    /// null; set by the lowering before {@link #normalize}.
+    TypeRef returnContext;
+    /// The value of the return statement being normalized, while it is.
+    private Expr returnValue;
+
     AsyncAnf(List<Param> params, Block body, java.util.function.Predicate<String> noValue) {
         this.noValue = noValue;
         for (Param p : params) {
@@ -227,7 +233,13 @@ final class AsyncAnf {
             if (AsyncLowering.statementAwait(s) != null) {
                 return s;
             }
-            Expr e = expr(((ReturnStmt) s).value, pre);
+            returnValue = ((ReturnStmt) s).value;
+            Expr e;
+            try {
+                e = expr(((ReturnStmt) s).value, pre);
+            } finally {
+                returnValue = null;
+            }
             if (e == null) {
                 return null;
             }
@@ -910,11 +922,17 @@ final class AsyncAnf {
         } else if (lit instanceof ListLit) {
             ListLit c = copy((ListLit) lit);
             c.elements = new ArrayList<Expr>();
+            if (c.elementType == null && lit == returnValue) {
+                c.elementType = contextElement("List");
+            }
             c.inferFrom = c.elementType == null ? els : null;
             empty = c;
         } else {
             SetLit c = copy((SetLit) lit);
             c.elements = new ArrayList<Expr>();
+            if (c.elementType == null && lit == returnValue) {
+                c.elementType = contextElement("Set");
+            }
             c.inferFrom = c.elementType == null ? els : null;
             empty = c;
         }
@@ -933,6 +951,20 @@ final class AsyncAnf {
             stmt(s, pre);
         }
         return ident(t, lit);
+    }
+
+    /// The element type a returned `kind` literal takes from the function's declared value
+    /// type, as Dart's downward inference gives it: `return [for (...) await f(i)]` in a
+    /// `Future<List<Object?>>` body is a List<Object?>, whatever its elements are. Hoisting
+    /// the literal into a temp would otherwise lose that context. Null when the context
+    /// does not name the element type (`Object`, `dynamic`, a type variable).
+    private TypeRef contextElement(String kind) {
+        TypeRef c = returnContext;
+        if (c == null || c.args.size() != 1 || c.funcParams != null || c.arg(0) == null
+                || !(c.is(kind) || c.is("Iterable"))) {
+            return null;
+        }
+        return c.arg(0);
     }
 
     private Stmt addElement(String t, Expr x) {
