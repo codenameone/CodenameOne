@@ -854,6 +854,11 @@ public final class Ast {
         public List<Pattern> elements = new ArrayList<Pattern>();
     }
 
+    /** A rest element of a list pattern: `...` or `...rest`; {@code inner} is null for a bare `...`. */
+    public static class RestPattern extends Pattern {
+        public Pattern inner;
+    }
+
     /** A relational pattern: `> 5`, `== x`, `<= y`, etc. */
     public static class RelationalPattern extends Pattern {
         public String op;

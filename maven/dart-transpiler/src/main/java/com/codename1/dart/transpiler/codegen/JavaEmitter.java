@@ -8022,6 +8022,12 @@ public final class JavaEmitter {
         }
         if (p instanceof ListPattern) {
             for (Pattern part : ((ListPattern) p).elements) {
+                if (part instanceof RestPattern) {
+                    part = ((RestPattern) part).inner;
+                    if (part == null) {
+                        continue;
+                    }
+                }
                 if (patternBinds(part)) {
                     return true;
                 }
@@ -8512,7 +8518,7 @@ public final class JavaEmitter {
      * reused by the bindings. A destructuring for-in discards the condition, so it calls
      * patternMatch directly.
      */
-    private String patternTest(Pattern p, String subj, TypeRef subjType, Ctx ctx, List<String> binds) {
+    String patternTest(Pattern p, String subj, TypeRef subjType, Ctx ctx, List<String> binds) {
         boolean saved = patternCondRuns;
         patternCondRuns = true;
         try {
@@ -8746,10 +8752,36 @@ public final class JavaEmitter {
             ListPattern l = (ListPattern) p;
             ctx.importClass("java.util.List");
             String cast = "((List) " + subj + ")";
-            String cond = subj + " instanceof List && " + cast + ".size() == " + l.elements.size();
+            int rest = -1;
             for (int i = 0; i < l.elements.size(); i++) {
-                String access = cast + ".get(" + i + ")";
-                cond = joinAnd(cond, patternMatch(l.elements.get(i), access, TypeRef.DYNAMIC, ctx, binds));
+                if (l.elements.get(i) instanceof RestPattern) {
+                    if (rest >= 0) {
+                        diags.error(l.elements.get(i), "E0434", "A list pattern can have at most one rest element");
+                        return "false";
+                    }
+                    rest = i;
+                }
+            }
+            int fixed = rest < 0 ? l.elements.size() : l.elements.size() - 1;
+            String cond = subj + " instanceof List && " + cast + ".size() " + (rest < 0 ? "==" : ">=")
+                    + " " + fixed;
+            for (int i = 0; i < l.elements.size(); i++) {
+                Pattern el = l.elements.get(i);
+                if (i == rest) {
+                    Pattern inner = ((RestPattern) el).inner;
+                    if (inner != null) {
+                        ctx.importClass("dart.core.DartList");
+                        int after = l.elements.size() - 1 - i;
+                        String slice = "DartList.from(" + cast + ".subList(" + i + ", " + cast + ".size() - "
+                                + after + "))";
+                        cond = joinAnd(cond, patternMatch(inner, slice, TypeRef.DYNAMIC, ctx, binds));
+                    }
+                    continue;
+                }
+                String access = rest >= 0 && i > rest
+                        ? cast + ".get(" + cast + ".size() - " + (l.elements.size() - i) + ")"
+                        : cast + ".get(" + i + ")";
+                cond = joinAnd(cond, patternMatch(el, access, TypeRef.DYNAMIC, ctx, binds));
             }
             return cond;
         }

@@ -874,14 +874,11 @@ public class Future<T> {
         r = new Runnable() {
             @Override
             public void run() {
-                Boolean outer = IN_LISTENER.get();
-                IN_LISTENER.set(Boolean.TRUE);
+                listenerDepth++;
                 try {
                     captured.run();
                 } finally {
-                    if (outer == null) {
-                        IN_LISTENER.remove();
-                    }
+                    listenerDepth--;
                 }
             }
         };
@@ -1024,7 +1021,7 @@ public class Future<T> {
             // A future a listener settles (the result of then/catchError) is Dart's
             // _propagateToListeners running inside the microtask that settled its
             // source: an error nobody listens for is reported right there.
-            reportIfUnhandled(reportNow || IN_LISTENER.get() != null);
+            reportIfUnhandled(reportNow || listenerDepth > 0);
         }
     }
 
@@ -1064,8 +1061,10 @@ public class Future<T> {
         }
     }
 
-    /// Set while a listener registered through onComplete runs on this thread.
-    private static final ThreadLocal<Boolean> IN_LISTENER = new ThreadLocal<Boolean>();
+    /// How many listeners registered through onComplete are running. Every Dart
+    /// callback runs on the single isolate thread, so a plain counter is enough
+    /// and avoids a ThreadLocal lookup per listener on ParparVM.
+    private static int listenerDepth;
 
     void markHandled() {
         synchronized (lock) {

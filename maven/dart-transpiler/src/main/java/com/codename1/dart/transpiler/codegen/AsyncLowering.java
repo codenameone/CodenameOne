@@ -326,7 +326,7 @@ final class AsyncLowering {
         }
         if (s instanceof IfStmt) {
             IfStmt i = (IfStmt) s;
-            return i.casePattern == null && !hasAwait(i.condition) && branchOk(i.thenStmt) && branchOk(i.elseStmt);
+            return !hasAwait(i.condition) && !hasAwait(i.caseGuard) && branchOk(i.thenStmt) && branchOk(i.elseStmt);
         }
         if (s instanceof WhileStmt) {
             WhileStmt w = (WhileStmt) s;
@@ -353,7 +353,7 @@ final class AsyncLowering {
         }
         if (s instanceof ForInStmt) {
             ForInStmt f = (ForInStmt) s;
-            return f.pattern == null && !hasAwait(f.iterable) && branchOk(f.body);
+            return !hasAwait(f.iterable) && branchOk(f.body);
         }
         if (s instanceof SwitchStmt) {
             SwitchStmt sw = (SwitchStmt) s;
@@ -881,6 +881,10 @@ final class AsyncLowering {
             }
             return;
         }
+        if (s instanceof IfStmt && ((IfStmt) s).casePattern != null) {
+            lowerIfCase((IfStmt) s, f, ctx);
+            return;
+        }
         if (s instanceof IfStmt) {
             IfStmt i = (IfStmt) s;
             JavaEmitter.Out c = em.dynCondition(em.emitExpr(i.condition, TypeRef.BOOL, ctx), ctx);
@@ -1019,11 +1023,15 @@ final class AsyncLowering {
             ctx.pushScope();
             String jt = em.javaType(elem, true, ctx);
             f.loopCaps.add(CaptureScan.lambdaRefs(fi.body));
-            if (isCell(f, fi.varName)) {
-                declareCell(f, ctx, fi.varName, elem, "(" + jt + ") " + it + ".next()");
+            String name = fi.pattern == null ? fi.varName : f.name + "pe" + f.states;
+            if (isCell(f, name)) {
+                declareCell(f, ctx, name, elem, "(" + jt + ") " + it + ".next()");
             } else {
-                String v = declareField(f, ctx, fi.varName, elem, jt);
+                String v = declareField(f, ctx, name, elem, jt);
                 w.line(v + " = (" + jt + ") " + it + ".next();");
+            }
+            if (fi.pattern != null) {
+                destructureElement(fi, name, f, ctx);
             }
             f.targets.add(new Target(f.fins.size(), LOOP, s.labels, exit, head));
             lowerBranch(fi.body, f, ctx);
@@ -1232,11 +1240,15 @@ final class AsyncLowering {
         ctx.pushScope();
         String jt = em.javaType(elem, true, ctx);
         f.loopCaps.add(CaptureScan.lambdaRefs(fi.body));
-        if (isCell(f, fi.varName)) {
-            declareCell(f, ctx, fi.varName, elem, "(" + jt + ") " + it + ".current()");
+        String name = fi.pattern == null ? fi.varName : f.name + "pe" + f.states;
+        if (isCell(f, name)) {
+            declareCell(f, ctx, name, elem, "(" + jt + ") " + it + ".current()");
         } else {
-            String v = declareField(f, ctx, fi.varName, elem, jt);
+            String v = declareField(f, ctx, name, elem, jt);
             w.line(v + " = (" + jt + ") " + it + ".current();");
+        }
+        if (fi.pattern != null) {
+            destructureElement(fi, name, f, ctx);
         }
         // A break leaves through the finally; continue stays inside it.
         int brk = newState(f);
@@ -1268,6 +1280,78 @@ final class AsyncLowering {
         open(f, after, ctx);
         finallyTail(fin, f, ctx);
         open(f, exit, ctx);
+    }
+
+    /// An if-case (`if (e case p when g) S1 else S2`) whose branches hold an await. The
+    /// subject, the match and the guard run in one state; the bindings are frame fields
+    /// (patternBinding), so the then-branch reads them in whatever state it resumes in.
+    /// AsyncAnf has already moved an await of the subject or the guard out of the test.
+    private void lowerIfCase(IfStmt i, Frame f, JavaEmitter.Ctx ctx) {
+        JavaEmitter.Ctx.Writer w = ctx.writer();
+        int then = newState(f);
+        int els = i.elseStmt != null ? newState(f) : -1;
+        int exit = newState(f);
+        ctx.pushScope();
+        w.line("{");
+        ctx.indent(1);
+        JavaEmitter.Out subj = em.emitExpr(i.condition, null, ctx);
+        String temp = ctx.newTemp();
+        w.line(em.javaType(subj.type, true, ctx) + " " + temp + " = " + subj.code + ";");
+        ctx.declare(temp, subj.type);
+        List<String> binds = new ArrayList<String>();
+        String cond;
+        f.patternFields = true;
+        try {
+            cond = em.patternTest(i.casePattern, temp, subj.type, ctx, binds);
+        } finally {
+            f.patternFields = false;
+        }
+        w.line("if (" + cond + ") {");
+        ctx.indent(1);
+        for (String b : binds) {
+            w.line(b);
+        }
+        if (i.caseGuard != null) {
+            JavaEmitter.Out g = em.dynCondition(em.emitExpr(i.caseGuard, TypeRef.BOOL, ctx), ctx);
+            w.line("if (" + g.code + ") {");
+            w.line("    " + jumpCode(f, then));
+            w.line("}");
+        } else {
+            w.line(jumpCode(f, then));
+        }
+        ctx.indent(-1);
+        w.line("}");
+        ctx.indent(-1);
+        w.line("}");
+        w.line(jumpCode(f, els >= 0 ? els : exit));
+        f.closed = true;
+        open(f, then, ctx);
+        lowerBranch(i.thenStmt, f, ctx);
+        ctx.popScope();
+        if (els >= 0) {
+            jump(f, exit, ctx);
+            open(f, els, ctx);
+            lowerBranch(i.elseStmt, f, ctx);
+        }
+        open(f, exit, ctx);
+    }
+
+    /// A pattern for-in (`for (var (a, b) in xs)`): the element went into the frame
+    /// field {@code name}, and the pattern is then bound from it exactly as a pattern
+    /// declaration is, so every binding is a frame field (patternBinding).
+    private void destructureElement(ForInStmt fi, String name, Frame f, JavaEmitter.Ctx ctx) {
+        Ident ref = new Ident();
+        ref.file = fi.file;
+        ref.line = fi.line;
+        ref.col = fi.col;
+        ref.name = name;
+        PatternDeclStmt decl = new PatternDeclStmt();
+        decl.file = fi.file;
+        decl.line = fi.line;
+        decl.col = fi.col;
+        decl.pattern = fi.pattern;
+        decl.init = ref;
+        lower(decl, f, ctx);
     }
 
     /// After a finally block: the pending completion it interrupted carries on.

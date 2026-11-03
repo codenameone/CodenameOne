@@ -1762,8 +1762,15 @@ public final class AstBuilder {
     private Pattern buildListPattern(Dart2Parser.ListPatternContext ctx) {
         ListPattern l = new ListPattern();
         pos(l, ctx);
-        for (Dart2Parser.PatternContext p : ctx.pattern()) {
-            l.elements.add(buildPattern(p));
+        for (Dart2Parser.ListPatternElementContext e : ctx.listPatternElement()) {
+            if (e.DDD() != null) {
+                RestPattern r = new RestPattern();
+                pos(r, e);
+                r.inner = e.pattern() == null ? null : buildPattern(e.pattern());
+                l.elements.add(r);
+            } else {
+                l.elements.add(buildPattern(e.pattern()));
+            }
         }
         return l;
     }

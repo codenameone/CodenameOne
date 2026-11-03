@@ -1096,7 +1096,13 @@ recordPattern
     ;
 
 listPattern
-    : typeArguments? OB (pattern (C pattern)* C?)? CB
+    : typeArguments? OB (listPatternElement (C listPatternElement)* C?)? CB
+    ;
+
+// `...` or `...rest` matches the elements between the leading and trailing ones
+listPatternElement
+    : DDD pattern?
+    | pattern
     ;
 
 patternField

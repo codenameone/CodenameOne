@@ -233,8 +233,13 @@ final class AsyncAnf {
             IfStmt i = (IfStmt) s;
             IfStmt c = copy(i);
             if (i.casePattern != null) {
-                if (AsyncLowering.hasAwait(i.condition) || AsyncLowering.hasAwait(i.caseGuard)) {
+                // The subject is evaluated first, so its await can run ahead of the test.
+                c.condition = expr(i.condition, pre);
+                if (c.condition == null) {
                     return null;
+                }
+                if (AsyncLowering.hasAwait(i.caseGuard)) {
+                    return guardedCase(i, c, pre);
                 }
             } else {
                 c.condition = expr(i.condition, pre);
@@ -319,10 +324,9 @@ final class AsyncAnf {
             return block(outer, f);
         }
         if (s instanceof ForInStmt) {
+            // `await for` too: its stream is evaluated once ahead of the loop, as an
+            // iterable is, and its body is normalized like any loop body.
             ForInStmt f = (ForInStmt) s;
-            if (f.isAwait) {
-                return null;
-            }
             ForInStmt c = copy(f);
             c.iterable = expr(f.iterable, pre);
             if (c.iterable == null) {
@@ -363,6 +367,85 @@ final class AsyncAnf {
             return c;
         }
         return null;
+    }
+
+    /// A switch expression: an await of the subject runs ahead of it. An await in an arm
+    /// makes it a chain of if-cases over the subject's temp, each assigning the result
+    /// temp (dynamic, as a Conditional's is), and the chain is normalized like any if-case.
+    private Expr switchExpr(SwitchExpr x, List<Stmt> pre) {
+        Expr subj = expr(x.subject, pre);
+        if (subj == null) {
+            return null;
+        }
+        boolean arms = false;
+        for (SwitchExprCase k : x.cases) {
+            arms |= AsyncLowering.hasAwait(k.guard) || AsyncLowering.hasAwait(k.value);
+        }
+        if (!arms) {
+            SwitchExpr c = copy(x);
+            c.subject = subj;
+            return c;
+        }
+        String st = temp();
+        pre.add(decl(st, null, subj, x));
+        String t = temp();
+        pre.add(decl(t, TypeRef.of("dynamic"), null, x));
+        Stmt chain = null;
+        for (int i = x.cases.size() - 1; i >= 0; i--) {
+            SwitchExprCase k = x.cases.get(i);
+            List<Stmt> body = new ArrayList<Stmt>();
+            body.add(assign(ident(t, k), k.value, k));
+            if (k.isDefault) {
+                // `_ => v`: matches anything, so the arms after it are unreachable.
+                chain = block(body, k);
+                continue;
+            }
+            if (k.pattern == null) {
+                return null;
+            }
+            IfStmt c = ifStmt(ident(st, k), block(body, k), chain, k);
+            c.casePattern = k.pattern;
+            c.caseGuard = k.guard;
+            chain = c;
+        }
+        if (chain == null) {
+            return null;
+        }
+        stmt(chain, pre);
+        return ident(t, x);
+    }
+
+    /// `if (s case p when await g) S1 else S2`: the guard runs only after a match, with
+    /// the pattern's bindings in scope, so it moves inside an unguarded if-case:
+    /// `m = false; if (s case p) { <guard's pre>; if (g') { m = true; S1 } } if (!m) S2`.
+    /// Without an else branch the flag is not needed.
+    private Stmt guardedCase(IfStmt i, IfStmt c, List<Stmt> pre) {
+        List<Stmt> inner = new ArrayList<Stmt>();
+        Expr g = expr(i.caseGuard, inner);
+        if (g == null) {
+            return null;
+        }
+        Stmt then = branch(i.thenStmt);
+        String m = null;
+        if (i.elseStmt != null) {
+            m = temp();
+            pre.add(decl(m, TypeRef.of("bool"), bool(false, i), i));
+            List<Stmt> t = new ArrayList<Stmt>();
+            t.add(assign(ident(m, i), bool(true, i), i));
+            t.add(then);
+            then = block(t, i);
+        }
+        inner.add(ifStmt(g, then, null, i));
+        c.caseGuard = null;
+        c.thenStmt = block(inner, i);
+        c.elseStmt = null;
+        if (m == null) {
+            return c;
+        }
+        List<Stmt> out = new ArrayList<Stmt>();
+        out.add(c);
+        out.add(ifStmt(not(ident(m, i), i), branch(i.elseStmt), null, i));
+        return block(out, i);
     }
 
     // ------------------------------------------------------------------
@@ -525,6 +608,29 @@ final class AsyncAnf {
             ListLit c = copy((ListLit) e);
             c.elements = elements(c.elements, pre);
             return c.elements == null ? null : c;
+        }
+        if (e instanceof RecordLit) {
+            // Record fields are evaluated left to right, positional and named alike.
+            RecordLit r = (RecordLit) e;
+            Expr[] vals = new Expr[r.fields.size()];
+            for (int i = 0; i < vals.length; i++) {
+                vals[i] = r.fields.get(i).value;
+            }
+            Expr[] k = kids(pre, null, vals);
+            if (k == null) {
+                return null;
+            }
+            RecordLit c = copy(r);
+            c.fields = new ArrayList<RecordField>();
+            for (int i = 0; i < vals.length; i++) {
+                RecordField fc = copy(r.fields.get(i));
+                fc.value = k[i];
+                c.fields.add(fc);
+            }
+            return c;
+        }
+        if (e instanceof SwitchExpr) {
+            return switchExpr((SwitchExpr) e, pre);
         }
         if (e instanceof SetLit) {
             SetLit c = copy((SetLit) e);

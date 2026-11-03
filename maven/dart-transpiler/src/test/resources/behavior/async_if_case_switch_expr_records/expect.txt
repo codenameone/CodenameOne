@@ -1,0 +1,19 @@
+guard 1
+not a big int
+guard 5
+big int 10
+not a big int
+subject 3 c 6
+guard 1
+guard 3
+captured 3
+guard 1
+1
+guard 3
+18
+16
+four
+zero
+(2, 7, name: rec)
+rec
+20 40
