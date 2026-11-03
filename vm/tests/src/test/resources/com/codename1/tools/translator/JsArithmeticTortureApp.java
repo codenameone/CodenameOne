@@ -157,7 +157,7 @@ public class JsArithmeticTortureApp {
         p("cinc", c);
         byte bb = 127; bb++;
         p("binc", bb);
-        short sh = 32767; sh += 1;
+        short sh = 32767; sh = (short) (sh + 1);
         p("sinc", sh);
 
         // strings
