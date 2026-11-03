@@ -71,6 +71,13 @@ public final class TypeWitness {
     /// then the named ones.
     private int fnRequired = -1;
     private String[] fnNamed;
+    /// The Dart name of a dart:core type that erases to Object (`Type`, `Pattern`), so a
+    /// `[int, String]` records List<Type> and prints it; null for any other witness.
+    private String coreName;
+
+    /// Interned core-type witnesses by name, non-null and nullable.
+    private static final java.util.HashMap<String, TypeWitness[]> CORE =
+            new java.util.HashMap<String, TypeWitness[]>();
 
     private TypeWitness(Class<?> type, boolean nullable, TypeWitness[] args) {
         this.type = type;
@@ -114,6 +121,29 @@ public final class TypeWitness {
         w.fnRequired = required;
         w.fnNamed = named;
         return w;
+    }
+
+    /// The interned witness of the dart:core type {@code name} that has no Java class of
+    /// its own: `Type` (a value is a Class, a TypeWitness or a FunctionType, the forms a
+    /// reified type takes) or `Pattern` (a String or a RegExp). Null for any other name.
+    public static TypeWitness core(String name, boolean nullable) {
+        if (!"Type".equals(name) && !"Pattern".equals(name)) {
+            return null;
+        }
+        TypeWitness[] pair = CORE.get(name);
+        if (pair == null) {
+            pair = new TypeWitness[2];
+            for (int i = 0; i < 2; i++) {
+                TypeWitness w = new TypeWitness(Object.class, i == 1, null);
+                w.coreName = name;
+                w.tester = "Type".equals(name)
+                        ? v -> v instanceof Class || v instanceof TypeWitness || v instanceof FunctionType
+                        : v -> v instanceof String || v instanceof dart.core.RegExp;
+                pair[i] = w;
+            }
+            CORE.put(name, pair);
+        }
+        return pair[nullable ? 1 : 0];
     }
 
     /// The interned witness of {@code type}.
@@ -216,6 +246,9 @@ public final class TypeWitness {
         if (w.nullable) {
             return w;
         }
+        if (w.coreName != null) {
+            return core(w.coreName, true);
+        }
         if (w.tester != null) {
             return function(w.type, true, w.tester, w.fnSig, w.fnRequired, w.fnNamed);
         }
@@ -305,6 +338,10 @@ public final class TypeWitness {
         }
         if (actual.nullable && !target.nullable) {
             return false;
+        }
+        if (target.coreName != null) {
+            // List<Object> is no List<Type>; only Type (or Null, above) is.
+            return target.coreName.equals(actual.coreName);
         }
         if (!target.type.isAssignableFrom(actual.type)) {
             return false;
@@ -757,6 +794,9 @@ public final class TypeWitness {
     public String toString() {
         if (this == DYNAMIC) {
             return "dynamic";
+        }
+        if (coreName != null) {
+            return nullable ? coreName + "?" : coreName;
         }
         if (recordNamed != null) {
             StringBuilder rb = new StringBuilder("(");

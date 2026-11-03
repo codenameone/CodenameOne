@@ -793,6 +793,8 @@ public final class DartRuntime {
         GENERIC_ARITY.put(dart.core.DartMap.class, Integer.valueOf(2));
         GENERIC_ARITY.put(dart.async.Future.class, Integer.valueOf(1));
         GENERIC_ARITY.put(dart.async.Stream.class, Integer.valueOf(1));
+        // dart:core Uri is held by DartUri; a List<Uri> prints its element as Uri.
+        DART_NAMES.put(dart.core.DartUri.class, "Uri");
     }
 
     /// Records that the transpiled class {@code c} declares {@code arity} type parameters.

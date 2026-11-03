@@ -9905,7 +9905,9 @@ public final class JavaEmitter {
                 // how Dart reads `this.favorites = const {}` for a Set<int> field.
                 SetLit sl = new SetLit();
                 sl.isConst = ml.isConst;
-                Out o = emitSetLit(sl, expected, ctx);
+                // Reified as a written set literal is: `Set<Map<T, int>> f<T>() => {}` is a
+                // _Set<Map<int, int>> at T = int, no _Set<dynamic>.
+                Out o = withSetWitness(emitSetLit(sl, expected, ctx), ctx);
                 return sl.isConst ? constCollection(o, ctx) : o;
             }
             Out o = withMapWitness(emitMapLit(ml, expected, ctx), ctx);
@@ -10886,6 +10888,12 @@ public final class JavaEmitter {
         if (el.is("Object") && el.nullable && el.args.isEmpty()) {
             // `<Object?>[]` prints as written; it tests as any nullable Object witness.
             return "dart.runtime.TypeWitness.OBJECT_NULLABLE";
+        }
+        if (el.args.isEmpty() && (el.is("Type") || el.is("Pattern")) && !program.classes.containsKey(el.name)
+                && !stubs.classes.containsKey(el.name)) {
+            // `[int, String]` is a List<Type>: the core type erases to Object, so it is
+            // recorded by name (TypeWitness.core) and prints and tests as Dart's does.
+            return "dart.runtime.TypeWitness.core(\"" + el.name + "\", " + el.nullable + ")";
         }
         boolean scalar = el.is("int") || el.is("double") || el.is("num") || el.is("String") || el.is("bool")
                 || el.is("Object");
@@ -12850,6 +12858,12 @@ public final class JavaEmitter {
     private static final java.util.Set<String> COVARIANT_CORE_GENERICS = new java.util.HashSet<String>(
             java.util.Arrays.asList("List", "Set", "Iterable", "Map", "Future", "FutureOr", "Stream"));
 
+    private boolean isPatternMember(TypeRef t) {
+        return t.name != null && t.args.isEmpty() && t.funcParams == null
+                && (t.is("String") || t.is("RegExp") || t.is("Pattern"))
+                && !program.classes.containsKey(t.name);
+    }
+
     private TypeRef upperBound(TypeRef a, TypeRef b) {
         // The ONE upper bound every inference site uses -- conditionals, list, set and map
         // literals, generic-call arguments -- so they cannot answer differently.
@@ -12878,6 +12892,10 @@ public final class JavaEmitter {
             for (int i = 0; i < a.args.size(); i++) {
                 r.args.add(upperBound(a.arg(i), b.arg(i)));
             }
+        } else if (isPatternMember(a) && isPatternMember(b)) {
+            // `['a', RegExp('b')]`: String and RegExp both implement dart:core Pattern,
+            // their only common supertype below Object, so the list is a List<Pattern>.
+            r = new TypeRef("Pattern");
         } else {
             // Two interface types: the deepest unique common supertype, else Object.
             TypeRef pl = programClassLub(copyNonNull(a), copyNonNull(b));
@@ -13966,8 +13984,15 @@ public final class JavaEmitter {
     }
 
     private String sigSlotWitness(TypeRef t, Ctx ctx) {
-        if (t == null || isDynamicType(t) || t.is("void") || readsTypeVarWitness(t, ctx)) {
+        if (t == null || isDynamicType(t) || t.is("void")) {
             return "null";
+        }
+        if (readsTypeVarWitness(t, ctx)) {
+            // `T Function(T)` inside mk<T>: the slot holds T's runtime witness. A null slot
+            // made mk<int>'s and mk<String>'s function types one interned Type, so the
+            // second reused the first's witness and printed and tested as it.
+            String w = witnessOf(t, ctx);
+            return w == null ? "null" : w;
         }
         String w = reifiedArgWitness(t, ctx);
         return w == null ? "null" : w;
