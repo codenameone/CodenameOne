@@ -384,3 +384,12 @@ class StateCommitRaceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FenceAttributeTest(unittest.TestCase):
+    def test_hugo_fence_attributes_are_stripped(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from syndicate_blog_posts import strip_fence_attributes
+
+        body = '```java {class="cn1-no-try"}\nint x;\n```\n\n```kotlin\nval y = 1\n```'
+        self.assertEqual('```java\nint x;\n```\n\n```kotlin\nval y = 1\n```', strip_fence_attributes(body))
