@@ -528,6 +528,39 @@ class JavascriptTargetIntegrationTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void stringBuilderFusionAppliesOnlyToBuildersThatNeverEscape(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-builder-fusion-sources");
+        Path classesDir = Files.createTempDirectory("js-builder-fusion-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-builder-fusion-classes");
+        Files.write(sourceDir.resolve("JsBuilderFusionFlow.java"), loadFixture("JsBuilderFusionFlow.java").getBytes(StandardCharsets.UTF_8));
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-builder-fusion-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsBuilderFusionFlow");
+        String translatedApp = new String(Files.readAllBytes(outputDir.resolve("dist").resolve("JsBuilderFusionFlow-js")
+                .resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        // Output equality cannot show this: an unfused builder prints the same text.
+        assertTrue(methodBody(translatedApp, "cn1_JsBuilderFusionFlow_fused_int_R_java_lang_String").contains("__sbv"),
+                "A builder that never escapes should be fused");
+        assertFalse(methodBody(translatedApp, "cn1_JsBuilderFusionFlow_passed_int_R_java_lang_String").contains("__sbv"),
+                "A builder passed to another method must not be fused");
+        assertFalse(methodBody(translatedApp, "cn1_JsBuilderFusionFlow_handled_int_R_java_lang_String").contains("__sbv"),
+                "A builder a catch handler hands on must not be fused");
+    }
+
+    private static String methodBody(String translatedApp, String name) {
+        int start = findFunctionStart(translatedApp, name + "__impl", "(__cn1Arg1)");
+        assertTrue(start >= 0, "missing " + name);
+        int end = translatedApp.indexOf("\n}\n", start);
+        assertTrue(end > start, "unbounded " + name);
+        return translatedApp.substring(start, end);
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void repeatedStaticInvokesUseMethodLevelInitCacheAndInternalImpls(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

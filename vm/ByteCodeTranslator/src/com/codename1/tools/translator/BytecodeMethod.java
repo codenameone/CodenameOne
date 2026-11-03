@@ -2080,11 +2080,10 @@ public class BytecodeMethod implements SignatureSet {
                     b.append("    ");
                     if (!hasLocalVariableWithIndex(arg.getQualifier(), localsOffset)) {
                         switch (arg.getQualifier()) {
-                            case 'i' : b.append("JAVA_INT"); break;
                             case 'f' : b.append("JAVA_FLOAT"); break;
                             case 'd' : b.append("JAVA_DOUBLE"); break;
                             case 'l' : b.append("JAVA_LONG"); break;
-                            default: b.append("JAVA_INT"); break;
+                            default: b.append("JAVA_INT"); break; // 'i' and the narrower ints
                         }
                         b.append(" ");
                         
@@ -2792,6 +2791,16 @@ public class BytecodeMethod implements SignatureSet {
      */
     // Exact NEW provenance on every object return, captured before IR rewrites.
     String freshReturnType;
+    // JavascriptTypeFlow summary of this body, or null when it was never analysed.
+    private String[][] typeFlowSummary;
+
+    String[][] getTypeFlowSummary() {
+        return typeFlowSummary;
+    }
+
+    void setTypeFlowSummary(String[][] summary) {
+        this.typeFlowSummary = summary;
+    }
 
     public String allocatedReturnType() {
         List<Instruction> real = new ArrayList<Instruction>();
@@ -4715,6 +4724,14 @@ public class BytecodeMethod implements SignatureSet {
     private boolean builderOwnershipFrozen;
 
     public void freezeBuilderOwnership() { builderOwnershipFrozen = true; }
+
+    /// The JavaScript backend's fused StringBuilder instructions and their kinds
+    /// (JavascriptBuilderFusion), proven on the raw bytecode at parse time; null when none.
+    private Map<Instruction, Integer> jsBuilderFusion;
+
+    void setJsBuilderFusion(Map<Instruction, Integer> fusion) { jsBuilderFusion = fusion; }
+
+    Map<Instruction, Integer> getJsBuilderFusion() { return jsBuilderFusion; }
 
     // Compute before instruction rewriting. A false entry also breaks recursive
     // proof cycles conservatively; no caller relies on an unfinished proof.
@@ -7216,6 +7233,29 @@ public class BytecodeMethod implements SignatureSet {
 
     public boolean isJsBodyMethod() {
         return jsBodyScript != null;
+    }
+
+    private boolean javascriptDetached;
+    private boolean javascriptDetachedBody;
+
+    /// True for an instance method returning `void` marked `@JavaScriptDetached`;
+    /// the annotation is ignored anywhere else.
+    public boolean isJavascriptDetached() {
+        return javascriptDetached && !staticMethod && !constructor && getSignature() != null && getSignature().endsWith(")V");
+    }
+
+    void markJavascriptDetached() {
+        javascriptDetached = true;
+    }
+
+    /// True once the suspension analysis found that a detached method's body can
+    /// wait: it is then emitted as a generator behind a plain function.
+    public boolean isJavascriptDetachedBody() {
+        return javascriptDetachedBody;
+    }
+
+    void setJavascriptDetachedBody(boolean value) {
+        javascriptDetachedBody = value;
     }
 
 

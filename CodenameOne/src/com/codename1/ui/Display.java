@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.analytics.Analytics;
 import com.codename1.annotations.Async;
+import com.codename1.annotations.JavaScriptDetached;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
@@ -1173,6 +1174,9 @@ public final class Display extends CN1Constants {
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
     /// the paint and key handling events
+    // Runs the runnable in place only before Codename One starts; on the web that
+    // path must not make every caller wait, and the contract never did.
+    @JavaScriptDetached
     public void callSerially(Runnable r) {
         // otherwise this will fail in an odd locaiton. Better it fails here...
         if (r == null) {
@@ -1203,6 +1207,9 @@ public final class Display extends CN1Constants {
     ///
     /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
     /// the paint and key handling events
+    // Runs the runnable in place only before Codename One starts; on the web that
+    // path must not make every caller wait, and the contract never did.
+    @JavaScriptDetached
     public void callSeriallyOnIdle(Runnable r) {
         if (codenameOneRunning) {
             synchronized (lock) {

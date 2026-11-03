@@ -2317,6 +2317,12 @@ public class Parser extends ClassVisitor {
         boolean sawLambdaIndy;
         final java.util.Map<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke> flowInvokes =
                 new java.util.IdentityHashMap<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke>();
+        // Every virtual call, for JavascriptTypeFlow's receiver facts.
+        final java.util.Map<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke> typeFlowInvokes =
+                new java.util.IdentityHashMap<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke>();
+        // StringBuilder allocations and calls, for JavascriptBuilderFusion.
+        final java.util.Map<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Instruction> builderNodes =
+                new java.util.IdentityHashMap<com.codename1.tools.translator.classfile.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Instruction>();
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
             super(mv);
             this.mtd = mtd;
@@ -2331,6 +2337,14 @@ public class Parser extends ClassVisitor {
             Frame<? extends com.codename1.tools.translator.classfile.analysis.Value>[] flowFrames = BytecodeMethod.optimizerOn
                     ? LocalReceiverTypes.capture(dupAnalysisOwner, dupAnalysisNode, flowInvokes, mtd,
                             indyLambdas) : null;
+            if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                JavascriptTypeFlow.capture(dupAnalysisOwner, dupAnalysisNode, typeFlowInvokes, mtd, indyLambdas);
+            }
+            typeFlowInvokes.clear();
+            if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT && !builderNodes.isEmpty()) {
+                mtd.setJsBuilderFusion(JavascriptBuilderFusion.analyze(dupAnalysisOwner, dupAnalysisNode, builderNodes));
+            }
+            builderNodes.clear();
             resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd, flowFrames);
             flowInvokes.clear();
             indyLambdas.clear();
@@ -2987,6 +3001,11 @@ public class Parser extends ClassVisitor {
 
                 BytecodeMethod factory = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, factoryMethodName, actualFactoryDesc, null, null);
                 lambdaClass.addMethod(factory);
+                if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                    JavascriptTypeFlow.summariseLambda(lambdaClassName, ctor, factory, interfaceMethod, capturedArgs,
+                            isCtorRef ? Opcodes.INVOKESPECIAL : invokeOpcode, implMethod.getOwner(),
+                            implMethod.getName(), implMethod.getDesc(), isCtorRef);
+                }
 
                 if (capturedArgs.length == 0) {
                     // A LAMBDA THAT CAPTURES NOTHING HAS NO DISTINGUISHABLE INSTANCES, so
@@ -3233,6 +3252,19 @@ public class Parser extends ClassVisitor {
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             mtd.addInvoke(opcode, owner, name, desc, itf);
             super.visitMethodInsn(opcode, owner, name, desc, itf);
+            if ("java/lang/StringBuilder".equals(owner)) {
+                recordBuilderNode(true);
+            }
+            if (dupAnalysisNode != null
+                    && (opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE)
+                    && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                java.util.List<com.codename1.tools.translator.bytecodes.Instruction> body = mtd.getInstructions();
+                com.codename1.tools.translator.bytecodes.Instruction last = body.get(body.size() - 1);
+                if (last instanceof com.codename1.tools.translator.bytecodes.Invoke) {
+                    typeFlowInvokes.put(dupAnalysisNode.instructions.getLast(),
+                            (com.codename1.tools.translator.bytecodes.Invoke) last);
+                }
+            }
             if (dupAnalysisNode != null && (LocalReceiverTypes.isCandidate(opcode, owner, name, desc)
                     || sawLambdaIndy && LocalReceiverTypes.isLambdaCandidate(opcode))) {
                 java.util.List<com.codename1.tools.translator.bytecodes.Instruction> body = mtd.getInstructions();
@@ -3251,6 +3283,27 @@ public class Parser extends ClassVisitor {
         public void visitTypeInsn(int opcode, String type) {
             mtd.addTypeInstruction(opcode, type);
             super.visitTypeInsn(opcode, type); 
+            if (opcode == Opcodes.NEW && "java/lang/StringBuilder".equals(type)) {
+                recordBuilderNode(false);
+            }
+        }
+
+        /// Pairs the node just teed into the MethodNode with the instruction just added,
+        /// when that instruction is of the expected kind (an intrinsic may add another).
+        private void recordBuilderNode(boolean invoke) {
+            com.codename1.tools.translator.classfile.tree.MethodNode node = dupAnalysisNode;
+            if (node == null || ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                return;
+            }
+            java.util.List<com.codename1.tools.translator.bytecodes.Instruction> body = mtd.getInstructions();
+            if (body.isEmpty()) {
+                return;
+            }
+            com.codename1.tools.translator.bytecodes.Instruction last = body.get(body.size() - 1);
+            if (invoke ? last instanceof com.codename1.tools.translator.bytecodes.Invoke
+                    : last instanceof com.codename1.tools.translator.bytecodes.TypeInstruction) {
+                builderNodes.put(node.instructions.getLast(), last);
+            }
         }
 
         @Override
@@ -3289,6 +3342,9 @@ public class Parser extends ClassVisitor {
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
             if ("Lcom/codename1/html5/js/JSBody;".equals(desc) || "Lorg/teavm/jso/JSBody;".equals(desc)) {
                 return new JSBodyAnnotationVisitor(mtd);
+            }
+            if (JavascriptSuspensionAnalysis.DETACHED_ANNOTATION.equals(desc)) {
+                mtd.markJavascriptDetached();
             }
             if (DISABLE_DEBUG_INFO_ANNOTATION.equals(desc)) {
                 mtd.setDisableDebugInfo(true);
