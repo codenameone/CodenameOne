@@ -208,8 +208,11 @@ jobs:
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
         # A cold Release compile of the hello app (now with the Android compatibility gallery, its runtime and the Kotlin stdlib) took 42.5 of 45 minutes.
-        # The Swing and JavaFX compatibility runtimes took it to 63.
-        timeout-minutes: 90
+        # The Swing and JavaFX compatibility runtimes took it to 63, and the
+        # Compose, Unity and Flutter galleries to 89.5 -- a run that passed by 30
+        # seconds, beside one that timed out. 130 matches the debug build below,
+        # and the job's 270 still covers both.
+        timeout-minutes: 130
 
       # The binary half of scripts-ios.yml's private-API gate. App Store Connect scans the
       # linked executable, so this reads what it would read: every import of the Release
