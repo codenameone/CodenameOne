@@ -166,6 +166,7 @@ public final class Program {
             register(part, part);
         }
         restoreShadowedAliases();
+        expandRecordTypedefs();
         // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
         // abstract base whose only abstract member is `iterator`, exactly IterableBase. The
         // Java dart.core.DartIterable is a concrete wrapper over a java.lang.Iterable, not a
@@ -337,6 +338,52 @@ public final class Program {
         }
     }
 
+    /**
+     * A record typedef (`typedef Pair = ({Op f, (int, Op) g})`) is replaced, wherever it is
+     * named, by the record shape it aliases, so {@code p.f(1)} resolves the record's
+     * fields like a record type written out would. A class of that name wins, as it
+     * would in Dart's scope.
+     */
+    private void expandRecordTypedefs() {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                Ast.TypedefDecl td = t.name == null ? null : typedefs.get(t.name);
+                if (td == null || td.aliased == null || td.aliased.name == null
+                        || !td.aliased.name.startsWith("Rec$") || td.aliased.funcParams != null
+                        || classesByName.containsKey(t.name)) {
+                    continue;
+                }
+                if (td.typeParams.size() != t.args.size() && !(t.args.isEmpty())) {
+                    continue;
+                }
+                Map<String, Ast.TypeRef> subst = new java.util.HashMap<String, Ast.TypeRef>();
+                for (int i = 0; i < td.typeParams.size(); i++) {
+                    subst.put(td.typeParams.get(i), i < t.args.size() ? t.args.get(i) : Ast.TypeRef.DYNAMIC);
+                }
+                List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+                for (Ast.TypeRef a : td.aliased.args) {
+                    args.add(substRecordArg(a, subst));
+                }
+                t.name = td.aliased.name;
+                t.args = args;
+            }
+        }
+    }
+
+    private static Ast.TypeRef substRecordArg(Ast.TypeRef a, Map<String, Ast.TypeRef> subst) {
+        if (a != null && a.name != null && a.args.isEmpty() && a.funcParams == null && subst.containsKey(a.name)) {
+            Ast.TypeRef r = subst.get(a.name);
+            if (a.nullable && !r.nullable) {
+                Ast.TypeRef c = new Ast.TypeRef(r.name);
+                c.args.addAll(r.args);
+                c.nullable = true;
+                return c;
+            }
+            return r;
+        }
+        return a;
+    }
+
     private boolean visibleUnprefixed(String name, Ast.Library lib) {
         List<Ast.ClassDecl> byName = classesByName.get(name);
         if (byName == null) {
@@ -368,6 +415,7 @@ public final class Program {
         owner.topLevelVars.addAll(part.topLevelVars);
         owner.typedefs.addAll(part.typedefs);
         owner.aliasedTypes.addAll(part.aliasedTypes);
+        owner.namedTypes.addAll(part.namedTypes);
         register(owner, part);
     }
 

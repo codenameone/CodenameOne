@@ -125,9 +125,11 @@ public final class TypeWitness {
 
     /// The interned witness of the dart:core type {@code name} that has no Java class of
     /// its own: `Type` (a value is a Class, a TypeWitness or a FunctionType, the forms a
-    /// reified type takes) or `Pattern` (a String or a RegExp). Null for any other name.
+    /// reified type takes), `Pattern` (a String or a RegExp) or `Never` (no value: what a
+    /// closure that only throws returns, `() => Never`). Null for any other name.
     public static TypeWitness core(String name, boolean nullable) {
-        if (!"Type".equals(name) && !"Pattern".equals(name)) {
+        if (!"Type".equals(name) && !"Pattern".equals(name) && !"Never".equals(name)
+                && !"Comparable<dynamic>".equals(name)) {
             return null;
         }
         TypeWitness[] pair = CORE.get(name);
@@ -136,8 +138,14 @@ public final class TypeWitness {
             for (int i = 0; i < 2; i++) {
                 TypeWitness w = new TypeWitness(Object.class, i == 1, null);
                 w.coreName = name;
+                // Never has no instances (its nullable form admits null alone, as Null does).
                 w.tester = "Type".equals(name)
                         ? v -> v instanceof Class || v instanceof TypeWitness || v instanceof FunctionType
+                        : "Never".equals(name) ? v -> false
+                        // Comparable<dynamic> (`['a', 'b' as Comparable]`): the core
+                        // comparables are Java Comparables, an enum a DartEnumComparable.
+                        : "Comparable<dynamic>".equals(name)
+                        ? v -> v instanceof Comparable || v instanceof dart.core.DartEnumComparable
                         : v -> v instanceof String || v instanceof dart.core.RegExp;
                 pair[i] = w;
             }
@@ -332,6 +340,11 @@ public final class TypeWitness {
         if (actual == DYNAMIC) {
             return false;
         }
+        if ("Never".equals(actual.coreName)) {
+            // Never is the bottom type: below every type (`Object? Function(Never)` takes an
+            // int function, whose parameter int is above Never).
+            return !actual.nullable || target.nullable;
+        }
         if (actual == NULL) {
             // Null is a subtype of every nullable type, and of no other.
             return target.nullable;
@@ -340,7 +353,13 @@ public final class TypeWitness {
             return false;
         }
         if (target.coreName != null) {
-            // List<Object> is no List<Type>; only Type (or Null, above) is.
+            // List<Object> is no List<Type>; only Type (or Null, above) is. A List<String>
+            // is a List<Comparable<dynamic>>, though: every core comparable is a Java one.
+            if ("Comparable<dynamic>".equals(target.coreName) && actual.coreName == null
+                    && (Comparable.class.isAssignableFrom(actual.type)
+                    || dart.core.DartEnumComparable.class.isAssignableFrom(actual.type))) {
+                return true;
+            }
             return target.coreName.equals(actual.coreName);
         }
         if (!target.type.isAssignableFrom(actual.type)) {
@@ -679,6 +698,10 @@ public final class TypeWitness {
     public static Object value(TypeWitness w) {
         if (w == null) {
             return Object.class;
+        }
+        if (w.coreName != null) {
+            // `Type`, `Pattern` as values: the named core witness, which prints its name.
+            return w;
         }
         if (w == DYNAMIC || w == OBJECT_NULLABLE) {
             // dynamic and Object? are Types of their own, distinct from Object (and from

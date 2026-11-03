@@ -1295,6 +1295,9 @@ public final class AstBuilder {
             t.aliasedFrom = writtenName;
             currentLib.aliasedTypes.add(t);
         }
+        if (currentLib != null) {
+            currentLib.namedTypes.add(t);
+        }
         pos(t, ctx);
         if (ctx.typeArguments() != null) {
             for (Dart2Parser.TypeContext a : ctx.typeArguments().typeList().type()) {

@@ -1025,9 +1025,11 @@ final class AsyncLowering {
             int k = newState(f);
             if (y.star) {
                 JavaEmitter.Out o = em.emitExpr(y.value, null, ctx);
+                em.noteYield(o, true, ctx);
                 w.line(f.name + ".yieldAll((Object) (" + o.code + "), " + k + ");");
             } else {
                 JavaEmitter.Out o = em.emitExpr(y.value, em.isDynamicType(f.starElem) ? null : f.starElem, ctx);
+                em.noteYield(o, false, ctx);
                 w.line(f.name + ".yield$(" + (f.starJava == null ? "(Object) (" + o.code + ")"
                         : em.coerce(o, f.starElem, ctx)) + ", " + k + ");");
             }
@@ -1833,6 +1835,10 @@ final class AsyncLowering {
         } else if (r.value != null) {
             TypeRef inner = f.valueType;
             JavaEmitter.Out o = em.emitExpr(r.value, em.isDynamicType(inner) ? null : inner, ctx);
+            if (ctx.asyncLambdaReturns != null) {
+                // What an async closure's Future carries, for its inferred signature.
+                ctx.asyncLambdaReturns.add(o.type);
+            }
             if (o.type != null && o.type.is("void")) {
                 w.line(o.code + ";");
             } else {

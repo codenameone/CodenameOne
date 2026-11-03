@@ -162,6 +162,9 @@ public final class Ast {
         public List<TypedefDecl> typedefs = new ArrayList<TypedefDecl>();
         /// Every unprefixed type annotation the parser aliased to a built-in collection.
         public List<TypeRef> aliasedTypes = new ArrayList<TypeRef>();
+        /// Every named (non-record, non-function) type annotation, so a record typedef can be
+        /// expanded in place once every library's typedefs are known (Program).
+        public List<TypeRef> namedTypes = new ArrayList<TypeRef>();
         /** Every import with its show/hide combinators, in source order. */
         public List<Directive> importDirectives = new ArrayList<Directive>();
         /** Every export with its show/hide combinators, in source order. */

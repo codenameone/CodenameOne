@@ -723,7 +723,36 @@ public final class JavaEmitter {
             if (ft != null && (isDynamicType(ft) || ft.is("var"))) {
                 ft = null;
             }
+            if (ft == null && f.value instanceof Lambda) {
+                // A closure field with no context is held by its own SAM, spelled out: the
+                // record's diamond (`new Rec<>(.., new Rec<>(s0((x) -> x * 2L)))`) gives javac
+                // no target to infer it from, and the parameter became Object.
+                ownTypedClosure = f.value;
+            }
             Out o = emitExpr(f.value, ft, ctx);
+            TypeRef gBase = ft == null && f.value instanceof Lambda && genericWitnessLambdas.contains(f.value)
+                    ? (o.type != null && o.type.funcParams != null ? o.type
+                    : inferredClosureType((Lambda) f.value, f.name != null ? f.name : "$" + (i + 1), ctx))
+                    : null;
+            if (gBase != null && gBase.funcParams != null) {
+                // `(fn: <T>(T x) => [x])`: a generic closure field, typed as a generic local
+                // is (erased signature, marked with the closure), so `r.fn('s')` passes its
+                // type arguments (SignedFns.instantiate) and answers a List<String>.
+                Lambda gl = (Lambda) f.value;
+                TypeRef gt = copyNonNull(gBase);
+                gt.nullable = false;
+                List<TypeRef> eps = new ArrayList<TypeRef>();
+                for (TypeRef pt : gBase.funcParams) {
+                    eps.add(substTypeParams(pt, gl.typeParams, java.util.Collections.<TypeRef>emptyList()));
+                }
+                gt.funcParams = eps;
+                gt.funcReturn = substTypeParams(gBase.funcReturn, gl.typeParams,
+                        java.util.Collections.<TypeRef>emptyList());
+                gt.genericClosure = gl;
+                args.append(funcCast(o, gt, ctx));
+                t.args.add(gt);
+                continue;
+            }
             if (ft != null && isFunctionValued(ft)) {
                 args.append(funcCast(o, ft, ctx));
                 t.args.add(ft);
@@ -821,6 +850,12 @@ public final class JavaEmitter {
         String enumJava = javaEnumName(e);
         Ctx ctx = new Ctx(syn);
         StringBuilder body = new StringBuilder();
+        if (!enumJava.equals(e.name)) {
+            // Renamed in Java (MainColor for a user `Color`): a List<Color>'s runtimeType
+            // and the enum's Type still print the Dart name, as a renamed class's do.
+            body.append("    static {\n        dart.runtime.DartRuntime.dartName(").append(enumJava)
+                    .append(".class, \"").append(e.name).append("\");\n    }\n\n");
+        }
         for (FieldDecl f : e.fields) {
             TypeRef ft = fieldType(f, ctx);
             // A static whose initialiser reads anything is initialised on first read, as a
@@ -7420,18 +7455,22 @@ public final class JavaEmitter {
             if (ctx.asyncStarSink != null) {
                 if (y.star) {
                     Out o = emitExpr(y.value, null, ctx);
+                    noteYield(o, true, ctx);
                     w.line(ctx.asyncStarSink + ".yieldAll(" + o.code + ");");
                 } else {
                     Out o = emitExpr(y.value, ctx.syncStarElem, ctx);
+                    noteYield(o, false, ctx);
                     w.line(ctx.asyncStarSink + ".yield$(" + coerce(o, ctx.syncStarElem, ctx) + ");");
                 }
             } else if (ctx.syncStarList == null) {
                 diags.error(y, "E0304", "yield outside a generator body");
             } else if (y.star) {
                 Out o = emitExpr(y.value, null, ctx);
+                noteYield(o, true, ctx);
                 w.line(ctx.syncStarList + ".addAllIterable(" + mixinIterableCode(o) + ");");
             } else {
                 Out o = emitExpr(y.value, ctx.syncStarElem, ctx);
+                noteYield(o, false, ctx);
                 w.line(ctx.syncStarList + ".add(" + coerce(o, ctx.syncStarElem, ctx) + ");");
             }
         } else if (s instanceof ReturnStmt && ctx.frame != null && ctx.frame.returns.contains(s)) {
@@ -7447,6 +7486,9 @@ public final class JavaEmitter {
                     w.line("return " + (ctx.asyncLambda ? "Future.value(null)" : reifyAsyncResult("Future.value(null)", rt, ctx)) + ";");
                 } else {
                     Out o = emitExpr(r.value, inner, ctx);
+                    if (ctx.asyncLambda && ctx.asyncLambdaReturns != null) {
+                        ctx.asyncLambdaReturns.add(o.type);
+                    }
                     // await already unwraps; returning a Future directly passes through
                     String rv = asyncReturnValue(o, inner, ctx);
                     w.line("return " + (ctx.asyncLambda || o.type != null && o.type.is("Future") ? rv
@@ -9910,10 +9952,13 @@ public final class JavaEmitter {
                 Out o = withSetWitness(emitSetLit(sl, expected, ctx), ctx);
                 return sl.isConst ? constCollection(o, ctx) : o;
             }
-            Out o = withMapWitness(emitMapLit(ml, expected, ctx), ctx);
+            Out plain = emitMapLit(ml, expected, ctx);
+            Out o = withMapWitness(plain, ctx);
             boolean dynK = ml.keyType != null && isDynamicType(ml.keyType);
             boolean dynV = ml.valueType != null && isDynamicType(ml.valueType);
-            if ((dynK || dynV) && !ml.isConst) {
+            // When the witnesses were recorded above (dynamic included), this Class form
+            // would overwrite them: `<String, dynamic>{}` printed _Map<dynamic, Object>.
+            if ((dynK || dynV) && !ml.isConst && o == plain) {
                 // A written `<String, dynamic>{..}` is reified: no Map<String, int>, whatever
                 // its values (DartRuntime.asMapOf reads the witness), as for a list literal.
                 o = new Out("dart.core.DartMap.typed(" + o.code + ", " + (dynK ? "Object.class" : "null") + ", "
@@ -10885,9 +10930,20 @@ public final class JavaEmitter {
             // `[null]` is a List<Null>: Null's own witness, which only null satisfies.
             return "dart.runtime.TypeWitness.NULL";
         }
+        if (el.is("Never") && el.args.isEmpty() && !program.classes.containsKey("Never")) {
+            // `() { throw 'x'; }` is a `() => Never`, `() async => throw 'z'` a
+            // `() => Future<Never>`; Never? is Null.
+            return el.nullable ? "dart.runtime.TypeWitness.NULL" : "dart.runtime.TypeWitness.core(\"Never\", false)";
+        }
         if (el.is("Object") && el.nullable && el.args.isEmpty()) {
             // `<Object?>[]` prints as written; it tests as any nullable Object witness.
             return "dart.runtime.TypeWitness.OBJECT_NULLABLE";
+        }
+        if (el.is("Comparable") && !el.nullable && (el.args.isEmpty() || el.args.size() == 1 && isDynamicType(el.arg(0)))
+                && !program.classes.containsKey(el.name)) {
+            // `['a', 'b' as Comparable]` is a List<Comparable<dynamic>>; Comparable erases to
+            // Object, so it is recorded by name, as Type and Pattern are.
+            return "dart.runtime.TypeWitness.core(\"Comparable<dynamic>\", false)";
         }
         if (el.args.isEmpty() && (el.is("Type") || el.is("Pattern")) && !program.classes.containsKey(el.name)
                 && !stubs.classes.containsKey(el.name)) {
@@ -11135,7 +11191,12 @@ public final class JavaEmitter {
             return code;
         }
         TypeRef ctxRet = ctxSig != null ? ctxSig[ctxSig.length - 1] : null;
-        boolean value = l.exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(l);
+        // A generator closure returns its Iterable / Stream whatever its body's `return`s say
+        // (`() sync* { yield 1; }` is no void function). An async one keeps the void SAM
+        // asyncClosureType gives a closure whose Future nobody reads; its signature still
+        // records the Future (asyncClosureReturn).
+        boolean producer = l.isSyncStar || l.isAsyncStar;
+        boolean value = producer || (l.exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(l));
         // The SAM: the context's, as the consumer's parameter or local declares it; with no
         // context, the closure's own from its declared parameters, void or value by its
         // body -- the choice pinnedHandler makes when it casts the closure.
@@ -11171,26 +11232,74 @@ public final class JavaEmitter {
                 samType.funcParams.add(pt);
             }
         }
-        if (ctxSig != null) {
-            samType.funcReturn = ctxRet != null ? ctxRet : TypeRef.DYNAMIC;
-        } else {
-            samType.funcReturn = !value ? new TypeRef("void") : l.exprBody != null && bodyType != null
-                    && !bodyType.is("void") ? bodyType : TypeRef.DYNAMIC;
-        }
         // The recorded signature. A block body with no `return value` returns nothing, though
         // the value SAM it may be held by returns null for it.
-        boolean returnsValue = l.exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(l);
+        boolean returnsValue = producer || (l.exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(l));
         TypeRef ret = ctxRet != null && !isDynamicType(ctxRet) ? ctxRet
                 : !returnsValue ? new TypeRef("void") : l.exprBody != null ? bodyType
                 : ctxRet == null ? blockClosureReturn(l, lastLambdaReturns) : null;
+        // A local's own async type (asyncClosureType's Future<dynamic>) is no context: the
+        // closure still infers Future<X> from its body.
+        boolean noCtxRet = ctxRet == null || isDynamicType(ctxRet)
+                || own && l.isAsync && ctxRet.is("Future") && (ctxRet.args.isEmpty() || isDynamicType(ctxRet.arg(0)));
+        boolean inferredNever = false;
+        String producerWitness = null;
+        if (noCtxRet && (l.isSyncStar || l.isAsyncStar)) {
+            // emitLambda's exprType for a generator: Iterable<E> / Stream<E> of what it yields;
+            // with no context E is what the yields have in common (`yield 1` -> Iterable<int>).
+            ret = bodyType;
+            TypeRef elem = ret != null && !ret.args.isEmpty() ? ret.arg(0) : null;
+            if (elem == null || isDynamicType(elem)) {
+                // What the yields were emitted as (`yield x`, `yield* other()` included).
+                TypeRef yb = yieldsBound(lastLambdaYields);
+                if (yb != null && typeVarsInScope(yb, ctx)) {
+                    elem = yb;
+                }
+            }
+            if (elem == null || isDynamicType(elem)) {
+                List<Expr> ys = new ArrayList<Expr>();
+                if (collectYields(l.body, ys) && !ys.isEmpty()) {
+                    elem = commonLiteralType(ys, ctx);
+                }
+            }
+            producerWitness = producerWitness(l.isSyncStar ? "java.lang.Iterable" : "dart.async.Stream", elem, ctx);
+        } else if (noCtxRet && l.isAsync) {
+            TypeRef fut = asyncClosureReturn(l, bodyType);
+            ret = fut != null ? fut : ret;
+            if (fut != null) {
+                producerWitness = producerWitness("dart.async.Future", fut.arg(0), ctx);
+            }
+        } else if (noCtxRet && l.exprBody == null && l.body != null && lastLambdaReturns.isEmpty()
+                && alwaysThrows(l.body)) {
+            // `() { throw 'x'; }` never completes: Dart infers Never.
+            ret = new TypeRef("Never");
+            inferredNever = true;
+        } else if (noCtxRet && l.exprBody != null && stripParens(l.exprBody) instanceof ThrowExpr) {
+            // `() => throw StateError('s')` is a `() => Never` too.
+            ret = new TypeRef("Never");
+            inferredNever = true;
+        }
+        if (ctxSig != null) {
+            samType.funcReturn = ctxRet != null ? ctxRet : TypeRef.DYNAMIC;
+        } else {
+            // A block body's own SAM returns what Dart infers from its returns, as the local
+            // it initializes is typed: `var a = () { try { return 1; } catch (e) { return 2; } }`
+            // is a Func0<Long>, and an Object-returning SAM spelled for it fails javac.
+            samType.funcReturn = !value ? new TypeRef("void") : l.exprBody != null && bodyType != null
+                    && !bodyType.is("void") ? bodyType
+                    : producer ? TypeRef.of(l.isSyncStar ? "Iterable" : "Stream", TypeRef.DYNAMIC)
+                    : l.exprBody == null && returnsValue ? uniformReturn(lastLambdaReturns) : TypeRef.DYNAMIC;
+        }
         StringBuilder sig = new StringBuilder();
         // With no context return (or a top one), Dart infers a synchronous block body that
         // returns no value as returning Null: `(int x) {}` is an `(int) => Null`, no
         // `void Function(int)`; only a void context makes it void.
         boolean inferredNull = (ctxRet == null || isDynamicType(ctxRet) || ctxRet.is("Object"))
                 && l.exprBody == null && !l.isAsync && !l.isSyncStar && !l.isAsyncStar
-                && !returnsValue;
+                && !returnsValue && !inferredNever;
         String retWitness = inferredNull ? "dart.runtime.TypeWitness.NULL"
+                : producerWitness != null ? producerWitness
+                : inferredNever ? staticWitness(ret, true, ctx)
                 : ret != null && ret.is("void") ? "dart.runtime.TypeWitness.of(Void.class, true)"
                 // No context return and an expression body of static type dynamic: Dart infers the
                 // return dynamic, which is no int (`(x) => x * 2` is no int Function(int)).
@@ -12858,15 +12967,114 @@ public final class JavaEmitter {
     private static final java.util.Set<String> COVARIANT_CORE_GENERICS = new java.util.HashSet<String>(
             java.util.Arrays.asList("List", "Set", "Iterable", "Map", "Future", "FutureOr", "Stream"));
 
+    private boolean isRawComparable(TypeRef t) {
+        return t.name != null && t.is("Comparable") && t.funcParams == null && !program.classes.containsKey(t.name)
+                && (t.args.isEmpty() || t.args.size() == 1 && isDynamicType(t.arg(0)));
+    }
+
+    /// A dart:core type that implements Comparable (directly or through num).
+    private boolean isCoreComparable(TypeRef t) {
+        return t.name != null && t.args.isEmpty() && t.funcParams == null && !program.classes.containsKey(t.name)
+                && (t.is("String") || t.is("int") || t.is("double") || t.is("num") || t.is("DateTime")
+                || t.is("Duration") || t.is("BigInt") || t.is("Comparable"));
+    }
+
     private boolean isPatternMember(TypeRef t) {
         return t.name != null && t.args.isEmpty() && t.funcParams == null
                 && (t.is("String") || t.is("RegExp") || t.is("Pattern"))
                 && !program.classes.containsKey(t.name);
     }
 
+    /// A function type's full shape, parameters and return included, for comparing two.
+    private static String fnShape(TypeRef t) {
+        if (t == null) {
+            return "?";
+        }
+        if (t.funcParams == null) {
+            return t.toString();
+        }
+        StringBuilder sb = new StringBuilder("(");
+        for (TypeRef p : t.funcParams) {
+            sb.append(fnShape(p)).append(',');
+        }
+        sb.append(t.funcNamed).append(t.funcNamedRequired).append(")=>").append(fnShape(t.funcReturn))
+                .append(t.nullable ? "?" : "");
+        return sb.toString();
+    }
+
     private TypeRef upperBound(TypeRef a, TypeRef b) {
         // The ONE upper bound every inference site uses -- conditionals, list, set and map
         // literals, generic-call arguments -- so they cannot answer differently.
+        if ((a.funcParams != null || b.funcParams != null) && !fnShape(a).equals(fnShape(b))
+                && !a.is("Null") && !b.is("Null")) {
+            // Two different function types print alike (`Function`), so the textual test
+            // below took `[print, f]` as one element type, a List<void Function(Object?)>
+            // that `f` is no member of in Java. Dart bounds two positional function types of
+            // one arity by the lower bound of each parameter and the upper bound of the
+            // returns (`(int) => void` there); any other pair by Function.
+            TypeRef fn = new TypeRef("Function");
+            fn.nullable = a.nullable || b.nullable;
+            if (a.funcParams == null || b.funcParams == null || a.funcReturn == null || b.funcReturn == null) {
+                return fn;
+            }
+            List<String> an = a.funcNamed == null ? java.util.Collections.<String>emptyList() : a.funcNamed;
+            List<String> bn = b.funcNamed == null ? java.util.Collections.<String>emptyList() : b.funcNamed;
+            int apos = a.funcParams.size() - an.size();
+            int bpos = b.funcParams.size() - bn.size();
+            if (apos != bpos || apos < 0 || a.funcRequired != b.funcRequired) {
+                return fn;
+            }
+            if (!an.equals(bn)) {
+                // Dart's bound of `({int a})` and `({int a, int b})` is `({int a}) => ..`, but
+                // here a closure's Java SAM has one slot per named parameter, so the second
+                // is no instance of the first's SAM and a list of their bound could not hold
+                // it. Only an identical named list bounds structurally; others are Function.
+                return fn;
+            }
+            // Named parameters: Dart's bound keeps those both types declare (a named
+            // parameter one side lacks is dropped, unless it is required there, which no
+            // common supertype could pass), required where either requires it.
+            List<String> named = new ArrayList<String>();
+            List<String> namedReq = new ArrayList<String>();
+            for (String nm : an) {
+                if (bn.contains(nm)) {
+                    named.add(nm);
+                    if (a.funcNamedRequired != null && a.funcNamedRequired.contains(nm)
+                            || b.funcNamedRequired != null && b.funcNamedRequired.contains(nm)) {
+                        namedReq.add(nm);
+                    }
+                } else if (a.funcNamedRequired != null && a.funcNamedRequired.contains(nm)) {
+                    return fn;
+                }
+            }
+            for (String nm : bn) {
+                if (!an.contains(nm) && b.funcNamedRequired != null && b.funcNamedRequired.contains(nm)) {
+                    return fn;
+                }
+            }
+            fn.funcParams = new ArrayList<TypeRef>();
+            for (int i = 0; i < apos + named.size(); i++) {
+                TypeRef pa = i < apos ? a.funcParams.get(i) : a.funcParams.get(apos + an.indexOf(named.get(i - apos)));
+                TypeRef pb = i < apos ? b.funcParams.get(i) : b.funcParams.get(bpos + bn.indexOf(named.get(i - apos)));
+                if (fnShape(pa).equals(fnShape(pb)) || isTopType(pb)) {
+                    fn.funcParams.add(pa);
+                } else if (isTopType(pa)) {
+                    fn.funcParams.add(pb);
+                } else {
+                    TypeRef bare = new TypeRef("Function");
+                    bare.nullable = fn.nullable;
+                    return bare;
+                }
+            }
+            if (!named.isEmpty()) {
+                fn.funcNamed = named;
+                fn.funcNamedRequired = namedReq.isEmpty() ? null : namedReq;
+            }
+            fn.funcRequired = a.funcRequired;
+            fn.funcReturn = a.funcReturn.is("void") || b.funcReturn.is("void") ? TypeRef.VOID
+                    : upperBound(a.funcReturn, b.funcReturn);
+            return fn;
+        }
         if (a.toString().equals(b.toString())) {
             return a;
         }
@@ -12882,16 +13090,37 @@ public final class JavaEmitter {
             r = new TypeRef("num");
         } else if (a.name != null && a.name.equals(b.name) && a.args.size() == b.args.size()
                 && a.funcParams == null && b.funcParams == null
-                && (COVARIANT_CORE_GENERICS.contains(a.name) || isProgramClassDecl(lubClass(a)))
-                && !containsDynamic(a) && !containsDynamic(b)) {
+                && (COVARIANT_CORE_GENERICS.contains(a.name) || isProgramClassDecl(lubClass(a))
+                || a.name.startsWith("Rec$"))
+                && (a.name.startsWith("Rec$") || !containsDynamic(a) && !containsDynamic(b))) {
+            // Two records of one shape bound field by field (`[p, (f: .., g: ..)]`), as
+            // Dart's upper bound of record types is.
             // Dart's upper bound of two instances of one covariant core generic is that
             // generic over the arguments' bound: `[[1], ['a']]` is a List<List<Object>>.
             // Every Dart class is covariant in its type parameters, so a program generic
             // takes the same rule: `c ? Box<int>(1) : Box<num>(2)` is a Box<num>.
             r = new TypeRef(a.name);
             for (int i = 0; i < a.args.size(); i++) {
-                r.args.add(upperBound(a.arg(i), b.arg(i)));
+                TypeRef ai = a.arg(i);
+                TypeRef bi = b.arg(i);
+                if (a.name.startsWith("Rec$")) {
+                    // A field typed by a function typedef (`Op f`) bounds as the function
+                    // type it names.
+                    TypeRef ea = ai == null ? null : nonGenericFunctionTypedef(ai);
+                    TypeRef eb = bi == null ? null : nonGenericFunctionTypedef(bi);
+                    ai = ea != null ? ea : ai;
+                    bi = eb != null ? eb : bi;
+                    if (ai == null || bi == null) {
+                        r.args.add(TypeRef.DYNAMIC);
+                        continue;
+                    }
+                }
+                r.args.add(upperBound(ai, bi));
             }
+        } else if (isRawComparable(a) && isCoreComparable(b) || isRawComparable(b) && isCoreComparable(a)) {
+            // `['a', 'b' as Comparable]`: String is a Comparable<String>, itself a
+            // Comparable<dynamic>, so the bound is the raw Comparable (Comparable<dynamic>).
+            r = new TypeRef("Comparable");
         } else if (isPatternMember(a) && isPatternMember(b)) {
             // `['a', RegExp('b')]`: String and RegExp both implement dart:core Pattern,
             // their only common supertype below Object, so the list is a List<Pattern>.
@@ -13635,16 +13864,53 @@ public final class JavaEmitter {
             return null;
         }
         java.util.Set<String> names = new HashSet<String>();
+        boolean allTyped = true;
         for (Param lp : l.params) {
             names.add(lp.name);
+            if (lp.type == null || lp.type.is("var") || isDynamicType(lp.type) || lp.named || lp.optional) {
+                allTyped = false;
+            }
         }
+        boolean scoped = false;
         if (!names.isEmpty()) {
             if (mentionsIdent(l.exprBody, names, java.util.Collections.newSetFromMap(
                     new java.util.IdentityHashMap<Object, Boolean>()))) {
-                return null;
+                if (!allTyped) {
+                    return null;
+                }
+                // `grp(xs, (int x) => x.isEven)`: every parameter is annotated, so the body
+                // types with them in scope and K binds to bool, as Dart's inference does.
+                ctx.pushScope();
+                for (Param lp : l.params) {
+                    ctx.declare(lp.name, lp.type);
+                }
+                scoped = true;
             }
         }
-        TypeRef t = elementTypeQuiet(l.exprBody, ctx);
+        TypeRef t;
+        try {
+            t = elementTypeQuiet(l.exprBody, ctx);
+            if ((t == null || isDynamicType(t)) && scoped) {
+                // The quiet readers do not type member reads (`x.isEven`): emit the body
+                // speculatively, into a discarded writer with its diagnostics rolled back,
+                // as a static's inferred type is (inferredStaticType).
+                int mark = diags.mark();
+                ctx.pushWriter(2);
+                try {
+                    Out o = emitExpr(l.exprBody, null, ctx);
+                    t = o == null ? null : o.type;
+                } catch (RuntimeException ex) {
+                    t = null;
+                } finally {
+                    ctx.popWriter();
+                    diags.rollback(mark);
+                }
+            }
+        } finally {
+            if (scoped) {
+                ctx.popScope();
+            }
+        }
         return t == null || t.is("dynamic") || t.is("var") ? null : t;
     }
 
@@ -14748,8 +15014,19 @@ public final class JavaEmitter {
         boolean mixed = false;
         TypeRef lub = null;
         boolean lubKnown = elem == null;
+        // The bound of function-typed elements (upperBound): `[print, f]` is a
+        // List<(int) => void>, which every element must be emitted against.
+        TypeRef fnElems = null;
+        boolean allFns = elem == null;
+        boolean fnsDiffer = false;
         for (Expr e : l.elements) {
             Out o = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
+            if (allFns && o.type != null && o.type.funcParams != null) {
+                fnsDiffer |= fnElems != null && !fnShape(fnElems).equals(fnShape(o.type));
+                fnElems = fnElems == null ? o.type : upperBound(fnElems, o.type);
+            } else {
+                allFns = false;
+            }
             codes.add(elementCode(o, elem, ctx));
             if (lubKnown) {
                 if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
@@ -14791,6 +15068,23 @@ public final class JavaEmitter {
                 for (int i = 0; i < codes.size(); i++) {
                     codes.set(i, "(" + jt + ") (Object) (" + codes.get(i) + ")");
                 }
+            }
+        }
+        if (elem == null && allFns && fnsDiffer && fnElems != null && fnElems.funcParams != null
+                && fnElems.funcReturn != null) {
+            elem = fnElems;
+            codes.clear();
+            for (Expr e : l.elements) {
+                Out eo = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
+                String ec = elementCode(eo, elem, ctx);
+                if (!(e instanceof Lambda) && eo.type != null && eo.type.funcParams != null
+                        && !javaType(eo.type, true, ctx).equals(javaType(elem, true, ctx))) {
+                    // A function value of another (Dart-compatible) signature, `[g1, g2]` with
+                    // `(int, ..)` and `(Object?, ..)`: a different parameterization of one SAM,
+                    // which Java generics call unrelated; erased, it is the same object.
+                    ec = "(" + javaType(elem, true, ctx) + ") (Object) (" + eo.code + ")";
+                }
+                codes.add(ec);
             }
         }
         if (elem == null) {
@@ -16223,6 +16517,15 @@ public final class JavaEmitter {
         // its own -- Dart's `Object == dynamic` is false, so a Set<Type> keeps both.
         if (n.equals("dynamic") && ctx.lookup(n) == null) {
             return new Out("dart.runtime.TypeWitness.DYNAMIC", new TypeRef("Type"));
+        }
+        // `Type`, `Pattern` and the raw `Comparable` as values (`print(Type)`, `Type t =
+        // Type`): dart:core types that erase to Object, so their value is the named core
+        // witness, which prints and compares as Dart's Type does.
+        if ((n.equals("Type") || n.equals("Pattern") || n.equals("Comparable")) && ctx.lookup(n) == null
+                && !program.classes.containsKey(n) && !stubs.classes.containsKey(n)) {
+            String cn = n.equals("Comparable") ? "Comparable<dynamic>" : n;
+            return new Out("dart.runtime.TypeWitness.value(dart.runtime.TypeWitness.core(\"" + cn + "\", false))",
+                    new TypeRef("Type"));
         }
         // `Null` as a value (`x.runtimeType == Null`): the class null's runtimeType
         // answers (TypeWitness.runtimeType), unless the program declares its own Null.
@@ -21303,6 +21606,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      */
     private TypeRef lastLambdaExprType;
     private List<TypeRef> lastLambdaReturns;
+    /// What the async closure emitted last returned through its Future (Ctx.asyncLambdaReturns).
+    private List<TypeRef> lastAsyncLambdaReturns;
     /**
      * Whether the most recently emitted lambda is a single-expression arrow body
      * (no statements had to be lifted out of it) whose body, AS EMITTED JAVA, is
@@ -21528,6 +21833,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private int genericWitnessDepth;
 
     /// The generic closures emitted through SignedFns.generic (see emitLambdaIn).
+    private static final String YIELD_WITNESS_PLACEHOLDER = "dart.runtime.TypeWitness.class.cast(\"$cn1$yieldWitness$\")";
+
+    /// What the generator closure emitted last yields (Ctx.lambdaYields); null after any
+    /// other closure.
+    private List<TypeRef> lastLambdaYields;
+
     private final java.util.Set<Lambda> genericWitnessLambdas =
             java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Lambda, Boolean>());
 
@@ -21724,6 +22035,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         String code;
         List<TypeRef> outerReturns = ctx.lambdaReturns;
         List<TypeRef> returns = new ArrayList<TypeRef>();
+        List<TypeRef> outerYields = ctx.lambdaYields;
+        List<TypeRef> yields = new ArrayList<TypeRef>();
+        // A closure nested in a generator yields nothing of the generator's own.
+        ctx.lambdaYields = null;
+        List<TypeRef> outerAsyncReturns = ctx.asyncLambdaReturns;
+        List<TypeRef> asyncReturns = new ArrayList<TypeRef>();
         TypeRef exprType = null;
         TypeRef asyncArrow = null;
         if ((l.isAsyncStar || l.isSyncStar) && l.body != null) {
@@ -21746,6 +22063,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.methodReturnType = TypeRef.VOID;
             ctx.pushWriter(ctx.currentIndent() + 2);
             ctx.lambdaReturns = returns;
+            ctx.lambdaYields = yields;
             // A void async closure (onPressed: () async {..}) runs as a frame whose errors
             // reach its zone, as Dart reports them.
             // One whose function type returns a value (whenComplete's FutureOr<void>, a
@@ -21753,15 +22071,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             TypeRef samReturn = sigTypes != null && sigTypes.length > 0 ? sigTypes[sigTypes.length - 1] : null;
             boolean voidSam = samReturn == null || samReturn.is("void");
             // An async* closure runs as an AsyncStarFrame its body returns the stream of.
-            boolean starFrame = async ? asyncLowering.tryEmitStar(l.params, l.body, elem,
-                    isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx), ctx)
-                    : asyncLowering.tryEmitSyncStar(l.params, l.body, elem,
-                    isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx), ctx);
+            // With no element type from the context, the generator's element type is what
+            // its yields are emitted as (`yield x`, `yield* xs`), known only once the body
+            // is: the frame is written against a placeholder witness replaced below.
+            String yieldW = isDynamicType(elem) && !(gen != null && gen.args.size() == 1 && isDynamicType(gen.arg(0)))
+                    ? YIELD_WITNESS_PLACEHOLDER : null;
+            String elemW = isDynamicType(elem) ? yieldW : reifiedArgWitness(elem, ctx);
+            boolean starFrame = async ? asyncLowering.tryEmitStar(l.params, l.body, elem, elemW, ctx)
+                    : asyncLowering.tryEmitSyncStar(l.params, l.body, elem, elemW, ctx);
             if (!starFrame && !(l.isAsync && asyncLowering.tryEmit(l.params, l.body, voidSam, null, null, ctx))) {
                 emitBodyStatements(l.params, l.body, ctx);
             }
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
+            TypeRef yieldElem = null;
+            if (yieldW != null) {
+                TypeRef yb = yieldsBound(yields);
+                yieldElem = yb != null && typeVarsInScope(yb, ctx) ? yb : null;
+                String w = yieldElem == null ? null : reifiedArgWitness(yieldElem, ctx);
+                body = body.replace(YIELD_WITNESS_PLACEHOLDER, w == null ? "(dart.runtime.TypeWitness) null" : w);
+            }
             ctx.asyncStarSink = savedSink;
             ctx.syncStarList = savedList;
             ctx.syncStarElem = savedElem;
@@ -21780,14 +22109,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             } else {
                 ctx.importClass("dart.core.DartList");
                 ctx.importClass("dart.core.DartIterable");
-                code = head + " -> DartIterable.syncStar(" + syncStarWitnessArg(elem, ctx) + "(DartList<" + ej
+                code = head + " -> DartIterable.syncStar(" + syncStarWitnessArg(yieldElem != null ? yieldElem : elem, ctx)
+                        + "(DartList<" + ej
                         + "> " + target + ") -> {\n"
                         + body + ind + "    })";
             }
         } else if (asyncValue) {
             lastAsyncArrowValue = null;
-            code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
-                    + indentStr(ctx.currentIndent()) + "}";
+            ctx.asyncLambdaReturns = asyncReturns;
+            try {
+                code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
+                        + indentStr(ctx.currentIndent()) + "}";
+            } finally {
+                ctx.asyncLambdaReturns = outerAsyncReturns;
+            }
             asyncArrow = l.exprBody != null ? lastAsyncArrowValue : null;
         } else if (l.body != null) {
             // `on<E>((event, emit) { emit(s); })`: a block that returns nothing, passed where
@@ -21815,6 +22150,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + (nullTail ? 2 : 1));
             writeLines(genericParamChecks, ctx);
             ctx.lambdaReturns = returns;
+            ctx.asyncLambdaReturns = l.isAsync ? asyncReturns : null;
             // A void async closure (onPressed: () async {..}) runs as a frame whose errors
             // reach its zone, as Dart reports them.
             // One whose function type returns a value (whenComplete's FutureOr<void>, a
@@ -21824,6 +22160,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (!(l.isAsync && asyncLowering.tryEmit(l.params, l.body, voidSam, null, null, ctx))) {
                 emitBodyStatements(l.params, l.body, ctx);
             }
+            ctx.asyncLambdaReturns = outerAsyncReturns;
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
             ctx.bareReturnIsNull = outerNullReturn;
@@ -21886,7 +22223,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             String lifted = ctx.popWriter();
             exprType = o.type;
-            lastLambdaVoid = o.type != null && o.type.is("void");
+            // `() async => throw 'z'` held as a fire-and-forget VoidFunc0 (asyncClosureType):
+            // its plain body is the throw, a statement, as a void SAM's must be.
+            lastLambdaVoid = o.type != null && o.type.is("void")
+                    || l.isAsync && !asyncValue && stripParens(l.exprBody) instanceof ThrowExpr;
             lastLambdaExprIsStatementShaped = lifted.isEmpty() && isJavaStatementExpr(o.code);
             boolean genericVoid = o.type != null && o.type.is("void") && (lambdaReturn != null
                     && (isTypeVariable(lambdaReturn, ctx) || lambdaReturn.is("FutureOr"))
@@ -21935,9 +22275,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         ctx.pinnedReturnCast = savedPinnedCast;
         ctx.lambdaReturnsVoid = savedLambdaVoid;
         ctx.narrowReturnToInt = outerNarrowInt;
+        ctx.lambdaYields = outerYields;
         // Last, so a lambda nested in this one cannot overwrite what this one yields.
+        lastLambdaYields = (l.isSyncStar || l.isAsyncStar) ? yields : null;
         lastLambdaExprType = exprType;
         lastLambdaReturns = returns;
+        lastAsyncLambdaReturns = asyncReturns;
         runTimeSignedLast = null;
         String signed = signClosure(code, l, expected, exprType, ctx);
         // The closure's own signature names its type parameters erased (Object in Java).
@@ -22060,6 +22403,134 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             r = upperBound(r, new TypeRef("Null"));
         }
         return r == null || isDynamicType(r) ? null : r;
+    }
+
+    /// The Future<X> Dart infers for an async closure with no context: X is the arrow body's
+    /// flattened type, or the upper bound of every `return`'s flattened type, joined with
+    /// Null when the body can fall off its end; Never for a body that only throws. Null
+    /// when a return's type is unknown here.
+    private TypeRef asyncClosureReturn(Lambda l, TypeRef bodyType) {
+        TypeRef x;
+        if (l.exprBody != null) {
+            x = stripParens(l.exprBody) instanceof ThrowExpr ? new TypeRef("Never")
+                    : lastAsyncArrowValue != null ? lastAsyncArrowValue : flattenFutureType(bodyType);
+        } else {
+            List<TypeRef> all = new ArrayList<TypeRef>(lastLambdaReturns);
+            if (lastAsyncLambdaReturns != null) {
+                all.addAll(lastAsyncLambdaReturns);
+            }
+            x = null;
+            for (TypeRef t : all) {
+                TypeRef f = flattenFutureType(t);
+                if (f == null || f.is("var") || isDynamicType(f)) {
+                    return null;
+                }
+                x = x == null ? f : upperBound(x, f);
+            }
+            if (x == null && alwaysThrows(l.body)) {
+                x = new TypeRef("Never");
+            } else if (x == null) {
+                x = new TypeRef("Null");
+            } else if (!endsWithJump(l.body)) {
+                x = upperBound(x, new TypeRef("Null"));
+            }
+        }
+        return x == null || x.is("var") || isDynamicType(x) || x.is("void") ? null : TypeRef.of("Future", x);
+    }
+
+    /// The witness of a Future / Iterable / Stream a closure returns, carrying its element
+    /// type's witness where one can be formed (`() => Future<int>`).
+    private String producerWitness(String cls, TypeRef arg, Ctx ctx) {
+        String aw = arg == null || isUnrecordedArg(arg) ? null : reifiedArgWitness(arg, ctx);
+        return "dart.runtime.TypeWitness.of(" + cls + ".class, false" + (aw == null ? "" : ", " + aw) + ")";
+    }
+
+    /// Adds the value of every plain `yield` in {@code s} to {@code out}; false when there
+    /// is a `yield*`, whose element type is not read here.
+    /// Records the static type a generator closure's `yield` (or, for `yield*`, the element
+    /// type of what it spreads) contributes to its element type; null where unknown.
+    void noteYield(Out o, boolean star, Ctx ctx) {
+        if (ctx.lambdaYields == null) {
+            return;
+        }
+        TypeRef t = o == null ? null : o.type;
+        if (star) {
+            t = t != null && t.args.size() == 1 && (t.is("Iterable") || t.is("List") || t.is("Set")
+                    || t.is("Stream")) ? t.arg(0) : null;
+        }
+        ctx.lambdaYields.add(t == null || isDynamicType(t) || t.is("var") ? null : t);
+    }
+
+    /// The upper bound of what a generator closure yields, or null when any yield is of a
+    /// type not known here.
+    private TypeRef yieldsBound(List<TypeRef> ys) {
+        if (ys == null || ys.isEmpty()) {
+            return null;
+        }
+        TypeRef r = null;
+        for (TypeRef y : ys) {
+            if (y == null) {
+                return null;
+            }
+            r = r == null ? y : entryLub(r, y);
+        }
+        return r;
+    }
+
+    private static boolean collectYields(Stmt s, List<Expr> out) {
+        if (s instanceof YieldStmt) {
+            out.add(((YieldStmt) s).value);
+            return !((YieldStmt) s).star;
+        }
+        if (s instanceof Block) {
+            for (Stmt x : ((Block) s).statements) {
+                if (!collectYields(x, out)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (s instanceof IfStmt) {
+            return collectYields(((IfStmt) s).thenStmt, out) && collectYields(((IfStmt) s).elseStmt, out);
+        }
+        if (s instanceof WhileStmt) {
+            return collectYields(((WhileStmt) s).body, out);
+        }
+        if (s instanceof ForStmt) {
+            return collectYields(((ForStmt) s).body, out);
+        }
+        if (s instanceof ForInStmt) {
+            return collectYields(((ForInStmt) s).body, out);
+        }
+        if (s instanceof TryStmt) {
+            TryStmt t = (TryStmt) s;
+            boolean ok = collectYields(t.tryBlock, out) && collectYields(t.finallyBlock, out);
+            for (CatchClause c : t.catches) {
+                ok &= collectYields(c.body, out);
+            }
+            return ok;
+        }
+        return true;
+    }
+
+    /// Whether a statement can only complete by throwing: a throw, a rethrow, a block that
+    /// ends in one, an if/else whose branches both do.
+    private static boolean alwaysThrows(Stmt s) {
+        if (s instanceof RethrowStmt) {
+            return true;
+        }
+        if (s instanceof ExprStmt) {
+            return ((ExprStmt) s).expr instanceof ThrowExpr;
+        }
+        if (s instanceof Block) {
+            List<Stmt> ss = ((Block) s).statements;
+            return !ss.isEmpty() && alwaysThrows(ss.get(ss.size() - 1));
+        }
+        if (s instanceof IfStmt) {
+            IfStmt is = (IfStmt) s;
+            return is.elseStmt != null && alwaysThrows(is.thenStmt) && alwaysThrows(is.elseStmt);
+        }
+        return false;
     }
 
     /// A closure's static return type, as Dart infers it with no context: the arrow body's
@@ -22241,6 +22712,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return s.endsWith("?") ? s.substring(0, s.length() - 1) : s;
     }
 
+    /// The Java return of a block closure's own SAM: the one type every `return` yields,
+    /// else dynamic. inferredClosureType types the local a closure initializes by it, and
+    /// signClosure spells the closure's SAM by it, so the two always agree.
+    private static TypeRef uniformReturn(List<TypeRef> returns) {
+        TypeRef ret = null;
+        for (TypeRef r : returns) {
+            TypeRef rr = r == null ? TypeRef.DYNAMIC : r;
+            if (ret == null) {
+                ret = rr;
+            } else if (!ret.toString().equals(rr.toString())) {
+                ret = TypeRef.DYNAMIC;
+            }
+        }
+        return ret == null || ret.is("Null") || ret.is("var") || ret.is("void") ? TypeRef.DYNAMIC : ret;
+    }
+
     private TypeRef inferredClosureType(Lambda l, String name, Ctx ctx) {
         TypeRef fn = new TypeRef("Function");
         fn.funcParams = new ArrayList<TypeRef>();
@@ -22261,18 +22748,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 ret = TypeRef.VOID;
             }
         } else {
-            ret = null;
-            for (TypeRef r : lastLambdaReturns) {
-                TypeRef rr = r == null ? TypeRef.DYNAMIC : r;
-                if (ret == null) {
-                    ret = rr;
-                } else if (!ret.toString().equals(rr.toString())) {
-                    ret = TypeRef.DYNAMIC;
-                }
-            }
-            if (ret == null) {
-                ret = TypeRef.VOID;
-            }
+            ret = lastLambdaReturns.isEmpty() ? TypeRef.VOID : uniformReturn(lastLambdaReturns);
         }
         if (ret.is("Null") || ret.is("var")) {
             ret = TypeRef.DYNAMIC;
@@ -22580,6 +23056,27 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
 
     private Out emitBareCall(Call c, TypeRef expected, Ctx ctx) {
         String n = c.name;
+        if ((n.equals("Map") || n.equals("Set")) && c.args.positional.isEmpty() && c.args.named.isEmpty()
+                && (c.typeArgs.isEmpty() || c.typeArgs.size() == (n.equals("Map") ? 2 : 1))
+                && ctx.lookup(n) == null && !program.classes.containsKey(n)) {
+            // `Map<String, dynamic>()` / `Set<int>()`: the unnamed core factories make an
+            // empty LinkedHashMap / LinkedHashSet, the same object as `<K, V>{}`.
+            if (n.equals("Map")) {
+                MapLit ml = new MapLit();
+                ml.file = c.file;
+                ml.line = c.line;
+                ml.col = c.col;
+                ml.keyType = c.typeArgs.isEmpty() ? null : c.typeArgs.get(0);
+                ml.valueType = c.typeArgs.isEmpty() ? null : c.typeArgs.get(1);
+                return emitExpr(ml, expected, ctx);
+            }
+            SetLit sl = new SetLit();
+            sl.file = c.file;
+            sl.line = c.line;
+            sl.col = c.col;
+            sl.elementType = c.typeArgs.isEmpty() ? null : c.typeArgs.get(0);
+            return emitExpr(sl, expected, ctx);
+        }
         // dart:core print
         if (n.equals("print")) {
             ctx.importClass("dart.runtime.DartRuntime");
@@ -23826,6 +24323,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             TypeRef ft = recordComponentType(tt, n);
             if (ft != null && isFunctionValued(ft)) {
                 Out field = emitMemberGet(target, n, c, ctx);
+                if (ft.genericClosure != null) {
+                    // A generic closure held by the field: instantiated at the call's type
+                    // arguments, as a generic local's call is.
+                    Out inst = instantiateGenericClosure(callable(field), ft, c, ctx);
+                    return new Out(fnCall(inst.code, inst.type, c.args, ctx),
+                            withInnerGenericClosure(funcResultType(ft), ft.genericClosure));
+                }
                 return new Out(fnCall(callable(field), ft, c.args, ctx), funcResultType(ft));
             }
         }
@@ -33544,6 +34048,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         final java.util.Set<String> valueCalledLocals = new HashSet<String>();
         /** Value types of the `return`s of the lambda block body being emitted, or null. */
         List<TypeRef> lambdaReturns;
+        /// The static types of the values a generator closure being emitted yields (a
+        /// `yield*` contributes its iterable's element type; null where unknown).
+        List<TypeRef> lambdaYields;
+        /// The types an async closure's `return value;`s yield, recorded apart from
+        /// lambdaReturns, which callers read as the closure's own (unwrapped) return.
+        List<TypeRef> asyncLambdaReturns;
         private final java.util.Set<String> boxedActive = new HashSet<String>();
         TypeRef methodReturnType;
         /// The Java type a method's returns are cast to when its Dart return is a class type
