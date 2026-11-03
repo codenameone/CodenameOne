@@ -8479,8 +8479,9 @@ public final class JavaEmitter {
             String flag = ctx.newTemp();
             String val = ctx.newTemp();
             ctx.writer().line("boolean " + flag + " = false;");
-            ctx.writer().line(javaType(types.get(e.getKey()), true, ctx) + " " + val + " = null;");
-            cache.put(e.getKey(), new String[] {flag, val});
+            String valType = javaType(types.get(e.getKey()), true, ctx);
+            ctx.writer().line(valType + " " + val + " = null;");
+            cache.put(e.getKey(), new String[] {flag, val, valType});
         }
         switchFieldCache = cache;
         return saved;
@@ -8604,7 +8605,13 @@ public final class JavaEmitter {
                 TypeRef ft;
                 if (programType) {
                     access = cast + "." + fieldAccess(o.type, f.name) + "()";
-                    ft = fieldTypeOf(o.type, f.name);
+                    ft = patternFieldType(o.type, subjType, f.name);
+                    ClassDecl pcd = program.classes.get(o.type.name);
+                    if (pcd != null && mentionsTypeParam(fieldTypeOf(o.type, f.name), pcd.typeParams)
+                            && !isDynamicType(ft)) {
+                        // Read through the raw class, a getter typed T answers its erasure.
+                        access = "((" + javaType(ft, true, ctx) + ") " + access + ")";
+                    }
                 } else {
                     // A core or stub type (`String(length: var n)`, `List(isEmpty: true)`):
                     // its getters are not get$x accessors, so read it the way `x.length`
@@ -8706,6 +8713,12 @@ public final class JavaEmitter {
             String val = cached[1];
             String lazy = "((" + flag + " || !(" + flag + " = true)) ? " + val + " : (" + val + " = "
                     + access + "))";
+            // The cache temp is dynamic when the getter's declared type is a type parameter
+            // of its class; each case reads it back at the type its own pattern gives it.
+            String want = javaType(ft, true, ctx);
+            if (cached.length > 2 && !want.equals(cached[2])) {
+                lazy = "((" + want + ") " + lazy + ")";
+            }
             for (int i = bindStart; i < binds.size(); i++) {
                 binds.set(i, binds.get(i).replace(token, lazy));
             }
@@ -8815,6 +8828,51 @@ public final class JavaEmitter {
             }
         }
         return "get$" + name;
+    }
+
+    /**
+     * The type of field {@code name} read through an object pattern on {@code patType},
+     * in the scope of the matched value. A field typed with the class's own type
+     * parameter ({@code T v} on {@code Ok<T>}) means nothing outside that class, so the
+     * parameter is replaced by the pattern's type argument -- written, or inferred from
+     * the subject's type the way Dart infers {@code Ok(:final v)} on a {@code Result<int>}
+     * as {@code Ok<int>} -- and by {@code dynamic} when neither says.
+     */
+    private TypeRef patternFieldType(TypeRef patType, TypeRef subjType, String name) {
+        TypeRef ft = fieldTypeOf(patType, name);
+        ClassDecl cd = program.classes.get(patType.name);
+        if (cd == null || cd.typeParams.isEmpty()) {
+            return ft;
+        }
+        List<TypeRef> args = new ArrayList<TypeRef>();
+        for (int i = 0; i < cd.typeParams.size(); i++) {
+            args.add(i < patType.args.size() ? patType.args.get(i) : null);
+        }
+        if (patType.args.isEmpty() && subjType != null && subjType.name != null
+                && !subjType.args.isEmpty()) {
+            List<TypeRef> own = new ArrayList<TypeRef>();
+            for (String tp : cd.typeParams) {
+                own.add(new TypeRef(tp));
+            }
+            TypeRef self = new TypeRef(patType.name);
+            self.args = own;
+            TypeRef sup = asSuper(self, subjType.name, 0);
+            if (sup != null && subjType.name.equals(sup.name) && sup.args.size() == subjType.args.size()) {
+                for (int i = 0; i < sup.args.size(); i++) {
+                    TypeRef a = sup.args.get(i);
+                    int at = a == null || !a.args.isEmpty() ? -1 : cd.typeParams.indexOf(a.name);
+                    if (at >= 0 && args.get(at) == null) {
+                        args.set(at, subjType.args.get(i));
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < args.size(); i++) {
+            if (args.get(i) == null) {
+                args.set(i, TypeRef.DYNAMIC);
+            }
+        }
+        return substTypeParams(ft, cd.typeParams, args);
     }
 
     private TypeRef fieldTypeOf(TypeRef ownerType, String name) {
@@ -18784,6 +18842,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         || n.endsWith("Error") && stubs.isStubClass(n)
                         || n.endsWith("Exception") && stubs.isStubClass(n);
             }
+            if (c.superclass == null && c.mixins.isEmpty()) {
+                // `class E implements Exception` with nothing to extend is emitted extending
+                // dart:core's Java class (see the class emitter's implements loop), so it is
+                // thrown as itself, never inside a DartThrown.
+                for (TypeRef itf : c.interfaces) {
+                    if (CORE_ERRORS.containsKey(itf.name) && !program.classes.containsKey(itf.name)) {
+                        return true;
+                    }
+                }
+            }
             cur = c.superclass;
         }
         return false;
@@ -22849,8 +22917,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // stream's static type names (a stream carries no element witness).
             String w = reifiedArgWitness(tt.arg(0), ctx);
             if (w != null) {
-                return new Out(target.code + ".toList(" + w + ")",
-                        TypeRef.of("Future", TypeRef.of("List", tt.arg(0))));
+                // The runtime declares Future<DartList<T>>; a Stream<int>'s List<int> is a
+                // DartLongList, so the result is viewed in that representation.
+                TypeRef seen = TypeRef.of("Future", TypeRef.of("List", tt.arg(0)));
+                TypeRef declared = TypeRef.of("Future", TypeRef.of("List", new TypeRef("T")));
+                return new Out(primitiveListSeen(target.code + ".toList(" + w + ")", declared, seen, ctx),
+                        seen);
             }
         }
         if (tt.is("Stream") && n.equals("timeout") && pos.size() == 1 && c.args.named.size() <= 1
@@ -23326,7 +23398,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + "." + n + "(" + f.code + ")", TypeRef.BOOL);
             }
             if (n.equals("fold")) {
-                Out init = coreArg(pos.get(0), null, ctx);
+                // `fold<double>(0, ...)`: the written T types the seed (an int literal
+                // there is a double) and the combiner, rather than the seed's own type.
+                TypeRef written = c.typeArgs.size() == 1 && !isDynamicType(c.typeArgs.get(0))
+                        ? c.typeArgs.get(0) : null;
+                Out init = coreArg(pos.get(0), written, ctx);
+                if (written != null) {
+                    init = new Out(coerce(init, written, ctx), written);
+                }
                 // The combiner is (R, E) -> R with R the seed's type, so its result is
                 // coerced to R: `fold(0.0, (num sum, int e) => sum + e)` computes a num
                 // and must hand back the double the seed made R.
