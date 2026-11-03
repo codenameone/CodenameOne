@@ -29,8 +29,8 @@ import dart.runtime.Funcs;
 /**
  * Dart's {@code dart:async} Timer: a one-shot callback scheduled after a
  * {@link Duration}. With a live CN1 Display the callback fires on the EDT via
- * {@code CN.setTimeout}; headless (tests, plain JVM) it falls back to a
- * short-lived thread. {@link #cancel()} prevents a not-yet-fired callback.
+ * {@code CN.setTimeout}; headless (tests, plain JVM) the isolate's event
+ * loop fires it (see Microtasks). {@link #cancel()} prevents a not-yet-fired callback.
  */
 public class Timer {
 
@@ -38,8 +38,6 @@ public class Timer {
     private volatile boolean fired;
     /** Cleared by cancel(), so a cancelled timer no longer keeps its callback reachable. */
     volatile Funcs.VoidFunc0 callback;
-    /** The scheduled task on the Display path, so cancel() can unschedule it. */
-    private Timers.Handle handle;
 
     public Timer(Duration duration, Funcs.VoidFunc0 callback) {
         this.callback = callback;
@@ -57,57 +55,22 @@ public class Timer {
                 fired = true;
                 Funcs.VoidFunc0 cb = Timer.this.callback;
                 Timer.this.callback = null;
+                // A timer callback is a turn of Dart's event loop. It runs from the
+                // loop itself (Microtasks.drain), which runs the microtasks it queued
+                // before the next timer; draining here as well ran the later timers
+                // nested inside this one, ahead of its own zone's error handler.
                 if (cb != null) {
-                    try {
-                        cb.call();
-                    } finally {
-                        // A timer callback is a turn of Dart's event loop: the
-                        // microtasks it queued run before the next one.
-                        Microtasks.drain();
-                    }
+                    cb.call();
                 }
             }
         });
-        if (com.codename1.ui.Display.isInitialized()) {
-            handle = Timers.schedule(ms, r);
-        } else {
-            final long delay = ms;
-            // The thread only waits out the delay: the callback is posted to the
-            // isolate's thread (see Microtasks), so it never runs beside the frame
-            // that awaits, and the program does not end while the timer is pending.
-            Microtasks.timerStarted();
-            headlessPending = true;
-            worker = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Thread.sleep(delay);
-                    } catch (InterruptedException ignore) {
-                        // cancel() interrupts the sleep and has already ended the
-                        // pending count; nothing is posted
-                        return;
-                    }
-                    if (!claimPending()) {
-                        return;
-                    }
-                    Microtasks.postTimerEvent(r);
-                }
-            }, "dart-timer");
-            worker.start();
-        }
+        // One ordered queue for every timer of the isolate (see Microtasks): equal
+        // deadlines fire in creation order, as in Dart, with or without a Display.
+        entry = Microtasks.scheduleTimer(ms, r);
     }
 
-    /** The headless sleeping thread, so cancel() can end it early. */
-    private Thread worker;
-    /** Headless: counted in Microtasks' pending timers and not yet posted or cancelled. */
-    private boolean headlessPending;
-
-    /// Takes the pending mark exactly once, for whichever of fire and cancel comes first.
-    private synchronized boolean claimPending() {
-        boolean was = headlessPending;
-        headlessPending = false;
-        return was;
-    }
+    /** The queued timer, so cancel() can remove it. */
+    private Microtasks.TimerEntry entry;
 
     public void cancel() {
         cancelled = true;
@@ -117,21 +80,10 @@ public class Timer {
             n.cancel();
         }
         callback = null;
-        Timers.Handle h = handle;
-        handle = null;
-        if (h != null) {
-            h.cancel();
-        }
-        // Headless, a timer is a (non-daemon) thread asleep until the deadline. Only
-        // setting the flag left a cancelled hours-long timer holding the JVM open and
-        // its callback reachable until then; interrupting ends the thread now.
-        Thread w = worker;
-        worker = null;
-        if (claimPending()) {
-            Microtasks.timerEnded();
-        }
-        if (w != null) {
-            w.interrupt();
+        Microtasks.TimerEntry e = entry;
+        entry = null;
+        if (e != null) {
+            Microtasks.cancelTimer(e);
         }
     }
 

@@ -306,6 +306,21 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess, dart.r
         return elem;
     }
 
+    /// The list a list pattern's rest element ({@code [h, ...var t]}) binds: a new,
+    /// growable copy of the elements between the fixed ones, with the matched list's
+    /// reified element type -- {@code t.runtimeType} is {@code List<int>} for a
+    /// {@code List<int>}, never {@code List<dynamic>}. A primitive list's sublist keeps
+    /// its storage type, which is the same answer.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static DartList<Object> patternRest(Object list, int start, int after) {
+        java.util.List<Object> l = (java.util.List<Object>) list;
+        int end = l.size() - after;
+        if (list instanceof DartList) {
+            return (DartList) ((DartList<?>) list).sublist(start, (long) end);
+        }
+        return from(new java.util.ArrayList<Object>(l.subList(start, end)));
+    }
+
     /// The reified element type of any Dart list value, or null when it records none.
     static dart.runtime.TypeWitness listWitness(Object list) {
         if (list instanceof DartList) {

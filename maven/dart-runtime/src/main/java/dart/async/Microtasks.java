@@ -77,20 +77,6 @@ final class Microtasks {
         }
     }
 
-    /// Headless only: timer callbacks whose deadline passed, waiting for the isolate's
-    /// thread. A timer used to run its callback on its own sleeping thread, so it raced
-    /// the thread parked in an await: a zero-delay Future.delayed completed and drained
-    /// microtasks there while the awaiting frame woke and ran on, and an event a
-    /// controller had queued was delivered after the code that followed the await, or
-    /// not at all (the drainer check let one thread abandon a task the other had just
-    /// stopped looking for). Now the timer thread only posts here, and the event runs
-    /// where the microtasks run, one at a time, after the microtask queue is empty --
-    /// Dart's event loop order.
-    private static final ArrayDeque<Runnable> EVENTS = new ArrayDeque<Runnable>();
-    /// Headless timers that have neither fired nor been cancelled. Dart's VM does not
-    /// exit while one is pending, so neither does {@link #runUntilIdle()}.
-    private static int pendingTimers;
-
     /// async* bodies running headless on a frame of their own (see AsyncStar) that are
     /// not parked in an await: main() cannot exit while one may still yield, which is
     /// how a bare {@code Stream.error(e).listen(...)} at the end of main() lost its
@@ -119,54 +105,101 @@ final class Microtasks {
         }
     }
 
-    /// Timer events on the isolate thread's stack right now. Each is still counted in
-    /// pendingTimers until it returns, so a runUntilIdle() called from inside one (an
-    /// async body resumed by a timer that then runs the loop nested, as native code
-    /// answering a channel call does) waited for its own event to end: a deadlock
-    /// whenever the resumption happened to arrive by timer rather than by microtask.
-    private static int runningTimerEvents;
+    /// One pending timer: its deadline, and its creation order to break ties -- Dart
+    /// fires timers by deadline and, for equal deadlines, in the order they were made.
+    static final class TimerEntry {
+        final long deadline;
+        final long seq;
+        final Runnable task;
+        /// The EDT wake-up on the Display path; null headless.
+        Timers.Handle wake;
 
-    static void timerStarted() {
-        synchronized (LOCK) {
-            pendingTimers++;
+        TimerEntry(long deadline, long seq, Runnable task) {
+            this.deadline = deadline;
+            this.seq = seq;
+            this.task = task;
         }
     }
 
-    /// A pending timer was cancelled before its event ran.
-    static void timerEnded() {
-        synchronized (LOCK) {
-            pendingTimers--;
-            LOCK.notifyAll();
-        }
-    }
-
-    /// Posts a fired headless timer's callback to the isolate's thread. The pending
-    /// count drops when the event has run, not now, so exit cannot slip between.
-    static void postTimerEvent(final Runnable r) {
-        synchronized (LOCK) {
-            EVENTS.addLast(new Runnable() {
+    /// Every pending timer of the isolate, ordered as Dart orders them. There is no
+    /// thread per timer: the event loop (drain, parkUntil, runUntilIdle) fires the
+    /// earliest due entry itself, and sleeps until the earliest deadline. Two timers
+    /// with one deadline used to be two sleeping threads that woke in whichever
+    /// order the scheduler chose.
+    private static final java.util.TreeSet<TimerEntry> TIMERS = new java.util.TreeSet<TimerEntry>(
+            new java.util.Comparator<TimerEntry>() {
                 @Override
-                public void run() {
-                    synchronized (LOCK) {
-                        runningTimerEvents++;
+                public int compare(TimerEntry x, TimerEntry y) {
+                    if (x.deadline != y.deadline) {
+                        return x.deadline < y.deadline ? -1 : 1;
                     }
-                    try {
-                        r.run();
-                    } finally {
-                        synchronized (LOCK) {
-                            runningTimerEvents--;
-                        }
-                        timerEnded();
-                    }
+                    return x.seq < y.seq ? -1 : (x.seq == y.seq ? 0 : 1);
                 }
             });
+    private static long timerSeq;
+
+    private static final Runnable WAKE = new Runnable() {
+        @Override
+        public void run() {
+            drain();
+        }
+    };
+
+    private static long nowMs() {
+        return System.nanoTime() / 1000000L;
+    }
+
+    /// Queues {@code task} to run as a timer event {@code ms} from now. With a Display
+    /// an EDT timeout only wakes the loop; which timer runs is still decided by the
+    /// queue, so equal deadlines keep their creation order there too.
+    static TimerEntry scheduleTimer(long ms, Runnable task) {
+        long delay = Math.max(0L, ms);
+        TimerEntry e;
+        synchronized (LOCK) {
+            e = new TimerEntry(nowMs() + delay, timerSeq++, task);
+            TIMERS.add(e);
             LOCK.notifyAll();
+        }
+        if (com.codename1.ui.Display.isInitialized()) {
+            e.wake = Timers.schedule(delay, WAKE);
+        }
+        return e;
+    }
+
+    /// Removes a timer that has not fired; a no-op for one that has.
+    static void cancelTimer(TimerEntry e) {
+        synchronized (LOCK) {
+            TIMERS.remove(e);
+            LOCK.notifyAll();
+        }
+        Timers.Handle h = e.wake;
+        e.wake = null;
+        if (h != null) {
+            h.cancel();
         }
     }
 
-    /// Runs queued tasks, in order, until none is left (tasks may queue more), then
-    /// one fired timer event at a time, each followed by the microtasks it queued. Off
-    /// the EDT of a live Display this does nothing: the posted turn drains on the EDT.
+    /// The earliest timer whose deadline has passed, removed from the queue; or null.
+    private static Runnable pollDueTimerLocked() {
+        if (TIMERS.isEmpty()) {
+            return null;
+        }
+        TimerEntry first = TIMERS.first();
+        if (first.deadline > nowMs()) {
+            return null;
+        }
+        TIMERS.pollFirst();
+        return first.task;
+    }
+
+    /// How long the loop may sleep before the next timer is due, at most {@code cap}.
+    private static long waitMsLocked(long cap) {
+        if (TIMERS.isEmpty()) {
+            return cap;
+        }
+        return Math.max(1L, Math.min(cap, TIMERS.first().deadline - nowMs()));
+    }
+
     static void drain() {
         if (com.codename1.ui.Display.isInitialized()
                 && !com.codename1.ui.Display.getInstance().isEdt()) {
@@ -188,7 +221,7 @@ final class Microtasks {
                 synchronized (LOCK) {
                     next = QUEUE.pollFirst();
                     if (next == null) {
-                        next = EVENTS.pollFirst();
+                        next = pollDueTimerLocked();
                     }
                     if (next == null) {
                         // Released under the same lock that found the queues empty: a
@@ -213,7 +246,8 @@ final class Microtasks {
 
     /// Headless: whether anything is queued for the isolate's thread.
     private static boolean idleLocked() {
-        return QUEUE.isEmpty() && EVENTS.isEmpty();
+        return QUEUE.isEmpty()
+                && (TIMERS.isEmpty() || TIMERS.first().deadline > nowMs());
     }
 
     /// Headless park of an awaiting frame: runs the event loop until f completes.
@@ -260,11 +294,11 @@ final class Microtasks {
             drain();
             synchronized (LOCK) {
                 if (idleLocked()) {
-                    if (pendingTimers - runningTimerEvents <= 0 && runningFrames <= 0) {
+                    if (TIMERS.isEmpty() && runningFrames <= 0) {
                         return;
                     }
                     try {
-                        LOCK.wait(20);
+                        LOCK.wait(waitMsLocked(20));
                     } catch (InterruptedException ignore) {
                         // the loop condition decides
                     }

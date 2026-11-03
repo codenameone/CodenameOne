@@ -1,0 +1,14 @@
+t1 7
+sync end
+innerH inner
+innerH innerMicro
+outerH fromHandler
+d 1
+outerH late
+outerH handledLater
+wait err w
+t2 7
+outerH deep
+outerH onData2
+caught late
+timer caught handledLater

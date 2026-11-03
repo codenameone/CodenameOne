@@ -8020,6 +8020,14 @@ public final class JavaEmitter {
             }
             return false;
         }
+        if (p instanceof MapPattern) {
+            for (Pattern part : ((MapPattern) p).values) {
+                if (patternBinds(part)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         if (p instanceof ListPattern) {
             for (Pattern part : ((ListPattern) p).elements) {
                 if (part instanceof RestPattern) {
@@ -8748,6 +8756,29 @@ public final class JavaEmitter {
             }
             return cond.append(")").toString();
         }
+        if (p instanceof MapPattern) {
+            // Dart: the subject is a Map and, per entry, `map[key]` is read once; a null
+            // result only matches when containsKey says the key is really there.
+            MapPattern mp = (MapPattern) p;
+            String cast = "((java.util.Map) " + subj + ")";
+            String cond = subj + " instanceof java.util.Map";
+            if (mp.type != null) {
+                // `<K, V>{...}` matches only a Map<K, V> (Dart: the subject is tested
+                // against the pattern's map type), with the same reified test as
+                // `x is Map<K, V>`; dynamic arguments leave the plain Map test.
+                String typed = collectionTest(subj, mp.type, "java.util.Map", ctx);
+                if (typed != null) {
+                    cond = typed;
+                }
+            }
+            for (int i = 0; i < mp.keys.size(); i++) {
+                String key = emitExpr(mp.keys.get(i), null, ctx).code;
+                cond = joinAnd(cond, cast + ".containsKey(" + key + ")");
+                cond = joinAnd(cond, patternMatch(mp.values.get(i), cast + ".get(" + key + ")",
+                        TypeRef.DYNAMIC, ctx, binds));
+            }
+            return cond;
+        }
         if (p instanceof ListPattern) {
             ListPattern l = (ListPattern) p;
             ctx.importClass("java.util.List");
@@ -8772,8 +8803,7 @@ public final class JavaEmitter {
                     if (inner != null) {
                         ctx.importClass("dart.core.DartList");
                         int after = l.elements.size() - 1 - i;
-                        String slice = "DartList.from(" + cast + ".subList(" + i + ", " + cast + ".size() - "
-                                + after + "))";
+                        String slice = "DartList.patternRest(" + subj + ", " + i + ", " + after + ")";
                         cond = joinAnd(cond, patternMatch(inner, slice, TypeRef.DYNAMIC, ctx, binds));
                     }
                     continue;
@@ -9720,7 +9750,12 @@ public final class JavaEmitter {
             // Never (a static Never function's arrow body, typed by its own type variable)
             // is left to javac's inference from the return position.
             if (expected != null && !expected.is("void") && !expected.is("dynamic")
-                    && !expected.is("var") && !isCoreNever(expected)) {
+                    && !expected.is("var") && !isCoreNever(expected)
+                    // An arrow body passed to a generic stub method (`map((x) => throw e)`,
+                    // `map<int>(...)`) is expected to be that method's own unbound `R`, which
+                    // is no Java type here: javac infers the helper's T from the lambda's
+                    // resolved target instead.
+                    && typeVarsInScope(expected, ctx)) {
                 return new Out("DartRuntime.<" + javaType(expected, true, ctx) + ">throwValue("
                         + v.code + ")", expected);
             }

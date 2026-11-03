@@ -1504,6 +1504,8 @@ public final class AstBuilder {
                 p = buildRecordPattern(pd.recordPattern());
             } else if (pd.listPattern() != null) {
                 p = buildListPattern(pd.listPattern());
+            } else if (pd.mapPattern() != null) {
+                p = buildMapPattern(pd.mapPattern());
             } else {
                 p = buildObjectPattern(pd.objectPattern());
             }
@@ -1712,6 +1714,9 @@ public final class AstBuilder {
         if (ctx.listPattern() != null) {
             return buildListPattern(ctx.listPattern());
         }
+        if (ctx.mapPattern() != null) {
+            return buildMapPattern(ctx.mapPattern());
+        }
         if (ctx.variablePattern() != null) {
             return buildVariablePattern(ctx.variablePattern());
         }
@@ -1757,6 +1762,24 @@ public final class AstBuilder {
             r.fields.add(buildPatternField(pf));
         }
         return r;
+    }
+
+    private Pattern buildMapPattern(Dart2Parser.MapPatternContext ctx) {
+        MapPattern m = new MapPattern();
+        pos(m, ctx);
+        if (ctx.typeArguments() != null) {
+            m.type = new TypeRef("Map");
+            for (Dart2Parser.TypeContext t : ctx.typeArguments().typeList().type()) {
+                m.type.args.add(buildType(t));
+            }
+        }
+        for (Dart2Parser.MapPatternEntryContext e : ctx.mapPatternEntry()) {
+            Dart2Parser.ConstantPatternContext cp = e.constantPattern();
+            m.keys.add(parseExprFragment(cp.getText(), cp.getStart().getLine(),
+                    cp.getStart().getCharPositionInLine()));
+            m.values.add(buildPattern(e.pattern()));
+        }
+        return m;
     }
 
     private Pattern buildListPattern(Dart2Parser.ListPatternContext ctx) {

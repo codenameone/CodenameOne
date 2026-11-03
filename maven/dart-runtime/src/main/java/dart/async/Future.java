@@ -307,30 +307,10 @@ public class Future<T> {
                 } catch (Throwable t) {
                     f.completeError(t);
                 }
-                // The end of a timer turn (see Microtasks).
-                Microtasks.drain();
+                // The loop that runs this timer drains its microtasks (see Microtasks).
             }
         });
-        if (com.codename1.ui.Display.isInitialized()) {
-            Timers.schedule(ms, complete);
-        } else {
-            final long sleepMs = ms;
-            // The thread only waits out the delay; completion is posted to the isolate's
-            // thread like any timer event (see Microtasks), and the program cannot end
-            // while it is pending.
-            Microtasks.timerStarted();
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Thread.sleep(sleepMs);
-                    } catch (InterruptedException ignore) {
-                        // fall through and complete anyway
-                    }
-                    Microtasks.postTimerEvent(complete);
-                }
-            }, "dart-future-delayed").start();
-        }
+        Microtasks.scheduleTimer(ms, complete);
         return f;
     }
 

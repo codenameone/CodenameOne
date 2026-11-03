@@ -291,7 +291,21 @@ public class Stream<T> {
         }
         Sub sub = new Sub();
         // Listener callbacks run in the zone listen() was called in.
-        sub.onData = (Funcs.VoidFunc1<T>) Zone.bindAny(onData);
+        // What onData throws is an uncaught error of that zone too (Dart's
+        // runUnaryGuarded), so it is caught inside the binding, while the listen
+        // zone is still current -- not by deliverData after the zone was restored,
+        // where a broadcast pump running in the root zone would lose it.
+        final Funcs.VoidFunc1<T> data = onData;
+        sub.onData = (Funcs.VoidFunc1<T>) Zone.bindAny(data == null ? null : new Funcs.VoidFunc1<T>() {
+            @Override
+            public void call(T value) {
+                try {
+                    data.call(value);
+                } catch (Throwable t) {
+                    reportUncaught(t);
+                }
+            }
+        });
         // With no onError the error goes to the zone of listen(), not to whichever
         // zone happens to be current at delivery: bind the reporter there too.
         sub.onError = Zone.bindAny(onError != null ? onError : new Funcs.VoidFunc1<Object>() {
@@ -935,22 +949,101 @@ public class Stream<T> {
     /** Dart's {@code Stream.fromIterable}: each element in turn, then done. */
     public static <T> Stream<T> fromIterable(final Iterable<? extends T> elements) {
         // Dart lets this stream be listened to more than once, each listener getting
-        // its own iteration; one async* run would hand a second listener only done.
+        // its own iteration; one run would hand a second listener only done.
         return new Stream<T>() {
             @Override
             Stream<T> perListener() {
-                return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
-                    @Override
-                    public void call(AsyncStar.Sink<T> s) {
-                        if (elements != null) {
-                            for (T e : elements) {
-                                s.yield$(e);
-                            }
-                        }
-                    }
-                });
+                return new IterableStream<T>(elements);
             }
         };
+    }
+
+    /// One listener's run of {@link #fromIterable}, timed as Dart's: the iterator is
+    /// taken at listen, then each step is a microtask that moves it once and delivers
+    /// that element -- or done, one step after the last element. It used to be an
+    /// async* body, whose frame added hops of its own, so its events interleaved with
+    /// other microtasks differently from Dart.
+    private static final class IterableStream<T> extends Stream<T> {
+        private final Iterable<? extends T> elements;
+        private java.util.Iterator<? extends T> iterator;
+        private boolean scheduled;
+        private boolean paused;
+        private boolean finished;
+        private final Runnable step = new Runnable() {
+            @Override
+            public void run() {
+                step();
+            }
+        };
+
+        IterableStream(Iterable<? extends T> elements) {
+            this.elements = elements;
+        }
+
+        @Override
+        protected void onFirstListener() {
+            try {
+                iterator = elements == null
+                        ? java.util.Collections.<T>emptyList().iterator() : elements.iterator();
+            } catch (Throwable t) {
+                fail(t);
+                return;
+            }
+            schedule();
+        }
+
+        @Override
+        protected void onPaused() {
+            paused = true;
+        }
+
+        @Override
+        protected void onResumed() {
+            paused = false;
+            schedule();
+        }
+
+        @Override
+        protected void onNoListeners() {
+            finished = true;
+        }
+
+        private void schedule() {
+            if (scheduled || finished || paused) {
+                return;
+            }
+            scheduled = true;
+            Microtasks.schedule(step);
+        }
+
+        private void step() {
+            scheduled = false;
+            if (finished || paused) {
+                return;
+            }
+            T value;
+            try {
+                if (!iterator.hasNext()) {
+                    finished = true;
+                    emitDone();
+                    return;
+                }
+                value = iterator.next();
+            } catch (Throwable t) {
+                fail(t);
+                return;
+            }
+            emit(value);
+            schedule();
+        }
+
+        /// Dart: an iterator that throws ends the stream with that error, then done,
+        /// in the same step.
+        private void fail(Throwable t) {
+            finished = true;
+            emitError(dart.runtime.DartRuntime.caught(t));
+            emitDone();
+        }
     }
 
     /// {@code Stream.eventTransformed(source, mapSink)}: every event of {@code source}
@@ -1006,14 +1099,15 @@ public class Stream<T> {
         return fromIterable(java.util.Collections.<T>emptyList());
     }
 
-    /** Dart's {@code Stream.error}. */
+    /// Dart's {@code Stream.error}: as in Dart, an async controller with the error
+    /// added and closed before anyone listens, so the error is the first microtask
+    /// after listen and done the next -- not an async* body throwing, whose frame
+    /// added hops of its own.
     public static <T> Stream<T> error(final Object error) {
-        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
-            @Override
-            public void call(AsyncStar.Sink<T> s) {
-                throw dart.runtime.DartRuntime.asError(error);
-            }
-        });
+        StreamController<T> c = new StreamController<T>();
+        c.addError(error);
+        c.close();
+        return c.stream();
     }
 
     /** Dart's {@code Stream.fromFuture}: the future's value as one event. */

@@ -45,7 +45,7 @@ public final class Async {
         // whatever zone the draining frame was in: a microtask scheduled inside
         // runZoned read the root zone's values once timer callbacks stopped draining
         // from their own (zoned) threads.
-        Microtasks.schedule(Zone.capture(new Runnable() {
+        Microtasks.schedule(Zone.captureGuarded(new Runnable() {
             @Override
             public void run() {
                 callback.call();

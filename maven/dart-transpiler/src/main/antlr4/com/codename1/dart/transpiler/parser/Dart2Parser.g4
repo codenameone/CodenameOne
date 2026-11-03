@@ -629,7 +629,7 @@ localVariableDeclaration
 
 // Dart 3 destructuring declaration -- CN1 addition: `final (a, b) = e;`, `var [x, y] = e;`
 patternVariableDeclaration
-    : metadata (FINAL_ | VAR_) (recordPattern | listPattern | objectPattern) EQ expr SC
+    : metadata (FINAL_ | VAR_) (recordPattern | listPattern | mapPattern | objectPattern) EQ expr SC
     ;
 
 logicalAndExpression
@@ -1069,6 +1069,7 @@ primaryPattern
     | objectPattern
     | recordPattern
     | listPattern
+    | mapPattern
     | variablePattern
     | OP pattern CP
     ;
@@ -1103,6 +1104,15 @@ listPattern
 listPatternElement
     : DDD pattern?
     | pattern
+    ;
+
+// `{'key': subpattern, ...}`: every key present (containsKey), its value matched
+mapPattern
+    : typeArguments? OBC (mapPatternEntry (C mapPatternEntry)* C?)? CBC
+    ;
+
+mapPatternEntry
+    : constantPattern CO pattern
     ;
 
 patternField

@@ -854,6 +854,14 @@ public final class Ast {
         public List<Pattern> elements = new ArrayList<Pattern>();
     }
 
+    /** A map pattern: `{key: p, ...}`; {@code keys[i]} is the constant key of {@code values[i]}. */
+    public static class MapPattern extends Pattern {
+        /** `<K, V>{...}`: the Map type the subject must be; null when the pattern has no type arguments. */
+        public TypeRef type;
+        public List<Expr> keys = new ArrayList<Expr>();
+        public List<Pattern> values = new ArrayList<Pattern>();
+    }
+
     /** A rest element of a list pattern: `...` or `...rest`; {@code inner} is null for a bare `...`. */
     public static class RestPattern extends Pattern {
         public Pattern inner;
