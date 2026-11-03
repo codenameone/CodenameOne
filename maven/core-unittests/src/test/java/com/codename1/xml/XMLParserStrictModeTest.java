@@ -71,9 +71,9 @@ class XMLParserStrictModeTest {
 
     @Test
     void entitiesAreDecodedInTextAndAttributes() {
-        Element r = parse("<r a=\"x&amp;y&#65;\">&lt;a&gt; &amp; b&#x1F600;</r>", true, false);
+        Element r = parse("<r a=\"x&amp;y&#65;\">&lt;a&gt; &amp; b&c</r>", true, false);
         assertEquals("x&yA", r.getAttribute("a"));
-        assertEquals("<a> & b\ud83d\ude00", r.getChildAt(0).getText());
+        assertEquals("<a> & b&c", r.getChildAt(0).getText());
     }
 
     @Test
@@ -124,7 +124,74 @@ class XMLParserStrictModeTest {
     }
 
     private static String failure(String xml) {
-        return assertThrows(XMLParseException.class, () -> parse(xml, true, false)).getMessage();
+        return assertThrows(XMLParseException.class, () -> rejecting().parse(new StringReader(xml))).getMessage();
+    }
+
+    private static XMLParser rejecting() {
+        XMLParser p = new XMLParser();
+        p.setRejectMalformed(true);
+        return p;
+    }
+
+    @Test
+    void rejectingDecodesSupplementaryReferences() {
+        Element r = rejecting().parse(new StringReader("<r>b&#x1F600;</r>"));
+        assertEquals("b\ud83d\ude00", r.getChildAt(0).getText());
+        assertTrue(rejecting().isStrict());
+    }
+
+    @Test
+    void strictAloneStaysTolerant() {
+        // Mappers.fromXml parses this way: what master accepted still parses.
+        XMLParser p = new XMLParser();
+        p.setStrict(true);
+        Element r = p.parse(new StringReader("<a>x&nbsp;y</a>"));
+        assertEquals("a", r.getTagName());
+        assertTrue(r.getChildAt(0).getText().startsWith("x"));
+        assertEquals("a", p.parse(new StringReader("<a/><b/>")).getTagName());
+        XMLParser q = new XMLParser();
+        q.setStrict(true);
+        q.setParserCallback((id, tag, attribute, value, description) -> true);
+        assertEquals("a", q.parse(new StringReader("<a/><b/>")).getTagName());
+    }
+
+    @Test
+    void errorsNameTheLineAndColumn() {
+        XMLParseException e = assertThrows(XMLParseException.class,
+                () -> rejecting().parse(new StringReader("<a>\n<b>\n  </c>")));
+        assertEquals(3, e.getLine());
+        assertTrue(e.getMessage().startsWith("line 3, column "), e.getMessage());
+        assertTrue(e.getColumn() > 0);
+    }
+
+    @Test
+    void controlCharactersAreRefused() {
+        assertTrue(failure("<a>x\u0001</a>").contains("control character"));
+        assertTrue(failure("<a v='\u0007'/>").contains("control character"));
+        assertTrue(failure("<a>&#1;</a>").contains("control character"));
+        assertTrue(failure("<a>&#X41;</a>").contains("lowercase x"));
+        assertEquals("\t\nA", rejecting().parse(new StringReader("<a>&#9;&#10;&#x41;</a>")).getChildAt(0).getText());
+    }
+
+    @Test
+    void ioErrorsKeepTheirCause() {
+        java.io.IOException boom = new java.io.IOException("boom");
+        java.io.Reader r = new java.io.Reader() {
+            public int read(char[] b, int o, int l) throws java.io.IOException {
+                throw boom;
+            }
+
+            public void close() {
+            }
+        };
+        XMLParseException e = assertThrows(XMLParseException.class, () -> rejecting().parse(r));
+        assertSame(boom, e.getCause());
+    }
+
+    @Test
+    void doctypeCommentsAndInstructionsAreSkippedWhole() {
+        Element r = rejecting().parse(new StringReader("<!DOCTYPE r [<!-- it's ]> --><?pi \"]>?>]><r/>"));
+        assertEquals("r", r.getTagName());
     }
 
     @Test
@@ -160,7 +227,7 @@ class XMLParserStrictModeTest {
     @Test
     void anEntityTheApplicationAddsIsDefined() {
         XMLParser p = new XMLParser();
-        p.setStrict(true);
+        p.setRejectMalformed(true);
         p.addCharEntity("nbsp", 160);
         assertEquals("\u00a0", p.parse(new StringReader("<a>&nbsp;</a>")).getChildAt(0).getText());
     }
@@ -172,7 +239,7 @@ class XMLParserStrictModeTest {
         assertTrue(failure(xxe).contains("undefined entity &xxe;"));
         String bomb = "<!DOCTYPE r [<!ENTITY a \"aaaa\"><!ENTITY b \"&a;&a;&a;\">]><r>&b;</r>";
         assertTrue(failure(bomb).contains("undefined entity &b;"));
-        Element r = parse("<!DOCTYPE r [<!ENTITY a \"x\">]>\n<r>ok</r>", true, false);
+        Element r = rejecting().parse(new StringReader("<!DOCTYPE r [<!ENTITY a \"x\">]>\n<r>ok</r>"));
         assertEquals("ok", r.getChildAt(0).getText());
     }
 
@@ -184,7 +251,7 @@ class XMLParserStrictModeTest {
         }
         assertTrue(failure(b.toString()).contains("nested deeper than 256"));
         XMLParser p = new XMLParser();
-        p.setStrict(true);
+        p.setRejectMalformed(true);
         p.setMaxDepth(2);
         assertEquals(2, p.getMaxDepth());
         assertEquals("b", p.parse(new StringReader("<a><b/></a>")).getChildAt(0).getTagName());
@@ -196,14 +263,14 @@ class XMLParserStrictModeTest {
 
     @Test
     void aByteOrderMarkAndTheDeclarationAreSkipped() {
-        Element r = parse("\ufeff<?xml version=\"1.0\"?>\n<r/>\n", true, false);
+        Element r = rejecting().parse(new StringReader("\ufeff<?xml version=\"1.0\"?>\n<r/>\n"));
         assertEquals("r", r.getTagName());
     }
 
     @Test
     void eventModeIsStrictToo() {
         XMLParser p = new XMLParser();
-        p.setStrict(true);
+        p.setRejectMalformed(true);
         assertThrows(XMLParseException.class, () -> p.eventParser(new StringReader("<a><b></a>")));
         assertThrows(XMLParseException.class, () -> p.eventParser(new StringReader("  ")));
     }

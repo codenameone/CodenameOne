@@ -68,7 +68,7 @@ import java.util.Map;
 /// signature is not verified. Binary property lists (`bplist00`) are not
 /// supported and are reported as such.
 ///
-/// Parsing goes through the shared [XMLParser] in strict mode, so a document
+/// Parsing goes through the shared [XMLParser] refusing malformed input, so a document
 /// type declaration is never interpreted and nesting is bounded: a hostile
 /// plist cannot fetch a URL, expand entities or exhaust the stack.
 public final class PropertyLists {
@@ -155,7 +155,7 @@ public final class PropertyLists {
     /// default nesting cap.
     private static Element parseXml(Reader in) {
         XMLParser parser = new XMLParser();
-        parser.setStrict(true);
+        parser.setRejectMalformed(true);
         Element root = parser.parse(in);
         if (root == null) {
             throw new XMLParseException("no root element");

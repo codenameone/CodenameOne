@@ -73,6 +73,10 @@ public class XMLParser {
     boolean includeWhitespacesBetweenTags; // For HTML white spaces between tags are significant to seperate words, in XML less so and it mostly creates garbage elements (Text with one space)
     private boolean eventParser;
     private boolean strict;
+    private boolean rejectMalformed;
+    // The position of the last character read, for error messages.
+    private int line = 1;
+    private int column;
     private boolean stripNamespacePrefixes;
     // How many parseTagContent calls are active. 1 is document level: the
     // synthetic ROOT of parse(), or no element at all for eventParser.
@@ -147,14 +151,35 @@ public class XMLParser {
         }
         c = buffer[buffOffset];
         buffOffset++;
-
+        advance((char) c);
         return c;
+    }
+
+    /// Moves the error position past `c`, refusing a control character the
+    /// XML character range excludes when malformed input is rejected.
+    private void advance(char c) {
+        if (c == '\n') {
+            line++;
+            column = 0;
+        } else {
+            column++;
+            if (rejectMalformed && c < 0x20 && c != '\t' && c != '\r') {
+                throw malformed("illegal control character 0x" + Integer.toHexString(c));
+            }
+        }
+    }
+
+    /// An [XMLParseException] at the current position.
+    private XMLParseException malformed(String message) {
+        return new XMLParseException(message, line, column);
     }
 
     private void resetBuffer() {
         buffOffset = 0;
         buffSize = -1;
         contentDepth = 0;
+        line = 1;
+        column = 0;
         openCount = 0;
         rootSeen = false;
         if (pool != null) {
@@ -467,9 +492,18 @@ public class XMLParser {
         try {
             parseTagContent(rootElement, is);
         } catch (IOException ioe) {
-            // Reported through the callback rather than a log: the parser is
-            // shared with the server runtime, which has no Codename One Log.
-            notifyError(ParserCallback.ERROR_IO, null, null, null, "I/O error while parsing: " + ioe.getMessage());
+            // Not Log.e: the parser is shared with the server runtime, which
+            // has no Codename One Log.
+            if (rejectMalformed) {
+                XMLParseException e = malformed("I/O error while parsing: " + ioe.getMessage());
+                e.initCause(ioe);
+                throw e;
+            }
+            if (parserCallback == null) {
+                ioe.printStackTrace(); //NOPMD AvoidPrintStackTrace - core cannot use Log here, see above
+            } else {
+                notifyError(ParserCallback.ERROR_IO, null, null, null, "I/O error while parsing: " + ioe.getMessage());
+            }
         }
         if (rootElement.getNumChildren() == 0) {
             notifyError(ParserCallback.ERROR_NO_ROOTS, null, null, null, "XML document contains no root element.");
@@ -552,8 +586,8 @@ public class XMLParser {
         resetBuffer();
         eventParser = true;
         parseTagContent(null, r);
-        if (strict && !rootSeen) {
-            throw new XMLParseException("no root element");
+        if (rejectMalformed && !rootSeen) {
+            throw malformed("no root element");
         }
     }
 
@@ -653,7 +687,7 @@ public class XMLParser {
         while (val != -1) {
             if (c == '<') {
                 if ((includeWhitespacesBetweenTags) && (leadingSpace) && (!inText) && (element != null) && (element.getNumChildren() > 0)
-                        && !(strict && contentDepth == 1)) {
+                        && !(rejectMalformed && contentDepth == 1)) {
                     leadingSpace = false;
                     text.clear();
                     text.add(' ');
@@ -681,7 +715,7 @@ public class XMLParser {
 
 
                 Element childElement = parseTag(is);
-                if (childElement == END_TAG && strict) {
+                if (childElement == END_TAG && rejectMalformed) {
                     strictEndTag(is);
                     return;
                 }
@@ -744,7 +778,7 @@ public class XMLParser {
                         inEntity = false;
                     }
                 } else if (c == '&') { //start char entity
-                    if (strict) {
+                    if (rejectMalformed) {
                         readStrictReference(is, text);
                     } else {
                         charEntity.clear();
@@ -766,16 +800,19 @@ public class XMLParser {
                         }
                         end++;
                     }
+                    for (int k = start; k < end; k++) {
+                        advance(b[k]);
+                    }
                     if (end > start) {
                         text.add(b, start, end - start);
                         buffOffset = end;
                     }
                 }
-            } else if (strict && contentDepth == 1 && (ws(c) || c == (char) 0xfeff)) {
+            } else if (rejectMalformed && contentDepth == 1 && (ws(c) || c == (char) 0xfeff)) {
                 // whitespace, or a byte order mark, around the root element
                 leadingSpace = true;
-            } else if (strict && contentDepth == 1) {
-                throw new XMLParseException("text outside the root element");
+            } else if (rejectMalformed && contentDepth == 1) {
+                throw malformed("text outside the root element");
             } else if (keepAllText || !isWhiteSpace(c)) {
                 text.clear();
                 inText = true;
@@ -785,7 +822,7 @@ public class XMLParser {
                 }
                 if (c == '&') { //text starts with a character entity (i.e. &nbsp;)
                     // The & is not included in the string we accumulate
-                    if (strict) {
+                    if (rejectMalformed) {
                         readStrictReference(is, text);
                     } else {
                         charEntity.clear();
@@ -801,8 +838,8 @@ public class XMLParser {
             val = read(is);
             c = (char) val;
         }
-        if (strict && contentDepth > 1) {
-            throw new XMLParseException("unexpected end of document inside <" + openName() + ">");
+        if (rejectMalformed && contentDepth > 1) {
+            throw malformed("unexpected end of document inside <" + openName() + ">");
         }
     }
 
@@ -818,7 +855,7 @@ public class XMLParser {
         int i = read(is);
         while (i != '>') {
             if (i < 0) {
-                throw new XMLParseException("unterminated end tag </" + closingTag + ">");
+                throw malformed("unterminated end tag </" + closingTag + ">");
             }
             closingTag.add((char) i);
             i = read(is);
@@ -828,11 +865,11 @@ public class XMLParser {
         }
         String ct = name(closingTag);
         if (contentDepth < 2 || openCount == 0) {
-            throw new XMLParseException("end tag </" + ct + "> with no open element");
+            throw malformed("end tag </" + ct + "> with no open element");
         }
         String open = openNames[openCount - 1];
         if (!ct.equals(open)) {
-            throw new XMLParseException("end tag </" + ct + "> does not match <" + open + ">");
+            throw malformed("end tag </" + ct + "> does not match <" + open + ">");
         }
         if (eventParser) {
             endTag(ct);
@@ -853,14 +890,21 @@ public class XMLParser {
                 break;
             }
             if (i < 0 || ref.len >= 32 || !isLegalStrictReferenceCharacter((char) i)) {
-                throw new XMLParseException("unterminated entity reference &" + ref);
+                throw malformed("unterminated entity reference &" + ref);
             }
             ref.add((char) i);
         }
         String name = ref.toString();
+        if (name.length() > 1 && name.charAt(0) == '#' && name.charAt(1) == 'X') {
+            throw malformed("character reference &" + name + "; must use a lowercase x");
+        }
         String decoded = CharEntities.decodeXml(name, userDefinedCharEntities);
         if (decoded == null) {
-            throw new XMLParseException("undefined entity &" + name + ";");
+            throw malformed("undefined entity &" + name + ";");
+        }
+        char d = decoded.charAt(0);
+        if (decoded.length() == 1 && d < 0x20 && d != '\t' && d != '\n' && d != '\r') {
+            throw malformed("character reference &" + name + "; is an illegal control character");
         }
         out.add(decoded);
     }
@@ -875,16 +919,35 @@ public class XMLParser {
     /// lenient parser always has.
     private char tagChar(Reader is) throws IOException {
         int i = read(is);
-        if (i < 0 && strict) {
-            throw new XMLParseException("unexpected end of document inside a tag");
+        if (i < 0 && rejectMalformed) {
+            throw malformed("unexpected end of document inside a tag");
         }
         return (char) i;
     }
 
+    /// Reads up to and including `terminator`, refusing the end of the document.
+    private void skipPast(Reader is, String terminator) throws IOException {
+        int len = terminator.length();
+        char[] last = new char[len];
+        int seen = 0;
+        while (true) {
+            int i = read(is);
+            if (i < 0) {
+                throw malformed("unterminated declaration");
+            }
+            System.arraycopy(last, 1, last, 0, len - 1);
+            last[len - 1] = (char) i;
+            seen++;
+            if (seen >= len && terminator.equals(new String(last))) {
+                return;
+            }
+        }
+    }
+
     /// What `parseTag` answers when the document ends inside a tag.
     private Element eofInTag() {
-        if (strict) {
-            throw new XMLParseException("unexpected end of document inside a tag");
+        if (rejectMalformed) {
+            throw malformed("unexpected end of document inside a tag");
         }
         return END_TAG;
     }
@@ -892,7 +955,7 @@ public class XMLParser {
     /// Parses the content of the element `tn` just opened, keeping strict
     /// mode's stack of open names and its depth cap.
     private void tagContent(Element element, Reader is, String tn) throws IOException {
-        if (!strict) {
+        if (!rejectMalformed) {
             parseTagContent(element, is);
             return;
         }
@@ -918,12 +981,16 @@ public class XMLParser {
         int brackets = 0;
         char quote = 0;
         int pending = 2;
+        int pushed = -1;
         while (true) {
             int i;
             if (pending == 2) {
                 i = first;
             } else if (pending == 1) {
                 i = second;
+            } else if (pushed >= 0) {
+                i = pushed;
+                pushed = -1;
             } else {
                 i = read(is);
             }
@@ -931,7 +998,7 @@ public class XMLParser {
                 pending--;
             }
             if (i < 0 || i == 0xffff) {
-                throw new XMLParseException("unterminated declaration");
+                throw malformed("unterminated declaration");
             }
             char ch = (char) i;
             if (quote != 0) {
@@ -940,6 +1007,25 @@ public class XMLParser {
                 }
             } else if (ch == '"' || ch == '\'') {
                 quote = ch;
+            } else if (ch == '<' && brackets > 0) {
+                // A comment or processing instruction in the internal subset
+                // is skipped whole: a quote or bracket inside it means nothing.
+                int n = read(is);
+                if (n == '?') {
+                    skipPast(is, "?>");
+                } else if (n == '!') {
+                    int m = read(is);
+                    if (m == '-') {
+                        if (read(is) != '-') {
+                            throw malformed("malformed comment in a declaration");
+                        }
+                        skipPast(is, "-->");
+                    } else {
+                        pushed = m;
+                    }
+                } else {
+                    pushed = n;
+                }
             } else if (ch == '[') {
                 brackets++;
             } else if (ch == ']') {
@@ -1002,7 +1088,7 @@ public class XMLParser {
             char c2 = tagChar(is);
             if ((c == '-') && (c2 == '-')) { //comment
                 return parseCommentOrXMLDeclaration(is, "-->");
-            } else if (strict && !((c == '[') && (c2 == 'C'))) {
+            } else if (rejectMalformed && !((c == '[') && (c2 == 'C'))) {
                 return skipDeclaration(is, c, c2);
             } else if ((c == '[') && (c2 == 'C')) { // CDATA?
                 c = tagChar(is);
@@ -1015,13 +1101,13 @@ public class XMLParser {
                     }
                 }
                 if (idx == clen) { //found CDATA
-                    if (strict && contentDepth == 1) {
-                        throw new XMLParseException("text outside the root element");
+                    if (rejectMalformed && contentDepth == 1) {
+                        throw malformed("text outside the root element");
                     }
                     return parseCommentOrXMLDeclaration(is, "]]>"); //parse doctypes i.e. <!DOCTYPE .... > as comments as well - i.e. ignore them
                 } else { // some other unknown tag
-                    if (strict) {
-                        throw new XMLParseException("malformed CDATA section");
+                    if (rejectMalformed) {
+                        throw malformed("malformed CDATA section");
                     }
                     return parseCommentOrXMLDeclaration(is, ">"); //parse doctypes i.e. <!DOCTYPE .... > as comments as well - i.e. ignore them
                 }
@@ -1060,18 +1146,18 @@ public class XMLParser {
 
         boolean processTag = true;
         String tn = name(tagName);
-        if (strict) {
+        if (rejectMalformed) {
             if (tagName.len == 0) {
-                throw new XMLParseException("expected a tag name after <");
+                throw malformed("expected a tag name after <");
             }
             if (contentDepth == 1) {
                 if (rootSeen) {
-                    throw new XMLParseException("a second root element <" + tn + ">");
+                    throw malformed("a second root element <" + tn + ">");
                 }
                 rootSeen = true;
             }
             if (openCount >= maxDepth) {
-                throw new XMLParseException("elements nested deeper than " + maxDepth);
+                throw malformed("elements nested deeper than " + maxDepth);
             }
             tagAttributes.clear();
         }
@@ -1195,8 +1281,8 @@ public class XMLParser {
 
             if ((c == '"') || (c == '\'')) {
                 quote = c;
-            } else if (strict) {
-                throw new XMLParseException("attribute " + curAttribute + " of <" + tn + "> is not quoted");
+            } else if (rejectMalformed) {
+                throw malformed("attribute " + curAttribute + " of <" + tn + "> is not quoted");
             } else {
                 curValue.add(c);
             }
@@ -1219,9 +1305,9 @@ public class XMLParser {
                     c = (char) i;
                 } else if ((quote == ' ') && ((c == '/') || (c == '>') || (ws(c)))) {
                     ended = true;
-                } else if (strict && c == '<') {
-                    throw new XMLParseException("< in the value of attribute " + curAttribute + " of <" + tn + ">");
-                } else if (strict && c == '&') {
+                } else if (rejectMalformed && c == '<') {
+                    throw malformed("< in the value of attribute " + curAttribute + " of <" + tn + ">");
+                } else if (rejectMalformed && c == '&') {
                     readStrictReference(is, curValue);
                 } else if (c == '&') {
                     if (inEntity) {
@@ -1256,13 +1342,13 @@ public class XMLParser {
 
             String an = attributeName(curAttribute);
             String av = value(curValue);
-            if (strict) {
+            if (rejectMalformed) {
                 if (tagAttributes.contains(an)) {
-                    throw new XMLParseException("duplicate attribute " + an + " in <" + tn + ">");
+                    throw malformed("duplicate attribute " + an + " in <" + tn + ">");
                 }
                 tagAttributes.add(an);
                 if (!ws(c) && c != '>' && c != '/') {
-                    throw new XMLParseException("expected whitespace after attribute " + an + " of <" + tn + ">");
+                    throw malformed("expected whitespace after attribute " + an + " of <" + tn + ">");
                 }
             }
             if (eventParser) {
@@ -1338,8 +1424,8 @@ public class XMLParser {
         while (!ended) {
             int in = read(is);
             if (in == -1) {
-                if (strict) {
-                    throw new XMLParseException("unterminated " + ("-->".equals(endTag) ? "comment"
+                if (rejectMalformed) {
+                    throw malformed("unterminated " + ("-->".equals(endTag) ? "comment"
                             : "]]>".equals(endTag) ? "CDATA section" : "declaration"));
                 }
                 // input stream ended abruptly
@@ -1427,8 +1513,8 @@ public class XMLParser {
                 throw new IllegalArgumentException(description);
             }
         }
-        if (strict) {
-            throw new XMLParseException(description);
+        if (rejectMalformed) {
+            throw malformed(description);
         }
     }
 
@@ -1502,15 +1588,27 @@ public class XMLParser {
     ///   `<w:t xml:space="preserve"> </w:t>` keeps its space;
     ///
     /// - whitespace is the four XML whitespace characters and `isWhiteSpace`
-    ///   is not consulted;
+    ///   is not consulted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strict`: true for strict XML parsing
+    public void setStrict(boolean strict) {
+        this.strict = strict;
+    }
+
+    /// Turns on refusing malformed input, for documents that may be hostile
+    /// (off by default). It implies `setStrict(true)` and adds to it:
     ///
     /// - a document that is not well formed is refused with an
-    ///   [XMLParseException]: a mismatched, stray or missing end tag, a second
-    ///   root element or text outside the root, an unquoted or duplicate
-    ///   attribute, a `<` in an attribute value, an unterminated comment, CDATA
-    ///   section or declaration, and an undefined or malformed entity
-    ///   reference. Every error reported to a [ParserCallback] is thrown, even
-    ///   when the callback asks to continue;
+    ///   [XMLParseException] naming the line and column: a mismatched, stray
+    ///   or missing end tag, a second root element or text outside the root,
+    ///   an unquoted or duplicate attribute, a `<` in an attribute value, an
+    ///   unterminated comment, CDATA section or declaration, an undefined or
+    ///   malformed entity reference, a control character other than tab, line
+    ///   feed and carriage return, and an I/O error (the exception's cause).
+    ///   Every error reported to a [ParserCallback] is thrown, even when the
+    ///   callback asks to continue;
     ///
     /// - only the five XML entities, character references and names added with
     ///   [#addCharEntity(String, int)] are defined. A document type
@@ -1524,9 +1622,22 @@ public class XMLParser {
     ///
     /// #### Parameters
     ///
-    /// - `strict`: true for strict XML parsing
-    public void setStrict(boolean strict) {
-        this.strict = strict;
+    /// - `rejectMalformed`: true to refuse malformed input
+    public void setRejectMalformed(boolean rejectMalformed) {
+        this.rejectMalformed = rejectMalformed;
+        if (rejectMalformed) {
+            strict = true;
+        }
+    }
+
+    /// Returns true if malformed input is refused, see
+    /// `setRejectMalformed(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true when malformed input is refused
+    public boolean isRejectMalformed() {
+        return rejectMalformed;
     }
 
     /// Returns true if strict XML parsing is on, see `setStrict(boolean)`.
@@ -1538,9 +1649,9 @@ public class XMLParser {
         return strict;
     }
 
-    /// Sets the deepest element nesting strict mode accepts; a deeper document
-    /// is an [XMLParseException]. The default is 256. The lenient mode does
-    /// not check nesting.
+    /// Sets the deepest element nesting `setRejectMalformed(boolean)` accepts; a deeper document
+    /// is an [XMLParseException]. The default is 256. Otherwise nesting is
+    /// not checked.
     ///
     /// #### Parameters
     ///
@@ -1552,7 +1663,7 @@ public class XMLParser {
         this.maxDepth = maxDepth;
     }
 
-    /// Returns the deepest element nesting strict mode accepts, see
+    /// Returns the deepest element nesting `setRejectMalformed(boolean)` accepts, see
     /// `setMaxDepth(int)`.
     ///
     /// #### Returns

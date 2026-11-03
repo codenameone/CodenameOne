@@ -22,7 +22,8 @@
  */
 package com.codename1.xml;
 
-/// Thrown by an [XMLParser] in strict mode (see [XMLParser#setStrict(boolean)])
+/// Thrown by an [XMLParser] refusing malformed input (see
+/// [XMLParser#setRejectMalformed(boolean)])
 /// when the document is not well formed, nests deeper than
 /// [XMLParser#setMaxDepth(int)], or references an entity the parser does not
 /// define.
@@ -32,12 +33,51 @@ package com.codename1.xml;
 /// keeps working.
 @com.codename1.impl.SharedWithBackend
 public class XMLParseException extends IllegalArgumentException {
-    /// Creates the exception with the description of what is wrong.
+    private final int line;
+    private final int column;
+
+    /// Creates an exception with no position.
     ///
     /// #### Parameters
     ///
-    /// - `message`: the description
+    /// - `message`: what is wrong
     public XMLParseException(String message) {
         super(message);
+        line = -1;
+        column = -1;
+    }
+
+    /// Creates an exception at a position, which the message names as
+    /// "line 3, column 7: ...".
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: what is wrong
+    ///
+    /// - `line`: the line of the offending character, from 1
+    ///
+    /// - `column`: its column, from 1 (0 before the first character of a line)
+    public XMLParseException(String message, int line, int column) {
+        super("line " + line + ", column " + column + ": " + message);
+        this.line = line;
+        this.column = column;
+    }
+
+    /// The line of the error, from 1, or -1 when it has no position.
+    ///
+    /// #### Returns
+    ///
+    /// the line
+    public int getLine() {
+        return line;
+    }
+
+    /// The column of the error, from 1, or -1 when it has no position.
+    ///
+    /// #### Returns
+    ///
+    /// the column
+    public int getColumn() {
+        return column;
     }
 }
