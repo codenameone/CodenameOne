@@ -22039,8 +22039,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 if (n.equals("sync") || n.equals("microtask")) {
                     Out f = emitExpr(c.args.positional.get(0), inlineFuncType0(TypeRef.DYNAMIC), ctx);
                     if (n.equals("microtask")) {
-                        ctx.importClass("dart.core.Duration");
-                        return new Out("Future.delayed(Duration.zero, " + castTo("dart.runtime.Funcs.Func0<Object>", f)
+                        // queued on the microtask queue at the call, not as a zero timer
+                        return new Out("Future.microtask(" + castTo("dart.runtime.Funcs.Func0<Object>", f)
                                 + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
                     }
                     ctx.importClass("dart.core.CoreStatics");

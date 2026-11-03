@@ -377,10 +377,10 @@ public final class StreamController<T> implements StreamSink<T> {
     public Future<Object> close() {
         if (!closed) {
             closed = true;
-            if (sync || outboxEmpty()
-                    || (!broadcast && !theStream.hasListeners())) {
-                // Nothing waits ahead of done (or nobody is listening to receive what
-                // does): done is delivered now, as before.
+            if (sync || outboxEmpty()) {
+                // Nothing waits ahead of done: it is delivered now. Events a
+                // single-subscription stream holds for its first listener stay ahead
+                // of done, as in Dart, and close() completes once they are delivered.
                 closeFuture = theStream.emitDone();
             } else {
                 closeFuture = new Future<Object>();

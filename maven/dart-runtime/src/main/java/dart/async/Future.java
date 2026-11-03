@@ -245,6 +245,27 @@ public class Future<T> {
     }
 
     /**
+     * Dart's {@code Future.microtask(computation)}: the computation is put on the
+     * microtask queue at the call, so it runs before any timer and in order with
+     * {@code scheduleMicrotask} calls made around it. A result that is a future is
+     * followed, and a throw completes this future with that error.
+     */
+    public static Future<Object> microtask(final Funcs.Func0<Object> computation) {
+        final Future<Object> f = new Future<Object>();
+        Microtasks.schedule(Zone.capture(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    f.complete(computation == null ? null : computation.call());
+                } catch (Throwable t) {
+                    f.completeError(t);
+                }
+            }
+        }));
+        return f;
+    }
+
+    /**
      * Dart's unnamed {@code Future(computation)} constructor: the computation runs
      * in a later timer event, as {@code Future.delayed(Duration.zero, computation)}
      * does. A computation that returns a future makes this one follow it, and one
@@ -952,15 +973,26 @@ public class Future<T> {
     }
 
     void completeError(Object err) {
+        completeError(err, false);
+    }
+
+    /// reportNow: an async body that failed after it had suspended. Every listener its
+    /// caller was going to add is already in place, so Dart hands an unlistened error to
+    /// the zone right here, in the microtask where it was thrown, not a timer turn later.
+    void completeError(Object err, boolean reportNow) {
         synchronized (lock) {
             if (done || adopting) {
                 throw new dart.core.StateError("Future already completed");
             }
         }
-        settleError(err);
+        settleError(err, reportNow);
     }
 
     private void settleError(Object err) {
+        settleError(err, false);
+    }
+
+    private void settleError(Object err, boolean reportNow) {
         List<Runnable> toRun;
         synchronized (lock) {
             if (done) {
@@ -975,7 +1007,7 @@ public class Future<T> {
         }
         runAll(toRun);
         if (toRun == null && zone != Zone.root) {
-            reportIfUnhandled();
+            reportIfUnhandled(reportNow);
         }
     }
 
@@ -983,9 +1015,9 @@ public class Future<T> {
     /// the future's zone. Only a zone with its own handler is told: the root zone's
     /// report would be a log line for every future this runtime's blocking await
     /// model reads without listening.
-    private void reportIfUnhandled() {
+    private void reportIfUnhandled(boolean reportNow) {
         final Zone z = zone;
-        new Timer(null, new Funcs.VoidFunc0() {
+        Funcs.VoidFunc0 report = new Funcs.VoidFunc0() {
             @Override
             public void call() {
                 Throwable e;
@@ -998,7 +1030,12 @@ public class Future<T> {
                 }
                 z.handleUncaughtError(DartRuntime.caught(e), Zone.stackOf(e));
             }
-        });
+        };
+        if (reportNow) {
+            report.call();
+        } else {
+            new Timer(null, report);
+        }
     }
 
     void markHandled() {

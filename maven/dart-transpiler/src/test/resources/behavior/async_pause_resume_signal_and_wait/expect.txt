@@ -1,0 +1,8 @@
+y0 L0 y1 L1 resume y2 L2 fin cx
+500
+[4, 2, 3]
+fw x
+9
+timeout
+s0 s1 s2 e0 e1 e2
+12

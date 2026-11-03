@@ -45,7 +45,7 @@ abstract class StreamSubscription<T> {
   external void onData(Function? handleData);
   external void onError(Function? handleError);
   external void onDone(Function? handleDone);
-  external void pause();
+  external void pause([Future<void>? resumeSignal]);
   external void resume();
   external bool get isPaused;
   external Future<E> asFuture<E>([E? futureValue]);

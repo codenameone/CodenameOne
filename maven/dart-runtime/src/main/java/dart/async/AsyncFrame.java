@@ -78,6 +78,7 @@ public abstract class AsyncFrame<T> implements Runnable {
     /// all; it resumes at {@code resume} from a microtask.
     public final void await(Object v, int resume) {
         state = resume;
+        suspended = true;
         $v = null;
         $e = null;
         final Future<Object> f = Future.awaitable(v);
@@ -124,13 +125,16 @@ public abstract class AsyncFrame<T> implements Runnable {
         future.complete(v);
     }
 
+    /// Set at the first await: a failure after it is reported to the zone at once.
+    private boolean suspended;
+
     /// An uncaught throw out of the body.
     public void fail(Throwable t) {
         if (finished) {
             throw new IllegalStateException("async frame failed after it finished", t);
         }
         finished = true;
-        future.completeError(t);
+        future.completeError(t, suspended);
     }
 
     final void markFinished() {
