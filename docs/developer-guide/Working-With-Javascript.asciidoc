@@ -304,7 +304,7 @@ For anything the hints don't cover, the markup is the `cn1-splash` `div` in the 
 
 The browser has one thread per page, so Codename One runs your threads as green threads inside a web worker. A Java method that can wait -- `Object.wait()`, `Thread.sleep()`, `invokeAndBlock()`, a modal `Dialog`, or a call that waits for the browser to answer -- is compiled to a JavaScript generator, which can pause and resume. Every method that can reach such a method is compiled to a generator too, through any direct call, and through any interface or virtual call whose target could be one. Code you never meant to block pays the cost: a call to a generator is several times slower than a call to a plain function.
 
-The build writes `*-js-suspension-report.txt` beside the bundle. It lists every method compiled as a generator, with the reason, and the callees that make the most of them.
+The build writes `*-js-suspension-report.txt` beside the bundle. It lists every method compiled as a generator, with the reason, and the called methods that make the most of them.
 
 The `@JavaScriptDetached` annotation in `com.codename1.annotations` stops that spread at a method boundary. Every other platform ignores it.
 
