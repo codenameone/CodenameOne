@@ -1361,9 +1361,21 @@ public final class JavaEmitter {
             ctx.syncStarElem = elem;
             ctx.inAsyncBody = true;
         } else {
+            TypeRef elem = rt.is("Iterable") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            ctx.methodReturnType = TypeRef.VOID;
+            ctx.syncStarElem = elem;
+            ctx.beginBodyCaptures(m.body, null);
+            ctx.pushScope();
+            boolean syncFrame = asyncLowering.tryEmitSyncStar(m.params, m.body, elem,
+                    isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx), ctx);
+            ctx.popScope();
+            ctx.syncStarElem = savedElem;
+            ctx.methodReturnType = savedRt;
+            if (syncFrame) {
+                return true;
+            }
             ctx.importClass("dart.core.DartList");
             ctx.importClass("dart.core.DartIterable");
-            TypeRef elem = rt.is("Iterable") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
             String ej = javaType(elem, true, ctx);
             w.line("return DartIterable.syncStar(" + syncStarWitnessArg(elem, ctx) + "(DartList<" + ej + "> "
                     + v + ") -> {");
@@ -6612,6 +6624,25 @@ public final class JavaEmitter {
             ctx.methodReturnType = null;
             ctx.inAsyncBody = false;
             return sb.toString();
+        }
+        if (m.isSyncStar && !rt.is("List") && !m.isSetter && m.body != null) {
+            // sync* as a resumable frame (AsyncLowering): lazy, one yield per moveNext.
+            TypeRef selem = rt.is("Iterable") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            ctx.methodReturnType = TypeRef.VOID;
+            TypeRef savedStarElem = ctx.syncStarElem;
+            ctx.syncStarElem = selem;
+            boolean syncFrame = asyncLowering.tryEmitSyncStar(m.params, m.body, selem,
+                    isDynamicType(selem) ? null : reifiedArgWitness(selem, ctx), ctx);
+            ctx.syncStarElem = savedStarElem;
+            if (syncFrame) {
+                sb.append(ctx.popWriter());
+                sb.append("    }\n\n");
+                ctx.popScope();
+                ctx.methodReturnType = null;
+                ctx.inAsyncBody = false;
+                return sb.toString();
+            }
+            ctx.methodReturnType = rt;
         }
         if (m.isSyncStar && !rt.is("List") && !m.isSetter) {
             // sync* generator. The body moves into a private helper that yields into the list
@@ -20713,7 +20744,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             TypeRef samReturn = sigTypes != null && sigTypes.length > 0 ? sigTypes[sigTypes.length - 1] : null;
             boolean voidSam = samReturn == null || samReturn.is("void");
             // An async* closure runs as an AsyncStarFrame its body returns the stream of.
-            boolean starFrame = async && asyncLowering.tryEmitStar(l.params, l.body, elem,
+            boolean starFrame = async ? asyncLowering.tryEmitStar(l.params, l.body, elem,
+                    isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx), ctx)
+                    : asyncLowering.tryEmitSyncStar(l.params, l.body, elem,
                     isDynamicType(elem) ? null : reifiedArgWitness(elem, ctx), ctx);
             if (!starFrame && !(l.isAsync && asyncLowering.tryEmit(l.params, l.body, voidSam, null, null, ctx))) {
                 emitBodyStatements(l.params, l.body, ctx);
@@ -20728,6 +20761,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             exprType = TypeRef.of(async ? "Stream" : "Iterable", elem);
             if (starFrame) {
                 code = head + " -> {\n" + body + ind + "}";
+                if (!async) {
+                    ctx.importClass("dart.core.DartIterable");
+                }
             } else if (async) {
                 ctx.importClass("dart.async.AsyncStar");
                 code = head + " -> AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + target
@@ -21181,7 +21217,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             fn.funcParams.add(p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type);
         }
         TypeRef ret;
-        if (l.exprBody != null) {
+        if (l.isSyncStar || l.isAsyncStar) {
+            // A generator closure returns its Iterable / Stream, never what a `return` says
+            // (a generator's `return;` has no value); the elements stay dynamic here.
+            ret = TypeRef.of(l.isSyncStar ? "Iterable" : "Stream", TypeRef.DYNAMIC);
+        } else if (l.exprBody != null) {
             Expr core = stripParens(l.exprBody);
             boolean callback = core instanceof Call || core instanceof CtorCall || core instanceof Assign
                     || core instanceof IncDec || core instanceof Cascade || core instanceof AwaitExpr;

@@ -217,6 +217,27 @@ public class DartIterable<E> implements Iterable<E> {
         return it;
     }
 
+    /// A `sync*` body lowered to a dart.async.SyncStarFrame: {@code make} builds a fresh
+    /// frame for each iteration, which runs the body lazily, one yield per step.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static <E> DartIterable<E> syncStarFrame(final dart.runtime.TypeWitness elem,
+            final Funcs.Func0<? extends Iterator> make) {
+        DartIterable<E> it = wrap(new Iterable<E>() {
+            @Override
+            public Iterator<E> iterator() {
+                return (Iterator<E>) make.call();
+            }
+        });
+        it.elem = elem;
+        return it;
+    }
+
+    /// As {@link #syncStarFrame(dart.runtime.TypeWitness, Funcs.Func0)}, unrecorded.
+    @SuppressWarnings("rawtypes")
+    public static <E> DartIterable<E> syncStarFrame(final Funcs.Func0<? extends Iterator> make) {
+        return syncStarFrame(null, make);
+    }
+
     /// A `sync*` body whose element type is an unwitnessed type variable: unrecorded.
     public static <E> DartIterable<E> syncStar(final Funcs.VoidFunc1<DartList<E>> body) {
         return wrap(new Iterable<E>() {

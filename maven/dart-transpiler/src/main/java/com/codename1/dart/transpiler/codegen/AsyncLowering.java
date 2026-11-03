@@ -108,6 +108,8 @@ final class AsyncLowering {
         LocalFunc localFunc;
         /// async*: the element type yields coerce to, else null.
         TypeRef starElem;
+        /// sync*: the frame is a dart.async.SyncStarFrame, made afresh per iteration.
+        boolean sync;
         /// The frame's Java element type argument; null when erased to Object.
         String starJava;
         TypeRef valueType;
@@ -433,8 +435,22 @@ final class AsyncLowering {
                 witness, ctx);
     }
 
+    /// A sync* body as a SyncStarFrame, written as `return <its iterable>;`: the iterable
+    /// builds a new frame for every iteration and each moveNext runs the body to its next
+    /// yield. {@code witness} reifies the element type (null: none). False, with nothing
+    /// written, for a body shape this stage does not lower (see lowerable).
+    boolean tryEmitSyncStar(List<Param> params, Block body, TypeRef elem, String witness, JavaEmitter.Ctx ctx) {
+        return body != null && emitFrame(params, body, true, null, null, elem == null ? TypeRef.DYNAMIC : elem,
+                witness, true, ctx);
+    }
+
     private boolean emitFrame(List<Param> params, Block body, boolean isVoid, TypeRef valueType, TypeRef rt,
             TypeRef starElem, String starWitness, JavaEmitter.Ctx ctx) {
+        return emitFrame(params, body, isVoid, valueType, rt, starElem, starWitness, false, ctx);
+    }
+
+    private boolean emitFrame(List<Param> params, Block body, boolean isVoid, TypeRef valueType, TypeRef rt,
+            TypeRef starElem, String starWitness, boolean sync, JavaEmitter.Ctx ctx) {
         if (body == null || starElem == null && !hasAwait(body.statements)) {
             return false;
         }
@@ -453,6 +469,7 @@ final class AsyncLowering {
         f.label = f.name + "sm";
         f.isVoid = isVoid;
         f.starElem = starElem;
+        f.sync = sync;
         if (starElem != null && !em.isDynamicType(starElem) && em.typeVarsInScope(starElem, ctx)) {
             f.starJava = em.javaType(em.boxType(starElem), true, ctx);
         }
@@ -503,9 +520,24 @@ final class AsyncLowering {
         // erased return) or declared FutureOr: the Future converts to it unchecked.
         boolean erased = !isVoid && (!em.typeVarsInScope(f.valueType, ctx) || ctx.asyncReturnWidened
                 || rt != null && !rt.is("Future"));
-        String cls = starElem != null ? "dart.async.AsyncStarFrame<" + (f.starJava == null ? "Object" : f.starJava) + ">"
+        String cls = sync ? "dart.async.SyncStarFrame<" + (f.starJava == null ? "Object" : f.starJava) + ">"
+                : starElem != null ? "dart.async.AsyncStarFrame<" + (f.starJava == null ? "Object" : f.starJava) + ">"
                 : isVoid ? "dart.async.LambdaVoidFrame"
                 : "dart.async.LambdaFrame<" + (erased ? "Object" : em.javaType(em.boxType(f.valueType), true, ctx)) + ">";
+        if (sync) {
+            // The factory lambda captures the arguments, which the method may have assigned
+            // (a default, a coercion) before this point: copy each to an effectively final local.
+            for (int i = 0; i < paramCopies.size(); i++) {
+                String pc = paramCopies.get(i);
+                int eq = pc.indexOf(" = ");
+                String cap = f.name + "a" + i;
+                w.line("var " + cap + " = " + outerNames.get(i) + ";");
+                paramCopies.set(i, pc.substring(0, eq) + " = " + cap + ";");
+            }
+            // Every iteration runs the body afresh: the factory makes one frame per iterator.
+            w.line("return dart.core.DartIterable.syncStarFrame(" + (starWitness == null ? "" : starWitness + ", ")
+                    + "() -> {");
+        }
         w.line("var " + f.name + " = new " + cls + "() {");
         for (String fd : f.fields) {
             w.line("    " + fd);
@@ -550,7 +582,10 @@ final class AsyncLowering {
         }
         w.line("    }");
         w.line("};");
-        if (starElem != null) {
+        if (sync) {
+            w.line("return " + f.name + ";");
+            w.line("});");
+        } else if (starElem != null) {
             String stream = (f.starJava == null ? "(dart.async.Stream) " : "") + f.name + ".stream()";
             w.line("return " + (starWitness == null ? stream
                     : "dart.async.Stream.reify(" + stream + ", " + starWitness + ")") + ";");
