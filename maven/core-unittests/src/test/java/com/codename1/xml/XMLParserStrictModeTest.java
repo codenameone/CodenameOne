@@ -137,7 +137,53 @@ class XMLParserStrictModeTest {
     void rejectingDecodesSupplementaryReferences() {
         Element r = rejecting().parse(new StringReader("<r>b&#x1F600;</r>"));
         assertEquals("b\ud83d\ude00", r.getChildAt(0).getText());
-        assertTrue(rejecting().isStrict());
+        assertTrue(rejecting().isRejectMalformed());
+    }
+
+    @Test
+    void turningRejectOffRestoresTheModeSetStrictChose() {
+        XMLParser p = rejecting();
+        assertTrue(!p.isStrict());
+        p.setRejectMalformed(false);
+        assertTrue(!p.isStrict());
+        // lenient again: case folded, nothing thrown
+        assertEquals("doc", p.parse(new StringReader("<Doc>b&c</Doc>")).getTagName());
+        XMLParser q = new XMLParser();
+        q.setStrict(true);
+        q.setRejectMalformed(true);
+        q.setRejectMalformed(false);
+        assertTrue(q.isStrict());
+        assertEquals("Doc", q.parse(new StringReader("<Doc/>")).getTagName());
+    }
+
+    @Test
+    void anIoErrorWithACallbackThatStopsStillReturnsThePartialTree() {
+        java.io.Reader r = new java.io.Reader() {
+            private boolean sent;
+
+            public int read(char[] b, int o, int l) throws java.io.IOException {
+                if (sent) {
+                    throw new java.io.IOException("boom");
+                }
+                sent = true;
+                "<a><b/></a>".getChars(0, 11, b, o);
+                return 11;
+            }
+
+            public void close() {
+            }
+        };
+        final int[] seen = new int[1];
+        XMLParser p = new XMLParser();
+        p.setParserCallback((id, tag, attribute, value, description) -> {
+            if (id == ParserCallback.ERROR_IO) {
+                seen[0]++;
+            }
+            return false;
+        });
+        Element e = p.parse(r);
+        assertEquals(1, seen[0]);
+        assertEquals("a", e.getTagName());
     }
 
     @Test

@@ -72,7 +72,10 @@ public class XMLParser {
     ParserCallback parserCallback;
     boolean includeWhitespacesBetweenTags; // For HTML white spaces between tags are significant to seperate words, in XML less so and it mostly creates garbage elements (Text with one space)
     private boolean eventParser;
+    // The strict behaviour in effect: setStrict(true) or setRejectMalformed(true).
     private boolean strict;
+    // What setStrict set, which isStrict reports.
+    private boolean strictRequested;
     private boolean rejectMalformed;
     // The position of the last character read, for error messages.
     private int line = 1;
@@ -151,19 +154,21 @@ public class XMLParser {
         }
         c = buffer[buffOffset];
         buffOffset++;
-        advance((char) c);
+        if (rejectMalformed) {
+            advance((char) c);
+        }
         return c;
     }
 
-    /// Moves the error position past `c`, refusing a control character the
-    /// XML character range excludes when malformed input is rejected.
+    /// Reject mode only: moves the error position past `c`, refusing a
+    /// control character the XML character range excludes.
     private void advance(char c) {
         if (c == '\n') {
             line++;
             column = 0;
         } else {
             column++;
-            if (rejectMalformed && c < 0x20 && c != '\t' && c != '\r') {
+            if (c < 0x20 && c != '\t' && c != '\r') {
                 throw malformed("illegal control character 0x" + Integer.toHexString(c));
             }
         }
@@ -502,7 +507,9 @@ public class XMLParser {
             if (parserCallback == null) {
                 ioe.printStackTrace(); //NOPMD AvoidPrintStackTrace - core cannot use Log here, see above
             } else {
-                notifyError(ParserCallback.ERROR_IO, null, null, null, "I/O error while parsing: " + ioe.getMessage());
+                // Told, but never allowed to abort: master returned the partial
+                // tree here, and existing callbacks have never seen ERROR_IO.
+                parserCallback.parsingError(ParserCallback.ERROR_IO, null, null, null, "I/O error while parsing: " + ioe.getMessage());
             }
         }
         if (rootElement.getNumChildren() == 0) {
@@ -793,15 +800,23 @@ public class XMLParser {
                     int start = buffOffset;
                     int end = start;
                     int lim = buffSize;
-                    while (end < lim) {
-                        char d = b[end];
-                        if (d == '<' || d == '&') {
-                            break;
+                    if (rejectMalformed) {
+                        while (end < lim) {
+                            char d = b[end];
+                            if (d == '<' || d == '&') {
+                                break;
+                            }
+                            advance(d);
+                            end++;
                         }
-                        end++;
-                    }
-                    for (int k = start; k < end; k++) {
-                        advance(b[k]);
+                    } else {
+                        while (end < lim) {
+                            char d = b[end];
+                            if (d == '<' || d == '&') {
+                                break;
+                            }
+                            end++;
+                        }
                     }
                     if (end > start) {
                         text.add(b, start, end - start);
@@ -1594,7 +1609,8 @@ public class XMLParser {
     ///
     /// - `strict`: true for strict XML parsing
     public void setStrict(boolean strict) {
-        this.strict = strict;
+        this.strictRequested = strict;
+        this.strict = strict || rejectMalformed;
     }
 
     /// Turns on refusing malformed input, for documents that may be hostile
@@ -1625,9 +1641,7 @@ public class XMLParser {
     /// - `rejectMalformed`: true to refuse malformed input
     public void setRejectMalformed(boolean rejectMalformed) {
         this.rejectMalformed = rejectMalformed;
-        if (rejectMalformed) {
-            strict = true;
-        }
+        this.strict = strictRequested || rejectMalformed;
     }
 
     /// Returns true if malformed input is refused, see
@@ -1646,7 +1660,7 @@ public class XMLParser {
     ///
     /// true for strict XML parsing
     public boolean isStrict() {
-        return strict;
+        return strictRequested;
     }
 
     /// Sets the deepest element nesting `setRejectMalformed(boolean)` accepts; a deeper document
