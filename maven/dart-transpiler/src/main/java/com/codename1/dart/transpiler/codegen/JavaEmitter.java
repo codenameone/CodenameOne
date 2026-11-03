@@ -7518,10 +7518,17 @@ public final class JavaEmitter {
                 }
             } else {
                 Out o = emitExpr(r.value, rt, ctx);
+                String rc = o.code;
                 if (rt == null && ctx.lambdaReturns != null) {
+                    if (o.type != null && o.type.funcParams != null && o.type.funcReturn != null) {
+                        // Marked for fnReturnsToBound, which converts it once every return
+                        // of the closure is known.
+                        int at = ctx.lambdaReturns.size();
+                        rc = FN_RETURN_OPEN + at + "<*/" + rc + FN_RETURN_OPEN + at + ">*/";
+                    }
                     ctx.lambdaReturns.add(o.type);
                 }
-                w.line("return " + (rt != null ? pinnedReturn(coerce(o, rt, ctx), ctx) : o.code) + ";");
+                w.line("return " + (rt != null ? pinnedReturn(coerce(o, rt, ctx), ctx) : rc) + ";");
             }
         } else if (s instanceof PatternDeclStmt) {
             PatternDeclStmt pd = (PatternDeclStmt) s;
@@ -8547,6 +8554,7 @@ public final class JavaEmitter {
                 ctx.indent(1);
             }
             Out v = emitExpr(c.value, resultType, ctx);
+            v = fnValueAs(v, resultType, ctx);
             if (promoName != null) {
                 ctx.restorePromotion(promoName, promoPrev);
             }
@@ -8564,6 +8572,7 @@ public final class JavaEmitter {
         if (defaultCase != null) {
             ctx.pushScope();
             Out v = emitExpr(defaultCase.value, resultType, ctx);
+            v = fnValueAs(v, resultType, ctx);
             w.line(res + " = " + coerce(v, resultType, ctx) + ";");
             ctx.popScope();
         } else {
@@ -8591,6 +8600,10 @@ public final class JavaEmitter {
             }
             if (common == null) {
                 common = at;
+            } else if (common.funcParams != null && at.funcParams != null) {
+                // Arms of different function types meet at their upper bound, as in Dart,
+                // and each is converted to it (fnValueAs).
+                common = upperBound(common, at);
             } else if (!common.name.equals(at.name)) {
                 return null;
             }
@@ -10549,12 +10562,14 @@ public final class JavaEmitter {
             String bCode = b.code;
             if (c.elseExpr instanceof Lambda && !(c.thenExpr instanceof Lambda)) {
                 String sam = a.type != null && a.type.funcParams != null ? functionSam(a.type, ctx) : null;
-                if (sam != null) {
+                if (sam != null && (b.type == null || b.type.funcParams == null
+                        || fnShape(b.type).equals(fnShape(a.type)))) {
                     bCode = castToBare(sam, b);
                 }
             } else if (c.thenExpr instanceof Lambda && !(c.elseExpr instanceof Lambda)) {
                 String sam = b.type != null && b.type.funcParams != null ? functionSam(b.type, ctx) : null;
-                if (sam != null) {
+                if (sam != null && (a.type == null || a.type.funcParams == null
+                        || fnShape(a.type).equals(fnShape(b.type)))) {
                     aCode = castToBare(sam, a);
                 }
             }
@@ -10572,6 +10587,10 @@ public final class JavaEmitter {
             // its marker; javac types the ternary by that intersection, which converts to no
             // other functional interface ("bad type in conditional expression"). With a
             // function-typed slot, the arm is recast to the slot's interface.
+            TypeRef fnTarget = expected != null && expected.funcParams != null ? expected
+                    : expected == null || expected.is("var") || expected.is("dynamic") ? t : null;
+            aCode = aCode.equals(a.code) ? fnArmTo(a, fnTarget, ctx) : aCode;
+            bCode = bCode.equals(b.code) ? fnArmTo(b, fnTarget, ctx) : bCode;
             String slotSam = expected == null ? null : functionSlotJavaType(expected, ctx);
             if (slotSam != null) {
                 if (aCode.equals(a.code) && isOwnSamSigned(a)) {
@@ -13002,6 +13021,11 @@ public final class JavaEmitter {
         return sb.toString();
     }
 
+    /// Whether parameter type {@code lo} is a (non-generic) subtype of {@code hi}.
+    private boolean paramBelow(TypeRef lo, TypeRef hi) {
+        return hi.is("num") && (lo.is("int") || lo.is("double")) || isSubtypeName(lo.name, hi.name);
+    }
+
     private TypeRef upperBound(TypeRef a, TypeRef b) {
         // The ONE upper bound every inference site uses -- conditionals, list, set and map
         // literals, generic-call arguments -- so they cannot answer differently.
@@ -13024,13 +13048,10 @@ public final class JavaEmitter {
             if (apos != bpos || apos < 0 || a.funcRequired != b.funcRequired) {
                 return fn;
             }
-            if (!an.equals(bn)) {
-                // Dart's bound of `({int a})` and `({int a, int b})` is `({int a}) => ..`, but
-                // here a closure's Java SAM has one slot per named parameter, so the second
-                // is no instance of the first's SAM and a list of their bound could not hold
-                // it. Only an identical named list bounds structurally; others are Function.
-                return fn;
-            }
+            // `({int a})` and `({int a, int b})` bound to `({int a}) => ..`, the named
+            // parameters both declare: a closure's Java SAM has one slot per named
+            // parameter, so the wider one is converted to the bound's SAM where it meets it
+            // (fnArmTo, through SignedFns.narrowNamed), never cast.
             // Named parameters: Dart's bound keeps those both types declare (a named
             // parameter one side lacks is dropped, unless it is required there, which no
             // common supertype could pass), required where either requires it.
@@ -13060,6 +13081,11 @@ public final class JavaEmitter {
                     fn.funcParams.add(pa);
                 } else if (isTopType(pa)) {
                     fn.funcParams.add(pb);
+                } else if (pa.args.isEmpty() && pb.args.isEmpty() && pa.funcParams == null && pb.funcParams == null
+                        && pa.nullable == pb.nullable && (paramBelow(pa, pb) || paramBelow(pb, pa))) {
+                    // `int Function(int)` and `num Function(num)`: a parameter is bounded
+                    // by the lower of the two, `num Function(int)`, as Dart's bound is.
+                    fn.funcParams.add(paramBelow(pa, pb) ? pa : pb);
                 } else {
                     TypeRef bare = new TypeRef("Function");
                     bare.nullable = fn.nullable;
@@ -15077,12 +15103,13 @@ public final class JavaEmitter {
             for (Expr e : l.elements) {
                 Out eo = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
                 String ec = elementCode(eo, elem, ctx);
-                if (!(e instanceof Lambda) && eo.type != null && eo.type.funcParams != null
+                if ((!(e instanceof Lambda) || eo.type != null && eo.type.funcNamed != null
+                        && !eo.type.funcNamed.equals(elem.funcNamed)) && eo.type != null && eo.type.funcParams != null
                         && !javaType(eo.type, true, ctx).equals(javaType(elem, true, ctx))) {
                     // A function value of another (Dart-compatible) signature, `[g1, g2]` with
                     // `(int, ..)` and `(Object?, ..)`: a different parameterization of one SAM,
                     // which Java generics call unrelated; erased, it is the same object.
-                    ec = "(" + javaType(elem, true, ctx) + ") (Object) (" + eo.code + ")";
+                    ec = fnArmTo(eo, elem, ctx);
                 }
                 codes.add(ec);
             }
@@ -19254,6 +19281,13 @@ public final class JavaEmitter {
         if (b == null || b.is("dynamic") || b.is("Null")) {
             return boxType(a);
         }
+        if (a.funcParams != null && b.funcParams != null && a.funcReturn != null && b.funcReturn != null
+                && !fnShape(a).equals(fnShape(b))) {
+            // `c ? h1 : h2` with `int Function(int)` and `num Function(num)`: Dart's upper
+            // bound of the two (`num Function(int)`; the shared named parameters for two
+            // named lists), each arm converted to it (fnArmTo). A function-typed slot wins.
+            return expected != null && expected.funcParams != null ? expected : upperBound(a, b);
+        }
         if (a.name.equals(b.name)) {
             // `c ? Box<int>(1) : Box<num>(2)` is a Box<num>: same class, the arguments' bound.
             return !a.args.isEmpty() && a.args.size() == b.args.size() && a.funcParams == null
@@ -19891,7 +19925,13 @@ public final class JavaEmitter {
                 ctx.writer().raw(rl.lifted);
                 right = rl.out;
                 right = new Out(upcastIfNullDefault(jt, lt, right), right.type);
-return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
+                right = ifNullRightAsIs(b.right, right, ctx);
+            TypeRef fb = ifNullFnBound(left.type, right.type);
+                if (fb != null) {
+                    return new Out("(" + left.code + " != null ? " + fnArmTo(new Out(left.code, copyNonNull(left.type)), fb, ctx)
+                            + " : " + fnArmTo(right, fb, ctx) + ")", fb);
+                }
+                return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
                         ifNullType(left.type, right.type));
             }
             String tmp = ctx.newTemp();
@@ -19910,6 +19950,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             right = rl.out;
             right = new Out(upcastIfNullDefault(jt, lt, right), right.type);
+            right = ifNullRightAsIs(b.right, right, ctx);
+            TypeRef fb = ifNullFnBound(left.type, right.type);
+            if (fb != null) {
+                return new Out("((" + tmp + " = " + left.code + ") != null ? "
+                        + fnArmTo(new Out(tmp, copyNonNull(left.type)), fb, ctx) + " : " + fnArmTo(right, fb, ctx) + ")", fb);
+            }
             return new Out("((" + tmp + " = " + left.code + ") != null ? " + tmp + " : " + right.code + ")",
                     ifNullType(left.type, right.type));
         }
@@ -22163,6 +22209,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.asyncLambdaReturns = outerAsyncReturns;
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
+            body = fnReturnsToBound(body, returns, ctx);
             ctx.bareReturnIsNull = outerNullReturn;
             lastLambdaNullTail = nullTail;
             if (nullTail) {
@@ -29491,6 +29538,52 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return returnsValue(l.body);
     }
 
+    private static final String FN_RETURN_OPEN = "/*cn1fr";
+
+    /// `(bool q) { if (q) return h1; return h2; }` with no context return: Dart's return
+    /// type is the upper bound of the returned function types (blockClosureReturn), and
+    /// Java calls two parameterizations of one SAM unrelated ("bad return type in lambda
+    /// expression"). A function-valued `return` is written between markers (the ReturnStmt
+    /// case); once the closure's returns are all known, each is converted to their bound
+    /// (fnArmTo) when they differ, and the markers are dropped either way.
+    private String fnReturnsToBound(String body, List<TypeRef> returns, Ctx ctx) {
+        if (!body.contains(FN_RETURN_OPEN)) {
+            return body;
+        }
+        TypeRef ub = null;
+        boolean differ = false;
+        for (TypeRef t : returns) {
+            if (t == null || t.funcParams == null || t.funcReturn == null) {
+                ub = null;
+                differ = false;
+                break;
+            }
+            differ |= ub != null && !fnShape(ub).equals(fnShape(t));
+            ub = ub == null ? t : upperBound(ub, t);
+        }
+        if (ub != null && ub.funcParams == null) {
+            ub = null;
+        }
+        for (int i = 0; i < returns.size(); i++) {
+            String open = FN_RETURN_OPEN + i + "<*/";
+            String close = FN_RETURN_OPEN + i + ">*/";
+            int a = body.indexOf(open);
+            int b = a < 0 ? -1 : body.indexOf(close, a);
+            if (b < 0) {
+                continue;
+            }
+            String inner = body.substring(a + open.length(), b);
+            String conv = differ && ub != null ? fnArmTo(new Out(inner, returns.get(i)), ub, ctx) : inner;
+            body = body.substring(0, a) + conv + body.substring(b + close.length());
+        }
+        if (differ && ub != null) {
+            for (int i = 0; i < returns.size(); i++) {
+                returns.set(i, ub);
+            }
+        }
+        return body;
+    }
+
     private static boolean returnsValue(Stmt s) {
         if (s == null) {
             return false;
@@ -30195,6 +30288,23 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         String body = call.apply(names);
         String lifted = ctx.popWriter();
         ctx.popScope();
+        // A closure with no context return (`({int a = 0}) => a`) returns what its body
+        // infers, as Dart types it: an `({int a}) => int`, not a dynamic-returning function.
+        // The static type, and so the SAM, carries it; the lambda itself is raw, so its
+        // Object-typed body still fits, and the cast to the SAM is the erased identity.
+        TypeRef inferredRet = adapterInferredReturn;
+        if (inferredRet != null && !nullReturn && isDynamicType(ft.funcReturn) && !isDynamicType(inferredRet)
+                && !inferredRet.is("void") && !inferredRet.is("Null") && !inferredRet.is("Object")
+                && typeVarsInScope(inferredRet, ctx)) {
+            TypeRef was = ft.funcReturn;
+            ft.funcReturn = inferredRet;
+            String nsam = javaType(ft, false, ctx);
+            if (nsam.startsWith(raw + "<")) {
+                sam = nsam;
+            } else {
+                ft.funcReturn = was;
+            }
+        }
         // The adapter is the function value, so it carries the signature (Signed): its
         // lambda's target is the raw SAM intersected with the marker.
         adapterNullReturn = nullReturn;
@@ -32223,6 +32333,76 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         c.funcReturn = t.funcReturn;
         c.funcTypeParams = t.funcTypeParams;
         return c;
+    }
+
+    /// A function value converted to the function type {@code target} that Dart's typing
+    /// says it already is: two function types are different Java parameterizations of one
+    /// SAM (`Func1<Long, Long>` and `Func1<Number, Number>`), which Java generics call
+    /// unrelated, so where arms, elements or returns of different signatures meet at their
+    /// bound ("bad type in conditional expression") each is viewed as the bound through
+    /// Object -- erased, the same object. A closure with named parameters the bound lacks
+    /// (`({int a, int b})` bound to `({int a})`) is another SAM arity altogether and is
+    /// converted through SignedFns.narrowNamed. Answers the code unchanged otherwise.
+    /// `maybe ?? h2` over two function types of different signatures: their upper bound,
+    /// to which both operands are converted (fnArmTo); null for anything else.
+    /// The right operand of `??` typed as itself: it is emitted in the left's context, so a
+    /// tear-off of another signature reports the left's function type while its code is
+    /// its own (`s1(MainLib::h2)`, a Func1<Number, Number>).
+    private Out ifNullRightAsIs(Expr e, Out right, Ctx ctx) {
+        if (right.type == null || right.type.funcParams == null || e instanceof Lambda) {
+            return right;
+        }
+        TypeRef own = inferExprTypeQuiet(e, ctx);
+        return own != null && own.funcParams != null && own.funcReturn != null ? new Out(right.code, own) : right;
+    }
+
+    private TypeRef ifNullFnBound(TypeRef l, TypeRef r) {
+        if (l == null || r == null || l.funcParams == null || r.funcParams == null || l.funcReturn == null
+                || r.funcReturn == null || r.is("Null")) {
+            return null;
+        }
+        TypeRef ln = copyNonNull(l);
+        ln.funcRequired = l.funcRequired;
+        ln.funcNamed = l.funcNamed;
+        ln.funcNamedRequired = l.funcNamedRequired;
+        if (fnShape(ln).equals(fnShape(r))) {
+            return null;
+        }
+        TypeRef ub = upperBound(ln, r);
+        return ub.funcParams == null ? null : ub;
+    }
+
+    /// {@code o} as {@code target} through fnArmTo, typed as the target when converted.
+    private Out fnValueAs(Out o, TypeRef target, Ctx ctx) {
+        String c = fnArmTo(o, target, ctx);
+        return c == null || c.equals(o.code) ? o : new Out(c, target);
+    }
+
+    private String fnArmTo(Out o, TypeRef target, Ctx ctx) {
+        if (o == null || o.type == null || o.type.funcParams == null || target == null
+                || target.funcParams == null || o.type.is("Null") || fnShape(o.type).equals(fnShape(target))) {
+            return o == null ? null : o.code;
+        }
+        String jt = javaType(target, true, ctx);
+        String own = javaType(o.type, true, ctx);
+        if (!jt.startsWith("Funcs.") && !jt.startsWith("dart.runtime.Funcs.")) {
+            return o.code;
+        }
+        List<String> on = o.type.funcNamed == null ? java.util.Collections.<String>emptyList() : o.type.funcNamed;
+        List<String> tn = target.funcNamed == null ? java.util.Collections.<String>emptyList() : target.funcNamed;
+        int tpos = target.funcParams.size() - tn.size();
+        if (on.size() > tn.size() && on.containsAll(tn) && o.type.funcParams.size() - on.size() == tpos) {
+            StringBuilder names = new StringBuilder();
+            for (String n : tn) {
+                names.append(names.length() > 0 ? ", " : "").append(quote(n));
+            }
+            return "((" + jt + ") dart.runtime.SignedFns.narrowNamed(" + o.code + ", " + tpos
+                    + ", new String[] {" + names + "}, " + jt.contains("VoidFunc") + "))";
+        }
+        if (own.equals(jt) || on.size() != tn.size()) {
+            return o.code;
+        }
+        return "((" + jt + ") (Object) (" + o.code + "))";
     }
 
     /** Whether a Dart type erases to Java Object (untyped/dynamic value). */

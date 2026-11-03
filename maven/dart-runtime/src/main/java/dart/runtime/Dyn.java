@@ -935,6 +935,9 @@ public final class Dyn {
     /// reified parameter type: a mismatch is a TypeError and an unknown name or a
     /// missing required one a NoSuchMethodError, as in Dart.
     public static Object invokeNamed(Object f, Object[] positional, String[] names, Object[] values) {
+        // A narrowed view (SignedFns.narrowNamed) answers the wide closure's signature, so
+        // its arguments are placed for the wide closure, which is the one called.
+        f = SignedFns.unwrap(f);
         if (f instanceof DynamicObject && !isFunction(f)) {
             // A callable object (`dynamic p = P(); p(a: 1)`): Dart calls its call method,
             // named arguments and all.
@@ -1010,6 +1013,7 @@ public final class Dyn {
     /// Invokes a function value with its arguments already in the SAM's positional slots.
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Object invokePlaced(Object f, Object[] a) {
+        f = SignedFns.unwrap(f);
         if (f instanceof DynamicObject && !isFunction(f)) {
             // A callable object (`dynamic p = P(); p(21)`): Dart calls its call method.
             return call(f, "call", a, null);

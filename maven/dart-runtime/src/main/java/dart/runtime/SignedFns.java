@@ -453,4 +453,188 @@ public final class SignedFns {
             String[] named) {
         return new V5<>(f, sig, required, named);
     }
+
+    /// A closure with more named parameters than its static type names, seen as that type:
+    /// `[({int a}) => a, ({int a, int b}) => a + b]` is a `List<({int a}) => int>`, the
+    /// named parameters both share. Each named parameter is its own positional slot of the
+    /// Java SAM, so the wider closure is a different SAM (a Func2 against a Func1) that no
+    /// cast can make the narrower one; it is converted here. A static call goes through the
+    /// narrow SAM, the {@code keep} names placed by name, any it omits (the absent marker)
+    /// left out so the wide closure applies its own defaults. As Signed it answers the WIDE
+    /// closure's signature -- its runtimeType and every `is` test are the closure's own, as
+    /// in Dart -- and a dynamic call reaches the wide closure itself (unwrap).
+    public static Object narrowNamed(Object wide, int positional, String[] keep, boolean isVoid) {
+        if (wide == null || !(wide instanceof Signed)) {
+            return wide;
+        }
+        int n = positional + keep.length;
+        Narrowed r;
+        switch (n) {
+            case 0: r = isVoid ? new NV0() : new N0(); break;
+            case 1: r = isVoid ? new NV1() : new N1(); break;
+            case 2: r = isVoid ? new NV2() : new N2(); break;
+            case 3: r = isVoid ? new NV3() : new N3(); break;
+            case 4: r = isVoid ? new NV4() : new N4(); break;
+            case 5: r = isVoid ? new NV5() : new N5(); break;
+            default: throw new IllegalArgumentException("too many parameters: " + n);
+        }
+        r.wide = (Signed) wide;
+        r.positional = positional;
+        r.keep = keep;
+        return r;
+    }
+
+    /// The closure a narrowNamed view stands for, or {@code f} itself.
+    public static Object unwrap(Object f) {
+        return f instanceof Narrowed ? ((Narrowed) f).wide : f;
+    }
+
+    private abstract static class Narrowed implements Signed {
+        Signed wide;
+        int positional;
+        String[] keep;
+
+        final Object fwd(Object... a) {
+            Object[] pos = new Object[positional];
+            System.arraycopy(a, 0, pos, 0, positional);
+            int k = 0;
+            for (int i = positional; i < a.length; i++) {
+                if (!DartRuntime.isAbsent(a[i])) {
+                    k++;
+                }
+            }
+            String[] names = new String[k];
+            Object[] values = new Object[k];
+            k = 0;
+            for (int i = positional; i < a.length; i++) {
+                if (!DartRuntime.isAbsent(a[i])) {
+                    String nm = keep[i - positional];
+                    names[k] = nm.startsWith("!") ? nm.substring(1) : nm;
+                    values[k++] = a[i];
+                }
+            }
+            return Dyn.invokeNamed(wide, pos, names, values);
+        }
+
+        @Override
+        public final TypeWitness[] $sig() {
+            return wide.$sig();
+        }
+
+        @Override
+        public final int $required() {
+            return wide.$required();
+        }
+
+        @Override
+        public final String[] $named() {
+            return wide.$named();
+        }
+
+        @Override
+        public final boolean $generic() {
+            return wide.$generic();
+        }
+
+        @Override
+        public final String[] $typeVars() {
+            return wide.$typeVars();
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N0 extends Narrowed implements Funcs.Func0 {
+        @Override
+        public Object call() {
+            return fwd();
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV0 extends Narrowed implements Funcs.VoidFunc0 {
+        @Override
+        public void call() {
+            fwd();
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N1 extends Narrowed implements Funcs.Func1 {
+        @Override
+        public Object call(Object a) {
+            return fwd(a);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV1 extends Narrowed implements Funcs.VoidFunc1 {
+        @Override
+        public void call(Object a) {
+            fwd(a);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N2 extends Narrowed implements Funcs.Func2 {
+        @Override
+        public Object call(Object a, Object b) {
+            return fwd(a, b);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV2 extends Narrowed implements Funcs.VoidFunc2 {
+        @Override
+        public void call(Object a, Object b) {
+            fwd(a, b);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N3 extends Narrowed implements Funcs.Func3 {
+        @Override
+        public Object call(Object a, Object b, Object c) {
+            return fwd(a, b, c);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV3 extends Narrowed implements Funcs.VoidFunc3 {
+        @Override
+        public void call(Object a, Object b, Object c) {
+            fwd(a, b, c);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N4 extends Narrowed implements Funcs.Func4 {
+        @Override
+        public Object call(Object a, Object b, Object c, Object d) {
+            return fwd(a, b, c, d);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV4 extends Narrowed implements Funcs.VoidFunc4 {
+        @Override
+        public void call(Object a, Object b, Object c, Object d) {
+            fwd(a, b, c, d);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N5 extends Narrowed implements Funcs.Func5 {
+        @Override
+        public Object call(Object a, Object b, Object c, Object d, Object e) {
+            return fwd(a, b, c, d, e);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV5 extends Narrowed implements Funcs.VoidFunc5 {
+        @Override
+        public void call(Object a, Object b, Object c, Object d, Object e) {
+            fwd(a, b, c, d, e);
+        }
+    }
 }
