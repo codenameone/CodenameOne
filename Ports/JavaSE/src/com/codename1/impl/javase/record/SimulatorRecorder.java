@@ -38,6 +38,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
@@ -49,6 +51,11 @@ import javax.sound.sampled.TargetDataLine;
 /// when the application repaints: a still screen still advances the video, so the
 /// result plays back in real time. When capture falls behind the clock, the last
 /// frame is written again rather than letting the video run fast.
+///
+/// Encoding is never done on the capture clock. Frames go through a bounded queue
+/// to writer threads -- one feeding ffmpeg, or several writing PNG files -- so a
+/// slow encode delays the file, not the next capture. Writing on the clock made
+/// every slow frame a repeated one, and the video stuttered.
 ///
 /// Audio is assembled when recording stops. The track is the microphone when that
 /// is on, silence otherwise, with a short synthesized click mixed in at every tap
@@ -86,6 +93,22 @@ public final class SimulatorRecorder {
     }
 
     private static final int SAMPLE_RATE = 44100;
+    /// Memory the frame queue may hold, which bounds how far encoding may lag.
+    private static final long QUEUE_BYTES = 256L * 1024 * 1024;
+
+    /// A captured frame waiting for a writer, with its place in the video.
+    private static final class Frame {
+        final int[] argb;
+        final int index;
+
+        Frame(int[] argb, int index) {
+            this.argb = argb;
+            this.index = index;
+        }
+    }
+
+    /// Tells a writer thread that no more frames are coming.
+    private static final Frame END = new Frame(null, -1);
 
     private static final class Caption {
         final String text;
@@ -119,6 +142,8 @@ public final class SimulatorRecorder {
     private ByteArrayOutputStream micData;
     private Thread micThread;
     private BufferedImage scaled;
+    private BlockingQueue<Frame> queue;
+    private Thread[] writers;
     private AppAudioTap appAudio;
     /// True from the moment a stop begins until the file is finished; a new
     /// recording cannot start over a writer that is still being closed.
@@ -228,7 +253,8 @@ public final class SimulatorRecorder {
         // muxing audio onto a video with no frames fails.
         compose(first, 0);
         try {
-            writeFrame(0);
+            writeOut(new Frame(pixels(), 0));
+            frameCount = 1;
         } catch (IOException e) {
             AppAudioTap.setActive(null);
             appAudio = null;
@@ -244,6 +270,7 @@ public final class SimulatorRecorder {
             throw e;
         }
         running = true;
+        startWriters();
         thread = new Thread(new Runnable() {
             public void run() {
                 captureLoop();
@@ -288,12 +315,18 @@ public final class SimulatorRecorder {
                 if (img != null) {
                     compose(img, now);
                 }
-                long due = (long) frameCount * 1000L / options.getFps();
-                // Write the frame as often as needed to catch the clock up, so a
+                int[] argb = pixels();
+                long due;
+                // Queue the frame as often as needed to catch the clock up, so a
                 // slow capture never makes the video play faster than it happened.
+                // A repeat is the same array: writers only read it.
                 do {
-                    writeFrame(due);
-                    due = (long) frameCount * 1000L / options.getFps();
+                    int index;
+                    synchronized (this) {
+                        index = frameCount++;
+                    }
+                    queue.put(new Frame(argb, index));
+                    due = (long) (index + 1) * 1000L / options.getFps();
                 } while (due + frameMs <= now);
                 long sleep = due - (System.currentTimeMillis() - startTime);
                 if (sleep > 0) {
@@ -302,12 +335,89 @@ public final class SimulatorRecorder {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        } catch (IOException e) {
-            synchronized (this) {
-                failure = e;
+        }
+    }
+
+    /// Starts the threads that drain the queue: one for ffmpeg, which needs its
+    /// frames in order, and one per spare core for PNG files, which do not.
+    private void startWriters() {
+        long frameBytes = (long) width * height * 4;
+        queue = new ArrayBlockingQueue<Frame>((int) Math.max(4, Math.min(options.getFps() * 4L,
+                QUEUE_BYTES / frameBytes)));
+        int count = writer != null ? 1
+                : Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() - 1));
+        writers = new Thread[count];
+        for (int i = 0; i < count; i++) {
+            writers[i] = new Thread(new Runnable() {
+                public void run() {
+                    drain();
+                }
+            }, "SimulatorRecorderWriter-" + i);
+            writers[i].setDaemon(true);
+            writers[i].start();
+        }
+    }
+
+    private void drain() {
+        BlockingQueue<Frame> q = queue;
+        boolean failed = false;
+        try {
+            while (true) {
+                Frame f = q.take();
+                if (f == END) {
+                    return;
+                }
+                if (failed) {
+                    // Keep taking, so the capture thread never blocks on a full queue.
+                    continue;
+                }
+                try {
+                    writeOut(f);
+                } catch (IOException e) {
+                    failed = true;
+                    synchronized (this) {
+                        if (failure == null) {
+                            failure = e;
+                        }
+                    }
+                    // Close ffmpeg and the microphone now; nobody may ever call stop().
+                    autoStop();
+                }
             }
-            // Close ffmpeg and the microphone now; nobody may ever call stop().
-            autoStop();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /// Lets the writers finish what is queued, then waits for them.
+    private void stopWriters() {
+        Thread[] w = writers;
+        writers = null;
+        if (w == null) {
+            return;
+        }
+        boolean interrupted = false;
+        for (int i = 0; i < w.length; i++) {
+            while (true) {
+                try {
+                    queue.put(END);
+                    break;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        }
+        for (int i = 0; i < w.length; i++) {
+            while (w[i].isAlive()) {
+                try {
+                    w[i].join();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -390,15 +500,18 @@ public final class SimulatorRecorder {
         return out;
     }
 
-    private void writeFrame(long ptsMs) throws IOException {
+    /// A copy of the composed frame, which the next capture overwrites.
+    private int[] pixels() {
+        return scaled.getRGB(0, 0, width, height, null, 0, width);
+    }
+
+    private void writeOut(Frame f) throws IOException {
         if (writer != null) {
-            int[] argb = scaled.getRGB(0, 0, width, height, null, 0, width);
-            writer.writeFrame(argb, width, height, ptsMs);
+            writer.writeFrame(f.argb, width, height, (long) f.index * 1000L / options.getFps());
         } else {
-            ImageIO.write(scaled, "png", new File(pngDir, String.format("frame-%05d.png", Integer.valueOf(frameCount))));
-        }
-        synchronized (this) {
-            frameCount++;
+            BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            img.setRGB(0, 0, width, height, f.argb, 0, width);
+            ImageIO.write(img, "png", new File(pngDir, String.format("frame-%05d.png", Integer.valueOf(f.index))));
         }
     }
 
@@ -466,6 +579,8 @@ public final class SimulatorRecorder {
                         Thread.currentThread().interrupt();
                     }
                 }
+                // Writers never get here: a failing one stops through autoStop's thread.
+                stopWriters();
                 r = finish();
                 return r;
             } catch (IOException e) {

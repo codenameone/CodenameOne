@@ -105,6 +105,22 @@ class FFMPEGVideoWriter extends VideoWriter {
             if (encoder == null) {
                 throw new IOException("No ffmpeg encoder available for video codec '" + cfg.getVideoCodec() + "'");
             }
+            // Hardware encoders are left to fail on their own: probing one costs
+            // a session, and VideoToolbox is the only one picked by default.
+            List<String> encoderOptions = new ArrayList<String>();
+            if (!encoder.contains("videotoolbox")) {
+                List<String> working = FFMPEGVideoIO.workingOptions(encoder);
+                if (working == null) {
+                    String other = io.fallbackEncoder(cfg.getVideoCodec(), encoder);
+                    if (other == null) {
+                        throw new IOException("ffmpeg's " + encoder + " encoder does not work on this machine"
+                                + " and no other encoder for '" + cfg.getVideoCodec() + "' does");
+                    }
+                    encoder = other;
+                    working = FFMPEGVideoIO.workingOptions(encoder);
+                }
+                encoderOptions.addAll(working);
+            }
             int bitRate = cfg.getVideoBitRate();
             if (bitRate <= 0) {
                 long derived = (long) (width * (long) height * Math.max(1f, frameRate) * 0.10);
@@ -134,6 +150,7 @@ class FFMPEGVideoWriter extends VideoWriter {
             command.add("-an");
             command.add("-c:v");
             command.add(encoder);
+            command.addAll(encoderOptions);
             command.add("-b:v");
             command.add(String.valueOf(bitRate));
             command.add("-pix_fmt");

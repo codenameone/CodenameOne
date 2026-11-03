@@ -3091,6 +3091,74 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-10-30T01:01:52+00:00"
+      },
+      "devto": {
+        "id": 4949758,
+        "url": "https://dev.to/codenameone/rewrite-everything-in-java-not-rust-5co8",
+        "syndicated_at": "2026-10-30T22:46:41+00:00"
+      }
+    },
+    "build-a-multiplayer-strategy-game-in-java": {
+      "hashnode": {
+        "url": "https://debugagent.com/skirmish-a-multiplayer-strategy-game-template-in-java",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae53da2e6bf8b25f54d7f93",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-31T01:01:14+00:00"
+      },
+      "devto": {
+        "id": 4954240,
+        "url": "https://dev.to/codenameone/skirmish-a-multiplayer-strategy-game-template-in-java-c5d",
+        "syndicated_at": "2026-10-31T18:31:24+00:00"
+      }
+    },
+    "launch-your-own-private-messenger": {
+      "hashnode": {
+        "url": "https://debugagent.com/parley-a-private-messenger-template-you-can-brand",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae68f1edeb2d682a93cec1e",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-01T01:01:09+00:00"
+      },
+      "devto": {
+        "id": 4959057,
+        "url": "https://dev.to/codenameone/parley-a-private-messenger-template-you-can-brand-9pi",
+        "syndicated_at": "2026-11-01T20:51:05+00:00"
+      }
+    },
+    "launch-your-own-food-delivery-app": {
+      "hashnode": {
+        "url": "https://debugagent.com/savor-a-food-delivery-template-for-restaurants-and-local-fleets",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae7e0cb5fd5ee9e592f9c09",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-02T01:02:00+00:00"
+      },
+      "devto": {
+        "id": 4965338,
+        "url": "https://dev.to/codenameone/savor-a-food-delivery-template-for-restaurants-and-local-fleets-36o0",
+        "syndicated_at": "2026-11-02T22:17:56+00:00"
+      }
+    },
+    "bring-your-java-code-everywhere": {
+      "hashnode": {
+        "url": "https://debugagent.com/more-of-the-java-api-and-an-experiment-with-unity-games",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae9322066256a43d8df73c0",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-03T01:01:16+00:00"
       }
     }
   }

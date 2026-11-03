@@ -3402,11 +3402,39 @@ extern bool lockDrawing;
 // never leaves landscape, so when the user stays in landscape its bounds never
 // change and no layout pass runs to correct the published size. viewDidAppear
 // and the transition's completion therefore re-read the real bounds as well.
+// Reads the window's safe-area insets into the globals the Java side asks for.
+// Answers whether any of them changed.
+- (BOOL)cn1ReadSafeAreaInsets {
+    UIEdgeInsets in = self.view.window.safeAreaInsets;
+    JAVA_INT l = (JAVA_INT)in.left * scaleValue;
+    JAVA_INT r = (JAVA_INT)in.right * scaleValue;
+    JAVA_INT t = (JAVA_INT)in.top * scaleValue;
+    JAVA_INT b = (JAVA_INT)in.bottom * scaleValue;
+    if (l == safeLeft && r == safeRight && t == safeTop && b == safeBottom) {
+        return NO;
+    }
+    safeLeft = l;
+    safeRight = r;
+    safeTop = t;
+    safeBottom = b;
+    return YES;
+}
+
 - (void)cn1PublishViewSizeIfChanged {
     // The same reason viewWillTransitionToSize: gives: iOS lays the view out
     // at the opposite orientation for its background snapshot.
     if (isAppSuspended || self.view == nil) {
         return;
+    }
+    // The insets go stale the same way the size does. viewSafeAreaInsetsDidChange
+    // is not sent to a view that a presented controller covers, so a rotation
+    // under one -- an orientation-locked screen, a camera -- left the landscape
+    // insets in place after the app was back in portrait, and every form with a
+    // safe area was squeezed between the old notch margins.
+    if (self.view.window != nil && [self cn1ReadSafeAreaInsets]) {
+        [self cn1UpdateStatusBarTapProxyFrame];
+        lockDrawing = NO;
+        repaintUI();
     }
     CGSize sz = self.view.bounds.size;
     int newW = (int)(sz.width * scaleValue);
@@ -5025,10 +5053,7 @@ BOOL prefersStatusBarHidden = NO;
 #if TARGET_OS_OSX
 #else
     [super viewSafeAreaInsetsDidChange];
-    safeLeft = (JAVA_INT)self.view.window.safeAreaInsets.left * scaleValue;
-    safeRight = (JAVA_INT)self.view.window.safeAreaInsets.right * scaleValue;
-    safeTop = (JAVA_INT)self.view.window.safeAreaInsets.top * scaleValue;
-    safeBottom = (JAVA_INT)self.view.window.safeAreaInsets.bottom * scaleValue;
+    [self cn1ReadSafeAreaInsets];
 
     // Status-bar tap proxy height tracks safeAreaInsets.top, so refresh it
     // here so rotations and other safe-area changes keep the proxy aligned

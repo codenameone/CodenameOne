@@ -334,6 +334,7 @@ The library is published in the same shape the Maven `cn1lib-archetype` produces
 `N-common`, classifier `cn1css`:: The library's CSS, as a zip.
 `N-<platform>`:: One jar per platform: compiled classes for `javase`, sources for the others, which the native builders compile.
 `N-lib`:: A `pom` that applications depend on, with one `codename1.platform` profile per platform.
+`N-backend`:: The library's server half, compiled from `src/backend/java` and `src/backend/resources`, when there is one. A server that depends on it wires its controllers, beans and entities as its own; see <<backend-libraries>>.
 
 Gradle cn1libs don't produce `.cn1lib` files.
 

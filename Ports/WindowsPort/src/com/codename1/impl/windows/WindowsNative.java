@@ -140,6 +140,13 @@ public final class WindowsNative {
 
     public static native int getDisplayHeight();
 
+    /**
+     * Fills {left, top, right, bottom} with the pixels to keep clear at each edge
+     * of the main window and returns true, or returns false when there is no such
+     * area. Only the UWP (Xbox) build has one: a television may crop its edges.
+     */
+    public static native boolean safeAreaInsets(int[] out);
+
     /** Real horizontal screen DPI (96 == 100% scale). */
     public static native int screenDpi();
 

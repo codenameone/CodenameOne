@@ -36,7 +36,7 @@
  * (negative stride); both are handled when packing into CN1's 0xAARRGGBB ints.
  */
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(CN1_WINDOWS_UWP) /* desktop only: stubbed for UWP in cn1_windows_uwp_stubs.c */
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

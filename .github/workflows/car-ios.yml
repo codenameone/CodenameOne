@@ -7,52 +7,20 @@ name: Car (CarPlay) integration
 # CarPlay.framework and injects the CarPlay scene/entitlement) and runs it on the iOS Simulator,
 # asserts the CarPlay scene/define/native sources are injected, and boots it on the iOS Simulator.
 'on':
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # Shared code (core, ports, builders, backend) reaches it through the nightly.
   pull_request:
     paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
       - '.github/workflows/car-ios.yml'
       - 'CodenameOne/src/com/codename1/car/**'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarBridge.java'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarPlayCallbacks.java'
       - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.h'
       - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.m'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java'
-      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
-      - 'scripts/lib/xcode.sh'
-  push:
-    branches:
-      - master
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/car-ios.yml'
-      - 'CodenameOne/src/com/codename1/car/**'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarBridge.java'
-      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCarPlayCallbacks.java'
-      - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.h'
-      - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.m'
-      - 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java'
-      - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
-      - 'scripts/lib/xcode.sh'
+  schedule:
+    - cron: '11 0 * * *'
+  workflow_dispatch:
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

@@ -53,6 +53,25 @@ class DeviceDeployerTest {
     }
 
     @Test
+    void theInstallRefusesADeviceOfAnotherArchitecture() throws IOException {
+        byte[] arm64 = new byte[64];
+        arm64[0] = 0x7f; arm64[1] = 'E'; arm64[2] = 'L'; arm64[3] = 'F';
+        arm64[5] = 1;            // little endian
+        arm64[18] = (byte) 183;  // EM_AARCH64
+        assertEquals("aarch64|arm64", DeviceDeployer.unameFor(write("arm", arm64, true)));
+        byte[] x64 = arm64.clone();
+        x64[18] = 62;
+        assertEquals("x86_64", DeviceDeployer.unameFor(write("x64", x64, true)));
+        assertNull(DeviceDeployer.unameFor(write("short", new byte[] {0x7f, 'E'}, true)));
+
+        String script = new DeviceDeployer(new NullLog()).remoteDir("/opt/app")
+                .installScript("demo", "/opt/app/demo", "x86_64");
+        int check = script.indexOf("case \"$(uname -m)\" in x86_64)");
+        assertTrue(check > script.indexOf("cat > "), script);
+        assertTrue(check < script.indexOf("sudo install"), script);
+    }
+
+    @Test
     void findsTheNewestElfExecutableOnly() throws IOException {
         byte[] elf = {0x7f, 'E', 'L', 'F', 2, 1, 1};
         write("script.sh", "#!/bin/sh\n".getBytes(StandardCharsets.US_ASCII), true);
@@ -92,6 +111,26 @@ class DeviceDeployerTest {
         }
         assertThrows(BuildException.class, new DeviceDeployer(new NullLog()).host("pi").binary(elf)
                 .remoteDir("/opt/../etc")::deploy);
+    }
+
+    @Test
+    void theServiceMayUseRealtimeSchedulingAndLockMemory() {
+        String script = new DeviceDeployer(new NullLog()).remoteDir("/opt/app").installScript("demo", "/opt/app/demo");
+        assertTrue(script.contains("LimitRTPRIO=infinity\n"), script);
+        assertTrue(script.contains("LimitMEMLOCK=infinity\n"), script);
+    }
+
+    @Test
+    void followingLogsNeedsAHostAndAServiceAndRefusesOptionLikeNames() {
+        DeviceDeployer d = new DeviceDeployer(new NullLog());
+        BuildException e = assertThrows(BuildException.class, d::tailLogs);
+        assertTrue(e.getMessage().contains("cn1.device.service"), e.getMessage());
+        d.service("demo");
+        assertThrows(BuildException.class, d::tailLogs, "no host");
+        d.host("-oProxyCommand=touch /tmp/x");
+        assertThrows(BuildException.class, d::tailLogs);
+        d.host("pi.local").service("demo; reboot");
+        assertThrows(BuildException.class, d::tailLogs);
     }
 
     @Test
