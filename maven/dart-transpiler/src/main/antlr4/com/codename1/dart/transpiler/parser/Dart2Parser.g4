@@ -632,6 +632,13 @@ patternVariableDeclaration
     : metadata (FINAL_ | VAR_) (recordPattern | listPattern | mapPattern | objectPattern) EQ expr SC
     ;
 
+// Dart 3 pattern assignment to existing locals: `(a, b) = (b, a + b);`, `[x, _] = xs;`,
+// `Point(:x, :y) = p;`, `({'k': v}) = m;` (a map pattern needs the parentheses at the start
+// of a statement, where `{` opens a block).
+patternAssignment
+    : (OP mapPattern CP | recordPattern | listPattern | objectPattern) EQ expr SC
+    ;
+
 logicalAndExpression
     : equalityExpression (AA equalityExpression)*
     ;
@@ -732,6 +739,7 @@ nonLabelledStatement
     | yieldEachStatement
     | yieldStatement
     | patternVariableDeclaration
+    | patternAssignment
     | localVariableDeclaration
     | forStatement
     | whileStatement

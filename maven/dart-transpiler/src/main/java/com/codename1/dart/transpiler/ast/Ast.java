@@ -690,6 +690,8 @@ public final class Ast {
 
     /** target.name(args) — method call, or function/ctor call when target == null. */
     public static class Call extends Expr {
+        // Inside a constant context (`const x = Point(0, 0)`): a constructor call is const.
+        public boolean inConst;
         public Expr target;                       // null for bare calls
         public String name;                       // method or function/class name; null when calling an expression value
         public Args args = new Args();
@@ -919,5 +921,49 @@ public final class Ast {
     public static class RecordField extends Node {
         public String name;
         public Expr value;
+    }
+
+    /// Marks the constant context below a const expression: Dart reads every constructor
+    /// call and collection literal written there as const (`const [Point(0, 0)]`).
+    public static void markConst(Expr e) {
+        if (e instanceof CtorCall) {
+            ((CtorCall) e).isConst = true;
+            markConstArgs(((CtorCall) e).args);
+        } else if (e instanceof Call && ((Call) e).target == null && ((Call) e).name != null) {
+            ((Call) e).inConst = true;
+            markConstArgs(((Call) e).args);
+        } else if (e instanceof ListLit) {
+            ((ListLit) e).isConst = true;
+            for (Expr x : ((ListLit) e).elements) {
+                markConst(x);
+            }
+        } else if (e instanceof SetLit) {
+            ((SetLit) e).isConst = true;
+            for (Expr x : ((SetLit) e).elements) {
+                markConst(x);
+            }
+        } else if (e instanceof MapLit) {
+            ((MapLit) e).isConst = true;
+            for (Expr x : ((MapLit) e).keys) {
+                markConst(x);
+            }
+            for (Expr x : ((MapLit) e).values) {
+                markConst(x);
+            }
+        }
+    }
+
+    /// Marks the arguments of a const constructor call as constant context.
+    public static void markConstArgsOf(CtorCall c) {
+        markConstArgs(c.args);
+    }
+
+    private static void markConstArgs(Args a) {
+        for (Expr x : a.positional) {
+            markConst(x);
+        }
+        for (NamedArg n : a.named) {
+            markConst(n.value);
+        }
     }
 }

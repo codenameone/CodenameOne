@@ -1513,6 +1513,9 @@ public final class AstBuilder {
             d.init = buildExpr(pd.expr());
             return d;
         }
+        if (s.patternAssignment() != null) {
+            return buildPatternAssignment(s.patternAssignment(), s);
+        }
         if (s.rethrowStatement() != null) {
             RethrowStmt r = new RethrowStmt();
             pos(r, s);
@@ -1520,6 +1523,90 @@ public final class AstBuilder {
         }
         unsupported(s, "E0115", "Unsupported statement: " + snippet(s));
         return null;
+    }
+
+    private int patternAssignCounter;
+
+    /**
+     * A pattern assignment, `(a, b) = (b, a + b);`. Dart evaluates the right-hand side,
+     * destructures it completely, and only then assigns the variables, so the statement
+     * becomes a destructuring declaration of fresh locals followed by plain assignments
+     * from them -- which also keeps every assignment on the ordinary path (captured
+     * variables, async frames, coercions).
+     */
+    private Stmt buildPatternAssignment(Dart2Parser.PatternAssignmentContext pa, ParserRuleContext at) {
+        Pattern p;
+        if (pa.recordPattern() != null) {
+            p = buildRecordPattern(pa.recordPattern());
+        } else if (pa.listPattern() != null) {
+            p = buildListPattern(pa.listPattern());
+        } else if (pa.objectPattern() != null) {
+            p = buildObjectPattern(pa.objectPattern());
+        } else {
+            p = buildMapPattern(pa.mapPattern());
+        }
+        Block b = new Block();
+        pos(b, at);
+        PatternDeclStmt d = new PatternDeclStmt();
+        pos(d, at);
+        d.pattern = p;
+        d.init = buildExpr(pa.expr());
+        b.statements.add(d);
+        List<VariablePattern> targets = new ArrayList<VariablePattern>();
+        collectAssignTargets(p, targets);
+        int n = patternAssignCounter++;
+        for (VariablePattern v : targets) {
+            String target = v.name;
+            v.name = "$pa" + n + "$" + target;
+            Ident lhs = new Ident();
+            pos(lhs, at);
+            lhs.name = target;
+            Ident rhs = new Ident();
+            pos(rhs, at);
+            rhs.name = v.name;
+            Assign as = new Assign();
+            pos(as, at);
+            as.lhs = lhs;
+            as.op = "=";
+            as.rhs = rhs;
+            ExprStmt es = new ExprStmt();
+            pos(es, at);
+            es.expr = as;
+            b.statements.add(es);
+        }
+        return b;
+    }
+
+    private static void collectAssignTargets(Pattern p, List<VariablePattern> out) {
+        if (p instanceof VariablePattern) {
+            if (!((VariablePattern) p).wildcard) {
+                out.add((VariablePattern) p);
+            }
+        } else if (p instanceof RecordPattern) {
+            for (PatternField f : ((RecordPattern) p).fields) {
+                collectAssignTargets(f.pattern, out);
+            }
+        } else if (p instanceof ObjectPattern) {
+            for (PatternField f : ((ObjectPattern) p).fields) {
+                collectAssignTargets(f.pattern, out);
+            }
+        } else if (p instanceof ListPattern) {
+            for (Pattern e : ((ListPattern) p).elements) {
+                collectAssignTargets(e, out);
+            }
+        } else if (p instanceof MapPattern) {
+            for (Pattern e : ((MapPattern) p).values) {
+                collectAssignTargets(e, out);
+            }
+        } else if (p instanceof RestPattern) {
+            if (((RestPattern) p).inner != null) {
+                collectAssignTargets(((RestPattern) p).inner, out);
+            }
+        } else if (p instanceof NullCheckPattern) {
+            collectAssignTargets(((NullCheckPattern) p).inner, out);
+        } else if (p instanceof CastPattern) {
+            collectAssignTargets(((CastPattern) p).inner, out);
+        }
     }
 
     /** A nested function declaration: `Ret name(params) { ... }` inside a body. */

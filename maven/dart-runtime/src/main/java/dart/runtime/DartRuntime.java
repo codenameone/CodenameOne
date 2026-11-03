@@ -768,6 +768,16 @@ public final class DartRuntime {
                 + " List operators at run time. Give the operand a static type.");
     }
 
+    /// The Dart names of the transpiled classes whose Java name differs (a class renamed so
+    /// it cannot clash with a runtime class): `Stack` emitted as `MainStack` still prints
+    /// as `Stack`. Filled by each such class's static initialiser.
+    private static final java.util.HashMap<Class<?>, String> DART_NAMES = new java.util.HashMap<Class<?>, String>();
+
+    /// Records that the transpiled class {@code c} is named {@code dartName} in Dart.
+    public static void dartName(Class<?> c, String dartName) {
+        DART_NAMES.put(c, dartName);
+    }
+
     public static String typeName(Object o) {
         if (o == null) {
             return "Null";
@@ -973,6 +983,10 @@ public final class DartRuntime {
             }
             if (c == dart.core.DartDoubleList.class) {
                 return "List<double>";
+            }
+            String dn = DART_NAMES.get(c);
+            if (dn != null) {
+                return dn;
             }
             String sn = c.getSimpleName();
             if (c.isInterface() && sn.length() > 2 && sn.endsWith("$I")) {

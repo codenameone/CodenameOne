@@ -221,6 +221,27 @@ public final class JavaEmitter {
         // of the two sorts last, silently, with no diagnostic.
         List<Library> mainCandidates = new ArrayList<Library>();
         for (Library lib : program.libraries) {
+            for (FieldDecl v : lib.topLevelVars) {
+                if (v.isConst && v.initializer != null) {
+                    Ast.markConst(v.initializer);
+                }
+            }
+            for (ClassDecl c : lib.classes) {
+                for (FieldDecl f : c.fields) {
+                    if (f.isConst && f.initializer != null) {
+                        Ast.markConst(f.initializer);
+                    }
+                }
+            }
+            for (EnumDecl en : lib.enums) {
+                for (FieldDecl f : en.fields) {
+                    if (f.isConst && f.initializer != null) {
+                        Ast.markConst(f.initializer);
+                    }
+                }
+            }
+        }
+        for (Library lib : program.libraries) {
             stubs.viewFrom(importedPackages(lib), program.classes.keySet());
             for (ClassDecl c : lib.classes) {
                 try {
@@ -794,6 +815,16 @@ public final class JavaEmitter {
         StringBuilder body = new StringBuilder();
         for (FieldDecl f : e.fields) {
             TypeRef ft = fieldType(f, ctx);
+            // A static field's initialiser (`static const fallback = Grade.c;`) is emitted
+            // with it; the type of an untyped one is the initialiser's.
+            Out staticInit = null;
+            if (f.isStatic && f.initializer != null) {
+                boolean untyped = ft == null || ft.is("var") || ft.is("dynamic");
+                staticInit = emitExpr(f.initializer, untyped ? null : ft, ctx);
+                if (untyped && staticInit.type != null) {
+                    ft = staticInit.type;
+                }
+            }
             String jt = javaType(ft, false, ctx);
             if (f.isStatic) {
                 body.append(f.name.startsWith("_") ? "    static " : "    public static ");
@@ -803,7 +834,11 @@ public final class JavaEmitter {
             if ((f.isFinal || f.isConst)) {
                 body.append("final ");
             }
-            body.append(jt).append(' ').append(f.name).append(";\n");
+            body.append(jt).append(' ').append(f.name);
+            if (staticInit != null) {
+                body.append(" = ").append(staticInit.code);
+            }
+            body.append(";\n");
             if (!f.name.startsWith("_") && !f.isStatic) {
                 body.append("    public ").append(jt).append(" get$").append(f.name)
                         .append("() {\n        return ").append(f.name).append(";\n    }\n");
@@ -2163,6 +2198,37 @@ public final class JavaEmitter {
         body.append(covariantFieldSetterBridges(c, ctx));
         body.append(emitSinkAddErrorBridges(c, ctx));
         body.append(defaultDartToString(c));
+        if (constKeyed(c)) {
+            // Its constants are canonicalized by value (ConstCanon): the key is every
+            // instance field, the program superclass's first.
+            ClassDecl ksup = c.superclass == null ? null : superDeclOf(c, c.superclass);
+            StringBuilder kb = new StringBuilder();
+            for (FieldDecl f : c.fields) {
+                if (!f.isStatic) {
+                    kb.append(kb.length() > 0 ? ", " : "").append("this.").append(f.name);
+                }
+            }
+            body.append("    public Object[] $constKey() {\n");
+            if (constKeyed(ksup)) {
+                body.append("        Object[] s = super.$constKey();\n        Object[] o = new Object[] {")
+                        .append(kb).append("};\n        Object[] r = new Object[s.length + o.length];\n")
+                        .append("        System.arraycopy(s, 0, r, 0, s.length);\n")
+                        .append("        System.arraycopy(o, 0, r, s.length, o.length);\n        return r;\n");
+            } else {
+                body.append("        return new Object[] {").append(kb).append("};\n");
+            }
+            body.append("    }\n\n");
+            if (impls.length() > 0) {
+                impls.append(", ");
+            }
+            impls.append("dart.runtime.ConstCanon.Keyed");
+        }
+        if (!c.isMixin && c.extensionOn == null && c.enumOf == null && !javaClassName(c).equals(c.name)) {
+            // Renamed in Java (it would clash with a runtime class): its runtimeType and
+            // Type value still print the Dart name.
+            body.append("    static {\n        dart.runtime.DartRuntime.dartName(").append(javaClassName(c))
+                    .append(".class, \"").append(c.name).append("\");\n    }\n\n");
+        }
         // Dart 3 sealed -> Java sealed: a sealed class with subtypes lists them in a permits clause and
         // its direct subtypes are marked non-sealed. Falls back to a plain abstract class when the
         // hierarchy has no subtypes (a permits-less sealed class is illegal in Java).
@@ -2739,6 +2805,26 @@ public final class JavaEmitter {
      * toString, and only when the superclass, if any, is a program class: a runtime or
      * stub superclass keeps its own.
      */
+    /// Whether constants of {@code c} are canonicalized: a plain program class (no mixin)
+    /// with a const constructor.
+    private boolean constKeyed(ClassDecl c) {
+        if (c == null || c.isMixin || c.extensionOn != null || c.enumOf != null || !c.mixins.isEmpty()
+                || !program.classes.containsValue(c)) {
+            return false;
+        }
+        // Every field must be in the key: a runtime or stub superclass (a widget's `key`)
+        // holds state the key cannot read, so such a class is not canonicalized.
+        if (c.superclass != null && !c.superclass.is("Object") && !constKeyed(superDeclOf(c, c.superclass))) {
+            return false;
+        }
+        for (CtorDecl k : c.ctors) {
+            if (k.isConst) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private String defaultDartToString(ClassDecl c) {
         if (c.isMixin || c.extensionOn != null || c.enumOf != null) {
             return "";
@@ -2772,6 +2858,11 @@ public final class JavaEmitter {
                 return "";
             }
             k = sup;
+        }
+        if (!c.typeParams.isEmpty()) {
+            // Dart names the type arguments too: `Instance of 'Box<int>'`.
+            return "    @Override\n    public String toString() {\n        return \"Instance of '\" + "
+                    + "dart.runtime.DartRuntime.str(dart.runtime.TypeWitness.runtimeType(this)) + \"'\";\n    }\n\n";
         }
         return "    @Override\n    public String toString() {\n        return \"Instance of '"
                 + c.name.replace("\\", "\\\\").replace("\"", "\\\"") + "'\";\n    }\n\n";
@@ -8872,7 +8963,14 @@ public final class JavaEmitter {
                 String access = rest >= 0 && i > rest
                         ? cast + ".get(" + cast + ".size() - " + (l.elements.size() - i) + ")"
                         : cast + ".get(" + i + ")";
-                cond = joinAnd(cond, patternMatch(el, access, TypeRef.DYNAMIC, ctx, binds));
+                // The element is typed by the matched list's own element type, so a
+                // variable it binds (`[var only]` of a List<Part>) is a Part: members and
+                // extension methods on it dispatch statically, as in Dart.
+                TypeRef et = staticListElementType(subjType);
+                if (et != null) {
+                    access = "(" + castSubject(access, TypeRef.DYNAMIC, et, ctx) + ")";
+                }
+                cond = joinAnd(cond, patternMatch(el, access, et != null ? et : TypeRef.DYNAMIC, ctx, binds));
             }
             return cond;
         }
@@ -9020,6 +9118,19 @@ public final class JavaEmitter {
     }
 
     /** Casts/unboxes a scrutinee temp to the target bind type when they differ. */
+    /** The element type a list pattern reads from a subject of static type {@code t}, or null when unknown. */
+    private static TypeRef staticListElementType(TypeRef t) {
+        if (t == null || t.nullable || t.funcParams != null || t.args.size() != 1 || !t.is("List")) {
+            return null;
+        }
+        TypeRef e = t.arg(0);
+        if (e == null || e.is("dynamic") || e.is("var") || e.is("Object") || e.funcParams != null
+                || e.nullable && (e.is("int") || e.is("double") || e.is("num") || e.is("bool"))) {
+            return null;
+        }
+        return e;
+    }
+
     private String castSubject(String subj, TypeRef from, TypeRef to, Ctx ctx) {
         if (from != null && from.name.equals(to.name)) {
             return subj;
@@ -9308,6 +9419,9 @@ public final class JavaEmitter {
 
     /// The construction emitExprRaw is emitting, so its reifying wrapper runs once.
     private Expr reifyingCtor;
+
+    /// The constant-context constructor call being canonicalized, so the wrapper runs once.
+    private Expr constWrapping;
 
     /// {@code future} with {@code t} recorded as its type argument (Future.reify); unchanged
     /// when t is unknown, dynamic or no witness can name it.
@@ -9666,12 +9780,35 @@ public final class JavaEmitter {
             Expr saved = reifyingCtor;
             reifyingCtor = e;
             try {
+                if (e instanceof CtorCall && ((CtorCall) e).isConst) {
+                    Ast.markConstArgsOf((CtorCall) e);
+                }
                 Out made = emitExprRaw(e, expected, ctx);
                 TypeRef written = e instanceof CtorCall ? ((CtorCall) e).type
                         : TypeRef.of(((Call) e).name, ((Call) e).typeArgs.toArray(new TypeRef[0]));
-                return reifyAsyncConstruction(written, made, ctx);
+                made = reifyAsyncConstruction(written, made, ctx);
+                // A constant of a program class is canonical: equal constants are one object.
+                boolean isConstNew = e instanceof CtorCall ? ((CtorCall) e).isConst : ((Call) e).inConst;
+                if (isConstNew && !made.fromError && constKeyed(program.resolveClass(written.name, ctx.library()))) {
+                    made = new Out("dart.runtime.ConstCanon.object(" + made.code + ")", made.type);
+                }
+                return made;
             } finally {
                 reifyingCtor = saved;
+            }
+        }
+        if (e != constWrapping && e instanceof Call && ((Call) e).inConst
+                && constKeyed(programClass(((Call) e).name, ctx))) {
+            // `static const zero = Vec(0, 0);`: a constructor call in a constant context is
+            // a constant, canonical like `const Vec(0, 0)` written anywhere else.
+            Expr saved = constWrapping;
+            constWrapping = e;
+            try {
+                Out made = emitExprRaw(e, expected, ctx);
+                return made.fromError ? made
+                        : new Out("dart.runtime.ConstCanon.object(" + made.code + ")", made.type);
+            } finally {
+                constWrapping = saved;
             }
         }
         if (e != reifyingCall && e instanceof Call) {
@@ -14258,21 +14395,21 @@ public final class JavaEmitter {
         }
         if (t.is("List")) {
             ctx.importClass("dart.core.DartList");
-            return new Out("DartList.constant(" + o.code + ")", t, o.fromError);
+            return new Out("dart.runtime.ConstCanon.list(" + "DartList.constant(" + o.code + ")" + ")", t, o.fromError);
         }
         if (t.is("Set")) {
             ctx.importClass("dart.core.DartSet");
-            return new Out("DartSet.constant(" + o.code + ")", t, o.fromError);
+            return new Out("dart.runtime.ConstCanon.set(" + "DartSet.constant(" + o.code + ")" + ")", t, o.fromError);
         }
         if (t.is("Map")) {
             // By what was built, not by the type: only the plain <int, int> literal is a
             // DartLongMap; a structured one (if/for/spread) is built as a DartMap.
             if (o.code.startsWith("DartLongMap.ofLongs(")) {
                 ctx.importClass("dart.core.DartLongMap");
-                return new Out("DartLongMap.constant(" + o.code + ")", t, o.fromError);
+                return new Out("dart.runtime.ConstCanon.map(" + "DartLongMap.constant(" + o.code + ")" + ")", t, o.fromError);
             }
             ctx.importClass("dart.core.DartMap");
-            return new Out("DartMap.constant(" + o.code + ")", t, o.fromError);
+            return new Out("dart.runtime.ConstCanon.map(" + "DartMap.constant(" + o.code + ")" + ")", t, o.fromError);
         }
         return o;
     }
@@ -15744,6 +15881,18 @@ public final class JavaEmitter {
                 if (selfEnum.hasEntry(n)) {
                     return new Out(javaEnumName(selfEnum) + "." + n, new TypeRef(cc.name));
                 }
+                // `values` is the enum's own static list, in scope unqualified in every
+                // body of the enum (static and instance alike), unless a member shadows it.
+                if (n.equals("values") && selfEnum.getter("values") == null) {
+                    PropertyGet qv = new PropertyGet();
+                    qv.at(id.file, id.line, id.col);
+                    Ident en = new Ident();
+                    en.at(id.file, id.line, id.col);
+                    en.name = selfEnum.name;
+                    qv.target = en;
+                    qv.name = "values";
+                    return emitExpr(qv, null, ctx);
+                }
                 if (n.equals("name")) {
                     return new Out("name()", TypeRef.STRING);
                 }
@@ -16901,6 +17050,32 @@ public final class JavaEmitter {
                 importEnum(cls, ctx);
                 if (name.equals("values")) {
                     return enumValues(cls, ctx);
+                }
+                Ast.EnumDecl ped = programEnum(cls, ctx);
+                if (ped != null && !ped.hasEntry(name)) {
+                    // A static getter or a static method (torn off: `map(Grade.of)`) of an
+                    // enhanced enum; static fields stay plain field reads below.
+                    MethodDecl sg = ped.getter(name);
+                    if (sg != null && sg.isStatic) {
+                        return new Out(simpleEnumName(cls, ctx) + "." + javaMethodName(name) + "()",
+                                sg.returnType == null ? TypeRef.DYNAMIC : sg.returnType);
+                    }
+                    MethodDecl sm = ped.method(name);
+                    if (sm != null && sm.isStatic) {
+                        Out ad = methodTearOffAdapter(sm, cls, name, posNode, ctx);
+                        if (ad != null) {
+                            return ad;
+                        }
+                        ClassDecl syn = new ClassDecl();
+                        syn.name = ped.name;
+                        syn.ownerLibrary = ped.ownerLibrary;
+                        syn.enumOf = ped;
+                        syn.fields = ped.fields;
+                        syn.methods = ped.methods;
+                        syn.ctors = ped.ctors;
+                        String mref = simpleEnumName(cls, ctx) + "::" + javaMethodName(name);
+                        return new Out(mref, tearOffType(sm, syn, new TypeRef(cls)), FnForm.methodRef(mref));
+                    }
                 }
                 return new Out(simpleEnumName(cls, ctx) + "." + name, new TypeRef(cls));
             }
@@ -22806,6 +22981,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         fo = new Out("(" + castToBare(stubSimpleName(cls, ctx), fo) + ")", fo.type);
                     }
                     return fo;
+                }
+            }
+            // A static method declared in an enhanced enum: `Grade.of(s)`.
+            Ast.EnumDecl sen = program.classes.get(cls) == null ? programEnum(cls, ctx) : null;
+            if (sen != null) {
+                MethodDecl em = sen.method(n);
+                if (em != null && em.isStatic) {
+                    return new Out(javaEnumName(sen) + "." + javaMethodName(n) + "("
+                            + methodArgs(em.params, c.args, ctx) + ")",
+                            em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
                 }
             }
             ClassDecl pc = program.classes.get(cls);
