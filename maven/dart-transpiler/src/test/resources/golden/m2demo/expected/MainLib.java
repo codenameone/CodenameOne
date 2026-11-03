@@ -10,7 +10,7 @@ public final class MainLib {
 
     public static void main$() {
         //@dart:4 main.dart
-        FlutterUI.runApp(new DemoApp(null));
+        FlutterUI.runApp(dart.runtime.ConstCanon.object(new DemoApp(null)));
     }
 
     static final String $cn1DartLines = "main.dart\n13:4";

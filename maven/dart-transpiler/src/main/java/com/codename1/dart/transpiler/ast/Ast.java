@@ -202,6 +202,9 @@ public final class Ast {
         public String name;
         public Library ownerLibrary;              // the user library that declares this class (single-package model)
         public EnumDecl enumOf;                   // set on the stand-in class an enhanced enum's body is emitted with
+        /// A stub class marked `@ConstKeyed`: its Java class implements ConstCanon.Keyed over
+        /// its own const-relevant state, so its constants and its subclasses' are canonical.
+        public boolean constKeyed;
         public String javaName;                   // from @JavaName('...') in stub files
         public boolean isAbstract;
         public boolean isSealed;                  // Dart 3: sealed class C { }

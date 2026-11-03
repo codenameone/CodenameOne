@@ -225,6 +225,8 @@ public final class AstBuilder {
             ClassDecl cd = buildClass(ctx.classDeclaration());
             if (cd != null) {
                 cd.javaName = javaName;
+                // `@ConstKeyed` in a stub: the Java class implements ConstCanon.Keyed.
+                cd.constKeyed = hasAnnotation(meta, "ConstKeyed");
                 lib.classes.add(cd);
             }
         } else if (ctx.extensionDeclaration() != null) {

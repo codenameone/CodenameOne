@@ -420,7 +420,7 @@ public final class DartRuntime {
         return (double) l == d;
     }
 
-    private static boolean isIntegral(Number n) {
+    static boolean isIntegral(Number n) {
         return n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte;
     }
 

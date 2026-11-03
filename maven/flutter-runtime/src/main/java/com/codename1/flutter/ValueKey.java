@@ -30,7 +30,7 @@ import dart.runtime.DartRuntime;
  * {@code ValueKey<T>}. Two ValueKeys are equal when they have the same
  * runtime class and equal values.
  */
-public class ValueKey<T> extends Key {
+public class ValueKey<T> extends Key implements dart.runtime.ConstCanon.Keyed {
     private final T value;
 
     public ValueKey(T value) {
@@ -39,6 +39,12 @@ public class ValueKey<T> extends Key {
 
     public T value() {
         return value;
+    }
+
+    /** {@code const ValueKey(1)} is one object wherever it is written, as in Dart. */
+    @Override
+    public Object[] $constKey() {
+        return new Object[] {value};
     }
 
     @Override

@@ -24,28 +24,32 @@ external void runApp(Widget app);
 @JavaName('com.codename1.flutter.Key')
 abstract class Key {}
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.ValueKey')
 class ValueKey extends Key {
-  external ValueKey(Object value);
+  external const ValueKey(Object value);
 }
 
 @JavaName('com.codename1.flutter.BuildContext')
 abstract class BuildContext {}
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.Widget')
 abstract class Widget {
-  external Widget({Key? key});
+  external const Widget({Key? key});
 }
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.StatelessWidget')
 abstract class StatelessWidget extends Widget {
-  external StatelessWidget({Key? key});
+  external const StatelessWidget({Key? key});
   Widget build(BuildContext context);
 }
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.StatefulWidget')
 abstract class StatefulWidget extends Widget {
-  external StatefulWidget({Key? key});
+  external const StatefulWidget({Key? key});
   State createState();
 }
 

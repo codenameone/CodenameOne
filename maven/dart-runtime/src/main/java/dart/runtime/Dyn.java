@@ -835,19 +835,60 @@ public final class Dyn {
                 Number hi = num(arg(a, 1));
                 // num.clamp: ordered by compareTo (NaN greatest), and the operand that wins
                 // is answered as it is -- 1.5.clamp(2, 3) is the int 2.
-                if (Double.compare(lo.doubleValue(), hi.doubleValue()) > 0) {
+                // Compared exactly, as num.compareTo does: through doubleValue() an int
+                // past 2^53 rounds and 9007199254740993.clamp(0, 9007199254740992.0)
+                // answered the receiver instead of the upper bound.
+                if (numCompare(lo, hi) > 0) {
                     throw new dart.core.ArgumentError(DartRuntime.str(lo));
                 }
-                if (Double.compare(d, lo.doubleValue()) < 0) {
+                if (numCompare(n, lo) < 0) {
                     return lo;
                 }
-                return Double.compare(d, hi.doubleValue()) > 0 ? hi : n;
+                return numCompare(n, hi) > 0 ? hi : n;
             }
             case "toString":
                 return DartRuntime.str(n);
             default:
                 return NO_MEMBER;
         }
+    }
+
+    /**
+     * Dart's {@code num.compareTo}: exact for two ints and for an int against a
+     * double, NaN greatest, and -0.0 below 0 (so {@code 0.compareTo(-0.0)} is 1).
+     */
+    static int numCompare(Number a, Number b) {
+        boolean ai = DartRuntime.isIntegral(a);
+        boolean bi = DartRuntime.isIntegral(b);
+        if (ai && bi) {
+            return Long.compare(a.longValue(), b.longValue());
+        }
+        if (!ai && !bi) {
+            return Double.compare(a.doubleValue(), b.doubleValue());
+        }
+        return ai ? intCompareDouble(a.longValue(), b.doubleValue())
+                : -intCompareDouble(b.longValue(), a.doubleValue());
+    }
+
+    private static int intCompareDouble(long l, double d) {
+        if (d != d) {
+            return -1;
+        }
+        if (d >= 9.223372036854775807E18) {
+            return -1;
+        }
+        if (d < -9.223372036854775807E18) {
+            return 1;
+        }
+        if (d == 0 && l == 0) {
+            return 1 / d < 0 ? 1 : 0;
+        }
+        double ld = (double) l;
+        if (ld != d) {
+            return ld < d ? -1 : 1;
+        }
+        // Equal as doubles, so d is integral and inside the long range: exact on longs.
+        return Long.compare(l, (long) d);
     }
 
     // ------------------------------------------------------------------ functions
