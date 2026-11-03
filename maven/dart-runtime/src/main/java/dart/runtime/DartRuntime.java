@@ -774,8 +774,11 @@ public final class DartRuntime {
     private static final java.util.HashMap<Class<?>, String> DART_NAMES = new java.util.HashMap<Class<?>, String>();
 
     /// Records that the transpiled class {@code c} is named {@code dartName} in Dart.
-    public static void dartName(Class<?> c, String dartName) {
+    /// Answers {@code c}, so a type literal of a renamed class can record its name where it
+    /// is written (a class literal runs no static initialiser).
+    public static <T> Class<T> dartName(Class<T> c, String dartName) {
         DART_NAMES.put(c, dartName);
+        return c;
     }
 
     public static String typeName(Object o) {

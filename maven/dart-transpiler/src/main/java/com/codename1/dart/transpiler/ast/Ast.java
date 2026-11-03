@@ -918,6 +918,8 @@ public final class Ast {
     /** A record literal: `(a, b, name: c)`. */
     public static class RecordLit extends Expr {
         public List<RecordField> fields = new ArrayList<RecordField>();
+        /// Written `const (...)`, or inside a constant context: canonicalized.
+        public boolean isConst;
     }
 
     /** One field of a record literal (name null for a positional field). */
@@ -944,6 +946,11 @@ public final class Ast {
             ((SetLit) e).isConst = true;
             for (Expr x : ((SetLit) e).elements) {
                 markConst(x);
+            }
+        } else if (e instanceof RecordLit) {
+            ((RecordLit) e).isConst = true;
+            for (RecordField f : ((RecordLit) e).fields) {
+                markConst(f.value);
             }
         } else if (e instanceof MapLit) {
             ((MapLit) e).isConst = true;

@@ -1920,6 +1920,9 @@ public final class AstBuilder {
             f.value = buildExpr(rf.expr());
             r.fields.add(f);
         }
+        if (ctx.CONST_() != null) {
+            markConstContext(r);
+        }
         return r;
     }
 
@@ -3058,6 +3061,11 @@ public final class AstBuilder {
         } else if (e instanceof IfElement) {
             markConstContext(((IfElement) e).thenElement);
             markConstContext(((IfElement) e).elseElement);
+        } else if (e instanceof RecordLit) {
+            ((RecordLit) e).isConst = true;
+            for (RecordField f : ((RecordLit) e).fields) {
+                markConstContext(f.value);
+            }
         } else if (e instanceof ParenExpr) {
             markConstContext(((ParenExpr) e).inner);
         } else if (e instanceof Conditional) {

@@ -724,7 +724,13 @@ public final class JavaEmitter {
             args.append(boxIfPrimitive(o, ctx));
             t.args.add(recordFieldType(o.type));
         }
-        return new Out("new " + cn + (r.fields.isEmpty() ? "(" : "<>(") + args + ")", t);
+        String made = "new " + cn + (r.fields.isEmpty() ? "(" : "<>(") + args + ")";
+        if (r.isConst) {
+            // `identical(const (1, 'a'), const (1, 'a'))` is true in Dart: a constant record
+            // is canonical, like any other constant.
+            made = "dart.runtime.ConstCanon.record(" + made + ", " + r.fields.size() + ")";
+        }
+        return new Out(made, t);
     }
 
     /** The static type of a record component accessed by name (`$1`, `$2`, or a named field). */
@@ -803,18 +809,21 @@ public final class JavaEmitter {
         // members through the same machinery as a class, with a synthetic ClassDecl standing
         // in for `this`-typing and own-member resolution inside the bodies.
         boolean enhanced = !e.methods.isEmpty() || !e.fields.isEmpty() || !e.ctors.isEmpty();
-        ClassDecl syn = new ClassDecl();
-        syn.name = e.name;
-        syn.ownerLibrary = e.ownerLibrary;
-        syn.enumOf = e;
+        ClassDecl syn = enumClass(e);
         String enumJava = javaEnumName(e);
-        syn.fields = e.fields;
-        syn.methods = e.methods;
-        syn.ctors = e.ctors;
         Ctx ctx = new Ctx(syn);
         StringBuilder body = new StringBuilder();
         for (FieldDecl f : e.fields) {
             TypeRef ft = fieldType(f, ctx);
+            // A static whose initialiser reads anything is initialised on first read, as a
+            // class's is -- and every reader (inside the enum's bodies and outside it) reaches
+            // it through the same isLazyStatic test, so declaration and access agree.
+            // `static const all = [a, b]; static final first = all[0];` declared a plain
+            // field while the bodies read Level.get$all().
+            if (isLazyStatic(f)) {
+                body.append(emitLazyTopLevel(f, ft, javaType(ft, false, ctx), ctx));
+                continue;
+            }
             // A static field's initialiser (`static const fallback = Grade.c;`) is emitted
             // with it; the type of an untyped one is the initialiser's.
             Out staticInit = null;
@@ -17197,16 +17206,19 @@ public final class JavaEmitter {
                         if (ad != null) {
                             return ad;
                         }
-                        ClassDecl syn = new ClassDecl();
-                        syn.name = ped.name;
-                        syn.ownerLibrary = ped.ownerLibrary;
-                        syn.enumOf = ped;
-                        syn.fields = ped.fields;
-                        syn.methods = ped.methods;
-                        syn.ctors = ped.ctors;
+                        ClassDecl syn = enumClass(ped);
                         String mref = simpleEnumName(cls, ctx) + "::" + javaMethodName(name);
                         return new Out(mref, tearOffType(sm, syn, new TypeRef(cls)), FnForm.methodRef(mref));
                     }
+                }
+                FieldDecl sf = ped == null || ped.hasEntry(name) ? null : enumStaticField(ped, name);
+                if (sf != null) {
+                    // A static field of an enhanced enum: its own type, read the way it is
+                    // declared (a lazy one through its getter, see emitEnum).
+                    Ctx fc = new Ctx(enumClass(ped));
+                    fc.staticMember = true;
+                    return new Out(simpleEnumName(cls, ctx) + (isLazyStatic(sf) ? ".get$" + name + "()" : "." + name),
+                            fieldType(sf, fc));
                 }
                 return new Out(simpleEnumName(cls, ctx) + "." + name, new TypeRef(cls));
             }
@@ -29746,6 +29758,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // `static const xs = [1, 2];` was a Java Object and `xs.add(3)` -- valid Dart,
             // which throws at runtime -- did not even compile.
             TypeRef literal = untypedLiteralType(f.initializer, ctx);
+            if (literal != null && hasLooseArgument(literal)) {
+                // The literal's elements are names (`static const all = [a, b];` in an
+                // enum): the literal alone cannot type them, the emission in the
+                // declaring scope can -- List<Level>, as Dart infers.
+                TypeRef emitted = staticInitializerType(f);
+                if (emitted != null) {
+                    return emitted;
+                }
+            }
             if (literal != null) {
                 return literal;
             }
@@ -29891,9 +29912,45 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return false;
     }
 
+    /** The synthetic class standing in for an enum in member resolution; one per enum, so
+     * a static field of it has a stable owner (see staticOwner). */
+    private final java.util.Map<Ast.EnumDecl, ClassDecl> enumClasses =
+            new java.util.IdentityHashMap<Ast.EnumDecl, ClassDecl>();
+
+    private ClassDecl enumClass(Ast.EnumDecl e) {
+        ClassDecl syn = enumClasses.get(e);
+        if (syn == null) {
+            syn = new ClassDecl();
+            syn.name = e.name;
+            syn.ownerLibrary = e.ownerLibrary;
+            syn.enumOf = e;
+            syn.fields = e.fields;
+            syn.methods = e.methods;
+            syn.ctors = e.ctors;
+            enumClasses.put(e, syn);
+        }
+        return syn;
+    }
+
+    private static FieldDecl enumStaticField(Ast.EnumDecl e, String name) {
+        for (FieldDecl f : e.fields) {
+            if (f.isStatic && f.name.equals(name)) {
+                return f;
+            }
+        }
+        return null;
+    }
+
     private Object staticOwner(FieldDecl f) {
         if (staticOwners == null) {
             staticOwners = new java.util.IdentityHashMap<FieldDecl, Object>();
+            for (Ast.EnumDecl ed : program.enums.values()) {
+                for (FieldDecl v : ed.fields) {
+                    if (v.isStatic) {
+                        staticOwners.put(v, enumClass(ed));
+                    }
+                }
+            }
             for (Library lib : program.libraries) {
                 for (FieldDecl v : lib.topLevelVars) {
                     staticOwners.put(v, lib);
@@ -30550,6 +30607,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             return appName + (t.args.isEmpty() ? "" : genericSuffix(t, ctx));
         }
+        // A user enum the library sees wins over a framework type of the same name: a
+        // program with its own `enum Color` and no Flutter import meant that enum, and
+        // declaring it as com.codename1.flutter.Color did not compile.
+        Ast.EnumDecl ownFirst = visibleProgramEnum(t.name, ctx);
+        if (ownFirst != null) {
+            return javaEnumName(ownFirst);
+        }
         // stub class or enum
         Ast.ClassDecl sc = stubs.classes.get(t.name);
         if (sc != null && sc.javaName != null) {
@@ -30788,7 +30852,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      */
     private Ast.EnumDecl visibleProgramEnum(String name, Ctx ctx) {
         Library from = ctx != null ? ctx.library() : null;
-        if (from == null || !stubs.isStubEnum(name)) {
+        if (from == null || (!stubs.isStubEnum(name) && !stubs.isStubClass(name))) {
             return null;
         }
         Ast.EnumDecl pe = program.resolveEnum(name, from);
@@ -30818,7 +30882,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      */
     private String javaEnumName(Ast.EnumDecl e) {
         List<Ast.EnumDecl> same = program.enumsByName.get(e.name);
-        boolean collides = (same != null && same.size() > 1) || program.classesByName.containsKey(e.name);
+        // A name a framework type also has is prefixed too, as javaClassName does for a
+        // class: one generated file can need both (a user `enum Color` beside a widget's
+        // Color), and two imports of one simple name do not compile.
+        boolean collides = (same != null && same.size() > 1) || program.classesByName.containsKey(e.name)
+                || stubs.isStubClass(e.name) || stubs.isStubEnum(e.name);
         if (!collides || e.ownerLibrary == null) {
             return e.name;
         }
@@ -30922,7 +30990,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         String jt = javaType(new TypeRef(dartName), true, ctx);
         int lt = jt.indexOf('<');
-        return (lt >= 0 ? jt.substring(0, lt) : jt) + ".class";
+        String raw = lt >= 0 ? jt.substring(0, lt) : jt;
+        String simple = raw.substring(raw.lastIndexOf('.') + 1);
+        if (simple.endsWith("$I")) {
+            simple = simple.substring(0, simple.length() - 2);
+        }
+        if (!simple.equals(dartName) && (program.resolveClass(dartName, ctx.library()) != null
+                || programEnum(dartName, ctx) != null)) {
+            // A program type renamed in Java (MainColor for a user `Color`): a class literal
+            // does not run the class's static initialiser, which is where the Dart name is
+            // recorded, so `print(Color)` before any instance printed MainColor. The name is
+            // recorded here, at the literal, as well.
+            return "dart.runtime.DartRuntime.dartName(" + raw + ".class, \"" + dartName + "\")";
+        }
+        return raw + ".class";
     }
 
     private TypeRef classRef(String className) {

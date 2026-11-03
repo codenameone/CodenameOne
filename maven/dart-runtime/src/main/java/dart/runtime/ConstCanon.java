@@ -50,6 +50,15 @@ public final class ConstCanon {
         return intern(v, ((Keyed) v).$constKey());
     }
 
+    /// A constant record of {@code n} fields: its class is its shape, its fields its value.
+    public static <T extends dart.core.Record> T record(T v, int n) {
+        Object[] parts = new Object[n];
+        for (int i = 0; i < n; i++) {
+            parts[i] = v.$field(i);
+        }
+        return intern(v, parts);
+    }
+
     public static <T extends dart.core.DartList<?>> T list(T v) {
         int n = (int) v.length();
         Object[] parts = new Object[n];
@@ -98,7 +107,9 @@ public final class ConstCanon {
             return false;
         }
         return a instanceof Long || a instanceof Double || a instanceof String || a instanceof Boolean
-                || a instanceof Integer || a instanceof TypeWitness ? a.equals(b) : false;
+                || a instanceof Integer || a instanceof TypeWitness
+                // a record's runtime type is built per call and equal by value
+                || a instanceof RecordType ? a.equals(b) : false;
     }
 
     private static final class Key {
