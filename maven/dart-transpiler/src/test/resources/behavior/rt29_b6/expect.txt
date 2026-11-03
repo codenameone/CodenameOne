@@ -1,0 +1,6 @@
+2
+[typedef, s]
+true
+false
+0
+true

@@ -687,7 +687,7 @@ public final class JavaEmitter {
         return new GeneratedFile(cn + ".java", sb.toString());
     }
 
-    private Out emitRecordLit(RecordLit r, Ctx ctx) {
+    private Out emitRecordLit(RecordLit r, TypeRef expected, Ctx ctx) {
         List<RecordField> positional = new ArrayList<RecordField>();
         List<RecordField> named = new ArrayList<RecordField>();
         for (RecordField f : r.fields) {
@@ -704,25 +704,33 @@ public final class JavaEmitter {
         }
         String cn = registerRecordShape(positional.size(), namedNames);
         TypeRef t = new TypeRef(cn);
+        // A context record type of this very shape (`(int, IntOp) pair() => (3, (x) => x + 1)`)
+        // types each field as Dart's downward inference does: a closure field takes its
+        // function type (so `x` is an int and the closure has a SAM javac can name).
+        List<TypeRef> ctxFields = expected != null && cn.equals(expected.name)
+                && expected.args.size() == r.fields.size() ? expected.args : null;
         StringBuilder args = new StringBuilder();
         boolean first = true;
-        for (RecordField f : positional) {
+        List<RecordField> ordered = new ArrayList<RecordField>(positional);
+        ordered.addAll(named);
+        for (int i = 0; i < ordered.size(); i++) {
+            RecordField f = ordered.get(i);
             if (!first) {
                 args.append(", ");
             }
             first = false;
-            Out o = emitExpr(f.value, null, ctx);
-            args.append(boxIfPrimitive(o, ctx));
-            t.args.add(recordFieldType(o.type));
-        }
-        for (RecordField f : named) {
-            if (!first) {
-                args.append(", ");
+            TypeRef ft = ctxFields == null ? null : ctxFields.get(i);
+            if (ft != null && (isDynamicType(ft) || ft.is("var"))) {
+                ft = null;
             }
-            first = false;
-            Out o = emitExpr(f.value, null, ctx);
-            args.append(boxIfPrimitive(o, ctx));
-            t.args.add(recordFieldType(o.type));
+            Out o = emitExpr(f.value, ft, ctx);
+            if (ft != null && isFunctionValued(ft)) {
+                args.append(funcCast(o, ft, ctx));
+                t.args.add(ft);
+            } else {
+                args.append(boxIfPrimitive(o, ctx));
+                t.args.add(recordFieldType(o.type));
+            }
         }
         String made = "new " + cn + (r.fields.isEmpty() ? "(" : "<>(") + args + ")";
         if (r.isConst) {
@@ -10093,7 +10101,7 @@ public final class JavaEmitter {
             return emitSwitchExpr((SwitchExpr) e, expected, ctx);
         }
         if (e instanceof RecordLit) {
-            return emitRecordLit((RecordLit) e, ctx);
+            return emitRecordLit((RecordLit) e, expected, ctx);
         }
         if (e instanceof PropertyGet) {
             if (((PropertyGet) e).target instanceof SuperExpr) {
@@ -11165,7 +11173,8 @@ public final class JavaEmitter {
         // the value SAM it may be held by returns null for it.
         boolean returnsValue = l.exprBody != null ? !lastLambdaVoid : lambdaReturnsValue(l);
         TypeRef ret = ctxRet != null && !isDynamicType(ctxRet) ? ctxRet
-                : !returnsValue ? new TypeRef("void") : l.exprBody != null ? bodyType : null;
+                : !returnsValue ? new TypeRef("void") : l.exprBody != null ? bodyType
+                : ctxRet == null ? blockClosureReturn(l, lastLambdaReturns) : null;
         StringBuilder sig = new StringBuilder();
         // With no context return (or a top one), Dart infers a synchronous block body that
         // returns no value as returning Null: `(int x) {}` is an `(int) => Null`, no
@@ -12959,6 +12968,11 @@ public final class JavaEmitter {
     }
 
     private boolean isProgramClassDecl(ClassDecl c) {
+        if (c == null) {
+            // No declaration at all (a runtime or core type such as Type, which
+            // `[int, String]` infers to) is not a program class.
+            return false;
+        }
         List<ClassDecl> same = program.classesByName.get(c.name);
         return program.classes.get(c.name) == c || (same != null && same.contains(c));
     }
@@ -13963,6 +13977,18 @@ public final class JavaEmitter {
         if (t == null) {
             return null;
         }
+        if (t.funcReturn == null && t.funcParams == null) {
+            // `wrap<IntOp>(a)` for `typedef IntOp = int Function(int)`: the explicit type
+            // argument is the function type the alias denotes, witnessed with its signature
+            // as the inline form is, not the erased SAM class (which prints as Func1).
+            TypeRef fnAlias = nonGenericFunctionTypedef(t);
+            if (fnAlias == null) {
+                fnAlias = expandGenericFunctionTypedef(t);
+            }
+            if (fnAlias != null) {
+                t = fnAlias;
+            }
+        }
         if (t.is("Null") && t.args.isEmpty() && t.funcReturn == null) {
             // `wrap(null)` binds T to Null, whose witness only null satisfies.
             return "dart.runtime.TypeWitness.NULL";
@@ -14698,7 +14724,7 @@ public final class JavaEmitter {
         TypeRef lub = null;
         boolean lubKnown = elem == null;
         for (Expr e : l.elements) {
-            Out o = emitExpr(e, elem, ctx);
+            Out o = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
             codes.add(elementCode(o, elem, ctx));
             if (lubKnown) {
                 if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
@@ -15404,7 +15430,7 @@ public final class JavaEmitter {
         TypeRef lub = null;
         boolean lubKnown = elem == null;
         for (Expr e : s.elements) {
-            Out o = emitExpr(e, elem, ctx);
+            Out o = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
             codes.add(elementCode(o, elem, ctx));
             if (lubKnown) {
                 if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
@@ -16168,10 +16194,10 @@ public final class JavaEmitter {
         if (tw != null) {
             return new Out("dart.runtime.TypeWitness.value(" + tw + ")", new TypeRef("Type"));
         }
-        // `dynamic` as a value (`T == dynamic`): the class a dynamic witness carries,
-        // which is Object's -- erasure cannot tell `dynamic` from `Object` apart.
+        // `dynamic` as a value (`T == dynamic`): the runtime's dynamic witness, a Type of
+        // its own -- Dart's `Object == dynamic` is false, so a Set<Type> keeps both.
         if (n.equals("dynamic") && ctx.lookup(n) == null) {
-            return new Out("Object.class", new TypeRef("Type"));
+            return new Out("dart.runtime.TypeWitness.DYNAMIC", new TypeRef("Type"));
         }
         // `Null` as a value (`x.runtimeType == Null`): the class null's runtimeType
         // answers (TypeWitness.runtimeType), unless the program declares its own Null.
@@ -21989,6 +22015,28 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return t;
     }
 
+    /// The return type Dart infers for a synchronous block-bodied closure with no context:
+    /// the upper bound of every `return` expression's type, joined with Null when the body
+    /// can fall off its end (`(int x) { if (x > 0) return null; }` is an `(int) => Null`).
+    /// Null (dynamic) when any return's type is unknown or the body is a generator/async.
+    private TypeRef blockClosureReturn(Lambda l, List<TypeRef> returns) {
+        if (l.body == null || l.isAsync || l.isSyncStar || l.isAsyncStar || returns == null
+                || returns.isEmpty()) {
+            return null;
+        }
+        TypeRef r = null;
+        for (TypeRef t : returns) {
+            if (t == null || t.is("var") || isDynamicType(t)) {
+                return null;
+            }
+            r = r == null ? t : upperBound(r, t);
+        }
+        if (!endsWithJump(l.body)) {
+            r = upperBound(r, new TypeRef("Null"));
+        }
+        return r == null || isDynamicType(r) ? null : r;
+    }
+
     /// A closure's static return type, as Dart infers it with no context: the arrow body's
     /// type or the one type every `return` yields, as Future<flatten(T)> for an async closure.
     private TypeRef closureStaticReturn(Lambda l, TypeRef exprType, List<TypeRef> returns, TypeRef asyncArrow) {
@@ -23746,6 +23794,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return new Out("CoreStatics.<" + ej + ">enumByName(" + target.code + ", "
                     + coreArg(c.args.positional.get(0), TypeRef.STRING, ctx).code + ", ($v) -> $v."
                     + (program.enums.containsKey(el.name) ? "name$()" : "name()") + ")", el);
+        }
+        if (tt.name != null && tt.name.startsWith("Rec$") && !c.nullAware) {
+            // `p.$2(1)` / `r.cb()` on a record whose field holds a function: Dart reads the
+            // field, then calls its value, as for a function-typed getter.
+            TypeRef ft = recordComponentType(tt, n);
+            if (ft != null && isFunctionValued(ft)) {
+                Out field = emitMemberGet(target, n, c, ctx);
+                return new Out(fnCall(callable(field), ft, c.args, ctx), funcResultType(ft));
+            }
         }
         diags.error(c, "E0137", "Cannot resolve method '" + n + "' on type " + tt
                 + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
@@ -29478,19 +29535,33 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && typedefSig(expected.name) == null || expected.funcReturn != null
                 && (isDynamicType(expected.funcReturn) || expected.funcReturn.is("Object")))
                 && l.exprBody == null && !l.isAsync && !l.isSyncStar && !l.isAsyncStar && !returnsValue(l.body);
+        // With no context return, Dart infers the closure's return from its body:
+        // `([int? x]) => x` is an `([int?]) => int?`, not a dynamic-returning function.
+        final boolean inferReturn = expected == null || expected.funcReturn == null
+                && expected.funcParams == null && typedefSig(expected.name) == null;
         try {
             return tearOffAdapter(l.params, types, ret, names -> {
                 String fn = callable(emitExpr(inner, innerFt, ctx));
+                if (inferReturn) {
+                    adapterInferredReturn = inner.exprBody != null
+                            ? closureStaticReturn(inner, lastLambdaExprType, lastLambdaReturns, null)
+                            : blockClosureReturn(inner, lastLambdaReturns);
+                }
                 return "(" + castToBare(javaType(innerFt, false, ctx), fn) + ").call(" + String.join(", ", names) + ")";
             }, ctx);
         } finally {
             adapterNullReturn = savedNullReturn;
+            adapterInferredReturn = null;
         }
     }
 
     /// Set while optionalParamLambda builds the adapter of a block-bodied closure whose
     /// inferred return is Null; adapterMarker records that return.
     private boolean adapterNullReturn;
+
+    /// Set by optionalParamLambda once the closure's body is emitted: the return Dart
+    /// infers for it with no context, which adapterMarker records in place of dynamic.
+    private TypeRef adapterInferredReturn;
 
     /** Parameters in SAM order: required positional, optional positional, then named. */
     private static List<Param> orderedParams(List<Param> params) {
@@ -29613,6 +29684,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         reifiedClassNames();
         boolean nullReturn = adapterNullReturn;
         adapterNullReturn = false; // only this adapter, not one nested in the body
+        TypeRef inferred = adapterInferredReturn;
+        adapterInferredReturn = null;
+        if (inferred != null && (ret == null || isDynamicType(ret)) && !nullReturn) {
+            ret = inferred;
+        }
         StringBuilder sig = new StringBuilder(nullReturn ? "dart.runtime.TypeWitness.NULL"
                 : ret != null && ret.is("void")
                 ? "dart.runtime.TypeWitness.of(Void.class, true)"
@@ -31532,6 +31608,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // Cast to the typed SAM so the closure is a standalone expression: a list
         // element, a `??` operand or an untyped local has no target type to bind it.
         return samCastOut(l, lo, javaType(ft, false, ctx), ft);
+    }
+
+    /// A type literal element of an untyped collection literal (`[int, String]`) is a Type
+    /// value: its code the Type the literal denotes and its static type Type, so the
+    /// literal infers a List<Type> rather than a list of class references.
+    private Out typeLiteralAsValue(Out o, Ctx ctx) {
+        if (o.type != null && isClassRef(o.type)) {
+            return new Out(classLiteral(o, ctx), new TypeRef("Type"));
+        }
+        return o;
     }
 
     private boolean isClassRef(TypeRef t) {

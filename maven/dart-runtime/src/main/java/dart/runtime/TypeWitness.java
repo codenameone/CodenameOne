@@ -643,9 +643,14 @@ public final class TypeWitness {
         if (w == null) {
             return Object.class;
         }
+        if (w == DYNAMIC || w == OBJECT_NULLABLE) {
+            // dynamic and Object? are Types of their own, distinct from Object (and from
+            // each other): the `dynamic` literal is DYNAMIC, so `T == dynamic` compares them.
+            return w;
+        }
         if (w.args == null && w.fnSig == null && (!w.nullable || w.type == Object.class)) {
-            // `dynamic` (and Object?) is Object's class, as a `dynamic` literal is:
-            // erasure cannot tell them apart, and `T == dynamic` compares the two.
+            // A plain class, or an unrecorded nullable Object: the class itself, as its
+            // type literal is.
             return w.type;
         }
         return rawIfDynamic(w);
@@ -655,6 +660,13 @@ public final class TypeWitness {
     /// literal is: Dart's `Holder == Holder<dynamic>` and `<dynamic>[].runtimeType == List`
     /// are true, and the class prints its arguments (`Holder<dynamic>`).
     private static Object rawIfDynamic(TypeWitness w) {
+        if (w.fnSig == null && w.recordNamed == null && w.args != null && w.args.length == 1
+                && (w.type == dart.core.DartLongList.class || w.type == dart.core.DartDoubleList.class)) {
+            // The literal `List<int>` names the primitive-backed class, while a list's
+            // runtimeType is the List witness over its element (`[1].runtimeType`): one Dart
+            // Type, so the literal takes the same canonical witness.
+            return of(dart.core.DartList.class, w.nullable, w.args[0]);
+        }
         if (w.args == null || w.nullable || w.fnSig != null || w.recordNamed != null || w.args.length == 0
                 || w.type == dart.core.DartLongList.class || w.type == dart.core.DartDoubleList.class) {
             return w;
