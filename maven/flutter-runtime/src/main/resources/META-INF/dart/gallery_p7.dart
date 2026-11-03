@@ -129,18 +129,24 @@ class ScaleStartDetails {
 // (`void Function(DragStartDetails)`), the type GestureDetector's drag-start
 // parameters declare.
 @JavaName('com.codename1.flutter.gestures.GestureDragStartCallback')
-class GestureDragStartCallback {}
+class GestureDragStartCallback {
+  external void call(DragStartDetails details);
+}
 
 // Signature for a drag-update callback — Flutter's `GestureDragUpdateCallback`
 // (`void Function(DragUpdateDetails)`). A SAM the transpiler binds closures to;
 // the reply bottom-drawer stores one and hands it to a GestureDetector.
 @JavaName('com.codename1.flutter.gestures.GestureDragUpdateCallback')
-class GestureDragUpdateCallback {}
+class GestureDragUpdateCallback {
+  external void call(DragUpdateDetails details);
+}
 
 // Signature for a drag-end callback — Flutter's `GestureDragEndCallback`
 // (`void Function(DragEndDetails)`).
 @JavaName('com.codename1.flutter.gestures.GestureDragEndCallback')
-class GestureDragEndCallback {}
+class GestureDragEndCallback {
+  external void call(DragEndDetails details);
+}
 
 // ======================================================================
 // Physics — Tolerance / Simulation family
@@ -979,7 +985,11 @@ class SynchronousFuture<T> implements Future<T> {
 // (`void Function(TapDownDetails)` / `void Function(TapUpDetails)`), not a
 // `Funcs.VoidFunc1`; the transpiler binds a closure to them by the Java name.
 @JavaName('com.codename1.flutter.gestures.GestureTapDownCallback')
-class GestureTapDownCallback {}
+class GestureTapDownCallback {
+  external void call(TapDownDetails details);
+}
 
 @JavaName('com.codename1.flutter.gestures.GestureTapUpCallback')
-class GestureTapUpCallback {}
+class GestureTapUpCallback {
+  external void call(TapUpDetails details);
+}

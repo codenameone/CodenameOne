@@ -304,4 +304,10 @@ public abstract class TearOff implements BoundTearOff {
     public static <T0, T1, T2, T3, T4, T5> Funcs.Func5<T0, T1, T2, T3, T4, T5> f5(Object recv, String key, Funcs.Func5<T0, T1, T2, T3, T4, T5> f) {
         return new F5<T0, T1, T2, T3, T4, T5>(recv, key, f);
     }
+
+    /// {@code body} applied to {@code recv}: a tear-off whose receiver is an expression
+    /// (`foo().m`) evaluates it once and builds its value from the result.
+    public static <R, F> F let(R recv, Funcs.Func1<? super R, F> body) {
+        return body.call(recv);
+    }
 }

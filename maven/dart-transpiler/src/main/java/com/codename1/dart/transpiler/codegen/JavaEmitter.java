@@ -165,7 +165,7 @@ public final class JavaEmitter {
     public List<GeneratedFile> emit() {
         pinMemberTypesToOwnLibraries();
         List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
-        if (!closureSignatures.isEmpty()) {
+        if (!closureSignatures.isEmpty() || !signedSams.isEmpty() || !callbackTearOffs.isEmpty()) {
             pruned.add(closureSignatureFile(pruned));
         }
         // After the pruning, which drops lines: the table pairs final Java lines.
@@ -9499,6 +9499,11 @@ public final class JavaEmitter {
             }
             out = valueTearOff(e, out, expected, ctx);
         }
+        if (!(e instanceof Lambda) && out != null && out.fn != null && out.fn.kind == FnKind.METHOD_REF
+                && out.fn.marker != null && !out.fn.doubleCast) {
+            // Signed by its marker where it was made (`Object o = c.m`): still a value.
+            out = valueTearOff(e, out, expected, ctx);
+        }
         if (out != null && !out.fromError && out.fn == null && expected != null && expected.funcParams != null
                 && (expected.funcTypeParams == null || expected.funcTypeParams.isEmpty()) && out.type != null
                 && out.type.funcTypeParams != null && !out.type.funcTypeParams.isEmpty()) {
@@ -9542,13 +9547,26 @@ public final class JavaEmitter {
         if (recv.startsWith("(") && recv.endsWith(")")) {
             recv = recv.substring(1, recv.length() - 1);
         }
-        if (name.equals("new") || !name.matches("[\\w$]+") || !SIMPLE_RECEIVER.matcher(recv).matches()
-                || STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null) {
+        boolean simple = SIMPLE_RECEIVER.matcher(recv).matches();
+        if (name.equals("new") || !name.matches("[\\w$]+")
+                || simple && STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null
+                || !simple && (e instanceof Ident || COMPLEX_TYPE_RECEIVER.matcher(recv).matches()
+                || recv.endsWith(".super") || recv.endsWith(".this"))) {
             return out;
         }
         String key = name;
         String self = recv;
-        if (recv.equals("super")) {
+        // `foo().m`, `(a ?? b).m`: the receiver is evaluated once, by TearOff.let, and the
+        // value is built from the lambda's parameter as for a named receiver.
+        String letRecv = null;
+        String recvRef = bare.substring(0, at);
+        if (!simple) {
+            letRecv = recv;
+            self = "$tr" + (tearOffLetCounter++);
+            recvRef = self;
+            bare = self + "::" + name;
+        }
+        if (recv.equals("super") || recv.endsWith(".super") && simple) {
             if (ctx.currentClass == null) {
                 return out;
             }
@@ -9559,25 +9577,31 @@ public final class JavaEmitter {
             }
             // Not overridden here, `super.m` is the very method `this.m` names, and equal to
             // it; otherwise it is the inherited one, keyed apart from the override.
-            key = overridden ? "super:" + (ctx.currentClass.superclass != null ? ctx.currentClass.superclass.name
-                    : "Object") + "." + name : name;
-        } else if (recv.endsWith(".super") || recv.endsWith(".this")) {
+            key = overridden ? "super:" + superDeclarer(ctx.currentClass, name, 0) + "." + name : name;
+        } else if (recv.endsWith(".this")) {
             return out;
         }
         String head = self + ", \"" + key + "\", ";
         java.util.regex.Matcher sm = SIGNED_TEAR_OFF.matcher(out.code);
-        if (sm.matches() && sm.group(3).equals(name) && (sm.group(2).equals(bare.substring(0, at)))) {
+        if (sm.matches() && sm.group(3).equals(name) && (sm.group(2).equals(out.fn.bare.substring(0, at)))) {
             String holder = sm.group(1);
             int dot = holder.lastIndexOf(".s");
             String[] sam = signedSamByName("S" + holder.substring(dot + 2));
             if (sam == null || !FUNCS_SAM.matcher(sam[1]).matches()) {
                 return out;
             }
-            return new Out(holder.substring(0, dot) + ".b" + holder.substring(dot + 2) + "(" + head + bare + ")",
-                    out.type, out.fn);
+            return letTearOff(letRecv, self, new Out(holder.substring(0, dot) + ".b" + holder.substring(dot + 2)
+                    + "(" + head + bare + ")", out.type, out.fn), ctx);
         }
         String cast = null;
         String code = out.code;
+        if (letRecv != null) {
+            code = code.equals(out.fn.bare) ? bare : code.startsWith("((") && code.endsWith(") " + out.fn.bare + ")")
+                    ? code.substring(0, code.length() - out.fn.bare.length() - 1) + bare + ")" : null;
+            if (code == null) {
+                return out;
+            }
+        }
         if (code.equals(bare)) {
             TypeRef t = expected != null && (expected.funcParams != null
                     || expected.name != null && typedefSig(expected.name) != null) ? expected : null;
@@ -9586,8 +9610,13 @@ public final class JavaEmitter {
                 // An Object, dynamic or Function slot, or none: the method's own function type.
                 // A slot of any other type (a stub's own callback interface) keeps the
                 // reference, whose target type javac gives it.
-                if (expected != null && (expected.funcParams != null || !(expected.is("Object")
-                        || expected.is("Function") || isDynamicType(expected)))) {
+                if (expected != null && expected.funcParams == null && !(expected.is("Object")
+                        || expected.is("Function") || isDynamicType(expected))) {
+                    String w = callbackTearOff(expected);
+                    return w == null ? out : letTearOff(letRecv, self, new Out(w + "(" + head + bare + ")",
+                            out.type, out.fn), ctx);
+                }
+                if (expected != null && expected.funcParams != null) {
                     return out;
                 }
                 if (out.type == null || out.type.funcParams == null || out.type.funcReturn == null) {
@@ -9605,20 +9634,209 @@ public final class JavaEmitter {
                 return out;
             }
             ctx.importClass("dart.runtime.TearOff");
-            return new Out("TearOff." + (fm.group(1) != null ? "v" : "f") + fm.group(2) + "(" + head
-                    + (cast != null ? "(" + cast + ") " + bare : bare) + ")", out.type, out.fn);
+            return letTearOff(letRecv, self, new Out("TearOff." + (fm.group(1) != null ? "v" : "f") + fm.group(2)
+                    + "(" + head + (cast != null ? "(" + cast + ") " + bare : bare) + ")", out.type, out.fn), ctx);
         }
         if (code.startsWith("((") && code.endsWith(") " + bare + ")")) {
             cast = code.substring(2, code.length() - bare.length() - 3);
+            if (cast.indexOf("->") >= 0) {
+                return out;
+            }
+            int amp = cast.indexOf(" & ");
+            if (amp > 0) {
+                // `(Funcs.FuncN<..> & DartFnSigs.Mk) recv::m`, a SAM signed by its marker:
+                // the signed SAM that is both, as its value tear-off.
+                String samPart = cast.substring(0, amp);
+                java.util.regex.Matcher mm = MARKER_CAST.matcher(cast.substring(amp + 3));
+                java.util.regex.Matcher sf = FUNCS_SAM.matcher(samPart);
+                if (!mm.matches() || !sf.matches()) {
+                    return out;
+                }
+                int lt = samPart.indexOf('<');
+                String samHead = lt < 0 ? samPart : samPart.substring(0, lt);
+                String targs = lt < 0 ? "" : samPart.substring(lt);
+                int n = Integer.parseInt(sf.group(2)) + (sf.group(1) != null ? 0 : 1);
+                String plain = samHead.substring(samHead.lastIndexOf("Funcs."));
+                String[] sam = null;
+                for (String[] cand : signedSams.values()) {
+                    if (cand[3].equals(mm.group(2)) && cand[2].equals(String.valueOf(n))
+                            && cand[1].endsWith(plain) && (cand[1].length() == plain.length()
+                            || cand[1].charAt(cand[1].length() - plain.length() - 1) == '.')) {
+                        sam = cand;
+                    }
+                }
+                if (sam == null) {
+                    sam = new String[] {"S" + signedSams.size(), samHead, String.valueOf(n), mm.group(2)};
+                    signedSams.put(samHead + "|" + n + "|" + mm.group(2), sam);
+                }
+                String num = sam[0].substring(1);
+                return letTearOff(letRecv, self, new Out(mm.group(1) + ".b" + num + "(" + head + "(("
+                        + mm.group(1) + ".S" + num + targs + ") " + bare + "))", out.type, out.fn), ctx);
+            }
             java.util.regex.Matcher fm = FUNCS_SAM.matcher(cast);
-            if (cast.indexOf("->") >= 0 || !fm.matches()) {
+            java.util.regex.Matcher dm = SIGNED_SAM_CAST.matcher(cast);
+            if (dm.matches()) {
+                // `(DartFnSigs.Sk) recv::m`, a signed SAM reached by a cast rather than sk(..).
+                String[] sam = signedSamByName("S" + dm.group(2));
+                if (sam == null || !FUNCS_SAM.matcher(sam[1]).matches()) {
+                    return out;
+                }
+                return letTearOff(letRecv, self, new Out(dm.group(1) + ".b" + dm.group(2) + "(" + head + "(" + cast
+                        + ") " + bare + ")", out.type, out.fn), ctx);
+            }
+            if (!fm.matches()) {
                 return out;
             }
             ctx.importClass("dart.runtime.TearOff");
-            return new Out("TearOff." + (fm.group(1) != null ? "v" : "f") + fm.group(2) + "(" + head
-                    + "(" + cast + ") " + bare + ")", out.type, out.fn);
+            return letTearOff(letRecv, self, new Out("TearOff." + (fm.group(1) != null ? "v" : "f") + fm.group(2)
+                    + "(" + head + "(" + cast + ") " + bare + ")", out.type, out.fn), ctx);
         }
         return out;
+    }
+
+    private static final java.util.regex.Pattern MARKER_CAST = java.util.regex.Pattern.compile(
+            "((?:[\\w$]+\\.)*DartFnSigs)\\.(M\\d+)");
+    private static final java.util.regex.Pattern SIGNED_SAM_CAST = java.util.regex.Pattern.compile(
+            "((?:[\\w$]+\\.)*DartFnSigs)\\.S(\\d+)(?:<.*>)?");
+    private static final java.util.regex.Pattern COMPLEX_TYPE_RECEIVER = java.util.regex.Pattern.compile(
+            "[\\w$.]+(?:<.*>)?(?:\\[\\])*");
+    private int tearOffLetCounter;
+    /// The type a value tear-off's code casts its method reference to: the last cast in it.
+    private static final java.util.regex.Pattern LET_VALUE_TYPE = java.util.regex.Pattern.compile(
+            "\\(\\(([\\w$.]+(?:<[\\w$.<>, ?]*>)?)\\) \\$tr\\d+::[\\w$]+\\)\\)$");
+
+    /// {@code v}, a value tear-off built from {@code self}, with the receiver
+    /// {@code letRecv} evaluated once and bound to {@code self}; {@code v} itself when the
+    /// receiver was a name.
+    private Out letTearOff(String letRecv, String self, Out v, Ctx ctx) {
+        if (letRecv == null) {
+            return v;
+        }
+        ctx.importClass("dart.runtime.TearOff");
+        // Cast, so the value's type comes from the body alone: a let in an Object or varargs
+        // slot otherwise fails javac's inference.
+        java.util.regex.Matcher tm = LET_VALUE_TYPE.matcher(v.code);
+        String t = tm.find() ? tm.group(1) : null;
+        return new Out((t != null ? "((" + t + ") " : "(") + "TearOff.let(" + letRecv + ", " + self + " -> " + v.code
+                + "))", v.type, v.fn);
+    }
+
+    /// The class whose {@code name} a `super.name` in {@code c} reaches: Dart's linearized
+    /// superclass chain, the last mixin first and the superclass after the mixins, so in
+    /// `class X extends B with M` a method M declares is M's, not B's.
+    private boolean classHasMember(ClassDecl d, String name) {
+        for (ClassDecl k = d; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            if (k.method(name) != null || k.getter(name) != null || k.field(name) != null) {
+                return true;
+            }
+            for (TypeRef m : k.mixins) {
+                ClassDecl md = program.classes.get(m.name);
+                if (md == null || md.method(name) != null || md.getter(name) != null || md.field(name) != null) {
+                    return true;
+                }
+            }
+            if (k.superclass != null && program.classes.get(k.superclass.name) == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String superDeclarer(ClassDecl c, String name, int depth) {
+        java.util.List<TypeRef> chain = new java.util.ArrayList<TypeRef>();
+        for (int i = c.mixins.size() - 1; i >= 0; i--) {
+            chain.add(c.mixins.get(i));
+        }
+        if (c.superclass != null) {
+            chain.add(c.superclass);
+        }
+        for (int i = 0; i < chain.size(); i++) {
+            TypeRef t = chain.get(i);
+            ClassDecl d = t.name != null ? program.classes.get(t.name) : null;
+            if (d == null) {
+                return t.name != null ? t.name : "Object";
+            }
+            for (MethodDecl md : d.methods) {
+                if (name.equals(md.name) && !md.isStatic && !md.isAbstract) {
+                    return d.name;
+                }
+            }
+            if (i == chain.size() - 1 && t == c.superclass && depth < 64) {
+                return superDeclarer(d, name, depth + 1);
+            }
+        }
+        return c.superclass != null && c.superclass.name != null ? c.superclass.name : "Object";
+    }
+
+    /// Value tear-off classes for a stub's own callback interface, by its Java name:
+    /// {name, class, Java parameter types, Java return type}.
+    private final java.util.LinkedHashMap<String, String[]> callbackTearOffs =
+            new java.util.LinkedHashMap<String, String[]>();
+
+    /// The factory (`DartFnSigs.cK`) of the value tear-off for {@code expected}, a stub
+    /// class mapped to a Java callback interface whose `call` the stub declares
+    /// (`external void call(DragStartDetails details)`); null for any other type.
+    private String callbackTearOff(TypeRef expected) {
+        if (expected.name == null || program.classes.containsKey(expected.name) || !expected.args.isEmpty()) {
+            return null;
+        }
+        ClassDecl sc = stubs.classes.get(expected.name);
+        if (sc == null || sc.javaName == null || !sc.typeParams.isEmpty()) {
+            return null;
+        }
+        MethodDecl call = null;
+        for (MethodDecl md : sc.methods) {
+            if (md.isStatic) {
+                continue;
+            }
+            if (call != null || !"call".equals(md.name) || md.isGetter || md.isSetter || !md.typeParams.isEmpty()) {
+                return null;
+            }
+            call = md;
+        }
+        if (call == null) {
+            return null;
+        }
+        StringBuilder ps = new StringBuilder();
+        for (Param p : call.params) {
+            String j = callbackJavaType(p.type);
+            if (j == null || p.named || p.optional) {
+                return null;
+            }
+            ps.append(ps.length() > 0 ? "," : "").append(j);
+        }
+        String ret = call.returnType == null || call.returnType.is("void") ? "void" : callbackJavaType(call.returnType);
+        if (ret == null) {
+            return null;
+        }
+        String[] w = callbackTearOffs.get(sc.javaName);
+        if (w == null) {
+            w = new String[] {sc.javaName, "C" + callbackTearOffs.size(), ps.toString(), ret};
+            callbackTearOffs.put(sc.javaName, w);
+        }
+        return pkg + ".DartFnSigs.c" + w[1].substring(1);
+    }
+
+    /// A callback parameter's Java type, fully qualified: a stub class's Java name, or a
+    /// core value type; null for anything else, whose Java spelling the interface may not share.
+    private String callbackJavaType(TypeRef t) {
+        if (t == null || t.name == null || !t.args.isEmpty() || t.funcParams != null) {
+            return null;
+        }
+        if (t.is("bool")) {
+            return t.nullable ? "java.lang.Boolean" : "boolean";
+        }
+        if (t.is("String")) {
+            return "java.lang.String";
+        }
+        if (t.is("Object")) {
+            return "java.lang.Object";
+        }
+        if (program.classes.containsKey(t.name)) {
+            return null;
+        }
+        ClassDecl sc = stubs.classes.get(t.name);
+        return sc != null && sc.javaName != null && sc.typeParams.isEmpty() ? sc.javaName : null;
     }
 
     private String[] signedSamByName(String n) {
@@ -12338,6 +12556,26 @@ public final class JavaEmitter {
                         .append("(Object recv, String key, ").append(st).append(" f) {\n        return new B")
                         .append(num).append(n > 0 ? "<>" : "").append("(recv, key, f);\n    }\n");
             }
+        }
+        for (String[] w : callbackTearOffs.values()) {
+            // The value of an instance-method tear-off held as a stub's callback interface.
+            String[] pt = w[2].isEmpty() ? new String[0] : w[2].split(",");
+            StringBuilder ps = new StringBuilder();
+            StringBuilder as = new StringBuilder();
+            for (int i = 0; i < pt.length; i++) {
+                ps.append(i == 0 ? "" : ", ").append(pt[i]).append(" a").append(i);
+                as.append(i == 0 ? "" : ", ").append("a").append(i);
+            }
+            String num = w[1].substring(1);
+            sb.append("\n    public static final class ").append(w[1]).append(" extends dart.runtime.TearOff implements ")
+                    .append(w[0]).append(" {\n        private final ").append(w[0]).append(" f;\n\n        ")
+                    .append(w[1]).append("(Object recv, String key, ").append(w[0])
+                    .append(" f) {\n            super(recv, key);\n            this.f = f;\n        }\n\n")
+                    .append("        @Override\n        public ").append(w[3]).append(" call(").append(ps)
+                    .append(") {\n            ").append("void".equals(w[3]) ? "" : "return ").append("f.call(")
+                    .append(as).append(");\n        }\n    }\n");
+            sb.append("\n    public static ").append(w[0]).append(" c").append(num).append("(Object recv, String key, ")
+                    .append(w[0]).append(" f) {\n        return new ").append(w[1]).append("(recv, key, f);\n    }\n");
         }
         sb.append("}\n");
         // A witness names its class as the file that signed the closure imports it; the
@@ -21810,8 +22048,23 @@ public final class JavaEmitter {
      */
     private Out superThroughMixin(String member, Ctx ctx) {
         ClassDecl c = ctx.currentClass;
-        if (member == null || c == null || c.superclass != null || c.mixins.isEmpty() || c.isMixin) {
+        if (member == null || c == null || c.mixins.isEmpty() || c.isMixin) {
             return null;
+        }
+        if (c.superclass != null) {
+            // `class X extends B with M`: a member M declares and B does not is M's, which
+            // Java reaches as the interface's default method; anything else stays `super`.
+            ClassDecl last = program.classes.get(c.mixins.get(c.mixins.size() - 1).name);
+            String owner = superDeclarer(c, member, 0);
+            ClassDecl od = program.classes.get(owner);
+            // Only where the superclass chain lacks the member: a mixin's own `super.m` in
+            // a forwarder is the mixin-super bridge's, and a member both declare still
+            // resolves to the superclass's here (see the report on `on` mixins).
+            ClassDecl sd = program.classes.get(c.superclass.name);
+            if (od == null || !od.isMixin || last == null || sd == null || classHasMember(sd, member)) {
+                return null;
+            }
+            return new Out(javaClassName(od) + ".super", new TypeRef(od.name));
         }
         for (int i = c.mixins.size() - 1; i >= 0; i--) {
             TypeRef mixRef = c.mixins.get(i);
