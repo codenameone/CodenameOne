@@ -628,7 +628,20 @@ public final class JavaEmitter {
         if (total > 0) {
             sb.append('<').append(tp).append('>');
         }
-        sb.append('(').append(comps).append(") {\n");
+        sb.append('(').append(comps).append(") implements dart.runtime.Reified {\n");
+        // A record's runtimeType is the record type of its fields' runtime types:
+        // `(null, 1, x: null)` is a `(Null, int, {Null x})`.
+        sb.append("    @Override\n    public Object $runtimeType() {\n");
+        sb.append("        return new dart.runtime.RecordType(").append(s.positional).append(", new String[] {");
+        for (int i = 0; i < s.named.size(); i++) {
+            sb.append(i > 0 ? ", " : "").append('"').append(s.named.get(i)).append('"');
+        }
+        sb.append('}');
+        for (int i = 0; i < total; i++) {
+            String comp = i < s.positional ? "$" + (i + 1) : s.named.get(i - s.positional);
+            sb.append(", dart.runtime.TypeWitness.runtimeType(").append(comp).append(')');
+        }
+        sb.append(");\n    }\n\n");
         // Dart's record toString: `(1, a)`, `(a: 1, b: true)`, `(7, label: seven)`.
         sb.append("    @Override\n    public String toString() {\n");
         sb.append("        return \"(\"");
@@ -12481,7 +12494,8 @@ public final class JavaEmitter {
         boolean anyNull = false;
         for (String n : pc.typeParams) {
             TypeRef a = bound.get(n);
-            if (a != null && (a.is("Null") || witnessOf(a, ctx) == null)) {
+            if (a != null && witnessOf(a, ctx) == null) {
+                // `Box(null)` is a Box<Null>: Null has a witness of its own.
                 a = null;
                 unknown.add(n);
             }
@@ -13350,6 +13364,9 @@ public final class JavaEmitter {
         } else {
             int pos = 0;
             List<String> nullBound = new ArrayList<String>();
+            Map<String, TypeRef> directLub = new LinkedHashMap<String, TypeRef>();
+            Map<String, Integer> directCount = new java.util.HashMap<String, Integer>();
+            java.util.Set<String> directBad = new java.util.HashSet<String>();
             for (Param p : params) {
                 Expr a = null;
                 if (p.named) {
@@ -13391,6 +13408,27 @@ public final class JavaEmitter {
                             && tps.contains(p.type.name)) {
                         nullBound.add(p.type.name);
                     }
+                    if (p.type != null && !p.type.nullable && p.type.args.isEmpty() && p.type.funcParams == null
+                            && tps.contains(p.type.name)) {
+                        // `two(null, 1)`, `two(1, 'a')`: T is the upper bound of every argument
+                        // bound to it directly (int?, Object), not the first one's type.
+                        TypeRef bt = a instanceof NullLit ? TypeRef.NULL : at;
+                        String tn = p.type.name;
+                        if (bt == null || isDynamicType(bt) || !bt.args.isEmpty() || bt.funcParams != null
+                                || bt.funcReturn != null) {
+                            directBad.add(tn);
+                        } else {
+                            TypeRef prev = directLub.get(tn);
+                            directLub.put(tn, prev == null ? bt
+                                    : prev.toString().equals(bt.toString()) ? prev : upperBound(prev, bt));
+                            directCount.put(tn, directCount.containsKey(tn) ? directCount.get(tn) + 1 : 1);
+                        }
+                    }
+                }
+            }
+            for (Map.Entry<String, TypeRef> dl : directLub.entrySet()) {
+                if (!directBad.contains(dl.getKey()) && directCount.get(dl.getKey()) > 1) {
+                    m.put(dl.getKey(), dl.getValue());
                 }
             }
             for (String nb : nullBound) {
@@ -13600,6 +13638,10 @@ public final class JavaEmitter {
         if (t.is("Null") && t.args.isEmpty() && t.funcReturn == null) {
             // `wrap(null)` binds T to Null, whose witness only null satisfies.
             return "dart.runtime.TypeWitness.NULL";
+        }
+        if (t.is("Object") && t.nullable && t.args.isEmpty() && t.funcReturn == null) {
+            // `Box<Object?>(1)` prints Box<Object?>, as reifiedArgWitness has it.
+            return "dart.runtime.TypeWitness.OBJECT_NULLABLE";
         }
         if (t.args.isEmpty() && t.funcReturn == null) {
             String w = witnessFor(t.name, ctx);
@@ -14647,6 +14689,17 @@ public final class JavaEmitter {
             }
             return elementTypeQuiet(f.body, ctx);
         }
+        if (e instanceof Conditional) {
+            // `c ? null : i`: the static type is the branches' upper bound, Null included
+            // (int?), as for an if element with an else.
+            TypeRef a = elementTypeQuiet(((Conditional) e).thenExpr, ctx);
+            TypeRef b = a == null ? null : elementTypeQuiet(((Conditional) e).elseExpr, ctx);
+            if (a != null && b != null && a.args.isEmpty() && b.args.isEmpty() && a.funcParams == null
+                    && b.funcParams == null && !isDynamicType(a) && !isDynamicType(b)) {
+                return a.toString().equals(b.toString()) ? a : upperBound(a, b);
+            }
+            return null;
+        }
         if (e instanceof CtorCall || e instanceof Call) {
             return programCallTypeQuiet(e, ctx);
         }
@@ -14940,12 +14993,28 @@ public final class JavaEmitter {
         }
         List<String> codes = new ArrayList<String>();
         TypeRef inferred = null;
+        TypeRef lub = null;
+        boolean lubKnown = elem == null;
         for (Expr e : s.elements) {
             Out o = emitExpr(e, elem, ctx);
             codes.add(elementCode(o, elem, ctx));
+            if (lubKnown) {
+                if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
+                    lubKnown = false;
+                } else {
+                    lub = entryLub(lub, o.type);
+                }
+            }
             if (inferred == null) {
                 inferred = o.type;
             }
+        }
+        if (elem == null && lubKnown && lub != null && lub.nullable && lub.args.isEmpty()
+                && lub.funcParams == null && inferred != null && !inferred.nullable
+                && (lub.name.equals(inferred.name) || inferred.is("Null"))) {
+            // `{null, 1}`, `{1, null}`: as for a list, the upper bound of T and Null is T?,
+            // so the set is a Set<int?>.
+            elem = lub;
         }
         if (elem == null) {
             elem = inferred != null ? inferred : TypeRef.DYNAMIC;
@@ -16685,7 +16754,7 @@ public final class JavaEmitter {
             return new Out("Dyn.get(" + target.code + ", \"" + name + "\")", TypeRef.DYNAMIC);
         }
         // record component accessor: `r.$1`, `r.$2`, or `r.namedField`
-        if (tt != null && tt.name.startsWith("Rec$")) {
+        if (tt != null && tt.name.startsWith("Rec$") && !name.equals("runtimeType")) {
             return new Out(target.code + "." + name + "()", recordComponentType(tt, name));
         }
         // Object protocol: `x.runtimeType` -- every Dart object exposes it. Maps to the

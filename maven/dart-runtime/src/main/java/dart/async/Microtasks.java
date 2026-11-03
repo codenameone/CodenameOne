@@ -145,8 +145,13 @@ final class Microtasks {
         }
     };
 
-    private static long nowMs() {
-        return System.nanoTime() / 1000000L;
+    /// The loop's clock, in nanoseconds. A deadline kept in whole milliseconds turned
+    /// creation gaps of a few milliseconds -- a JVM's first-call class loading between two
+    /// timer constructions, measured at 2.2-2.4ms where Dart takes microseconds -- into
+    /// equal deadlines whenever the gap crossed a millisecond boundary: `Timer(5ms, b)`
+    /// then, 2.3ms later, `Timer(2ms, c)` tied, and b fired first by creation order.
+    private static long nowNs() {
+        return System.nanoTime();
     }
 
     /// Queues {@code task} to run as a timer event {@code ms} from now. With a Display
@@ -161,7 +166,8 @@ final class Microtasks {
         boolean display = com.codename1.ui.Display.isInitialized();
         TimerEntry e;
         synchronized (LOCK) {
-            e = new TimerEntry(nowMs() + delay, timerSeq++, task);
+            // Capped so a delay of centuries cannot overflow the nanosecond deadline.
+            e = new TimerEntry(nowNs() + Math.min(delay, 1L << 42) * 1000000L, timerSeq++, task);
             TIMERS.add(e);
             LOCK.notifyAll();
         }
@@ -190,7 +196,7 @@ final class Microtasks {
             return null;
         }
         TimerEntry first = TIMERS.first();
-        if (first.deadline > nowMs()) {
+        if (first.deadline > nowNs()) {
             return null;
         }
         TIMERS.pollFirst();
@@ -202,7 +208,7 @@ final class Microtasks {
         if (TIMERS.isEmpty()) {
             return cap;
         }
-        return Math.max(1L, Math.min(cap, TIMERS.first().deadline - nowMs()));
+        return Math.max(1L, Math.min(cap, (TIMERS.first().deadline - nowNs() + 999999L) / 1000000L));
     }
 
     static void drain() {
@@ -252,7 +258,7 @@ final class Microtasks {
     /// Headless: whether anything is queued for the isolate's thread.
     private static boolean idleLocked() {
         return QUEUE.isEmpty()
-                && (TIMERS.isEmpty() || TIMERS.first().deadline > nowMs());
+                && (TIMERS.isEmpty() || TIMERS.first().deadline > nowNs());
     }
 
     /// Headless park of an awaiting frame: runs the event loop until f completes.
