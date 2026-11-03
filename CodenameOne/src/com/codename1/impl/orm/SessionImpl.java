@@ -1489,7 +1489,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     if (relation.element) {
                         boolean keyed = keyedByValue(relation);
                         element = new Attribute("", relation.inverseJoinColumn, Elements.kind(relation.target),
-                                keyed, false, !keyed, false);
+                                keyed, false, !keyed, false,
+                                relation.elementType.length() == 0 ? null : relation.elementType);
                         expected.add(element);
                         if (relation.mapKey.length() > 0) {
                             expected.add(new Attribute("", relation.mapKey, Attribute.TEXT, true, false, false, false));
@@ -2537,7 +2538,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (keyedByValue(relation)) {
             // The key type, not the plain one: a value that is part of the key
             // needs a bounded type on MySQL, which cannot index TEXT.
-            String type = sql.assignedKeyColumn(Elements.kind(relation.target))
+            String type = relation.elementType.length() > 0 ? relation.elementType
+                    : sql.assignedKeyColumn(Elements.kind(relation.target))
                     .replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
             definition.append(", ").append(q(relation.inverseJoinColumn)).append(' ').append(type)
                     .append(" NOT NULL, PRIMARY KEY (").append(quoted(columns)).append(", ")
@@ -2548,7 +2550,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     .append(" INTEGER NOT NULL, ")
                     .append(q(relation.inverseJoinColumn))
                     .append(' ')
-                    .append(sql.columnType(Elements.kind(relation.target)));
+                    .append(relation.elementType.length() > 0 ? relation.elementType
+                            : sql.columnType(Elements.kind(relation.target)));
             if (relation.mapKey.length() > 0) {
                 String type = sql.assignedKeyColumn(Attribute.TEXT).replace(" PRIMARY KEY", "").replace(" NOT NULL", "");
                 definition.append(", ").append(q(relation.mapKey)).append(' ').append(type).append(" NOT NULL");

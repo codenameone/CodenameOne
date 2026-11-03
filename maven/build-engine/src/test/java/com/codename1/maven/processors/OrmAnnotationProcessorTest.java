@@ -777,6 +777,32 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void elementCollectionNamesItsOwnerColumnAndValueTypeAndQuotedNamesAreUnwrapped() throws Exception {
+        File classes=tmp.newFolder("ecnames");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        // Hibernate-style quoting: the runtime quotes every identifier itself, so the
+        // quotes must not become part of the name.
+        sources.put("ecnames.Feed","package ecnames; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"`ec_feed`\") public class Feed { @Id public long id; @Column(name=\"`signal`\") public String signal; @Column(name=\"\\\"order\\\"\") public int order; @ElementCollection(joinColumn=\"`feed_ref`\",column=\"\\\"note\\\"\",type=\"LONGTEXT\") @JoinTable(name=\"`ec_feed_note`\") public java.util.List<String> notes=new java.util.ArrayList<String>(); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();Class type=loader.loadClass("ecnames.Feed");
+        com.codename1.backend.orm.EntityManager em=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));com.codename1.orm.session.Session s=em.openSession();
+        try {
+            s.createTables();
+            org.junit.Assert.assertEquals("LONGTEXT",s.createNativeQuery("SELECT type FROM pragma_table_info('ec_feed_note') WHERE name='note'",String.class).first());
+            org.junit.Assert.assertEquals(Long.valueOf(1),s.createNativeQuery("SELECT COUNT(*) FROM pragma_table_info('ec_feed_note') WHERE name='feed_ref'",Long.class).first());
+            org.junit.Assert.assertEquals(Long.valueOf(1),s.createNativeQuery("SELECT COUNT(*) FROM pragma_table_info('ec_feed') WHERE name='signal'",Long.class).first());
+            org.junit.Assert.assertTrue(s.schemaReport().getIssues().toString(),s.schemaReport().getIssues().isEmpty());
+            s.beginTransaction();Object feed=type.newInstance();type.getField("signal").set(feed,"up");((List)type.getField("notes").get(feed)).add("first");s.persist(feed);s.commitTransaction();Object id=type.getField("id").get(feed);s.clear();
+            feed=s.find(type,id);org.junit.Assert.assertEquals("up",type.getField("signal").get(feed));org.junit.Assert.assertEquals(1,s.count(feed,"notes"));org.junit.Assert.assertEquals("first",s.createNativeQuery("SELECT note FROM ec_feed_note WHERE feed_ref="+id,String.class).first());
+        } finally { s.close();em.close();loader.close(); }
+        // The owner column named in both places is ambiguous.
+        File conflict=tmp.newFolder("ecconflict");sources.clear();
+        sources.put("ecconflict.Feed","package ecconflict; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Feed { @Id public long id; @ElementCollection(joinColumn=\"a\") @JoinTable(name=\"ec_conflict\",joinColumn=\"b\") public java.util.List<String> notes=new java.util.ArrayList<String>(); }");
+        JavaSourceCompiler.compile(sources,conflict,Arrays.asList(testClassesDir()));
+        ProcessorContext bad=runProcessor(conflict,backendClasspath());assertTrue(bad.hasErrors());assertTrue(bad.getErrors().toString(),bad.getErrors().toString().contains("ElementCollection.joinColumn"));
+    }
+
+    @Test
     public void jpqlAcceptsSupplementaryJavaIdentifiers() throws Exception {
         String letter="\ud801\udc00",entityName=letter+"Entity",field=letter+"Value",continuation="tail"+letter;
         File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();

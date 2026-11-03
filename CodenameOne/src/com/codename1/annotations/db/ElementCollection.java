@@ -33,6 +33,16 @@ public @interface ElementCollection {
     /// Names the scalar value column in the collection table.
     /// @return column name; element_value by default
     String column() default "element_value";
+    /// Names the column that holds the owner's id in the collection table.
+    /// Empty keeps `JoinTable.joinColumn` when that is set and `owner_id`
+    /// otherwise; naming the column in both places is a build error.
+    /// @return owner column name; empty for the default
+    String joinColumn() default "";
+    /// The SQL type of the value column, written into `CREATE TABLE` as it
+    /// is, like `Column.type` -- for example `LONGTEXT` -- and validated against
+    /// the existing column the same way.
+    /// @return SQL type; empty for the dialect's type for the element class
+    String type() default "";
     /// Names the column that stores each element's position, which keys the
     /// table together with the owner and keeps a List's order and duplicates.
     ///

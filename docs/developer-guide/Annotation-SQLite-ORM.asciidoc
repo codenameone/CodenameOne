@@ -372,6 +372,11 @@ List, Set, and Map with String keys. Values may be String, boxed primitive types
 or `java.util.Date`. Lists preserve order and duplicate values. Map columns can
 be named with `@MapKeyColumn`; `@JoinTable` names the collection table and its
 owner column, and `@ElementCollection(column=...)` names the value column.
+`@ElementCollection(joinColumn=...)` names the owner column without a
+`@JoinTable`, and `type=...` sets the value column's SQL type, such as
+`LONGTEXT`, the way `@Column(type=...)` does. Names are quoted for you, so a
+name such as `signal` needs no backticks, and a name wrapped in backticks or
+double quotes has them removed.
 A List or Set table has an `element_position` column by default.
 `@ElementCollection(positionColumn="")` maps a Set to a table with no position
 column, keyed by owner and value, which is the usual shape of an existing tag
