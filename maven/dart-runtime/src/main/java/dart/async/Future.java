@@ -870,7 +870,21 @@ public class Future<T> {
     void onComplete(Runnable r) {
         // A listener runs in the zone it was registered in, not the one that
         // happens to complete the future.
-        r = Zone.capture(r);
+        final Runnable captured = Zone.capture(r);
+        r = new Runnable() {
+            @Override
+            public void run() {
+                Boolean outer = IN_LISTENER.get();
+                IN_LISTENER.set(Boolean.TRUE);
+                try {
+                    captured.run();
+                } finally {
+                    if (outer == null) {
+                        IN_LISTENER.remove();
+                    }
+                }
+            }
+        };
         driveOnce();
         boolean immediate;
         synchronized (lock) {
@@ -1007,17 +1021,20 @@ public class Future<T> {
         }
         runAll(toRun);
         if (toRun == null && zone != Zone.root) {
-            reportIfUnhandled(reportNow);
+            // A future a listener settles (the result of then/catchError) is Dart's
+            // _propagateToListeners running inside the microtask that settled its
+            // source: an error nobody listens for is reported right there.
+            reportIfUnhandled(reportNow || IN_LISTENER.get() != null);
         }
     }
 
-    /// Dart hands an error no one has listened for by the next turn of the event loop to
+    /// Dart hands an error no one has listened for by the microtask that settles it to
     /// the future's zone. Only a zone with its own handler is told: the root zone's
     /// report would be a log line for every future this runtime's blocking await
     /// model reads without listening.
     private void reportIfUnhandled(boolean reportNow) {
         final Zone z = zone;
-        Funcs.VoidFunc0 report = new Funcs.VoidFunc0() {
+        final Funcs.VoidFunc0 report = new Funcs.VoidFunc0() {
             @Override
             public void call() {
                 Throwable e;
@@ -1034,9 +1051,21 @@ public class Future<T> {
         if (reportNow) {
             report.call();
         } else {
-            new Timer(null, report);
+            // Dart settles a failed future in a microtask and, finding no listener
+            // there, reports it to the zone at that point -- before the microtasks
+            // queued after it and long before any timer. A handler attached in the
+            // same synchronous turn is already listening; one attached later is late.
+            Microtasks.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    report.call();
+                }
+            });
         }
     }
+
+    /// Set while a listener registered through onComplete runs on this thread.
+    private static final ThreadLocal<Boolean> IN_LISTENER = new ThreadLocal<Boolean>();
 
     void markHandled() {
         synchronized (lock) {

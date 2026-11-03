@@ -195,6 +195,28 @@ final class AsyncAnf {
             c.value = e;
             return c;
         }
+        if (s instanceof PatternDeclStmt) {
+            // `var (a, b) = await f();`: the subject goes to a temp the await settles,
+            // and the destructuring reads the temp in the state that resumes.
+            PatternDeclStmt pd = (PatternDeclStmt) s;
+            if (!AsyncLowering.hasAwait(pd.init)) {
+                return s;
+            }
+            Expr e = expr(pd.init, pre);
+            if (e == null) {
+                return null;
+            }
+            if (AsyncLowering.hasAwait(e)) {
+                String t = temp();
+                pre.add(decl(t, null, e, pd));
+                e = ident(t, pd);
+            }
+            PatternDeclStmt c = at(new PatternDeclStmt(), pd);
+            c.pattern = pd.pattern;
+            c.init = e;
+            c.labels = pd.labels;
+            return c;
+        }
         if (s instanceof ReturnStmt) {
             if (AsyncLowering.statementAwait(s) != null) {
                 return s;

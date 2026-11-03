@@ -1,0 +1,3 @@
+[body, Za, m1, Zc, hhandled, Z2se, v1, Zb, t]
+[Zearly, Zlate, ZthenLate, hsame, hearly, hlate, hthenLate]
+ticks [0, 1, 2, 3] true

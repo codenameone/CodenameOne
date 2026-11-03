@@ -8627,12 +8627,20 @@ public final class JavaEmitter {
                     // coercion made of a Bag, so test and bind the object behind the view.
                     seen = "dart.runtime.DartRuntime.unview(" + subj + ")";
                 }
+                if (ctx.frame != null && ctx.frame.patternFields) {
+                    binds.add(asyncLowering.patternBinding(v.name, v.type, jt, "(" + jt + ") " + seen, ctx));
+                    return seen + " instanceof " + erasedJavaType(v.type, ctx);
+                }
                 binds.add(jt + " " + nm + " = (" + jt + ") " + seen + ";");
                 // Tested erased: Java has no instanceof for a parameterized type.
                 return seen + " instanceof " + erasedJavaType(v.type, ctx);
             }
             TypeRef bt = v.type != null ? v.type : subjType;
             String jt = javaType(bt, false, ctx);
+            if (ctx.frame != null && ctx.frame.patternFields) {
+                binds.add(asyncLowering.patternBinding(v.name, bt, jt, castSubject(subj, subjType, bt, ctx), ctx));
+                return v.type != null ? instanceofCheck(subj, v.type, ctx) : "true";
+            }
             String nm = ctx.declareShadowSafe(v.name, bt);
             binds.add(jt + " " + nm + " = " + castSubject(subj, subjType, bt, ctx) + ";");
             return v.type != null ? instanceofCheck(subj, v.type, ctx) : "true";

@@ -292,7 +292,19 @@ public class Stream<T> {
         Sub sub = new Sub();
         // Listener callbacks run in the zone listen() was called in.
         sub.onData = (Funcs.VoidFunc1<T>) Zone.bindAny(onData);
-        sub.onError = Zone.bindAny(onError);
+        // With no onError the error goes to the zone of listen(), not to whichever
+        // zone happens to be current at delivery: bind the reporter there too.
+        sub.onError = Zone.bindAny(onError != null ? onError : new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object err) {
+                if (Zone.current != Zone.root) {
+                    Zone.current.handleUncaughtError(err, dart.core.StackTrace.forError(err));
+                } else {
+                    reportUncaught(err instanceof Throwable ? (Throwable) err
+                            : new RuntimeException(String.valueOf(err)));
+                }
+            }
+        });
         sub.onDone = (Funcs.VoidFunc0) Zone.bindAny(onDone);
         sub.cancelOnError = cancelOnError != null && cancelOnError.booleanValue();
         boolean wasClosed;

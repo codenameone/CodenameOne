@@ -119,6 +119,8 @@ final class AsyncLowering {
         final Set<Stmt> returns = Collections.newSetFromMap(new IdentityHashMap<Stmt, Boolean>());
         final List<Target> targets = new ArrayList<Target>();
         VarDeclStmt fieldDecl;
+        /// While a destructuring is emitted: its bindings are frame fields, not locals.
+        boolean patternFields;
         /// What closures reference in each split loop being lowered, innermost last.
         final List<Set<String>> loopCaps = new ArrayList<Set<String>>();
         /// Per-iteration variables: Dart name to {field, type, holder class}.
@@ -286,7 +288,8 @@ final class AsyncLowering {
                     || st instanceof ForInStmt || st instanceof ReturnStmt || st instanceof BreakStmt
                     || st instanceof ContinueStmt || st instanceof SwitchStmt || st instanceof TryStmt
                     || st instanceof Block || st instanceof RethrowStmt || st instanceof YieldStmt
-                    || st instanceof LocalFunc;
+                    || st instanceof LocalFunc
+                    || st instanceof PatternDeclStmt && !hasAwait(((PatternDeclStmt) st).init);
             if (st instanceof VarDeclGroup) {
                 known = true;
                 for (VarDeclStmt d : ((VarDeclGroup) st).decls) {
@@ -782,6 +785,18 @@ final class AsyncLowering {
                 em.emitStatement(s, ctx);
             } finally {
                 f.fieldDecl = null;
+            }
+            restore(snap, ctx);
+            return;
+        }
+        if (s instanceof PatternDeclStmt) {
+            // AsyncAnf has moved any await of the subject into a temp ahead of it.
+            List<Object[]> snap = snapshot(s, f, ctx);
+            f.patternFields = true;
+            try {
+                em.emitStatement(s, ctx);
+            } finally {
+                f.patternFields = false;
             }
             restore(snap, ctx);
             return;
@@ -1433,6 +1448,22 @@ final class AsyncLowering {
         }
         String ref = declareField(f, ctx, v.name, t, jt);
         ctx.writer().line(ref + " = " + code + ";");
+    }
+
+    /// One binding of a destructuring in a lowered body: the variable is a frame field
+    /// (a cell when a closure of a split loop captures it), and the answer is the Java
+    /// statement that assigns it, emitted where the pattern's other bindings are.
+    String patternBinding(String name, TypeRef t, String jt, String code, JavaEmitter.Ctx ctx) {
+        Frame f = ctx.frame;
+        if (isCell(f, name)) {
+            String holder = em.refHolder(t, ctx);
+            String raw = holder.startsWith("Ref<") ? "Ref<>" : holder;
+            String ref = declareField(f, ctx, name, t, holder);
+            ctx.markBoxed(ref);
+            f.cells.put(name, new Object[] {ref, t, raw});
+            return ref + " = new " + raw + "(" + code + ");";
+        }
+        return declareField(f, ctx, name, t, jt) + " = " + code + ";";
     }
 
     /// `return` in a lowered body: completes the frame's Future and leaves the step.
