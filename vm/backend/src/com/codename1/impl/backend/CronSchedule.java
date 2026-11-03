@@ -374,7 +374,7 @@ public final class CronSchedule {
         long t = afterMillis - floorMod(afterMillis, 1000L) + 1000L;
         for (int guard = 0 ; guard < SEARCH_DAYS ; guard++) {
             long local = t + offsetAt(t);
-            long day = floorDiv(local, DAY);
+            long day = CivilTime.floorDiv(local, DAY);
             int timeOfDay = (int) (local - day * DAY);
             int[] civil = civilFromDays(day);
             int month = civil[1];
@@ -425,7 +425,7 @@ public final class CronSchedule {
             return false;
         }
         if (lastDayOfMonth) {
-            return day == daysInMonth(year, month);
+            return day == CivilTime.daysInMonth(year, month);
         }
         return (daysOfMonth & (1L << day)) != 0;
     }
@@ -473,7 +473,7 @@ public final class CronSchedule {
             m = 1;
             y++;
         }
-        return daysFromCivil(y, m, 1);
+        return CivilTime.daysFromCivil(y, m, 1);
     }
 
     /// Milliseconds east of UTC at the instant `utc`.
@@ -483,7 +483,7 @@ public final class CronSchedule {
         }
         int raw = timeZone.getRawOffset();
         long standard = utc + raw;
-        long day = floorDiv(standard, DAY);
+        long day = CivilTime.floorDiv(standard, DAY);
         int[] civil = civilFromDays(day);
         int dow = (int) floorMod(day + 4, 7);
         return timeZone.getOffset(1, civil[0], civil[1] - 1, civil[2], dow + 1,
@@ -523,20 +523,8 @@ public final class CronSchedule {
         return local - offsetAt(utc);
     }
 
-    static long floorDiv(long value, long divisor) {
-        return CivilTime.floorDiv(value, divisor);
-    }
-
     static long floorMod(long value, long divisor) {
-        return value - floorDiv(value, divisor) * divisor;
-    }
-
-    static int daysInMonth(int year, int month) {
-        return CivilTime.daysInMonth(year, month);
-    }
-
-    static long daysFromCivil(int y, int m, int d) {
-        return CivilTime.daysFromCivil(y, m, d);
+        return value - CivilTime.floorDiv(value, divisor) * divisor;
     }
 
     static int[] civilFromDays(long z) {

@@ -257,15 +257,11 @@ public final class JsonCodec {
         StringBuilder sb = new StringBuilder(24);
         sb.append('"');
         CivilTime.appendDate(sb, days, '-').append('T');
-        pad(sb, ms / 3600000L, 2).append(':');
-        pad(sb, ms / 60000L % 60, 2).append(':');
-        pad(sb, ms / 1000L % 60, 2).append('.');
-        pad(sb, ms % 1000L, 3).append("Z\"");
+        CivilTime.pad(sb, ms / 3600000L, 2).append(':');
+        CivilTime.pad(sb, ms / 60000L % 60, 2).append(':');
+        CivilTime.pad(sb, ms / 1000L % 60, 2).append('.');
+        CivilTime.pad(sb, ms % 1000L, 3).append("Z\"");
         out.putAscii(sb.toString());
-    }
-
-    private static StringBuilder pad(StringBuilder sb, long v, int width) {
-        return CivilTime.pad(sb, v, width);
     }
 
     private static String describe(Object got) {
@@ -416,7 +412,7 @@ public final class JsonCodec {
         int year = digits(s, 0, 4);
         int month = digits(s, 5, 2);
         int day = digits(s, 8, 2);
-        if (year < 0 || month < 1 || month > 12 || day < 1 || day > daysIn(year, month)) {
+        if (year < 0 || month < 1 || month > 12 || day < 1 || day > CivilTime.daysInMonth(year, month)) {
             return Long.MIN_VALUE;
         }
         int hour = 0;
@@ -478,7 +474,7 @@ public final class JsonCodec {
                 return Long.MIN_VALUE;
             }
         }
-        long days = daysFromCivil(year, month, day);
+        long days = CivilTime.daysFromCivil(year, month, day);
         return ((days * 24 + hour) * 60 + minute - offsetMinutes) * 60000L
                 + second * 1000L + millis;
     }
@@ -499,11 +495,4 @@ public final class JsonCodec {
         return v;
     }
 
-    private static int daysIn(int year, int month) {
-        return CivilTime.daysInMonth(year, month);
-    }
-
-    private static long daysFromCivil(int year, int month, int day) {
-        return CivilTime.daysFromCivil(year, month, day);
-    }
 }
