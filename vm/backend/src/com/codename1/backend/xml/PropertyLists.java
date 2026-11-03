@@ -23,6 +23,7 @@
 package com.codename1.backend.xml;
 
 import com.codename1.backend.Base64;
+import com.codename1.impl.backend.CivilTime;
 import com.codename1.xml.Element;
 import com.codename1.xml.XMLParseException;
 import com.codename1.xml.XMLParser;
@@ -279,21 +280,10 @@ public final class PropertyLists {
                 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 60) {
             throw new XMLParseException("bad <date> " + s);
         }
-        boolean leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-        int length = month == 2 ? (leap ? 29 : 28)
-                : month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31;
-        if (day > length) {
+        if (day > CivilTime.daysInMonth(year, month)) {
             throw new XMLParseException("bad <date> " + s);
         }
-        // Days from the civil calendar (H. Hinnant's algorithm), proleptic Gregorian.
-        // y is -1 for January and February of year 0, so the era floors.
-        int y = month <= 2 ? year - 1 : year;
-        int era = (y >= 0 ? y : y - 399) / 400;
-        int yoe = y - era * 400;
-        int mp = (month + 9) % 12;
-        int doy = (153 * mp + 2) / 5 + day - 1;
-        int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        long days = (long) era * 146097 + doe - 719468;
+        long days = CivilTime.daysFromCivil(year, month, day);
         long seconds = days * 86400L + hour * 3600L + minute * 60L + second;
         return new Date(seconds * 1000L);
     }

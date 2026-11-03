@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.log;
 
+import com.codename1.impl.backend.CivilTime;
+
 /// ISO-8601 UTC timestamps without java.time or a formatter.
 final class Timestamps {
     private Timestamps() {
@@ -29,21 +31,9 @@ final class Timestamps {
 
     /// Appends `millis` as `yyyy-MM-ddTHH:mm:ss.SSSZ`.
     static void appendIso(StringBuilder out, long millis) {
-        long days = Math.floorDiv(millis, 86400000L);
+        long days = CivilTime.floorDiv(millis, 86400000L);
         long ofDay = millis - days * 86400000L;
-        // Civil date from days since the epoch (H. Hinnant's days_from_civil inverse).
-        long z = days + 719468;
-        long era = Math.floorDiv(z, 146097);
-        long doe = z - era * 146097;
-        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        long mp = (5 * doy + 2) / 153;
-        long day = doy - (153 * mp + 2) / 5 + 1;
-        long month = mp < 10 ? mp + 3 : mp - 9;
-        long year = yoe + era * 400 + (month <= 2 ? 1 : 0);
-        pad(out, year, 4).append('-');
-        pad(out, month, 2).append('-');
-        pad(out, day, 2).append('T');
+        CivilTime.appendDate(out, days, '-').append('T');
         pad(out, ofDay / 3600000L, 2).append(':');
         pad(out, ofDay / 60000L % 60, 2).append(':');
         pad(out, ofDay / 1000L % 60, 2).append('.');
@@ -51,10 +41,6 @@ final class Timestamps {
     }
 
     private static StringBuilder pad(StringBuilder out, long value, int width) {
-        String digits = Long.toString(value);
-        for (int i = digits.length(); i < width; i++) {
-            out.append('0');
-        }
-        return out.append(digits);
+        return CivilTime.pad(out, value, width);
     }
 }
