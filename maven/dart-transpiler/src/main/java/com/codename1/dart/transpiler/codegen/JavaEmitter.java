@@ -6676,20 +6676,6 @@ public final class JavaEmitter {
         // throw surfaces as one (DartRuntime.asError wraps non-exceptions), and
         // a VM error such as a stack overflow is not turned into a value.
         String asyncErr = null;
-        boolean asyncVoidBody = m.isAsync && rt.is("void") && m.body != null;
-        if (asyncFuture && (m.body != null || m.exprBody != null) || asyncVoidBody) {
-            // The body runs as a coroutine (Await.async): up to its first await now, the
-            // rest from the event loop, so the caller gets its Future at that await.
-            // Parameters it reassigns are boxed, since the body is a Java lambda now.
-            for (Param p : m.params) {
-                if (p.name != null && CaptureScan.assignedNames(m.body, m.exprBody).contains(p.name)) {
-                    ctx.boxedLocals.add(p.name);
-                }
-            }
-            ctx.writer().line(asyncVoidBody ? "dart.async.Await.asyncVoid(() -> {"
-                    : "return dart.async.Await.async(() -> {");
-            ctx.indent(1);
-        }
         if (asyncFuture && (m.body != null || m.exprBody != null)) {
             ctx.importClass("dart.async.Future");
             asyncErr = ctx.newTemp();
@@ -6734,10 +6720,6 @@ public final class JavaEmitter {
             ctx.indent(-1);
             ctx.writer().line("}");
         }
-        if (asyncFuture && (m.body != null || m.exprBody != null) || asyncVoidBody) {
-            ctx.indent(-1);
-            ctx.writer().line("});");
-        }
         ctx.narrowReturnToInt = savedNarrow;
         sb.append(ctx.popWriter());
         ctx.popScope();
@@ -6764,20 +6746,6 @@ public final class JavaEmitter {
         ctx.inAsyncBody = m.isAsync;
         boolean asyncFuture = m.isAsync && (rt.is("Future") || rt.is("FutureOr"));
         String asyncErr = null;
-        boolean asyncVoidBody = m.isAsync && rt.is("void") && m.body != null;
-        if (asyncFuture && (m.body != null || m.exprBody != null) || asyncVoidBody) {
-            // The body runs as a coroutine (Await.async): up to its first await now, the
-            // rest from the event loop, so the caller gets its Future at that await.
-            // Parameters it reassigns are boxed, since the body is a Java lambda now.
-            for (Param p : m.params) {
-                if (p.name != null && CaptureScan.assignedNames(m.body, m.exprBody).contains(p.name)) {
-                    ctx.boxedLocals.add(p.name);
-                }
-            }
-            ctx.writer().line(asyncVoidBody ? "dart.async.Await.asyncVoid(() -> {"
-                    : "return dart.async.Await.async(() -> {");
-            ctx.indent(1);
-        }
         if (asyncFuture && (m.body != null || m.exprBody != null)) {
             ctx.importClass("dart.async.Future");
             asyncErr = ctx.newTemp();
@@ -6812,10 +6780,6 @@ public final class JavaEmitter {
             ctx.writer().line("return " + reifyAsyncResult("Future.error(" + asyncErr + ")", rt, ctx) + ";");
             ctx.indent(-1);
             ctx.writer().line("}");
-        }
-        if (asyncFuture && (m.body != null || m.exprBody != null) || asyncVoidBody) {
-            ctx.indent(-1);
-            ctx.writer().line("});");
         }
         ctx.inAsyncBody = savedAsync;
     }
@@ -9599,10 +9563,7 @@ public final class JavaEmitter {
             // Awaiting a void-typed operand (e.g. a `void` stub call) yields nothing; wrapping it
             // in Await.await$(...) is a "void not allowed here" error, so emit the bare call.
             if (o.type != null && o.type.is("void")) {
-                // Still an await: the body yields to the event loop after the call.
-                ctx.importClass("dart.async.Await");
-                ctx.writer().line(o.code + ";");
-                return new Out("Await.yield$()", TypeRef.VOID);
+                return new Out(o.code, TypeRef.VOID);
             }
             ctx.importClass("dart.async.Await");
             if (o.type != null && o.type.is("Future") && o.type.nullable) {
@@ -9661,8 +9622,8 @@ public final class JavaEmitter {
                 return new Out(isDynamicType(awaited) ? v
                         : "((" + javaType(boxType(awaited), true, ctx) + ") " + v + ")", boxType(awaited));
             }
-            // A statically non-Future value: `await 42` is 42, after a yield.
-            return new Out("Await.pass(" + o.code + ")", o.type);
+            // A statically non-Future value: `await 42` is 42.
+            return new Out(o.code, o.type);
         }
         if (e instanceof ParenExpr) {
             Out inner = emitExpr(((ParenExpr) e).inner, expected, ctx);
@@ -20509,17 +20470,6 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             code = head + " -> {\n" + emitAsyncLambdaBody(l, lambdaReturn, ctx)
                     + indentStr(ctx.currentIndent()) + "}";
             asyncArrow = l.exprBody != null ? lastAsyncArrowValue : null;
-        } else if (l.body != null && l.isAsync && sigTypes != null && sigTypes.length > 0
-                && sigTypes[sigTypes.length - 1] != null && !sigTypes[sigTypes.length - 1].is("void")) {
-            // An async block passed where a value is returned (FutureOr<void>, dynamic,
-            // Object): its Future is that value, so it runs as an async method's body does.
-            boolean outerAsyncValue = ctx.asyncLambda;
-            ctx.asyncLambda = true;
-            ctx.inAsyncBody = true;
-            ctx.importClass("dart.async.Future");
-            code = head + " -> {\n" + emitAsyncLambdaBody(l, TypeRef.of("Future", TypeRef.DYNAMIC), ctx)
-                    + indentStr(ctx.currentIndent()) + "}";
-            ctx.asyncLambda = outerAsyncValue;
         } else if (l.body != null) {
             // `on<E>((event, emit) { emit(s); })`: a block that returns nothing, passed where
             // the function type returns dynamic -- a value-returning Funcs.FuncN in Java.
@@ -20543,8 +20493,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     && returnsValue(l.body) && !returnsNonNullValue(l.body);
             boolean outerNullReturn = ctx.bareReturnIsNull;
             ctx.bareReturnIsNull = nullTail;
-            boolean asyncVoidBody = l.isAsync && !nullTail && !returnsValue(l.body);
-            Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + (nullTail || asyncVoidBody ? 2 : 1));
+            Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + (nullTail ? 2 : 1));
             writeLines(genericParamChecks, ctx);
             ctx.lambdaReturns = returns;
             emitBodyStatements(l.params, l.body, ctx);
@@ -20552,13 +20501,6 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             String body = ctx.popWriter();
             ctx.bareReturnIsNull = outerNullReturn;
             lastLambdaNullTail = nullTail;
-            if (asyncVoidBody) {
-                // An async closure whose Future nobody sees (`onPressed: () async {..}`)
-                // still runs as a coroutine: the caller goes on at its first await, and
-                // what it throws is the zone's uncaught error, not the caller's.
-                String in = indentStr(ctx.currentIndent() + 1);
-                body = in + "dart.async.Await.asyncVoid(() -> {\n" + body + in + "});\n";
-            }
             if (nullTail) {
                 String in = indentStr(ctx.currentIndent() + 1);
                 body = in + "if (true) {\n" + body + in + "}\n" + in + "return null;\n";
@@ -20786,9 +20728,6 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         ctx.pushWriter(ctx.currentIndent() + 1);
         Ctx.Writer w = ctx.writer();
         String err = ctx.newTemp();
-        // A coroutine, as an async method's body is (see Await.async).
-        w.line("return dart.async.Await.async(() -> {");
-        ctx.indent(1);
         w.line("try {");
         ctx.indent(1);
         if (l.body != null) {
@@ -20816,8 +20755,6 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         w.line("return Future.error(" + err + ");");
         ctx.indent(-1);
         w.line("}");
-        ctx.indent(-1);
-        w.line("});");
         return ctx.popWriter();
     }
 
@@ -23810,20 +23747,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // of a function returning one -- goes to whenCompleteFuture, which waits for
                 // a returned Future and surfaces its failure. The void form discarded it.
                 Expr action = pos.get(0);
-                // An async cleanup is typed `Future<dynamic> Function()`, so its body is
-                // emitted as a value-returning async body whose Future is waited for.
-                TypeRef cleanupType = null;
-                if (action instanceof Lambda && ((Lambda) action).isAsync && ((Lambda) action).params.isEmpty()) {
-                    cleanupType = new TypeRef("Function");
-                    cleanupType.funcParams = new ArrayList<TypeRef>();
-                    cleanupType.funcReturn = TypeRef.of("Future", TypeRef.DYNAMIC);
-                }
-                Out cb = emitExpr(action, cleanupType, ctx);
+                Out cb = emitExpr(action, null, ctx);
                 boolean value;
                 if (action instanceof Lambda) {
-                    // An async cleanup returns its Future, which whenComplete waits for.
-                    value = ((Lambda) action).isAsync
-                            || (((Lambda) action).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(action));
+                    value = ((Lambda) action).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(action);
                 } else {
                     // A tear-off is typed a bare Function, so its declared return is read
                     // from the method or function it names; unresolved stays on the void form.
