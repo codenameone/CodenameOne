@@ -6675,14 +6675,21 @@ public final class JavaEmitter {
         // RuntimeException, as an untyped Dart `catch` is emitted: every Dart
         // throw surfaces as one (DartRuntime.asError wraps non-exceptions), and
         // a VM error such as a stack overflow is not turned into a value.
+        // An async body with an await runs as a resumable frame (AsyncLowering).
+        boolean lowered = m.body != null && m.isAsync
+                && (asyncFuture && rt.is("Future") && !ctx.asyncReturnWidened || rt.is("void"))
+                && asyncLowering.tryEmit(m.params, m.body, !asyncFuture,
+                        asyncFuture && !rt.args.isEmpty() ? rt.arg(0) : null, asyncFuture ? rt : null, ctx);
         String asyncErr = null;
-        if (asyncFuture && (m.body != null || m.exprBody != null)) {
+        if (!lowered && asyncFuture && (m.body != null || m.exprBody != null)) {
             ctx.importClass("dart.async.Future");
             asyncErr = ctx.newTemp();
             ctx.writer().line("try {");
             ctx.indent(1);
         }
-        if (m.body != null) {
+        if (lowered) {
+            // AsyncLowering emitted the frame and the statement returning its Future.
+        } else if (m.body != null) {
             emitBodyStatements(m.params, m.body, ctx);
             boolean closed = neverFallsOff(m.body, rt, ctx);
             if (asyncFuture && !closed && !endsWithJump(m.body)) {
@@ -6745,14 +6752,21 @@ public final class JavaEmitter {
         boolean savedAsync = ctx.inAsyncBody;
         ctx.inAsyncBody = m.isAsync;
         boolean asyncFuture = m.isAsync && (rt.is("Future") || rt.is("FutureOr"));
+        // An async body with an await runs as a resumable frame (AsyncLowering).
+        boolean lowered = m.body != null && m.isAsync
+                && (asyncFuture && rt.is("Future") && !ctx.asyncReturnWidened || rt.is("void"))
+                && asyncLowering.tryEmit(m.params, m.body, !asyncFuture,
+                        asyncFuture && !rt.args.isEmpty() ? rt.arg(0) : null, asyncFuture ? rt : null, ctx);
         String asyncErr = null;
-        if (asyncFuture && (m.body != null || m.exprBody != null)) {
+        if (!lowered && asyncFuture && (m.body != null || m.exprBody != null)) {
             ctx.importClass("dart.async.Future");
             asyncErr = ctx.newTemp();
             ctx.writer().line("try {");
             ctx.indent(1);
         }
-        if (m.body != null) {
+        if (lowered) {
+            // AsyncLowering emitted the frame and the statement returning its Future.
+        } else if (m.body != null) {
             emitBodyStatements(m.params, m.body, ctx);
             boolean closed = neverFallsOff(m.body, rt, ctx);
             if (asyncFuture && !closed && !endsWithJump(m.body)) {
@@ -6847,7 +6861,7 @@ public final class JavaEmitter {
         }
     }
 
-    private void emitStatement(Stmt s, Ctx ctx) {
+    void emitStatement(Stmt s, Ctx ctx) {
         if (s != null && !(s instanceof Block)) {
             lineMark(s, ctx);
         }
@@ -6916,7 +6930,7 @@ public final class JavaEmitter {
      * top-level read -- is assigned to a discarded local. Only a literal, `this` or a
      * closure literal, which cannot, is dropped.
      */
-    private void emitDiscardedValue(Expr e, Ctx ctx) {
+    void emitDiscardedValue(Expr e, Ctx ctx) {
         Expr core = stripParens(e);
         if (core instanceof IntLit || core instanceof DoubleLit || core instanceof BoolLit
                 || core instanceof NullLit || core instanceof ThisExpr || core instanceof Lambda
@@ -7082,6 +7096,10 @@ public final class JavaEmitter {
                 }
                 t.genericClosure = gl;
             }
+            if (ctx.frame != null && ctx.frame.fieldDecl == v) {
+                asyncLowering.emitFieldLocal(v, t, init, ctx);
+                return;
+            }
             if (t.is("Function") && t.funcReturn == null && v.initializer instanceof Lambda) {
                 Lambda l = (Lambda) v.initializer;
                 if (l.params.isEmpty()) {
@@ -7189,6 +7207,8 @@ public final class JavaEmitter {
                 Out o = emitExpr(y.value, ctx.syncStarElem, ctx);
                 w.line(ctx.syncStarList + ".add(" + coerce(o, ctx.syncStarElem, ctx) + ");");
             }
+        } else if (s instanceof ReturnStmt && ctx.frame != null && ctx.frame.returns.contains(s)) {
+            asyncLowering.emitReturn((ReturnStmt) s, ctx);
         } else if (s instanceof ReturnStmt) {
             ReturnStmt r = (ReturnStmt) s;
             TypeRef rt = ctx.methodReturnType;
@@ -7534,6 +7554,8 @@ public final class JavaEmitter {
             }
             ctx.popBreakTarget();
             ctx.popScope();
+        } else if (ctx.frame != null && ctx.frame.jumps.containsKey(s)) {
+            w.line(ctx.frame.jumps.get(s));
         } else if (s instanceof BreakStmt) {
             String bl = ((BreakStmt) s).label != null ? javaLabel(((BreakStmt) s).label)
                     : ctx.currentBreakLabel();
@@ -8891,7 +8913,7 @@ public final class JavaEmitter {
     }
 
     /** Blocks nested under if/while/for are emitted inline (the brace is already written). */
-    private Stmt unwrapBlock(Stmt s) {
+    Stmt unwrapBlock(Stmt s) {
         return s;
     }
 
@@ -8900,7 +8922,7 @@ public final class JavaEmitter {
     // ==================================================================
 
     /** Emitted expression: Java code + inferred Dart static type. */
-    private static final class Out {
+    static final class Out {
         final String code;
         final TypeRef type;
         /**
@@ -9042,7 +9064,7 @@ public final class JavaEmitter {
      * emitters that want to extend the chain call {@link #emitExprRaw} for their target
      * instead, so the guard propagates until the chain ends.
      */
-    private Out emitExpr(Expr e, TypeRef expected, Ctx ctx) {
+    Out emitExpr(Expr e, TypeRef expected, Ctx ctx) {
         if (programFnSlot && expected != null && expected.funcParams != null && expected.funcReturn != null
                 && expected.funcReturn.is("dynamic") && (e instanceof Ident || e instanceof PropertyGet)
                 && isVoidMethodTearOff(e, ctx)) {
@@ -9601,6 +9623,9 @@ public final class JavaEmitter {
                         + v.code + ")", expected);
             }
             return new Out("DartRuntime.throwValue(" + v.code + ")", TypeRef.DYNAMIC);
+        }
+        if (e instanceof AwaitExpr && ctx.frame != null && ctx.frame.resumeAwait == e) {
+            return asyncLowering.resumeValue(ctx);
         }
         if (e instanceof AwaitExpr) {
             Expr operand = ((AwaitExpr) e).operand;
@@ -16853,7 +16878,7 @@ public final class JavaEmitter {
         return t != null && t.is("Set") && !program.classes.containsKey("Set");
     }
 
-    private static String primitiveListKind(TypeRef tt) {
+    static String primitiveListKind(TypeRef tt) {
         TypeRef td = typedDataListElem(tt);
         if (td != null) {
             // The runtime classes extend DartLongList / DartDoubleList.
@@ -17711,7 +17736,7 @@ public final class JavaEmitter {
      * simple in-scope local narrows {@code x} to {@code T}. Returns an undo list of
      * {name, priorPromotion} pairs to pass to {@link #restorePromotions}.
      */
-    private List<Object[]> applyGuardPromotions(Expr cond, Ctx ctx) {
+    List<Object[]> applyGuardPromotions(Expr cond, Ctx ctx) {
         List<Object[]> undo = new ArrayList<Object[]>();
         collectPromotions(cond, ctx, undo);
         return undo;
@@ -17767,7 +17792,7 @@ public final class JavaEmitter {
      * every disjunct is false, so recurse both sides; a false {@code x is! T} narrows
      * {@code x} to {@code T}.
      */
-    private void collectNegativePromotions(Expr cond, Ctx ctx, List<Object[]> undo) {
+    void collectNegativePromotions(Expr cond, Ctx ctx, List<Object[]> undo) {
         if (cond instanceof Binary && "||".equals(((Binary) cond).op)) {
             collectNegativePromotions(((Binary) cond).left, ctx, undo);
             collectNegativePromotions(((Binary) cond).right, ctx, undo);
@@ -17793,7 +17818,7 @@ public final class JavaEmitter {
         }
     }
 
-    private void restorePromotions(List<Object[]> undo, Ctx ctx) {
+    void restorePromotions(List<Object[]> undo, Ctx ctx) {
         for (int i = undo.size() - 1; i >= 0; i--) {
             ctx.restorePromotion((String) undo.get(i)[0], (TypeRef) undo.get(i)[1]);
         }
@@ -18865,7 +18890,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// A condition (`if`, `while`, `?:`, a collection `if`) that is `dynamic` -- the result
     /// of a call on a dynamic receiver -- is checked to be a bool at run time, as Dart
     /// does; javac rejects an Object where a boolean condition is required.
-    private Out dynCondition(Out o, Ctx ctx) {
+    Out dynCondition(Out o, Ctx ctx) {
         if (o == null || o.type == null || !isDynamicType(o.type)) {
             return o;
         }
@@ -20513,7 +20538,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.methodReturnType = TypeRef.VOID;
             ctx.pushWriter(ctx.currentIndent() + 2);
             ctx.lambdaReturns = returns;
-            emitBodyStatements(l.params, l.body, ctx);
+            // A void async closure (onPressed: () async {..}) runs as a frame whose errors
+            // reach its zone, as Dart reports them.
+            // One whose function type returns a value (whenComplete's FutureOr<void>, a
+            // handler answering Future<dynamic>) returns the frame's Future instead.
+            TypeRef samReturn = sigTypes != null && sigTypes.length > 0 ? sigTypes[sigTypes.length - 1] : null;
+            boolean voidSam = samReturn == null || samReturn.is("void");
+            if (!(l.isAsync && asyncLowering.tryEmit(l.params, l.body, voidSam, null, null, ctx))) {
+                emitBodyStatements(l.params, l.body, ctx);
+            }
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
             ctx.asyncStarSink = savedSink;
@@ -20564,7 +20597,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             Ctx.Writer w = ctx.pushWriter(ctx.currentIndent() + (nullTail ? 2 : 1));
             writeLines(genericParamChecks, ctx);
             ctx.lambdaReturns = returns;
-            emitBodyStatements(l.params, l.body, ctx);
+            // A void async closure (onPressed: () async {..}) runs as a frame whose errors
+            // reach its zone, as Dart reports them.
+            // One whose function type returns a value (whenComplete's FutureOr<void>, a
+            // handler answering Future<dynamic>) returns the frame's Future instead.
+            TypeRef samReturn = sigTypes != null && sigTypes.length > 0 ? sigTypes[sigTypes.length - 1] : null;
+            boolean voidSam = samReturn == null || samReturn.is("void");
+            if (!(l.isAsync && asyncLowering.tryEmit(l.params, l.body, voidSam, null, null, ctx))) {
+                emitBodyStatements(l.params, l.body, ctx);
+            }
             ctx.lambdaReturns = outerReturns;
             String body = ctx.popWriter();
             ctx.bareReturnIsNull = outerNullReturn;
@@ -20770,6 +20811,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     /// emitted last, else null.
     private TypeRef lastAsyncArrowValue;
 
+    /// Lowers async bodies to resumable frames (see AsyncLowering).
+    private final AsyncLowering asyncLowering = new AsyncLowering(this);
+
     /// Dart's flatten: the X of Future<X> / FutureOr<X>, else the type itself.
     private static TypeRef flattenFutureType(TypeRef t) {
         if (t != null && (t.is("Future") || t.is("FutureOr")) && t.args.size() == 1) {
@@ -20795,6 +20839,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private String emitAsyncLambdaBody(Lambda l, TypeRef futureType, Ctx ctx) {
         ctx.pushWriter(ctx.currentIndent() + 1);
         Ctx.Writer w = ctx.writer();
+        if (l.body != null && asyncLowering.tryEmit(l.params, l.body, false,
+                futureType.args.isEmpty() ? null : futureType.arg(0), null, ctx)) {
+            return ctx.popWriter();
+        }
         String err = ctx.newTemp();
         w.line("try {");
         ctx.indent(1);
@@ -20866,7 +20914,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return "Future.<" + j + ">value(" + v + ")";
     }
 
-    private String reifyAsyncResult(String future, TypeRef rt, Ctx ctx) {
+    String reifyAsyncResult(String future, TypeRef rt, Ctx ctx) {
         // Object is a real type argument here: `Future<Object> f() async => 3` is no
         // Future<int>, so it is recorded like any other.
         if (rt == null || !rt.is("Future") || rt.args.size() != 1 || rt.arg(0) == null
@@ -22579,7 +22627,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * an unbound {@code K2} of a generic stub method's signature, which as a Java type
      * argument is "cannot find symbol".
      */
-    private boolean typeVarsInScope(TypeRef t, Ctx ctx) {
+    boolean typeVarsInScope(TypeRef t, Ctx ctx) {
         if (t == null) {
             return true;
         }
@@ -23834,9 +23882,21 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // of a function returning one -- goes to whenCompleteFuture, which waits for
                 // a returned Future and surfaces its failure. The void form discarded it.
                 Expr action = pos.get(0);
-                Out cb = emitExpr(action, null, ctx);
+                // An async block cleanup suspends at its awaits, so it is emitted for its
+                // Future, which whenCompleteFuture waits for, as Dart's whenComplete does.
+                boolean asyncBlock = action instanceof Lambda && ((Lambda) action).isAsync
+                        && ((Lambda) action).body != null && ((Lambda) action).params.isEmpty();
+                TypeRef asyncCleanup = null;
+                if (asyncBlock) {
+                    asyncCleanup = new TypeRef("Function");
+                    asyncCleanup.funcParams = new ArrayList<TypeRef>();
+                    asyncCleanup.funcReturn = TypeRef.of("Future", TypeRef.DYNAMIC);
+                }
+                Out cb = emitExpr(action, asyncCleanup, ctx);
                 boolean value;
-                if (action instanceof Lambda) {
+                if (asyncBlock) {
+                    value = true;
+                } else if (action instanceof Lambda) {
                     value = ((Lambda) action).exprBody != null ? !lastLambdaVoid : lastLambdaNullTail || lambdaReturnsValue(action);
                 } else {
                     // A tear-off is typed a bare Function, so its declared return is read
@@ -29045,7 +29105,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return false;
     }
 
-    private String javaType(TypeRef t, boolean boxed, Ctx ctx) {
+    String javaType(TypeRef t, boolean boxed, Ctx ctx) {
         if (t != null && t.funcTypeParams != null && !t.funcTypeParams.isEmpty() && t.funcParams != null) {
             // A generic function type (`List<T> Function<T>(T, T)`) is held by its erased
             // SAM, as a generic closure is: its own type parameters are bound per call
@@ -30026,7 +30086,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return false;
     }
 
-    private TypeRef boxType(TypeRef t) {
+    TypeRef boxType(TypeRef t) {
         if (t == null) {
             return TypeRef.DYNAMIC;
         }
@@ -30054,7 +30114,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** Whether a Dart type erases to Java Object (untyped/dynamic value). */
-    private boolean isDynamicType(TypeRef t) {
+    boolean isDynamicType(TypeRef t) {
         return t == null || t.is("var") || t.is("dynamic") || t.is("Object") || t.is("FutureOr");
     }
 
@@ -30227,7 +30287,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return true;
     }
 
-    private String coerce(Out o, TypeRef target, Ctx ctx) {
+    String coerce(Out o, TypeRef target, Ctx ctx) {
         if (target == null) {
             return o.code;
         }
@@ -30951,12 +31011,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && ctx.currentClass.typeParams.contains(t.name);
     }
 
-    private String boxIfPrimitive(Out o, Ctx ctx) {
+    String boxIfPrimitive(Out o, Ctx ctx) {
         // Java autoboxing covers long/double/boolean -> Long/Double/Boolean
         return o.code;
     }
 
-    private String zeroValue(TypeRef t) {
+    String zeroValue(TypeRef t) {
         if (t == null) {
             return "null";
         }
@@ -31836,7 +31896,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     // Emission context
     // ==================================================================
 
-    private final class Ctx {
+    final class Ctx {
         /// The member a `super.x` about to be emitted names, for [#superThroughMixin].
         String superMember;
         /// Declared bounds of the type parameters of the method being emitted (`m<T extends B>`).
@@ -31896,6 +31956,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         /** Method type parameters dropped from the Java signature; each reads as Object. */
         java.util.Set<String> erasedMethodTypeVars;
         boolean inAsyncBody;
+        /// The async frame whose state machine is being emitted (AsyncLowering), else null.
+        AsyncLowering.Frame frame;
         /** Inside an async closure's body, whose Future may be typed Future of dynamic. */
         boolean asyncLambda;
         /**
@@ -32088,6 +32150,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         private final java.util.Set<String> lateLocals = new HashSet<String>();
 
         /** Declares a late local under a Java name no other local can have. */
+        /// Declares a local read and written under {@code javaName}, an async frame's field.
+        void declareAs(String name, TypeRef type, String javaName) {
+            declare(name, type);
+            renameScopes.get(renameScopes.size() - 1).put(name, javaName);
+            boxedActive.remove(javaName);
+        }
+
         String declareLate(String name, TypeRef type) {
             declare(name, type);
             String javaName = javaIdent(name) + "$late" + (shadowCounter++);
