@@ -1,13 +1,15 @@
 ---
 title: "Build an Endless Runner in Java with Dash"
-description: "Dash is a 3D endless runner with a Java backend: levels that swing from 2D to 3D, leaderboards the server re-simulates, live races with voice chat, a track editor, crews, in-app purchases and an admin console. Free MIT-0 source."
+description: "Dash is a 3D endless runner in Java: live races with WebRTC voice chat, runs through your own city on a real street map, leaderboards the server re-simulates, a track editor and an admin console. Free MIT-0 source."
 url: "/dash/"
-summary: "A complete full-stack runner with races, a level editor and honest leaderboards."
+summary: "A full-stack runner: voice chat while racing friends, runs through your own city, and honest leaderboards."
 images: ["/developer-guide/img/dash-run-chase.png"]
 ShowToc: true
 ---
 
-Dash is a complete, full-stack endless runner in Java. A runner dashes down a track of lanes, jumping hurdles, sliding under barriers and dodging traffic, and a level can start side on like a platformer and swing behind the runner into 3D halfway down the track. Around the run is everything a live game needs: accounts, levels with stars, leaderboards, live races between friends with voice chat, ghosts and replays, a track editor, crews, a shop and a console for running the game. Use it to build your own game with Codename One, or to see how a Codename One app and server share one codebase.
+Dash is an endless runner that does what a game engine leaves to you. Race your friends and talk to them while you run: the voice goes peer to peer over WebRTC, from the same Java code on iPhone, Android, desktop and the web. Pick two points on a real street map and run that route through your own city, every street a stretch of track with its name overhead and the landmarks beside it. And every score on a board was played again on the server from the run's inputs, by the same rules module the game runs, so a cheated run never shows up.
+
+Those are the parts other game frameworks leave to plugins, a second language and a separate backend team. In Dash they're ordinary Codename One code in one project: the game, its server, its maps, its voice chat and its admin console. Around them is everything a live game needs: accounts, levels with stars, ghosts and replays, a track editor, crews, a shop and pushes. Use it to build your own game, or to see how a Codename One app and server share one codebase.
 
 {{< guide-block >}}
 <video controls playsinline preload="metadata" poster="/dash/dash-promo-poster.jpg" style="width:100%;max-width:420px;height:auto;display:block;margin:0 auto" aria-label="A tour of Dash: a run that swings from side on into 3D, a city route picked on a map and run past its landmarks, a live race with chat, the level editor and the boards">

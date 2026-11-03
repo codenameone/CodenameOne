@@ -44,6 +44,11 @@
     tintColor: "d0060818";
     /* Lists scroll by touch; the bar is noise on a phone. */
     scrollVisibleBool: false;
+    /* The admin console's tabs are the desk's own flat cells (DeskTab). The
+       native selection capsule drew its glass pill around them as well, two
+       highlights colliding on one tab. */
+    tabsSelectionCapsuleBool: false;
+    tabsAnimatedIndicatorBool: false;
     /* tag::dash-palette[] */
     --bg: #0b0e1d;
     --surface: #151a33;

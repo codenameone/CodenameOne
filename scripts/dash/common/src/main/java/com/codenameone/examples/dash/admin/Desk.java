@@ -337,8 +337,18 @@ final class Desk {
 
     private static void axis(XYMultipleSeriesRenderer r, String[] labels, double most) {
         r.setXLabels(0);
-        // At most about seven names along the bottom, evenly spread.
-        int every = Math.max(1, (labels.length + 6) / 7);
+        // As many names along the bottom as fit the width without touching:
+        // seven dates fill a desktop chart, and overlap on a phone's.
+        int longest = 1;
+        for (String l : labels) {
+            longest = Math.max(longest, l.length());
+        }
+        // A digit or letter of the label font is about 0.6 of its size, and
+        // 3 mm of air keeps neighbours apart. The plot is about 60% of the
+        // screen's width once the card and the axis margins are taken.
+        float labelPx = longest * 0.6f * CN.convertToPixels(2.4f) + CN.convertToPixels(3);
+        int fit = Math.max(2, Math.min(7, (int) (CN.getDisplayWidth() * 0.6f / labelPx)));
+        int every = Math.max(1, (labels.length + fit - 1) / fit);
         for (int i = 0; i < labels.length; i += every) {
             r.addXTextLabel(i, labels[i]);
         }

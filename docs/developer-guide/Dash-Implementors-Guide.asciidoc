@@ -1,13 +1,20 @@
 [[dash-implementors-guide]]
 == Dash: Making the runner your own
 
+Dash is an endless runner built around the things a game engine leaves to you.
+Friends race on the same track at the same moment and talk while they run, their
+voices going peer to peer over WebRTC (<<dash-races>>). A player picks two points on a
+real street map and runs that route through their own city, the street names overhead
+and the landmarks beside the track (<<dash-city-runs>>). And every score on a board is a run
+the server played again from its inputs, by the same Java rules module the game runs.
+In other game frameworks each of those is a plugin, a second language or a separate
+backend. Here they're ordinary Codename One code in one project, beside the levels
+that are data, the camera that swings from side on into 3D halfway down a track, and
+the console that runs the game.
+
 Dash shares the module layout, the accounts and sign-in, push notifications and the
-operations console with <<skirmish-implementors-guide,Skirmish>>. What it adds is a
-different kind of game: an endless runner whose levels are data, whose camera can
-start side on and swing into 3D halfway down the track, whose leaderboards hold only
-runs the server played again, and whose races put friends on the same track at the
-same moment with their voices in each other's ears. This chapter shows where each of
-those lives and what to change to make the game yours.
+operations console with <<skirmish-implementors-guide,Skirmish>>. This chapter shows
+where each part lives and what to change to make the game yours.
 
 [[dash-launch]]
 === Running it
