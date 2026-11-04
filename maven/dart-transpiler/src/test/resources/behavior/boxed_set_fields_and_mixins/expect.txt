@@ -1,0 +1,11 @@
+7 7 8 true
+4 4 8 true true
+1.5 1.5 2.5 1.5
+true true 3.0
+3.0 true
+2.5 2.5
+true true 6 true
+true true 0 true
+1 b 1 2
+1 2
+5 false

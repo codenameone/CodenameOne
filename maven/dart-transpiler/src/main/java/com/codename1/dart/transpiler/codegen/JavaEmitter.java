@@ -212,8 +212,8 @@ public final class JavaEmitter {
     /// each one a covariant override of all the others; call sites unbox by the static Dart
     /// type (boxedSetCallCast). Sets whose returns are all primitive, or all references, are
     /// untouched and keep their primitive returns.
-    private final java.util.Set<MethodDecl> boxedReturnMembers = java.util.Collections.newSetFromMap(
-            new java.util.IdentityHashMap<MethodDecl, Boolean>());
+    private final java.util.Set<Object> boxedReturnMembers = java.util.Collections.newSetFromMap(
+            new java.util.IdentityHashMap<Object, Boolean>());
 
     private void computeBoxedReturnSets() {
         final Map<Object, Object> parent = new java.util.IdentityHashMap<Object, Object>();
@@ -251,7 +251,9 @@ public final class JavaEmitter {
         }
         for (List<Object> set : sets.values()) {
             boolean hasRef = false;
-            List<MethodDecl> prims = new ArrayList<MethodDecl>();
+            // Fields too: a field is the getter of its set, so `final int area` over `num get
+            // area` boxes its get$ accessor and every getter bridge to it (pinnedFieldGetter).
+            List<Object> prims = new ArrayList<Object>();
             for (Object d : set) {
                 ClassDecl owner = ownerOf.get(d);
                 TypeRef rt = d instanceof MethodDecl ? ((MethodDecl) d).returnType : ((FieldDecl) d).type;
@@ -267,8 +269,8 @@ public final class JavaEmitter {
                 String jt = javaType(rt, false, new Ctx(owner));
                 if (!isJavaPrimitive(jt)) {
                     hasRef = true;
-                } else if (d instanceof MethodDecl) {
-                    prims.add((MethodDecl) d);
+                } else {
+                    prims.add(d);
                 }
             }
             if (hasRef) {
@@ -280,7 +282,7 @@ public final class JavaEmitter {
         for (Map.Entry<ClassDecl, Map<String, List<Object>>> e : perClass.entrySet()) {
             for (Map.Entry<String, List<Object>> k : e.getValue().entrySet()) {
                 for (Object d : k.getValue()) {
-                    if (d instanceof MethodDecl && boxedReturnMembers.contains(d)) {
+                    if (boxedReturnMembers.contains(d)) {
                         java.util.Set<String> keys = boxedReturnKeys.get(e.getKey());
                         if (keys == null) {
                             keys = new HashSet<String>();
@@ -2135,7 +2137,8 @@ public final class JavaEmitter {
         for (FieldDecl f : mx.fields) {
             TypeRef ft = fieldType(f, ctx);
             String jt = javaType(ft, false, ctx);
-            body.append("    ").append(jt).append(" get$").append(f.name).append("();\n");
+            String pinnedGet = pinnedFieldGetter(mx, f, ctx);
+            body.append("    ").append(pinnedGet != null ? pinnedGet : jt).append(" get$").append(f.name).append("();\n");
             body.append("    void set$").append(f.name).append('(').append(jt).append(" v);\n\n");
         }
         for (MethodDecl m : mx.methods) {
@@ -2199,7 +2202,11 @@ public final class JavaEmitter {
             if (m.typeParams != null && !m.typeParams.isEmpty()) {
                 body.append('<').append(String.join(", ", m.typeParams)).append("> ");
             }
-            body.append(m.isSetter ? "void" : javaType(rt, false, ctx))
+            String mxRet = m.isSetter ? "void" : javaType(rt, false, ctx);
+            if (!m.isSetter && isJavaPrimitive(mxRet) && boxedReturnKey(mx, m.name, m.isGetter)) {
+                mxRet = boxedJava(mxRet);
+            }
+            body.append(mxRet)
                     .append(' ').append(m.isGetter ? m.name : m.name).append('(').append(lead);
             for (int i = 0; i < m.params.size(); i++) {
                 Param pm = m.params.get(i);
@@ -2622,7 +2629,8 @@ public final class JavaEmitter {
                 }
                 if (!lazyMixinField) {
                     body.append(";\n");
-                    body.append("    public ").append(jt).append(" get$").append(f.name)
+                    String pinnedGet = pinnedFieldGetter(c, f, ctx);
+                    body.append("    public ").append(pinnedGet != null ? pinnedGet : jt).append(" get$").append(f.name)
                             .append("() {\n        return ").append(f.name).append(";\n    }\n");
                     body.append("    public void set$").append(f.name).append('(').append(jt)
                             .append(" v) {\n        this.").append(f.name).append(" = v;\n    }\n\n");
@@ -3207,7 +3215,7 @@ public final class JavaEmitter {
                 continue;
             }
             String jt = javaType(fieldType(f, ctx), false, ctx);
-            String gh = jt + " " + f.name + "()";
+            String gh = boxedBridgeReturn(c, f.name, jt) + " " + f.name + "()";
             if (seen.add(gh)) {
                 rec.heads.add(gh);
                 body.append("    default ").append(gh).append(" {\n        return get$").append(f.name)
@@ -3609,6 +3617,12 @@ public final class JavaEmitter {
                     continue;
                 }
                 FieldDecl f = findFieldInChain(c, g.name);
+                if (f == null && findMixinMember(c, g.name, true) instanceof FieldDecl
+                        && !(findMixinMember(c, g.name, false) instanceof MethodDecl)) {
+                    // `int level` in a mixin applied here meets the implemented `num get
+                    // level` too: the applying class holds it behind get$level.
+                    f = (FieldDecl) findMixinMember(c, g.name, true);
+                }
                 if (f != null) {
                     TypeRef ft = fieldType(f, ctx);
                     String jt = javaType(ft, false, ctx);
@@ -3620,6 +3634,14 @@ public final class JavaEmitter {
                     if (gt != null && !javaType(gt, false, ctx).equals(jt)) {
                         val = coerce(new Out(val, ft), gt, ctx);
                         jt = javaType(gt, false, ctx);
+                    }
+                    if (boxedReturnKey(c, g.name, true) && isJavaPrimitive(javaType(ft, false, ctx))) {
+                        // One boxed bridge serves every implemented getter of the set.
+                        jt = boxedJava(javaType(ft, false, ctx));
+                        val = "get$" + g.name + "()";
+                    }
+                    if (!firstBridgeHead(c, g.name + "()")) {
+                        continue;
                     }
                     sb.append("    public ").append(jt).append(' ')
                             .append(g.name).append("() {\n        return ").append(val)
@@ -3716,8 +3738,14 @@ public final class JavaEmitter {
             String gjt = gt == null ? jt : javaType(gt, false, ctx);
             String val = gt == null ? "get$" + f.name + "()"
                     : coerce(new Out("get$" + f.name + "()", ft), gt, ctx);
-            sb.append("    public ").append(gjt).append(' ').append(f.name)
-                    .append("() {\n        return ").append(val).append(";\n    }\n\n");
+            if (isJavaPrimitive(jt) && boxedReturnKey(c, f.name, true)) {
+                gjt = boxedJava(jt);
+                val = "get$" + f.name + "()";
+            }
+            if (firstBridgeHead(c, f.name + "()")) {
+                sb.append("    public ").append(gjt).append(' ').append(f.name)
+                        .append("() {\n        return ").append(val).append(";\n    }\n\n");
+            }
             if (!f.isFinal && !f.isConst && findSetterInChain(sup, f.name) != null) {
                 sb.append("    public void ").append(f.name).append('(').append(jt)
                         .append(" v) {\n        set$").append(f.name).append("(v);\n    }\n\n");
@@ -4268,6 +4296,11 @@ public final class JavaEmitter {
     private String pinnedCallBox(ClassDecl pc, MethodDecl m, Ctx ctx) {
         for (ClassDecl k = pc; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             if (k.methods.contains(m)) {
+                if (inBoxedReturnSet(m)) {
+                    // Boxed by its override set, mixins included (computeBoxedReturnSets).
+                    TypeRef brt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
+                    return javaType(brt, true, ctx);
+                }
                 if (k.isMixin || (interfacePinnedReturn(k, m, ctx) == null && !bridgedToBoxedReturn(k, m, ctx))) {
                     return null;
                 }
@@ -4306,35 +4339,57 @@ public final class JavaEmitter {
     /// type serves. Readers that know the subclass cast the value back to the field's type.
     private String pinnedFieldGetter(ClassDecl c, FieldDecl f, Ctx ctx) {
         // Mutable fields too: `int x` over `covariant num x` -- its setter is bridged by
-        // covariantFieldSetterBridges, and the getter must return the inherited Number.
-        if (f.isStatic) {
+        // covariantFieldSetterBridges, and the getter must return a boxed value. The override
+        // set (computeBoxedReturnSets) is the one source of truth: it reaches superclasses,
+        // interfaces and mixins alike, so the accessor agrees with every getter it meets.
+        if (f.isStatic || !boxedReturnMembers.contains(f)) {
             return null;
         }
-        TypeRef ft = fieldType(f, ctx);
-        if (ft == null || !isJavaPrimitive(javaType(ft, false, ctx))) {
-            return null;
+        String jt = javaType(fieldType(f, ctx), false, ctx);
+        return isJavaPrimitive(jt) ? boxedJava(jt) : null;
+    }
+
+    /// The Java return of a get-bridge `name()` that class {@code c} emits over a value of
+    /// Java type {@code jt}: boxed when the getter's override set is (computeBoxedReturnSets).
+    private String boxedBridgeReturn(ClassDecl c, String name, String jt) {
+        return isJavaPrimitive(jt) && boxedReturnKey(c, name, true) ? boxedJava(jt) : jt;
+    }
+
+    /// Bridge heads already written per class: implementerBridges runs once per implemented
+    /// type, and two of them boxed to the same return would declare one method twice.
+    private final Map<ClassDecl, java.util.Set<String>> bridgeHeadsDone =
+            new java.util.IdentityHashMap<ClassDecl, java.util.Set<String>>();
+
+    private boolean firstBridgeHead(ClassDecl c, String head) {
+        java.util.Set<String> s = bridgeHeadsDone.get(c);
+        if (s == null) {
+            s = new HashSet<String>();
+            bridgeHeadsDone.put(c, s);
         }
-        Ast.MethodDecl probe = new Ast.MethodDecl();
-        probe.name = f.name;
-        probe.isGetter = true;
-        TypeRef over = overriddenProgramReturn(c, probe, new HashSet<String>(), ctx);
-        if (over == null || over.is("void")) {
-            return null;
-        }
-        String baseRet = javaType(over, false, ctx);
-        return isJavaPrimitive(baseRet) || "void".equals(baseRet) ? null : baseRet;
+        return s.add(head);
     }
 
     /// A get$ read {@code code} of field {@code f}, declared by {@code pc} or a superclass of
     /// it, cast back to the field's own type when pinnedFieldGetter pinned its accessor.
     private String pinnedFieldRead(ClassDecl pc, FieldDecl f, String code, Ctx ctx) {
-        for (ClassDecl k = pc; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
-            if (k.fields.contains(f)) {
-                return pinnedFieldGetter(k, f, ctx) == null ? code
-                        : "((" + javaType(fieldType(f, ctx), true, ctx) + ") (Object) " + code + ")";
-            }
+        // The field's own membership decides, whichever class (or mixin) declares it.
+        // Unboxed again when the field is primitive, so `==` compares values, not boxes.
+        String pin = pinnedFieldGetter(pc, f, ctx);
+        if (pin == null) {
+            return code;
         }
-        return code;
+        String prim = javaType(fieldType(f, ctx), false, ctx);
+        return "((" + prim + ") (" + pin + ") (Object) " + code + ")";
+    }
+
+    private static final java.util.regex.Pattern PINNED_FIELD_READ = java.util.regex.Pattern.compile(
+            "\\(\\((?:[a-z]+\\) \\()?[A-Za-z_.]+\\) \\(Object\\) (.+\\.get\\$[A-Za-z0-9_$]+\\(\\))\\)");
+
+    /// An assignment target read back through pinnedFieldRead, without its cast: the
+    /// accessor read `x.get$f()` the setter rewrite recognizes.
+    private static String unpinnedFieldRead(String code) {
+        java.util.regex.Matcher mt = PINNED_FIELD_READ.matcher(code);
+        return mt.matches() ? mt.group(1) : code;
     }
 
     /// A getter read {@code code} on a receiver of class {@code pc}, cast back to the getter's
@@ -19373,7 +19428,7 @@ public final class JavaEmitter {
             if (f != null) {
                 if (cc.isMixin && !f.isStatic) {
                     // interface default methods reach mixin state via accessors
-                    return new Out("this.get$" + n + "()", fieldType(f, ctx));
+                    return new Out(pinnedFieldRead(cc, f, "this.get$" + n + "()", ctx), fieldType(f, ctx));
                 }
                 if (isLazyStatic(f) || isLateChecked(f, cc)) {
                     return new Out((f.isStatic ? javaClassName(cc) : "this") + ".get$" + n + "()", fieldType(f, ctx));
@@ -19420,7 +19475,7 @@ public final class JavaEmitter {
                             }
                             ft = substituteTypeParams(ft, sub);
                         }
-                        return new Out("this.get$" + n + "()", ft);
+                        return new Out(pinnedFieldRead(cc, mf, "this.get$" + n + "()", ctx), ft);
                     }
                 }
             }
@@ -21074,12 +21129,13 @@ public final class JavaEmitter {
             }
             Object mixF = findMixinMember(pc, name, true);
             if (mixF instanceof FieldDecl) {
-                return new Out(target.code + ".get$" + name + "()",
+                return new Out(pinnedFieldRead(pc, (FieldDecl) mixF, target.code + ".get$" + name + "()", ctx),
                         asSeenFrom(fieldType((FieldDecl) mixF, ctx), mixF, null, pc, tt));
             }
             Object mixG = findMixinMember(pc, name, false);
             if (mixG instanceof MethodDecl && ((MethodDecl) mixG).isGetter) {
-                return new Out(target.code + "." + name + "()",
+                return new Out(boxedSetCallCast((MethodDecl) mixG, ((MethodDecl) mixG).returnType,
+                        target.code + "." + name + "()", ctx),
                         asSeenFrom(((MethodDecl) mixG).returnType, mixG, null, pc, tt));
             }
             // field/getter inherited from a program superclass
@@ -22099,6 +22155,7 @@ public final class JavaEmitter {
             Out lhs = emitExpr(a.lhs, null, ctx);
             Lazy rl = emitLazyOperand(a.rhs, lhs.type, ctx, 1);
             Out rhs = rl.out;
+            lhs = new Out(unpinnedFieldRead(lhs.code), lhs.type, lhs.fn);
             boolean accessor = lhs.code.endsWith("()") && lhs.code.contains(".get$");
             if (rl.lifts()) {
                 // The value lifted statements (`cache ??= [...load()]`); they run only
@@ -22382,7 +22439,7 @@ public final class JavaEmitter {
                 ctx.writeTarget = savedTarget;
             }
         }
-        String lcode = lhs.code;
+        String lcode = unpinnedFieldRead(lhs.code);
         // A member read through an accessor method (`list.length()`, a runtime getter) is
         // written through its setter overload, `list.length(v)`: as an expression-bodied
         // setter (`set length(int v) => _items.length = v;`) it fell through to
