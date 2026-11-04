@@ -14579,10 +14579,16 @@ public final class JavaEmitter {
     /// reference, a lambda the cast applies to): `(type) code`.
     private String castToBare(String type, Out o) {
         String recast = recastSigned(type, o);
-        return recast != null ? recast : "(" + type + ") " + o.code;
+        return recast != null ? recast : castToBare(type, o.code);
     }
 
     private String castToBare(String type, String code) {
+        // `(Object) -0.5` is not a cast in Java but the subtraction `Object - 0.5`: a
+        // cast to a reference type cannot take a unary +/- operand unparenthesized
+        // (`-0.5 as dynamic`).
+        if (code.startsWith("-") || code.startsWith("+")) {
+            code = "(" + code + ")";
+        }
         return "(" + type + ") " + code;
     }
 
@@ -29432,6 +29438,32 @@ public final class JavaEmitter {
             Out other = coreArg(pos.get(0), new TypeRef("num"), ctx);
             return new Out("DartComparable.compare(" + boxNumber(new Out(target.code, tt)) + ", "
                     + boxNumber(other) + ")", TypeRef.INT);
+        }
+        if ((tt.is("int") || tt.is("double") || tt.is("num") && !program.classes.containsKey("num"))
+                && (n.equals("toStringAsPrecision") && pos.size() == 1
+                    || n.equals("toStringAsExponential") && pos.size() <= 1
+                    || n.equals("truncateToDouble") && pos.isEmpty())) {
+            // Each reads an int receiver as its double, as Dart's int does
+            // (int.toStringAsExponential is toDouble().toStringAsExponential()).
+            ctx.importClass("dart.runtime.DartRuntime");
+            String d = tt.is("double") ? target.code
+                    : tt.is("int") ? "((double) " + paren(target.code) + ")"
+                    : "DartRuntime.numToDouble(" + target.code + ")";
+            if (n.equals("truncateToDouble")) {
+                return new Out("DartRuntime.truncateToDouble(" + d + ")", TypeRef.DOUBLE);
+            }
+            if (pos.isEmpty()) {
+                return new Out("DartRuntime.toStringAsExponential(" + d + ")", TypeRef.STRING);
+            }
+            TypeRef optInt = new TypeRef("int");
+            optInt.nullable = true;
+            Out arg = coreArg(pos.get(0), n.equals("toStringAsExponential") ? optInt : TypeRef.INT, ctx);
+            if (n.equals("toStringAsExponential") && !isNonNullKind(arg.type, "int")) {
+                // `int? digits`, null meaning the shortest form: the boxed overload.
+                return new Out("DartRuntime.toStringAsExponentialOrShortest(" + d + ", (Long) " + paren(boxIfPrimitive(arg, ctx)) + ")",
+                        TypeRef.STRING);
+            }
+            return new Out("DartRuntime." + n + "(" + d + ", " + arg.code + ")", TypeRef.STRING);
         }
         if (tt.is("int")) {
             if (n.equals("toString")) {

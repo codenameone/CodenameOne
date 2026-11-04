@@ -1296,6 +1296,26 @@ public final class DartRuntime {
             end--;
         }
         digits = digits.substring(0, end);
+        // Java's Double.toString before JDK 19 is not always the SHORTEST round
+        // trip (JDK-4511638): 5e-324 printed as 4.9E-324, and some 17-digit
+        // outputs have a 16-digit twin. Try fewer digits while they still read
+        // back as the same double -- only for those two shapes, as the exact
+        // rounding is multi-word arithmetic.
+        double a = Math.abs(d);
+        while (digits.length() > 1 && (digits.length() >= 16 || a < 2.2250738585072014E-308)) {
+            Object[] r = roundedDigits(a, digits.length() - 1);
+            String c = (String) r[0];
+            int ce = ((Integer) r[1]).intValue();
+            if (Double.parseDouble(c.charAt(0) + "." + c.substring(1) + "0E" + ce) != a) {
+                break;
+            }
+            end = c.length();
+            while (end > 1 && c.charAt(end - 1) == '0') {
+                end--;
+            }
+            digits = c.substring(0, end);
+            n = ce + 1;
+        }
         int k = digits.length();
         StringBuilder out = new StringBuilder();
         if (d < 0) {
@@ -1412,6 +1432,202 @@ public final class DartRuntime {
         digits = padded.append(digits).toString();
         int split = digits.length() - n;
         return sb.append(digits, 0, split).append('.').append(digits, split, digits.length()).toString();
+    }
+
+    /**
+     * Dart's {@code num.toStringAsPrecision(precision)}: {@code precision}
+     * significant digits (1 through 21) of the double's EXACT value, rounded
+     * half up as Dart's double-conversion does, in fixed notation unless the
+     * decimal exponent is below -6 or at least {@code precision}, when it is
+     * exponential (1.2e+2). The sign bit decides the sign, so -0.0 gives -0.
+     * Hand-written over the multi-word integers below: neither vm/JavaAPI nor
+     * Ports/CLDC11 has String.format or BigDecimal.
+     */
+    public static String toStringAsPrecision(double d, long precision) {
+        if (precision < 1 || precision > 21) {
+            throw new dart.core.RangeError("Invalid value: precision must be in 1..21: " + precision);
+        }
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return nonFinite(d);
+        }
+        int p = (int) precision;
+        StringBuilder sb = new StringBuilder();
+        if (Double.doubleToLongBits(d) < 0) {
+            sb.append('-');
+        }
+        String digits;
+        int e;
+        if (d == 0) {
+            digits = zeros(p);
+            e = 0;
+        } else {
+            Object[] r = roundedDigits(Math.abs(d), p);
+            digits = (String) r[0];
+            e = ((Integer) r[1]).intValue();
+        }
+        if (e < -6 || e >= p) {
+            return appendExponential(sb, digits, e);
+        }
+        if (e >= 0) {
+            sb.append(digits, 0, e + 1);
+            if (p > e + 1) {
+                sb.append('.').append(digits, e + 1, p);
+            }
+            return sb.toString();
+        }
+        return sb.append("0.").append(zeros(-e - 1)).append(digits).toString();
+    }
+
+    /** Dart's {@code num.toStringAsExponential()}: the shortest digits that read back as the value. */
+    public static String toStringAsExponential(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return nonFinite(d);
+        }
+        StringBuilder sb = new StringBuilder();
+        if (Double.doubleToLongBits(d) < 0) {
+            sb.append('-');
+        }
+        if (d == 0) {
+            return sb.append("0e+0").toString();
+        }
+        // Dart's toString already prints the shortest round-trip digits; read them
+        // back out of it rather than run a second shortest-digits algorithm.
+        String s = str(Math.abs(d));
+        int exp = 0;
+        int ePos = s.indexOf('e');
+        if (ePos >= 0) {
+            String es = s.substring(ePos + 1);
+            if (es.startsWith("+")) {
+                es = es.substring(1);
+            }
+            exp = Integer.parseInt(es);
+            s = s.substring(0, ePos);
+        }
+        int dot = s.indexOf('.');
+        String all = s;
+        if (dot >= 0) {
+            all = s.substring(0, dot) + s.substring(dot + 1);
+            exp -= s.length() - dot - 1;
+        }
+        int start = 0;
+        while (start < all.length() - 1 && all.charAt(start) == '0') {
+            start++;
+        }
+        int end = all.length();
+        while (end > start + 1 && all.charAt(end - 1) == '0') {
+            end--;
+            exp++;
+        }
+        String digits = all.substring(start, end);
+        return appendExponential(sb, digits, digits.length() - 1 + exp);
+    }
+
+    /** Dart's {@code num.toStringAsExponential(fractionDigits)}, for 0 through 20 digits. */
+    public static String toStringAsExponential(double d, long fractionDigits) {
+        if (fractionDigits < 0 || fractionDigits > 20) {
+            throw new dart.core.RangeError("Invalid value: fractionDigits must be in 0..20: "
+                    + fractionDigits);
+        }
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return nonFinite(d);
+        }
+        int p = (int) fractionDigits + 1;
+        StringBuilder sb = new StringBuilder();
+        if (Double.doubleToLongBits(d) < 0) {
+            sb.append('-');
+        }
+        if (d == 0) {
+            return appendExponential(sb, zeros(p), 0);
+        }
+        Object[] r = roundedDigits(Math.abs(d), p);
+        return appendExponential(sb, (String) r[0], ((Integer) r[1]).intValue());
+    }
+
+    /** Dart's {@code toStringAsExponential(null)}: the shortest form, as with no argument. */
+    public static String toStringAsExponentialOrShortest(double d, Long fractionDigits) {
+        return fractionDigits == null ? toStringAsExponential(d) : toStringAsExponential(d, fractionDigits.longValue());
+    }
+
+    /**
+     * Dart's {@code double.truncateToDouble()}: toward zero, keeping the sign, so
+     * -0.5 gives -0.0; NaN, the infinities and values already integral (every
+     * double of 2^52 or more) come back unchanged.
+     */
+    public static double truncateToDouble(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) >= 4503599627370496.0) {
+            return d;
+        }
+        double t = (double) (long) d;
+        return t == 0 && Double.doubleToLongBits(d) < 0 ? -0.0 : t;
+    }
+
+    private static String nonFinite(double d) {
+        return Double.isNaN(d) ? "NaN" : d > 0 ? "Infinity" : "-Infinity";
+    }
+
+    private static String zeros(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            sb.append('0');
+        }
+        return sb.toString();
+    }
+
+    private static String appendExponential(StringBuilder sb, String digits, int e) {
+        sb.append(digits.charAt(0));
+        if (digits.length() > 1) {
+            sb.append('.').append(digits, 1, digits.length());
+        }
+        return sb.append('e').append(e < 0 ? '-' : '+').append(Math.abs(e)).toString();
+    }
+
+    /**
+     * The first {@code p} significant digits of positive finite {@code a}, rounded
+     * half up from its exact binary value, and the decimal exponent of the first
+     * one, as {String, Integer}. m * 2^e with e < 0 is exactly m * 5^-e * 10^e.
+     */
+    private static Object[] roundedDigits(double a, int p) {
+        long bits = Double.doubleToLongBits(a);
+        int biased = (int) ((bits >>> 52) & 0x7ff);
+        long mantissa = bits & 0xfffffffffffffL;
+        int exp;
+        if (biased == 0) {
+            exp = -1074;
+        } else {
+            mantissa |= 1L << 52;
+            exp = biased - 1075;
+        }
+        int[] v = fromLong(mantissa);
+        int scale = 0;
+        if (exp >= 0) {
+            v = shiftLeft(v, exp);
+        } else {
+            for (int i = 0; i < -exp; i++) {
+                v = mulSmall(v, 5);
+            }
+            scale = exp;
+        }
+        String all = toDecimal(v);
+        int e = all.length() - 1 + scale;
+        if (all.length() <= p) {
+            return new Object[] {all + zeros(p - all.length()), Integer.valueOf(e)};
+        }
+        char[] c = all.substring(0, p).toCharArray();
+        if (all.charAt(p) >= '5') {
+            int i = p - 1;
+            while (i >= 0 && c[i] == '9') {
+                c[i] = '0';
+                i--;
+            }
+            if (i < 0) {
+                // 9.99 -> 10.0: one more leading digit, and the last one falls off.
+                c[0] = '1';
+                e++;
+            } else {
+                c[i]++;
+            }
+        }
+        return new Object[] {new String(c), Integer.valueOf(e)};
     }
 
     // Minimal unsigned multi-word integers for toStringAsFixed: little-endian

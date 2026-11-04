@@ -272,7 +272,9 @@ public final class Dyn {
             case "isNaN":
                 return Boolean.valueOf(dbl && Double.isNaN(n.doubleValue()));
             case "isNegative":
-                return Boolean.valueOf(n.doubleValue() < 0);
+                // Dart: -0.0 is negative (the sign bit decides), NaN is not; `< 0`
+                // answered false for -0.0.
+                return Boolean.valueOf(dart.core.CoreStatics.isNegative(n.doubleValue()));
             case "isFinite":
                 return Boolean.valueOf(!dbl || !(Double.isNaN(n.doubleValue()) || Double.isInfinite(n.doubleValue())));
             case "isInfinite":
@@ -458,7 +460,7 @@ public final class Dyn {
             case "containsKey": case "containsValue": case "remove": case "addAll": case "forEach": case "add":
             case "removeAt": case "sort": case "map": case "where": case "any": case "every":
             case "reduce": case "expand": case "join": case "elementAt": case "skip": case "take": case "endsWith":
-            case "split": case "codeUnitAt": case "compareTo": case "toStringAsFixed": case "remainder":
+            case "split": case "codeUnitAt": case "compareTo": case "toStringAsFixed": case "toStringAsPrecision": case "remainder":
                 return 1;
             case "putIfAbsent": case "insert": case "indexOf": case "sublist": case "firstWhere": case "fold":
             case "substring": case "replaceAll": case "padLeft": case "clamp": case "contains": case "startsWith":
@@ -809,6 +811,14 @@ public final class Dyn {
                 return dbl ? (Object) Double.valueOf(Math.abs(d)) : (Object) Long.valueOf(Math.abs(n.longValue()));
             case "toStringAsFixed":
                 return DartRuntime.toStringAsFixed(d, num(arg(a, 0)).longValue());
+            case "toStringAsPrecision":
+                return DartRuntime.toStringAsPrecision(d, num(arg(a, 0)).longValue());
+            case "toStringAsExponential":
+                // An int receiver formats as its double, as Dart's int does.
+                return a.length == 0 || a[0] == null ? DartRuntime.toStringAsExponential(d)
+                        : DartRuntime.toStringAsExponential(d, num(a[0]).longValue());
+            case "truncateToDouble":
+                return Double.valueOf(DartRuntime.truncateToDouble(d));
             case "toRadixString":
                 if (dbl) {
                     return NO_MEMBER;
