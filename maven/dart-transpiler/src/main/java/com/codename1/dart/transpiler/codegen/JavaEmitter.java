@@ -9751,6 +9751,12 @@ public final class JavaEmitter {
     /// key}, so the adapter is itself the tear-off's value (equal by receiver and method).
     private String[] adapterTearOffKey;
 
+    /// The function a static or top-level tear-off adapter stands for (`C::opt`), set by
+    /// its caller for the next tearOffAdapter only. A static function captures nothing, so
+    /// its adapter is canonicalized (DartRuntime.canonTearOff): Dart makes `C.f == C.f` and
+    /// `identical(C.f, C.f)` true, which a fresh lambda per tear-off was not.
+    private String adapterStaticKey;
+
     private static final java.util.regex.Pattern MARKER_CAST = java.util.regex.Pattern.compile(
             "((?:[\\w$]+\\.)*DartFnSigs)\\.(M\\d+)");
     private static final java.util.regex.Pattern SIGNED_SAM_CAST = java.util.regex.Pattern.compile(
@@ -10017,6 +10023,22 @@ public final class JavaEmitter {
     /// context gave it no type) is bound to its own SAM there, since a method reference
     /// cannot be an Object, and given its identity.
     private Out objectOperand(Expr e, Out o, Ctx ctx) {
+        if (o != null && o.fn != null && o.fn.kind == FnKind.METHOD_REF && o.code.equals(o.fn.bare)
+                && o.type != null && o.type.funcParams == null && e instanceof Ident
+                && ctx.lookup(((Ident) e).name) == null) {
+            // A top-level function declared with no return type (`f(x) => x`) is typed a bare
+            // Function, which names no SAM; its declaration gives the signature, returning dynamic.
+            Ast.FunctionDecl fd = program.functions.get(((Ident) e).name);
+            if (fd != null && (fd.returnType == null || fd.returnType.is("var") || isDynamicType(fd.returnType)) && fd.typeParams.isEmpty() && fd.params.stream().noneMatch(p -> p.optional || p.named || p.defaultValue != null)) {
+                TypeRef t = new TypeRef("Function");
+                t.funcParams = new ArrayList<TypeRef>();
+                for (Param p : fd.params) {
+                    t.funcParams.add(paramValueType(p));
+                }
+                t.funcReturn = TypeRef.DYNAMIC;
+                o = new Out(o.code, t, o.fn);
+            }
+        }
         if (o != null && o.fn == null && o.type != null && o.type.funcParams != null && o.type.funcReturn != null
                 && BARE_LAMBDA.matcher(o.code).matches() && functionSamProbe(o.type, ctx) != null) {
             // A closure (an extension tear-off, say) is no Object either until it has a SAM.
@@ -17441,6 +17463,8 @@ public final class JavaEmitter {
                 if (ft.funcRequired >= 0 && ft.funcRequired < ordered.size()) {
                     // Optional parameters: an adapter restores defaults (see tearOffAdapter).
                     final String lib = Program.libClassName(owner.fileName) + "." + n;
+                    // witnesses differ per instantiation and may name locals: keyed only without
+                    adapterStaticKey = wargs.isEmpty() ? lib.replace(".", "::") : null;
                     Out ad = tearOffAdapter(ordered, ft.funcParams, ft.funcReturn,
                             names -> lib + "(" + joinArgs(wargs, names) + ")", ctx);
                     if (ad != null) {
@@ -30847,6 +30871,9 @@ public final class JavaEmitter {
         // a bound tear-off is a value keyed by its receiver and method; a static one
         // (no receiver) is a constant reference already
         adapterTearOffKey = recv != null && !md.isStatic ? new String[] {recv, name} : null;
+        String staticOwner = recv != null ? recv : ctx.currentClass != null ? ctx.currentClass.name : null;
+        adapterStaticKey = md.isStatic && staticOwner != null && STATIC_TEAR_OFF.matcher(staticOwner + "::" + name).matches()
+                && ctx.lookup(staticOwner) == null ? staticOwner + "::" + name : null;
         return tearOffAdapter(md.params, types, retType, names -> {
             Call call = new Call().at(pos.file, pos.line, pos.col);
             call.name = name;
@@ -31032,6 +31059,8 @@ public final class JavaEmitter {
         adapterNullReturn = false;
         String[] tearKey = adapterTearOffKey;
         adapterTearOffKey = null;
+        String staticKey = adapterStaticKey;
+        adapterStaticKey = null;
         List<Param> ordered = new ArrayList<Param>();
         List<TypeRef> otypes = new ArrayList<TypeRef>();
         int required = 0;
@@ -31147,6 +31176,11 @@ public final class JavaEmitter {
                 code = "((" + sam + ") TearOff." + (rawSam.group(1) != null ? "v" : "f") + rawSam.group(2) + "("
                         + head + "(" + raw + ") " + lambda + "))";
             }
+        }
+        if (staticKey != null && tearKey == null && staticKey.indexOf('"') < 0) {
+            // One object per static function and view, as a method reference's is.
+            code = "DartRuntime.canonTearOff(\"" + staticKey + "\", \"" + sam
+                    + (marker != null ? " & " + marker : "") + "\", " + code + ")";
         }
         return new Out(code, ft);
     }
@@ -32985,6 +33019,12 @@ public final class JavaEmitter {
             final Node pos = posNode;
             TypeRef ret = body instanceof CtorCall ? ((CtorCall) body).type
                     : tearOffReturn != null ? tearOffReturn : TypeRef.DYNAMIC;
+            // A static method (`C.opt`), not instantiated: one value however often torn off.
+            if (body instanceof Call && ((Call) body).target instanceof Ident && typeArgs.isEmpty()) {
+                String sk = ((Ident) ((Call) body).target).name + "::" + ((Call) body).name;
+                adapterStaticKey = STATIC_TEAR_OFF.matcher(sk).matches()
+                        && ctx.lookup(((Ident) ((Call) body).target).name) == null ? sk : null;
+            }
             Out ad = tearOffAdapter(params, ptypes, ret, names -> {
                 for (int i = 0; i < ordered.size(); i++) {
                     Ident ref = new Ident();
