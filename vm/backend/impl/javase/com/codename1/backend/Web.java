@@ -245,6 +245,8 @@ public final class Web {
     /// JDK's spelling.
     private static final class Transport {
         private final TrackingSockets sockets;
+        /// The java.net.http clients a WebClient that requires HTTP/2 uses.
+        private final JdkHttp2.Clients http2 = new JdkHttp2.Clients();
 
         Transport(SSLSocketFactory sockets) {
             this.sockets = new TrackingSockets(sockets);
@@ -387,20 +389,11 @@ public final class Web {
         // http:// connection has no factory to track it by and expires there
         // on its own; it carries no credential.
         ((Transport) transport).sockets.closeAll();
+        ((Transport) transport).http2.close();
     }
 
     static Result request(WebClient client, String method, String url, List headers,
                           byte[] body) throws IOException {
-        if (client != null && client.isRequireHttp2()) {
-            // Said out loud, the way PATCH is: the request would otherwise go
-            // out over HTTP/1.1, the protocol the caller ruled out.
-            throw new IOException("The local Java SE runtime cannot make an HTTP/2 "
-                    + "request -- its client is HttpURLConnection, which speaks HTTP/1.1 "
-                    + "only. The packaged backend negotiates HTTP/2, so this is a "
-                    + "limitation of cn1:backend rather than of your code. Exercise "
-                    + "this path against the packaged binary, or leave HTTP/2 "
-                    + "preferred rather than required while developing.");
-        }
         Urls.requireHttp(url);
         // The request line's other field; see HeaderLines.requireMethod.
         HeaderLines.requireMethod(method);
@@ -453,6 +446,12 @@ public final class Web {
     /// the translated twin's rule, for the translated twin's reason.
     private static Result perform(WebClient client, String method, String url, List headers,
                                   byte[] body, List trace) throws IOException {
+        if (client != null && client.isRequireHttp2()) {
+            // HttpURLConnection speaks HTTP/1.1 only; the JDK's other client
+            // negotiates HTTP/2 and is refused if it does not get it.
+            return JdkHttp2.perform(client, ((Transport) client.transport(TRANSPORTS)).http2,
+                    method, url, headers, body, trace, maxResponseBytes());
+        }
         int connectTimeout = 30000;
         int readTimeout = 30000;
         int requestTimeout = 0;
@@ -719,8 +718,8 @@ public final class Web {
     static Exchange open(WebClient client, String method, String url, List headers,
                          long requestLength) throws IOException {
         if (client != null && client.isRequireHttp2()) {
-            throw new IOException("The local Java SE runtime cannot make an HTTP/2 "
-                    + "request; see Web.request");
+            throw new IOException("The local Java SE runtime cannot stream an HTTP/2 "
+                    + "exchange; Web.request makes the whole request over HTTP/2 instead");
         }
         Urls.requireHttp(url);
         HeaderLines.requireMethod(method);

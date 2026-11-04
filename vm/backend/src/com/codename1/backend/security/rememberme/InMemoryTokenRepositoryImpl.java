@@ -22,8 +22,11 @@
  */
 package com.codename1.backend.security.rememberme;
 
+import com.codename1.backend.security.SecuritySchema;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /// Remembered sign-ins kept in this process: gone when it stops, and unknown to
@@ -50,7 +53,8 @@ public final class InMemoryTokenRepositoryImpl implements PersistentTokenReposit
             return false;
         }
         bySeries.put(series, new PersistentRememberMeToken(current.getUsername(), series,
-                newTokenHash, lastUsed, expectedTokenHash));
+                newTokenHash, lastUsed, expectedTokenHash, current.getUserAgent(),
+                current.getIpAddress()));
         return true;
     }
 
@@ -75,6 +79,23 @@ public final class InMemoryTokenRepositoryImpl implements PersistentTokenReposit
     }
 
     /// How many series are stored.
+    @Override
+    public synchronized List<PersistentRememberMeToken> getTokensForUser(String username) {
+        List<PersistentRememberMeToken> out = new ArrayList<PersistentRememberMeToken>();
+        String key = SecuritySchema.usernameKey(username);
+        for (PersistentRememberMeToken token : bySeries.values()) {
+            if (key != null && key.equals(SecuritySchema.usernameKey(token.getUsername()))) {
+                out.add(token);
+            }
+        }
+        return out;
+    }
+
+    @Override
+    public synchronized boolean removeUserToken(String username, String series) {
+        return PersistentTokenRepository.super.removeUserToken(username, series);
+    }
+
     public synchronized int size() {
         return bySeries.size();
     }

@@ -873,16 +873,6 @@ installMissingGlobalDelegate(
   "Label.focusLostInternalMissing"
 );
 installMissingGlobalDelegate(
-  "cn1_com_codename1_ui_Label_getStyle_R_com_codename1_ui_plaf_Style",
-  "cn1_com_codename1_ui_Component_getStyle_R_com_codename1_ui_plaf_Style",
-  "Label.getStyleMissing"
-);
-installMissingGlobalDelegate(
-  "cn1_com_codename1_ui_Label_getUIManager_R_com_codename1_ui_plaf_UIManager",
-  "cn1_com_codename1_ui_Component_getUIManager_R_com_codename1_ui_plaf_UIManager",
-  "Label.getUIManagerMissing"
-);
-installMissingGlobalDelegate(
   "cn1_com_codename1_ui_Label_keyPressed_int",
   "cn1_com_codename1_ui_Component_keyPressed_int",
   "Label.keyPressedMissing"
@@ -3985,8 +3975,8 @@ const formGetActualPaneMethodId = "cn1_s_getActualPane_R_com_codename1_ui_Contai
 const formSetFocusedMethodId = "cn1_s_setFocused_com_codename1_ui_Component";
 const formLayoutContainerMethodId = "cn1_s_layoutContainer";
 const containerFindFirstFocusableMethodId = "cn1_s_findFirstFocusable_R_com_codename1_ui_Component";
-const displayGetInstanceMethodId = "cn1_com_codename1_ui_Display_getInstance_R_com_codename1_ui_Display";
 const displayShouldRenderSelectionMethodId = "cn1_s_shouldRenderSelection_R_boolean";
+const displayGetInstanceMethodId = "cn1_com_codename1_ui_Display_getInstance_R_com_codename1_ui_Display";
 let formInitLafDiagCount = 0;
 function emitFormInitLafDiag(line) {
   if (formInitLafDiagCount >= 80) {

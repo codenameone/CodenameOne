@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>cn1-app-kit</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>cn1-app-kit-backend</artifactId>
+    <packaging>jar</packaging>
+    <name>Codename One App Kit: server</name>
+    <!-- Not annotation processed here: the server that uses it is, and the
+         marker resource META-INF/codenameone/backend-library says so. -->
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

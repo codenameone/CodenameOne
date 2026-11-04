@@ -38,6 +38,7 @@ package com.codename1.util.regex;
 /// `UnicodeBlock.of` over every code point, with the script aliases and block
 /// names the JDK's `forName` methods accept (a block name's spaceless
 /// spelling is derived rather than stored).
+@com.codename1.impl.SharedWithBackend
 final class UnicodeTables {
     private static final String DIGITS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 

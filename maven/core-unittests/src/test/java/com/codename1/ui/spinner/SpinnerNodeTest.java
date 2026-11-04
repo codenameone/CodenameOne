@@ -22,6 +22,21 @@ public class SpinnerNodeTest extends UITestBase {
         assertTrue(node.getChildCount() > 0, "SpinnerNode should have children after layout");
     }
 
+    @FormTest
+    public void testSelectedIndexRoundTripsForEveryRow() {
+        // Issue #6165: with 365 rows, selecting "7" (index 6) read back as index 5.
+        SpinnerNode node = new SpinnerNode();
+        DefaultListModel<String> model = new DefaultListModel<>();
+        for (int i = 1; i <= 365; i++) {
+            model.addItem(Integer.toString(i));
+        }
+        node.setListModel(model);
+        for (int i = 0; i < 365; i++) {
+            node.setSelectedIndex(i);
+            assertEquals(i, node.getSelectedIndex(), "row " + (i + 1));
+        }
+    }
+
     public static class TestSpinnerNode extends SpinnerNode {
         public void doLayout() {
             layoutChildren();

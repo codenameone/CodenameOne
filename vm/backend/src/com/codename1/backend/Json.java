@@ -22,8 +22,10 @@
  */
 package com.codename1.backend;
 
+import com.codename1.impl.backend.JsonCodec;
 import com.codename1.io.JSONParser;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -59,6 +61,157 @@ public final class Json {
     /// Parses any JSON value. Throws IOException on anything malformed.
     public static Object parse(String json) throws IOException {
         return JSONParser.parseStrict(json);
+    }
+
+    /// Reads a JSON document into `type`, as Jackson's `readValue` does.
+    ///
+    /// ```java
+    /// Release release = Json.read(body, Release.class);
+    /// ```
+    ///
+    /// An application class is read by the codec the build generated for it --
+    /// the one a route taking it as a `@RequestBody` uses, so `@JsonProperty`,
+    /// `@JsonIgnore` and the rest mean the same thing here. The build writes a
+    /// codec for every class literal passed to this method, [#readList] and
+    /// [#convert] in the application's code, so name the class literally: a
+    /// `Class` that arrives in a variable is read only if some other use made the
+    /// build write its codec, and is refused with `IllegalStateException`
+    /// otherwise.
+    ///
+    /// `String`, the boxed numbers, `Boolean`, `Map`, `List` and `Object` need
+    /// no codec.
+    ///
+    /// @param json the document
+    /// @param type what to read it into
+    /// @return the value, or null for a JSON `null`
+    /// @throws IOException when `json` is not JSON
+    /// @throws IllegalArgumentException when the document does not fit `type`;
+    /// the message names where, as `$.items[2].due`
+    public static <T> T read(String json, Class<T> type) throws IOException {
+        return convert(parse(json), type);
+    }
+
+    /// Reads a JSON array of `element`, as Jackson's
+    /// `readValue(json, new TypeReference<List<T>>() {})` does.
+    ///
+    /// @param json the document, an array
+    /// @param element what each element is read into; see [#read(String, Class)]
+    /// @return the elements, in order
+    /// @throws IOException when `json` is not JSON
+    /// @throws IllegalArgumentException when it is not an array, or an element
+    /// does not fit `element`
+    public static <T> List<T> readList(String json, Class<T> element) throws IOException {
+        Object tree = parse(json);
+        if (!(tree instanceof List)) {
+            throw new IllegalArgumentException("$: expected an array, got " + describe(tree));
+        }
+        List in = (List) tree;
+        List<T> out = new ArrayList<T>(in.size());
+        for (Object item : in) {
+            out.add(convert(item, element));
+        }
+        return out;
+    }
+
+    /// Reads a document already parsed by [#parse] -- or a member of one -- into
+    /// `type`, as Jackson's `convertValue` does. See [#read(String, Class)].
+    ///
+    /// @param tree what [#parse] returned, or part of it
+    /// @param type what to read it into
+    /// @return the value, or null for null
+    /// @throws IllegalArgumentException when `tree` does not fit `type`
+    public static <T> T convert(Object tree, Class<T> type) {
+        if (type == null) {
+            throw new IllegalArgumentException("type is null");
+        }
+        if (tree == null) {
+            return null;
+        }
+        Object value = builtIn(tree, type);
+        if (value == null) {
+            JsonCodec.Registry codecs = JsonCodec.registry();
+            if (codecs == null) {
+                throw new IllegalStateException("No JSON codec for " + type.getName()
+                        + ": this binary has none. The build writes one for a class passed "
+                        + "literally to Json.read, Json.readList or Json.convert, or used by "
+                        + "a route; nothing reads a class by reflection.");
+            }
+            value = codecs.read(type, tree);
+        }
+        // Checked rather than cast: the translated runtime does not check a cast.
+        if (value != null && !type.isInstance(value)) {
+            throw new IllegalArgumentException("$: expected " + type.getName() + ", got "
+                    + describe(tree));
+        }
+        return (T) value;
+    }
+
+    /// `tree` as one of the types that need no codec, or null when `type` is not
+    /// one of them.
+    private static Object builtIn(Object tree, Class type) {
+        if (type == Object.class) {
+            return tree;
+        }
+        if (type == String.class || type == Boolean.class || type == Map.class
+                || type == List.class) {
+            if (!type.isInstance(tree)) {
+                throw new IllegalArgumentException("$: expected " + type.getName() + ", got "
+                        + describe(tree));
+            }
+            return tree;
+        }
+        if (type == Long.class || type == Integer.class || type == Double.class
+                || type == Float.class || type == Short.class || type == Byte.class) {
+            if (!(tree instanceof Number)) {
+                throw new IllegalArgumentException("$: expected a number, got "
+                        + describe(tree));
+            }
+            Number n = (Number) tree;
+            if (type == Double.class) {
+                return Double.valueOf(n.doubleValue());
+            }
+            if (type == Float.class) {
+                return Float.valueOf(n.floatValue());
+            }
+            if (tree instanceof Double && n.doubleValue() != Math.floor(n.doubleValue())) {
+                throw new IllegalArgumentException("$: expected a whole number, got " + tree);
+            }
+            if (tree instanceof Double && (n.doubleValue() >= 9.223372036854775807E18
+                    || n.doubleValue() < -9.223372036854775808E18)) {
+                // longValue() would clamp 1e30 to Long.MAX_VALUE without a word
+                throw new IllegalArgumentException("$: " + tree + " is out of range for "
+                        + type.getName());
+            }
+            long l = n.longValue();
+            if (type == Long.class) {
+                return Long.valueOf(l);
+            }
+            long min = type == Integer.class ? Integer.MIN_VALUE
+                    : type == Short.class ? Short.MIN_VALUE : Byte.MIN_VALUE;
+            long max = type == Integer.class ? Integer.MAX_VALUE
+                    : type == Short.class ? Short.MAX_VALUE : Byte.MAX_VALUE;
+            if (l < min || l > max) {
+                throw new IllegalArgumentException("$: " + l + " is out of range for "
+                        + type.getName());
+            }
+            return type == Integer.class ? (Object) Integer.valueOf((int) l)
+                    : type == Short.class ? (Object) Short.valueOf((short) l)
+                    : (Object) Byte.valueOf((byte) l);
+        }
+        return null;
+    }
+
+    private static String describe(Object tree) {
+        if (tree instanceof Map) {
+            return "an object";
+        }
+        if (tree instanceof List) {
+            return "an array";
+        }
+        if (tree instanceof String) {
+            return "a string";
+        }
+        return String.valueOf(tree);
     }
 
     // ------------------------------------------------------------------
@@ -226,6 +379,12 @@ public final class Json {
             writeString(out, Base64Url.encode((byte[]) value));
             return;
         }
+        JsonCodec.Registry codecs = JsonCodec.registry();
+        if (codecs != null && codecs.write(value, out)) {
+            // One of the application's own classes, through the codec the build
+            // wrote for it -- the same one a route answering with it uses.
+            return;
+        }
         writeString(out, String.valueOf(value));
     }
 
@@ -387,6 +546,21 @@ public final class Json {
             }
             out.append(']');
             return;
+        }
+        JsonCodec.Registry codecs = JsonCodec.registry();
+        if (codecs != null) {
+            // As the sink writer does: the two have to agree on an application
+            // class, or it is an object over one protocol and a string over the
+            // other.
+            ByteSink sink = new ByteSink(256);
+            if (codecs.write(value, sink)) {
+                try {
+                    out.append(new String(sink.bytes(), 0, sink.length(), "UTF-8"));
+                } catch (java.io.UnsupportedEncodingException never) {
+                    throw new IllegalStateException(never.toString(), never);
+                }
+                return;
+            }
         }
         writeString(out, value.toString());
     }

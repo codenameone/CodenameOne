@@ -28,6 +28,7 @@ import java.util.HashMap;
 /// #### See also
 ///
 /// - RE
+@com.codename1.impl.SharedWithBackend
 public class RECompiler {
     // Node flags
     static final int NODE_NORMAL = 0;                 // No flags (nothing special)

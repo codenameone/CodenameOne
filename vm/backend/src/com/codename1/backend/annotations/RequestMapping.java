@@ -38,4 +38,13 @@ public @interface RequestMapping {
     String[] value() default {};
     /// The HTTP verb, when this is used on a method directly.
     String method() default "";
+    /// Media types the route takes, matched against the request's
+    /// `Content-Type`; a request outside them is answered 415. Empty takes any.
+    /// On a class it applies to every route that names none of its own.
+    String[] consumes() default {};
+    /// Media types the route answers with, matched against the request's
+    /// `Accept`; a request that accepts none of them is answered 406. Empty
+    /// answers anything. The handler still sets the type of what it returns.
+    /// On a class it applies to every route that names none of its own.
+    String[] produces() default {};
 }

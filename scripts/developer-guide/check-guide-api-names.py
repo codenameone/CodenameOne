@@ -72,11 +72,15 @@ APP_ROOTS = [
 #
 # scripts/bastion is the same for the Bastion implementor's guide: its EthRpc
 # wraps the framework's EvmRpc, one letter away.
+#
+# scripts/dash is the same for the Dash implementor's guide: its Outfit, the
+# runner's colours, is two letters from Output.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                     for d in ('CodenameOne', 'Ports', 'vm', 'maven',
                               os.path.join('docs', 'demos'),
                               os.path.join('scripts', 'wayline'),
-                              os.path.join('scripts', 'bastion'))]
+                              os.path.join('scripts', 'bastion'),
+                              os.path.join('scripts', 'dash'))]
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
                        '.xml', '.gradle', '.swift', '.cs')
 

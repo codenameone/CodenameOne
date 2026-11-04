@@ -262,7 +262,7 @@ class MfaTest {
         assertEquals(10, hashes.size());
         java.util.Set<String> salts = new java.util.HashSet<String>();
         for (String hash : hashes) {
-            assertTrue(hash.startsWith("pbkdf2$"), hash);
+            assertTrue(hash.startsWith("{pbkdf2-sha256}pbkdf2$"), hash);
             salts.add(hash.split("\\$")[2]);
         }
         assertEquals(10, salts.size());

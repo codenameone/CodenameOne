@@ -22,6 +22,9 @@
  */
 package com.codename1.backend.security.rememberme;
 
+import com.codename1.backend.security.SecuritySchema;
+import java.util.List;
+
 /// Where remembered sign-ins are kept.
 public interface PersistentTokenRepository {
     /// Stores a new series.
@@ -47,4 +50,33 @@ public interface PersistentTokenRepository {
 
     /// Forgets every series of a user: every browser they were remembered in.
     void removeUserTokens(String username);
+
+    /// Every series a user holds, for a "signed-in devices" page: one per browser
+    /// or device that signed in with remember-me and has not signed out. A
+    /// repository that cannot list throws `UnsupportedOperationException`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `username`: the user, matched ignoring case as sign-in does
+    default List<PersistentRememberMeToken> getTokensForUser(String username) {
+        throw new UnsupportedOperationException(getClass().getName()
+                + " cannot list a user's remember-me tokens");
+    }
+
+    /// Revokes one series of a user, such as a device chosen on a "signed-in
+    /// devices" page. A series of another user is left alone, so a series taken
+    /// from a request cannot revoke someone else's sign-in.
+    ///
+    /// #### Returns
+    ///
+    /// whether the series belonged to the user and was removed
+    default boolean removeUserToken(String username, String series) {
+        PersistentRememberMeToken token = getTokenForSeries(series);
+        if (token == null || username == null || !SecuritySchema.usernameKey(username).equals(
+                SecuritySchema.usernameKey(token.getUsername()))) {
+            return false;
+        }
+        removeToken(series);
+        return true;
+    }
 }

@@ -960,6 +960,18 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void arithmeticAndStringTortureMatchesTheJvm(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsArithmeticTortureApp.java", "JsArithmeticTortureApp");
+
+        // The JVM's answer: FNV-1a over 8209 result lines, xor the line count.
+        assertEquals(415757853, result.result,
+                "long/int/string results must match the JVM line for line. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void intArithmeticWrapsAt32BitsLikeJava(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsIntOverflowApp.java", "JsIntOverflowApp");
 
@@ -1349,12 +1361,32 @@ class JavascriptRuntimeSemanticsTest {
         void patch(Path classesDir) throws Exception;
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void detachedMethodDetachesOnlyFromASynchronousCaller(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsDetachedApp.java", "JsDetachedApp", null,
+                "com/codename1/annotations/JavaScriptDetached.java",
+                "package com.codename1.annotations;\n"
+                + "@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.CLASS)\n"
+                + "@java.lang.annotation.Target(java.lang.annotation.ElementType.METHOD)\n"
+                + "public @interface JavaScriptDetached {}\n");
+        // 1: a plain-function caller continued before the body finished waiting;
+        // 2: a generator caller waited for it; 4: the detached body completed;
+        // 8: a monitor held across the split was released by its own thread.
+        assertEquals(15, result.result, "@JavaScriptDetached: " + result.rawMessage);
+    }
+
     private static WorkerRunResult translateAndRunFixture(CompilerHelper.CompilerConfig config, String fixtureName, String appName) throws Exception {
         return translateAndRunFixture(config, fixtureName, appName, null);
     }
 
     private static WorkerRunResult translateAndRunFixture(CompilerHelper.CompilerConfig config, String fixtureName, String appName,
             ClassPatcher patcher) throws Exception {
+        return translateAndRunFixture(config, fixtureName, appName, patcher, null, null);
+    }
+
+    private static WorkerRunResult translateAndRunFixture(CompilerHelper.CompilerConfig config, String fixtureName, String appName,
+            ClassPatcher patcher, String extraPath, String extraSource) throws Exception {
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("js-runtime-src");
@@ -1363,6 +1395,11 @@ class JavascriptRuntimeSemanticsTest {
 
         Files.write(sourceDir.resolve(appName + ".java"),
                 JavascriptTargetIntegrationTest.loadFixture(fixtureName).getBytes(StandardCharsets.UTF_8));
+        if (extraPath != null) {
+            Path extra = sourceDir.resolve(extraPath);
+            Files.createDirectories(extra.getParent());
+            Files.write(extra, extraSource.getBytes(StandardCharsets.UTF_8));
+        }
 
         JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
         if (patcher != null) {

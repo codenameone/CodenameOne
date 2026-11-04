@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security.ratelimit;
 
+import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.DataSource;
@@ -129,20 +130,20 @@ public final class JdbcRateLimiter implements RateLimiter {
             // The window has passed: start the next one. Only one of several
             // callers at this moment changes the row; the rest count in the
             // window it started.
-            if (dataSource.execute("UPDATE cn1_rate_limit SET window_start = ?, window_end = ?, hits = 1 WHERE "
+            if (dataSource.execute("UPDATE " + SecuritySchema.table("cn1_rate_limit") + " SET window_start = ?, window_end = ?, hits = 1 WHERE "
                     + "limit_key = ? AND window_start <= ?", new Object[] {Long.valueOf(now),
                         Long.valueOf(windowEnd(now)), row,
                         windowFloor}) == 1) {
                 return true;
             }
-            if (dataSource.queryOne("SELECT hits FROM cn1_rate_limit WHERE limit_key = ?",
+            if (dataSource.queryOne("SELECT hits FROM " + SecuritySchema.table("cn1_rate_limit") + " WHERE limit_key = ?",
                     new Object[] {row}) != null) {
                 // The row is there and neither statement took it: the window is
                 // full, or another caller has just started the next one.
                 return count(row, windowFloor);
             }
             try {
-                dataSource.execute("INSERT INTO cn1_rate_limit (limit_key, window_start, window_end, hits) "
+                dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_rate_limit") + " (limit_key, window_start, window_end, hits) "
                         + "VALUES (?, ?, ?, 1)", new Object[] {row, Long.valueOf(now), Long.valueOf(windowEnd(now))});
                 return true;
             } catch (IOException raced) {
@@ -164,7 +165,7 @@ public final class JdbcRateLimiter implements RateLimiter {
             return;
         }
         try {
-            dataSource.execute("DELETE FROM cn1_rate_limit WHERE limit_key = ?",
+            dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_rate_limit") + " WHERE limit_key = ?",
                     new Object[] {row(key)});
         } catch (IOException err) {
             System.err.println("cn1: the rate limit store could not be reached, so a count "
@@ -175,7 +176,7 @@ public final class JdbcRateLimiter implements RateLimiter {
     /// One more hit in the row's window, when that window is still open and
     /// has room.
     private boolean count(String row, Long windowFloor) throws IOException {
-        return dataSource.execute("UPDATE cn1_rate_limit SET hits = hits + 1 WHERE limit_key = ? "
+        return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_rate_limit") + " SET hits = hits + 1 WHERE limit_key = ? "
                 + "AND window_start > ? AND hits < ?", new Object[] {row, windowFloor,
                     Integer.valueOf(permits)}) == 1;
     }
@@ -186,7 +187,7 @@ public final class JdbcRateLimiter implements RateLimiter {
             return 1;
         }
         try {
-            java.util.Map found = dataSource.queryOne("SELECT window_start FROM cn1_rate_limit "
+            java.util.Map found = dataSource.queryOne("SELECT window_start FROM " + SecuritySchema.table("cn1_rate_limit") + " "
                     + "WHERE limit_key = ?", new Object[] {row(key)});
             Object start = found == null ? null : found.get("window_start");
             if (!(start instanceof Number)) {
@@ -212,7 +213,7 @@ public final class JdbcRateLimiter implements RateLimiter {
         long retention = olderThanSeconds * 1000L;
         long now = clock.currentTimeMillis();
         long cutoff = now < Long.MIN_VALUE + retention ? Long.MIN_VALUE : now - retention;
-        return dataSource.execute("DELETE FROM cn1_rate_limit WHERE window_end < ?",
+        return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_rate_limit") + " WHERE window_end < ?",
                 new Object[] {Long.valueOf(cutoff)});
     }
 

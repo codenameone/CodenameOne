@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /// this package's [Pattern]: `matches`, `split`, `replaceAll` and
 /// `replaceFirst`, with the JDK's syntax. Each takes the string as its
 /// first argument, so `s.split(";")` becomes `StringRegex.split(s, ";")`.
+@com.codename1.impl.SharedWithBackend
 public final class StringRegex {
 
     /// The pattern compiled last. Code that splits every line of a file by

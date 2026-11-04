@@ -148,7 +148,7 @@ class SecurityStoresTest {
             }
         }
         MigrationInfo[] info = Migrations.of(pool, SecuritySchema.migrations()).info();
-        assertEquals(11, info.length);
+        assertEquals(12, info.length);
         for (int i = 0; i < info.length; i++) {
             assertEquals(String.valueOf(i + 1), info[i].getVersion());
             assertEquals(MigrationState.SUCCESS, info[i].getState());
@@ -161,12 +161,12 @@ class SecurityStoresTest {
         assertEquals("passkeys", info[8].getDescription());
         assertEquals("rate limit expiry", info[9].getDescription());
         // Its own history, not the application's.
-        assertEquals(11L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
+        assertEquals(12L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM "
                 + "cn1_security_schema_history", null).get("n")).longValue());
         // And a second run finds nothing to do.
         MigrateResult again = Migrations.of(pool, SecuritySchema.migrations()).migrate();
         assertEquals(0, again.getMigrationsExecuted());
-        assertEquals("11", again.getTargetVersion());
+        assertEquals("12", again.getTargetVersion());
         assertEquals("security", SecuritySchema.migrations().getName());
         assertEquals("cn1_security_schema_history", SecuritySchema.migrations().getTable());
     }

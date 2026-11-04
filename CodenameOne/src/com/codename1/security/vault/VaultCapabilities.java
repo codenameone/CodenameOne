@@ -149,9 +149,19 @@ public final class VaultCapabilities {
         return device.requiresUserVerification();
     }
 
-    /// A line per capability, for a diagnostics screen.
+    /// Names the device protection these capabilities describe, without asking it
+    /// anything. The answers come from the platform, which can wait -- on the web
+    /// every one of them is a host query -- and a `toString` is called from places
+    /// that must not: string concatenation, logging, debuggers. Use [#describe()]
+    /// for the answers.
     @Override
     public String toString() {
+        return "VaultCapabilities[" + device.getClass().getName() + "]";
+    }
+
+    /// A line per capability, for a diagnostics screen. Asks the platform, so it
+    /// can take as long as [#supports(UnlockPolicy)] does.
+    public String describe() {
         return "session=" + supports(UnlockPolicy.SESSION_ONLY)
                 + ", remember=" + supports(UnlockPolicy.REMEMBER_DEVICE)
                 + ", userVerification=" + supports(UnlockPolicy.REQUIRE_USER_VERIFICATION)

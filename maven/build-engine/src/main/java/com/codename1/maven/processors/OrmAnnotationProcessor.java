@@ -408,7 +408,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 : ec.packageName + "." + ec.daoSimpleName;
         Object indexes=entityAnn.get("indexes");
         if(indexes instanceof List) for(Object index:(List)indexes) ec.indexes.add((AnnotationValues)index);
-        String table = entityAnn.getString("table");
+        String table = unquoteName(entityAnn.getString("table"));
         ec.tableName = (table == null || table.length() == 0) ? physical(ec.simpleName) : table;
         if (backend && tooLongForAnEngine(ec.tableName)) {
             ctx.error(cls, "@Entity " + ec.binaryName + " is stored in a table named '"
@@ -480,6 +480,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 AnnotatedClass converterClass=findType(pf.converter,ctx);
                 if(converterClass==null || !hasPublicNoArgConstructor(converterClass)) ctx.error(cls,"Converter requires a public no-arg constructor: "+pf.converter);
                 if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot declare converters");
+            }
+            // @Lob is accepted for a ported JPA entity and changes no column: every
+            // string and byte column is already a large one (see Lob). Only the type is checked.
+            if(f.getAnnotation("Lcom/codename1/annotations/db/Lob;")!=null && !("java.lang.String".equals(pf.javaType)
+                    || "byte[]".equals(pf.javaType) || "char[]".equals(pf.javaType) || pf.converter!=null)) {
+                ctx.error(cls,"@Lob applies to a String, char[] or byte[] field: "+pf.fieldName);
             }
             AnnotationValues temporal=f.getAnnotation("Lcom/codename1/annotations/db/Temporal;");
             if(temporal!=null) {
@@ -557,9 +563,23 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             String colType = null;
             boolean nullable = true;
             if (col != null) {
-                colName = col.getString("name");
+                colName = unquoteName(col.getString("name"));
                 colType = col.getString("type");
                 nullable = col.getBoolOrDefault("nullable", true);
+                pf.insertable = col.getBoolOrDefault("insertable", true);
+                pf.updatable = col.getBoolOrDefault("updatable", true);
+                String collation = col.getString("collation");
+                if (collation != null && collation.length() > 0) {
+                    if (!collationName(collation)) {
+                        // Spliced into DDL as it is.
+                        ctx.error(cls, "@Column(collation) must be letters, digits, underscores and hyphens: "
+                                + pf.fieldName + " declares \"" + collation + "\"");
+                    }
+                    pf.collation = collation;
+                }
+                if ((!pf.insertable || !pf.updatable) && (f.getAnnotation(ID_DESC) != null || pf.version)) {
+                    ctx.error(cls, "@Column(insertable/updatable=false) cannot be used on an @Id or @Version field: " + pf.fieldName);
+                }
             }
             pf.columnName = (colName == null || colName.length() == 0) ? physical(pf.fieldName)
                     : physical(fieldPath.prefix)+colName;
@@ -1161,6 +1181,18 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return out.toString().toLowerCase(java.util.Locale.ROOT);
     }
 
+    /// Whether a `@Column(collation)` name is safe to splice into DDL. A
+    /// hyphen is allowed for ICU names (`und-x-icu`); such a name is emitted
+    /// quoted.
+    static boolean collationName(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-')) {
+                return false;
+            }
+        }
+        return name.length() > 0;
+    }
     /// The java.time field types the ORM maps, by descriptor, to the simple name
     /// JavaTimeConverter's nested converters start with.
     private static final java.util.Map<String,String> JAVA_TIME_TYPES=new java.util.HashMap<String,String>();
@@ -1179,12 +1211,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if("text".equals(token)) return true;
         if(temporal==1) return "date".equals(token);
         if(!"timestamp".equals(token) && !"timestamptz".equals(token) && !"datetime".equals(token)) return false;
-        // The converter writes milliseconds, so the column has to keep three
-        // fractional digits: MySQL's DATETIME defaults to none, PostgreSQL's
-        // TIMESTAMP to six.
-        java.util.regex.Matcher precision=java.util.regex.Pattern.compile("\\(\\s*(\\d+)\\s*\\)").matcher(type);
-        int digits=precision.find() ? Integer.parseInt(precision.group(1)) : "datetime".equals(token) ? 0 : 6;
-        return digits>=3;
+        // The converter writes milliseconds. A coarser type -- MySQL's DATETIME
+        // keeps none -- is the developer's explicit choice to lose them, as
+        // Hibernate allows, and the engine rounds on write.
+        return true;
     }
 
     private static boolean lowerOrDigit(char c) { return Character.isLowerCase(c) || Character.isDigit(c); }
@@ -1266,7 +1296,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             Object position=annotation.get("positionColumn");
             if(position instanceof String) {
                 if(orderColumn!=null) ctx.error("Choose OrderColumn or ElementCollection.positionColumn: "+relation.field);
-                relation.orderColumn=(String)position;
+                relation.orderColumn=unquoteName((String)position);
                 if(relation.orderColumn.length()==0 && !"Ljava/util/Set;".equals(field.getDescriptor()))
                     ctx.error("Only a Set element collection can omit its position column: "+relation.field);
             } else if(relation.orderColumn.length()==0) relation.orderColumn="element_position";
@@ -1320,14 +1350,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             ctx.error("A Set of "+relation.target+" needs its position column, since its values cannot key the table: "+relation.field);
         AnnotationValues join=field.getAnnotation(prefix+"JoinColumn;");
         String joinDefault=physical(relation.field)+"_id";
-        relation.columnName=join==null?joinDefault:join.getStringOrDefault("name",joinDefault);
+        relation.columnName=join==null?joinDefault:unquoteName(join.getStringOrDefault("name",joinDefault));
         if(relation.columnName.length()==0) relation.columnName=joinDefault;
         relation.nullable=annotation.getBoolOrDefault("optional",true) && (join==null || join.getBoolOrDefault("nullable",true));
         AnnotationValues table=field.getAnnotation(prefix+"JoinTable;");
         String tableDefault=owner.tableName+"_"+physical(relation.field);
-        relation.table=table==null?tableDefault:table.getStringOrDefault("name",tableDefault);
-        relation.ownerColumn=table==null?"owner_id":table.getStringOrDefault("joinColumn","owner_id");
-        relation.targetColumn=table==null?"target_id":table.getStringOrDefault("inverseJoinColumn","target_id");
+        relation.table=table==null?tableDefault:unquoteName(table.getStringOrDefault("name",tableDefault));
+        relation.ownerColumn=table==null?"owner_id":unquoteName(table.getStringOrDefault("joinColumn","owner_id"));
+        relation.targetColumn=table==null?"target_id":unquoteName(table.getStringOrDefault("inverseJoinColumn","target_id"));
         if(relation.table.length()==0) relation.table=tableDefault;
         if(relation.ownerColumn.length()==0) relation.ownerColumn="owner_id";
         if(relation.targetColumn.length()==0) relation.targetColumn="target_id";
@@ -1335,12 +1365,30 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(relation.many && join!=null) ctx.error("Use mappedBy or JoinTable for a to-many association: "+relation.field);
         if(!relation.many && table!=null) ctx.error("To-one associations use JoinColumn: "+relation.field);
         if(relation.element) {
-            relation.targetColumn=annotation.getStringOrDefault("column","element_value");
+            relation.targetColumn=unquoteName(annotation.getStringOrDefault("column","element_value"));
+            if(relation.targetColumn.length()==0) relation.targetColumn="element_value";
+            String owning=unquoteName(annotation.getStringOrDefault("joinColumn",""));
+            if(owning.length()>0) {
+                if(table!=null && table.getStringOrDefault("joinColumn","").length()>0)
+                    ctx.error("Choose JoinTable.joinColumn or ElementCollection.joinColumn: "+relation.field);
+                relation.ownerColumn=owning;
+            }
+            relation.elementType=annotation.getStringOrDefault("type","");
             if(map && (field.getSignature()==null || !field.getSignature().contains("<Ljava/lang/String;"))) ctx.error("Scalar maps require String keys: "+relation.field);
             PropertyTypeKind scalar=PropertyTypeKind.scalar(relation.target);
             if(scalar.kind==PropertyTypeKind.Kind.UNSUPPORTED || scalar.kind==PropertyTypeKind.Kind.BYTE_ARRAY) ctx.error("ElementCollection requires a supported scalar value: "+relation.target);
         }
         return relation;
+    }
+
+    /// Unwraps a name quoted Hibernate style, in one pair of backticks or of
+    /// double quotes. The runtime quotes every identifier itself, so the quotes
+    /// would otherwise become part of the name and never match the column.
+    static String unquoteName(String name) {
+        if(name==null || name.length()<3) return name;
+        char first=name.charAt(0);
+        if((first=='`' || first=='"') && name.charAt(name.length()-1)==first) return name.substring(1,name.length()-1);
+        return name;
     }
 
     private static String boxedDomainType(String type) {
@@ -1535,7 +1583,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
               .append(", ").append(f.isId).append(", ").append(f.isId && f.autoIncrement)
               .append(", ").append(f.nullable).append(", ").append(f.version).append(", ")
               .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"")
-              .append(f.temporal==0?"":", "+f.temporal).append(")")
+              .append(f.temporal==0 && f.insertable && f.updatable && f.collation==null?"":", "+f.temporal)
+              .append(f.insertable && f.updatable && f.collation==null?"":", "+f.insertable+", "+f.updatable)
+              .append(f.collation==null?"":", \""+f.collation+"\"").append(")")
               .append(i + 1 < ec.fields.size() ? ",\n" : "\n");
         }
         sb.append("  };\n  public Class<").append(ec.binaryName).append("> type() { return ")
@@ -1626,7 +1676,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
               .append(relation.target).append(".class, ").append(relation.many).append(", ").append(relation.lazy)
               .append(", ").append(relation.column).append(", ").append('"').append(escape(relation.mappedBy)).append("\", ").append('"')
               .append(escape(relation.table)).append("\", ").append('"').append(escape(relation.ownerColumn)).append("\", ").append('"')
-              .append(escape(relation.targetColumn)).append("\", ").append(relation.cascade).append(", ").append(relation.orphan).append(", ").append(relation.unique).append(", \"").append(escape(relation.mapKey)).append("\", \"").append(escape(relation.orderColumn)).append("\", \"").append(escape(relation.orderBy)).append("\", ").append(relation.element).append("),\n");
+              .append(escape(relation.targetColumn)).append("\", ").append(relation.cascade).append(", ").append(relation.orphan).append(", ").append(relation.unique).append(", \"").append(escape(relation.mapKey)).append("\", \"").append(escape(relation.orderColumn)).append("\", \"").append(escape(relation.orderBy)).append("\", ").append(relation.element).append(", \"").append(escape(relation.elementType)).append("\"),\n");
         }
         sb.append("}; }\n  public Object relation(").append(ec.binaryName).append(" e, int index) { switch(index) {\n");
         for (RelationField relation : ec.relations) {
@@ -3108,7 +3158,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     static final class RelationField {
-        String field, descriptor, target, mappedBy, columnName, table, ownerColumn, targetColumn,kind,declaringType;
+        String field, descriptor, target, mappedBy, columnName, table, ownerColumn, targetColumn,kind,declaringType,elementType="";
         String mapKey="",orderColumn="",orderBy="",mapKeyType="";
         boolean many,lazy,orphan,nullable,unique,element;
         int cascade,index,column=-1;
@@ -3165,6 +3215,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         boolean autoIncrement;
         boolean version;
         boolean unique;
+        /// @Column(insertable/updatable); both true unless the developer said otherwise.
+        boolean insertable = true, updatable = true;
+        /// @Column(collation), or null.
+        String collation;
         RelationField relation;
         int relationPart;
         PropertyTypeKind kind;

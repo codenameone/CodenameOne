@@ -460,4 +460,15 @@
         <Method name="asBooleanObject" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
+    <!--
+    mainEDTLoop calls UIManager.getInstance() for its effect: it builds the UI
+    manager (and its theme state) on the EDT before the first form. Without the
+    lock the getter reads as side-effect free, but the holder's class
+    initialization is the side effect.
+    -->
+    <Match>
+        <Class name="com.codename1.ui.Display" />
+        <Method name="mainEDTLoop" />
+        <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
+    </Match>
 </FindBugsFilter>
