@@ -68,7 +68,14 @@ public class RadioButton extends ToggleButton {
 
     @Override
     protected Component cn1CreateNative() {
-        com.codename1.ui.RadioButton b = new com.codename1.ui.RadioButton();
+        com.codename1.ui.RadioButton b = new com.codename1.ui.RadioButton() {
+            @Override
+            public void repaint() {
+                if (!repaintThroughNode()) {
+                    super.repaint();
+                }
+            }
+        };
         // The toggle group decides; the native button never turns itself
         // off on its own.
         b.addActionListener(cn1ActionBridge());

@@ -341,6 +341,46 @@ public class ControlsDataTest {
         assertFalse(empty.isVisible());
     }
 
+    @Test
+    public void aCellGraphicWiderThanTheListWrapsInsideIt() {
+        final String longText = "A sentence long enough to need several lines in a list this narrow";
+        final List<ListCell<String>> cells = new ArrayList<ListCell<String>>();
+        ListView<String> list = new ListView<String>();
+        list.getItems().add(longText);
+        list.setCellFactory(new Callback<ListView<String>, ListCell<String>>() {
+            @Override
+            public ListCell<String> call(ListView<String> view) {
+                ListCell<String> cell = new ListCell<String>() {
+                    private final Label wrapped = new Label();
+
+                    @Override
+                    protected void updateItem(String item, boolean empty) {
+                        super.updateItem(item, empty);
+                        wrapped.setWrapText(true);
+                        wrapped.setText(item);
+                        setGraphic(empty || item == null ? null : wrapped);
+                    }
+                };
+                cells.add(cell);
+                return cell;
+            }
+        });
+        sceneOf(list, 150, 400);
+        ListCell<String> shown = null;
+        for (ListCell<String> c : cells) {
+            if (longText.equals(c.getItem()) && c.isVisible()) {
+                shown = c;
+            }
+        }
+        assertNotNull(shown);
+        Node g = shown.getGraphic();
+        assertTrue("graphic " + g.getLayoutBounds().getWidth() + " wide in a cell " + shown.getWidth(),
+                g.getLayoutBounds().getWidth() <= shown.getWidth() + 0.5);
+        double oneLine = new Label("A").prefHeight(-1);
+        assertTrue("the row is " + shown.getHeight() + " tall, one line is " + oneLine,
+                shown.getHeight() > oneLine * 1.5);
+    }
+
     /// A row of the table tests.
     private static final class Person {
         final StringProperty name;

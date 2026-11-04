@@ -68,8 +68,12 @@ import javafx.scene.text.TextAlignment;
 /// `graphicTextGap` away from it; the label's padding makes the room, so
 /// the preferred size covers both. A text too long for the control is cut
 /// short and ends in three points, and the minimum width is the width of
-/// those. `wrapText`, `ellipsisString`, `textOverrun`, `lineSpacing` are
-/// recorded or absent and have no effect on a single line native label.
+/// those. With `wrapText` on, a `Label` breaks its text into lines at
+/// the width it is given instead (`com.codename1.fxcompat.runtime.WrappingLabel`),
+/// its content bias is horizontal and its preferred height is that of the
+/// wrapped lines at a width; other labeled controls stay on one line.
+/// `ellipsisString`, `textOverrun` and `lineSpacing` are recorded or
+/// absent and have no effect.
 ///
 /// With `mnemonicParsing` on, as it is for every button and off for a
 /// label, the underscore that marks a mnemonic is taken out of the text
@@ -152,7 +156,11 @@ public abstract class Labeled extends Control {
         String t = isMnemonicParsing() ? Mnemonics.strip(getText()) : getText();
         label.setText(t == null || getContentDisplay() == ContentDisplay.GRAPHIC_ONLY ? "" : t);
         Style style = com.codename1.fxcompat.runtime.PeerPaint.allStyles(label);
-        if (c.getClass() == com.codename1.ui.Label.class) {
+        if (c instanceof com.codename1.fxcompat.runtime.WrappingLabel) {
+            ((com.codename1.fxcompat.runtime.WrappingLabel) c).setWrap(isWrapText());
+        }
+        if (c.getClass() == com.codename1.ui.Label.class
+                || c.getClass() == com.codename1.fxcompat.runtime.WrappingLabel.class) {
             style.setBgTransparency(0);
             style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
         }
@@ -189,6 +197,7 @@ public abstract class Labeled extends Control {
             // preferred size of the label covers both.
             Style base = UIManager.getInstance().getComponentStyle(label.getUIID());
             int[] room = g == null ? new int[GRAPHIC_BOX] : graphicBox(label, g);
+            System.arraycopy(room, 0, paddedRoom, 0, paddedRoom.length);
             style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
             if (bare) {
                 style.setPadding(room[0], room[1], room[2], room[3]);
@@ -207,6 +216,9 @@ public abstract class Labeled extends Control {
     }
 
     private static final int GRAPHIC_BOX = 9;
+    /// The room around the text the native label's padding was last set
+    /// to hold for the graphic, `{top, bottom, left, right}`.
+    private final int[] paddedRoom = new int[4];
 
     /// Whether a subclass places the graphic itself, as a cell does; this
     /// class then leaves the graphic and the padding of the label alone.
@@ -317,10 +329,26 @@ public abstract class Labeled extends Control {
     }
 
     /// Whether the control is one that gives up padding: a native label
-    /// with padding of its theme, and no graphic whose room is kept in it.
+    /// with padding of its theme. A graphic's room in that padding is never
+    /// given up (see [#sheddable(Component, Node, int, boolean)]), but the
+    /// theme's part of it is: a tab bar of icon-over-text buttons otherwise
+    /// cut "Home" to "Ho..." between margins wide enough for the word.
     private boolean sheds(Component c, Node graphic) {
-        return c instanceof com.codename1.ui.Label && graphic == null && !paddedForGraphic && !cn1BareText()
-                && !ownsGraphic();
+        return c instanceof com.codename1.ui.Label && !cn1BareText() && !ownsGraphic()
+                && (graphic != null || !paddedForGraphic);
+    }
+
+    /// How much of a side's padding, `full` device pixels of it, may be
+    /// given up: three quarters of it without a graphic, and with one only
+    /// three quarters of what the theme put there, so the graphic's room
+    /// stays whole.
+    private int sheddable(Component c, Node graphic, int full, boolean left) {
+        if (graphic == null) {
+            return full - kept(full);
+        }
+        Style base = UIManager.getInstance().getComponentStyle(c.getUIID());
+        int theme = left ? base.getPaddingLeftNoRTL() : base.getPaddingRightNoRTL();
+        return Math.max(0, Math.min(full, theme) - kept(theme));
     }
 
     /// The least of its padding a control keeps on a side: a quarter.
@@ -350,11 +378,12 @@ public abstract class Labeled extends Control {
         int left = 0;
         int right = 0;
         if (missing > 0) {
-            int most = fullLeft - kept(fullLeft) + fullRight - kept(fullRight);
-            int give = Math.min(missing, most);
-            left = Math.min(fullLeft - kept(fullLeft), (give + 1) / 2);
-            right = Math.min(fullRight - kept(fullRight), give - left);
-            left = Math.min(fullLeft - kept(fullLeft), give - right);
+            int maxLeft = sheddable(c, graphic, fullLeft, true);
+            int maxRight = sheddable(c, graphic, fullRight, false);
+            int give = Math.min(missing, maxLeft + maxRight);
+            left = Math.min(maxLeft, (give + 1) / 2);
+            right = Math.min(maxRight, give - left);
+            left = Math.min(maxLeft, give - right);
         }
         if (left == shedLeft && right == shedRight) {
             return;
@@ -384,16 +413,34 @@ public abstract class Labeled extends Control {
         }
         com.codename1.ui.Label label = (com.codename1.ui.Label) c;
         int[] box = graphicBox(label, g);
+        if (box[0] != paddedRoom[0] || box[1] != paddedRoom[1] || box[2] != paddedRoom[2]
+                || box[3] != paddedRoom[3]) {
+            // The graphic changed size since the padding was set -- an icon
+            // whose font arrives in a style after the label was styled is
+            // the usual case. Placed by its new size beside text padded for
+            // the old one, a wider icon was drawn over the first letters.
+            cn1SyncNative();
+            requestLayout();
+        }
         Style base = UIManager.getInstance().getComponentStyle(label.getUIID());
+        // A bare label has none of the theme's padding (cn1SyncNative zeroes
+        // it), so none is counted here either. Counting it put the graphic
+        // that far into the text: on a phone theme that pads a label, the
+        // icon of every titled card was drawn over its first letters.
+        boolean bare = cn1BareText();
+        int baseLeft = bare ? 0 : base.getPaddingLeftNoRTL();
+        int baseRight = bare ? 0 : base.getPaddingRightNoRTL();
+        int baseTop = bare ? 0 : base.getPaddingTop();
+        int baseBottom = bare ? 0 : base.getPaddingBottom();
         Insets in = getInsets();
         // The area the label lays its content out in, less the room made
         // for the graphic: where graphic and text sit together.
-        int areaX = Units.toPixels(in.getLeft()) + base.getPaddingLeftNoRTL();
-        int areaY = Units.toPixels(in.getTop()) + base.getPaddingTop();
-        int areaW = Units.toPixels(getWidth() - in.getLeft() - in.getRight()) - base.getPaddingLeftNoRTL()
-                - base.getPaddingRightNoRTL();
-        int areaH = Units.toPixels(getHeight() - in.getTop() - in.getBottom()) - base.getPaddingTop()
-                - base.getPaddingBottom();
+        // Less what was given up of the theme's padding (fitPadding).
+        int areaX = Units.toPixels(in.getLeft()) + baseLeft - shedLeft;
+        int areaY = Units.toPixels(in.getTop()) + baseTop;
+        int areaW = Units.toPixels(getWidth() - in.getLeft() - in.getRight()) - baseLeft - baseRight + shedLeft
+                + shedRight;
+        int areaH = Units.toPixels(getHeight() - in.getTop() - in.getBottom()) - baseTop - baseBottom;
         int gw = box[4];
         int gh = box[5];
         int gap = box[8];
@@ -428,6 +475,56 @@ public abstract class Labeled extends Control {
         positionInArea(g, Units.toLogical(gx), Units.toLogical(gy), w, height, 0, HPos.CENTER, VPos.CENTER);
     }
 
+    /// A label that wraps its text is as tall as its lines at a width.
+    @Override
+    public javafx.geometry.Orientation getContentBias() {
+        return wraps() ? javafx.geometry.Orientation.HORIZONTAL : super.getContentBias();
+    }
+
+    private boolean wraps() {
+        return isWrapText() && cn1CreatesWrappingNative();
+    }
+
+    /// Whether the native label breaks its text into lines when
+    /// `wrapText` is on. True of a label.
+    boolean cn1CreatesWrappingNative() {
+        return false;
+    }
+
+    /// The height of the wrapped text at a width, when the label wraps;
+    /// the native label's own height otherwise.
+    @Override
+    protected double computePrefHeight(double width) {
+        double single = super.computePrefHeight(width);
+        if (width < 0 || !wraps()) {
+            return single;
+        }
+        Component c = cn1NativeIfCreated();
+        String t = isMnemonicParsing() ? Mnemonics.strip(getText()) : getText();
+        if (t == null || t.length() == 0 || getContentDisplay() == ContentDisplay.GRAPHIC_ONLY) {
+            return single;
+        }
+        com.codename1.ui.Font f = null;
+        int padLeft = 0;
+        int padRight = 0;
+        if (c != null) {
+            Style s = c.getUnselectedStyle();
+            f = s.getFont();
+            padLeft = s.getPaddingLeftNoRTL();
+            padRight = s.getPaddingRightNoRTL();
+        }
+        if (f == null) {
+            f = Fonts.of(getFont());
+        }
+        Insets in = getInsets();
+        int area = Units.toPixels(width - in.getLeft() - in.getRight()) - padLeft - padRight;
+        int lines = com.codename1.fxcompat.runtime.WrappingLabel.lines(f, t, area).size();
+        if (lines <= 1) {
+            return single;
+        }
+        return single + snapSizeY(Units.toLogical((lines - 1) * f.getHeight()));
+    }
+
     /// A labeled control can be as narrow as its ellipsis: the native
     /// label cuts a text that does not fit short and ends it with three
     /// points, so a row that is too narrow shrinks its labels rather than
@@ -459,12 +556,14 @@ public abstract class Labeled extends Control {
         String t = label.getText();
         // Before any of the text goes, the padding beside it does.
         int padding = 0;
-        if (sheds(c, shownGraphic())) {
+        Node graphic = shownGraphic();
+        if (sheds(c, graphic)) {
             shed(c);
             Style s = c.getUnselectedStyle();
             int left = s.getPaddingLeftNoRTL() + shedLeft;
             int right = s.getPaddingRightNoRTL() + shedRight;
-            padding = left - kept(left) + right - kept(right);
+            // Only what fitPadding can give up: the graphic's room stays.
+            padding = sheddable(c, graphic, left, true) + sheddable(c, graphic, right, false);
         }
         if (f == null || t == null || t.length() == 0 || !label.isEndsWith3Points()) {
             return Math.max(0, pref - Units.toLogical(padding));

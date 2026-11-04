@@ -58,7 +58,12 @@ public class Label extends Labeled {
 
     @Override
     protected Component cn1CreateNative() {
-        return new com.codename1.ui.Label();
+        return new com.codename1.fxcompat.runtime.WrappingLabel();
+    }
+
+    @Override
+    boolean cn1CreatesWrappingNative() {
+        return true;
     }
 
     @Override
