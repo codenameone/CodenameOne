@@ -3296,6 +3296,7 @@ public final class JavaEmitter {
      * library meant, not the one its own imports resolve the bare name to.
      */
     private void pinMemberTypesToOwnLibraries() {
+        pinSupertypesToDeclarations();
         for (ClassDecl c : new ArrayList<ClassDecl>(program.classes.values())) {
             for (MethodDecl m : c.methods) {
                 pinToLibrary(m.returnType, c, 0);
@@ -3319,6 +3320,46 @@ public final class JavaEmitter {
             for (FieldDecl f : lib.topLevelVars) {
                 pinToLibrary(f.type, lib, java.util.Collections.<String>emptyList(), 0);
             }
+        }
+    }
+
+    /// Every program class's superclass, mixins, interfaces and `on` types carry the
+    /// declaration they name ({@code TypeRef.resolved}), resolved in the declaring
+    /// library and through its import prefix. program.classes is keyed by the simple
+    /// name and holds the last class of each name, so a walk up a superclass or mixin
+    /// chain that looked a name up there took another library's `Base` or `M`, and a
+    /// prefixed mixin (`with a.M`) named no class at all. Only names that need it are
+    /// pinned: a prefixed one, or one that more than one program class declares.
+    private void pinSupertypesToDeclarations() {
+        for (List<ClassDecl> same : new ArrayList<List<ClassDecl>>(program.classesByName.values())) {
+            for (ClassDecl c : same) {
+                pinSupertype(c, c.superclass);
+                for (TypeRef t : c.mixins) {
+                    pinSupertype(c, t);
+                }
+                for (TypeRef t : c.interfaces) {
+                    pinSupertype(c, t);
+                }
+                for (TypeRef t : c.mixinOn) {
+                    pinSupertype(c, t);
+                }
+            }
+        }
+    }
+
+    private void pinSupertype(ClassDecl c, TypeRef t) {
+        if (t == null || t.resolved != null || t.runtimeOnly || t.name == null) {
+            return;
+        }
+        int dot = t.name.lastIndexOf('.');
+        String simple = dot > 0 ? t.name.substring(dot + 1) : t.name;
+        List<ClassDecl> same = program.classesByName.get(simple);
+        if (same == null || same.isEmpty() || dot < 0 && same.size() < 2) {
+            return;
+        }
+        ClassDecl d = superDeclOf(c, t);
+        if (d != null && d != c && simple.equals(d.name)) {
+            t.resolved = d;
         }
     }
 
@@ -7405,7 +7446,7 @@ public final class JavaEmitter {
                     // value is handed over through Object.
                     String held = init.code;
                     String bare = genericTearOffLambdas.get(gl);
-                    String key = bare != null ? canonFunctionKey(bare, t, ctx) : genericCtorTearOffKeys.get(gl);
+                    String key = bare != null ? bare : genericCtorTearOffKeys.get(gl);
                     if (key != null) {
                         // Still the one Dart function: `f == identity` holds, as the canonical
                         // tear-off `identity` compares by the same key (DartRuntime.eq).
@@ -9655,22 +9696,43 @@ public final class JavaEmitter {
         if ((r == null || !pc.typeParams.isEmpty() && r.args.isEmpty()) && expected != null) {
             r = expected.funcReturn;
         }
-        if (r == null || !pc.typeParams.isEmpty() && r.args.size() != pc.typeParams.size()
+        String code = out.code;
+        if (BARE_LAMBDA.matcher(code).matches() || code.startsWith("DartRuntime.canonTearOff(")) {
+            return out;
+        }
+        String key;
+        if (r != null && !pc.typeParams.isEmpty() && (r.args.isEmpty() || allDynamic(r.args, ctx))) {
+            // `G.new` in a slot that does not instantiate it (`{c}.contains(G.new)`, typed
+            // by the element type, or an Object parameter): the uninstantiated generic
+            // constructor, under the key its generic closure has (genericCtorTearOffKeys),
+            // so it is the same Dart function however the slot types it.
+            key = "new " + javaClassName(pc) + "<>." + name;
+        } else if (r == null || !pc.typeParams.isEmpty() && r.args.size() != pc.typeParams.size()
                 || readsTypeVarWitness(r, ctx) || mentionsTypeVariable(r, ctx)) {
             return out;
+        } else {
+            key = "new " + javaType(r, false, ctx) + "." + name;
         }
-        String code = out.code;
-        if (code.indexOf('"') >= 0 || code.indexOf('\\') >= 0 || BARE_LAMBDA.matcher(code).matches()
-                || code.startsWith("DartRuntime.canonTearOff(")) {
-            return out;
-        }
-        String key = "new " + javaType(r, false, ctx) + "." + name;
         if (key.indexOf('"') >= 0) {
             return out;
         }
         ctx.importClass("dart.runtime.DartRuntime");
-        String view = code.replaceAll("\\s+", " ");
+        // The view only has to tell the Java types apart; the code is that, escaped (a
+        // signed adapter names its parameters in string literals).
+        String view = code.replaceAll("\\s+", " ").replace("\\", "\\\\").replace("\"", "\\\"");
         return new Out("DartRuntime.canonTearOff(\"" + key + "\", \"" + view + "\", " + code + ")", out.type, out.fn);
+    }
+
+    /// Whether every type argument erases to Object: an instantiation to dynamic, which is
+    /// how a slot typed by the element type of an untyped collection reads an
+    /// uninstantiated generic tear-off.
+    private boolean allDynamic(List<TypeRef> args, Ctx ctx) {
+        for (TypeRef a : args) {
+            if (!"Object".equals(javaType(a, true, ctx))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Dart's instantiate-to-bounds over {@code tps}: each variable starts at its bound
@@ -9983,22 +10045,64 @@ public final class JavaEmitter {
         String q = bare.substring(0, cc);
         String n = bare.substring(cc + 2);
         List<String> tps = null;
+        List<Param> params = null;
+        TypeRef ret = null;
         Ast.FunctionDecl fd = program.functions.get(n);
         if (fd != null && !program.classes.containsKey(q.substring(q.lastIndexOf('.') + 1))) {
             tps = fd.typeParams;
+            params = fd.params;
+            ret = fd.returnType;
         } else {
             ClassDecl c = program.classes.get(q.substring(q.lastIndexOf('.') + 1));
             MethodDecl md = c != null ? c.method(n) : null;
             tps = md != null ? md.typeParams : null;
+            params = md != null ? md.params : null;
+            ret = md != null ? md.returnType : null;
         }
         if (tps == null || tps.isEmpty()) {
             return bare;
         }
-        if (t == null || t.funcParams == null || readsTypeVarWitness(t, ctx) || mentionsTypeVariable(t, ctx)) {
+        if (t == null || t.funcParams == null) {
+            return null;
+        }
+        if (t.funcTypeParams != null && !t.funcTypeParams.isEmpty()
+                || erasedSignature(params, ret, tps, t, ctx)) {
+            // The generic function itself, uninstantiated: one key per function, its
+            // identity, however it is held -- a generic local, an Object slot, a generic
+            // function type -- so `{g, gen}` with `g = gen` has one element. Held at its
+            // erasure is how an uninstantiated generic travels through an Object or
+            // Function slot; an explicit `gen<dynamic>` is keyed the same way, a
+            // difference no program observes short of comparing it with `gen`.
+            return bare;
+        }
+        if (readsTypeVarWitness(t, ctx) || mentionsTypeVariable(t, ctx)) {
             return null;
         }
         String k = bare + "<" + javaType(t, false, ctx) + ">";
         return k.indexOf('"') >= 0 ? null : k;
+    }
+
+    /// Whether {@code t} is the declaration's own signature with its type variables
+    /// {@code tps} erased: the generic function held uninstantiated.
+    private boolean erasedSignature(List<Param> params, TypeRef ret, List<String> tps, TypeRef t, Ctx ctx) {
+        if (params == null || ret == null || t.funcReturn == null) {
+            return false;
+        }
+        List<Param> ordered = orderedParams(params);
+        if (ordered.size() != t.funcParams.size()) {
+            return false;
+        }
+        List<TypeRef> none = java.util.Collections.<TypeRef>emptyList();
+        for (int i = 0; i < ordered.size(); i++) {
+            TypeRef d = substTypeParams(paramValueType(ordered.get(i)), tps, none);
+            if (!javaType(d, true, ctx).equals(javaType(t.funcParams.get(i), true, ctx))) {
+                return false;
+            }
+        }
+        if (ret.is("var")) {
+            return false;
+        }
+        return javaType(substTypeParams(ret, tps, none), true, ctx).equals(javaType(t.funcReturn, true, ctx));
     }
 
     private static final java.util.regex.Pattern FUNCS_SAM = java.util.regex.Pattern.compile(
@@ -18069,7 +18173,12 @@ public final class JavaEmitter {
                     // Optional parameters: an adapter restores defaults (see tearOffAdapter).
                     final String lib = Program.libClassName(owner.fileName) + "." + n;
                     // witnesses differ per instantiation and may name locals: keyed only without
-                    adapterStaticKey = wargs.isEmpty() ? lib.replace(".", "::") : null;
+                    // An instantiation (`gen<int>`, or `gen` in an `int Function(int)` slot) is
+                    // its own function, keyed by its type arguments (canonFunctionKey); the
+                    // uninstantiated function by its name.
+                    adapterStaticKey = !wargs.isEmpty() ? null
+                            : inst == null ? lib.replace(".", "::")
+                            : canonFunctionKey(lib.replace(".", "::"), ft, ctx);
                     Out ad = tearOffAdapter(ordered, ft.funcParams, ft.funcReturn,
                             names -> lib + "(" + joinArgs(wargs, names) + ")", ctx);
                     if (ad != null) {

@@ -276,6 +276,19 @@ public final class DartRuntime {
         return canonHash(o);
     }
 
+    /// {@code System.identityHashCode(o)}, except for a view of a canonical static,
+    /// constructor or instantiated generic tear-off, which hashes by its function the way
+    /// identical() compares it: Set.identity and Map.identity see the views as one key.
+    public static int identityHash(Object o) {
+        if (isTearOffCandidate(o)) {
+            String k = CANON_FUNCTIONS.get(o);
+            if (k != null) {
+                return k.hashCode();
+            }
+        }
+        return System.identityHashCode(o);
+    }
+
     /// {@code o.hashCode()}, except for a canonical static, constructor or instantiated
     /// generic tear-off: its views (a signed SAM, a plain cast, one per erased SAM) are
     /// separate Java objects that eq calls one Dart function, so they hash by that

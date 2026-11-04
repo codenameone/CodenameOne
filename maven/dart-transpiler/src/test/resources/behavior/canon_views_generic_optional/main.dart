@@ -25,6 +25,7 @@ void main() {
   print(g<int>(3));
   print(g<String>('s', n: 2));
   print(g(4.5));
+  print({g, gen}.length);
   final p = pos;
   print(p<int>(1));
   print(p<int>(1, 2));
@@ -50,7 +51,7 @@ void main() {
   print(s.length);
   Object o = G.new;
   print({o, b, G.new}.length);
-  print({c, b}.contains(b));
+  print({c, b}.contains(G.new));
   final m = <Object, int>{G.new: 1};
   m[b] = 2;
   print(m.length);
@@ -69,4 +70,23 @@ void main() {
   int Function(int, {int n}) inst2 = gen;
   print({inst, inst2}.length);
   print(inst == inst2);
+  print(gen<int> == gen<String>);
+  print(gen<int> == inst);
+  Object un = gen;
+  print(un == gen);
+  print(identical(G.new, G.new));
+  print(identical(g, gen));
+  final ids = Set<Object>.identity()..add(G.new)..add(b)..add(o)..add(c);
+  print(ids.length);
+  final idf = Set<Object>.identity()..add(typed)..add(loose)..add(obj)..add(plain);
+  print(idf.length);
+  final idm = Map<Object, int>.identity();
+  idm[G.new] = 1;
+  idm[b] = 2;
+  idm[typed] = 3;
+  idm[obj] = 4;
+  print(idm.length);
+  print(idm[o]);
+  print(ids.contains(G.new));
+  print((Set<Object>.identity()..add(g)..add(gen)).length);
 }

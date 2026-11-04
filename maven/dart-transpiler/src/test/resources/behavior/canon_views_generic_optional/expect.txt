@@ -2,6 +2,7 @@
 s
 4.5
 1
+1
 2
 b
 List<num>
@@ -24,3 +25,14 @@ t
 true
 1
 true
+false
+true
+true
+true
+true
+1
+1
+2
+2
+true
+1
