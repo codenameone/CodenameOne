@@ -793,6 +793,20 @@ final class AsyncLowering {
     }
 
     private void lower(Stmt s, Frame f, JavaEmitter.Ctx ctx) {
+        if ((s instanceof WhileStmt || s instanceof ForStmt || s instanceof ForInStmt || s instanceof TryStmt
+                || s instanceof SwitchStmt || s.labels != null) && hasAwait(s)) {
+            // Null-safety flow promotion across a suspending loop, try, switch or labelled
+            // statement, conservatively: what it assigns is demoted before it, and only what
+            // held at entry survives it.
+            java.util.Set<String> entry = em.flowEnterConservative(s, ctx);
+            lowerStmt(s, f, ctx);
+            em.flowRetain(entry, ctx);
+            return;
+        }
+        lowerStmt(s, f, ctx);
+    }
+
+    private void lowerStmt(Stmt s, Frame f, JavaEmitter.Ctx ctx) {
         JavaEmitter.Ctx.Writer w = ctx.writer();
         if (f.closed) {
             // Dart allows statements after a return; they never run, and Java rejects them.
@@ -942,9 +956,18 @@ final class AsyncLowering {
             w.line(jumpCode(f, els >= 0 ? els : exit));
             f.closed = true;
             open(f, then, ctx);
+            // Null-safety flow promotion, as JavaEmitter's if: each branch sees what the
+            // condition proves on its side, and the join keeps what every reaching branch has.
+            java.util.Set<String> preFlow = new java.util.HashSet<String>(ctx.nonNull);
+            em.flowGuard(i.condition, true, ctx);
             List<Object[]> undo = em.applyGuardPromotions(i.condition, ctx);
             lowerBranch(i.thenStmt, f, ctx);
             em.restorePromotions(undo, ctx);
+            java.util.Set<String> thenFlow = em.flowTerminates(i.thenStmt) ? null
+                    : new java.util.HashSet<String>(ctx.nonNull);
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(preFlow);
+            em.flowGuard(i.condition, false, ctx);
             if (els >= 0) {
                 jump(f, exit, ctx);
                 open(f, els, ctx);
@@ -952,6 +975,15 @@ final class AsyncLowering {
                 em.collectNegativePromotions(i.condition, ctx, neg);
                 lowerBranch(i.elseStmt, f, ctx);
                 em.restorePromotions(neg, ctx);
+            }
+            boolean elseLeaves = i.elseStmt != null && em.flowTerminates(i.elseStmt);
+            if (elseLeaves && thenFlow != null) {
+                ctx.nonNull.clear();
+                ctx.nonNull.addAll(thenFlow);
+            } else if (thenFlow != null) {
+                ctx.nonNull.retainAll(thenFlow);
+            } else if (elseLeaves) {
+                ctx.nonNull.retainAll(preFlow);
             }
             open(f, exit, ctx);
             return;

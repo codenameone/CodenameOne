@@ -7188,6 +7188,25 @@ public final class JavaEmitter {
         return t;
     }
 
+    /// An emitted operand's type, non-nullable when it is a local promoted here.
+    private TypeRef promotedOperandType(Expr e, TypeRef t, Ctx ctx) {
+        Expr u = stripParens(e);
+        if (t != null && t.nullable && u instanceof Ident && ctx.nonNull.contains(((Ident) u).name)) {
+            return copyNonNull(t);
+        }
+        return t;
+    }
+
+    /// A `?:` operand's static type under the promotions in effect for it; a literal, which
+    /// the element inference leaves unknown, still joins with the other operand.
+    private TypeRef conditionalOperandType(Expr e, Ctx ctx) {
+        TypeRef t = flowType(e, ctx);
+        if (t == null && !(stripParens(e) instanceof Ident)) {
+            t = inferExprTypeQuiet(e, ctx);
+        }
+        return t;
+    }
+
     /// Whether the static type of {@code e} is known and non-nullable: the type its emission
     /// produced ({@code emitted}, null when unseen), else what the quiet inference reports.
     private boolean staticallyNonNull(Expr e, TypeRef emitted, Ctx ctx) {
@@ -7210,6 +7229,24 @@ public final class JavaEmitter {
         if (!ctx.writeCaptured.contains(name) && ctx.lookup(name) != null) {
             ctx.nonNull.add(name);
         }
+    }
+
+    /// For the async lowering: demotes what {@code s} assigns and answers the state left.
+    java.util.Set<String> flowEnterConservative(Stmt s, Ctx ctx) {
+        demoteAssigned(s, ctx);
+        return new HashSet<String>(ctx.nonNull);
+    }
+
+    void flowRetain(java.util.Set<String> entry, Ctx ctx) {
+        ctx.nonNull.retainAll(entry);
+    }
+
+    void flowGuard(Expr cond, boolean whenTrue, Ctx ctx) {
+        nullGuardPromotions(cond, whenTrue, ctx);
+    }
+
+    boolean flowTerminates(Stmt s) {
+        return stmtTerminates(s);
     }
 
     /// Demotes every promoted local that {@code o} assigns.
@@ -7235,7 +7272,9 @@ public final class JavaEmitter {
         }
         Binary b = (Binary) cond;
         if (whenTrue && "&&".equals(b.op) || !whenTrue && "||".equals(b.op)) {
+            // Left to right: what the right operand assigns undoes the left's promotion.
             nullGuardPromotions(b.left, whenTrue, ctx);
+            demoteAssigned(b.right, ctx);
             nullGuardPromotions(b.right, whenTrue, ctx);
             return;
         }
@@ -7321,22 +7360,105 @@ public final class JavaEmitter {
     }
 
     void emitStatement(Stmt s, Ctx ctx) {
-        if (s instanceof WhileStmt || s instanceof ForStmt || s instanceof ForInStmt || s instanceof TryStmt
-                || s instanceof SwitchStmt) {
+        if (s instanceof BreakStmt) {
+            recordBreakFlow((BreakStmt) s, ctx);
+        }
+        if (s instanceof WhileStmt || s instanceof ForStmt || s instanceof ForInStmt || s instanceof SwitchStmt) {
             // A loop demotes what it assigns before its first pass, and only what held at
-            // entry survives it. A try or switch is joined the same, conservatively.
+            // entry survives it; a switch is joined the same, conservatively. A loop whose
+            // condition is false at its exit promotes what that proves (`while (x == null)`),
+            // and every `break` out of it is joined in.
             demoteAssigned(s, ctx);
             java.util.Set<String> entry = new HashSet<String>(ctx.nonNull);
-            emitStatementFlow(s, ctx);
+            List<java.util.Set<String>> breaks = pushFlowJoin(s, ctx);
+            try {
+                emitStatementFlow(s, ctx);
+            } finally {
+                ctx.flowJoins.remove(ctx.flowJoins.size() - 1);
+            }
             ctx.nonNull.retainAll(entry);
+            Expr cond = s instanceof WhileStmt ? ((WhileStmt) s).condition
+                    : s instanceof ForStmt ? ((ForStmt) s).condition : null;
+            if (cond != null) {
+                nullGuardPromotions(cond, false, ctx);
+            }
+            joinBreaks(breaks, ctx);
             return;
         }
+        if (s != null && s.labels != null) {
+            // A labelled statement: `break label;` leaves it, and joins at its end.
+            List<java.util.Set<String>> breaks = pushFlowJoin(s, ctx);
+            try {
+                emitStatementPromoting(s, ctx);
+            } finally {
+                ctx.flowJoins.remove(ctx.flowJoins.size() - 1);
+            }
+            joinBreaks(breaks, ctx);
+            return;
+        }
+        emitStatementPromoting(s, ctx);
+    }
+
+    private List<java.util.Set<String>> pushFlowJoin(Stmt s, Ctx ctx) {
+        List<java.util.Set<String>> states = new ArrayList<java.util.Set<String>>();
+        ctx.flowJoins.add(new Object[] {s, states});
+        return states;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<List<java.util.Set<String>>> flowJoinStates(Ctx ctx) {
+        List<List<java.util.Set<String>>> r = new ArrayList<List<java.util.Set<String>>>();
+        for (Object[] j : ctx.flowJoins) {
+            r.add((List<java.util.Set<String>>) j[1]);
+        }
+        return r;
+    }
+
+    private void joinBreaks(List<java.util.Set<String>> breaks, Ctx ctx) {
+        for (java.util.Set<String> b : breaks) {
+            ctx.nonNull.retainAll(b);
+        }
+    }
+
+    private void removeAssigned(java.util.Set<String> state, Object o) {
+        for (java.util.Iterator<String> it = state.iterator(); it.hasNext();) {
+            if (assignsName(o, it.next(), 0)) {
+                it.remove();
+            }
+        }
+    }
+
+    /// Records the state a `break` carries to the statement it leaves.
+    @SuppressWarnings("unchecked")
+    private void recordBreakFlow(BreakStmt b, Ctx ctx) {
+        for (int k = ctx.flowJoins.size() - 1; k >= 0; k--) {
+            Stmt target = (Stmt) ctx.flowJoins.get(k)[0];
+            boolean hit = b.label != null ? target.labels != null && target.labels.contains(b.label)
+                    : isLoop(target) || target instanceof SwitchStmt;
+            if (hit) {
+                ((List<java.util.Set<String>>) ctx.flowJoins.get(k)[1]).add(new HashSet<String>(ctx.nonNull));
+                return;
+            }
+        }
+    }
+
+    private void emitStatementPromoting(Stmt s, Ctx ctx) {
         Expr init = s instanceof VarDeclStmt ? ((VarDeclStmt) s).initializer : null;
         if (init != null) {
             ctx.watchedTypes.put(init, null);
         }
         emitStatementFlow(s, ctx);
         TypeRef emitted = init != null ? ctx.watchedTypes.remove(init) : null;
+        if (s instanceof ExprStmt) {
+            // `x!;` completes only when x is not null.
+            Expr ex = stripParens(((ExprStmt) s).expr);
+            if (ex instanceof NotNullAssert) {
+                Expr op = stripParens(((NotNullAssert) ex).operand);
+                if (op instanceof Ident) {
+                    promoteNonNull(((Ident) op).name, ctx);
+                }
+            }
+        }
         if (s instanceof VarDeclStmt && !((VarDeclStmt) s).isLate) {
             VarDeclStmt v = (VarDeclStmt) s;
             if (v.type != null && v.type.nullable && v.initializer != null
@@ -7850,23 +7972,77 @@ public final class JavaEmitter {
             }
         } else if (s instanceof TryStmt) {
             TryStmt t = (TryStmt) s;
+            // Dart's flow analysis of try: the body starts from the entry state; a catch, which
+            // can be reached from any point of the body, from the entry minus what the body
+            // assigns; the finally from the entry minus what the body and the catches assign.
+            // After it: the join of the body and the catches that complete normally, minus what
+            // the finally assigns, plus what the finally itself promotes.
+            java.util.Set<String> entry = new HashSet<String>(ctx.nonNull);
+            List<List<java.util.Set<String>>> outerBreaks = flowJoinStates(ctx);
+            int[] breakMarks = new int[outerBreaks.size()];
+            for (int k = 0; k < breakMarks.length; k++) {
+                breakMarks[k] = ((List<?>) ctx.flowJoins.get(k)[1]).size();
+            }
             w.line("try {");
             ctx.indent(1);
             ctx.pushScope();
             emitStatements(t.tryBlock, ctx);
             ctx.popScope();
             ctx.indent(-1);
+            List<java.util.Set<String>> exits = new ArrayList<java.util.Set<String>>();
+            if (!stmtTerminates(t.tryBlock)) {
+                exits.add(new HashSet<String>(ctx.nonNull));
+            }
+            java.util.Set<String> afterTry = new HashSet<String>(entry);
+            removeAssigned(afterTry, t.tryBlock);
             if (!t.catches.isEmpty()) {
-                emitCatchChain(t.catches, ctx);
+                java.util.Set<String> savedEntry = ctx.catchEntryFlow;
+                List<java.util.Set<String>> savedExits = ctx.catchExits;
+                ctx.catchEntryFlow = afterTry;
+                ctx.catchExits = exits;
+                try {
+                    emitCatchChain(t.catches, ctx);
+                } finally {
+                    ctx.catchEntryFlow = savedEntry;
+                    ctx.catchExits = savedExits;
+                }
+            }
+            java.util.Set<String> join = null;
+            for (java.util.Set<String> e : exits) {
+                if (join == null) {
+                    join = new HashSet<String>(e);
+                } else {
+                    join.retainAll(e);
+                }
+            }
+            if (join == null) {
+                join = new HashSet<String>(afterTry);
             }
             if (t.finallyBlock != null) {
+                java.util.Set<String> finEntry = new HashSet<String>(afterTry);
+                for (CatchClause cc : t.catches) {
+                    removeAssigned(finEntry, cc.body);
+                }
+                ctx.nonNull.clear();
+                ctx.nonNull.addAll(finEntry);
                 w.line("} finally {");
                 ctx.indent(1);
                 ctx.pushScope();
                 emitStatements(t.finallyBlock, ctx);
                 ctx.popScope();
                 ctx.indent(-1);
+                removeAssigned(join, t.finallyBlock);
+                join.addAll(ctx.nonNull);
+                // A break out of the body or a catch runs the finally on its way.
+                for (int k = 0; k < breakMarks.length; k++) {
+                    List<java.util.Set<String>> st = outerBreaks.get(k);
+                    for (int m = breakMarks[k]; m < st.size(); m++) {
+                        removeAssigned(st.get(m), t.finallyBlock);
+                    }
+                }
             }
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(join);
             w.line("}");
         } else if (s instanceof IfStmt && ((IfStmt) s).casePattern != null) {
             emitIfCaseStmt((IfStmt) s, ctx);
@@ -12114,12 +12290,24 @@ public final class JavaEmitter {
             Out cond = dynCondition(emitExpr(c.condition, TypeRef.BOOL, ctx), ctx);
             // `x is T ? x.member : ...` promotes x to T in the then-branch.
             List<Object[]> undo = applyGuardPromotions(c.condition, ctx);
+            // `x != null ? x : d`: each operand sees what the condition proves on its side.
+            java.util.Set<String> condFlow = new HashSet<String>(ctx.nonNull);
+            nullGuardPromotions(c.condition, true, ctx);
             Lazy la = emitLazyOperand(c.thenExpr, expected, ctx, 1);
+            TypeRef aType = promotedOperandType(c.thenExpr, la.out.type, ctx);
             restorePromotions(undo, ctx);
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(condFlow);
+            nullGuardPromotions(c.condition, false, ctx);
             Lazy lb = emitLazyOperand(c.elseExpr, expected, ctx, 1);
+            TypeRef bType = promotedOperandType(c.elseExpr, lb.out.type, ctx);
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(condFlow);
+            demoteAssigned(c.thenExpr, ctx);
+            demoteAssigned(c.elseExpr, ctx);
             Out a = la.out;
             Out b = lb.out;
-            TypeRef t = conditionalType(a.type, b.type, expected);
+            TypeRef t = conditionalType(aType, bType, expected);
             boolean mixedNumeric = a.type != null && b.type != null
                     && ((a.type.is("int") && b.type.is("double")) || (a.type.is("double") && b.type.is("int")))
                     && (expected == null || expected.is("var") || expected.is("Object") || expected.is("num")
@@ -17269,8 +17457,16 @@ public final class JavaEmitter {
         if (e instanceof Conditional) {
             // `c ? null : i`: the static type is the branches' upper bound, Null included
             // (int?), as for an if element with an else.
-            TypeRef a = elementTypeQuiet(((Conditional) e).thenExpr, ctx);
-            TypeRef b = a == null ? null : elementTypeQuiet(((Conditional) e).elseExpr, ctx);
+            Conditional ce = (Conditional) e;
+            java.util.Set<String> condFlow = new HashSet<String>(ctx.nonNull);
+            nullGuardPromotions(ce.condition, true, ctx);
+            TypeRef a = conditionalOperandType(ce.thenExpr, ctx);
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(condFlow);
+            nullGuardPromotions(ce.condition, false, ctx);
+            TypeRef b = a == null ? null : conditionalOperandType(ce.elseExpr, ctx);
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(condFlow);
             if (a != null && b != null && a.funcParams == null
                     && b.funcParams == null && !isDynamicType(a) && !isDynamicType(b)) {
                 return upperBound(a, b);
@@ -22377,7 +22573,15 @@ public final class JavaEmitter {
             }
             String outerRethrow = ctx.rethrowTarget;
             ctx.rethrowTarget = caught;
+            if (ctx.catchEntryFlow != null) {
+                // Every catch starts from the try's entry state minus what the try assigns.
+                ctx.nonNull.clear();
+                ctx.nonNull.addAll(ctx.catchEntryFlow);
+            }
             emitStatements(cc.body, ctx);
+            if (ctx.catchExits != null && !stmtTerminates(cc.body)) {
+                ctx.catchExits.add(new HashSet<String>(ctx.nonNull));
+            }
             ctx.rethrowTarget = outerRethrow;
             ctx.popScope();
             ctx.indent(-1);
@@ -37820,6 +38024,13 @@ public final class JavaEmitter {
 
         /// Nullable locals flow-promoted to non-null here (see flowType).
         final java.util.Set<String> nonNull = new HashSet<String>();
+        /// The statements a `break` can leave (loops, switches, labelled statements), innermost
+        /// last, each as {target, the promotion states its breaks carry}.
+        final List<Object[]> flowJoins = new ArrayList<Object[]>();
+        /// While a try's catch clauses are emitted: the state each starts from, and where the
+        /// states of those that complete normally are collected.
+        java.util.Set<String> catchEntryFlow;
+        List<java.util.Set<String>> catchExits;
         /// Expressions whose emitted static type a flow rule is waiting for (emitExpr).
         final Map<Expr, TypeRef> watchedTypes = new java.util.IdentityHashMap<Expr, TypeRef>();
         /// Locals some closure assigns: never promoted again.
