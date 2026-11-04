@@ -7182,7 +7182,7 @@ public final class JavaEmitter {
             e = ((ParenExpr) e).inner;
         }
         TypeRef t = elementTypeQuiet(e, ctx);
-        if (t != null && t.nullable && e instanceof Ident && ctx.nonNull.contains(((Ident) e).name)) {
+        if (t != null && t.nullable && promotedHere(e, ctx)) {
             t = copyNonNull(t);
         }
         return t;
@@ -7191,7 +7191,7 @@ public final class JavaEmitter {
     /// An emitted operand's type, non-nullable when it is a local promoted here.
     private TypeRef promotedOperandType(Expr e, TypeRef t, Ctx ctx) {
         Expr u = stripParens(e);
-        if (t != null && t.nullable && u instanceof Ident && ctx.nonNull.contains(((Ident) u).name)) {
+        if (t != null && t.nullable && promotedHere(u, ctx)) {
             return copyNonNull(t);
         }
         return t;
@@ -7218,7 +7218,7 @@ public final class JavaEmitter {
         if (u instanceof NullLit) {
             return false;
         }
-        if (t != null && t.nullable && u instanceof Ident && ctx.nonNull.contains(((Ident) u).name)) {
+        if (t != null && t.nullable && promotedHere(u, ctx)) {
             t = copyNonNull(t);
         }
         return t != null && t != TypeRef.DYNAMIC && !t.nullable && !t.is("dynamic") && !t.is("Null")
@@ -7235,6 +7235,13 @@ public final class JavaEmitter {
     java.util.Set<String> flowEnterConservative(Stmt s, Ctx ctx) {
         demoteAssigned(s, ctx);
         return new HashSet<String>(ctx.nonNull);
+    }
+
+    /// For the async lowering: {@code state} minus what {@code o} assigns, leaving the flow as is.
+    java.util.Set<String> flowMinusAssigned(java.util.Set<String> state, Object o) {
+        java.util.Set<String> r = new HashSet<String>(state);
+        removeAssigned(r, o);
+        return r;
     }
 
     java.util.Set<String> flowSnapshot(Ctx ctx) {
@@ -7264,7 +7271,7 @@ public final class JavaEmitter {
     /// Demotes every promoted local that {@code o} assigns.
     private void demoteAssigned(Object o, Ctx ctx) {
         for (java.util.Iterator<String> it = ctx.nonNull.iterator(); it.hasNext();) {
-            if (assignsName(o, it.next(), 0)) {
+            if (assignsName(o, promotionRoot(it.next()), 0)) {
                 it.remove();
             }
         }
@@ -7308,6 +7315,11 @@ public final class JavaEmitter {
             } else {
                 promoteNonNull(n, ctx);
             }
+        } else if (x instanceof PropertyGet) {
+            String k = promotionKey(x, ctx);
+            if (k != null) {
+                ctx.nonNull.add(k);
+            }
         }
     }
 
@@ -7323,7 +7335,7 @@ public final class JavaEmitter {
                 if (staticallyNonNull(a.rhs, null, ctx)) {
                     promoteNonNull(((Ident) a.lhs).name, ctx);
                 } else {
-                    ctx.nonNull.remove(((Ident) a.lhs).name);
+                    ctx.demote(((Ident) a.lhs).name);
                 }
             }
         } else if (e instanceof PropertyGet) {
@@ -7354,13 +7366,22 @@ public final class JavaEmitter {
     /// when it is private, final and nullable, and no declaration of that name in its library
     /// is a getter or a non-final field (which could answer something else on a second read).
     private boolean promotableField(String name, Ctx ctx) {
-        if (!name.startsWith("_") || ctx.currentClass == null || ctx.currentExtension != null) {
+        return ctx.currentExtension == null && promotableField(ctx.currentClass, name, ctx);
+    }
+
+    /// Whether `name`, read on an instance of {@code start}, is a promotable field: private to
+    /// the library doing the read, final, nullable, never a getter or a non-final field anywhere
+    /// in that library, and not left to a same-library noSuchMethod forwarder (a class there
+    /// that implements or extends the owner, has its own noSuchMethod and does not declare the
+    /// member answers the read through noSuchMethod, which may answer anything each time).
+    private boolean promotableField(ClassDecl start, String name, Ctx ctx) {
+        if (start == null || name == null || !name.startsWith("_")) {
             return false;
         }
         FieldDecl decl = null;
         ClassDecl owner = null;
         java.util.Set<String> seen = new HashSet<String>();
-        for (ClassDecl k = ctx.currentClass; k != null && seen.add(k.name);
+        for (ClassDecl k = start; k != null && seen.add(k.name);
                 k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
             FieldDecl f = k.field(name);
             if (f != null) {
@@ -7375,6 +7396,11 @@ public final class JavaEmitter {
         if (decl == null || !decl.isFinal || decl.isStatic || decl.type == null || !decl.type.nullable) {
             return false;
         }
+        Library here = ctx.currentExtension != null ? ctx.currentExtension.ownerLibrary
+                : ctx.currentClass != null ? ctx.currentClass.ownerLibrary : ctx.currentLibrary;
+        if (here != null && owner.ownerLibrary != null && owner.ownerLibrary != here) {
+            return false;
+        }
         for (ClassDecl k : program.classes.values()) {
             if (k.ownerLibrary != owner.ownerLibrary) {
                 continue;
@@ -7383,8 +7409,88 @@ public final class JavaEmitter {
             if (f != null && (!f.isFinal || f.isStatic) || k.getter(name) != null) {
                 return false;
             }
+            if (f == null && k != owner && k.method("noSuchMethod") != null && isProgramSubtype(k, owner)) {
+                return false;
+            }
         }
         return true;
+    }
+
+    /// The declared type of a field or getter {@code pg} reads on a non-generic program class,
+    /// or null when that is not what it reads.
+    private TypeRef declaredMemberType(PropertyGet pg, Ctx ctx) {
+        if (pg.nullAware && !(pg.target instanceof ThisExpr)) {
+            return null;
+        }
+        ClassDecl c;
+        if (pg.target instanceof ThisExpr) {
+            c = ctx.currentExtension == null ? ctx.currentClass : null;
+        } else {
+            TypeRef rt = flowType(pg.target, ctx);
+            c = rt == null || rt.nullable ? null : program.classes.get(rt.name);
+        }
+        java.util.Set<String> seen = new HashSet<String>();
+        for (ClassDecl k = c; k != null && k.typeParams.isEmpty() && seen.add(k.name);
+                k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            FieldDecl f = k.field(pg.name);
+            if (f != null) {
+                return f.isStatic || f.type == null || f.type == TypeRef.VAR || f.type.is("var") ? null : f.type;
+            }
+            MethodDecl g = k.getter(pg.name);
+            if (g != null) {
+                return g.isStatic || g.returnType == null || g.returnType.is("var") ? null : g.returnType;
+            }
+        }
+        return null;
+    }
+
+    /// The key a promotable reference is tracked under in ctx.nonNull, or null when the
+    /// expression cannot be promoted: a local (`x`), a promotable field of this object (`_p`,
+    /// `this._p`, both keyed `_p`), or a promotable field read through another promotable
+    /// reference (`p._p`, `p._q._r`), keyed by the path.
+    private String promotionKey(Expr e, Ctx ctx) {
+        e = stripParens(e);
+        if (e instanceof Ident) {
+            String n = ((Ident) e).name;
+            if (ctx.lookup(n) != null) {
+                return n;
+            }
+            return promotableField(n, ctx) ? n : null;
+        }
+        if (!(e instanceof PropertyGet) || ((PropertyGet) e).nullAware) {
+            return null;
+        }
+        PropertyGet pg = (PropertyGet) e;
+        if (pg.target instanceof ThisExpr) {
+            return promotableField(pg.name, ctx) ? pg.name : null;
+        }
+        String rk = promotionKey(pg.target, ctx);
+        if (rk == null || !rk.contains(".") && ctx.lookup(rk) == null && !promotableField(rk, ctx)) {
+            return null;
+        }
+        if (ctx.writeCaptured.contains(promotionRoot(rk))) {
+            return null;
+        }
+        TypeRef rt = flowType(pg.target, ctx);
+        if (rt == null || rt.nullable) {
+            return null;
+        }
+        ClassDecl rc = program.classes.get(rt.name);
+        return promotableField(rc, pg.name, ctx) ? rk + "." + pg.name : null;
+    }
+
+    private static String promotionRoot(String key) {
+        int i = key.indexOf('.');
+        return i < 0 ? key : key.substring(0, i);
+    }
+
+    /// Whether {@code e} is a promotable reference promoted to non-null here.
+    private boolean promotedHere(Expr e, Ctx ctx) {
+        if (ctx.nonNull.isEmpty()) {
+            return false;
+        }
+        String k = promotionKey(e, ctx);
+        return k != null && ctx.nonNull.contains(k);
     }
 
     /// Records the closure {@code l}'s writes to enclosing locals (write capture) and returns the
@@ -7518,7 +7624,7 @@ public final class JavaEmitter {
 
     private void removeAssigned(java.util.Set<String> state, Object o) {
         for (java.util.Iterator<String> it = state.iterator(); it.hasNext();) {
-            if (assignsName(o, it.next(), 0)) {
+            if (assignsName(o, promotionRoot(it.next()), 0)) {
                 it.remove();
             }
         }
@@ -16094,6 +16200,10 @@ public final class JavaEmitter {
                             at = it;
                         }
                     }
+                    if ((at == null || at.is("dynamic")) && a instanceof PropertyGet) {
+                        // `sh(b._g)` / `sh(this._f)`: a program class's declared field or getter.
+                        at = declaredMemberType((PropertyGet) a, ctx);
+                    }
                     if ((at == null || at.is("dynamic")) && a instanceof Call && ((Call) a).target == null
                             && ((Call) a).name != null && ctx.lookup(((Call) a).name) != null) {
                         // `sh(k())` with `var k = () => z`: the local closure's inferred return.
@@ -16109,7 +16219,7 @@ public final class JavaEmitter {
                         at = new TypeRef(((Call) a).name);
                         at.args.addAll(((Call) a).typeArgs);
                     }
-                    if (at != null && at.nullable && a instanceof Ident && ctx.nonNull.contains(((Ident) a).name)) {
+                    if (at != null && at.nullable && promotedHere(a, ctx)) {
                         at = copyNonNull(at);
                     }
                     unifyThroughSupers(p.type, at, tps, m, 0);
@@ -20404,6 +20514,10 @@ public final class JavaEmitter {
         }
         ClassDecl extCls = findUserExtension(tt.name, name, true, ctx);
         extCls = mostSpecificExtension(extCls, tt, name, true);
+        // As for methods: the receiver's PROMOTED static type picks `on T` over `on T?`.
+        Expr getRecv = posNode instanceof PropertyGet ? ((PropertyGet) posNode).target : null;
+        TypeRef getFlow = getRecv != null ? promotedOperandType(getRecv, tt, ctx) : tt;
+        extCls = nullabilitySpecificExtension(extCls, getFlow == null || getFlow.nullable, name, true, ctx);
         if (extCls != null) {
             MethodDecl eg = extCls.getter(name);
             String self = extensionSelf(target, tt, extCls, ctx);
@@ -21133,7 +21247,7 @@ public final class JavaEmitter {
                 if (nn) {
                     promoteNonNull(n, ctx);
                 } else {
-                    ctx.nonNull.remove(n);
+                    ctx.demote(n);
                 }
             } else if ("??=".equals(a.op) && nn) {
                 promoteNonNull(n, ctx);
@@ -21359,6 +21473,43 @@ public final class JavaEmitter {
                     String recv = a.op.equals("=") && ctx.statementExpr == a ? tgt.code : receiverOnce(tgt, ctx);
                     return voidSetterWrite(a, recv + "." + pg.name,
                             a.op.equals("=") ? null : recv + "." + pg.name + "()", pt, ctx);
+                }
+            }
+            if (tgt.type != null && a.op.equals("=") && findAppSetter(
+                    program.resolveClass(tgt.type.name, ctx.library()), pg.name) == null) {
+                // An extension setter, `x.s = v`: the extension's static `Ext.s($self, v)`,
+                // chosen by the receiver's PROMOTED type as methods and getters are.
+                TypeRef flow = promotedOperandType(pg.target, tgt.type, ctx);
+                MethodDecl es = null;
+                ClassDecl ext = null;
+                for (ClassDecl e : program.extensions) {
+                    if (e.extensionOn == null || !e.extensionOn.name.equals(tgt.type.name)
+                            || !e.typeParams.isEmpty() || !e.extensionOn.args.isEmpty()
+                            || ctx.library() != null && !program.extensionVisible(e, ctx.library())
+                            || flow.nullable && !e.extensionOn.nullable) {
+                        continue;
+                    }
+                    for (MethodDecl m : e.methods) {
+                        if (m.isSetter && !m.isStatic && m.name.equals(pg.name) && m.params.size() == 1
+                                && (es == null || ext.extensionOn.nullable && !e.extensionOn.nullable)) {
+                            es = m;
+                            ext = e;
+                        }
+                    }
+                }
+                if (es != null) {
+                    TypeRef pt = es.params.get(0).type == null || es.params.get(0).type.is("var")
+                            ? TypeRef.DYNAMIC : es.params.get(0).type;
+                    String self = extensionSelf(tgt, tgt.type, ext, ctx);
+                    String value = coerce(emitExpr(a.rhs, pt, ctx), pt, ctx);
+                    if (ctx.statementExpr == a) {
+                        return new Out(ext.name + "." + pg.name + "(" + self + ", " + value + ")", pt);
+                    }
+                    String jt = declarableType(pt, false, ctx);
+                    String v = ctx.newTemp();
+                    ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + value + ";");
+                    ctx.writer().line(ext.name + "." + pg.name + "(" + self + ", " + v + ");");
+                    return new Out(v, pt);
                 }
             }
             if ((ctx.statementExpr != a || !a.op.equals("=")) && !isRepeatable(tgt)) {
@@ -38173,8 +38324,19 @@ public final class JavaEmitter {
         /// Locals assigned somewhere in their scope after the declaration.
         final java.util.Set<String> reassigned = new HashSet<String>();
 
-        void declare(String name, TypeRef type) {
+        /// Drops the promotion of {@code name} and of every field path read through it.
+        void demote(String name) {
             nonNull.remove(name);
+            for (java.util.Iterator<String> it = nonNull.iterator(); it.hasNext();) {
+                String k = it.next();
+                if (k.startsWith(name) && k.length() > name.length() && k.charAt(name.length()) == '.') {
+                    it.remove();
+                }
+            }
+        }
+
+        void declare(String name, TypeRef type) {
+            demote(name);
             writeCaptured.remove(name);
             reassigned.remove(name);
             if (!scopes.isEmpty()) {

@@ -799,7 +799,11 @@ final class AsyncLowering {
             // statement, conservatively: what it assigns is demoted before it, and only what
             // held at entry survives it.
             java.util.Set<String> pre = em.flowSnapshot(ctx);
-            java.util.Set<String> entry = em.flowEnterConservative(s, ctx);
+            // A try is no loop: its body runs once, from the full entry state (what it
+            // assigns is demoted where it is assigned); the catches and finally start from
+            // tryEntryFlow, and only what held at entry and nothing assigned survives it.
+            java.util.Set<String> entry = s instanceof TryStmt ? em.flowMinusAssigned(pre, s)
+                    : em.flowEnterConservative(s, ctx);
             java.util.Set<String> savedTryEntry = tryEntryFlow;
             tryEntryFlow = s instanceof TryStmt ? pre : null;
             try {

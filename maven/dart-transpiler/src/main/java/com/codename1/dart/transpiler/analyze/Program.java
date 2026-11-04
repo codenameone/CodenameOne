@@ -165,6 +165,7 @@ public final class Program {
             libraries.add(part);
             register(part, part);
         }
+        separateLibraryPrivateMembers();
         restoreShadowedAliases();
         expandRecordTypedefs();
         // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
@@ -827,4 +828,127 @@ public final class Program {
         }
         return sb.append("Lib").toString();
     }
+    /**
+     * Dart library privacy: a member named {@code _x} declared in one library is a different
+     * member from an {@code _x} declared in another, even on a subclass, so neither overrides
+     * nor answers for the other. Java has no such scoping, so every library but the first to
+     * declare a colliding private member name has that name renamed throughout its own
+     * declarations ({@code _x$p1}); the name is private, so nothing outside the library can
+     * spell it. Type, top-level and constructor names are left alone, as are stub libraries,
+     * whose members map onto Java names.
+     */
+    private void separateLibraryPrivateMembers() {
+        Map<String, List<Ast.Library>> declaring = new LinkedHashMap<String, List<Ast.Library>>();
+        Set<String> excluded = new HashSet<String>();
+        for (Ast.Library lib : libraries) {
+            for (Ast.ClassDecl c : lib.classes) {
+                excluded.add(c.name);
+            }
+            for (Ast.EnumDecl e : lib.enums) {
+                excluded.add(e.name);
+            }
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                excluded.add(t.name);
+            }
+            for (Ast.FunctionDecl f : lib.functions) {
+                excluded.add(f.name);
+            }
+            for (Ast.FieldDecl f : lib.topLevelVars) {
+                excluded.add(f.name);
+            }
+        }
+        for (Ast.Library lib : libraries) {
+            Set<String> own = new HashSet<String>();
+            boolean stub = false;
+            for (Ast.ClassDecl c : lib.classes) {
+                stub |= c.javaName != null;
+                for (Ast.FieldDecl f : c.fields) {
+                    own.add(f.name);
+                }
+                for (Ast.MethodDecl m : c.methods) {
+                    own.add(m.name);
+                }
+            }
+            for (Ast.EnumDecl e : lib.enums) {
+                stub |= e.javaName != null;
+                for (Ast.FieldDecl f : e.fields) {
+                    own.add(f.name);
+                }
+                for (Ast.MethodDecl m : e.methods) {
+                    own.add(m.name);
+                }
+            }
+            if (stub) {
+                continue;
+            }
+            for (String n : own) {
+                if (n != null && n.startsWith("_") && !excluded.contains(n)) {
+                    List<Ast.Library> l = declaring.get(n);
+                    if (l == null) {
+                        l = new ArrayList<Ast.Library>();
+                        declaring.put(n, l);
+                    }
+                    l.add(lib);
+                }
+            }
+        }
+        Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        for (Map.Entry<String, List<Ast.Library>> en : declaring.entrySet()) {
+            List<Ast.Library> l = en.getValue();
+            for (int i = 1; i < l.size(); i++) {
+                Map<String, String> m = renames.get(l.get(i));
+                if (m == null) {
+                    m = new java.util.HashMap<String, String>();
+                    renames.put(l.get(i), m);
+                }
+                m.put(en.getKey(), en.getKey() + "$p" + libraries.indexOf(l.get(i)));
+            }
+        }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
+            renamePrivate(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+    }
+
+    private static void renamePrivate(Object o, Map<String, String> names, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                renamePrivate(e, names, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        boolean typeName = o instanceof Ast.ClassDecl || o instanceof Ast.EnumDecl || o instanceof Ast.TypedefDecl
+                || o instanceof Ast.Library;
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive()
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(o);
+                    if (f.getType() == String.class) {
+                        String nm = f.getName();
+                        if (!typeName && ("name".equals(nm) || "field".equals(nm)) && names.containsKey(v)) {
+                            f.set(o, names.get(v));
+                        }
+                    } else {
+                        renamePrivate(v, names, seen);
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+    }
+
 }
