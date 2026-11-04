@@ -167,6 +167,7 @@ public final class JavaEmitter {
         inferUntypedMethodReturns();
         pinMemberTypesToOwnLibraries();
         computeBoxedReturnSets();
+        checkStubInterfaceReturnConflicts();
         List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
         if (!closureSignatures.isEmpty() || !signedSams.isEmpty() || !callbackTearOffs.isEmpty()) {
             pruned.add(closureSignatureFile(pruned));
@@ -214,6 +215,78 @@ public final class JavaEmitter {
     /// untouched and keep their primitive returns.
     private final java.util.Set<Object> boxedReturnMembers = java.util.Collections.newSetFromMap(
             new java.util.IdentityHashMap<Object, Boolean>());
+
+    /**
+     * E0144: `class Mixed extends Color implements Base`, where the stub superclass already
+     * implements a member (Color's `int get value`, a Java {@code long value()}) that a
+     * program interface declares with a reference return (Base's untyped `get value`, an
+     * {@code Object value()} on Base$I). Java has no bridge for a primitive return, and the
+     * stub's method is final in shape, so the class cannot be emitted; javac would report
+     * "return type long is not compatible with Object" against generated code. Reported
+     * here, against the Dart class, with the fix the program can make: give the interface's
+     * getter the stub's type.
+     */
+    private void checkStubInterfaceReturnConflicts() {
+        for (List<ClassDecl> same : program.classesByName.values()) {
+            for (ClassDecl c : same) {
+                if (c.extensionOn != null || c.isMixin || c.interfaces.isEmpty()) {
+                    continue;
+                }
+                String stubSuper = nearestStubSuper(c);
+                if (stubSuper == null) {
+                    continue;
+                }
+                for (TypeRef iref : c.interfaces) {
+                    ClassDecl iface = iref == null ? null : program.resolveClass(iref.name, c.ownerLibrary);
+                    if (iface == null || iface.extensionOn != null) {
+                        continue;
+                    }
+                    for (MethodDecl m : iface.methods) {
+                        if (m.isStatic || m.isSetter || declaredInProgramChain(c, m.name, stubSuper)) {
+                            continue;
+                        }
+                        Ast.MethodDecl sm = stubs.findMethod(stubSuper, m.name, m.isGetter);
+                        if (sm == null || sm.isStatic || sm.returnType == null) {
+                            continue;
+                        }
+                        Ctx cx = new Ctx(c);
+                        String stubJt = javaType(sm.returnType, false, cx);
+                        boolean ifaceRef = m.returnType == null || m.returnType.is("var")
+                                || boxedReturnMembers.contains(m)
+                                || !isJavaPrimitive(javaType(m.returnType, false, new Ctx(iface)));
+                        if (!isJavaPrimitive(stubJt) || !ifaceRef) {
+                            continue;
+                        }
+                        String kind = m.isGetter ? "getter" : "method";
+                        diags.error(c, "E0144", "Class " + c.name + " extends " + stubSuper + " and implements "
+                                + iface.name + ", which both declare the " + kind + " '" + m.name + "': "
+                                + stubSuper + "." + m.name + " returns " + sm.returnType + " but " + iface.name + "."
+                                + m.name + " is " + (m.returnType == null || m.returnType.is("var")
+                                        ? "untyped (dynamic)" : "declared " + m.returnType)
+                                + ", and the generated Java cannot implement both. Declare the " + kind
+                                + "'s type in " + iface.name + " (`" + sm.returnType + (m.isGetter ? " get " : " ")
+                                + m.name + "`), or override '" + m.name + "' in " + c.name + ".");
+                    }
+                }
+            }
+        }
+    }
+
+    /** Whether {@code c} or a program superclass below {@code stubSuper} declares {@code name}. */
+    private boolean declaredInProgramChain(ClassDecl c, String name, String stubSuper) {
+        for (ClassDecl k = c; k != null && !k.name.equals(stubSuper);
+                k = k.superclass == null ? null : program.resolveClass(k.superclass.name, k.ownerLibrary)) {
+            for (MethodDecl m : k.methods) {
+                if (m.name.equals(name) && !m.isSetter) {
+                    return true;
+                }
+            }
+            if (k.field(name) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private void computeBoxedReturnSets() {
         final Map<Object, Object> parent = new java.util.IdentityHashMap<Object, Object>();
@@ -11386,6 +11459,7 @@ public final class JavaEmitter {
 
     private static TypeRef copyNullable(TypeRef t) {
         TypeRef r = new TypeRef(t.name);
+        r.extensionType = t.extensionType;
         r.args.addAll(t.args);
         r.funcParams = t.funcParams;
         r.funcReturn = t.funcReturn;
@@ -20756,6 +20830,14 @@ public final class JavaEmitter {
             target = boundView;
             tt = boundView.type;
         }
+        // A receiver whose static type is an extension type: its own members (and those of
+        // the extension types it implements) win over the representation's, statically.
+        ClassDecl extTypeGet = extensionTypeMember(tt, name, true);
+        if (extTypeGet != null) {
+            MethodDecl eg = extTypeGet.getter(name);
+            return new Out(extTypeGet.name + "." + name + "(" + extensionSelf(target, tt, extTypeGet, ctx) + ")",
+                    eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
+        }
         // Cascade suppression: the receiver already fell to `dynamic` from a reported
         // diagnostic upstream; a member read on a dynamic receiver is legal Dart, so
         // don't re-diagnose the same root cause on every link of the chain.
@@ -22364,6 +22446,25 @@ public final class JavaEmitter {
             // A compound `x.prop += v` reads through the getter, `x.prop(x.prop() + v)`, as the
             // stub branch above does; it fell through to `x.prop() += v`, which is not Java.
             // (`??=` never gets here: it is rewritten to a plain `=` under a null test.)
+            // `h.n = v` on a receiver typed as an extension type declaring `set n`: the
+            // extension type's setter, statically, even where the representation has an
+            // `n` of its own.
+            ClassDecl extTypeSet = a.op.equals("=") ? extensionTypeSetterOwner(tgt.type, pg.name) : null;
+            if (extTypeSet != null) {
+                MethodDecl es = extensionSetter(extTypeSet, pg.name);
+                TypeRef pt = es.params.get(0).type == null || es.params.get(0).type.is("var")
+                        ? TypeRef.DYNAMIC : es.params.get(0).type;
+                String self = extensionSelf(tgt, tgt.type, extTypeSet, ctx);
+                String value = coerce(emitExpr(a.rhs, pt, ctx), pt, ctx);
+                if (ctx.statementExpr == a) {
+                    return new Out(extTypeSet.name + "." + pg.name + "(" + self + ", " + value + ")", pt);
+                }
+                String jt = declarableType(pt, false, ctx);
+                String v = ctx.newTemp();
+                ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + value + ";");
+                ctx.writer().line(extTypeSet.name + "." + pg.name + "(" + self + ", " + v + ");");
+                return new Out(v, pt);
+            }
             if (tgt.type != null) {
                 ClassDecl tc = program.resolveClass(tgt.type.name, ctx.library());
                 Ast.MethodDecl setter = findAppSetter(tc, pg.name);
@@ -22374,8 +22475,12 @@ public final class JavaEmitter {
                             a.op.equals("=") ? null : recv + "." + pg.name + "()", pt, ctx);
                 }
             }
+            // A field of the receiver's class is an instance member too, and an instance
+            // member always wins over an extension's: `cell.v = x` inside `set v(x)` of an
+            // extension (type) on Cell writes the field, never recursing into the setter.
             if (tgt.type != null && findAppSetter(
-                    program.resolveClass(tgt.type.name, ctx.library()), pg.name) == null) {
+                    program.resolveClass(tgt.type.name, ctx.library()), pg.name) == null
+                    && findFieldInChain(program.resolveClass(tgt.type.name, ctx.library()), pg.name) == null) {
                 // An extension setter, `x.s = v` (or `x.s += v`, `x.s++`): the extension's
                 // static `Ext.s($self, v)`, chosen by the receiver's PROMOTED type as methods
                 // and getters are -- the nearest supertype's, generic extensions (`on List<T>`)
@@ -23531,6 +23636,17 @@ public final class JavaEmitter {
         }
         ctx.writer().raw(rLifted);
         boolean numeric = isNumeric(l.type) && isNumeric(r.type);
+        // An operator an extension type declares: static, and ahead of the representation's.
+        String etOp = b.op.equals("==") || b.op.equals("!=") || b.op.equals("&&") || b.op.equals("||")
+                || b.op.equals("??") ? null : com.codename1.dart.transpiler.parser.AstBuilder.mangleOperator(b.op);
+        ClassDecl etOpOwner = etOp == null ? null : extensionTypeMember(l.type, etOp, false);
+        if (etOpOwner != null) {
+            MethodDecl om = etOpOwner.method(etOp);
+            TypeRef pt = om.params.isEmpty() ? null : om.params.get(0).type;
+            return new Out(etOpOwner.name + "." + etOp + "(" + extensionSelf(l, l.type, etOpOwner, ctx) + ", "
+                    + (pt == null ? r.code : coerce(r, pt, ctx)) + ")",
+                    om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType);
+        }
         // user-defined operators on program classes
         ClassDecl opClass = classOfRef(l.type);
         if (opClass != null && !b.op.equals("==") && !b.op.equals("!=")
@@ -24329,6 +24445,7 @@ public final class JavaEmitter {
             return a;
         }
         TypeRef c = new TypeRef(t.name);
+        c.extensionType = t.extensionType;
         c.nullable = t.nullable;
         c.resolved = t.resolved;
         c.shadowsCore = t.shadowsCore;
@@ -27697,6 +27814,14 @@ public final class JavaEmitter {
         if (boundView != null) {
             target = boundView;
             tt = boundView.type;
+        }
+        ClassDecl extTypeM = extensionTypeMember(tt, c.name, false);
+        if (extTypeM != null) {
+            MethodDecl em = extTypeM.method(c.name);
+            String rest = methodArgs(extensionCallbackParams(extTypeM, em.params, tt), c.args, ctx);
+            return new Out(extTypeM.name + "." + c.name + "(" + extensionSelf(target, tt, extTypeM, ctx)
+                    + (rest.isEmpty() ? "" : ", " + rest) + ")",
+                    em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
         }
         String n = c.name;
         // Cascade suppression: the receiver's type already fell to `dynamic` because a
@@ -31433,6 +31558,7 @@ public final class JavaEmitter {
             return r;
         }
         TypeRef out = new TypeRef(t.name);
+        out.extensionType = t.extensionType;
         out.nullable = t.nullable;
         out.resolved = t.resolved;
         out.shadowsCore = t.shadowsCore;
@@ -33443,6 +33569,62 @@ public final class JavaEmitter {
         return found;
     }
 
+    /**
+     * The extension type that declares instance member {@code name} for a receiver whose
+     * static type was written as an extension type (TypeRef.extensionType), searching the
+     * extension types it implements breadth first; null when the type is no extension type or
+     * neither it nor they declare the member, so the representation's member answers.
+     */
+    /** As {@link #extensionTypeMember}, for a setter. */
+    private ClassDecl extensionTypeSetterOwner(TypeRef tt, String name) {
+        if (tt == null || tt.extensionType == null || name == null) {
+            return null;
+        }
+        java.util.ArrayDeque<ClassDecl> queue = new java.util.ArrayDeque<ClassDecl>();
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        queue.add(tt.extensionType);
+        while (!queue.isEmpty()) {
+            ClassDecl et = queue.poll();
+            if (!seen.add(et)) {
+                continue;
+            }
+            if (extensionSetter(et, name) != null) {
+                return et;
+            }
+            for (TypeRef i : et.interfaces) {
+                if (i.extensionType != null) {
+                    queue.add(i.extensionType);
+                }
+            }
+        }
+        return null;
+    }
+
+    private ClassDecl extensionTypeMember(TypeRef tt, String name, boolean getter) {
+        if (tt == null || tt.extensionType == null || name == null) {
+            return null;
+        }
+        java.util.ArrayDeque<ClassDecl> queue = new java.util.ArrayDeque<ClassDecl>();
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        queue.add(tt.extensionType);
+        while (!queue.isEmpty()) {
+            ClassDecl et = queue.poll();
+            if (!seen.add(et)) {
+                continue;
+            }
+            MethodDecl m = getter ? et.getter(name) : et.method(name);
+            if (m != null && !m.isStatic) {
+                return et;
+            }
+            for (TypeRef i : et.interfaces) {
+                if (i.extensionType != null) {
+                    queue.add(i.extensionType);
+                }
+            }
+        }
+        return null;
+    }
+
     private ClassDecl findUserExtension(String typeName, String member, boolean getter, Ctx ctx) {
         ClassDecl direct = program.findExtension(typeName, member, getter, ctx.library());
         if (direct != null || typeName == null) {
@@ -33662,6 +33844,7 @@ public final class JavaEmitter {
             return t;
         }
         TypeRef copy = new TypeRef(t.name);
+        copy.extensionType = t.extensionType;
         copy.nullable = t.nullable;
         copy.args.addAll(substituteTypeParams(t.args, params, args));
         return copy;
@@ -37132,6 +37315,7 @@ public final class JavaEmitter {
             return TypeRef.DYNAMIC;
         }
         TypeRef c = TypeRef.of(t.name, t.args.toArray(new TypeRef[0]));
+        c.extensionType = t.extensionType;
         c.nullable = true;
         // The copy names the same type: javaType strips an import prefix in place
         // (`io.WebSocket` -> `WebSocket`) and leaves which library it meant only in
@@ -37177,6 +37361,7 @@ public final class JavaEmitter {
         TypeRef c = TypeRef.of(t.name, t.args.toArray(new TypeRef[0]));
         c.nullable = false;
         c.runtimeOnly = t.runtimeOnly;
+        c.extensionType = t.extensionType;
         c.resolved = t.resolved;
         c.shadowsCore = t.shadowsCore;
         // An inline function type keeps its signature (in boxType too): without it a
@@ -38753,6 +38938,7 @@ public final class JavaEmitter {
             // An inline function type (`R Function(T)` of Zone.bindUnaryCallback): its
             // signature carries the variables, not its (empty) type arguments.
             TypeRef f = new TypeRef(t.name);
+            f.extensionType = t.extensionType;
             f.nullable = t.nullable;
             f.line = t.line;
             f.col = t.col;

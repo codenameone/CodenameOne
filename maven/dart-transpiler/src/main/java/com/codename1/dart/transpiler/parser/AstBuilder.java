@@ -229,6 +229,8 @@ public final class AstBuilder {
                 cd.constKeyed = hasAnnotation(meta, "ConstKeyed");
                 lib.classes.add(cd);
             }
+        } else if (ctx.extensionTypeDeclaration() != null) {
+            buildExtensionType(ctx.extensionTypeDeclaration(), javaName, lib);
         } else if (ctx.extensionDeclaration() != null) {
             Dart2Parser.ExtensionDeclarationContext ext = ctx.extensionDeclaration();
             ClassDecl cd = new ClassDecl();
@@ -391,6 +393,165 @@ public final class AstBuilder {
         } else {
             unsupported(ctx, "E0103", "Unsupported top-level declaration: " + snippet(ctx));
         }
+    }
+
+    /**
+     * `extension type Id(int value) implements I { ... }`. An extension type is erased to its
+     * representation at run time, so it is lowered to an ordinary extension on the
+     * representation type, whose members are then dispatched statically like any other
+     * extension's, plus:
+     * <ul>
+     * <li>a getter for the representation field answering {@code this};</li>
+     * <li>a top-level function named after the type for the primary constructor, returning
+     *     its argument -- so {@code Id(3)} allocates nothing;</li>
+     * <li>a static method of the extension for each named constructor or factory, whose
+     *     result is the representation value an initializer, a redirect or a body gives.</li>
+     * </ul>
+     * Every type that names the extension type is erased to the representation once all
+     * libraries are known (Program.eraseExtensionTypes); {@code implements} needs nothing,
+     * because the representation's own members and the extensions of the extension types it
+     * implements are found on the erased type.
+     */
+    private void buildExtensionType(Dart2Parser.ExtensionTypeDeclarationContext et, String javaName, Library lib) {
+        ClassDecl cd = new ClassDecl();
+        pos(cd, et);
+        cd.name = et.typeIdentifier().getText();
+        cd.javaName = javaName;
+        cd.isExtensionType = true;
+        List<Dart2Parser.IdentifierContext> ids = et.identifier();
+        // ids: [`type`, optional primary constructor name, representation field name]
+        String repName = ids.get(ids.size() - 1).getText();
+        String primaryName = ids.size() > 2 ? ids.get(1).getText() : null;
+        TypeRef rep = buildType(et.type());
+        cd.extensionOn = rep;
+        if (et.interfaces() != null) {
+            for (Dart2Parser.TypeNotVoidContext t : et.interfaces().typeNotVoidList().typeNotVoid()) {
+                cd.interfaces.add(buildTypeNotVoid(t));
+            }
+        }
+        if (et.typeParameters() != null) {
+            for (Dart2Parser.TypeParameterContext tp : et.typeParameters().typeParameter()) {
+                cd.typeParams.add(tp.identifier().getText());
+                if (tp.typeNotVoid() != null) {
+                    cd.typeParamBounds.put(tp.identifier().getText(), buildTypeNotVoid(tp.typeNotVoid()));
+                }
+            }
+        }
+        java.util.List<Dart2Parser.ClassMemberDeclarationContext> members = et.classMemberDeclaration();
+        java.util.List<Dart2Parser.MetadataContext> metas = et.metadata();
+        // metadata(0) annotates the representation field; the members' follow it.
+        for (int i = 0; i < members.size(); i++) {
+            buildMember(members.get(i), metas.size() > i + 1 ? metas.get(i + 1) : null, cd);
+        }
+        MethodDecl getter = new MethodDecl();
+        pos(getter, et);
+        getter.name = repName;
+        getter.isGetter = true;
+        getter.returnType = rep;
+        ThisExpr self = new ThisExpr();
+        pos(self, et);
+        getter.exprBody = self;
+        cd.methods.add(getter);
+        // The type the constructors return: `Box<T>`, erased with every other mention.
+        TypeRef selfType = new TypeRef(cd.name);
+        pos(selfType, et);
+        for (String tp : cd.typeParams) {
+            selfType.args.add(new TypeRef(tp));
+        }
+        lib.namedTypes.add(selfType);
+        Param p = new Param();
+        p.name = repName;
+        p.type = rep;
+        if (primaryName == null) {
+            FunctionDecl fn = new FunctionDecl();
+            pos(fn, et);
+            fn.name = cd.name;
+            fn.returnType = selfType;
+            fn.typeParams.addAll(cd.typeParams);
+            fn.typeParamBounds.putAll(cd.typeParamBounds);
+            fn.params.add(p);
+            fn.exprBody = ident(repName, et);
+            lib.functions.add(fn);
+        } else {
+            MethodDecl m = new MethodDecl();
+            pos(m, et);
+            m.name = primaryName;
+            m.isStatic = true;
+            m.returnType = selfType;
+            m.typeParams.addAll(cd.typeParams);
+            m.params.add(p);
+            m.exprBody = ident(repName, et);
+            cd.methods.add(m);
+        }
+        for (CtorDecl c : cd.ctors) {
+            MethodDecl m = new MethodDecl();
+            m.file = c.file;
+            m.line = c.line;
+            m.col = c.col;
+            m.name = c.name == null ? "new" : c.name;
+            m.isStatic = true;
+            m.returnType = selfType;
+            m.typeParams.addAll(cd.typeParams);
+            for (Param cp : c.params) {
+                if (cp.isThis) {
+                    // `Id.of(this.value)`: the parameter is the representation.
+                    cp.isThis = false;
+                    if (cp.type == null || cp.type.is("var")) {
+                        cp.type = rep;
+                    }
+                }
+                m.params.add(cp);
+            }
+            Expr result = null;
+            for (Param cp : c.params) {
+                if (cp.name.equals(repName)) {
+                    result = ident(repName, et);
+                }
+            }
+            for (FieldInit fi : c.fieldInits) {
+                if (repName.equals(fi.field)) {
+                    result = fi.value;
+                }
+            }
+            if (c.redirect != null) {
+                Call call = new Call();
+                call.file = c.file;
+                call.line = c.line;
+                call.col = c.col;
+                if (c.redirect.namedCtor == null) {
+                    call.name = primaryName == null ? cd.name : primaryName;
+                    if (primaryName != null) {
+                        call.target = ident(cd.name, et);
+                    }
+                } else {
+                    call.target = ident(cd.name, et);
+                    call.name = c.redirect.namedCtor;
+                }
+                call.args = c.redirect.args;
+                result = call;
+            }
+            if (c.isFactory || c.body != null && result == null) {
+                // A factory's body already returns the value; a redirecting factory
+                // (`factory Id.of(int v) = Id;`) has none and is not lowered.
+                m.body = c.body;
+            }
+            if (m.body == null && m.exprBody == null) {
+                if (result == null) {
+                    result = new NullLit();
+                }
+                m.exprBody = result;
+            }
+            cd.methods.add(m);
+        }
+        cd.ctors.clear();
+        lib.classes.add(cd);
+    }
+
+    private Ident ident(String name, org.antlr.v4.runtime.ParserRuleContext at) {
+        Ident id = new Ident();
+        pos(id, at);
+        id.name = name;
+        return id;
     }
 
     private TypedefDecl buildTypedef(Dart2Parser.TypeAliasContext ctx) {

@@ -170,6 +170,7 @@ public final class Program {
         separateLibraryPrivateTypedefs();
         restoreShadowedAliases();
         markShadowedCoreTypes();
+        eraseExtensionTypes();
         expandRecordTypedefs();
         // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
         // abstract base whose only abstract member is `iterator`, exactly IterableBase. The
@@ -357,6 +358,56 @@ public final class Program {
                     // Only the flag: {@code resolved} reaches a whole class declaration, which
                     // the reflective AST walks would then follow from every type reference.
                     t.shadowsCore = true;
+                }
+            }
+        }
+    }
+
+    /**
+     * Every type that names a Dart 3 extension type is its representation type at run time:
+     * `List<Id>` is a `List<int>`, `x is Id` is `x is int`. Rewritten in place, through
+     * chains (`extension type Admin(Id id)` is an int) and with the type arguments of a
+     * generic one substituted (`Box<String>` over `List<T>` is `List<String>`). A class of the
+     * same name wins, as in {@link #expandRecordTypedefs}.
+     */
+    private void eraseExtensionTypes() {
+        Map<String, Ast.ClassDecl> ext = new java.util.HashMap<String, Ast.ClassDecl>();
+        for (Ast.ClassDecl c : extensions) {
+            if (c.isExtensionType && !classesByName.containsKey(c.name)) {
+                ext.put(c.name, c);
+            }
+        }
+        if (ext.isEmpty()) {
+            return;
+        }
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                for (int depth = 0; depth < 16 && t.name != null && ext.containsKey(t.name); depth++) {
+                    Ast.ClassDecl et = ext.get(t.name);
+                    if (t.extensionType == null) {
+                        t.extensionType = et;
+                    }
+                    Ast.TypeRef rep = et.extensionOn;
+                    Map<String, Ast.TypeRef> subst = new java.util.HashMap<String, Ast.TypeRef>();
+                    for (int i = 0; i < et.typeParams.size(); i++) {
+                        subst.put(et.typeParams.get(i), i < t.args.size() ? t.args.get(i) : Ast.TypeRef.DYNAMIC);
+                    }
+                    if (rep.args.isEmpty() && subst.containsKey(rep.name)) {
+                        // `extension type Wrap<T>(T value)`: the representation is the argument.
+                        Ast.TypeRef r = subst.get(rep.name);
+                        t.name = r.name;
+                        t.args = r.args;
+                        t.funcParams = r.funcParams;
+                        t.nullable = t.nullable || r.nullable;
+                        continue;
+                    }
+                    List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+                    for (Ast.TypeRef a : rep.args) {
+                        args.add(substRecordArg(a, subst));
+                    }
+                    t.name = rep.name;
+                    t.args = args;
+                    t.nullable = t.nullable || rep.nullable;
                 }
             }
         }

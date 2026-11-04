@@ -361,6 +361,14 @@ expressionWithoutCascade
     | throwExpressionWithoutCascade
     ;
 
+// Dart 3 extension type -- CN1 addition. `type` is a built-in identifier, not a keyword,
+// so it is matched by text: `extension type X(...)` cannot be read as `extension X on T`,
+// which needs ON_ after the name.
+extensionTypeDeclaration
+    : EXTENSION_ {_input.LT(1).getText().equals("type")}? identifier CONST_? typeIdentifier typeParameters?
+      (DOT identifier)? OP metadata type identifier CP interfaces? OBC (metadata classMemberDeclaration)* CBC
+    ;
+
 extensionDeclaration
     : EXTENSION_ identifier? typeParameters? ON_ type OBC (metadata classMemberDeclaration)* CBC
     ;
@@ -1150,6 +1158,7 @@ tildeOperator
 topLevelDeclaration
     : classDeclaration
     | mixinDeclaration
+    | extensionTypeDeclaration
     | extensionDeclaration
     | enumType
     | typeAlias

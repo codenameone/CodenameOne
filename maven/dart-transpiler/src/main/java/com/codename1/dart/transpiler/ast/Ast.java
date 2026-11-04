@@ -73,6 +73,10 @@ public final class Ast {
         /// of that name: it is the runtime type, even where a program class of the same
         /// simple name is in scope.
         public boolean runtimeOnly;
+        /// The Dart 3 extension type this type was written as before it was erased to its
+        /// representation (Program.eraseExtensionTypes): its members are dispatched
+        /// statically and shadow the representation's own.
+        public ClassDecl extensionType;
         /// The name as written when the parser aliased it to a built-in collection
         /// (`Queue` to List); null otherwise. A program class of that name visible in the
         /// library wins over the alias (Program.restoreShadowedAliases).
@@ -239,6 +243,11 @@ public final class Ast {
         public TypeRef extensionOn;               // extension X on T { } — non-null marks an extension
         /** An `extension on T` with no name: no show combinator can import it, no hide drop it. */
         public boolean unnamedExtension;
+        /// A Dart 3 `extension type X(R r)`: lowered to an extension on R (its
+        /// {@link #extensionOn}), every type named X erased to R (Program.eraseExtensionTypes)
+        /// and its constructors to functions returning the representation, so no value of X
+        /// is ever wrapped.
+        public boolean isExtensionType;
         public List<TypeRef> mixins = new ArrayList<TypeRef>();  // class C with M1, M2
         /** {@code class C = S with M;}: C gets a forwarding constructor for each of S's. */
         public boolean forwardSuperCtors;
