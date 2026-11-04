@@ -52,6 +52,7 @@
 @property (nonatomic, strong) CN1View *previewView;
 @property (nonatomic, strong) dispatch_queue_t videoQueue;
 @property (nonatomic, assign) BOOL frameDeliveryEnabled;
+@property (nonatomic, assign) BOOL frameDeliveryRaw;
 @property (nonatomic, assign) int frameMaxFps;
 @property (nonatomic, assign) NSTimeInterval lastFrameTime;
 @property (nonatomic, assign) BOOL frameInFlight;
@@ -68,7 +69,7 @@
                 callbackId:(int)callbackId;
 - (BOOL)startVideoToPath:(NSString *)path captureAudio:(BOOL)audio;
 - (void)stopVideoWithCallback:(int)callbackId;
-- (void)setFrameDeliveryEnabled:(BOOL)enabled maxFps:(int)maxFps;
+- (void)setFrameDeliveryEnabled:(BOOL)enabled maxFps:(int)maxFps raw:(BOOL)raw;
 - (void)setFlashMode:(int)mode;
 - (void)setZoomRatio:(float)ratio;
 - (void)focusAtX:(float)xNorm y:(float)yNorm;
