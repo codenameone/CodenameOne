@@ -389,6 +389,9 @@ public final class Program {
                     scope = et.ownerLibrary;
                     if (t.extensionType == null) {
                         t.extensionType = et;
+                        if (!et.typeParams.isEmpty()) {
+                            t.extensionTypeArgs = new ArrayList<Ast.TypeRef>(t.args);
+                        }
                     }
                     Ast.TypeRef rep = et.extensionOn;
                     Map<String, Ast.TypeRef> subst = new java.util.HashMap<String, Ast.TypeRef>();
@@ -484,6 +487,7 @@ public final class Program {
         c.resolved = a.resolved;
         c.runtimeOnly = a.runtimeOnly;
         c.extensionType = a.extensionType;
+        c.extensionTypeArgs = a.extensionTypeArgs;
         c.aliasedFrom = a.aliasedFrom;
         for (Ast.TypeRef x : a.args) {
             c.args.add(pinnedCopy(x, scope, lib));
@@ -568,27 +572,64 @@ public final class Program {
     private void expandRecordTypedefs() {
         for (Ast.Library lib : libraries) {
             for (Ast.TypeRef t : lib.namedTypes) {
-                Ast.TypedefDecl td = t.name == null ? null : typedefs.get(t.name);
-                if (td == null || td.aliased == null || td.aliased.name == null
-                        || !td.aliased.name.startsWith("Rec$") || td.aliased.funcParams != null
-                        || classesByName.containsKey(t.name)) {
-                    continue;
+                // through chains (`typedef Id = Key; typedef Key = String`)
+                for (int depth = 0; depth < 8 && expandAliasTypedef(t); depth++) {
+                    // expanded one level
                 }
-                if (td.typeParams.size() != t.args.size() && !(t.args.isEmpty())) {
-                    continue;
-                }
-                Map<String, Ast.TypeRef> subst = new java.util.HashMap<String, Ast.TypeRef>();
-                for (int i = 0; i < td.typeParams.size(); i++) {
-                    subst.put(td.typeParams.get(i), i < t.args.size() ? t.args.get(i) : Ast.TypeRef.DYNAMIC);
-                }
-                List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
-                for (Ast.TypeRef a : td.aliased.args) {
-                    args.add(substRecordArg(a, subst));
-                }
-                t.name = td.aliased.name;
-                t.args = args;
             }
         }
+    }
+
+    /**
+     * Rewrites {@code t} to what the typedef it names aliases: a record shape, or a plain
+     * class type (`typedef Key = String`, `typedef Row = List<int>`) -- the program's own
+     * typedef, which shadows a Flutter or runtime type of that name exactly as a class would,
+     * so `Key k; k.toUpperCase()` is a String's member. A function type is left to the
+     * emitter's typedef signatures. False when {@code t} names no such typedef.
+     */
+    private boolean expandAliasTypedef(Ast.TypeRef t) {
+        Ast.TypedefDecl td = t.name == null ? null : typedefs.get(t.name);
+        if (td == null || td.aliased == null || td.aliased.name == null || td.aliased == Ast.TypeRef.DYNAMIC
+                || td.aliased.funcParams != null || td.aliased.funcReturn != null
+                || "Function".equals(td.aliased.name) || td.aliased.name.equals(t.name)
+                || t.funcParams != null || classesByName.containsKey(t.name)) {
+            return false;
+        }
+        if (td.typeParams.size() != t.args.size() && !(t.args.isEmpty())) {
+            return false;
+        }
+        Map<String, Ast.TypeRef> subst = new java.util.HashMap<String, Ast.TypeRef>();
+        for (int i = 0; i < td.typeParams.size(); i++) {
+            subst.put(td.typeParams.get(i), i < t.args.size() ? t.args.get(i) : Ast.TypeRef.DYNAMIC);
+        }
+        boolean record = td.aliased.name.startsWith("Rec$");
+        if (!record && td.aliased.args.isEmpty() && subst.containsKey(td.aliased.name)) {
+            // `typedef Same<T> = T`
+            Ast.TypeRef r = subst.get(td.aliased.name);
+            t.name = r.name;
+            t.args = r.args;
+            t.funcParams = r.funcParams;
+            t.funcReturn = r.funcReturn;
+            t.nullable = t.nullable || r.nullable;
+            return true;
+        }
+        List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+        for (Ast.TypeRef a : td.aliased.args) {
+            args.add(substRecordArg(a, subst));
+        }
+        t.name = td.aliased.name;
+        t.args = args;
+        if (!record) {
+            t.nullable = t.nullable || td.aliased.nullable;
+            t.resolved = td.aliased.resolved;
+            t.runtimeOnly = td.aliased.runtimeOnly;
+            t.shadowsCore = td.aliased.shadowsCore;
+            if (t.extensionType == null) {
+                t.extensionType = td.aliased.extensionType;
+                t.extensionTypeArgs = td.aliased.extensionTypeArgs;
+            }
+        }
+        return true;
     }
 
     private static Ast.TypeRef substRecordArg(Ast.TypeRef a, Map<String, Ast.TypeRef> subst) {

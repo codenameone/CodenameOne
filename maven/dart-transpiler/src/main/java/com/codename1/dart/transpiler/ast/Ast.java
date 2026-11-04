@@ -77,6 +77,10 @@ public final class Ast {
         /// representation (Program.eraseExtensionTypes): its members are dispatched
         /// statically and shadow the representation's own.
         public ClassDecl extensionType;
+        /// The type arguments {@link #extensionType} was written with (`Boxed<Shape>`), as
+        /// they were before erasure; null for a non-generic one. Member types of the extension
+        /// type are substituted with them.
+        public List<TypeRef> extensionTypeArgs;
         /// The name as written when the parser aliased it to a built-in collection
         /// (`Queue` to List); null otherwise. A program class of that name visible in the
         /// library wins over the alias (Program.restoreShadowedAliases).

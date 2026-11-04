@@ -10284,9 +10284,10 @@ public final class JavaEmitter {
                     && fd.returnType.extensionType != null) {
                 return fd.returnType;
             }
-            // a generic one (`Boxed<Shape>(xs)`) with its type arguments bound from the call
+            // a generic one (`Boxed<Shape>(xs)`, `Boxed([shape])`), its type arguments bound
+            // from the call: substitution carries them onto the extension type marker
             if (fd != null && !fd.isGetter && !fd.typeParams.isEmpty() && fd.returnType != null
-                    && fd.returnType.extensionType != null) {
+                    && fd.returnType.extensionType != null && e instanceof Call) {
                 return bindMethodTypeParams(fd.returnType, fd, (Call) e, ctx);
             }
         }
@@ -11498,6 +11499,7 @@ public final class JavaEmitter {
     private static TypeRef copyNullable(TypeRef t) {
         TypeRef r = new TypeRef(t.name);
         r.extensionType = t.extensionType;
+        r.extensionTypeArgs = t.extensionTypeArgs;
         r.args.addAll(t.args);
         r.funcParams = t.funcParams;
         r.funcReturn = t.funcReturn;
@@ -20888,7 +20890,7 @@ public final class JavaEmitter {
         if (extTypeGet != null) {
             MethodDecl eg = extTypeGet.getter(name);
             return new Out(extJavaName(extTypeGet) + "." + name + "(" + extensionSelf(target, tt, extTypeGet, ctx) + ")",
-                    eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
+                    etMemberType(tt, extTypeGet, eg.returnType));
         }
         // Cascade suppression: the receiver already fell to `dynamic` from a reported
         // diagnostic upstream; a member read on a dynamic receiver is legal Dart, so
@@ -23711,10 +23713,10 @@ public final class JavaEmitter {
         ClassDecl etOpOwner = etOp == null ? null : extensionTypeMember(l.type, etOp, false);
         if (etOpOwner != null) {
             MethodDecl om = etOpOwner.method(etOp);
-            TypeRef pt = om.params.isEmpty() ? null : om.params.get(0).type;
+            TypeRef pt = om.params.isEmpty() ? null : etMemberType(l.type, etOpOwner, om.params.get(0).type);
             return new Out(etOpOwner.name + "." + etOp + "(" + extensionSelf(l, l.type, etOpOwner, ctx) + ", "
                     + (pt == null ? r.code : coerce(r, pt, ctx)) + ")",
-                    om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType);
+                    etMemberType(l.type, etOpOwner, om.returnType));
         }
         // user-defined operators on program classes
         ClassDecl opClass = classOfRef(l.type);
@@ -24497,6 +24499,10 @@ public final class JavaEmitter {
     }
 
     private static TypeRef substTypeParams(TypeRef t, List<String> names, List<TypeRef> args) {
+        return keepExtensionMarker(t, substTypeParams0(t, names, args), x -> substTypeParams(x, names, args));
+    }
+
+    private static TypeRef substTypeParams0(TypeRef t, List<String> names, List<TypeRef> args) {
         if (t == null) {
             return null;
         }
@@ -24515,6 +24521,7 @@ public final class JavaEmitter {
         }
         TypeRef c = new TypeRef(t.name);
         c.extensionType = t.extensionType;
+        c.extensionTypeArgs = t.extensionTypeArgs;
         c.nullable = t.nullable;
         c.resolved = t.resolved;
         c.shadowsCore = t.shadowsCore;
@@ -24608,6 +24615,11 @@ public final class JavaEmitter {
                 b.args.addAll(a.args);
                 b.funcParams = a.funcParams;
                 b.funcReturn = a.funcReturn;
+                b.resolved = a.resolved;
+                b.shadowsCore = a.shadowsCore;
+                // an extension type argument stays one (`pick(boxedShapes, ..)` is a Boxed<Shape>)
+                b.extensionType = a.extensionType;
+                b.extensionTypeArgs = a.extensionTypeArgs;
                 // Dart's rule: `T` against `X?` binds X?, `T?` against `X?` binds X (the
                 // slot's own `?` absorbs the argument's), and a non-null argument binds X.
                 b.nullable = a.nullable && !p.nullable;
@@ -27987,7 +27999,7 @@ public final class JavaEmitter {
             String rest = methodArgs(extensionCallbackParams(extTypeM, em.params, tt), c.args, ctx);
             return new Out(extJavaName(extTypeM) + "." + c.name + "(" + extensionSelf(target, tt, extTypeM, ctx)
                     + (rest.isEmpty() ? "" : ", " + rest) + ")",
-                    em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
+                    etMemberType(tt, extTypeM, em.returnType));
         }
         String n = c.name;
         // Cascade suppression: the receiver's type already fell to `dynamic` because a
@@ -31715,6 +31727,10 @@ public final class JavaEmitter {
     }
 
     private TypeRef substituteTypeParams(TypeRef t, Map<String, TypeRef> subst) {
+        return keepExtensionMarker(t, substituteTypeParams0(t, subst), x -> substituteTypeParams(x, subst));
+    }
+
+    private TypeRef substituteTypeParams0(TypeRef t, Map<String, TypeRef> subst) {
         if (t == null) {
             return null;
         }
@@ -31729,6 +31745,7 @@ public final class JavaEmitter {
         }
         TypeRef out = new TypeRef(t.name);
         out.extensionType = t.extensionType;
+        out.extensionTypeArgs = t.extensionTypeArgs;
         out.nullable = t.nullable;
         out.resolved = t.resolved;
         out.shadowsCore = t.shadowsCore;
@@ -33770,6 +33787,103 @@ public final class JavaEmitter {
         return null;
     }
 
+    /**
+     * The result {@code r} of substituting type variables in {@code t}, carrying {@code t}'s
+     * extension type marker with its type arguments substituted the same way: `Boxed<T>` with
+     * T = Shape is `Boxed<Shape>`, so Boxed's members read with T bound. A bare `T` erased from
+     * `extension type Wrapper<T>(T value)` keeps the marker on the substituted type too.
+     */
+    private static TypeRef keepExtensionMarker(TypeRef t, TypeRef r, java.util.function.Function<TypeRef, TypeRef> f) {
+        if (t == null || r == null || t.extensionType == null) {
+            return r;
+        }
+        java.util.List<TypeRef> etArgs = null;
+        boolean changed = r.extensionType != t.extensionType;
+        if (t.extensionTypeArgs != null) {
+            etArgs = new ArrayList<TypeRef>();
+            for (TypeRef a : t.extensionTypeArgs) {
+                TypeRef na = f.apply(a);
+                changed |= na != a;
+                etArgs.add(na);
+            }
+        }
+        if (!changed && r.extensionTypeArgs == t.extensionTypeArgs) {
+            return r;
+        }
+        TypeRef c = new TypeRef(r.name);
+        c.args.addAll(r.args);
+        c.nullable = r.nullable;
+        c.resolved = r.resolved;
+        c.runtimeOnly = r.runtimeOnly;
+        c.shadowsCore = r.shadowsCore;
+        c.aliasedFrom = r.aliasedFrom;
+        c.funcParams = r.funcParams;
+        c.funcReturn = r.funcReturn;
+        c.funcTypeParams = r.funcTypeParams;
+        c.funcRequired = r.funcRequired;
+        c.funcNamed = r.funcNamed;
+        c.funcNamedRequired = r.funcNamedRequired;
+        c.line = r.line;
+        c.col = r.col;
+        c.extensionType = t.extensionType;
+        c.extensionTypeArgs = etArgs;
+        return c;
+    }
+
+    /**
+     * The substitution of the type parameters of extension type {@code owner} for a member read
+     * on a receiver of static type {@code tt}: {@code tt}'s own type arguments, carried through
+     * the extension types it implements (`Sub<T> implements Base<T>`) down to {@code owner}.
+     * Empty when nothing is bound.
+     */
+    private Map<String, TypeRef> extensionTypeSubst(TypeRef tt, ClassDecl owner) {
+        Map<String, TypeRef> none = new java.util.HashMap<String, TypeRef>();
+        if (tt == null || tt.extensionType == null || owner == null) {
+            return none;
+        }
+        java.util.ArrayDeque<Object[]> queue = new java.util.ArrayDeque<Object[]>();
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        queue.add(new Object[] {tt.extensionType, tt.extensionTypeArgs});
+        while (!queue.isEmpty()) {
+            Object[] e = queue.poll();
+            ClassDecl et = (ClassDecl) e[0];
+            @SuppressWarnings("unchecked")
+            List<TypeRef> args = (List<TypeRef>) e[1];
+            if (!seen.add(et)) {
+                continue;
+            }
+            Map<String, TypeRef> m = new java.util.HashMap<String, TypeRef>();
+            for (int i = 0; i < et.typeParams.size(); i++) {
+                m.put(et.typeParams.get(i), args != null && i < args.size() ? args.get(i) : TypeRef.DYNAMIC);
+            }
+            if (et == owner) {
+                return m;
+            }
+            for (TypeRef i : et.interfaces) {
+                if (i.extensionType != null) {
+                    List<TypeRef> ia = null;
+                    if (i.extensionTypeArgs != null) {
+                        ia = new ArrayList<TypeRef>();
+                        for (TypeRef a : i.extensionTypeArgs) {
+                            ia.add(m.isEmpty() ? a : substituteTypeParams(a, m));
+                        }
+                    }
+                    queue.add(new Object[] {i.extensionType, ia});
+                }
+            }
+        }
+        return none;
+    }
+
+    /** The type {@code t} of a member of extension type {@code owner}, read on {@code tt}. */
+    private TypeRef etMemberType(TypeRef tt, ClassDecl owner, TypeRef t) {
+        if (t == null || t.is("var")) {
+            return TypeRef.DYNAMIC;
+        }
+        Map<String, TypeRef> m = extensionTypeSubst(tt, owner);
+        return m.isEmpty() ? t : substituteTypeParams(t, m);
+    }
+
     private ClassDecl extensionTypeMember(TypeRef tt, String name, boolean getter) {
         if (tt == null || tt.extensionType == null || name == null) {
             return null;
@@ -33994,6 +34108,10 @@ public final class JavaEmitter {
     }
 
     private TypeRef substituteTypeParam(TypeRef t, List<String> params, List<TypeRef> args) {
+        return keepExtensionMarker(t, substituteTypeParam0(t, params, args), x -> substituteTypeParam(x, params, args));
+    }
+
+    private TypeRef substituteTypeParam0(TypeRef t, List<String> params, List<TypeRef> args) {
         if (t == null) {
             return null;
         }
@@ -34015,6 +34133,7 @@ public final class JavaEmitter {
         }
         TypeRef copy = new TypeRef(t.name);
         copy.extensionType = t.extensionType;
+        copy.extensionTypeArgs = t.extensionTypeArgs;
         copy.nullable = t.nullable;
         copy.args.addAll(substituteTypeParams(t.args, params, args));
         return copy;
@@ -36068,6 +36187,13 @@ public final class JavaEmitter {
         }
         // user typedef that plainly aliases another type: resolve through to the target
         Ast.TypedefDecl userTd = typedefDecl(t.name);
+        // Program.expandRecordTypedefs already rewrote every type the program wrote with a
+        // plain alias; one still spelled so came from a stub (`super.key` is Flutter's Key),
+        // and is that stub's class, not the program typedef that happens to share its name.
+        if (userTd != null && userTd.aliased != null && !userTd.aliased.name.startsWith("Rec$")
+                && stubs.classes.containsKey(t.name)) {
+            userTd = null;
+        }
         if (userTd != null && userTd.aliased != null) {
             return javaType(userTd.aliased, boxed, ctx);
         }
@@ -37521,6 +37647,7 @@ public final class JavaEmitter {
         }
         TypeRef c = TypeRef.of(t.name, t.args.toArray(new TypeRef[0]));
         c.extensionType = t.extensionType;
+        c.extensionTypeArgs = t.extensionTypeArgs;
         c.nullable = true;
         // The copy names the same type: javaType strips an import prefix in place
         // (`io.WebSocket` -> `WebSocket`) and leaves which library it meant only in
@@ -37567,6 +37694,7 @@ public final class JavaEmitter {
         c.nullable = false;
         c.runtimeOnly = t.runtimeOnly;
         c.extensionType = t.extensionType;
+        c.extensionTypeArgs = t.extensionTypeArgs;
         c.resolved = t.resolved;
         c.shadowsCore = t.shadowsCore;
         // An inline function type keeps its signature (in boxType too): without it a
@@ -39136,6 +39264,10 @@ public final class JavaEmitter {
      * directly; otherwise the substitution recurses into the type arguments.
      */
     private TypeRef substTypeVars(TypeRef t, java.util.Map<String, TypeRef> subst) {
+        return keepExtensionMarker(t, substTypeVars0(t, subst), x -> substTypeVars(x, subst));
+    }
+
+    private TypeRef substTypeVars0(TypeRef t, java.util.Map<String, TypeRef> subst) {
         if (t == null || subst.isEmpty()) {
             return t;
         }
@@ -39144,6 +39276,7 @@ public final class JavaEmitter {
             // signature carries the variables, not its (empty) type arguments.
             TypeRef f = new TypeRef(t.name);
             f.extensionType = t.extensionType;
+            f.extensionTypeArgs = t.extensionTypeArgs;
             f.nullable = t.nullable;
             f.line = t.line;
             f.col = t.col;
