@@ -24,6 +24,7 @@
 package com.codename1.xml;
 
 /// A callback used to dispatch errors encountered while parsing XML resources
+@com.codename1.impl.SharedWithBackend
 public interface ParserCallback {
 
     /// Error code denoting that an unsupported tag was found in the XML
@@ -56,6 +57,8 @@ public interface ParserCallback {
 
     /// Error code denoting that the encoding the page needed according to its charset (usually specified in the content-type response header) is unsupported in the device
     int ERROR_ENCODING = 9;
+    /// Error code denoting that reading the document failed with an `IOException`
+    int ERROR_IO = 10;
 
     /// Called when encountering an error while parsing the XML document.
     /// When implementing this, the developer should return true if the error should be ignored and the document needs to be further parsed, or false to stop parsing and issue an error to the user

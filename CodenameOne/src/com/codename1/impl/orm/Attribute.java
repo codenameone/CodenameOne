@@ -51,6 +51,14 @@ public final class Attribute {
     /// itself is TEXT storage through TemporalConverter; this picks the DDL type
     /// and what an existing column may be.
     public final int temporal;
+    /// False for `@Column(insertable = false)`: no INSERT names the column.
+    public final boolean insertable;
+    /// False for `@Column(updatable = false)`: no dirty-checking UPDATE names it.
+    public final boolean updatable;
+    /// Null, or the `@Column(collation)` name: the DDL appends it, and the
+    /// schema report holds the column to it instead of to a case-sensitive key
+    /// collation.
+    public final String collation;
     /// The kind that decides SQL semantics -- collation, LIKE, the text
     /// functions -- as opposed to [#kind], which decides how a value is bound and
     /// read. A `@Temporal` column exchanges text through its converter but is a
@@ -68,6 +76,19 @@ public final class Attribute {
     }
     public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
             boolean version, String declaredType, int temporal) {
+        this(field, column, kind, id, generated, nullable, version, declaredType, temporal, true, true);
+    }
+    public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
+            boolean version, String declaredType, int temporal, boolean insertable, boolean updatable) {
+        this(field, column, kind, id, generated, nullable, version, declaredType, temporal, insertable, updatable,
+                null);
+    }
+    public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
+            boolean version, String declaredType, int temporal, boolean insertable, boolean updatable,
+            String collation) {
+        this.collation = collation == null || collation.length() == 0 ? null : collation;
+        this.insertable = insertable;
+        this.updatable = updatable;
         this.temporal = temporal;
         this.declaredType = declaredType;
         this.field = field;

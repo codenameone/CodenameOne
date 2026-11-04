@@ -22,6 +22,7 @@ package com.codename1.util.regex;
 /// a regular expression during development.
 /// If you are making regular expresion programs dynamically then you can catch it
 /// if you wish. But should not be forced to.
+@com.codename1.impl.SharedWithBackend
 public class RESyntaxException extends RuntimeException {
     /// Constructor.
     ///

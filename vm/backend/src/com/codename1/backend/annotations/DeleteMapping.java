@@ -35,4 +35,11 @@ import java.lang.annotation.Target;
 public @interface DeleteMapping {
     /// The path, relative to any [RequestMapping] on the class.
     String[] value() default {};
+    /// Media types the route takes, matched against the request's
+    /// `Content-Type`; a request outside them is answered 415. Empty takes any.
+    String[] consumes() default {};
+    /// Media types the route answers with, matched against the request's
+    /// `Accept`; a request that accepts none of them is answered 406. Empty
+    /// answers anything. The handler still sets the type of what it returns.
+    String[] produces() default {};
 }

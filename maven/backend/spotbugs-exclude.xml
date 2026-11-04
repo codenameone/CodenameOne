@@ -182,4 +182,18 @@
         <Method name="getClaimAsBoolean" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
+
+    <!--
+    The shared XML Element's case-insensitive search folds the document's own
+    text, which is natural language rather than a protocol token, so the
+    locale's fold is what such a search means. Parsing never calls it.
+    -->
+    <Match>
+        <Class name="com.codename1.xml.Element" />
+        <Or>
+            <Method name="getTextDescendants" />
+            <Method name="getTextDescendantsInternal" />
+        </Or>
+        <Bug pattern="DM_CONVERT_CASE" />
+    </Match>
 </FindBugsFilter>

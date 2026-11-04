@@ -340,4 +340,13 @@ class PkiTest {
         assertThrows(IOException.class, () -> Asn1.parseTime("700101000000", true));
     }
 
+    @Test
+    void timesRejectADayPastTheMonthEnd() throws Exception {
+        assertThrows(IOException.class, () -> Asn1.parseTime("240230120000Z", true));
+        assertThrows(IOException.class, () -> Asn1.parseTime("19000229120000Z", false));
+        assertThrows(IOException.class, () -> Asn1.parseTime("20250431000000Z", false));
+        assertEquals(951825600000L, Asn1.parseTime("000229120000Z", true));
+        assertEquals(951825600000L, Asn1.parseTime("20000229120000Z", false));
+    }
+
 }

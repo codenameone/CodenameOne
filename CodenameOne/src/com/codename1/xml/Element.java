@@ -27,10 +27,12 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Vector;
 
 /// The Element class defines a single XML element with its attributes and children.
 /// Due to its hierarchial nature, this class can be used for a single "leaf" Element, for more complex elements (with child elements), and up to describing the entire document.
+@com.codename1.impl.SharedWithBackend
 public class Element implements Iterable<Element> {
 
     /// A constant that can be used for the get descendants methods to denote infinite recursion
@@ -949,5 +951,75 @@ public class Element implements Iterable<Element> {
     @Override
     public Iterator<Element> iterator() {
         return children.iterator();
+    }
+
+    /// Returns the first child element with the given tag name, the same as
+    /// `getFirstChildByTagName(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The child's tag name
+    ///
+    /// #### Returns
+    ///
+    /// the first child with the specified name, or null if there is none
+    public Element child(String name) {
+        return getFirstChildByTagName(name);
+    }
+
+    /// Returns the child elements with the given tag name, in document order.
+    /// Unlike `getChildrenByTagName(String)` this answers a typed list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The tag name to look for
+    ///
+    /// #### Returns
+    ///
+    /// the matching children; empty, never null, when there are none
+    public List<Element> children(String name) {
+        List<Element> out = new ArrayList<Element>();
+        if (children == null) {
+            return out;
+        }
+        int count = children.size();
+        for (int i = 0; i < count; i++) {
+            Element child = children.get(i);
+            if (!child.textElement && cmpTagName(name, child)) {
+                out.add(child);
+            }
+        }
+        return out;
+    }
+
+    /// Returns the text of the first child element with the given tag name:
+    /// its text children joined, CDATA included, with the leading and trailing
+    /// whitespace trimmed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: The child's tag name
+    ///
+    /// #### Returns
+    ///
+    /// the child's trimmed text, empty when it has none, or null if there is
+    /// no such child
+    public String childText(String name) {
+        Element child = getFirstChildByTagName(name);
+        if (child == null) {
+            return null;
+        }
+        if (child.children == null) {
+            return "";
+        }
+        StringBuilder b = new StringBuilder();
+        int count = child.children.size();
+        for (int i = 0; i < count; i++) {
+            Element c = child.children.get(i);
+            if (c.textElement) {
+                b.append(c.name);
+            }
+        }
+        return b.toString().trim();
     }
 }

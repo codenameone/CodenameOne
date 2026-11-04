@@ -6451,6 +6451,9 @@ public final class HttpServer {
             Throwable handlerError = null;
             try {
                 try {
+                    // A handler that threw past its MDC.remove left its context on
+                    // this thread; the next request must not log under it.
+                    com.codename1.backend.log.MDC.clear();
                     response = handler.handle(request);
                     if (response == null) {
                         response = fallback(request, 404, "not found");
@@ -6930,6 +6933,9 @@ public final class HttpServer {
                 // owns ending it.
                 boolean spanRegistered = false;
                 try {
+                    // A handler that threw past its MDC.remove left its context on
+                    // this thread; the next request must not log under it.
+                    com.codename1.backend.log.MDC.clear();
                     response = handler.handle(request);
                     if (response == null) {
                         response = fallback(request, 404, "not found");

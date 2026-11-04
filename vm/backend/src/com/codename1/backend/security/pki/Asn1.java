@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.pki;
 
+import com.codename1.impl.backend.CivilTime;
+
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
@@ -556,11 +558,11 @@ final class Asn1 {
         int hour = digits(text, yearDigits + 4, 2);
         int minute = digits(text, yearDigits + 6, 2);
         int second = digits(text, yearDigits + 8, 2);
-        if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59
-                || second > 59) {
+        if (month < 1 || month > 12 || day < 1 || day > CivilTime.daysInMonth(year, month)
+                || hour > 23 || minute > 59 || second > 59) {
             throw new IOException("Not an RFC 5280 time: " + text);
         }
-        long days = daysFromCivil(year, month, day);
+        long days = CivilTime.daysFromCivil(year, month, day);
         return ((days * 24 + hour) * 60 + minute) * 60000L + second * 1000L;
     }
 
@@ -570,18 +572,10 @@ final class Asn1 {
         if (millis < 0 && seconds * 1000L != millis) {
             seconds--;
         }
-        long days = seconds / 86400L;
-        if (seconds < 0 && days * 86400L != seconds) {
-            days--;
-        }
+        long days = CivilTime.floorDiv(seconds, 86400L);
         int secondOfDay = (int) (seconds - days * 86400L);
-        int[] civil = civilFromDays(days);
         StringBuilder out = new StringBuilder();
-        pad(out, civil[0], 4);
-        out.append('-');
-        pad(out, civil[1], 2);
-        out.append('-');
-        pad(out, civil[2], 2);
+        CivilTime.appendDate(out, days, '-');
         out.append('T');
         pad(out, secondOfDay / 3600, 2);
         out.append(':');
@@ -592,11 +586,7 @@ final class Asn1 {
     }
 
     private static void pad(StringBuilder out, int value, int width) {
-        String text = Integer.toString(value);
-        for (int iter = text.length() ; iter < width ; iter++) {
-            out.append('0');
-        }
-        out.append(text);
+        CivilTime.pad(out, value, width);
     }
 
     private static int digits(String text, int from, int count) throws IOException {
@@ -609,30 +599,6 @@ final class Asn1 {
             out = out * 10 + (c - '0');
         }
         return out;
-    }
-
-    /// Days since 1970-01-01 of a proleptic Gregorian date (Howard Hinnant's
-    /// algorithm).
-    static long daysFromCivil(int year, int month, int day) {
-        int y = month <= 2 ? year - 1 : year;
-        int era = (y >= 0 ? y : y - 399) / 400;
-        int yoe = y - era * 400;
-        int doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
-        int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        return era * 146097L + doe - 719468L;
-    }
-
-    static int[] civilFromDays(long days) {
-        long z = days + 719468L;
-        long era = (z >= 0 ? z : z - 146096) / 146097;
-        int doe = (int) (z - era * 146097);
-        int yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-        int doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        int mp = (5 * doy + 2) / 153;
-        int day = doy - (153 * mp + 2) / 5 + 1;
-        int month = mp < 10 ? mp + 3 : mp - 9;
-        long year = yoe + era * 400 + (month <= 2 ? 1 : 0);
-        return new int[] {(int) year, month, day};
     }
 
     static String hex(byte[] value) {

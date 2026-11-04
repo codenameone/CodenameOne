@@ -24,6 +24,7 @@ package com.codename1.backend.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codename1.backend.DataSource;
@@ -94,7 +95,7 @@ class SecuritySchemaHistoryTest {
             Migrations.of(pool, SecuritySchema.migrations()).target("10").migrate();
             pool.execute("INSERT INTO cn1_persistent_logins (series, username_key, username, token_hash, last_used) "
                     + "VALUES ('browser', 'ada', 'Ada', 'old-hash', 1000)", null);
-            assertEquals(1, Migrations.of(pool, SecuritySchema.migrations()).migrate().getMigrationsExecuted());
+            assertEquals(2, Migrations.of(pool, SecuritySchema.migrations()).migrate().getMigrationsExecuted());
             com.codename1.backend.security.rememberme.JdbcTokenRepository repository =
                     new com.codename1.backend.security.rememberme.JdbcTokenRepository(pool);
             assertEquals("old-hash", repository.getTokenForSeries("browser").getTokenHash());
@@ -112,9 +113,9 @@ class SecuritySchemaHistoryTest {
         DataSource pool = DataSource.open(new File(dir, "named.db").getPath(), 2, 5000, 10000);
         try {
             MigrateResult result = Migrations.of(pool, SecuritySchema.migrations()).migrate();
-            assertEquals(11, result.getMigrationsExecuted());
-            assertEquals(11, new TreeSet<String>(result.getApplied()).size(),
-                    "eleven versions reported under fewer names: " + result.getApplied());
+            assertEquals(12, result.getMigrationsExecuted());
+            assertEquals(12, new TreeSet<String>(result.getApplied()).size(),
+                    "twelve versions reported under fewer names: " + result.getApplied());
             assertEquals("com.codename1.backend.security.SecuritySchema.V1__users_and_authorities",
                     result.getApplied().get(0));
             assertEquals("com.codename1.backend.security.SecuritySchema.V9__passkeys",
@@ -139,14 +140,130 @@ class SecuritySchemaHistoryTest {
             Migrations.of(pool, SecuritySchema.migrations()).validate();
             MigrateResult again = Migrations.of(pool, SecuritySchema.migrations()).migrate();
             assertEquals(0, again.getMigrationsExecuted());
-            assertEquals("11", again.getTargetVersion());
+            assertEquals("12", again.getTargetVersion());
             MigrationInfo[] info = Migrations.of(pool, SecuritySchema.migrations()).info();
-            assertEquals(11, info.length);
+            assertEquals(12, info.length);
             for (MigrationInfo row : info) {
                 assertEquals(MigrationState.SUCCESS, row.getState(), "version " + row.getVersion());
             }
             // Nothing rewrote the rows: the history is a record of what ran.
             assertEquals(before, scripts(pool));
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    void rememberMeRecordsAndListsTheDeviceOnAnUpgradedTable() throws Exception {
+        DataSource pool = DataSource.open(new File(dir, "item9-devices.db").getPath(), 2, 5000, 10000);
+        try {
+            // A table as version 11 left it: no device columns.
+            Migrations.of(pool, SecuritySchema.migrations()).target("11").migrate();
+            pool.execute("INSERT INTO cn1_persistent_logins (series, username_key, username, "
+                    + "token_hash, last_used) VALUES ('old', 'ada', 'Ada', 'h0', 1000)", null);
+            assertEquals(1, Migrations.of(pool, SecuritySchema.migrations()).migrate()
+                    .getMigrationsExecuted());
+            com.codename1.backend.security.rememberme.JdbcTokenRepository repository =
+                    new com.codename1.backend.security.rememberme.JdbcTokenRepository(pool);
+            repository.createNewToken(new com.codename1.backend.security.rememberme
+                    .PersistentRememberMeToken("Ada", "phone", "h1", 3000L, null, "Phone/1.0",
+                    "203.0.113.7"));
+            repository.createNewToken(new com.codename1.backend.security.rememberme
+                    .PersistentRememberMeToken("Bob", "bobs", "h2", 2000L));
+            java.util.List<com.codename1.backend.security.rememberme.PersistentRememberMeToken>
+                    devices = repository.getTokensForUser("ADA");
+            assertEquals(2, devices.size());
+            assertEquals("phone", devices.get(0).getSeries());
+            assertEquals("Phone/1.0", devices.get(0).getUserAgent());
+            assertEquals("203.0.113.7", devices.get(0).getIpAddress());
+            assertEquals(null, devices.get(1).getUserAgent());
+            assertEquals("Phone/1.0", repository.getTokenForSeries("phone").getUserAgent());
+            // Revoking one series names its owner.
+            assertFalse(repository.removeUserToken("Bob", "phone"));
+            assertTrue(repository.removeUserToken("ada", "phone"));
+            assertEquals(1, repository.getTokensForUser("Ada").size());
+            assertEquals(1, repository.getTokensForUser("Bob").size());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    void configuredTableNamesAreUsedEverywhere() throws Exception {
+        DataSource pool = DataSource.open(new File(dir, "item9-names.db").getPath(), 2, 5000, 10000);
+        java.util.Properties props = new java.util.Properties();
+        props.setProperty(SecuritySchema.TABLE_NAME_PREFIX, "app_");
+        props.setProperty(SecuritySchema.TABLE_PREFIX + "cn1_persistent_logins", "remembered");
+        try {
+            SecuritySchema.configure(com.codename1.backend.Config.of(props, "default"));
+            assertEquals("app_users", SecuritySchema.table("cn1_users"));
+            assertEquals("remembered", SecuritySchema.table("cn1_persistent_logins"));
+            Migrations.of(pool, SecuritySchema.migrations()).migrate();
+            assertEquals(0L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM app_mfa_recovery_code",
+                    null).get("n")).longValue());
+            com.codename1.backend.security.rememberme.JdbcTokenRepository tokens =
+                    new com.codename1.backend.security.rememberme.JdbcTokenRepository(pool);
+            tokens.createNewToken(new com.codename1.backend.security.rememberme
+                    .PersistentRememberMeToken("Ada", "s", "h", 1L));
+            assertEquals(1L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM remembered",
+                    null).get("n")).longValue());
+            com.codename1.backend.security.mfa.RecoveryCodeService codes =
+                    new com.codename1.backend.security.mfa.RecoveryCodeService(
+                    new com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository(pool));
+            codes.generate("Ada");
+            assertEquals(10L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM app_mfa_recovery_code",
+                    null).get("n")).longValue());
+            assertThrows(IllegalArgumentException.class,
+                    () -> SecuritySchema.setTableName("cn1_users", "users; DROP TABLE x"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> SecuritySchema.setTableName("cn1_users", "1users"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> SecuritySchema.setTableName("cn1_users", "a.b.c"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> SecuritySchema.setTableName("cn1_users", "auth.users"));
+            java.util.Properties bad = new java.util.Properties();
+            bad.setProperty(SecuritySchema.TABLE_PREFIX + "cn1_users", "x\"y");
+            assertThrows(IllegalArgumentException.class,
+                    () -> SecuritySchema.configure(com.codename1.backend.Config.of(bad, "default")));
+        } finally {
+            SecuritySchema.resetTableNames();
+            pool.close();
+        }
+    }
+
+    @Test
+    void legacySha256RecoveryCodesVerifyOnce() throws Exception {
+        DataSource pool = DataSource.open(new File(dir, "item9-codes.db").getPath(), 2, 5000, 10000);
+        try {
+            Migrations.of(pool, SecuritySchema.migrations()).migrate();
+            com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository repository =
+                    new com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository(pool);
+            com.codename1.backend.security.crypto.Sha256HexPasswordEncoder sha =
+                    new com.codename1.backend.security.crypto.Sha256HexPasswordEncoder();
+            // Imported from another system: upper case hex of the normalized code.
+            java.util.List<String> imported = new java.util.ArrayList<String>();
+            imported.add("{sha256}" + sha.encode("abcde23456").toUpperCase(java.util.Locale.ROOT));
+            imported.add("{sha256}" + sha.encode("zzzzz99999"));
+            repository.replace("Ada", imported);
+            com.codename1.backend.security.mfa.RecoveryCodeService codes =
+                    new com.codename1.backend.security.mfa.RecoveryCodeService(repository);
+            assertFalse(codes.consume("Ada", "abcde-23457"));
+            assertTrue(codes.consume("Ada", "ABCDE-23456"));
+            assertFalse(codes.consume("Ada", "abcde-23456"));
+            assertEquals(1, codes.remaining("Ada"));
+            // Codes made here are PBKDF2, and say so.
+            java.util.List<String> fresh = codes.generate("Ada");
+            for (String hash : repository.findHashes("Ada")) {
+                assertTrue(hash.startsWith("{pbkdf2-sha256}"), hash);
+            }
+            assertTrue(codes.consume("Ada", fresh.get(3)));
+            assertFalse(codes.consume("Ada", fresh.get(3)));
+            // A hash stored before ids were written is still PBKDF2.
+            java.util.List<String> bare = new java.util.ArrayList<String>();
+            bare.add(new com.codename1.backend.security.crypto.Pbkdf2Sha256PasswordEncoder()
+                    .encode("mnpqr45678"));
+            repository.replace("Bob", bare);
+            assertTrue(codes.consume("Bob", "mnpqr-45678"));
         } finally {
             pool.close();
         }

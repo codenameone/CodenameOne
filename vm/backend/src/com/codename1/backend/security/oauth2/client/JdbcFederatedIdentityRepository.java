@@ -72,7 +72,7 @@ public final class JdbcFederatedIdentityRepository implements FederatedIdentityR
     }
 
     private String read(String provider, String subject) throws IOException {
-        Map row = dataSource.queryOne("SELECT username FROM cn1_federated_identity WHERE "
+        Map row = dataSource.queryOne("SELECT username FROM " + SecuritySchema.table("cn1_federated_identity") + " WHERE "
                 + "provider = ? AND subject = ?", new Object[] {provider, subject});
         return row == null ? null : String.valueOf(row.get("username"));
     }
@@ -85,7 +85,7 @@ public final class JdbcFederatedIdentityRepository implements FederatedIdentityR
                 return existing;
             }
             try {
-                dataSource.execute("INSERT INTO cn1_federated_identity (provider, subject, "
+                dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_federated_identity") + " (provider, subject, "
                         + "username_key, username, created_at) VALUES (?, ?, ?, ?, ?)",
                         new Object[] {provider, subject, SecuritySchema.usernameKey(username),
                             username, Long.valueOf(clock.currentTimeMillis())});
@@ -108,7 +108,7 @@ public final class JdbcFederatedIdentityRepository implements FederatedIdentityR
     @Override
     public boolean unlink(String provider, String subject) {
         try {
-            return dataSource.execute("DELETE FROM cn1_federated_identity WHERE provider = ? "
+            return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_federated_identity") + " WHERE provider = ? "
                     + "AND subject = ?", new Object[] {provider, subject}) == 1;
         } catch (IOException err) {
             throw new IllegalStateException("The federated identity could not be removed: "
@@ -121,7 +121,7 @@ public final class JdbcFederatedIdentityRepository implements FederatedIdentityR
         List<String[]> out = new ArrayList<String[]>();
         try {
             for (Object row : dataSource.query("SELECT provider, subject FROM "
-                    + "cn1_federated_identity WHERE username_key = ? ORDER BY created_at, "
+                    + SecuritySchema.table("cn1_federated_identity") + " WHERE username_key = ? ORDER BY created_at, "
                     + "provider, subject", new Object[] {SecuritySchema.usernameKey(username)})) {
                 Map r = (Map) row;
                 out.add(new String[] {String.valueOf(r.get("provider")),
