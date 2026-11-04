@@ -9603,6 +9603,30 @@ public final class JavaEmitter {
         return new Out("DartRuntime.canonTearOff(\"" + key + "\", \"" + view + "\", " + code + ")", out.type, out.fn);
     }
 
+    /// Whether {@code t} names one of {@code names} anywhere (a bound naming its own class's
+    /// type variables, which the use site's scope cannot see).
+    private static boolean namesAny(TypeRef t, List<String> names) {
+        if (t == null) {
+            return false;
+        }
+        if (t.args.isEmpty() && t.funcParams == null && names.contains(t.name)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (namesAny(a, names)) {
+                return true;
+            }
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (namesAny(a, names)) {
+                    return true;
+                }
+            }
+        }
+        return namesAny(t.funcReturn, names);
+    }
+
     private boolean mentionsTypeVariable(TypeRef t, Ctx ctx) {
         if (t == null) {
             return false;
@@ -33310,6 +33334,22 @@ public final class JavaEmitter {
                                 inferred = viaParams;
                             }
                         }
+                    }
+                }
+                if ((inferred == null || inferred.isEmpty()) && !tps.isEmpty()
+                        && (ctorTearOffExpected != null && ctorTearOffExpected.funcParams == null
+                        && (ctorTearOffExpected.is("Object") || ctorTearOffExpected.is("Function")
+                        || isDynamicType(ctorTearOffExpected)))) {
+                    // Nothing instantiates it (`dynamic pd = P.new`; only a dynamic, Object or
+                    // Function slot: a function-typed one or none at all, `f.then(Success.new)`,
+                    // is inferred downstream), `Function.apply(P.new,
+                    // ..)`): Dart instantiates each type variable to its bound, which is
+                    // dynamic when it declares none -- `pd(4)` builds P<dynamic>, never
+                    // P<Object>. A bound naming a type variable (F-bounded) reads dynamic.
+                    inferred = new ArrayList<TypeRef>();
+                    for (String tp : tps) {
+                        TypeRef b = pc.typeParamBounds.get(tp);
+                        inferred.add(b != null && !mentionsTypeVariable(b, ctx) && !namesAny(b, tps) ? b : new TypeRef("dynamic"));
                     }
                 }
                 call.type.args.addAll(inferred);
