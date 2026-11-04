@@ -5,6 +5,9 @@ ctor new true true
 ctor named true false
 ctor views true true 5
 gctor true false
-gctor inferred true 6
+gctor inferred true true 6 G<int>
+gctor param G<bool> true
+gctor ret G<String> true
+gctor list G<double> true
 gen inst true false
-gen inferred true 7
+gen inferred true true 7

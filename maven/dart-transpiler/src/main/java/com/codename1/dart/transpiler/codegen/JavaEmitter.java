@@ -9496,7 +9496,24 @@ public final class JavaEmitter {
                 return emitExpr(l, expected, ctx);
             }
         }
-        Out out = narrowFullArityValue(e, materializeShort(emitExprRaw(e, expected, ctx)), expected, ctx);
+        Out raw;
+        if (e instanceof PropertyGet && ((PropertyGet) e).target instanceof Ident) {
+            // `G.new` (or `G.named`) in a slot: staticTearOff reads the slot's type for the
+            // type arguments Dart infers from it (`G<int> Function(int) gi = G.new`).
+            Expr prevNode = ctorTearOffNode;
+            TypeRef prevExpected = ctorTearOffExpected;
+            ctorTearOffNode = e;
+            ctorTearOffExpected = expected;
+            try {
+                raw = emitExprRaw(e, expected, ctx);
+            } finally {
+                ctorTearOffNode = prevNode;
+                ctorTearOffExpected = prevExpected;
+            }
+        } else {
+            raw = emitExprRaw(e, expected, ctx);
+        }
+        Out out = narrowFullArityValue(e, materializeShort(raw), expected, ctx);
         // A method reference tear-off, bare or bound to its producer's SAM, and not yet signed.
         if (!(e instanceof Lambda) && out != null && out.fn != null && out.fn.kind == FnKind.METHOD_REF
                 && out.fn.marker == null && !out.fn.doubleCast) {
@@ -18428,6 +18445,23 @@ public final class JavaEmitter {
             ctx.importClass("dart.runtime.Dyn");
             dynNames.add(name);
             return new Out("Dyn.get(" + target.code + ", \"" + name + "\")", TypeRef.DYNAMIC);
+        }
+        // `o.hashCode` on an Object or Function: the value may be a canonical tear-off,
+        // one Dart function held as several Java objects (one per SAM view) that eq calls
+        // equal, so it hashes by that function through the runtime, not Java's hashCode.
+        if (tt != null && "hashCode".equals(name) && !target.fromError
+                && (tt.is("Object") || tt.is("Function"))) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            Expr te = posNode instanceof PropertyGet ? ((PropertyGet) posNode).target : null;
+            Out h;
+            if (target.fn != null && te instanceof PropertyGet && ((PropertyGet) te).target instanceof Ident) {
+                // `G<int>.new.hashCode`: the tear-off read raw, not yet the canonical value
+                // emitExpr makes it, which is the object its other views hash alike with.
+                h = emitExpr(te, new TypeRef("Object"), ctx);
+            } else {
+                h = te != null ? objectOperand(te, target, ctx) : target;
+            }
+            return new Out("DartRuntime.hashCodeOf(" + h.code + ")", TypeRef.INT);
         }
         // record component accessor: `r.$1`, `r.$2`, or `r.namedField`
         if (tt != null && tt.name.startsWith("Rec$") && !name.equals("runtimeType")) {
@@ -30717,6 +30751,10 @@ public final class JavaEmitter {
     private int tearOffSeq;
     /** The expected type of the identifier being resolved as a top-level tear-off. */
     private TypeRef tearOffExpected;
+    /// The constructor tear-off expression emitExpr is emitting and the slot type it goes
+    /// into, so staticTearOff can infer `G.new`'s type arguments from `G<int> Function(int)`.
+    private Expr ctorTearOffNode;
+    private TypeRef ctorTearOffExpected;
     /// The property read emitExprRaw is emitting and the type its context expects, so a
     /// method tear-off it turns out to be knows whether its slot is untyped.
     private PropertyGet memberTearOffNode;
@@ -33063,7 +33101,20 @@ public final class JavaEmitter {
                 params = cd != null ? cd.params : new ArrayList<Param>();
                 CtorCall call = new CtorCall();
                 call.type = new TypeRef(cls);
-                call.type.args.addAll(typeArgs);
+                List<TypeRef> inferred = typeArgs;
+                if ((inferred == null || inferred.isEmpty()) && !tps.isEmpty() && posNode != null
+                        && posNode == ctorTearOffNode && ctorTearOffExpected != null) {
+                    // `G<int> Function(int) gi = G.new`: Dart instantiates G from the slot's
+                    // return type; without it the witness is Object and `gi(1).runtimeType`
+                    // reads G<Object>. Only a fully known instantiation of this class.
+                    TypeRef r = ctorTearOffExpected.funcReturn;
+                    if (r != null && cls.equals(r.name) && r.args.size() == tps.size()
+                            && !mentionsTypeVariable(r, ctx)) {
+                        inferred = r.args;
+                    }
+                }
+                call.type.args.addAll(inferred);
+                typeArgs = inferred;
                 call.ctorName = name.equals("new") ? null : name;
                 body = call;
             } else {

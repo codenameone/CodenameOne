@@ -12,6 +12,12 @@ class G<T> {
   G(this.v);
 }
 
+void takeG(G<bool> Function(bool) f) {
+  print('gctor param ${f(true).runtimeType} ${f == G<bool>.new}');
+}
+
+G<String> Function(String) makeG() => G.new;
+
 void main() {
   Object? Function(int) wide = twice;
   dynamic Function(Never) never = twice;
@@ -28,9 +34,13 @@ void main() {
 
   print('gctor ${G<int>.new == G<int>.new} ${G<int>.new == G<String>.new}');
   G<int> Function(int) gi = G.new;
-  print('gctor inferred ${gi == G<int>.new} ${gi(6).v}');
+  print('gctor inferred ${gi == G<int>.new} ${gi.hashCode == G<int>.new.hashCode} ${gi(6).v} ${gi(1).runtimeType}');
+  takeG(G.new);
+  print('gctor ret ${makeG()('s').runtimeType} ${makeG() == G<String>.new}');
+  List<G<double> Function(double)> gl = [G.new];
+  print('gctor list ${gl[0](1.5).runtimeType} ${gl[0] == G<double>.new}');
 
   print('gen inst ${gen<int> == gen<int>} ${gen<int> == gen<String>}');
   int Function(int) gin = gen;
-  print('gen inferred ${gin == gen<int>} ${gin(7)}');
+  print('gen inferred ${gin == gen<int>} ${gin.hashCode == gen<int>.hashCode} ${gin(7)}');
 }

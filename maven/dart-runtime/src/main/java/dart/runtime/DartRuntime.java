@@ -273,6 +273,20 @@ public final class DartRuntime {
         if (o instanceof Integer || o instanceof Short || o instanceof Byte) {
             return Long.valueOf(((Number) o).longValue()).hashCode();
         }
+        return canonHash(o);
+    }
+
+    /// {@code o.hashCode()}, except for a canonical static, constructor or instantiated
+    /// generic tear-off: its views (a signed SAM, a plain cast, one per erased SAM) are
+    /// separate Java objects that eq calls one Dart function, so they hash by that
+    /// function's key, the same name eq compares them by.
+    private static int canonHash(Object o) {
+        if (isTearOffCandidate(o)) {
+            String k = CANON_FUNCTIONS.get(o);
+            if (k != null) {
+                return k.hashCode();
+            }
+        }
         return o.hashCode();
     }
 
@@ -1088,7 +1102,7 @@ public final class DartRuntime {
 
     /// `x.hashCode` for an object the emitter has no declaration for.
     public static long hashCodeOf(Object o) {
-        return o == null ? 0 : o.hashCode();
+        return o == null ? 0 : canonHash(o);
     }
 
     /**
