@@ -290,10 +290,16 @@ class JavaScriptRuntimeFacadeTest {
                         || html5Source.contains("nativeSurfaceWritePixels("),
                 "HTML5Implementation should write image data via ImageData.writeArgbBuffer "
                 + "or the surface model (nativeSurfaceWritePixels)");
-        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveWidth("),
-                "HTML5Implementation.NativeImage should delegate width resolution to the native image adapter");
-        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveHeight("),
-                "HTML5Implementation.NativeImage should delegate height resolution to the native image adapter");
+        // NativeImage's size getters answer from fields and never ask the host:
+        // layout measures images everywhere, and a host query there made every
+        // caller a JavaScript generator.
+        for (String getter : new String[] {"public int getWidth(){", "public int getHeight(){"}) {
+            int at = html5Source.indexOf(getter, html5Source.indexOf("class NativeImage"));
+            assertTrue(at >= 0, "HTML5Implementation.NativeImage should declare " + getter);
+            String body = html5Source.substring(at, html5Source.indexOf("\n        }", at));
+            assertFalse(body.contains("awaitNaturalDimensions") || body.contains("JavaScriptNativeImageAdapter."),
+                    "HTML5Implementation.NativeImage." + getter + " must not query the host: " + body);
+        }
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.draw("),
                 "HTML5Implementation.NativeImage should delegate draw dispatch to the native image adapter");
         // The black-chrome fix (d944b6bae) reimplemented NativeImage.tile() as

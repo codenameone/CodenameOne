@@ -31,6 +31,8 @@ public final class PersistentRememberMeToken {
     private final String tokenHash;
     private final long lastUsed;
     private final String previousTokenHash;
+    private final String userAgent;
+    private final String ipAddress;
 
     /// @param tokenHash the SHA-256 of the token, in hex: the token itself is
     /// only ever in the cookie
@@ -51,6 +53,29 @@ public final class PersistentRememberMeToken {
         this.tokenHash = tokenHash;
         this.lastUsed = lastUsed;
         this.previousTokenHash = previousTokenHash;
+        this.userAgent = null;
+        this.ipAddress = null;
+    }
+
+    /// A token with the device it was issued to, for a "signed-in devices" page.
+    ///
+    /// #### Parameters
+    ///
+    /// - `userAgent`: the `User-Agent` of the sign-in, or null
+    /// - `ipAddress`: the client address of the sign-in, or null
+    public PersistentRememberMeToken(String username, String series, String tokenHash,
+                                     long lastUsed, String previousTokenHash, String userAgent,
+                                     String ipAddress) {
+        if (username == null || series == null || tokenHash == null) {
+            throw new IllegalArgumentException("A token needs a user, a series and a hash");
+        }
+        this.username = username;
+        this.series = series;
+        this.tokenHash = tokenHash;
+        this.lastUsed = lastUsed;
+        this.previousTokenHash = previousTokenHash;
+        this.userAgent = userAgent;
+        this.ipAddress = ipAddress;
     }
 
     public String getUsername() {
@@ -72,5 +97,17 @@ public final class PersistentRememberMeToken {
     /// The hash replaced at [#getLastUsed()], or null before the first rotation.
     public String getPreviousTokenHash() {
         return previousTokenHash;
+    }
+
+    /// The `User-Agent` the series was issued to, or null when it was not recorded.
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    /// The client address the series was issued to, or null when it was not
+    /// recorded. It is the address at sign-in; the series may since be used from
+    /// another.
+    public String getIpAddress() {
+        return ipAddress;
     }
 }

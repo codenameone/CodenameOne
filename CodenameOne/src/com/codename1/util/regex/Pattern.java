@@ -88,6 +88,7 @@ import java.util.stream.StreamSupport;
 /// likely to have. A group repeated many thousand times
 /// over a long text recurses once for each repetition, as the JDK's does,
 /// on a stack that is smaller on a device.
+@com.codename1.impl.SharedWithBackend
 public final class Pattern {
 
     public static final int UNIX_LINES = 0x01;

@@ -448,15 +448,14 @@ public class UIManager {
     ///
     /// Instance of the ui manager
     public static UIManager getInstance() {
+        // No lock: UIManagerHolder's class initialization is the synchronization, and
+        // the constructor publishes `instance` itself before anything can reach it.
+        // A monitor here made this, and through it getUIManager()/getStyle() and most
+        // of the paint path, a generator on the JavaScript port.
         UIManager currentInstance = instance;
         if (currentInstance == null) {
-            synchronized (UIManager.class) {
-                currentInstance = instance;
-                if (currentInstance == null) {
-                    currentInstance = UIManagerHolder.INSTANCE;
-                    instance = currentInstance;
-                }
-            }
+            currentInstance = UIManagerHolder.INSTANCE;
+            instance = currentInstance;
         }
         return currentInstance;
     }

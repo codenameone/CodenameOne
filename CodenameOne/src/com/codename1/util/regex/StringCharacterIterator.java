@@ -18,6 +18,7 @@
 package com.codename1.util.regex;
 
 /// Encapsulates String as CharacterIterator.
+@com.codename1.impl.SharedWithBackend
 public final class StringCharacterIterator implements CharacterIterator {
     /// encapsulated
     private final String src;

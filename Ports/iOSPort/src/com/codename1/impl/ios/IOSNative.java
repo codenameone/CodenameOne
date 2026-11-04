@@ -727,7 +727,7 @@ public class IOSNative {
     native void cn1CameraTakePhoto(long sessionPeer, int width, int height, int jpegQuality, String filePath, int callbackId);
     native boolean cn1CameraStartVideo(long sessionPeer, String filePath, boolean captureAudio);
     native void cn1CameraStopVideo(long sessionPeer, int callbackId);
-    native void cn1CameraSetFrameDelivery(long sessionPeer, boolean enabled, int maxFps);
+    native void cn1CameraSetFrameDelivery(long sessionPeer, boolean enabled, int maxFps, boolean raw);
     native void cn1CameraSetFlash(long sessionPeer, int mode);
     native void cn1CameraSetZoom(long sessionPeer, float ratio);
     native void cn1CameraFocus(long sessionPeer, float xNorm, float yNorm);

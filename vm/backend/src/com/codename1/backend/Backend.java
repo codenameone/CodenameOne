@@ -915,6 +915,7 @@ public final class Backend {
         /// gets, as Spring's filter puts them on every response.
         @Override
         public void decorateFallback(HttpServer.Request request, HttpServer.Response response) {
+            Cors cors = corsFor(request);
             if (cors != null) {
                 cors.decorate(request, response);
             }
@@ -927,6 +928,24 @@ public final class Backend {
 
         /// The first of the application's routers to take `request`, or null.
         /// What the security layer calls once it lets a request through.
+        /// The CORS policy that governs `request`: the `@CrossOrigin` of the route
+        /// it is for (the route a preflight asks about), which replaces the global
+        /// one for that route, as a handler-level policy is the more specific; or
+        /// the global `cn1.cors.*` policy, or null when neither applies. Consulted
+        /// for the reject, the preflight and the response headers alike, so the
+        /// three never disagree about which policy a request is under.
+        Cors corsFor(HttpServer.Request request) {
+            for (Object route : chain) {
+                if (route instanceof com.codename1.backend.web.CorsRoutes) {
+                    Cors own = ((com.codename1.backend.web.CorsRoutes) route).corsPolicy(request);
+                    if (own != null) {
+                        return own;
+                    }
+                }
+            }
+            return cors;
+        }
+
         @Override
         public HttpServer.Response route(HttpServer.Request request) throws Exception {
             HttpServer.Response response = null;
@@ -1129,6 +1148,7 @@ public final class Backend {
             try {
                 HttpServer.Response response = null;
                 List attempted = new ArrayList(2);
+                Cors cors = corsFor(request);
                 try {
                     // A cross-origin request the CORS policy does not admit never
                     // reaches a handler.
@@ -1832,6 +1852,9 @@ public final class Backend {
                 config = Config.load();
             }
             config = config.withCompiledDefaults(compiledSettings);
+            // Before anything logs: the logging.level.* settings decide what the
+            // rest of the start-up writes.
+            com.codename1.backend.log.Logging.configure(config);
             // Before anything is opened: a setting only the build could have
             // acted on is refused here rather than silently doing nothing.
             BuildTimeSettings.require(config, managementRoute != null || testApplication,
@@ -2241,6 +2264,7 @@ public final class Backend {
                         JsonCodec.MAX_DEPTH_SETTING,
                         JsonCodec.MAX_DEPTH));
                 Cors cors = Cors.fromConfig(config);
+                Cors.routesServedOverTls(context != null);
                 if (cors != null) {
                     // Whether a request arrives over TLS, for telling a same-origin
                     // request from a cross-origin one: the scheme is part of an origin.

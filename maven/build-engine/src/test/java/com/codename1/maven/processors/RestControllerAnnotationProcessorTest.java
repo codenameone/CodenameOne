@@ -178,6 +178,49 @@ public class RestControllerAnnotationProcessorTest {
         assertEquals("{\"body\":\"hi\"}", Router.bodyOf(response));
     }
 
+    /// `consumes` answers 415 to a request outside it, `produces` 406 to one that
+    /// accepts none of it; the class's apply where the method names none.
+    @Test
+    public void consumesAndProducesNegotiate() throws Exception {
+        Router router = generate("package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController @RequestMapping(value = \"/m\", produces = \"application/json\")\n"
+                + "public class Notes {\n"
+                + "  @PostMapping(value = \"/in\", consumes = {\"application/json\", \"text/*\"})\n"
+                + "  public String in(@RequestBody String body) { return \"ok\"; }\n"
+                + "  @GetMapping(value = \"/out\")\n"
+                + "  public String out() { return \"ok\"; }\n"
+                + "}\n");
+        assertEquals(415, Router.statusOf(router.callWith("POST", "/m/in", "x", "Content-Type: application/xml")));
+        assertEquals(415, Router.statusOf(router.callWith("POST", "/m/in", "x")));
+        assertEquals(200, Router.statusOf(router.callWith("POST", "/m/in", "x", "Content-Type: Application/JSON; charset=utf-8")));
+        assertEquals(200, Router.statusOf(router.callWith("POST", "/m/in", "x", "Content-Type: text/plain")));
+        assertEquals(406, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: text/html")));
+        assertEquals(406, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: application/json;q=0, text/html")));
+        assertEquals(200, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: text/html, */*;q=0.1")));
+        assertEquals(200, Router.statusOf(router.callWith("GET", "/m/out", null)));
+    }
+
+    /// A `@CrossOrigin` route reports its own policy, the preflight included, and
+    /// a route without one reports none so the global policy applies.
+    @Test
+    public void crossOriginNamesTheRoutesPolicy() throws Exception {
+        Router router = generate("package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController @RequestMapping(\"/c\")\n"
+                + "public class Notes {\n"
+                + "  @CrossOrigin(origins = \"https://app.example.com\", allowCredentials = true)\n"
+                + "  @GetMapping(\"/items/{id}\") public String item(@PathVariable(\"id\") String id) { return id; }\n"
+                + "  @GetMapping(\"/plain\") public String plain() { return \"p\"; }\n"
+                + "}\n");
+        assertNotNull(router.corsPolicy("GET", "/c/items/7"));
+        assertNotNull("a preflight is matched by the method it asks about",
+                router.corsPolicy("OPTIONS", "/c/items/7", "Origin: https://app.example.com",
+                        "Access-Control-Request-Method: GET"));
+        assertNull(router.corsPolicy("POST", "/c/items/7"));
+        assertNull(router.corsPolicy("GET", "/c/plain"));
+    }
+
     @Test
     public void doesNotMatchWhatItShouldNot() throws Exception {
         Router router = generate(CONTROLLER_SOURCE);
@@ -1573,6 +1616,67 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void jsonReadAndWriteReachTheCodecOfAClassNamedInCode() throws Exception {
+        // Release is used by no route: only the Json.read call names it, and the
+        // build has to find that call to write its codec.
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Release",
+                "package com.example;\n"
+                + "public class Release {\n"
+                + "    public String name;\n"
+                + "    public int build;\n"
+                + "}\n");
+        sources.put("com.example.Feed",
+                "package com.example;\n"
+                + "import com.codename1.backend.Json;\n"
+                + "public class Feed {\n"
+                + "    public static String roundTrip(String body) throws java.io.IOException {\n"
+                + "        Release r = Json.read(body, Release.class);\n"
+                + "        r.build++;\n"
+                + "        return Json.write(r);\n"
+                + "    }\n"
+                + "    public static int count(String body) throws java.io.IOException {\n"
+                + "        return Json.readList(body, Release.class).size();\n"
+                + "    }\n"
+                + "}\n");
+        sources.put("com.example.Notes",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/n\")\n"
+                + "    public String n() { return \"n\"; }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        ProcessorContext ctx = run(classes);
+        assertFalse(ctx.getErrors().toString(), ctx.hasErrors());
+        URLClassLoader loader = new URLClassLoader(new URL[]{ classes.toURI().toURL() },
+                getClass().getClassLoader());
+        com.codename1.impl.backend.JsonCodec.install((com.codename1.impl.backend.JsonCodec.Registry)
+                loader.loadClass("cn1app.JsonCodecs").newInstance());
+        try {
+            Class<?> feed = loader.loadClass("com.example.Feed");
+            assertEquals("{\"name\":\"v1\",\"build\":8}", feed.getMethod("roundTrip",
+                    String.class).invoke(null, "{\"name\":\"v1\",\"build\":7}"));
+            assertEquals(2, feed.getMethod("count", String.class).invoke(null,
+                    "[{\"name\":\"a\"},{\"name\":\"b\"}]"));
+            try {
+                feed.getMethod("roundTrip", String.class).invoke(null, "{\"build\":\"x\"}");
+                fail("a string where the class has an int must be refused");
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                assertTrue(String.valueOf(e.getCause()),
+                        e.getCause() instanceof IllegalArgumentException
+                        && e.getCause().getMessage().indexOf("build") >= 0);
+            }
+            assertEquals(Long.valueOf(3), com.codename1.backend.Json.read("3", Long.class));
+            assertEquals(Integer.valueOf(3), com.codename1.backend.Json.read("3", Integer.class));
+        } finally {
+            com.codename1.impl.backend.JsonCodec.install(null);
+        }
+    }
+
+    @Test
     public void aParameterWithTwoBindingAnnotationsIsRefused() throws Exception {
         // The binding chain is priority-ordered, so this used to bind the header
         // and ignore the @RequestParam without a word. For an authentication input
@@ -2105,6 +2209,16 @@ public class RestControllerAnnotationProcessorTest {
             return handle.invoke(instance, request(method, target, body));
         }
 
+        /// A request carrying `headers`, each "Name: value".
+        Object callWith(String method, String target, String body, String... headers) throws Exception {
+            return handle.invoke(instance, request(method, target, body, headers));
+        }
+
+        Object corsPolicy(String method, String target, String... headers) throws Exception {
+            return instance.getClass().getMethod("corsPolicy", HttpServer.Request.class)
+                    .invoke(instance, request(method, target, null, headers));
+        }
+
         String text2(String method, String target, String body) throws Exception {
             Object response = call(method, target, body);
             assertNotNull(method + " " + target + " matched no route", response);
@@ -2132,13 +2246,25 @@ public class RestControllerAnnotationProcessorTest {
             return new String((byte[]) bodyField.get(response), "UTF-8");
         }
 
-        private static HttpServer.Request request(String method, String target, String body)
-                throws Exception {
+        private static HttpServer.Request request(String method, String target, String body,
+                String... headers) throws Exception {
             reflect();
-            byte[] raw = (method + " " + target + " HTTP/1.1\r\nUser-Agent: probe\r\n\r\n")
-                    .getBytes("UTF-8");
+            StringBuilder text = new StringBuilder(method + " " + target + " HTTP/1.1\r\n");
+            int[] slices = new int[headers.length * 4];
+            for (int i = 0; i < headers.length; i++) {
+                int colon = headers[i].indexOf(':');
+                String name = headers[i].substring(0, colon);
+                String value = headers[i].substring(colon + 1).trim();
+                slices[i * 4] = text.length();
+                slices[i * 4 + 1] = name.length();
+                text.append(name).append(": ");
+                slices[i * 4 + 2] = text.length();
+                slices[i * 4 + 3] = value.length();
+                text.append(value).append("\r\n");
+            }
+            byte[] raw = text.append("\r\n").toString().getBytes("UTF-8");
             return (HttpServer.Request) requestCtor.newInstance(method, target, "HTTP/1.1", raw,
-                    new int[0], 0, body, Integer.valueOf(method.length() + 1),
+                    slices, Integer.valueOf(headers.length), body, Integer.valueOf(method.length() + 1),
                     Integer.valueOf(target.getBytes("UTF-8").length));
         }
 

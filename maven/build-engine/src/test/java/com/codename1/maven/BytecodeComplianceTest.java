@@ -139,6 +139,68 @@ class BytecodeComplianceTest {
     }
 
     @Test
+    void backendMovesRegularExpressionsOntoTheSharedEngine(@TempDir Path dir) throws Exception {
+        Path src = Files.createDirectories(dir.resolve("src/app"));
+        Path output = Files.createDirectories(dir.resolve("output"));
+        Path api = Files.createDirectories(dir.resolve("api"));
+        Path dependency = Files.createDirectories(dir.resolve("dependency"));
+        Files.write(src.resolve("Regex.java"), java.util.Arrays.asList(
+                "package app;",
+                "public class Regex {",
+                "    public static boolean run(String s) {",
+                "        boolean a = java.util.regex.Pattern.compile(\"[a-z]+\").matcher(s).matches();",
+                "        String[] p = s.split(\",\");",
+                "        String r = s.replaceAll(\"x\", \"y\").replaceFirst(\"y\", \"z\");",
+                "        return a && s.matches(\"b\") && p.length > 0 && r.length() > 0;",
+                "    }",
+                "}"), java.nio.charset.StandardCharsets.UTF_8);
+        javax.tools.JavaCompiler javac = javax.tools.ToolProvider.getSystemJavaCompiler();
+        assertEquals(0, javac.run(null, null, null, "-source", "8", "-target", "8", "-nowarn",
+                "-d", output.toString(), src.resolve("Regex.java").toString()));
+
+        // The server's class library: no java.util.regex, no String regex members.
+        writeJavaLangObject(api);
+        writeStub(api, "java/lang/String", "length()I");
+        writeStub(api, "java/lang/CharSequence");
+        String r = "com/codename1/util/regex/";
+        writeStub(dependency, r + "Pattern", "static compile(Ljava/lang/String;)L" + r + "Pattern;",
+                "matcher(Ljava/lang/CharSequence;)L" + r + "Matcher;");
+        writeStub(dependency, r + "Matcher", "matches()Z");
+        String str = "Ljava/lang/String;";
+        writeStub(dependency, r + "StringRegex", "static matches(" + str + str + ")Z",
+                "static split(" + str + str + ")[" + str,
+                "static replaceAll(" + str + str + str + ")" + str,
+                "static replaceFirst(" + str + str + str + ")" + str);
+
+        BytecodeCompliance compliance = new BytecodeCompliance(TestProjectHost.empty());
+        compliance.checkBackend(output.toFile(), api.toFile(), Collections.singletonList(dependency.toFile()));
+        assertEquals(4, compliance.lastRewrittenCallsites());
+        String rewritten = new String(Files.readAllBytes(output.resolve("app/Regex.class")),
+                java.nio.charset.StandardCharsets.ISO_8859_1);
+        org.junit.jupiter.api.Assertions.assertFalse(rewritten.contains("java/util/regex"));
+        org.junit.jupiter.api.Assertions.assertTrue(rewritten.contains(r + "StringRegex"));
+    }
+
+    /// A class whose methods are native: present for the compliance index,
+    /// nothing to run. A method spec is `[static ]name descriptor`.
+    private void writeStub(Path root, String className, String... methods) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+        for (String m : methods) {
+            int access = Opcodes.ACC_PUBLIC | Opcodes.ACC_NATIVE;
+            String spec = m;
+            if (spec.startsWith("static ")) {
+                access |= Opcodes.ACC_STATIC;
+                spec = spec.substring(7);
+            }
+            int paren = spec.indexOf('(');
+            writer.visitMethod(access, spec.substring(0, paren), spec.substring(paren), null, null).visitEnd();
+        }
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    @Test
     void backendComplianceUsesTheFirstClasspathDefinition(@TempDir Path dir) throws Exception {
         Path output = Files.createDirectories(dir.resolve("output"));
         Path api = Files.createDirectories(dir.resolve("api"));

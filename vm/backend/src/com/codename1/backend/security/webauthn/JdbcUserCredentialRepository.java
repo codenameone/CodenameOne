@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security.webauthn;
 
+import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.DataSource;
@@ -85,7 +86,7 @@ public final class JdbcUserCredentialRepository implements UserCredentialReposit
             flag(record.isBackupState()), transports.toString(), record.getLabel(),
             Long.valueOf(record.getCreated()), Long.valueOf(record.getLastUsed())};
         try {
-            dataSource.execute("INSERT INTO cn1_webauthn_credential (credential_key, " + COLUMNS
+            dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_webauthn_credential") + " (credential_key, " + COLUMNS
                     + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values);
             return true;
         } catch (IOException refused) {
@@ -99,7 +100,7 @@ public final class JdbcUserCredentialRepository implements UserCredentialReposit
     }
 
     private CredentialRecord read(byte[] credentialId) throws IOException {
-        Map row = dataSource.queryOne("SELECT " + COLUMNS + " FROM cn1_webauthn_credential "
+        Map row = dataSource.queryOne("SELECT " + COLUMNS + " FROM " + SecuritySchema.table("cn1_webauthn_credential") + " "
                 + "WHERE credential_key = ?", new Object[] {key(credentialId)});
         return row == null ? null : record(row);
     }
@@ -124,7 +125,7 @@ public final class JdbcUserCredentialRepository implements UserCredentialReposit
         }
         try {
             for (Object row : dataSource.query("SELECT " + COLUMNS + " FROM "
-                    + "cn1_webauthn_credential WHERE user_id = ? ORDER BY created_at, "
+                    + SecuritySchema.table("cn1_webauthn_credential") + " WHERE user_id = ? ORDER BY created_at, "
                     + "credential_key", new Object[] {Base64Url.encode(userEntityUserId)})) {
                 if (row instanceof Map) {
                     out.add(record((Map) row));
@@ -153,7 +154,7 @@ public final class JdbcUserCredentialRepository implements UserCredentialReposit
                         Long.valueOf(lastUsed), key(credentialId)}
                     : new Object[] {count, flag(uvInitialized), flag(backupState),
                         Long.valueOf(lastUsed), key(credentialId), count};
-            return dataSource.execute("UPDATE cn1_webauthn_credential SET sign_count = ?, "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_webauthn_credential") + " SET sign_count = ?, "
                     + "uv_initialized = ?, backup_state = ?, last_used = ? WHERE "
                     + "credential_key = ? AND " + moved, values) == 1;
         } catch (IOException err) {
@@ -167,7 +168,7 @@ public final class JdbcUserCredentialRepository implements UserCredentialReposit
             return false;
         }
         try {
-            return dataSource.execute("DELETE FROM cn1_webauthn_credential WHERE "
+            return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_webauthn_credential") + " WHERE "
                     + "credential_key = ?", new Object[] {key(credentialId)}) == 1;
         } catch (IOException err) {
             throw failed(err);

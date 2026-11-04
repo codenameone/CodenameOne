@@ -10177,6 +10177,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void run() {
                 im.load();
+                im.awaitNaturalDimensions();
                 im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
@@ -10215,6 +10216,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void run() {
                 im.load();
+                im.awaitNaturalDimensions();
                 im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
@@ -10272,6 +10274,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void run() {
                 im.load();
+                im.awaitNaturalDimensions();
                 im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
@@ -10326,6 +10329,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             im.img = renderingBackend.createBlobImageElement(blob);
             registerImageResource(im, im.img);
             im.load();
+            im.awaitNaturalDimensions();
             return im;
         } else {
             InputStream in = this.getResourceAsStream(getClass(), path);
@@ -13736,6 +13740,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         copyBytesToUint8Array(bytes, offset, len, arr);
         Blob blob = BlobUtil.createBlob(arr, "image/png");
         NativeImage nimg = new NativeImage();
+        // The size is known now, from the header, rather than when the browser
+        // finishes decoding: getWidth()/getHeight() never ask the host.
+        int[] size = ImageHeaderDimensions.read(bytes, offset, len);
+        if (size != null) {
+            nimg.width = size[0];
+            nimg.height = size[1];
+        }
         nimg.img = renderingBackend.createBlobImageElement(blob);
         registerImageResource(nimg, nimg.img);
         nimg.load();
@@ -13981,20 +13992,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
         
+        // Fields only, never the host: layout measures images everywhere, and a
+        // host query here made every caller a JavaScript generator. Images made
+        // from bytes know their size from the header (ImageHeaderDimensions), the
+        // load event fills it in for the rest, and the creation paths that cannot
+        // read a header wait for it themselves (awaitNaturalDimensions). Until
+        // then the answer is JavaScriptNativeImageAdapter's fallback.
         public int getWidth(){
-            awaitNaturalDimensions();
-            return JavaScriptNativeImageAdapter.resolveWidth(imageModel);
+            if (width > 0) {
+                return width;
+            }
+            return mutableGraphics != null ? mutableGraphics.getCanvasWidth() : 10;
         }
 
         public int getHeight(){
-            awaitNaturalDimensions();
-            return JavaScriptNativeImageAdapter.resolveHeight(imageModel);
+            if (height > 0) {
+                return height;
+            }
+            return mutableGraphics != null ? mutableGraphics.getCanvasHeight() : 10;
         }
 
         /**
          * Block briefly (up to ~200 ms total) until the underlying
-         * {@code HTMLImageElement} exposes a positive natural width,
-         * so that {@link #getWidth()} / {@link #getHeight()} don't
+         * {@code HTMLImageElement} exposes a positive natural width.
+         * Called where an element-backed image is created without bytes
+         * to read a header from (a file path, a URL download), never from
+         * {@link #getWidth()}, so that {@link #getWidth()} / {@link #getHeight()} don't
          * fall through to the hard-coded 10-pixel fallback in
          * {@link JavaScriptNativeImageAdapter} during the gap between
          * {@code createNativeImage()} returning and the main thread

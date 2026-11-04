@@ -57,6 +57,23 @@ final class ClientCredentials {
     }
 
     static SSLSocketFactory socketFactory(ClientCertificate credential) throws IOException {
+        return context(credential).getSocketFactory();
+    }
+
+    /// The TLS context presenting `credential`, or default trust and no key
+    /// for null: what the HTTP/2 client is built over, as the factories above
+    /// are for HttpURLConnection.
+    static SSLContext context(ClientCertificate credential) throws IOException {
+        if (credential == null) {
+            try {
+                SSLContext context = SSLContext.getInstance("TLS");
+                context.init(null, null, null);
+                return context;
+            } catch (GeneralSecurityException err) {
+                throw new IOException("TLS is not available: " + err.getClass().getSimpleName(),
+                        err);
+            }
+        }
         try {
             KeyStore store;
             char[] password;
@@ -102,7 +119,7 @@ final class ClientCredentials {
             keys.init(store, password);
             SSLContext context = SSLContext.getInstance("TLS");
             context.init(keys.getKeyManagers(), null, null);
-            return context.getSocketFactory();
+            return context;
         } catch (GeneralSecurityException err) {
             throw new IOException("The client certificate could not be used: "
                     + err.getClass().getSimpleName(), err);

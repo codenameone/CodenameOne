@@ -209,6 +209,25 @@ final class JavascriptSuspensionAnalysis {
             return m;
         }
 
+        /// The site's own answer: the bodies type flow proved can reach it when it
+        /// bounded the receiver, the cone otherwise. The analysis classified the
+        /// enclosing method from exactly this list (propagate), so both sides agree.
+        boolean isDispatchSuspending(Invoke invoke) {
+            List<BytecodeMethod> flow = invoke.getFlowImpls();
+            String owner = invoke.getOwner();
+            String sig = invoke.getName() + invoke.getDesc();
+            if (flow == null || rta == null || isUnconditionallySuspendingDispatch(rta, jsoSigs, bridgeSigs,
+                    jsoClasses, owner, sig) || isDrivenSignature(sig)) {
+                return isDispatchSuspending(owner, invoke.getName(), invoke.getDesc());
+            }
+            for (int i = 0; i < flow.size(); i++) {
+                if (flow.get(i).isJavascriptSuspending()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         boolean isDispatchSuspending(String owner, String name, String desc) {
             String sig = name + desc;
             if (rta == null || isUnconditionallySuspendingDispatch(rta, jsoSigs, bridgeSigs,
@@ -263,6 +282,17 @@ final class JavascriptSuspensionAnalysis {
     // back to the signature-wide answer.
     private final Map<String, Integer> dispatchSites = new HashMap<String, Integer>();
 
+    // Investigation aid, off unless ``parparvm.js.suspension.graph`` names a
+    // file: the whole suspension graph -- every seed with its reason, every
+    // typed edge, every signature-wide dispatch -- where the report keeps only
+    // the FIRST cause per method. A script can then re-run the fixpoint with a
+    // category of seeds or edges removed and price it, which the first-cause
+    // report cannot: a hot method usually has several independent routes.
+    // Line kinds: S <method> <reason>, E <kind> <caller> <callee>,
+    // G <caller> <sig>, U <sig>, I <sig> <impl>.
+    private static final String GRAPH_PATH = System.getProperty("parparvm.js.suspension.graph");
+    private StringBuilder graph;
+
     // Kill-switch for the class-initialization edges (issue #5774). With them
     // off, a <clinit> that suspends is only driven correctly when the guard
     // happens to sit in a method that is suspending for some other reason --
@@ -271,6 +301,9 @@ final class JavascriptSuspensionAnalysis {
     // suspension-report.txt, and so a regression has something to bisect
     // against. JavascriptMethodGenerator reads the same property, because the
     // two sides MUST make the same decision.
+
+    static final String DETACHED_ANNOTATION = "Lcom/codename1/annotations/JavaScriptDetached;";
+
     private static final boolean CLINIT_EDGES_OFF =
             System.getProperty("parparvm.js.clinitedge.off") != null;
 
@@ -294,17 +327,50 @@ final class JavascriptSuspensionAnalysis {
             a.reportPath = JavascriptBundleWriter.sidecar(
                     outputDirectory, JavascriptBundleWriter.SUSPENSION_REPORT).getAbsolutePath();
         }
+        if (GRAPH_PATH != null) {
+            a.graph = new StringBuilder();
+        }
         a.rta = JavascriptReachability.modelFor(classes);
         a.index(classes);
         a.seedDirectlySuspending(classes);
         a.seedBridgeReferenced(classes);
+        if (a.rta != null) {
+            final JavascriptSuspensionAnalysis self = a;
+            JavascriptTypeFlow tf = JavascriptTypeFlow.solve(classes, a.rta, new JavascriptTypeFlow.Resolver() {
+                @Override
+                public BytecodeMethod resolveDirect(String owner, String name, String desc) {
+                    return self.resolveTarget(owner, name, desc);
+                }
+            }, a.jsoBridgeClasses);
+            if (ByteCodeTranslator.verbose) {
+                System.out.println("JS type flow: " + tf.refinedSites + " virtual sites bounded ("
+                        + tf.narrowedSites + " narrower than the cone), " + tf.topSites + " unknown");
+            }
+        }
         a.propagate(classes);
+        a.writeGraph();
         return a.applyResults(classes);
     }
 
     private void index(List<ByteCodeClass> classes) {
         for (ByteCodeClass cls : classes) {
             byName.put(cls.getClsName(), cls);
+        }
+    }
+
+    private void writeGraph() {
+        if (graph == null) {
+            return;
+        }
+        try {
+            java.io.Writer w = new java.io.OutputStreamWriter(new java.io.FileOutputStream(GRAPH_PATH), "UTF-8");
+            try {
+                w.write(graph.toString());
+            } finally {
+                w.close();
+            }
+        } catch (java.io.IOException e) {
+            System.out.println("JS suspension graph not written: " + e);
         }
     }
 
@@ -315,6 +381,20 @@ final class JavascriptSuspensionAnalysis {
      * worklist sites that depend on that return value.
      */
     private boolean markSuspending(BytecodeMethod m, String reason) {
+        if (m.isJavascriptDetached()) {
+            // @JavaScriptDetached: the body becomes a generator of its own and
+            // the method a plain function that finishes it on a new green thread
+            // once it really waits, so its callers stay synchronous.
+            if (graph != null && !m.isJavascriptDetachedBody()) {
+                graph.append("D ").append(qualify(m)).append('\n');
+            }
+            m.setJavascriptDetachedBody(true);
+            return false;
+        }
+        if (graph != null && !reason.startsWith("calls:") && !reason.startsWith("dispatch:")
+                && !reason.startsWith("clinit:")) {
+            graph.append("S ").append(qualify(m)).append(' ').append(reason).append('\n');
+        }
         if (!suspending.add(m)) {
             return false;
         }
@@ -588,6 +668,19 @@ final class JavascriptSuspensionAnalysis {
         // callers get escalated.
         suspendingSigs.addAll(jsoDeclaredSigs);
         suspendingSigs.addAll(bridgeDispatchSigs);
+        if (graph != null) {
+            for (String sig : jsoDeclaredSigs) {
+                graph.append("U ").append(sig).append(" jso\n");
+            }
+            for (String sig : bridgeDispatchSigs) {
+                graph.append("U ").append(sig).append(" bridge\n");
+            }
+            for (Map.Entry<String, List<BytecodeMethod>> e : sigImpls.entrySet()) {
+                for (BytecodeMethod impl : e.getValue()) {
+                    graph.append("I ").append(e.getKey()).append(' ').append(qualify(impl)).append('\n');
+                }
+            }
+        }
         for (ByteCodeClass cls : classes) {
             for (BytecodeMethod caller : cls.getMethods()) {
                 if (caller.isEliminated() || caller.isAbstract()) {
@@ -613,7 +706,7 @@ final class JavascriptSuspensionAnalysis {
                     if (twin == null) {
                         markSuspending(caller, "delegate-missing:" + delegateTwin);
                     } else {
-                        addCaller(callersOf, twin, caller);
+                        addEdge(callersOf, "twin", twin, caller);
                     }
                     continue;
                 }
@@ -696,7 +789,7 @@ final class JavascriptSuspensionAnalysis {
                                     + "." + inv.getName() + inv.getDesc());
                             continue;
                         }
-                        addCaller(callersOf, target, caller);
+                        addEdge(callersOf, "call", target, caller);
                     } else if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
                         String sig = inv.getName() + inv.getDesc();
                         // Count the site BEFORE the receiver-resolved branch
@@ -725,11 +818,12 @@ final class JavascriptSuspensionAnalysis {
                         }
                         List<BytecodeMethod> impls = rta == null || unconditional
                                 ? null
+                                : inv.getFlowImpls() != null ? inv.getFlowImpls()
                                 : rta.resolveImpls(inv.getOwner(), inv.getName(), inv.getDesc());
                         if (impls != null) {
                             for (int i = 0; i < impls.size(); i++) {
                                 BytecodeMethod impl = impls.get(i);
-                                addCaller(callersOf, impl, caller);
+                                addEdge(callersOf, "dispatch", impl, caller);
                                 if (suspending.contains(impl)) {
                                     markSuspending(caller, "dispatch:"
                                             + JavascriptNameUtil.sanitizeClassName(inv.getOwner())
@@ -743,6 +837,9 @@ final class JavascriptSuspensionAnalysis {
                         // signature the bridge can override at runtime):
                         // keep the historical signature-wide edge.
                         addSigCaller(sigCallersOf, sig, caller);
+                        if (graph != null) {
+                            graph.append("G ").append(qualify(caller)).append(' ').append(sig).append('\n');
+                        }
                         // Early escalation: if ANY impl of the sig is
                         // already known suspending, this caller also
                         // needs to be suspending. Add to the initial
@@ -819,7 +916,8 @@ final class JavascriptSuspensionAnalysis {
      * because "we do not know" has to mean "assume the bridge can reach it".
      */
     /// True for the signatures whose virtual call sites are classified synchronous
-    /// regardless of their implementations: `hashCode()` and `equals(Object)`.
+    /// regardless of their implementations: `hashCode()`, `equals(Object)` and
+    /// `toString()`.
     ///
     /// Signature suspension is a fixpoint over the whole program, and these two are
     /// where it collapses. A handful of genuinely blocking bodies (`Vector`,
@@ -839,12 +937,21 @@ final class JavascriptSuspensionAnalysis {
     /// method is a place a program blocks, and every synchronous-dispatch site
     /// already carried that contract for its CHA gaps.
     ///
+    /// `toString()` joined them for the same reason: string concatenation and
+    /// `String.valueOf(Object)` reach it on receivers no analysis can type, and a
+    /// handful of descriptions that queried the platform (`VaultCapabilities`,
+    /// `VideoCaptureConstraints`) put 38,000 dispatch edges into the cycle. Those
+    /// two no longer wait. The suspension report lists every implementation of
+    /// these signatures that is still a generator (`DRIVEN-SUSPENDING`); each is
+    /// a body that fails if it really waits under a synchronous call site.
+    ///
     /// Kill switch: -Dparparvm.js.drivensigs.off.
     static boolean isDrivenSignature(String sig) {
         if (System.getProperty("parparvm.js.drivensigs.off") != null) {
             return false;
         }
-        return "hashCode()I".equals(sig) || "equals(Ljava/lang/Object;)Z".equals(sig);
+        return "hashCode()I".equals(sig) || "equals(Ljava/lang/Object;)Z".equals(sig)
+                || "toString()Ljava/lang/String;".equals(sig);
     }
 
     private static boolean isUnconditionallySuspendingDispatch(JavascriptReachability.Model rta,
@@ -866,6 +973,15 @@ final class JavascriptSuspensionAnalysis {
             }
         }
         return false;
+    }
+
+    private void addEdge(Map<BytecodeMethod, List<BytecodeMethod>> callersOf, String kind,
+            BytecodeMethod callee, BytecodeMethod caller) {
+        if (graph != null) {
+            graph.append("E ").append(kind).append(' ').append(qualify(caller)).append(' ')
+                    .append(qualify(callee)).append('\n');
+        }
+        addCaller(callersOf, callee, caller);
     }
 
     private static void addCaller(Map<BytecodeMethod, List<BytecodeMethod>> callersOf,
@@ -940,7 +1056,7 @@ final class JavascriptSuspensionAnalysis {
                 if (m == caller) {
                     continue;        // a clinit does not guard against itself
                 }
-                addCaller(callersOf, m, caller);
+                addEdge(callersOf, "clinit", m, caller);
                 if (suspending.contains(m)) {
                     markSuspending(caller, "clinit:" + cur);
                 }
@@ -1103,6 +1219,10 @@ final class JavascriptSuspensionAnalysis {
                     cause = m.isAbstract() ? "abstract" : "unattributed";
                 }
                 methodLines.add("M SUSP " + qualified + " " + cause);
+                if (!m.isAbstract() && !m.isStatic() && isDrivenSignature(m.getMethodName() + m.getSignature())) {
+                    // Driven at every synchronous site: fails there if it really waits.
+                    methodLines.add("DRIVEN-SUSPENDING " + qualified + " " + cause);
+                }
                 Integer prev = causeCount.get(cause);
                 causeCount.put(cause, Integer.valueOf(prev == null ? 1 : prev.intValue() + 1));
             }

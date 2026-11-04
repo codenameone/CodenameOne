@@ -33,4 +33,27 @@ public interface CrudRepository<E, K> {
     java.util.List<E> findAll();
     long count();
     boolean existsById(K id);
+
+    /// Deletes one entity, managed or detached, as Spring Data's `delete` does: a
+    /// detached instance is merged first, so the row it stands for is removed. An
+    /// entity whose row no longer exists is ignored. Requires a transaction.
+    void delete(E entity);
+
+    /// Deletes every entity of this type, one by one, so cascades and lifecycle
+    /// callbacks run as they do for `delete`. Requires a transaction.
+    void deleteAll();
+
+    /// Deletes each of the given entities, as `delete` does. Requires a transaction.
+    void deleteAll(Iterable<? extends E> entities);
+
+    /// Saves each of the given entities, as `save` does, and answers the managed
+    /// results in the same order.
+    java.util.List<E> saveAll(Iterable<? extends E> entities);
+
+    /// The entities whose ids are given, in the order given; an id with no row is
+    /// skipped, so the list can be shorter than the input.
+    java.util.List<E> findAllById(Iterable<K> ids);
+
+    /// Writes pending changes of the caller's session now, rather than at commit.
+    void flush();
 }

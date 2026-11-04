@@ -24,10 +24,14 @@ package com.codename1.backend.security.mfa;
 
 import com.codename1.backend.Crypto;
 import com.codename1.backend.security.SecuritySchema;
+import com.codename1.backend.security.crypto.DelegatingPasswordEncoder;
 import com.codename1.backend.security.crypto.Pbkdf2Sha256PasswordEncoder;
 import com.codename1.backend.security.crypto.PasswordEncoder;
+import com.codename1.backend.security.crypto.Sha256HexPasswordEncoder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
@@ -49,13 +53,49 @@ public final class RecoveryCodeService {
     private static final int MAX_VERIFYING = 4;
 
     private final RecoveryCodeRepository repository;
-    private final PasswordEncoder encoder = new Pbkdf2Sha256PasswordEncoder();
+    private final PasswordEncoder encoder;
 
+    /// A service whose codes are hashed by [#defaultEncoder()].
     public RecoveryCodeService(RecoveryCodeRepository repository) {
+        this(repository, defaultEncoder());
+    }
+
+    /// A service whose codes are hashed and verified by `encoder`, for codes
+    /// imported from a system that stored them another way.
+    ///
+    /// #### Parameters
+    ///
+    /// - `repository`: where the hashes are kept
+    /// - `encoder`: hashes new codes and verifies stored ones
+    public RecoveryCodeService(RecoveryCodeRepository repository, PasswordEncoder encoder) {
         if (repository == null) {
             throw new IllegalArgumentException("repository cannot be null");
         }
+        if (encoder == null) {
+            throw new IllegalArgumentException("encoder cannot be null");
+        }
         this.repository = repository;
+        this.encoder = encoder;
+    }
+
+    /// The encoder recovery codes use unless another is given: a
+    /// [DelegatingPasswordEncoder] that hashes new codes as `{pbkdf2-sha256}`, and
+    /// verifies a stored hash by the `{id}` in front of it -- `{pbkdf2-sha256}`,
+    /// or `{sha256}` for the hexadecimal SHA-256 of the code another system may
+    /// have stored ([Sha256HexPasswordEncoder]). A hash with no `{id}` is
+    /// PBKDF2, as every code this service made before ids were written.
+    ///
+    /// A code is compared in the normalized form a user's input is reduced to:
+    /// lower case, without `-` or spaces. Codes imported as `{sha256}` must be
+    /// hashed from that form.
+    public static PasswordEncoder defaultEncoder() {
+        Map<String, PasswordEncoder> encoders = new HashMap<String, PasswordEncoder>();
+        PasswordEncoder pbkdf2 = new Pbkdf2Sha256PasswordEncoder();
+        encoders.put("pbkdf2-sha256", pbkdf2);
+        encoders.put("sha256", new Sha256HexPasswordEncoder());
+        DelegatingPasswordEncoder out = new DelegatingPasswordEncoder("pbkdf2-sha256", encoders);
+        out.setDefaultPasswordEncoderForMatches(pbkdf2);
+        return out;
     }
 
     /// Makes [#COUNT] new codes for `username`, replacing any they had.
