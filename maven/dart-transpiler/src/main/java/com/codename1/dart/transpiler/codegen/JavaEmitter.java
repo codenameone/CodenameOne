@@ -7155,9 +7155,78 @@ public final class JavaEmitter {
     // ==================================================================
 
     private void emitStatements(Block b, Ctx ctx) {
-        for (Stmt s : b.statements) {
+        for (int i = 0; i < b.statements.size(); i++) {
+            Stmt s = b.statements.get(i);
             emitStatement(s, ctx);
+            if (s instanceof VarDeclStmt && !((VarDeclStmt) s).isLate) {
+                VarDeclStmt v = (VarDeclStmt) s;
+                if (v.type != null && v.type.nullable && !v.type.is("var") && nonNullInitializer(v.initializer)
+                        && !assignsName(b.statements.subList(i + 1, b.statements.size()), v.name, 0)) {
+                    // `String? b = 'x';`: Dart promotes b to String by the initialization, so
+                    // `sh(b)` binds T to String. Only while nothing later assigns b.
+                    ctx.nonNullByInit.add(v.name);
+                }
+            }
         }
+    }
+
+    /// An initializer whose static type is non-nullable by its form alone.
+    private boolean nonNullInitializer(Expr e) {
+        return e instanceof StringLit || e instanceof IntLit || e instanceof DoubleLit || e instanceof BoolLit
+                || e instanceof ListLit || e instanceof MapLit || e instanceof SetLit || e instanceof CtorCall
+                || e instanceof Call && ((Call) e).target == null && ((Call) e).name != null
+                && program.classes.containsKey(((Call) e).name);
+    }
+
+    /// Whether anything under {@code o} assigns (or increments) the local {@code name}.
+    private boolean assignsName(Object o, String name, int depth) {
+        if (o == null || depth > 200) {
+            return false;
+        }
+        if (o instanceof List) {
+            for (Object e : (List<?>) o) {
+                if (assignsName(e, name, depth + 1)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (o instanceof Args) {
+            if (assignsName(((Args) o).positional, name, depth + 1)) {
+                return true;
+            }
+            for (NamedArg na : ((Args) o).named) {
+                if (assignsName(na.value, name, depth + 1)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!(o instanceof Node)) {
+            return false;
+        }
+        if (o instanceof Assign && ((Assign) o).lhs instanceof Ident && name.equals(((Ident) ((Assign) o).lhs).name)
+                || o instanceof IncDec && ((IncDec) o).operand instanceof Ident
+                && name.equals(((Ident) ((IncDec) o).operand).name)) {
+            return true;
+        }
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType().isPrimitive()
+                        || f.getType() == String.class || f.getType() == TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    if (assignsName(f.get(o), name, depth + 1)) {
+                        return true;
+                    }
+                } catch (IllegalAccessException ex) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     void emitStatement(Stmt s, Ctx ctx) {
@@ -14809,9 +14878,11 @@ public final class JavaEmitter {
             int d = calleeWitnessDemand((Call) o);
             if (d == HARD_DEMAND) {
                 collectTypeNames(((Call) o).args, tps, used, 0);
+                collectArgParamTypeNames(((Call) o).args, tps, used);
                 implicitWitnessCalls++;
             } else if (d == SOFT_DEMAND && softUses != null) {
                 collectTypeNames(((Call) o).args, tps, softUses, 0);
+                collectArgParamTypeNames(((Call) o).args, tps, softUses);
                 implicitSoftWitnessCalls++;
             }
         }
@@ -15017,6 +15088,30 @@ public final class JavaEmitter {
         return methodWitnessCache.get(decl);
     }
 
+    /// The parameters of the declaration whose witnesses are being computed, so an inferred
+    /// call that passes one (`wrap<T>(T? x) => sh(x)`) needs the type parameters its declared
+    /// type names: sh's T is inferred from x's type, which only this method's T witnesses.
+    private List<Param> witnessScanParams;
+
+    private void collectArgParamTypeNames(Args args, java.util.Set<String> tps, java.util.Set<String> out) {
+        if (witnessScanParams == null || args == null) {
+            return;
+        }
+        List<Expr> es = new ArrayList<Expr>(args.positional);
+        for (NamedArg na : args.named) {
+            es.add(na.value);
+        }
+        for (Expr e : es) {
+            if (e instanceof Ident) {
+                for (Param p : witnessScanParams) {
+                    if (p.type != null && ((Ident) e).name.equals(p.name)) {
+                        collectTypeNames(p.type, tps, out, 0);
+                    }
+                }
+            }
+        }
+    }
+
     /** Computes (and caches) the witnesses of decl's override group; true when any grew. */
     private boolean computeMethodWitnesses(Object decl) {
         List<String> tps = decl instanceof MethodDecl ? ((MethodDecl) decl).typeParams
@@ -15081,6 +15176,8 @@ public final class JavaEmitter {
             java.util.Set<String> soft = new HashSet<String>();
             softUses = soft;
             TypeRef gret = g instanceof MethodDecl ? ((MethodDecl) g).returnType : ((FunctionDecl) g).returnType;
+            List<Param> savedScanParams = witnessScanParams;
+            witnessScanParams = g instanceof MethodDecl ? ((MethodDecl) g).params : ((FunctionDecl) g).params;
             if (g instanceof MethodDecl) {
                 MethodDecl m = (MethodDecl) g;
                 scanTypeValueUses(m.params, set, used, seen);
@@ -15092,6 +15189,7 @@ public final class JavaEmitter {
                 scanTypeValueUses(f.body, set, used, seen);
                 scanTypeValueUses(f.exprBody, set, used, seen);
             }
+            witnessScanParams = savedScanParams;
             if (implicitSoftWitnessCalls != implicitSoftBefore) {
                 collectTypeNames(gret, set, soft, 0);
             }
@@ -15548,13 +15646,40 @@ public final class JavaEmitter {
                         // inferred type, List<int>.
                         at = untypedLiteralType(a, ctx);
                     }
+                    if (at == null || at.is("dynamic")) {
+                        // `sh(li.first)` of a List<int?>: the getter's static type, int?.
+                        TypeRef it = inferExprTypeQuiet(a, ctx);
+                        if (it == null && a instanceof PropertyGet) {
+                            PropertyGet pg = (PropertyGet) a;
+                            TypeRef rt = inferExprTypeQuiet(pg.target, ctx);
+                            if (rt != null && (rt.is("List") || rt.is("Set") || rt.is("Iterable"))
+                                    && rt.args.size() == 1 && !rt.nullable && !pg.nullAware
+                                    && (pg.name.equals("first") || pg.name.equals("last")
+                                    || pg.name.equals("single"))) {
+                                it = rt.arg(0);
+                            }
+                        }
+                        if (it != null && !it.is("dynamic")) {
+                            at = it;
+                        }
+                    }
                     if ((at == null || at.is("dynamic")) && a instanceof Call && ((Call) a).target == null
                             && ((Call) a).name != null && program.classes.containsKey(((Call) a).name)) {
                         // An unannotated construction: its class, with what was written.
                         at = new TypeRef(((Call) a).name);
                         at.args.addAll(((Call) a).typeArgs);
                     }
+                    if (at != null && at.nullable && a instanceof Ident && ctx.nonNullByInit.contains(((Ident) a).name)) {
+                        at = copyNonNull(at);
+                    }
                     unifyThroughSupers(p.type, at, tps, m, 0);
+                    if (at != null && at != TypeRef.DYNAMIC && at.is("dynamic") && at.args.isEmpty()
+                            && a instanceof Ident && p.type != null && p.type.args.isEmpty()
+                            && p.type.funcParams == null && tps.contains(p.type.name) && !m.containsKey(p.type.name)) {
+                        // `sh(dy)` with `dynamic dy`: Dart binds T to dynamic itself, which
+                        // prints as such (a written dynamic, not the DYNAMIC "unknown" sentinel).
+                        m.put(p.type.name, new TypeRef("dynamic"));
+                    }
                     if (a instanceof NullLit && p.type != null && !p.type.nullable && p.type.args.isEmpty()
                             && tps.contains(p.type.name)) {
                         nullBound.add(p.type.name);
@@ -18823,8 +18948,25 @@ public final class JavaEmitter {
                 ctx.importClass("dart.async.Future");
                 return new Out("(() -> Future.value(null))", new TypeRef("Function"));
             }
-            Out top = resolveTopLevel(pg.name,
-                    pg.target instanceof Ident ? ((Ident) pg.target).name : null, ctx);
+            // `p.gen<int>`: the explicit instantiation reaches the tear-off as the
+            // unprefixed `gen<int>` does.
+            // A function-typed slot (`String Function(int) g = p.gen`) instantiates it, too.
+            List<TypeRef> savedTearOffTypeArgs = tearOffTypeArgs;
+            TypeRef savedTearOffExpected = tearOffExpected;
+            if (pg.typeArgs != null) {
+                tearOffTypeArgs = pg.typeArgs;
+            }
+            if (memberTearOffNode == pg) {
+                tearOffExpected = memberTearOffExpected;
+            }
+            Out top;
+            try {
+                top = resolveTopLevel(pg.name,
+                        pg.target instanceof Ident ? ((Ident) pg.target).name : null, ctx);
+            } finally {
+                tearOffTypeArgs = savedTearOffTypeArgs;
+                tearOffExpected = savedTearOffExpected;
+            }
             if (top != null) {
                 return top;
             }
@@ -22633,9 +22775,9 @@ public final class JavaEmitter {
                 b.args.addAll(a.args);
                 b.funcParams = a.funcParams;
                 b.funcReturn = a.funcReturn;
-                // `T x` against `Object?` binds T to Object?, the top type that prints with
-                // its `?` (`'$T'`), not Object; other nullability stays the argument's own.
-                b.nullable = a.is("Object") && a.args.isEmpty() && a.nullable && !p.nullable;
+                // Dart's rule: `T` against `X?` binds X?, `T?` against `X?` binds X (the
+                // slot's own `?` absorbs the argument's), and a non-null argument binds X.
+                b.nullable = a.nullable && !p.nullable;
                 m.put(p.name, b);
             }
             return;
@@ -37495,7 +37637,11 @@ public final class JavaEmitter {
             return true;
         }
 
+        /// Nullable locals promoted to non-null by their initializer (emitStatements).
+        final java.util.Set<String> nonNullByInit = new HashSet<String>();
+
         void declare(String name, TypeRef type) {
+            nonNullByInit.remove(name);
             if (!scopes.isEmpty()) {
                 scopes.get(scopes.size() - 1).put(name, type);
             }
