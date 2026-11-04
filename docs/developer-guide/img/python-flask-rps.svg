@@ -20,14 +20,14 @@
 <line x1="680.0" y1="80" x2="680.0" y2="143" stroke="#e8eaed"/>
 <text x="680.0" y="159" font-size="11" fill="#5f6368" text-anchor="middle">30k </text>
 <text x="142" y="110" font-size="12" fill="#202124" text-anchor="end">requests/s</text>
-<rect x="150" y="84" width="11.8" height="8" fill="#9aa0a6"/>
-<text x="165.8" y="91" font-size="9" fill="#5f6368">670</text>
-<rect x="150" y="93" width="11.9" height="8" fill="#f9ab00"/>
-<text x="165.9" y="100" font-size="9" fill="#5f6368">673</text>
-<rect x="150" y="102" width="9.2" height="8" fill="#a142f4"/>
-<text x="163.2" y="109" font-size="9" fill="#5f6368">520</text>
-<rect x="150" y="111" width="404.1" height="8" fill="#1a73e8"/>
-<text x="558.1" y="118" font-size="9" fill="#5f6368">22876</text>
-<rect x="150" y="120" width="344.6" height="8" fill="#8ab4f8"/>
-<text x="498.6" y="127" font-size="9" fill="#5f6368">19504</text>
+<rect x="150" y="84" width="12.3" height="8" fill="#9aa0a6"/>
+<text x="166.3" y="91" font-size="9" fill="#5f6368">699</text>
+<rect x="150" y="93" width="12.2" height="8" fill="#f9ab00"/>
+<text x="166.2" y="100" font-size="9" fill="#5f6368">692</text>
+<rect x="150" y="102" width="9.9" height="8" fill="#a142f4"/>
+<text x="163.9" y="109" font-size="9" fill="#5f6368">559</text>
+<rect x="150" y="111" width="479.1" height="8" fill="#1a73e8"/>
+<text x="633.1" y="118" font-size="9" fill="#5f6368">27117</text>
+<rect x="150" y="120" width="452.6" height="8" fill="#8ab4f8"/>
+<text x="606.6" y="127" font-size="9" fill="#5f6368">25619</text>
 </svg>

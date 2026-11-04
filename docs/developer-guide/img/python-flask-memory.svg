@@ -13,77 +13,79 @@
 <text x="368" y="69" font-size="12" fill="#202124">Codename One Python, 128 MB budget</text>
 <line x1="150.0" y1="80" x2="150.0" y2="379" stroke="#e8eaed"/>
 <text x="150.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">0 MB</text>
-<line x1="208.9" y1="80" x2="208.9" y2="379" stroke="#e8eaed"/>
-<text x="208.9" y="395" font-size="11" fill="#5f6368" text-anchor="middle">100 MB</text>
-<line x1="267.8" y1="80" x2="267.8" y2="379" stroke="#e8eaed"/>
-<text x="267.8" y="395" font-size="11" fill="#5f6368" text-anchor="middle">200 MB</text>
-<line x1="326.7" y1="80" x2="326.7" y2="379" stroke="#e8eaed"/>
-<text x="326.7" y="395" font-size="11" fill="#5f6368" text-anchor="middle">300 MB</text>
-<line x1="385.6" y1="80" x2="385.6" y2="379" stroke="#e8eaed"/>
-<text x="385.6" y="395" font-size="11" fill="#5f6368" text-anchor="middle">400 MB</text>
-<line x1="444.4" y1="80" x2="444.4" y2="379" stroke="#e8eaed"/>
-<text x="444.4" y="395" font-size="11" fill="#5f6368" text-anchor="middle">500 MB</text>
-<line x1="503.3" y1="80" x2="503.3" y2="379" stroke="#e8eaed"/>
-<text x="503.3" y="395" font-size="11" fill="#5f6368" text-anchor="middle">600 MB</text>
-<line x1="562.2" y1="80" x2="562.2" y2="379" stroke="#e8eaed"/>
-<text x="562.2" y="395" font-size="11" fill="#5f6368" text-anchor="middle">700 MB</text>
-<line x1="621.1" y1="80" x2="621.1" y2="379" stroke="#e8eaed"/>
-<text x="621.1" y="395" font-size="11" fill="#5f6368" text-anchor="middle">800 MB</text>
+<line x1="203.0" y1="80" x2="203.0" y2="379" stroke="#e8eaed"/>
+<text x="203.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">100 MB</text>
+<line x1="256.0" y1="80" x2="256.0" y2="379" stroke="#e8eaed"/>
+<text x="256.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">200 MB</text>
+<line x1="309.0" y1="80" x2="309.0" y2="379" stroke="#e8eaed"/>
+<text x="309.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">300 MB</text>
+<line x1="362.0" y1="80" x2="362.0" y2="379" stroke="#e8eaed"/>
+<text x="362.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">400 MB</text>
+<line x1="415.0" y1="80" x2="415.0" y2="379" stroke="#e8eaed"/>
+<text x="415.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">500 MB</text>
+<line x1="468.0" y1="80" x2="468.0" y2="379" stroke="#e8eaed"/>
+<text x="468.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">600 MB</text>
+<line x1="521.0" y1="80" x2="521.0" y2="379" stroke="#e8eaed"/>
+<text x="521.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">700 MB</text>
+<line x1="574.0" y1="80" x2="574.0" y2="379" stroke="#e8eaed"/>
+<text x="574.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">800 MB</text>
+<line x1="627.0" y1="80" x2="627.0" y2="379" stroke="#e8eaed"/>
+<text x="627.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">900 MB</text>
 <line x1="680.0" y1="80" x2="680.0" y2="379" stroke="#e8eaed"/>
-<text x="680.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">900 MB</text>
+<text x="680.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">1000 MB</text>
 <text x="142" y="110" font-size="12" fill="#202124" text-anchor="end">idle</text>
-<rect x="150" y="84" width="16.7" height="8" fill="#9aa0a6"/>
-<text x="170.7" y="91" font-size="9" fill="#5f6368">28</text>
-<rect x="150" y="93" width="35.0" height="8" fill="#f9ab00"/>
-<text x="189.0" y="100" font-size="9" fill="#5f6368">60</text>
-<rect x="150" y="102" width="143.6" height="8" fill="#a142f4"/>
-<text x="297.6" y="109" font-size="9" fill="#5f6368">244</text>
-<rect x="150" y="111" width="8.2" height="8" fill="#1a73e8"/>
-<text x="162.2" y="118" font-size="9" fill="#5f6368">14</text>
-<rect x="150" y="120" width="8.2" height="8" fill="#8ab4f8"/>
-<text x="162.2" y="127" font-size="9" fill="#5f6368">14</text>
+<rect x="150" y="84" width="14.9" height="8" fill="#9aa0a6"/>
+<text x="168.9" y="91" font-size="9" fill="#5f6368">28</text>
+<rect x="150" y="93" width="31.6" height="8" fill="#f9ab00"/>
+<text x="185.6" y="100" font-size="9" fill="#5f6368">60</text>
+<rect x="150" y="102" width="131.1" height="8" fill="#a142f4"/>
+<text x="285.1" y="109" font-size="9" fill="#5f6368">247</text>
+<rect x="150" y="111" width="7.4" height="8" fill="#1a73e8"/>
+<text x="161.4" y="118" font-size="9" fill="#5f6368">14</text>
+<rect x="150" y="120" width="7.4" height="8" fill="#8ab4f8"/>
+<text x="161.4" y="127" font-size="9" fill="#5f6368">14</text>
 <text x="142" y="169" font-size="12" fill="#202124" text-anchor="end">after load</text>
-<rect x="150" y="143" width="16.3" height="8" fill="#9aa0a6"/>
-<text x="170.3" y="150" font-size="9" fill="#5f6368">28</text>
-<rect x="150" y="152" width="41.5" height="8" fill="#f9ab00"/>
-<text x="195.5" y="159" font-size="9" fill="#5f6368">70</text>
-<rect x="150" y="161" width="502.9" height="8" fill="#a142f4"/>
-<text x="656.9" y="168" font-size="9" fill="#5f6368">854</text>
-<rect x="150" y="170" width="65.1" height="8" fill="#1a73e8"/>
-<text x="219.1" y="177" font-size="9" fill="#5f6368">110</text>
-<rect x="150" y="179" width="39.9" height="8" fill="#8ab4f8"/>
-<text x="193.9" y="186" font-size="9" fill="#5f6368">68</text>
+<rect x="150" y="143" width="15.3" height="8" fill="#9aa0a6"/>
+<text x="169.3" y="150" font-size="9" fill="#5f6368">29</text>
+<rect x="150" y="152" width="42.4" height="8" fill="#f9ab00"/>
+<text x="196.4" y="159" font-size="9" fill="#5f6368">80</text>
+<rect x="150" y="161" width="522.4" height="8" fill="#a142f4"/>
+<text x="676.4" y="168" font-size="9" fill="#5f6368">986</text>
+<rect x="150" y="170" width="83.3" height="8" fill="#1a73e8"/>
+<text x="237.3" y="177" font-size="9" fill="#5f6368">157</text>
+<rect x="150" y="179" width="40.5" height="8" fill="#8ab4f8"/>
+<text x="194.5" y="186" font-size="9" fill="#5f6368">76</text>
 <text x="142" y="228" font-size="12" fill="#202124" text-anchor="end">5s after load</text>
-<rect x="150" y="202" width="16.3" height="8" fill="#9aa0a6"/>
-<text x="170.3" y="209" font-size="9" fill="#5f6368">28</text>
-<rect x="150" y="211" width="41.5" height="8" fill="#f9ab00"/>
-<text x="195.5" y="218" font-size="9" fill="#5f6368">70</text>
-<rect x="150" y="220" width="511.7" height="8" fill="#a142f4"/>
-<text x="665.7" y="227" font-size="9" fill="#5f6368">869</text>
-<rect x="150" y="229" width="59.9" height="8" fill="#1a73e8"/>
-<text x="213.9" y="236" font-size="9" fill="#5f6368">102</text>
-<rect x="150" y="238" width="38.9" height="8" fill="#8ab4f8"/>
-<text x="192.9" y="245" font-size="9" fill="#5f6368">66</text>
+<rect x="150" y="202" width="15.3" height="8" fill="#9aa0a6"/>
+<text x="169.3" y="209" font-size="9" fill="#5f6368">29</text>
+<rect x="150" y="211" width="42.4" height="8" fill="#f9ab00"/>
+<text x="196.4" y="218" font-size="9" fill="#5f6368">80</text>
+<rect x="150" y="220" width="522.5" height="8" fill="#a142f4"/>
+<text x="676.5" y="227" font-size="9" fill="#5f6368">986</text>
+<rect x="150" y="229" width="81.2" height="8" fill="#1a73e8"/>
+<text x="235.2" y="236" font-size="9" fill="#5f6368">153</text>
+<rect x="150" y="238" width="39.3" height="8" fill="#8ab4f8"/>
+<text x="193.3" y="245" font-size="9" fill="#5f6368">74</text>
 <text x="142" y="287" font-size="12" fill="#202124" text-anchor="end">peak</text>
-<rect x="150" y="261" width="17.4" height="8" fill="#9aa0a6"/>
-<text x="171.4" y="268" font-size="9" fill="#5f6368">30</text>
-<rect x="150" y="270" width="47.8" height="8" fill="#f9ab00"/>
-<text x="201.8" y="277" font-size="9" fill="#5f6368">81</text>
-<rect x="150" y="279" width="508.7" height="8" fill="#a142f4"/>
-<text x="662.7" y="286" font-size="9" fill="#5f6368">864</text>
-<rect x="150" y="288" width="251.7" height="8" fill="#1a73e8"/>
-<text x="405.7" y="295" font-size="9" fill="#5f6368">427</text>
-<rect x="150" y="297" width="61.2" height="8" fill="#8ab4f8"/>
-<text x="215.2" y="304" font-size="9" fill="#5f6368">104</text>
+<rect x="150" y="261" width="15.6" height="8" fill="#9aa0a6"/>
+<text x="169.6" y="268" font-size="9" fill="#5f6368">29</text>
+<rect x="150" y="270" width="49.1" height="8" fill="#f9ab00"/>
+<text x="203.1" y="277" font-size="9" fill="#5f6368">93</text>
+<rect x="150" y="279" width="524.0" height="8" fill="#a142f4"/>
+<text x="678.0" y="286" font-size="9" fill="#5f6368">989</text>
+<rect x="150" y="288" width="250.1" height="8" fill="#1a73e8"/>
+<text x="404.1" y="295" font-size="9" fill="#5f6368">472</text>
+<rect x="150" y="297" width="59.0" height="8" fill="#8ab4f8"/>
+<text x="213.0" y="304" font-size="9" fill="#5f6368">111</text>
 <text x="142" y="346" font-size="12" fill="#202124" text-anchor="end">deployed size</text>
-<rect x="150" y="320" width="48.4" height="8" fill="#9aa0a6"/>
-<text x="202.4" y="327" font-size="9" fill="#5f6368">82</text>
-<rect x="150" y="329" width="65.1" height="8" fill="#f9ab00"/>
-<text x="219.1" y="336" font-size="9" fill="#5f6368">111</text>
-<rect x="150" y="338" width="180.1" height="8" fill="#a142f4"/>
-<text x="334.1" y="345" font-size="9" fill="#5f6368">306</text>
-<rect x="150" y="347" width="20.6" height="8" fill="#1a73e8"/>
-<text x="174.6" y="354" font-size="9" fill="#5f6368">35</text>
-<rect x="150" y="356" width="20.6" height="8" fill="#8ab4f8"/>
-<text x="174.6" y="363" font-size="9" fill="#5f6368">35</text>
+<rect x="150" y="320" width="43.6" height="8" fill="#9aa0a6"/>
+<text x="197.6" y="327" font-size="9" fill="#5f6368">82</text>
+<rect x="150" y="329" width="58.7" height="8" fill="#f9ab00"/>
+<text x="212.7" y="336" font-size="9" fill="#5f6368">111</text>
+<rect x="150" y="338" width="162.5" height="8" fill="#a142f4"/>
+<text x="316.5" y="345" font-size="9" fill="#5f6368">307</text>
+<rect x="150" y="347" width="18.6" height="8" fill="#1a73e8"/>
+<text x="172.6" y="354" font-size="9" fill="#5f6368">35</text>
+<rect x="150" y="356" width="18.6" height="8" fill="#8ab4f8"/>
+<text x="172.6" y="363" font-size="9" fill="#5f6368">35</text>
 </svg>

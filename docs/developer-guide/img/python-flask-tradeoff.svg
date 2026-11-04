@@ -4,24 +4,26 @@
 <text x="80" y="44" font-size="12" fill="#5f6368">Up is faster, left is smaller. Requests/s on a log scale.</text>
 <line x1="80.0" y1="70" x2="80.0" y2="370" stroke="#e8eaed"/>
 <text x="80.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">0 MB</text>
-<line x1="151.1" y1="70" x2="151.1" y2="370" stroke="#e8eaed"/>
-<text x="151.1" y="386" font-size="11" fill="#5f6368" text-anchor="middle">100 MB</text>
-<line x1="222.2" y1="70" x2="222.2" y2="370" stroke="#e8eaed"/>
-<text x="222.2" y="386" font-size="11" fill="#5f6368" text-anchor="middle">200 MB</text>
-<line x1="293.3" y1="70" x2="293.3" y2="370" stroke="#e8eaed"/>
-<text x="293.3" y="386" font-size="11" fill="#5f6368" text-anchor="middle">300 MB</text>
-<line x1="364.4" y1="70" x2="364.4" y2="370" stroke="#e8eaed"/>
-<text x="364.4" y="386" font-size="11" fill="#5f6368" text-anchor="middle">400 MB</text>
-<line x1="435.6" y1="70" x2="435.6" y2="370" stroke="#e8eaed"/>
-<text x="435.6" y="386" font-size="11" fill="#5f6368" text-anchor="middle">500 MB</text>
-<line x1="506.7" y1="70" x2="506.7" y2="370" stroke="#e8eaed"/>
-<text x="506.7" y="386" font-size="11" fill="#5f6368" text-anchor="middle">600 MB</text>
-<line x1="577.8" y1="70" x2="577.8" y2="370" stroke="#e8eaed"/>
-<text x="577.8" y="386" font-size="11" fill="#5f6368" text-anchor="middle">700 MB</text>
-<line x1="648.9" y1="70" x2="648.9" y2="370" stroke="#e8eaed"/>
-<text x="648.9" y="386" font-size="11" fill="#5f6368" text-anchor="middle">800 MB</text>
+<line x1="144.0" y1="70" x2="144.0" y2="370" stroke="#e8eaed"/>
+<text x="144.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">100 MB</text>
+<line x1="208.0" y1="70" x2="208.0" y2="370" stroke="#e8eaed"/>
+<text x="208.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">200 MB</text>
+<line x1="272.0" y1="70" x2="272.0" y2="370" stroke="#e8eaed"/>
+<text x="272.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">300 MB</text>
+<line x1="336.0" y1="70" x2="336.0" y2="370" stroke="#e8eaed"/>
+<text x="336.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">400 MB</text>
+<line x1="400.0" y1="70" x2="400.0" y2="370" stroke="#e8eaed"/>
+<text x="400.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">500 MB</text>
+<line x1="464.0" y1="70" x2="464.0" y2="370" stroke="#e8eaed"/>
+<text x="464.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">600 MB</text>
+<line x1="528.0" y1="70" x2="528.0" y2="370" stroke="#e8eaed"/>
+<text x="528.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">700 MB</text>
+<line x1="592.0" y1="70" x2="592.0" y2="370" stroke="#e8eaed"/>
+<text x="592.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">800 MB</text>
+<line x1="656.0" y1="70" x2="656.0" y2="370" stroke="#e8eaed"/>
+<text x="656.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">900 MB</text>
 <line x1="720.0" y1="70" x2="720.0" y2="370" stroke="#e8eaed"/>
-<text x="720.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">900 MB</text>
+<text x="720.0" y="386" font-size="11" fill="#5f6368" text-anchor="middle">1000 MB</text>
 <line x1="80" y1="370.0" x2="720" y2="370.0" stroke="#e8eaed"/>
 <text x="74" y="374.0" font-size="11" fill="#5f6368" text-anchor="end">100</text>
 <line x1="80" y1="270.0" x2="720" y2="270.0" stroke="#e8eaed"/>
@@ -31,15 +33,15 @@
 <line x1="80" y1="70.0" x2="720" y2="70.0" stroke="#e8eaed"/>
 <text x="74" y="74.0" font-size="11" fill="#5f6368" text-anchor="end">100k</text>
 <text x="400.0" y="410" font-size="12" fill="#202124" text-anchor="middle">physical footprint after load</text>
-<line x1="158.6" y1="134.1" x2="128.1" y2="141.0" stroke="#1a73e8" stroke-dasharray="4 3"/>
-<circle cx="99.7" cy="287.4" r="6" fill="#9aa0a6"/>
-<text x="109.7" y="291.4" font-size="11" fill="#202124" text-anchor="start">CPython (28 MB, 670/s)</text>
-<circle cx="130.1" cy="287.2" r="6" fill="#f9ab00"/>
-<text x="140.1" y="291.2" font-size="11" fill="#202124" text-anchor="start">PyPy (70 MB, 673/s)</text>
-<circle cx="687.3" cy="298.4" r="6" fill="#a142f4"/>
-<text x="677.3" y="302.4" font-size="11" fill="#202124" text-anchor="end">GraalPy (854 MB, 520/s)</text>
-<circle cx="158.6" cy="134.1" r="6" fill="#1a73e8"/>
-<text x="168.6" y="138.1" font-size="11" fill="#202124" text-anchor="start">Codename One Python (110 MB, 22.9k/s)</text>
-<circle cx="128.1" cy="141.0" r="6" fill="#8ab4f8"/>
-<text x="138.1" y="145.0" font-size="11" fill="#202124" text-anchor="start">Codename One Python, 128 MB budget (68 MB, 19.5k/s)</text>
+<line x1="180.6" y1="126.7" x2="128.9" y2="129.1" stroke="#1a73e8" stroke-dasharray="4 3"/>
+<circle cx="98.4" cy="285.6" r="6" fill="#9aa0a6"/>
+<text x="108.4" y="289.6" font-size="11" fill="#202124" text-anchor="start">CPython (29 MB, 699/s)</text>
+<circle cx="131.2" cy="286.0" r="6" fill="#f9ab00"/>
+<text x="141.2" y="290.0" font-size="11" fill="#202124" text-anchor="start">PyPy (80 MB, 692/s)</text>
+<circle cx="710.8" cy="295.3" r="6" fill="#a142f4"/>
+<text x="700.8" y="299.3" font-size="11" fill="#202124" text-anchor="end">GraalPy (986 MB, 559/s)</text>
+<circle cx="180.6" cy="126.7" r="6" fill="#1a73e8"/>
+<text x="190.6" y="130.7" font-size="11" fill="#202124" text-anchor="start">Codename One Python (157 MB, 27.1k/s)</text>
+<circle cx="128.9" cy="129.1" r="6" fill="#8ab4f8"/>
+<text x="138.9" y="133.1" font-size="11" fill="#202124" text-anchor="start">Codename One Python, 128 MB budget (76 MB, 25.6k/s)</text>
 </svg>

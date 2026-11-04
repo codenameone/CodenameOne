@@ -11,32 +11,30 @@
 <text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
 <line x1="150.0" y1="80" x2="150.0" y2="184" stroke="#e8eaed"/>
 <text x="150.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">0 </text>
-<line x1="256.0" y1="80" x2="256.0" y2="184" stroke="#e8eaed"/>
-<text x="256.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">10 </text>
-<line x1="362.0" y1="80" x2="362.0" y2="184" stroke="#e8eaed"/>
-<text x="362.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">20 </text>
-<line x1="468.0" y1="80" x2="468.0" y2="184" stroke="#e8eaed"/>
-<text x="468.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">30 </text>
-<line x1="574.0" y1="80" x2="574.0" y2="184" stroke="#e8eaed"/>
-<text x="574.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">40 </text>
+<line x1="282.5" y1="80" x2="282.5" y2="184" stroke="#e8eaed"/>
+<text x="282.5" y="200" font-size="11" fill="#5f6368" text-anchor="middle">10 </text>
+<line x1="415.0" y1="80" x2="415.0" y2="184" stroke="#e8eaed"/>
+<text x="415.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">20 </text>
+<line x1="547.5" y1="80" x2="547.5" y2="184" stroke="#e8eaed"/>
+<text x="547.5" y="200" font-size="11" fill="#5f6368" text-anchor="middle">30 </text>
 <line x1="680.0" y1="80" x2="680.0" y2="184" stroke="#e8eaed"/>
-<text x="680.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">50 </text>
+<text x="680.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">40 </text>
 <text x="142" y="106" font-size="12" fill="#202124" text-anchor="end">wall time (ms)</text>
-<rect x="150" y="84" width="266.7" height="8" fill="#9aa0a6"/>
-<text x="420.7" y="91" font-size="9" fill="#5f6368">25</text>
-<rect x="150" y="93" width="233.3" height="8" fill="#f9ab00"/>
-<text x="387.3" y="100" font-size="9" fill="#5f6368">22</text>
-<rect x="150" y="102" width="440.7" height="8" fill="#a142f4"/>
-<text x="594.7" y="109" font-size="9" fill="#5f6368">42</text>
-<rect x="150" y="111" width="82.3" height="8" fill="#1a73e8"/>
-<text x="236.3" y="118" font-size="9" fill="#5f6368">7.8</text>
+<rect x="150" y="84" width="239.4" height="8" fill="#9aa0a6"/>
+<text x="393.4" y="91" font-size="9" fill="#5f6368">18</text>
+<rect x="150" y="93" width="218.1" height="8" fill="#f9ab00"/>
+<text x="372.1" y="100" font-size="9" fill="#5f6368">16</text>
+<rect x="150" y="102" width="423.2" height="8" fill="#a142f4"/>
+<text x="577.2" y="109" font-size="9" fill="#5f6368">32</text>
+<rect x="150" y="111" width="81.1" height="8" fill="#1a73e8"/>
+<text x="235.1" y="118" font-size="9" fill="#5f6368">6.1</text>
 <text x="142" y="156" font-size="12" fill="#202124" text-anchor="end">peak memory (MB)</text>
-<rect x="150" y="134" width="69.9" height="8" fill="#9aa0a6"/>
-<text x="223.9" y="141" font-size="9" fill="#5f6368">6.6</text>
-<rect x="150" y="143" width="232.7" height="8" fill="#f9ab00"/>
-<text x="386.7" y="150" font-size="9" fill="#5f6368">22</text>
-<rect x="150" y="152" width="299.1" height="8" fill="#a142f4"/>
-<text x="453.1" y="159" font-size="9" fill="#5f6368">28</text>
-<rect x="150" y="161" width="48.0" height="8" fill="#1a73e8"/>
-<text x="202.0" y="168" font-size="9" fill="#5f6368">4.5</text>
+<rect x="150" y="134" width="87.6" height="8" fill="#9aa0a6"/>
+<text x="241.6" y="141" font-size="9" fill="#5f6368">6.6</text>
+<rect x="150" y="143" width="289.8" height="8" fill="#f9ab00"/>
+<text x="443.8" y="150" font-size="9" fill="#5f6368">22</text>
+<rect x="150" y="152" width="396.9" height="8" fill="#a142f4"/>
+<text x="550.9" y="159" font-size="9" fill="#5f6368">30</text>
+<rect x="150" y="161" width="60.0" height="8" fill="#1a73e8"/>
+<text x="214.0" y="168" font-size="9" fill="#5f6368">4.5</text>
 </svg>

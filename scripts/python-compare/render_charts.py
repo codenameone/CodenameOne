@@ -28,8 +28,9 @@ common.json is what common_compare.py --json writes: python-perf-time.svg
 (milliseconds, log scale, because the runtimes differ by two orders of
 magnitude) and python-perf-rss.svg (peak RSS, linear). compare.json is what
 compare.py --json writes: python-kernels-time.svg, python-kernels-rss.svg,
-python-startup.svg, python-flask-rps.svg, python-flask-memory.svg and
-python-flask-tradeoff.svg. The
+python-startup.svg, python-flask-rps.svg, python-flask-memory.svg,
+python-flask-tradeoff.svg, and with gunicorn rows python-flask-fair-rps.svg and
+python-flask-fair-memory.svg. The
 SVGs are self-contained so the website and the PDF build render them alike.
 """
 
@@ -55,12 +56,18 @@ BUDGETED_COLORS = ["#8ab4f8", "#c6dafc"]
 def color(arm):
     if arm in COLORS:
         return COLORS[arm]
+    # "<runtime>, gunicorn <n> workers" is that runtime deployed behind gunicorn: its
+    # own color, so the fair chart reads runtime by runtime.
+    g = re.match(r"(.*), gunicorn \d+ workers$", arm)
+    if g and g.group(1) in COLORS:
+        return COLORS[g.group(1)]
     m = re.match(r"Codename One Python, (\d+) MB budget", arm)
     if m:
         return BUDGETED_COLORS[0 if int(m.group(1)) >= 64 else 1]
     return MUTED
 
 
+CN1 = "Codename One Python"
 TEXT = "#202124"
 MUTED = "#5f6368"
 WIDTH = 760
@@ -221,8 +228,21 @@ def main():
         out.append(("python-flask-memory.svg", chart(
             {"arms": c["arms"], "results": rows}, "v",
             "Flask server physical footprint and deployed size, MB (lower is better)", "MB", False)))
+        dev = {n: r for n, r in fl.items() if n in c["arms"]}
         out.append(("python-flask-tradeoff.svg", tradeoff(
-            fl, "Flask: throughput against memory, the same binary with and without a budget")))
+            dev, "Flask: throughput against memory, the same binary with and without a budget")))
+        # The fair comparison: each interpreter deployed behind gunicorn, against the
+        # one Codename One process. Bars, not the scatter: the points crowd together.
+        fair = [n for n in fl if "gunicorn" in n] + [n for n in c["arms"] if n.startswith(CN1)]
+        if any("gunicorn" in n for n in fair):
+            out.append(("python-flask-fair-rps.svg", chart(
+                {"arms": fair, "results": {"requests/s": {n: {"v": fl[n]["rps"]} for n in fair}}},
+                "v", "Flask in production: throughput (higher is better)", "", False)))
+            out.append(("python-flask-fair-memory.svg", chart(
+                {"arms": fair, "results": {"after load": {n: {"v": fl[n]["loaded_mb"]} for n in fair},
+                                           "peak": {n: {"v": fl[n]["peak_mb"]} for n in fair}}},
+                "v", "Flask in production: physical footprint, every process, MB (lower is better)",
+                "MB", False)))
     for name, svg in out:
         with open(os.path.join(a.out, name), "w") as f:
             f.write(svg)

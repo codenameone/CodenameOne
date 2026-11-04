@@ -34,6 +34,16 @@ Every Codename One binary also runs a second time under a memory budget
 the collector's trade: memory spent for throughput when it is free, and given
 back when the process has a limit.
 
+The server rows run each interpreter's Flask twice: with `app.run()`, and
+behind gunicorn with `--gunicorn-workers` worker processes (8 by default) when
+gunicorn is installed beside the interpreter (`<python> -m pip install
+gunicorn`). Only the gunicorn rows are a fair comparison: Werkzeug's
+development server, which `app.run()` starts, holds every connection open about
+10 ms after its response, so its rows measure that wait rather than the
+interpreter. GraalPy cannot run gunicorn (no `grp` module) and is reported as
+such. `flask_cost.py` times Flask alone, through its test client with no
+server, on whichever interpreter runs it.
+
 ## CommonWorkloads
 
 `common_compare.py` runs `com.bench.CommonWorkloads`, the benchmark every

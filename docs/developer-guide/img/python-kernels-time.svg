@@ -12,66 +12,68 @@
 <rect x="350" y="58" width="12" height="12" fill="#8ab4f8"/>
 <text x="368" y="69" font-size="12" fill="#202124">Codename One Python, 128 MB budget</text>
 <line x1="150.0" y1="80" x2="150.0" y2="379" stroke="#e8eaed"/>
-<text x="150.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">10 ms</text>
-<line x1="326.7" y1="80" x2="326.7" y2="379" stroke="#e8eaed"/>
-<text x="326.7" y="395" font-size="11" fill="#5f6368" text-anchor="middle">100 ms</text>
-<line x1="503.3" y1="80" x2="503.3" y2="379" stroke="#e8eaed"/>
-<text x="503.3" y="395" font-size="11" fill="#5f6368" text-anchor="middle">1000 ms</text>
+<text x="150.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">1 ms</text>
+<line x1="282.5" y1="80" x2="282.5" y2="379" stroke="#e8eaed"/>
+<text x="282.5" y="395" font-size="11" fill="#5f6368" text-anchor="middle">10 ms</text>
+<line x1="415.0" y1="80" x2="415.0" y2="379" stroke="#e8eaed"/>
+<text x="415.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">100 ms</text>
+<line x1="547.5" y1="80" x2="547.5" y2="379" stroke="#e8eaed"/>
+<text x="547.5" y="395" font-size="11" fill="#5f6368" text-anchor="middle">1000 ms</text>
 <line x1="680.0" y1="80" x2="680.0" y2="379" stroke="#e8eaed"/>
 <text x="680.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">10k ms</text>
 <text x="142" y="110" font-size="12" fill="#202124" text-anchor="end">nbody</text>
-<rect x="150" y="84" width="360.0" height="8" fill="#9aa0a6"/>
-<text x="514.0" y="91" font-size="9" fill="#5f6368">1091</text>
-<rect x="150" y="93" width="167.4" height="8" fill="#f9ab00"/>
-<text x="321.4" y="100" font-size="9" fill="#5f6368">89</text>
-<rect x="150" y="102" width="271.7" height="8" fill="#a142f4"/>
-<text x="425.7" y="109" font-size="9" fill="#5f6368">345</text>
-<rect x="150" y="111" width="193.9" height="8" fill="#1a73e8"/>
-<text x="347.9" y="118" font-size="9" fill="#5f6368">125</text>
-<rect x="150" y="120" width="194.9" height="8" fill="#8ab4f8"/>
-<text x="348.9" y="127" font-size="9" fill="#5f6368">127</text>
+<rect x="150" y="84" width="383.4" height="8" fill="#9aa0a6"/>
+<text x="537.4" y="91" font-size="9" fill="#5f6368">783</text>
+<rect x="150" y="93" width="238.5" height="8" fill="#f9ab00"/>
+<text x="392.5" y="100" font-size="9" fill="#5f6368">63</text>
+<rect x="150" y="102" width="303.4" height="8" fill="#a142f4"/>
+<text x="457.4" y="109" font-size="9" fill="#5f6368">195</text>
+<rect x="150" y="111" width="258.5" height="8" fill="#1a73e8"/>
+<text x="412.5" y="118" font-size="9" fill="#5f6368">89</text>
+<rect x="150" y="120" width="258.9" height="8" fill="#8ab4f8"/>
+<text x="412.9" y="127" font-size="9" fill="#5f6368">90</text>
 <text x="142" y="169" font-size="12" fill="#202124" text-anchor="end">richards</text>
-<rect x="150" y="143" width="345.8" height="8" fill="#9aa0a6"/>
-<text x="499.8" y="150" font-size="9" fill="#5f6368">907</text>
-<rect x="150" y="152" width="130.1" height="8" fill="#f9ab00"/>
-<text x="284.1" y="159" font-size="9" fill="#5f6368">54</text>
-<rect x="150" y="161" width="227.9" height="8" fill="#a142f4"/>
-<text x="381.9" y="168" font-size="9" fill="#5f6368">195</text>
-<rect x="150" y="170" width="125.1" height="8" fill="#1a73e8"/>
-<text x="279.1" y="177" font-size="9" fill="#5f6368">51</text>
-<rect x="150" y="179" width="138.0" height="8" fill="#8ab4f8"/>
-<text x="292.0" y="186" font-size="9" fill="#5f6368">60</text>
+<rect x="150" y="143" width="372.5" height="8" fill="#9aa0a6"/>
+<text x="526.5" y="150" font-size="9" fill="#5f6368">648</text>
+<rect x="150" y="152" width="216.8" height="8" fill="#f9ab00"/>
+<text x="370.8" y="159" font-size="9" fill="#5f6368">43</text>
+<rect x="150" y="161" width="272.1" height="8" fill="#a142f4"/>
+<text x="426.1" y="168" font-size="9" fill="#5f6368">113</text>
+<rect x="150" y="170" width="208.7" height="8" fill="#1a73e8"/>
+<text x="362.7" y="177" font-size="9" fill="#5f6368">38</text>
+<rect x="150" y="179" width="206.9" height="8" fill="#8ab4f8"/>
+<text x="360.9" y="186" font-size="9" fill="#5f6368">36</text>
 <text x="142" y="228" font-size="12" fill="#202124" text-anchor="end">fannkuch</text>
-<rect x="150" y="202" width="452.8" height="8" fill="#9aa0a6"/>
-<text x="606.8" y="209" font-size="9" fill="#5f6368">3656</text>
-<rect x="150" y="211" width="377.8" height="8" fill="#f9ab00"/>
-<text x="531.8" y="218" font-size="9" fill="#5f6368">1376</text>
+<rect x="150" y="202" width="454.2" height="8" fill="#9aa0a6"/>
+<text x="608.2" y="209" font-size="9" fill="#5f6368">2680</text>
+<rect x="150" y="211" width="368.8" height="8" fill="#f9ab00"/>
+<text x="522.8" y="218" font-size="9" fill="#5f6368">607</text>
 <rect x="150" y="220" width="362.0" height="8" fill="#a142f4"/>
-<text x="516.0" y="227" font-size="9" fill="#5f6368">1119</text>
-<rect x="150" y="229" width="348.7" height="8" fill="#1a73e8"/>
-<text x="502.7" y="236" font-size="9" fill="#5f6368">941</text>
-<rect x="150" y="238" width="343.5" height="8" fill="#8ab4f8"/>
-<text x="497.5" y="245" font-size="9" fill="#5f6368">880</text>
+<text x="516.0" y="227" font-size="9" fill="#5f6368">540</text>
+<rect x="150" y="229" width="366.2" height="8" fill="#1a73e8"/>
+<text x="520.2" y="236" font-size="9" fill="#5f6368">581</text>
+<rect x="150" y="238" width="365.8" height="8" fill="#8ab4f8"/>
+<text x="519.8" y="245" font-size="9" fill="#5f6368">576</text>
 <text x="142" y="287" font-size="12" fill="#202124" text-anchor="end">spectral_norm</text>
-<rect x="150" y="261" width="365.6" height="8" fill="#9aa0a6"/>
-<text x="519.6" y="268" font-size="9" fill="#5f6368">1173</text>
-<rect x="150" y="270" width="63.0" height="8" fill="#f9ab00"/>
-<text x="217.0" y="277" font-size="9" fill="#5f6368">23</text>
-<rect x="150" y="279" width="39.6" height="8" fill="#a142f4"/>
-<text x="193.6" y="286" font-size="9" fill="#5f6368">17</text>
-<rect x="150" y="288" width="64.4" height="8" fill="#1a73e8"/>
-<text x="218.4" y="295" font-size="9" fill="#5f6368">23</text>
-<rect x="150" y="297" width="61.9" height="8" fill="#8ab4f8"/>
-<text x="215.9" y="304" font-size="9" fill="#5f6368">22</text>
+<rect x="150" y="261" width="379.8" height="8" fill="#9aa0a6"/>
+<text x="533.8" y="268" font-size="9" fill="#5f6368">735</text>
+<rect x="150" y="270" width="143.7" height="8" fill="#f9ab00"/>
+<text x="297.7" y="277" font-size="9" fill="#5f6368">12</text>
+<rect x="150" y="279" width="115.7" height="8" fill="#a142f4"/>
+<text x="269.7" y="286" font-size="9" fill="#5f6368">7.5</text>
+<rect x="150" y="288" width="142.1" height="8" fill="#1a73e8"/>
+<text x="296.1" y="295" font-size="9" fill="#5f6368">12</text>
+<rect x="150" y="297" width="142.1" height="8" fill="#8ab4f8"/>
+<text x="296.1" y="304" font-size="9" fill="#5f6368">12</text>
 <text x="142" y="346" font-size="12" fill="#202124" text-anchor="end">dicts_strings</text>
-<rect x="150" y="320" width="328.9" height="8" fill="#9aa0a6"/>
-<text x="482.9" y="327" font-size="9" fill="#5f6368">727</text>
-<rect x="150" y="329" width="246.0" height="8" fill="#f9ab00"/>
-<text x="400.0" y="336" font-size="9" fill="#5f6368">247</text>
-<rect x="150" y="338" width="305.9" height="8" fill="#a142f4"/>
-<text x="459.9" y="345" font-size="9" fill="#5f6368">539</text>
-<rect x="150" y="347" width="254.7" height="8" fill="#1a73e8"/>
-<text x="408.7" y="354" font-size="9" fill="#5f6368">276</text>
-<rect x="150" y="356" width="271.8" height="8" fill="#8ab4f8"/>
-<text x="425.8" y="363" font-size="9" fill="#5f6368">345</text>
+<rect x="150" y="320" width="343.3" height="8" fill="#9aa0a6"/>
+<text x="497.3" y="327" font-size="9" fill="#5f6368">390</text>
+<rect x="150" y="329" width="283.0" height="8" fill="#f9ab00"/>
+<text x="437.0" y="336" font-size="9" fill="#5f6368">137</text>
+<rect x="150" y="338" width="312.7" height="8" fill="#a142f4"/>
+<text x="466.7" y="345" font-size="9" fill="#5f6368">229</text>
+<rect x="150" y="347" width="304.6" height="8" fill="#1a73e8"/>
+<text x="458.6" y="354" font-size="9" fill="#5f6368">199</text>
+<rect x="150" y="356" width="310.2" height="8" fill="#8ab4f8"/>
+<text x="464.2" y="363" font-size="9" fill="#5f6368">219</text>
 </svg>

@@ -8,190 +8,210 @@
  ],
  "startup": {
   "CPython": {
-   "ms": 24.221958010457456,
-   "rss_mb": 6.6254119873046875
+   "ms": 18.06558307725936,
+   "rss_mb": 6.609764099121094
   },
   "PyPy": {
-   "ms": 21.523665986023843,
-   "rss_mb": 21.953514099121094
+   "ms": 16.45820797421038,
+   "rss_mb": 21.875389099121094
   },
   "GraalPy": {
-   "ms": 41.73249995801598,
-   "rss_mb": 29.96959686279297
+   "ms": 31.93791606463492,
+   "rss_mb": 29.95397186279297
   },
   "Codename One Python": {
-   "ms": 7.553874980658293,
-   "rss_mb": 4.515968322753906
+   "ms": 6.1227919068187475,
+   "rss_mb": 4.531593322753906
   }
  },
  "kernels": {
   "nbody": {
    "CPython": {
-    "ms": 1088.617,
-    "rss_mb": 7.187889099121094
+    "ms": 783.183,
+    "rss_mb": 7.125389099121094
    },
    "PyPy": {
-    "ms": 88.483,
-    "rss_mb": 22.750389099121094
+    "ms": 63.143,
+    "rss_mb": 22.734764099121094
    },
    "GraalPy": {
-    "ms": 267.149,
-    "rss_mb": 119.23540496826172
+    "ms": 194.871,
+    "rss_mb": 125.59491729736328
    },
    "Codename One Python": {
-    "ms": 126.088,
-    "rss_mb": 5.1566619873046875
+    "ms": 89.252,
+    "rss_mb": 5.0941619873046875
    },
    "Codename One Python, 128 MB budget": {
-    "ms": 125.509,
-    "rss_mb": 5.1254119873046875
+    "ms": 89.93,
+    "rss_mb": 5.141014099121094
    }
   },
   "richards": {
    "CPython": {
-    "ms": 901.196,
-    "rss_mb": 7.6097412109375
+    "ms": 648.03,
+    "rss_mb": 7.641014099121094
    },
    "PyPy": {
-    "ms": 54.906,
-    "rss_mb": 24.219139099121094
+    "ms": 43.265,
+    "rss_mb": 24.500389099121094
    },
    "GraalPy": {
-    "ms": 293.515,
-    "rss_mb": 145.90755462646484
+    "ms": 113.123,
+    "rss_mb": 157.43896484375
    },
    "Codename One Python": {
-    "ms": 58.148,
-    "rss_mb": 5.3285369873046875
+    "ms": 37.599,
+    "rss_mb": 5.2816619873046875
    },
    "Codename One Python, 128 MB budget": {
-    "ms": 60.812,
-    "rss_mb": 5.3129119873046875
+    "ms": 36.404,
+    "rss_mb": 5.3597869873046875
    }
   },
   "fannkuch": {
    "CPython": {
-    "ms": 3784.128,
-    "rss_mb": 6.984764099121094
+    "ms": 2679.588,
+    "rss_mb": 6.859764099121094
    },
    "PyPy": {
-    "ms": 827.106,
-    "rss_mb": 23.312889099121094
+    "ms": 606.889,
+    "rss_mb": 23.187889099121094
    },
    "GraalPy": {
-    "ms": 776.449,
-    "rss_mb": 123.34477996826172
+    "ms": 539.971,
+    "rss_mb": 137.7042694091797
    },
    "Codename One Python": {
-    "ms": 800.228,
-    "rss_mb": 5.3129119873046875
+    "ms": 580.947,
+    "rss_mb": 5.1097869873046875
    },
    "Codename One Python, 128 MB budget": {
-    "ms": 800.844,
-    "rss_mb": 5.2816619873046875
+    "ms": 576.11,
+    "rss_mb": 5.125389099121094
    }
   },
   "spectral_norm": {
    "CPython": {
-    "ms": 1013.202,
-    "rss_mb": 7.000389099121094
+    "ms": 735.208,
+    "rss_mb": 6.859764099121094
    },
    "PyPy": {
-    "ms": 16.717,
-    "rss_mb": 22.703514099121094
+    "ms": 12.145,
+    "rss_mb": 22.547264099121094
    },
    "GraalPy": {
-    "ms": 10.288,
-    "rss_mb": 134.39181518554688
+    "ms": 7.462,
+    "rss_mb": 146.29811096191406
    },
    "Codename One Python": {
-    "ms": 16.569,
-    "rss_mb": 5.1254119873046875
+    "ms": 11.815,
+    "rss_mb": 5.094139099121094
    },
    "Codename One Python, 128 MB budget": {
-    "ms": 16.426,
-    "rss_mb": 5.0785369873046875
+    "ms": 11.814,
+    "rss_mb": 5.125434875488281
    }
   },
   "dicts_strings": {
    "CPython": {
-    "ms": 550.554,
-    "rss_mb": 54.78168487548828
+    "ms": 390.225,
+    "rss_mb": 53.51605987548828
    },
    "PyPy": {
-    "ms": 188.819,
-    "rss_mb": 87.12543487548828
+    "ms": 136.707,
+    "rss_mb": 90.14105987548828
    },
    "GraalPy": {
-    "ms": 350.872,
-    "rss_mb": 261.3605422973633
+    "ms": 229.018,
+    "rss_mb": 293.98561096191406
    },
    "Codename One Python": {
-    "ms": 277.198,
-    "rss_mb": 124.75050354003906
+    "ms": 199.16,
+    "rss_mb": 122.37550354003906
    },
    "Codename One Python, 128 MB budget": {
-    "ms": 301.3,
-    "rss_mb": 94.40675354003906
+    "ms": 219.268,
+    "rss_mb": 87.65670776367188
    }
   }
  },
  "flask": {
   "CPython": {
-   "first_ms": 134.00095800170675,
-   "idle_mb": 28.4,
-   "loaded_mb": 28.0,
-   "settled_mb": 28.0,
-   "peak_mb": 29.6,
-   "loaded_rss_mb": 40.640625,
-   "rps": 682.77,
-   "p99_ms": 17
+   "first_ms": 115.40624999906868,
+   "idle_mb": 28.1,
+   "loaded_mb": 28.8,
+   "settled_mb": 28.8,
+   "peak_mb": 29.4,
+   "loaded_rss_mb": 40.296875,
+   "rps": 698.59,
+   "p99_ms": 12
   },
   "PyPy": {
-   "first_ms": 439.6487500052899,
-   "idle_mb": 59.8,
-   "loaded_mb": 87.7,
-   "settled_mb": 87.7,
-   "peak_mb": 87.7,
-   "loaded_rss_mb": 110.578125,
-   "rps": 676.71,
-   "p99_ms": 18
+   "first_ms": 305.42920797597617,
+   "idle_mb": 59.7,
+   "loaded_mb": 80.0,
+   "settled_mb": 80.0,
+   "peak_mb": 92.6,
+   "loaded_rss_mb": 99.125,
+   "rps": 692.33,
+   "p99_ms": 15
   },
   "GraalPy": {
-   "first_ms": 1207.4180000345223,
-   "idle_mb": 238.5,
-   "loaded_mb": 831.1,
-   "settled_mb": 848.2,
-   "peak_mb": 901.9,
-   "loaded_rss_mb": 979.40625,
-   "rps": 517.08,
-   "p99_ms": 50
+   "first_ms": 905.5894579505548,
+   "idle_mb": 247.4,
+   "loaded_mb": 985.6,
+   "settled_mb": 985.8,
+   "peak_mb": 988.6,
+   "loaded_rss_mb": 1082.046875,
+   "rps": 558.71,
+   "p99_ms": 38
+  },
+  "CPython, gunicorn 8 workers": {
+   "first_ms": 152.07095898222178,
+   "idle_mb": 47.0,
+   "loaded_mb": 254.2,
+   "settled_mb": 254.2,
+   "peak_mb": 254.2,
+   "loaded_rss_mb": 313.0625,
+   "rps": 9336.68,
+   "p99_ms": 1
+  },
+  "PyPy, gunicorn 8 workers": {
+   "first_ms": 319.94866707827896,
+   "idle_mb": 129.2,
+   "loaded_mb": 653.2,
+   "settled_mb": 652.5,
+   "peak_mb": 653.2,
+   "loaded_rss_mb": 766.21875,
+   "rps": 9324.24,
+   "p99_ms": 2
   },
   "Codename One Python": {
-   "first_ms": 78.0928329913877,
-   "idle_mb": 14.1,
-   "loaded_mb": 104.5,
-   "settled_mb": 98.3,
-   "peak_mb": 346.5,
-   "loaded_rss_mb": 214.46875,
-   "rps": 15926.43,
-   "p99_ms": 3
+   "first_ms": 65.92545798048377,
+   "idle_mb": 14.0,
+   "loaded_mb": 157.2,
+   "settled_mb": 153.2,
+   "peak_mb": 471.9,
+   "loaded_rss_mb": 275.890625,
+   "rps": 27116.6,
+   "p99_ms": 2
   },
   "Codename One Python, 128 MB budget": {
-   "first_ms": 30.67649999866262,
-   "idle_mb": 14.0,
-   "loaded_mb": 67.1,
-   "settled_mb": 64.7,
-   "peak_mb": 106.8,
-   "loaded_rss_mb": 114.640625,
-   "rps": 14286.0,
-   "p99_ms": 3
+   "first_ms": 26.520792045630515,
+   "idle_mb": 13.9,
+   "loaded_mb": 76.4,
+   "settled_mb": 74.2,
+   "peak_mb": 111.4,
+   "loaded_rss_mb": 105.578125,
+   "rps": 25619.42,
+   "p99_ms": 2
   }
  },
  "deploy": {
   "CPython": 82.226097,
-  "PyPy": 110.518901,
-  "GraalPy": 305.841445,
+  "PyPy": 110.67629099999999,
+  "GraalPy": 306.568148,
   "Codename One Python": 35.022792,
   "Codename One Python, 128 MB budget": 35.022792
  }

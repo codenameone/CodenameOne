@@ -425,10 +425,10 @@ image::img/python-startup.svg["Startup wall time and peak footprint on CPython, 
 [cols="1,1,1",options="header"]
 |===
 | | Wall time (ms) | Peak footprint (MB)
-| CPython 3.14 | 25.2 | 6.6
-| PyPy 3.11 | 22.0 | 22.0
-| GraalPy 3.13 | 41.6 | 28.2
-| Codename One | 7.8 | 4.5
+| CPython 3.14 | 18.1 | 6.6
+| PyPy 3.11 | 16.5 | 21.9
+| GraalPy 3.13 | 31.9 | 30.0
+| Codename One | 6.1 | 4.5
 |===
 
 ==== Python kernels
@@ -443,24 +443,27 @@ image::img/python-kernels-rss.svg["Peak footprint of the Python kernels on CPyth
 [cols="2,1,1,1,1,1,1,1,1,1,1",options="header"]
 |===
 | Kernel 2+| CPython 3.14 2+| PyPy 3.11 2+| GraalPy 3.13 2+| Codename One 2+| Codename One, 128 MB budget
-| nbody | 1091 | 7.3 | 89 | 22.9 | 345 | 120 | 125 | 5.2 | 127 | 5.2
-| richards | 907 | 7.6 | 55 | 24.2 | 195 | 149 | 51 | 5.3 | 60 | 5.4
-| fannkuch | 3656 | 6.9 | 1376 | 23.4 | 1119 | 121 | 941 | 5.3 | 880 | 5.2
-| spectral_norm | 1173 | 7.0 | 23 | 22.7 | 17 | 125 | 23 | 5.2 | 22 | 5.3
-| dicts_strings | 727 | 53.3 | 247 | 84.1 | 539 | 256 | 277 | 124 | 345 | 98
+| nbody | 783 | 7.1 | 63 | 22.7 | 195 | 126 | 89 | 5.1 | 90 | 5.1
+| richards | 648 | 7.6 | 43 | 24.5 | 113 | 157 | 38 | 5.3 | 36 | 5.4
+| fannkuch | 2680 | 6.9 | 607 | 23.2 | 540 | 138 | 581 | 5.1 | 576 | 5.1
+| spectral_norm | 735 | 6.9 | 12 | 22.5 | 7.5 | 146 | 12 | 5.1 | 12 | 5.1
+| dicts_strings | 390 | 53.5 | 137 | 90.1 | 229 | 294 | 199 | 122 | 219 | 88
 |===
 
 The numeric kernels allocate almost nothing, so the budget changes nothing
 there. `dicts_strings` builds large dictionaries and strings, and shows the
-trade in miniature: under the budget it gives up about a fifth of its speed
-for a fifth less memory.
+trade in miniature: under the budget it gives up about a tenth of its speed
+for more than a quarter less memory.
 
 ==== A Flask server
 
 The Flask sample above, under thirty seconds of `ab -c 8` after a warm-up. Every
 server gets the same length of load rather than the same number of requests, so
 a fast server isn't measured before its collector has settled. Footprint is read
-when the load ends, again five seconds later, and at its peak.
+when the load ends, again five seconds later, and at its peak. Each server runs
+the way `app.run()` starts it: Werkzeug's threaded server under CPython, PyPy
+and GraalPy, and the native backend server under Codename One, which lowers
+the same call onto it.
 
 image::img/python-flask-rps.svg["Requests per second of the Flask sample on CPython, PyPy, GraalPy and Codename One"]
 
@@ -469,26 +472,108 @@ image::img/python-flask-memory.svg["Footprint of the Flask sample on CPython, Py
 [cols="2,1,1,1,1,1,1,1",options="header"]
 |===
 | | First response (ms) | Requests per second | p99 (ms) | Idle (MB) | After load (MB) | 5 s later (MB) | Peak (MB)
-| CPython 3.14 | 346 | 670 | 21 | 28.3 | 27.7 | 27.7 | 29.5
-| PyPy 3.11 | 392 | 673 | 22 | 59.5 | 70.5 | 70.5 | 81.2
-| GraalPy 3.13 | 1298 | 520 | 53 | 243.8 | 854.0 | 868.9 | 863.8
-| Codename One | 90 | 22,876 | 2 | 14.0 | 110.5 | 101.8 | 427.4
-| Codename One, 128 MB budget | 29 | 19,504 | 2 | 14.0 | 67.7 | 66.0 | 103.9
+| CPython 3.14 | 115 | 699 | 12 | 28.1 | 28.8 | 28.8 | 29.4
+| PyPy 3.11 | 305 | 692 | 15 | 59.7 | 80.0 | 80.0 | 92.6
+| GraalPy 3.13 | 906 | 559 | 38 | 247.4 | 985.6 | 985.8 | 988.6
+| Codename One | 66 | 27,117 | 2 | 14.0 | 157.2 | 153.2 | 471.9
+| Codename One, 128 MB budget | 27 | 25,619 | 2 | 13.9 | 76.4 | 74.2 | 111.4
 |===
 
-Unconstrained, the server spends memory for speed: 110 MB after load, at about
-23,000 requests a second. That's the collector seeing a busy program and spare
-memory, and choosing throughput; it reaches its peak only while the load is
-heaviest. Under the 128 MB budget the same binary keeps the heap tight instead:
-68 MB, never past 104 MB, at 19,500 requests a second. It keeps 85% of its
-unconstrained throughput, uses less memory than PyPy, and still serves 29 times
-as many requests as CPython, which answers 670 a second in 28 MB.
-
-The chart below puts each server at its throughput and its footprint, with the
-two Codename One points joined: the line is the trade the collector makes, and
-both ends of it are far to the right of every interpreter.
-
 image::img/python-flask-tradeoff.svg["Requests per second against footprint for the Flask sample, with the two Codename One configurations joined"]
+
+===== Why these numbers are suspicious
+
+Read that table with suspicion. Codename One serves 37 times as many requests
+as CPython, and the gap doesn't fit anything else on this page. On the kernels
+above, Codename One runs about as fast as PyPy, and PyPy is many times faster
+than CPython. Yet here PyPy serves 692 requests a second and CPython 699: the
+interpreter that runs Python several times faster gains nothing. When a faster
+engine doesn't move the result, the engine isn't what's being measured.
+
+===== How the cause was found
+
+Three measurements found what was being measured instead.
+
+First, Flask alone, with no server. `scripts/python-compare/flask_cost.py`
+sends the same request through Flask's test client, which calls the application
+directly without a socket, so it times only the routing, the view and the JSON
+response. On one core CPython handles about 14,000 of these requests a second,
+PyPy about 28,500 and GraalPy about 5,800. Flask is fast enough on every
+interpreter: under `app.run()`, 95% of each request's time went somewhere else.
+
+Second, concurrency. With one connection at a time Werkzeug's server answered
+86 requests a second, with 8 connections 686, and with 32 connections 2,707.
+Throughput rose in step with the number of connections while the server used
+about a tenth of one core. A server bound by computation stops scaling once
+its core is busy; this one was mostly waiting.
+
+Third, one request timed by hand: send it, then note when the first byte of the
+response arrives and when the server closes the connection. The response
+arrived after 0.4 ms. The server closed the connection about 12 ms after that.
+
+The 12 ms is in `werkzeug/serving.py`. After every response the development
+server drains whatever the client might still be sending, so that a client
+whose upload was too large sees the error page rather than a reset
+connection. It keeps reading until a `select` with a 10 ms timeout finds
+nothing more, so every connection stays open for at least 10 ms after its
+response. `ab` speaks HTTP/1.0 and counts a request as done when the server
+closes the connection. Eight connections that each take about 12 ms come to
+about 670 requests a second, whichever interpreter runs the Python. That's the
+number CPython and PyPy both reached.
+
+The Werkzeug documentation is clear that its server is for development, so
+none of this is a defect. It means the table above compares Codename One's
+production server with Python's development server.
+
+===== A fair comparison
+
+In production a Flask application runs behind a WSGI server such as gunicorn,
+with several worker processes: each worker is a whole interpreter, and they
+handle connections in parallel. The rows below serve the same application with
+`gunicorn -w 8`, under the same load. Their footprint is the master process
+and all eight workers added together, because that's what the machine pays
+for. GraalPy is missing: gunicorn imports the `grp` module, which GraalPy
+doesn't provide.
+
+image::img/python-flask-fair-rps.svg["Requests per second of the Flask sample behind gunicorn with 8 workers, against Codename One"]
+
+image::img/python-flask-fair-memory.svg["Footprint of the Flask sample behind gunicorn with 8 workers, against Codename One"]
+
+[cols="2,1,1,1,1",options="header"]
+|===
+| | Requests per second | p99 (ms) | After load (MB) | Peak (MB)
+| CPython 3.14, gunicorn 8 workers | 9,337 | 1 | 254.2 | 254.2
+| PyPy 3.11, gunicorn 8 workers | 9,324 | 2 | 653.2 | 653.2
+| Codename One | 27,117 | 2 | 157.2 | 471.9
+| Codename One, 128 MB budget | 25,619 | 2 | 76.4 | 111.4
+|===
+
+Behind gunicorn, CPython serves 13 times as many requests as it did under
+`app.run()`. Codename One under its budget still serves 2.7 times as many, in
+30% of CPython's memory and 12% of PyPy's. That's the gap to plan around: about
+three times the throughput, not 37 times, and a fraction of the memory.
+
+===== What the fair comparison means
+
+The difference comes from how each server is built, more than from how fast
+each runs Python:
+
+* *One process instead of eight.* Gunicorn gets its parallelism by running a
+  whole interpreter per worker, and each one costs 30 MB under CPython and
+  more than 70 MB under PyPy. Codename One serves every connection from one
+  process.
+* *The server is native code.* Codename One accepts connections, parses
+  requests and writes responses in compiled code, outside the global
+  interpreter lock, on several threads at once. Only the view itself runs as Python, one
+  thread at a time, as under CPython.
+* *Python runs compiled.* The view and Flask's routing run as compiled code,
+  at PyPy's speed or close to it, from the first request, with no JIT to warm
+  up.
+
+PyPy and CPython reach the same throughput behind gunicorn too, although PyPy
+runs Flask's own code about twice as fast, so with eight workers the Python
+code isn't the limit for either of them. What PyPy does change is memory: its
+eight workers, each with its own JIT, use two and a half times CPython's.
 
 [cols="1,1",options="header"]
 |===
@@ -500,10 +585,7 @@ image::img/python-flask-tradeoff.svg["Requests per second against footprint for 
 |===
 
 The deployed size is the interpreter's installation plus Flask and its
-dependencies, against the one executable. CPython, PyPy and GraalPy serve with
-Werkzeug's threaded server, which is what `app.run()` starts; a production
-CPython deployment behind a WSGI server with several worker processes serves
-more, using a full interpreter's memory per worker.
+dependencies (and gunicorn, under 1 MB), against the one executable.
 
 Where an application needs CPython instead: code that builds source text and
 runs it with `exec`, and packages whose C code is the bulk of the package
