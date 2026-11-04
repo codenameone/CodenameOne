@@ -1,0 +1,13 @@
+String
+String
+nonnull
+nullable
+nonnull
+nullable
+String
+String
+List<String>
+_Map<String, int>
+List<String?>
+List<String?>
+nullable

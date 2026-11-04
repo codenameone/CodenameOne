@@ -798,8 +798,15 @@ final class AsyncLowering {
             // Null-safety flow promotion across a suspending loop, try, switch or labelled
             // statement, conservatively: what it assigns is demoted before it, and only what
             // held at entry survives it.
+            java.util.Set<String> pre = em.flowSnapshot(ctx);
             java.util.Set<String> entry = em.flowEnterConservative(s, ctx);
-            lowerStmt(s, f, ctx);
+            java.util.Set<String> savedTryEntry = tryEntryFlow;
+            tryEntryFlow = s instanceof TryStmt ? pre : null;
+            try {
+                lowerStmt(s, f, ctx);
+            } finally {
+                tryEntryFlow = savedTryEntry;
+            }
             em.flowRetain(entry, ctx);
             return;
         }
@@ -1197,8 +1204,15 @@ final class AsyncLowering {
     /// of the try and catch parts that has a finally block goes through it: falling off
     /// the end, return, break and continue record a pending completion and enter it, and
     /// it ends by carrying that completion out, through the next finally when there is one.
+    /// The flow state before the suspending try being lowered (null when none): its catches
+    /// start from it minus what the body assigns, its finally minus what body and catches
+    /// assign, as the non-lowered try does.
+    private java.util.Set<String> tryEntryFlow;
+
     private void lowerTry(TryStmt t, Frame f, JavaEmitter.Ctx ctx) {
         JavaEmitter.Ctx.Writer w = ctx.writer();
+        java.util.Set<String> pre = tryEntryFlow;
+        tryEntryFlow = null;
         int exit = newState(f);
         int saved = f.handler;
         Fin fin = null;
@@ -1253,6 +1267,9 @@ final class AsyncLowering {
                 CatchClause cc = (CatchClause) c[1];
                 Object[] m = (Object[]) c[2];
                 open(f, ((Integer) c[0]).intValue(), ctx);
+                if (pre != null) {
+                    em.flowResetMinusAssigned(pre, t.tryBlock, ctx);
+                }
                 ctx.pushScope();
                 String var = declareField(f, ctx, cc.exceptionVar != null ? cc.exceptionVar : "$e", (TypeRef) m[3],
                         (String) m[1]);
@@ -1276,6 +1293,12 @@ final class AsyncLowering {
         if (fin != null) {
             f.fins.remove(f.fins.size() - 1);
             open(f, fin.state, ctx);
+            if (pre != null) {
+                java.util.List<Object> ran = new ArrayList<Object>();
+                ran.add(t.tryBlock);
+                ran.add(t.catches);
+                em.flowResetMinusAssigned(pre, ran, ctx);
+            }
             ctx.pushScope();
             lowerList(t.finallyBlock.statements, f, ctx);
             ctx.popScope();

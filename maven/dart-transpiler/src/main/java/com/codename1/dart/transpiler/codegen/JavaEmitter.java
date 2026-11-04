@@ -7237,6 +7237,18 @@ public final class JavaEmitter {
         return new HashSet<String>(ctx.nonNull);
     }
 
+    java.util.Set<String> flowSnapshot(Ctx ctx) {
+        return new HashSet<String>(ctx.nonNull);
+    }
+
+    /// For the async lowering: resets the flow to {@code state} minus what {@code o} assigns.
+    void flowResetMinusAssigned(java.util.Set<String> state, Object o, Ctx ctx) {
+        java.util.Set<String> r = new HashSet<String>(state);
+        removeAssigned(r, o);
+        ctx.nonNull.clear();
+        ctx.nonNull.addAll(r);
+    }
+
     void flowRetain(java.util.Set<String> entry, Ctx ctx) {
         ctx.nonNull.retainAll(entry);
     }
@@ -7275,6 +7287,9 @@ public final class JavaEmitter {
             // Left to right: what the right operand assigns undoes the left's promotion.
             nullGuardPromotions(b.left, whenTrue, ctx);
             demoteAssigned(b.right, ctx);
+            // `x == null || (y = x).isEmpty` false: the right operand ran with x promoted, so
+            // what it assigned there is promoted as well.
+            assignmentPromotions(b.right, ctx);
             nullGuardPromotions(b.right, whenTrue, ctx);
             return;
         }
@@ -7287,8 +7302,89 @@ public final class JavaEmitter {
             x = ((ParenExpr) x).inner;
         }
         if (x instanceof Ident) {
-            promoteNonNull(((Ident) x).name, ctx);
+            String n = ((Ident) x).name;
+            if (ctx.lookup(n) == null && promotableField(n, ctx)) {
+                ctx.nonNull.add(n);
+            } else {
+                promoteNonNull(n, ctx);
+            }
         }
+    }
+
+    /// Re-applies the promotions of the assignments {@code e} always evaluates (not those
+    /// under a short-circuit) to the flow state in effect for it.
+    private void assignmentPromotions(Expr e, Ctx ctx) {
+        if (e instanceof ParenExpr) {
+            assignmentPromotions(((ParenExpr) e).inner, ctx);
+        } else if (e instanceof Assign) {
+            Assign a = (Assign) e;
+            assignmentPromotions(a.rhs, ctx);
+            if ("=".equals(a.op) && a.lhs instanceof Ident && ctx.lookup(((Ident) a.lhs).name) != null) {
+                if (staticallyNonNull(a.rhs, null, ctx)) {
+                    promoteNonNull(((Ident) a.lhs).name, ctx);
+                } else {
+                    ctx.nonNull.remove(((Ident) a.lhs).name);
+                }
+            }
+        } else if (e instanceof PropertyGet) {
+            assignmentPromotions(((PropertyGet) e).target, ctx);
+        } else if (e instanceof Call) {
+            Call c = (Call) e;
+            assignmentPromotions(c.target, ctx);
+            if (!c.nullAware) {
+                for (Expr p : c.args.positional) {
+                    assignmentPromotions(p, ctx);
+                }
+                for (NamedArg na : c.args.named) {
+                    assignmentPromotions(na.value, ctx);
+                }
+            }
+        } else if (e instanceof Unary) {
+            assignmentPromotions(((Unary) e).operand, ctx);
+        } else if (e instanceof Binary) {
+            Binary b = (Binary) e;
+            assignmentPromotions(b.left, ctx);
+            if (!"&&".equals(b.op) && !"||".equals(b.op) && !"??".equals(b.op)) {
+                assignmentPromotions(b.right, ctx);
+            }
+        }
+    }
+
+    /// Dart's field promotion: `_f != null` promotes an instance field read by its bare name
+    /// when it is private, final and nullable, and no declaration of that name in its library
+    /// is a getter or a non-final field (which could answer something else on a second read).
+    private boolean promotableField(String name, Ctx ctx) {
+        if (!name.startsWith("_") || ctx.currentClass == null || ctx.currentExtension != null) {
+            return false;
+        }
+        FieldDecl decl = null;
+        ClassDecl owner = null;
+        java.util.Set<String> seen = new HashSet<String>();
+        for (ClassDecl k = ctx.currentClass; k != null && seen.add(k.name);
+                k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            FieldDecl f = k.field(name);
+            if (f != null) {
+                decl = f;
+                owner = k;
+                break;
+            }
+            if (k.getter(name) != null) {
+                return false;
+            }
+        }
+        if (decl == null || !decl.isFinal || decl.isStatic || decl.type == null || !decl.type.nullable) {
+            return false;
+        }
+        for (ClassDecl k : program.classes.values()) {
+            if (k.ownerLibrary != owner.ownerLibrary) {
+                continue;
+            }
+            FieldDecl f = k.field(name);
+            if (f != null && (!f.isFinal || f.isStatic) || k.getter(name) != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Records the closure {@code l}'s writes to enclosing locals (write capture) and returns the
@@ -15999,6 +16095,15 @@ public final class JavaEmitter {
                         }
                     }
                     if ((at == null || at.is("dynamic")) && a instanceof Call && ((Call) a).target == null
+                            && ((Call) a).name != null && ctx.lookup(((Call) a).name) != null) {
+                        // `sh(k())` with `var k = () => z`: the local closure's inferred return.
+                        TypeRef kt = ctx.lookup(((Call) a).name);
+                        if (kt.funcParams != null && kt.funcReturn != null && !isDynamicType(kt.funcReturn)
+                                && !kt.funcReturn.is("void") && kt.funcTypeParams == null) {
+                            at = kt.funcReturn;
+                        }
+                    }
+                    if ((at == null || at.is("dynamic")) && a instanceof Call && ((Call) a).target == null
                             && ((Call) a).name != null && program.classes.containsKey(((Call) a).name)) {
                         // An unannotated construction: its class, with what was written.
                         at = new TypeRef(((Call) a).name);
@@ -17041,18 +17146,20 @@ public final class JavaEmitter {
             } else {
                 allFns = false;
             }
+            // A promoted local is an element of its promoted type: `[s]` is a List<String>.
+            TypeRef oType = promotedOperandType(e, o.type, ctx);
             codes.add(elementCode(o, elem, ctx));
             if (lubKnown) {
-                if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
+                if (isUnrecordedArg(oType) || oType.funcParams != null) {
                     lubKnown = false;
                 } else {
-                    lub = entryLub(lub, o.type);
+                    lub = entryLub(lub, oType);
                 }
             }
             if (inferred == null) {
-                inferred = o.type;
-            } else if (o.type == null || inferred.name == null || !inferred.name.equals(o.type.name)
-                    || !inferred.args.toString().equals(o.type.args.toString())) {
+                inferred = oType;
+            } else if (oType == null || inferred.name == null || !inferred.name.equals(oType.name)
+                    || !inferred.args.toString().equals(oType.args.toString())) {
                 // `[1, 2.5, 'x', null]`: elements that disagree make a List<dynamic>
                 // (Dart would say List<Object?>), never a list of the first one's type.
                 // The type arguments count too: `[[1, 2], [1.5, 2.5]]` holds a List<int>
@@ -17797,15 +17904,16 @@ public final class JavaEmitter {
                     anyNonFn = true;
                 }
             }
+            TypeRef oType = promotedOperandType(e, o.type, ctx);
             if (lubKnown) {
-                if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
+                if (isUnrecordedArg(oType) || oType.funcParams != null) {
                     lubKnown = false;
                 } else {
-                    lub = entryLub(lub, o.type);
+                    lub = entryLub(lub, oType);
                 }
             }
             if (inferred == null) {
-                inferred = o.type;
+                inferred = oType;
             }
         }
         if (elem == null && lubKnown && lub != null && lub.nullable && lub.args.isEmpty()
@@ -18031,10 +18139,10 @@ public final class JavaEmitter {
             // `{'k': 1, 'j': 2.5}`: each type argument is the upper bound of its entries'
             // (num here), as Dart infers it, not the first entry's.
             if (inferK) {
-                k = entryLub(k, ko.type);
+                k = entryLub(k, promotedOperandType(m.keys.get(i), ko.type, ctx));
             }
             if (inferV) {
-                v = entryLub(v, vo.type);
+                v = entryLub(v, promotedOperandType(m.values.get(i), vo.type, ctx));
             }
         }
         for (int i = 0; i < kos.size(); i++) {
@@ -24923,7 +25031,8 @@ public final class JavaEmitter {
                         ? TypeRef.of("Iterable", o.type.arg(0)) : lambdaReturn);
             }
             String lifted = ctx.popWriter();
-            exprType = o.type;
+            // `() => z` of a promoted, never-reassigned `String? z` returns a String.
+            exprType = promotedOperandType(l.exprBody, o.type, ctx);
             // `() async => throw 'z'` held as a fire-and-forget VoidFunc0 (asyncClosureType):
             // its plain body is the throw, a statement, as a void SAM's must be.
             lastLambdaVoid = o.type != null && o.type.is("void")
@@ -27038,6 +27147,10 @@ public final class JavaEmitter {
         // extension methods
         ClassDecl extCls = findUserExtension(tt.name, n, false, ctx);
         extCls = mostSpecificExtension(extCls, tt, n, false);
+        // The receiver's static type is the PROMOTED one: a promoted `String? x` calls the
+        // `on String` extension, an unpromoted one only an `on String?` extension.
+        TypeRef recvFlow = c.target != null ? promotedOperandType(c.target, tt, ctx) : tt;
+        extCls = nullabilitySpecificExtension(extCls, recvFlow == null || recvFlow.nullable, n, false, ctx);
         if (extCls != null) {
             MethodDecl em = extCls.method(n);
             String rest = methodArgs(extensionCallbackParams(extCls, em.params, tt), c.args, ctx);
@@ -32114,6 +32227,28 @@ public final class JavaEmitter {
             if (same) {
                 return e;
             }
+        }
+        return found;
+    }
+
+    /**
+     * Of the extensions on one type name declaring {@code member}, the one Dart's applicability
+     * and most-specific rules pick by nullability: a nullable receiver only matches an `on T?`
+     * extension, and a non-nullable one prefers `on T` over `on T?`.
+     */
+    private ClassDecl nullabilitySpecificExtension(ClassDecl found, boolean recvNullable, String member,
+            boolean getter, Ctx ctx) {
+        if (found == null || found.extensionOn == null || found.extensionOn.nullable == recvNullable) {
+            return found;
+        }
+        for (ClassDecl e : program.extensions) {
+            if (e == found || e.extensionOn == null || e.extensionOn.nullable != recvNullable
+                    || !e.extensionOn.name.equals(found.extensionOn.name)
+                    || (getter ? e.getter(member) == null : e.method(member) == null)
+                    || ctx.library() != null && !program.extensionVisible(e, ctx.library())) {
+                continue;
+            }
+            return e;
         }
         return found;
     }
