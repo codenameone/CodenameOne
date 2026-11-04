@@ -361,6 +361,15 @@ public final class Ast {
         public boolean isThis;                    // this.x
         public boolean isSuper;                   // super.x
         public Expr defaultValue;                 // nullable
+        /// The name a named argument reaches this parameter by, when the transpiler
+        /// renamed the parameter itself (a constructor tear-off's `p$b` for Dart's `b`);
+        /// null when it is {@link #name}.
+        public String argName;
+
+        /// The name a call passes a named argument to this parameter by.
+        public String argumentName() {
+            return argName != null ? argName : name;
+        }
     }
 
     public static class CtorDecl extends Node {

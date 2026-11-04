@@ -10178,6 +10178,21 @@ public final class JavaEmitter {
     /// context gave it no type) is bound to its own SAM there, since a method reference
     /// cannot be an Object, and given its identity.
     private Out objectOperand(Expr e, Out o, Ctx ctx) {
+        if (o != null && o.fn != null && o.fn.kind == FnKind.METHOD_REF && o.fn.marker == null && !o.fromError
+                && o.code.indexOf("canonTearOff(") < 0 && o.code.indexOf("TearOff.") < 0
+                && o.code.startsWith("((") && o.code.endsWith(") " + o.fn.bare + ")")
+                && (e instanceof Ident && ctx.lookup(((Ident) e).name) == null
+                || e instanceof PropertyGet && ((PropertyGet) e).target instanceof Ident
+                && ctx.lookup(((Ident) ((PropertyGet) e).target).name) == null)) {
+            // `top.hashCode`, `top == x`: the receiver was read as its SAM cast, not yet the
+            // canonical value an Object slot holds (`Object o = top`), so it hashes and
+            // compares unlike its other views. Read again as that value: an Ident or a
+            // static member read has no side effect to repeat.
+            Out canon = emitExpr(e, new TypeRef("Object"), ctx);
+            if (canon != null && !canon.fromError && canon.code.indexOf("canonTearOff(") >= 0) {
+                return canon;
+            }
+        }
         if (o != null && o.fn != null && o.fn.kind == FnKind.METHOD_REF && o.code.equals(o.fn.bare)
                 && o.type != null && o.type.funcParams == null && e instanceof Ident
                 && ctx.lookup(((Ident) e).name) == null) {
@@ -11952,7 +11967,7 @@ public final class JavaEmitter {
                 if (named == null) {
                     named = new ArrayList<String>();
                 }
-                named.add(p.required ? "!" + p.name : p.name);
+                named.add(p.required ? "!" + p.argumentName() : p.argumentName());
             } else if (p.optional && required < 0) {
                 required = i;
             }
@@ -16630,9 +16645,29 @@ public final class JavaEmitter {
         TypeRef inferred = null;
         TypeRef lub = null;
         boolean lubKnown = elem == null;
+        // The Java types of function-typed elements: two that differ (`{gi, gs}`, an
+        // `int Function(int)` and a `String Function(String)`) share no SAM, so the set is
+        // a Set<Function> (Set<Object> when a non-function joins them), as Dart's upper bound is.
+        String fnJava = null;
+        boolean fnMixed = false;
+        boolean anyFn = false;
+        boolean anyNonFn = false;
         for (Expr e : s.elements) {
             Out o = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
             codes.add(elementCode(o, elem, ctx));
+            if (elem == null && o.type != null) {
+                if (o.type.funcParams != null) {
+                    anyFn = true;
+                    String jt = javaType(o.type, true, ctx);
+                    if (fnJava == null) {
+                        fnJava = jt;
+                    } else if (!fnJava.equals(jt)) {
+                        fnMixed = true;
+                    }
+                } else {
+                    anyNonFn = true;
+                }
+            }
             if (lubKnown) {
                 if (isUnrecordedArg(o.type) || o.type.funcParams != null) {
                     lubKnown = false;
@@ -16655,8 +16690,18 @@ public final class JavaEmitter {
             // element type is the elements' upper bound, as a list literal's is.
             elem = lub;
         }
+        boolean objectElems = false;
+        if (elem == null && anyFn && (fnMixed || anyNonFn)) {
+            elem = anyNonFn ? TypeRef.of("Object") : new TypeRef("Function");
+            objectElems = true;
+        }
         if (elem == null) {
             elem = inferred != null ? inferred : TypeRef.DYNAMIC;
+        }
+        if (objectElems) {
+            for (int i = 0; i < codes.size(); i++) {
+                codes.set(i, "(Object) " + paren(codes.get(i)));
+            }
         }
         StringBuilder sb = new StringBuilder("DartSet.<").append(javaType(elem, true, ctx)).append(">of(");
         for (int i = 0; i < codes.size(); i++) {
@@ -17679,6 +17724,23 @@ public final class JavaEmitter {
                     }
                 }
                 if (!fn.typeParams.isEmpty()) {
+                    if (inst != null && wargs.isEmpty() && !boundEntry && ref.equals(FnForm.methodRef(ref).bare)
+                            && functionSamProbe(ft, ctx) != null
+                            // Only where the slot holds exactly this instantiation (or nothing
+                            // types it): a generic callee's `E Function(E)` parameter infers E
+                            // from the reference itself, which a cast to Func1<Long, Long> breaks.
+                            && (tearOffExpected == null || isDynamicType(tearOffExpected)
+                            || tearOffExpected.funcParams == null && (tearOffExpected.is("Object")
+                            || tearOffExpected.is("Function"))
+                            || sam.equals(javaType(tearOffExpected, false, ctx)))) {
+                        // Instantiated, implicitly (`int Function(int) gi = gid`) or explicitly
+                        // (`gid<int>`): one canonical value per instantiation, keyed on it
+                        // (canonFunctionKey), so `gi == gi2` and a set of both holds one.
+                        Out canon = identifyTearOff(null, samCastOut(sam, FnForm.methodRef(ref), ft), true, ctx);
+                        if (canon != null && canon.code.startsWith("DartRuntime.canonTearOff(")) {
+                            return canon;
+                        }
+                    }
                     // A cast would pin the erased Func<Object..>; a bare reference takes
                     // whatever instantiation the context names, and ft types a local.
                     return new Out(ref, ft, FnForm.methodRef(ref));
@@ -18094,6 +18156,10 @@ public final class JavaEmitter {
         // a method reference its Dart signature (see emitPropertyGet).
         Out target = "runtimeType".equals(pg.name) && (pg.target instanceof Ident || pg.target instanceof PropertyGet)
                 ? emitExpr(pg.target, null, ctx) : emitExprRaw(pg.target, null, ctx);
+        if ("runtimeType".equals(pg.name)) {
+            // A static tear-off read as its canonical value, as every other view of it is.
+            target = objectOperand(pg.target, target, ctx);
+        }
         if (pg.nullAware) {
             // a?.b -> lift `$t = a` (materializing any guard a itself carries) and start a
             // new short: the member reads on the non-null $t, and $t being null shorts the
@@ -18877,6 +18943,21 @@ public final class JavaEmitter {
                     ctx.writer().line("final " + tempReceiverType(tt, ctx) + " " + rt + " = " + target.code + ";");
                     ctx.declare(rt, tt);
                     Out ad = methodTearOffAdapter(tm, rt, name, posNode, ctx, pc, tt);
+                    if (ad == null && !tm.typeParams.isEmpty() && posNode == memberTearOffNode
+                            && (memberTearOffExpected == null || isDynamicType(memberTearOffExpected)
+                            || memberTearOffExpected.is("Object") || memberTearOffExpected.is("Function")
+                            && memberTearOffExpected.funcParams == null)) {
+                        // `Function gf = c.gen` with `T gen<T>(T v, {T? w})`: held untyped, the
+                        // value is only ever called dynamically, so its type variables erase to
+                        // dynamic and it is the same adapter a non-generic method gets -- a
+                        // bare reference has no functional interface to be an Object by.
+                        eraseAdapterTypeParams = true;
+                        try {
+                            ad = methodTearOffAdapter(tm, rt, name, posNode, ctx, pc, tt);
+                        } finally {
+                            eraseAdapterTypeParams = false;
+                        }
+                    }
                     if (ad != null) {
                         return ad;
                     }
@@ -22705,6 +22786,68 @@ public final class JavaEmitter {
     /// The type arguments a function type context instantiates a generic function's
     /// tear-off with -- unified over the parameter types and the return type -- or null when
     /// the context is no function type or leaves one undetermined.
+    /// A constructor's positional and named parameters with an initializing formal
+    /// (`this.v`, untyped) typed by its field, so inference reads `T v` through it.
+    /// An unbound name or a static member read through one (`inc`, `Box.hold`,
+    /// `lib.Shape.make`): reading it again repeats no side effect.
+    /// {@code t} with every program class it names bound to the class {@code lib} means
+    /// by that name (TypeRef.resolved), so it is named right wherever it is emitted.
+    private TypeRef inLibrary(TypeRef t, Library lib) {
+        if (t == null) {
+            return null;
+        }
+        TypeRef c = new TypeRef(t.name);
+        c.nullable = t.nullable;
+        c.resolved = t.resolved;
+        c.runtimeOnly = t.runtimeOnly;
+        c.aliasedFrom = t.aliasedFrom;
+        c.funcRequired = t.funcRequired;
+        c.funcNamed = t.funcNamed;
+        c.funcNamedRequired = t.funcNamedRequired;
+        c.funcTypeParams = t.funcTypeParams;
+        c.genericClosure = t.genericClosure;
+        for (TypeRef a : t.args) {
+            c.args.add(inLibrary(a, lib));
+        }
+        if (t.funcParams != null) {
+            c.funcParams = new ArrayList<TypeRef>();
+            for (TypeRef a : t.funcParams) {
+                c.funcParams.add(inLibrary(a, lib));
+            }
+        }
+        c.funcReturn = inLibrary(t.funcReturn, lib);
+        if (c.resolved == null && !c.runtimeOnly && c.funcParams == null && program.classes.containsKey(c.name)) {
+            c.resolved = program.resolveClass(c.name, lib);
+        }
+        return c;
+    }
+
+    private static boolean isSideEffectFreeName(Expr e, Ctx ctx) {
+        if (e instanceof Ident) {
+            return ctx.lookup(((Ident) e).name) == null;
+        }
+        return e instanceof PropertyGet && isSideEffectFreeName(((PropertyGet) e).target, ctx);
+    }
+
+    private static List<Param> ctorParamsAsValues(ClassDecl pc, CtorDecl cd) {
+        List<Param> out = new ArrayList<Param>();
+        for (Param p : cd.params) {
+            FieldDecl f = p.isThis && (p.type == null || p.type.is("var")) ? pc.field(p.name) : null;
+            if (f != null && f.type != null) {
+                Param q = new Param();
+                q.name = p.name;
+                q.type = f.type;
+                q.named = p.named;
+                q.optional = p.optional;
+                q.required = p.required;
+                out.add(q);
+            } else {
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
     private List<TypeRef> contextInstantiation(List<String> tps, List<Param> params, TypeRef ret, TypeRef expected) {
         TypeRef ctxFn = expected == null ? null : expected.funcParams != null ? expected
                 : expandFunctionTypedef(expected) != null ? expandFunctionTypedef(expected)
@@ -25350,7 +25493,18 @@ public final class JavaEmitter {
         // Object protocol
         if (n.equals("toString") && c.args.positional.isEmpty()) {
             ctx.importClass("dart.runtime.DartRuntime");
-            return new Out("DartRuntime.str(" + target.code + ")", TypeRef.STRING);
+            String recv = target.code;
+            if (target.fn != null && target.fn.kind == FnKind.METHOD_REF && !target.fromError
+                    && recv.indexOf("canonTearOff(") < 0 && isSideEffectFreeName(c.target, ctx)) {
+                // `inc.toString()`, `Box.hold.toString()`: the tear-off as the canonical value
+                // an Object slot holds (a bare generic reference is no Object at all), so it
+                // prints as `(inc as Object).toString()` does.
+                Out canon = emitExpr(c.target, new TypeRef("Object"), ctx);
+                if (canon != null && !canon.fromError && canon.code.indexOf("canonTearOff(") >= 0) {
+                    recv = canon.code;
+                }
+            }
+            return new Out("DartRuntime.str(" + recv + ")", TypeRef.STRING);
         }
         if (n.equals("compareTo") && c.args.positional.size() == 1 && c.args.named.isEmpty()
                 && isTypeVariable(tt, ctx)) {
@@ -31025,16 +31179,27 @@ public final class JavaEmitter {
     /// `recvDecl`): the owner's type parameters in the signature are read as seen from the
     /// receiver, and any left unbound (a raw receiver) erase to `dynamic`, since the
     /// adapter is emitted outside the owner where those names do not exist.
+    /// Set while methodTearOffAdapter adapts a generic method held untyped (its type
+    /// variables erased to dynamic).
+    private boolean eraseAdapterTypeParams;
+
     private Out methodTearOffAdapter(MethodDecl md, final String recv, final String name, final Node pos, Ctx ctx,
                                      ClassDecl recvDecl, TypeRef recvType) {
-        if (!hasOptionalParam(md) || !md.typeParams.isEmpty() || md.returnType == null) {
+        if (!hasOptionalParam(md) || !md.typeParams.isEmpty() && !eraseAdapterTypeParams
+                || md.returnType == null) {
             return null;
         }
         List<TypeRef> types = new ArrayList<TypeRef>();
-        for (Param p : md.params) {
-            types.add(paramValueType(p));
+        java.util.List<TypeRef> dyns = new ArrayList<TypeRef>();
+        for (int i = 0; i < md.typeParams.size(); i++) {
+            dyns.add(TypeRef.DYNAMIC);
         }
-        TypeRef retType = md.returnType;
+        for (Param p : md.params) {
+            types.add(md.typeParams.isEmpty() ? paramValueType(p)
+                    : substTypeParams(paramValueType(p), md.typeParams, dyns));
+        }
+        TypeRef retType = md.typeParams.isEmpty() ? md.returnType
+                : substTypeParams(md.returnType, md.typeParams, dyns);
         ClassDecl owner = recvDecl == null ? null : memberOwner(md);
         if (owner != null && !owner.typeParams.isEmpty()) {
             Map<String, TypeRef> erase = new LinkedHashMap<String, TypeRef>();
@@ -31105,7 +31270,7 @@ public final class JavaEmitter {
         int required = -1;
         for (Param p : l.params) {
             if (p.named) {
-                named.append(named.length() > 0 ? ", " : "").append(quote(p.required ? "!" + p.name : p.name));
+                named.append(named.length() > 0 ? ", " : "").append(quote(p.required ? "!" + p.argumentName() : p.argumentName()));
             } else {
                 if (p.optional && required < 0) {
                     required = positional;
@@ -31396,7 +31561,7 @@ public final class JavaEmitter {
                 if (named == null) {
                     named = new ArrayList<String>();
                 }
-                named.add(fp.required ? "!" + fp.name : fp.name);
+                named.add(fp.required ? "!" + fp.argumentName() : fp.argumentName());
             } else if ((fp.optional || fp.defaultValue != null) && required < 0) {
                 required = i;
             }
@@ -33111,6 +33276,40 @@ public final class JavaEmitter {
                     if (r != null && cls.equals(r.name) && r.args.size() == tps.size()
                             && !mentionsTypeVariable(r, ctx)) {
                         inferred = r.args;
+                    } else if (cd != null) {
+                        // `Object Function(int) c4 = G.new`: the return names no G, so Dart
+                        // infers T through the constructor's parameters from the slot's
+                        // parameter types (`G(this.v)` with T v gives T = int), as it does
+                        // for a generic function's instantiation (contextInstantiation).
+                        TypeRef self = new TypeRef(cls);
+                        for (String tp : tps) {
+                            self.args.add(new TypeRef(tp));
+                        }
+                        List<Param> cps = ctorParamsAsValues(pc, cd);
+                        if (ctorTearOffExpected.funcParams != null
+                                && ctorTearOffExpected.funcParams.size() < cps.size()) {
+                            // A slot that names fewer parameters (`Object Function(String)` for
+                            // `P(this.a, {this.b})`) infers from the ones it does name: the
+                            // leading positional ones.
+                            List<Param> lead = new ArrayList<Param>();
+                            for (Param p : cps) {
+                                if (!p.named && lead.size() < ctorTearOffExpected.funcParams.size()) {
+                                    lead.add(p);
+                                }
+                            }
+                            cps = lead;
+                        }
+                        List<TypeRef> viaParams = contextInstantiation(tps, cps,
+                                r != null && cls.equals(r.name) ? self : null, ctorTearOffExpected);
+                        if (viaParams != null) {
+                            boolean known = true;
+                            for (TypeRef t : viaParams) {
+                                known &= !mentionsTypeVariable(t, ctx) && !isDynamicType(t);
+                            }
+                            if (known) {
+                                inferred = viaParams;
+                            }
+                        }
                     }
                 }
                 call.type.args.addAll(inferred);
@@ -33156,12 +33355,31 @@ public final class JavaEmitter {
                             ft.funcParams.add(substTypeParams(paramValueType(fp), md.typeParams, none));
                         }
                         ft.funcReturn = substTypeParams(md.returnType, md.typeParams, none);
+                        if (pc.ownerLibrary != null && pc.ownerLibrary != ctx.library()) {
+                            // Its signature's names are its own library's: from another one
+                            // (`base.Channel.open`, or a class that library imports and this
+                            // one does not see) a bare name could mean a different class.
+                            ft = inLibrary(ft, pc.ownerLibrary);
+                        }
                         String mref = javaClassName(pc) + "::" + name;
                         if (tearOffTypeArgs == null) {
                             String checked = boundCheckedMethodTearOff(md, javaClassName(pc), name, ctx);
                             if (checked != null) {
                                 mref = checked;
                             }
+                        }
+                        TypeRef slot = ctorTearOffExpected;
+                        if (md.typeParams.isEmpty() && tearOffTypeArgs == null && mref.endsWith("::" + name)
+                                && (slot == null || slot.funcParams == null && (slot.is("Object")
+                                || slot.is("Function") || isDynamicType(slot)))
+                                && functionSamProbe(ft, ctx) != null) {
+                            // Only where nothing types it: a function-typed slot gives the
+                            // reference its SAM itself, with the slot's own view of the types.
+                            // Bound to its own SAM, as a top-level function's tear-off is: an
+                            // Object slot (`m[C.st]`, `C.st as Object`) needs a functional
+                            // interface, and identifyTearOff canonicalizes the cast form.
+                            return samCastOut(javaType(samAtBoundsRaw(ft, null), false, ctx),
+                                    FnForm.methodRef(mref), ft);
                         }
                         return new Out(mref, ft, FnForm.methodRef(mref));
                     }
@@ -33259,6 +33477,10 @@ public final class JavaEmitter {
             }
             Param lp = new Param();
             lp.name = "p$" + p.name;
+            if (p.named) {
+                // Renamed for the lambda; a named argument still reaches it as Dart names it.
+                lp.argName = p.argumentName();
+            }
             lp.named = p.named;
             lp.required = p.required;
             TypeRef pt = p.type;

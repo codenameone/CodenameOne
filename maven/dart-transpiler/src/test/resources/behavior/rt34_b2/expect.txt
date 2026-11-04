@@ -1,0 +1,15 @@
+n 1 1 null
+n 2 3 null
+n 3 1 null
+n 4 9 x
+o 7 null
+o 1 null
+o 1 null
+o 2 4
+top null 2
+top null 5
+n 5 6 null
+nsm true
+nsm2
+n 8 1 null
+top null 0

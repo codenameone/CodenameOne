@@ -166,8 +166,18 @@ public final class SignedFns {
     /// keeps its own, which also records its parameter types. Parameter types it lacks
     /// stay untested here (null witnesses): the closure's own casts check them.
     public static Object named(Object f, int params, int required, String[] named) {
-        if (f instanceof Signed || f == null) {
+        if (f == null) {
             return f;
+        }
+        if (f instanceof Signed) {
+            Signed sf = (Signed) f;
+            if (sf.$named() != null || sf.$generic() || sf.$sig() == null || sf.$sig().length != params + 1) {
+                return f;
+            }
+            // Signed by its types alone (a constructor tear-off's marker): it records no
+            // names, so a dynamic call or Function.apply could place no named argument.
+            // Keep its types and add the names.
+            return wrap(f, sf.$sig(), required, named);
         }
         return wrap(f, new TypeWitness[params + 1], required, named);
     }

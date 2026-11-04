@@ -35,6 +35,12 @@ public final class Symbol {
         this.name = name;
     }
 
+    /// The name this symbol was made from (`#a` is "a"); Function.apply places a named
+    /// argument by it.
+    public String $name() {
+        return name;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof Symbol && ((Symbol) o).name.equals(name);

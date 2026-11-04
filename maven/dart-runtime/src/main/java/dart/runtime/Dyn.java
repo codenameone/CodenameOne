@@ -902,14 +902,11 @@ public final class Dyn {
 
     /// Dart's {@code Function.apply(f, positional, named)}. The positional list is spread
     /// over the function as {@link #invoke} does. Function values are held in their
-    /// canonical positional shape, which keeps no parameter names, so named arguments
-    /// cannot be matched to anything: a non-empty map is refused rather than dropped.
+    /// canonical positional shape; named arguments (a `Map<Symbol, dynamic>`) are placed
+    /// by name through {@link #invokeNamed}, from the names the closure's signature
+    /// records, exactly as a dynamic call `f(8, a: 1)` is.
     @SuppressWarnings("unchecked")
     public static Object apply(Object f, Object positional, Object named) {
-        if (named instanceof Map && !((Map<Object, Object>) named).isEmpty()) {
-            throw new dart.core.UnsupportedError(
-                    "Function.apply with named arguments is not supported: function values keep no parameter names");
-        }
         Object[] a = NONE;
         if (positional instanceof java.util.Collection) {
             a = ((java.util.Collection<Object>) positional).toArray();
@@ -919,6 +916,23 @@ public final class Dyn {
                 l.add(o);
             }
             a = l.toArray();
+        }
+        if (named instanceof Map && !((Map<Object, Object>) named).isEmpty()) {
+            Map<Object, Object> nm = (Map<Object, Object>) named;
+            String[] names = new String[nm.size()];
+            Object[] values = new Object[names.length];
+            int k = 0;
+            for (Map.Entry<Object, Object> en : nm.entrySet()) {
+                Object key = en.getKey();
+                if (!(key instanceof dart.core.Symbol)) {
+                    throw new dart.core.TypeError("type '" + DartRuntime.typeName(key)
+                            + "' is not a subtype of type 'Symbol' of 'namedArguments'");
+                }
+                names[k] = ((dart.core.Symbol) key).$name();
+                values[k] = en.getValue();
+                k++;
+            }
+            return invokeNamed(f, a, names, values);
         }
         if (f instanceof DynamicObject) {
             // A callable object: Function.apply reaches its call method.
