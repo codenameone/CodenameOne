@@ -7268,6 +7268,16 @@ public final class JavaEmitter {
         return stmtTerminates(s);
     }
 
+    /// Drops the `is` promotion of every local that {@code o} assigns: Dart demotes such a
+    /// local at loop entry, and once a closure that writes it exists.
+    private void demoteTypePromotions(Object o, Ctx ctx) {
+        for (java.util.Iterator<String> it = ctx.promotions.keySet().iterator(); it.hasNext();) {
+            if (assignsName(o, it.next(), 0)) {
+                it.remove();
+            }
+        }
+    }
+
     /// Demotes every promoted local that {@code o} assigns.
     private void demoteAssigned(Object o, Ctx ctx) {
         for (java.util.Iterator<String> it = ctx.nonNull.iterator(); it.hasNext();) {
@@ -7332,6 +7342,7 @@ public final class JavaEmitter {
             Assign a = (Assign) e;
             assignmentPromotions(a.rhs, ctx);
             if ("=".equals(a.op) && a.lhs instanceof Ident && ctx.lookup(((Ident) a.lhs).name) != null) {
+                ctx.demote(((Ident) a.lhs).name);
                 if (staticallyNonNull(a.rhs, null, ctx)) {
                     promoteNonNull(((Ident) a.lhs).name, ctx);
                 } else {
@@ -7504,6 +7515,7 @@ public final class JavaEmitter {
                 }
             }
         }
+        demoteTypePromotions(l, ctx);
         // Demote through Ctx.demote so field-path keys rooted at a write-captured (or
         // reassigned) local go too: `a.b` must not stay promoted once a closure may assign `a`.
         java.util.Set<String> dropped = new HashSet<String>(ctx.writeCaptured);
@@ -7584,6 +7596,7 @@ public final class JavaEmitter {
             // condition is false at its exit promotes what that proves (`while (x == null)`),
             // and every `break` out of it is joined in.
             demoteAssigned(s, ctx);
+            demoteTypePromotions(s, ctx);
             java.util.Set<String> entry = new HashSet<String>(ctx.nonNull);
             List<java.util.Set<String>> breaks = pushFlowJoin(s, ctx);
             try {
@@ -12460,7 +12473,27 @@ public final class JavaEmitter {
                 Out target = emitExpr(id.operand, null, ctx);
                 String targetLifted = ctx.popWriter();
                 boolean accessor = target.code.endsWith("()") && target.code.contains(".get$");
-                if ((id.operand instanceof PropertyGet
+                // A read that is not a Java variable (`TE.s(nn(t))`, a promoted local's cast
+                // `((Long) x)`) cannot take `++`: written as `+= 1` through the assignment path.
+                boolean notVariable = target.code.endsWith(")")
+                        && (id.operand instanceof PropertyGet || id.operand instanceof Ident);
+                if (notVariable && id.operand instanceof Ident && !statement && !id.prefix
+                        && ctx.promotedType(((Ident) id.operand).name) != null) {
+                    // `n--` as a value on a promoted local: the old value goes into a temp,
+                    // then the variable is written `n = n - 1` as a statement.
+                    ctx.writer().raw(targetLifted);
+                    String jt = declarableType(target.type, false, ctx);
+                    String old = ctx.newTemp();
+                    ctx.writer().line((jt != null ? jt : "var") + " " + old + " = " + target.code + ";");
+                    ctx.statementExpr = inc;
+                    ctx.postfixAssign = savedPostfix;
+                    String w = statementize(emitAssign(inc, ctx).code);
+                    if (!w.isEmpty()) {
+                        ctx.writer().line(w + ";");
+                    }
+                    return new Out(old, target.type);
+                }
+                if (notVariable || (id.operand instanceof PropertyGet
                         && (target.code.endsWith("." + ((PropertyGet) id.operand).name + "()")
                         // an extension getter's static form, `Ext.p($self)`
                         || target.code.endsWith(")")
@@ -18585,7 +18618,9 @@ public final class JavaEmitter {
             String jn = ctx.javaNameOf(n);
             String base = ctx.isLate(jn) ? jn + ".get$v()" : ctx.isBoxed(jn) ? jn + ".v" : jn;
             // Flow-promoted by an `is` guard: read as the narrowed type via a cast.
-            TypeRef promo = ctx.promotedType(n);
+            // An assignment target is the variable itself, never the promoted read's cast:
+            // `((String) x) = 3L` is not Java.
+            TypeRef promo = id == ctx.writeTarget ? null : ctx.promotedType(n);
             if (promo != null) {
                 if (promo.name != null && program.classes.containsKey(promo.name)
                         && appliedCollectionMixin(promo.name) != null
@@ -21077,7 +21112,11 @@ public final class JavaEmitter {
         Expr lhs = hoistNullAwareTarget(a, ctx, null);
         Out read = emitExpr(lhs, null, ctx);
         Ctx.Writer w = ctx.writer();
-        w.line("if (" + read.code + " == null) {");
+        // A primitive read (an `int` extension getter, `TE.s($t)`) cannot be compared with
+        // null in Java; boxed, the test is the same one Dart makes and is simply false.
+        String jt = read.type == null ? null : javaType(read.type, false, ctx);
+        boolean primitive = "long".equals(jt) || "double".equals(jt) || "boolean".equals(jt) || "int".equals(jt);
+        w.line("if (" + (primitive ? "((Object) " + read.code + ")" : read.code) + " == null) {");
         ctx.indent(1);
         String write = statementize(emitStatementExpr(plainAssign(a, lhs), ctx).code);
         if (!write.isEmpty()) {
@@ -21262,7 +21301,9 @@ public final class JavaEmitter {
             String n = ((Ident) a.lhs).name;
             boolean nn = staticallyNonNull(a.rhs, emitted, ctx);
             if ("=".equals(a.op)) {
-                // An assignment re-promotes or demotes, by the static type assigned.
+                // An assignment re-promotes or demotes, by the static type assigned. Either
+                // way the field paths read through the old value (`n.f`) no longer hold.
+                ctx.demote(n);
                 if (nn) {
                     promoteNonNull(n, ctx);
                 } else {
@@ -21276,6 +21317,26 @@ public final class JavaEmitter {
     }
 
     private Out emitAssignFlow(Assign a, Ctx ctx) {
+        if (a.lhs instanceof Ident && a.op.length() > 1 && a.op.endsWith("=") && !"??=".equals(a.op)
+                && ctx.lookup(((Ident) a.lhs).name) != null && ctx.promotedType(((Ident) a.lhs).name) != null) {
+            // `x += v` on a promoted local: the read is the promoted cast and the target the
+            // variable, so it is written `x = x + v`, the two emitted apart.
+            Binary b = new Binary().at(a.file, a.line, a.col);
+            b.left = a.lhs;
+            b.op = a.op.substring(0, a.op.length() - 1);
+            b.right = a.rhs;
+            Assign plain = new Assign().at(a.file, a.line, a.col);
+            plain.lhs = a.lhs;
+            plain.op = "=";
+            plain.rhs = b;
+            if (ctx.statementExpr == a) {
+                ctx.statementExpr = plain;
+            }
+            if (ctx.postfixAssign == a) {
+                ctx.postfixAssign = plain;
+            }
+            return emitAssignFlow(plain, ctx);
+        }
         Out shorted = emitShortedAssign(a, ctx);
         if (shorted != null) {
             return shorted;

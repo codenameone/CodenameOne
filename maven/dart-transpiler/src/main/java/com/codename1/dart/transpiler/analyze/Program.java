@@ -845,13 +845,21 @@ public final class Program {
      */
     private void separateLibraryPrivateMembers() {
         Map<String, List<Ast.Library>> declaring = new LinkedHashMap<String, List<Ast.Library>>();
-        Set<String> excluded = new HashSet<String>();
+        // Top-level names are excluded per library: renaming a member whose name a top-level
+        // declaration of the SAME library also has would rename that declaration's references
+        // too. Another library declaring only the member is still separated.
+        Map<Ast.Library, Set<String>> excludedBy = new java.util.IdentityHashMap<Ast.Library, Set<String>>();
         for (Ast.Library lib : libraries) {
+            Set<String> excluded = new HashSet<String>();
+            excludedBy.put(lib, excluded);
             for (Ast.ClassDecl c : lib.classes) {
                 excluded.add(c.name);
             }
             for (Ast.EnumDecl e : lib.enums) {
                 excluded.add(e.name);
+                // Enum values keep their names (renamePrivate does not reach them); they are
+                // reached through their enum, so another library's `_x` cannot meet them.
+                excluded.addAll(e.entries);
             }
             for (Ast.TypedefDecl t : lib.typedefs) {
                 excluded.add(t.name);
@@ -887,8 +895,14 @@ public final class Program {
             if (stub) {
                 continue;
             }
+            // Every private name the library spells as a member, a local or a `#_x` literal
+            // takes part too, though it declares no member of that name: a dynamic `d._x` or
+            // a `#_x` from this library must not reach (or equal) another library's `_x`, and
+            // renaming the library's own spelling is what keeps it apart.
+            collectPrivateNames(lib, own, java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
             for (String n : own) {
-                if (n != null && n.startsWith("_") && !excluded.contains(n)) {
+                if (n != null && n.startsWith("_") && n.length() > 1) {
                     List<Ast.Library> l = declaring.get(n);
                     if (l == null) {
                         l = new ArrayList<Ast.Library>();
@@ -901,7 +915,21 @@ public final class Program {
         Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
         for (Map.Entry<String, List<Ast.Library>> en : declaring.entrySet()) {
             List<Ast.Library> l = en.getValue();
-            for (int i = 1; i < l.size(); i++) {
+            if (l.size() < 2) {
+                continue;
+            }
+            // A library that cannot rename the name keeps it; every other one is renamed.
+            Ast.Library keeper = l.get(0);
+            for (Ast.Library lib : l) {
+                if (excludedBy.get(lib).contains(en.getKey())) {
+                    keeper = lib;
+                    break;
+                }
+            }
+            for (int i = 0; i < l.size(); i++) {
+                if (l.get(i) == keeper || excludedBy.get(l.get(i)).contains(en.getKey())) {
+                    continue;
+                }
                 Map<String, String> m = renames.get(l.get(i));
                 if (m == null) {
                     m = new java.util.HashMap<String, String>();
@@ -1017,9 +1045,76 @@ public final class Program {
         }
     }
 
+    /// The private names {@link #renamePrivate} would rename in {@code o}, into {@code out}.
+    private static void collectPrivateNames(Object o, Set<String> out, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                collectPrivateNames(e, out, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        String sym = privateSymbol(o);
+        if (sym != null) {
+            out.add(sym);
+        }
+        boolean typeName = o instanceof Ast.ClassDecl || o instanceof Ast.EnumDecl || o instanceof Ast.TypedefDecl
+                || o instanceof Ast.Library;
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive()
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(o);
+                    if (f.getType() == String.class) {
+                        String nm = f.getName();
+                        if (!typeName && ("name".equals(nm) || "field".equals(nm)) && v != null
+                                && ((String) v).startsWith("_")) {
+                            out.add((String) v);
+                        }
+                    } else {
+                        collectPrivateNames(v, out, seen);
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+    }
+
+    /// The name of a `#_x` literal, or null.
+    private static String privateSymbol(Object o) {
+        if (!(o instanceof Ast.Call) || !((Ast.Call) o).symbolLiteral) {
+            return null;
+        }
+        Ast.Call c = (Ast.Call) o;
+        if (c.args.positional.size() != 1 || !(c.args.positional.get(0) instanceof Ast.StringLit)) {
+            return null;
+        }
+        List<Object> parts = ((Ast.StringLit) c.args.positional.get(0)).parts;
+        if (parts.size() != 1 || !(parts.get(0) instanceof String) || !((String) parts.get(0)).startsWith("_")) {
+            return null;
+        }
+        return (String) parts.get(0);
+    }
+
     private static void renamePrivate(Object o, Map<String, String> names, Set<Object> seen) {
         if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
             return;
+        }
+        String sym = privateSymbol(o);
+        if (sym != null && names.containsKey(sym)) {
+            ((Ast.StringLit) ((Ast.Call) o).args.positional.get(0)).parts.set(0, names.get(sym));
         }
         if (o instanceof Iterable) {
             for (Object e : (Iterable<?>) o) {

@@ -715,6 +715,8 @@ public final class Ast {
         public Args args = new Args();
         public boolean nullAware;
         public List<TypeRef> typeArgs = new ArrayList<TypeRef>();
+        /// A `#name` literal built as {@code Symbol("name")}: a private one is library scoped.
+        public boolean symbolLiteral;
     }
 
     /** Explicit `new X(...)`/`const X(...)`/`X.named(...)` when syntactically unambiguous. */

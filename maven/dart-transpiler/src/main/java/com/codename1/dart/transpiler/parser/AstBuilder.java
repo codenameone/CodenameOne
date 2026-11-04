@@ -2997,6 +2997,7 @@ public final class AstBuilder {
             Call sym = new Call();
             pos(sym, ctx);
             sym.name = "Symbol";
+            sym.symbolLiteral = true;
             sym.args.positional.add(sl);
             return sym;
         }
