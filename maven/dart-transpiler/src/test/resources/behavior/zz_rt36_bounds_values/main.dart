@@ -11,7 +11,7 @@ class Contra<T extends void Function(T)> {
   String toString() => 'Contra<$T>($v)';
 }
 
-class Dep<T extends Object, U extends T> {
+class Dep<T extends Object, U extends List<T>> {
   final int v;
   Dep(this.v);
   String toString() => 'Dep<$T, $U>($v)';
@@ -69,6 +69,9 @@ void main() {
   attempt('Mixed', () => m(6));
   dynamic o = Obj.new;
   attempt('Obj', () => o(7));
+  print(Dep<Object, List<Object>>(9));
+  print(Dep<Object, List<Object>>(9).runtimeType);
+  print(Dep<int, List<int>>(1).runtimeType.toString());
   attempt('apply', () => Function.apply(Contra.new, [8]));
 
   for (final f in <dynamic>[Fo.new, Nul.new, Top.new, Cn.new, Ne.new]) {

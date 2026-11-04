@@ -7345,6 +7345,32 @@ public final class JavaEmitter {
                 // generic closure itself, uninstantiated, so `keep<String>(..)` binds T per call.
                 t = init.type;
             }
+            if (init != null && !init.fromError && init.fn != null && init.fn.bare != null
+                    && isGenericFunctionType(declared) && STATIC_TEAR_OFF.matcher(init.fn.bare).matches()
+                    && !init.code.startsWith("DartRuntime.canonTearOff(")
+                    && ctx.lookup(init.fn.bare.substring(0, init.fn.bare.indexOf("::"))) == null) {
+                // `T Function<T>(T) id = identity;` is still the function `identity`, so
+                // `id == identity` holds: keyed as the tear-off `identity` is (identifyTearOff).
+                // Its own type variables erase, as in the closure's signature and in the key
+                // the tear-off is read by in an Object slot.
+                TypeRef erased = init.type != null && init.type.funcParams != null ? init.type : declared;
+                List<String> own = new ArrayList<String>();
+                if (erased.funcTypeParams != null) {
+                    own.addAll(erased.funcTypeParams);
+                }
+                if (declared.funcTypeParams != null) {
+                    own.addAll(declared.funcTypeParams);
+                }
+                erased = copyNonNull(substTypeParams(erased, own, java.util.Collections.<TypeRef>emptyList()));
+                erased.funcTypeParams = null;
+                String key = canonFunctionKey(init.fn.bare, erased, ctx);
+                if (key != null) {
+                    ctx.importClass("dart.runtime.DartRuntime");
+                    String jt = javaType(t, false, ctx);
+                    init = new Out("((" + jt + ") (Object) DartRuntime.canonTearOff(\"" + key + "\", \"" + jt
+                            + "\", (Object) " + init.code + "))", init.type, init.fn);
+                }
+            }
             // untyped closure locals get a SAM type by arity. A declared signature
             // (`int Function() f = ...`) has its own SAM type below; it was forced to
             // VoidFunc0 here, which a value-returning closure does not compile against.
@@ -9616,6 +9642,14 @@ public final class JavaEmitter {
         ClassDecl pc = pinnedCls != null ? pinnedCls : program.resolveClass(cls, ctx.library());
         if (pc == null || program.enums.containsKey(cls) || !(name.equals("new") || pc.namedCtor(name) != null)) {
             return out;
+        }
+        String slotKey = genericCtorSlotKeys.get(e);
+        if (slotKey != null && !out.code.startsWith("DartRuntime.canonTearOff(")) {
+            // The view only has to tell the Java types apart; the code is that, escaped.
+            ctx.importClass("dart.runtime.DartRuntime");
+            String view = out.code.replaceAll("\\s+", " ").replace("\\", "\\\\").replace("\"", "\\\"");
+            return new Out("DartRuntime.canonTearOff(\"" + slotKey + "\", \"" + view + "\", " + out.code + ")",
+                    out.type, out.fn);
         }
         TypeRef r = out.type != null ? out.type.funcReturn : null;
         if ((r == null || !pc.typeParams.isEmpty() && r.args.isEmpty()) && expected != null) {
@@ -12155,6 +12189,14 @@ public final class JavaEmitter {
     }
 
     private String[] collectionTestArgs(TypeRef t, Ctx ctx) {
+        return collectionTestArgs(t, false, ctx);
+    }
+
+    /// {@code exact}: a type argument's witness (witnessOf), which must also spell an
+    /// argument a test can skip. `List<Object>` tests like a raw List, but as the argument
+    /// of `Dep<Object, List<Object>>` it prints and compares as List<Object>, not
+    /// List<dynamic>.
+    private String[] collectionTestArgs(TypeRef t, boolean exact, Ctx ctx) {
         if (t == null || t.args.isEmpty()) {
             return null;
         }
@@ -12171,12 +12213,17 @@ public final class JavaEmitter {
         if (kind == null) {
             return null;
         }
-        String a0 = isDynamicType(t.arg(0)) ? null : reifiedArgWitness(t.arg(0), ctx);
-        String a1 = t.args.size() < 2 || isDynamicType(t.arg(1)) ? null : reifiedArgWitness(t.arg(1), ctx);
+        String a0 = skipsCollectionArg(t.arg(0), exact) ? null : reifiedArgWitness(t.arg(0), ctx);
+        String a1 = t.args.size() < 2 || skipsCollectionArg(t.arg(1), exact) ? null : reifiedArgWitness(t.arg(1), ctx);
         if (a0 == null && a1 == null) {
             return null;
         }
         return new String[] {kind, nullWitness(a0), nullWitness(a1)};
+    }
+
+    private boolean skipsCollectionArg(TypeRef a, boolean exact) {
+        return exact ? a == null || a == TypeRef.DYNAMIC || a.is("var") || a.is("FutureOr") && a.args.isEmpty()
+                : isDynamicType(a);
     }
 
     /// `f is R Function(P..)`: the closure's reified signature (TypeWitness.isFunctionOf);
@@ -15544,7 +15591,7 @@ public final class JavaEmitter {
             }
         }
         String nested = reifiedHead(t, ctx) != null ? reifiedArgWitnesses(t, ctx) : "";
-        String[] coll = nested.isEmpty() ? collectionTestArgs(t, ctx) : null;
+        String[] coll = nested.isEmpty() ? collectionTestArgs(t, true, ctx) : null;
         if (coll != null) {
             // `List<String>` as a type argument (`conv<List<String>>(..)`'s `as T`): the
             // witness carries the element arguments, which TypeWitness.test compares with
@@ -16987,7 +17034,7 @@ public final class JavaEmitter {
         boolean anyFn = false;
         boolean anyNonFn = false;
         for (Expr e : s.elements) {
-            Out o = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
+            Out o = typeLiteralAsValue(emitExpr(e, elem != null ? elem : genericCtorValueSlot(e, ctx), ctx), ctx);
             codes.add(elementCode(o, elem, ctx));
             if (elem == null && o.type != null) {
                 if (o.type.funcParams != null) {
@@ -21309,9 +21356,9 @@ public final class JavaEmitter {
             }
             return new Out(logicalOperand(l, ctx) + " || " + logicalOperand(r.out, ctx), TypeRef.BOOL);
         }
-        Out l = emitExpr(b.left, null, ctx);
+        Out l = emitExpr(b.left, genericCtorValueSlot(b.left, ctx), ctx);
         ctx.pushWriter(ctx.currentIndent());
-        Out r = emitExpr(b.right, null, ctx);
+        Out r = emitExpr(b.right, genericCtorValueSlot(b.right, ctx), ctx);
         String rLifted = ctx.popWriter();
         if (!rLifted.isEmpty() && !(b.left instanceof IntLit || b.left instanceof StringLit
                 || b.left instanceof BoolLit || b.left instanceof NullLit)) {
@@ -24373,7 +24420,13 @@ public final class JavaEmitter {
             boolean callback = core instanceof Call || core instanceof CtorCall || core instanceof Assign
                     || core instanceof IncDec || core instanceof Cascade || core instanceof AwaitExpr;
             ret = lastLambdaExprType;
-            if (ret == null || ret.is("void") || (callback && !ctx.valueCalledLocals.contains(name))) {
+            // A tear-off's closure (`final b = G.new;`) is the Dart function value itself,
+            // whose result is the constructed object however the local is used: typing it
+            // as a void callback when it is only stored or compared made it a VoidFunc1,
+            // which the generic value it holds is not.
+            boolean tearOff = genericTearOffLambdas.containsKey(l) || genericCtorTearOffKeys.containsKey(l);
+            if (ret == null || ret.is("void")
+                    || (callback && !tearOff && !ctx.valueCalledLocals.contains(name))) {
                 ret = TypeRef.VOID;
             }
         } else {
@@ -25108,8 +25161,10 @@ public final class JavaEmitter {
         // dart:core identical(a, b): unresolved before, so any use failed the build.
         if (n.equals("identical") && c.args.positional.size() == 2 && !program.functions.containsKey(n)) {
             ctx.importClass("dart.runtime.DartRuntime");
-            Out a = objectOperand(c.args.positional.get(0), emitExpr(c.args.positional.get(0), null, ctx), ctx);
-            Out b = objectOperand(c.args.positional.get(1), emitExpr(c.args.positional.get(1), null, ctx), ctx);
+            Expr a0 = c.args.positional.get(0);
+            Expr a1 = c.args.positional.get(1);
+            Out a = objectOperand(a0, emitExpr(a0, genericCtorValueSlot(a0, ctx), ctx), ctx);
+            Out b = objectOperand(a1, emitExpr(a1, genericCtorValueSlot(a1, ctx), ctx), ctx);
             // Object parameters: a primitive long/double/bool argument autoboxes.
             return new Out("DartRuntime.identical(" + a.code + ", " + b.code + ")", TypeRef.BOOL);
         }
@@ -33825,6 +33880,10 @@ public final class JavaEmitter {
                         }
                     }
                     fBoundedToBounds |= fails;
+                    // Still the generic constructor's one Dart value, only instantiated when
+                    // called: `G.new == G.new`, `identical(G.new, b)` and `{G.new, b}` with
+                    // `final b = G.new;` compare it by the key the generic local carries.
+                    genericCtorSlotKeys.put(posNode, "new " + javaClassName(pc) + "<>." + name);
                     inferred = new ArrayList<TypeRef>();
                     for (int i = 0; i < tps.size(); i++) {
                         TypeRef a = toBounds.get(i);
@@ -34074,6 +34133,34 @@ public final class JavaEmitter {
         }
         return l;
     }
+
+    /// Object for `G.new` of a generic class in a slot that types nothing (an operand of
+    /// `==` or identical, an element of an untyped set literal, a `.hashCode` receiver),
+    /// else null. Dart reads the generic constructor there, uninstantiated; with no slot
+    /// type the emitter would instantiate it for a call nobody makes, as a fresh closure
+    /// that equals nothing (and, from two sides of one `==`, is no functional type javac
+    /// can infer).
+    private TypeRef genericCtorValueSlot(Expr e, Ctx ctx) {
+        Expr x = stripParens(e);
+        if (!(x instanceof PropertyGet) || !(((PropertyGet) x).target instanceof Ident)) {
+            return null;
+        }
+        Ident t = (Ident) ((PropertyGet) x).target;
+        if (t.typeArgs != null || ctx.lookup(t.name) != null) {
+            return null;
+        }
+        ClassDecl pc = t.pinnedClass != null ? t.pinnedClass : program.resolveClass(t.name, ctx.library());
+        String n = ((PropertyGet) x).name;
+        if (pc == null || pc.typeParams.isEmpty() || program.enums.containsKey(t.name)
+                || !(n.equals("new") || pc.namedCtor(n) != null)) {
+            return null;
+        }
+        return new TypeRef("Object");
+    }
+
+    /// Generic constructor tear-offs in an Object, Function or dynamic slot, each with the
+    /// genericCtorTearOffKeys key of the uninstantiated constructor it is.
+    private final java.util.Map<Node, String> genericCtorSlotKeys = new java.util.IdentityHashMap<Node, String>();
 
     /// The closures genericTearOffClosure desugared a generic tear-off to, each with the
     /// `Lib::fn` its function is canonicalized by (null for a constructor).
