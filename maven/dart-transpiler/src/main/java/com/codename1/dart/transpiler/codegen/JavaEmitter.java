@@ -21211,6 +21211,16 @@ public final class JavaEmitter {
             return new Out("Double." + name + "(((Number) " + paren(target.code) + ").doubleValue())",
                     TypeRef.BOOL);
         }
+        if (tt.is("num") && !program.classes.containsKey("num") && name.equals("isNegative")) {
+            // Through the double value, exact for an int, which is never -0.0.
+            return new Out("dart.core.CoreStatics.isNegative(((Number) " + paren(target.code) + ").doubleValue())",
+                    TypeRef.BOOL);
+        }
+        if (tt.is("num") && !program.classes.containsKey("num") && name.equals("sign")) {
+            // num.sign answers the receiver's own kind (an int's is an int), so it
+            // dispatches on the boxed value.
+            return new Out("((Number) dart.runtime.Dyn.get(" + target.code + ", \"sign\"))", new TypeRef("num"));
+        }
         // The same implicit members on a stub enum, which is a plain Java enum.
         if (!program.enums.containsKey(tt.name) && stubs.isStubEnum(tt.name)
                 && (name.equals("index") || name.equals("name"))) {
@@ -23654,8 +23664,9 @@ public final class JavaEmitter {
                     return new Out("(" + left.code + " != null ? " + fnArmTo(new Out(left.code, copyNonNull(left.type)), fb, ctx)
                             + " : " + fnArmTo(right, fb, ctx) + ")", fb);
                 }
-                return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
-                        ifNullType(left.type, right.type, ctx));
+                TypeRef it = ifNullType(left.type, right.type, ctx);
+                return new Out("(" + left.code + " != null ? " + ifNullLeftArm(left.code, left.type, it, ctx)
+                        + " : " + right.code + ")", it);
             }
             String tmp = ctx.newTemp();
             if (jt == null) {
@@ -23679,8 +23690,9 @@ public final class JavaEmitter {
                 return new Out("((" + tmp + " = " + left.code + ") != null ? "
                         + fnArmTo(new Out(tmp, copyNonNull(left.type)), fb, ctx) + " : " + fnArmTo(right, fb, ctx) + ")", fb);
             }
-            return new Out("((" + tmp + " = " + left.code + ") != null ? " + tmp + " : " + right.code + ")",
-                    ifNullType(left.type, right.type, ctx));
+            TypeRef it = ifNullType(left.type, right.type, ctx);
+            return new Out("((" + tmp + " = " + left.code + ") != null ? " + ifNullLeftArm(tmp, left.type, it, ctx)
+                    + " : " + right.code + ")", it);
         }
         if (b.op.equals("&&")) {
             // `x is T && x.member`: the left `is` guard flow-promotes x to T for the right operand.
@@ -29143,7 +29155,20 @@ public final class JavaEmitter {
             }
             return o;
         }
-        return emitExpr(a, param, ctx);
+        Out o = emitExpr(a, param, ctx);
+        if (param != null && param.name != null && o.type != null && !param.name.equals(o.type.name)) {
+            // A `T extends String` argument for a String parameter: Java erased T to
+            // Object, so the value is passed viewed as its bound.
+            TypeRef b = typeVarBound(o.type, ctx);
+            if (b != null && b.name != null && (b.name.equals(param.name)
+                    || param.is("num") && (b.is("int") || b.is("double")))) {
+                Out v = typeParamBoundView(o, ctx);
+                if (v != null) {
+                    return v;
+                }
+            }
+        }
+        return o;
     }
 
     /// An `Iterable<Object?>` parameter of a runtime method that takes any Java Iterable
@@ -29364,7 +29389,7 @@ public final class JavaEmitter {
             }
             if (n.equals("compareTo")) {
                 return new Out("DString.compareTo(" + target.code + ", "
-                        + coreArg(pos.get(0), null, ctx).code + ")", TypeRef.INT);
+                        + coreArg(pos.get(0), TypeRef.STRING, ctx).code + ")", TypeRef.INT);
             }
             if (n.equals("toUpperCase") || n.equals("toLowerCase")) {
                 // Through the runtime, not Java's String methods: those follow the
@@ -29457,6 +29482,19 @@ public final class JavaEmitter {
             }
             return new Out("((Number) dart.runtime.Dyn.call(" + target.code + ", \"" + n + "\", new Object[] {"
                     + args + "}))", new TypeRef("num"));
+        }
+        if (tt.is("num") && pos.isEmpty() && (n.equals("floorToDouble") || n.equals("ceilToDouble")
+                || n.equals("roundToDouble"))) {
+            // Each answers a double for an int receiver too, the same as for that int as a
+            // double, so a num reads them through its double value.
+            ctx.importClass("dart.runtime.DartRuntime");
+            return intrinsicCall(new Out("DartRuntime.numToDouble(" + target.code + ")", TypeRef.DOUBLE), c, ctx);
+        }
+        if (tt.is("num") && n.equals("toStringAsFixed") && pos.size() == 1) {
+            // num.toStringAsFixed: an int receiver formats as its double, as int's does.
+            ctx.importClass("dart.runtime.DartRuntime");
+            return new Out("DartRuntime.toStringAsFixed(DartRuntime.numToDouble(" + target.code + "), "
+                    + coreArg(pos.get(0), TypeRef.INT, ctx).code + ")", TypeRef.STRING);
         }
         if (tt.is("num") && pos.isEmpty()) {
             // A value typed only `num` -- `(json['id'] as num).toInt()`, the shape
@@ -34018,14 +34056,32 @@ public final class JavaEmitter {
     /// The static type of `a ?? b`, UP(NonNull(A), B), where Dart's UP replaces a type
     /// variable by its bound when the other side is not that variable: `v ?? 0` for
     /// `T extends num?` is UP(num, int), a num -- not an Object.
+    /// The left arm of `a ?? b` as the operator's type {@code it}. A type variable
+    /// erases to Object in Java, so when UP replaced it by its bound (`v ?? 'x'` for
+    /// `T extends String?` is a String) the arm is viewed as the bound; javac otherwise
+    /// rejects the conditional wherever a String is expected.
+    private String ifNullLeftArm(String code, TypeRef lt, TypeRef it, Ctx ctx) {
+        if (lt == null || it == null || it.name == null || it.name.equals(lt.name)
+                || typeVarBound(lt, ctx) == null || it.is("Object") || it.is("dynamic")
+                || it.funcParams != null || it.funcReturn != null) {
+            return code;
+        }
+        return "((" + javaType(copyNonNull(it), true, ctx) + ") (Object) " + code + ")";
+    }
+
     private TypeRef ifNullType(TypeRef lt, TypeRef rt, Ctx ctx) {
         if (lt != null && rt != null && lt.name != null && !lt.name.equals(rt.name)) {
-            TypeRef lb = numericTypeVarBound(lt, ctx);
-            TypeRef rb = numericTypeVarBound(rt, ctx);
+            // UP(X, Y) with X a type variable and Y not that variable is UP(bound(X), Y),
+            // for any bound: `v ?? 'x'` for `T extends String?` is a String.
+            TypeRef lb = typeVarBound(lt, ctx);
+            TypeRef rb = typeVarBound(rt, ctx);
             if (lb != null || rb != null) {
-                TypeRef l2 = lb != null ? new TypeRef(lb.name) : lt;
-                TypeRef r2 = rb != null ? new TypeRef(rb.name) : rt;
-                r2.nullable = rb != null ? rt.nullable : r2.nullable;
+                TypeRef l2 = lb != null ? lb : lt;
+                TypeRef r2 = rt;
+                if (rb != null) {
+                    r2 = copyNonNull(rb);
+                    r2.nullable = rt.nullable || rb.nullable;
+                }
                 return ifNullType(l2, r2);
             }
         }
@@ -36113,6 +36169,14 @@ public final class JavaEmitter {
                 && !program.classes.containsKey(t.name) && !stubs.classes.containsKey(t.name)) {
             // `FormatException fe = ...` as a declared type: the runtime class, imported.
             ctx.importClass(CORE_ERRORS.get(t.name));
+        }
+        if (t.is("Comparable") && t.args.size() == 1 && t.funcParams == null
+                && !program.classes.containsKey("Comparable")
+                && (t.arg(0).is("num") || t.arg(0).is("int") || t.arg(0).is("double"))) {
+            // dart:core Comparable<num>: both an int and a double are one, but Java's Long
+            // and Double are Comparable only to themselves, so no Java instantiation holds
+            // both. Raw Comparable does; its compareTo goes through DartComparable anyway.
+            return "Comparable";
         }
         if (t.is("Pattern") && !program.classes.containsKey("Pattern") && !stubs.classes.containsKey("Pattern")) {
             // dart:core Pattern: a String or a RegExp at run time, which share no
@@ -39201,13 +39265,29 @@ public final class JavaEmitter {
     /// the enclosing class's or extension's), following a bound that is itself a type
     /// parameter (`U extends T`, `T extends num`); null when {@code t} is no such parameter.
     private TypeRef numericTypeVarBound(TypeRef t, Ctx ctx) {
+        TypeRef bound = typeVarBound(t, ctx);
+        if (bound == null || !bound.args.isEmpty()) {
+            return null;
+        }
+        return bound.is("num") || bound.is("int") || bound.is("double") ? bound : null;
+    }
+
+    /// The bound of the type parameter {@code t} names (a method's own, which shadows the
+    /// enclosing class's, then the class's, then an extension's), followed through bounds
+    /// that are themselves type parameters (`U extends T`, `T extends String`) to the
+    /// first that is not; null when {@code t} is no type parameter or its bound is implicit.
+    private TypeRef typeVarBound(TypeRef t, Ctx ctx) {
         TypeRef tt = t;
+        boolean nullable = false;
         for (int depth = 0; depth < 8; depth++) {
-            if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null
-                    || tt.funcParams != null) {
+            if (tt == null || tt.name == null) {
                 return null;
             }
-            TypeRef bound = null;
+            if (!tt.args.isEmpty() || tt.funcReturn != null || tt.funcParams != null) {
+                // a generic or function type is never a type parameter: it is the bound
+                return depth == 0 ? null : tt;
+            }
+            TypeRef bound;
             java.util.Map<String, TypeRef> mb = ctx.methodTypeParamBounds;
             ClassDecl cc = ctx.currentClass;
             if (mb != null && mb.containsKey(tt.name)) {
@@ -39220,14 +39300,20 @@ public final class JavaEmitter {
                 // generic in the extension's own T
                 bound = ctx.currentExtension.typeParamBounds.get(tt.name);
             } else {
+                if (depth == 0) {
+                    return null;
+                }
+                if (nullable && !tt.nullable) {
+                    TypeRef n = copyNonNull(tt);
+                    n.nullable = true;
+                    return n;
+                }
+                return tt;
+            }
+            if (bound == null || bound.name == null || bound.name.equals(tt.name)) {
                 return null;
             }
-            if (bound == null || !bound.args.isEmpty()) {
-                return null;
-            }
-            if (bound.is("num") || bound.is("int") || bound.is("double")) {
-                return bound;
-            }
+            nullable |= bound.nullable;
             tt = bound;
         }
         return null;
@@ -39235,41 +39321,26 @@ public final class JavaEmitter {
 
     private Out typeParamBoundView(Out target, Ctx ctx) {
         TypeRef tt = target.type;
-        ClassDecl cc = ctx.currentClass;
         if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null) {
             return null;
         }
-        TypeRef bound = null;
-        java.util.Map<String, TypeRef> mb = ctx.methodTypeParamBounds;
-        if (mb != null && mb.containsKey(tt.name)) {
-            // a method's own type parameter shadows the class's
-            bound = mb.get(tt.name);
-            if (bound != null && (mb.containsKey(bound.name)
-                    || (cc != null && cc.typeParams.contains(bound.name)))) {
-                return null;
-            }
-        } else {
-            if (cc == null || cc.typeParamBounds == null || !cc.typeParams.contains(tt.name)) {
-                return null;
-            }
-            bound = cc.typeParamBounds.get(tt.name);
-            if (bound != null && cc.typeParams.contains(bound.name)) {
-                return null;
-            }
-        }
+        TypeRef bound = typeVarBound(tt, ctx);
         // Comparable bounds keep the type-variable compareTo path (DartComparable.compare,
         // answering Dart's int), never java.lang.Comparable's int-returning compareTo.
-        if (bound == null || bound.name == null || bound.name.equals(tt.name)
-                || bound.name.equals("Comparable")) {
+        if (bound == null || bound.name == null || bound.is("Comparable") || bound.is("Object")
+                || bound.is("dynamic") || bound.funcParams != null || bound.funcReturn != null) {
             return null;
         }
-        // `L extends List<int>`: a core collection bound reads its members through the
-        // runtime collection type, as a value of the bound type itself would.
-        boolean coreBound = bound.is("List") || bound.is("Iterable") || bound.is("Set") || bound.is("Map");
+        // `L extends List<int>`, `T extends String`, `T extends num`: a core bound reads its
+        // members through the runtime type, as a value of the bound type itself would.
+        boolean coreBound = bound.is("List") || bound.is("Iterable") || bound.is("Set") || bound.is("Map")
+                || SEALED_CORE.contains(bound.name) || bound.is("num");
         if (programClass(bound.name, ctx) == null && !stubs.isStubClass(bound.name) && !coreBound) {
             return null;
         }
-        return new Out("(" + castToBare(javaType(bound, true, ctx), target) + ")", bound);
+        // NonNull(T) (promoted, or `v!`) of a `T extends String?` is the bound without `?`.
+        TypeRef seen = tt.nullable ? bound : copyNonNull(bound);
+        return new Out("(" + castToBare(javaType(seen, true, ctx), target) + ")", seen);
     }
 
     private MethodDecl findMethodInHierarchy(ClassDecl c, String name) {

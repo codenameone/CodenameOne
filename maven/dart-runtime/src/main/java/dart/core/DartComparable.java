@@ -45,6 +45,14 @@ public final class DartComparable {
         if (a instanceof DartEnumComparable) {
             return ((DartEnumComparable) a).compareTo$(b);
         }
+        if (a instanceof String && b instanceof String) {
+            // Dart's String.compareTo answers -1, 0 or 1; Java's answers the difference of
+            // the first differing code units ('e' against 'c' is 2). Both order by UTF-16
+            // code unit, so only the magnitude needs folding. Hand-folded: ParparVM's
+            // class library has no Integer.signum.
+            int c = ((String) a).compareTo((String) b);
+            return c > 0 ? 1 : c < 0 ? -1 : 0;
+        }
         if (a instanceof Comparable) {
             return ((Comparable) a).compareTo(b);
         }
