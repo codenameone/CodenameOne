@@ -406,10 +406,19 @@ public final class Program {
                     }
                     List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
                     for (Ast.TypeRef a : rep.args) {
-                        args.add(substRecordArg(a, subst));
+                        Ast.TypeRef sa = substRecordArg(a, subst);
+                        // `List<s.Shape>`: an argument written in the extension type's
+                        // library is resolved there, never by the reader's imports
+                        args.add(sa == a ? pinnedCopy(a, et.ownerLibrary, lib) : sa);
                     }
                     t.name = rep.name;
                     t.args = args;
+                    if (rep.resolved != null || rep.runtimeOnly) {
+                        // the representation was already erased (and pinned) in its own
+                        // library: `extension type Wrap(Area a)` over `Area(s.Shape s)`
+                        t.resolved = rep.resolved;
+                        t.runtimeOnly = rep.runtimeOnly;
+                    }
                     // `extension type Fn(int Function(int) f)`: the function shape is the
                     // type, so a closure passed where an Fn is expected gets its context
                     t.funcParams = rep.funcParams;
@@ -433,7 +442,21 @@ public final class Program {
      */
     private void pinPrefixedRepresentation(Ast.TypeRef t, Ast.Library scope, Ast.Library lib) {
         int dot = t.name == null ? -1 : t.name.indexOf('.');
-        if (scope == lib || dot <= 0 || t.resolved != null) {
+        if (scope == lib || t.resolved != null || t.name == null) {
+            return;
+        }
+        if (dot < 0) {
+            // a bare name of the representation's library (`Shape` imported there without a
+            // prefix) may not be visible, or may be another class, where it is read
+            if (scope != null && classesByName.containsKey(t.name)) {
+                Ast.ClassDecl c = resolveClass(t.name, scope);
+                if (c != null && c.ownerLibrary != null) {
+                    t.resolved = c;
+                }
+            }
+            return;
+        }
+        if (dot == 0) {
             return;
         }
         String prefix = t.name.substring(0, dot);
@@ -446,6 +469,27 @@ public final class Program {
             t.name = bare;
             t.resolved = c;
         }
+    }
+
+    /**
+     * A copy of {@code a}, written in {@code scope}, with every program class it names
+     * (its type arguments included) pinned in {@code scope}: the copy is read in {@code lib}.
+     */
+    private Ast.TypeRef pinnedCopy(Ast.TypeRef a, Ast.Library scope, Ast.Library lib) {
+        if (a == null || scope == lib || a.funcParams != null) {
+            return a;
+        }
+        Ast.TypeRef c = new Ast.TypeRef(a.name);
+        c.nullable = a.nullable;
+        c.resolved = a.resolved;
+        c.runtimeOnly = a.runtimeOnly;
+        c.extensionType = a.extensionType;
+        c.aliasedFrom = a.aliasedFrom;
+        for (Ast.TypeRef x : a.args) {
+            c.args.add(pinnedCopy(x, scope, lib));
+        }
+        pinPrefixedRepresentation(c, scope, lib);
+        return c;
     }
 
     /**

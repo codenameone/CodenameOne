@@ -2073,6 +2073,30 @@ public final class JavaEmitter {
         StringBuilder body = new StringBuilder();
         body.append("    private ").append(extJavaName(ext)).append("() {\n    }\n\n");
         for (MethodDecl m : ext.methods) {
+            if (m.isStatic && m.typeParams != null && !m.typeParams.isEmpty()
+                    && !methodWitnesses(m).isEmpty()) {
+                // `static List<T> gen<T>(T x) => [x]`: a generic static takes its type
+                // arguments' witnesses as a class static does, so the list it builds is a
+                // List<int>, not a List<dynamic>; call sites and tear-offs pass them
+                // (emitExplicitExtensionCall, staticTearOff).
+                Method sm = new Method();
+                sm.name = m.name;
+                sm.isStatic = true;
+                sm.isGetter = m.isGetter;
+                sm.isSetter = m.isSetter;
+                sm.isAsync = m.isAsync;
+                sm.isSyncStar = m.isSyncStar;
+                sm.isAsyncStar = m.isAsyncStar;
+                sm.returnType = m.returnType;
+                sm.params = m.params;
+                sm.typeParams = m.typeParams;
+                sm.typeParamBounds = m.typeParamBounds;
+                sm.body = m.body;
+                sm.exprBody = m.exprBody;
+                sm.witnesses = methodWitnesses(m);
+                body.append(emitMethodLike(sm, ctx, false));
+                continue;
+            }
             ctx.pushScope();
             TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
             StringBuilder sig = new StringBuilder();
@@ -10259,6 +10283,11 @@ public final class JavaEmitter {
             if (fd != null && !fd.isGetter && fd.typeParams.isEmpty() && fd.returnType != null
                     && fd.returnType.extensionType != null) {
                 return fd.returnType;
+            }
+            // a generic one (`Boxed<Shape>(xs)`) with its type arguments bound from the call
+            if (fd != null && !fd.isGetter && !fd.typeParams.isEmpty() && fd.returnType != null
+                    && fd.returnType.extensionType != null) {
+                return bindMethodTypeParams(fd.returnType, fd, (Call) e, ctx);
             }
         }
         return null;
@@ -27066,8 +27095,26 @@ public final class JavaEmitter {
             ClassDecl ext = extensionTarget(c.target, ctx);
             MethodDecl m = ext == null ? null : ext.method(c.name);
             if (m != null && m.isStatic) {
-                TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
-                return new Out(extJavaName(ext) + "." + c.name + "(" + methodArgs(m.params, c.args, ctx) + ")", rt);
+                // as a class static's call (`Channel.make<S>(s)`): the written type arguments
+                // bind the parameters and the result, and a generic one gets its witnesses
+                String targs = "";
+                List<Param> mps = m.params;
+                if (c.typeArgs != null && !c.typeArgs.isEmpty() && m.typeParams != null
+                        && c.typeArgs.size() == m.typeParams.size()) {
+                    StringBuilder tb = new StringBuilder("<");
+                    for (int i = 0; i < c.typeArgs.size(); i++) {
+                        tb.append(i > 0 ? ", " : "").append(javaType(boxType(c.typeArgs.get(i)), true, ctx));
+                    }
+                    targs = tb.append('>').toString();
+                    mps = bindGenericParams(m.typeParams, m.params, c, new ArrayList<TypeRef>(), ctx);
+                }
+                TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
+                        : m.typeParams == null || m.typeParams.isEmpty() ? m.returnType
+                        : bindMethodTypeParams(m.returnType, m, c, ctx);
+                String code = extJavaName(ext) + "." + targs + c.name + "(" + withWitnesses(methodWitnessCall(m, c,
+                        callExpected(c, ctx), ctx), methodArgs(mps, c.args, ctx)) + ")";
+                // a List<T> bound to List<int> is a boxed DartList<Long> in the body
+                return new Out(m.returnType == null ? code : primitiveListSeen(code, m.returnType, rt, ctx), rt);
             }
             return null;
         }
@@ -27593,8 +27640,11 @@ public final class JavaEmitter {
                 ctx.ctorContextArgs = null;
             }
         }
-        // constructor of stub class
-        if (stubs.isStubClass(n)) {
+        // constructor of stub class -- unless the program declares an extension type of that
+        // name here (`extension type Wrap(Area a)` beside the runtime's Wrap widget): its
+        // primary constructor is a top-level function, as for a program class above
+        if (stubs.isStubClass(n) && program.extensionTypeIn(ctx.callPrefix == null ? n
+                : ctx.callPrefix + "." + n, ctx.library()) == null) {
             // `() => MapEntry(key, v)` where a MapEntry<K, V> is expected: Dart takes the
             // missing type arguments from the context type, so the Java instance does too.
             List<TypeRef> stubArgs = c.typeArgs;
@@ -28223,14 +28273,18 @@ public final class JavaEmitter {
                         targs = tb.append('>').toString();
                         mps = bindGenericParams(m.typeParams, m.params, c, new ArrayList<TypeRef>(), ctx);
                     }
-                    return new Out(jcls + "." + targs + n + "(" + withWitnesses(methodWitnessCall(m, c,
-                            callExpected(c, ctx), ctx), methodArgs(mps, c.args, ctx)) + ")",
-                            // `Result.capture(f)` with `capture<T>(Future<T>)`: the method's
-                            // own T is bound from the call, or the result names a type
-                            // variable the caller does not declare and its uses see Object.
-                            m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
-                                    : m.typeParams == null || m.typeParams.isEmpty() ? m.returnType
-                                    : bindMethodTypeParams(m.returnType, m, c, ctx));
+                    String scode = jcls + "." + targs + n + "(" + withWitnesses(methodWitnessCall(m, c,
+                            callExpected(c, ctx), ctx), methodArgs(mps, c.args, ctx)) + ")";
+                    // `Result.capture(f)` with `capture<T>(Future<T>)`: the method's
+                    // own T is bound from the call, or the result names a type
+                    // variable the caller does not declare and its uses see Object.
+                    TypeRef srt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
+                            : m.typeParams == null || m.typeParams.isEmpty() ? m.returnType
+                            : bindMethodTypeParams(m.returnType, m, c, ctx);
+                    // `static List<T> gen<T>(..)` bound to int built a boxed DartList<Long>,
+                    // viewed as the DartLongList a List<int> is held in, as for a function
+                    return new Out(m.typeParams == null || m.typeParams.isEmpty() || m.returnType == null ? scode
+                            : primitiveListSeen(scode, m.returnType, srt, ctx), srt);
                 }
                 CtorDecl named = pc.namedCtor(n);
                 if (named != null) {
@@ -36350,7 +36404,9 @@ public final class JavaEmitter {
     }
 
     private List<String> staticWitnessArgs(ClassDecl c, MethodDecl md, List<TypeRef> inst, Ctx ctx) {
-        return program.extensions.contains(c) ? new ArrayList<String>()
+        // an extension's generic static takes witnesses when its body reads them, as
+        // emitExtension declares it
+        return program.extensions.contains(c) && methodWitnesses(md).isEmpty() ? new ArrayList<String>()
                 : instantiatedWitnessArgs(md, md.typeParams, inst, ctx);
     }
 
@@ -36947,8 +37003,10 @@ public final class JavaEmitter {
                                 ift = inLibrary(ift, pc.ownerLibrary);
                             }
                             tearOffReturn = null;
-                            String lam = "((" + String.join(", ", ps) + ") -> " + staticOwnerName(pc) + "."
-                                    + name + "(" + joinArgs(sW, ps) + "))";
+                            // `List<T> gen<T>` at int: the body's DartList<Long> seen as the
+                            // DartLongList the instantiated SAM returns
+                            String lam = "((" + String.join(", ", ps) + ") -> " + primitiveListSeen(staticOwnerName(pc) + "."
+                                    + name + "(" + joinArgs(sW, ps) + ")", md.returnType, ift.funcReturn, ctx) + ")";
                             // One canonical value per instantiation: `C.sm == C.sm`.
                             String keyed = keyedInstantiatedTearOff(lam, null,
                                     instantiationKeyExpr(staticOwnerName(pc) + "::" + name, sInst, ctx), sInst, ift, ctx);
