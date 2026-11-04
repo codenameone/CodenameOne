@@ -12752,6 +12752,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         return kc == null ? 0 : kc.getPanOffset();
     }
 
+    /// The skin's bottom safe-area inset in screen pixels: where a Skin Designer
+    /// Android skin leaves room for the navigation bar. The safe area is screen
+    /// relative for those skins; a legacy skin that declares it in skin pixels
+    /// lands past the screen bottom and reads as 0.
+    private int simulatorNavigationBarHeight() {
+        Rectangle sc = getScreenCoordinates();
+        Rectangle safe = portrait ? safeAreaPortrait : safeAreaLandscape;
+        if (sc == null || safe == null) {
+            return 0;
+        }
+        int inset = sc.height - (safe.y + safe.height);
+        return inset > 0 && inset < sc.height / 4 ? inset : 0;
+    }
+
     /// Top of the simulated keyboard in screen pixels, or -1 when none is up.
     private int simulatedKeyboardTop() {
         com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
@@ -12759,7 +12773,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (kc == null || !kc.isShowing() || sc == null) {
             return -1;
         }
-        return sc.height - kc.getHeight();
+        return sc.height - kc.getBottomInset() - kc.getHeight();
     }
 
     /// A press on the main canvas, in screen pixels. Feeds the touch indicators and
@@ -12773,7 +12787,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         requestOverlayRepaint();
         int top = simulatedKeyboardTop();
-        if (top >= 0 && y >= top) {
+        // A press below the keyboard is on the navigation bar, not a key.
+        if (top >= 0 && y >= top && y < top + keyboardController.getHeight()) {
             keyboardController.pressAt(x, y - top);
             return true;
         }
@@ -12849,6 +12864,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             g.fillRect(0, 0, out.getWidth(), out.getHeight());
         }
         g.drawImage(src, 0, -pan, null);
+        com.codename1.impl.javase.vkb.KeyboardController kcNav = keyboardController;
+        int nav = kcNav == null || !kcNav.isShowing() ? 0 : (int) Math.round(kcNav.getBottomInset() * scale);
+        if (pan != 0 && nav > 0) {
+            // Panning moves the application window, not the navigation bar under
+            // it: draw that strip where it was.
+            int sy = src.getHeight() - nav;
+            g.drawImage(src, 0, sy, out.getWidth(), out.getHeight(), 0, sy, src.getWidth(), src.getHeight(), null);
+        }
         com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
         if (kc != null && (kc.isShowing() || kc.isAnimating())) {
             int h = kc.getKeyboard().preferredHeight(sc.width, sc.height);
@@ -12857,8 +12880,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             float frac = kc.visibleFraction();
             if (frac > 0f) {
+                // Android's keyboard opens above the navigation bar and slides
+                // in from behind it, so it is clipped to the area above the bar.
+                int bottom = sc.height - kc.getBottomInset();
                 Graphics2D kg = (Graphics2D) g.create();
-                kg.translate(0, (int) Math.round((sc.height - h * frac) * scale));
+                kg.clipRect(0, 0, out.getWidth(), (int) Math.round(bottom * scale));
+                kg.translate(0, (int) Math.round((bottom - h * frac) * scale));
                 kg.scale(scale, scale);
                 kc.getKeyboard().paint(kg, sc.width, h);
                 kg.dispose();
@@ -13013,6 +13040,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public boolean isTablet() {
             return JavaSEPort.this.isTablet();
+        }
+
+        public int navigationBarHeight() {
+            return simulatorNavigationBarHeight();
         }
 
         public void setResizeInset(int pixels) {
