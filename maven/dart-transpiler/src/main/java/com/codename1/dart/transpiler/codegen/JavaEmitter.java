@@ -2071,7 +2071,7 @@ public final class JavaEmitter {
         ctx.extensionSelfType = ext.extensionOn;
         ctx.currentExtension = ext;
         StringBuilder body = new StringBuilder();
-        body.append("    private ").append(ext.name).append("() {\n    }\n\n");
+        body.append("    private ").append(extJavaName(ext)).append("() {\n    }\n\n");
         for (MethodDecl m : ext.methods) {
             ctx.pushScope();
             TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
@@ -2112,7 +2112,7 @@ public final class JavaEmitter {
             ctx.popScope();
             body.append("    }\n\n");
         }
-        return finishClassFile(ext.name, "public final class " + ext.name, null, null, body, ctx, ext.file);
+        return finishClassFile(extJavaName(ext), "public final class " + extJavaName(ext), null, null, body, ctx, ext.file);
     }
 
     /**
@@ -19681,8 +19681,14 @@ public final class JavaEmitter {
         // it, and only the enclosing one is meant.
         if (ctx.currentExtension != null && ctx.currentExtension.getter(n) != null) {
             MethodDecl eg = ctx.currentExtension.getter(n);
-            return new Out(ctx.currentExtension.name + "." + n + "($self)",
+            return new Out(extJavaName(ctx.currentExtension) + "." + n + "($self)",
                     eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
+        }
+        // `extension Neg on Id` over an extension type: a bare `v` is the extension type's
+        // member on the extended value, as `this.v` is.
+        if (ctx.extensionSelfType != null && ctx.extensionSelfType.extensionType != null
+                && !lexicalTopLevel(n, ctx) && extensionTypeMember(ctx.extensionSelfType, n, true) != null) {
+            return emitMemberGet(new Out("$self", ctx.extensionSelfType), n, id, ctx);
         }
         // Inside `extension on List<E>`, a bare `length` is `this.length` on the extended value.
         if (ctx.extensionSelfType != null && !lexicalTopLevel(n, ctx)
@@ -20845,7 +20851,7 @@ public final class JavaEmitter {
         ClassDecl extTypeGet = extensionTypeMember(tt, name, true);
         if (extTypeGet != null) {
             MethodDecl eg = extTypeGet.getter(name);
-            return new Out(extTypeGet.name + "." + name + "(" + extensionSelf(target, tt, extTypeGet, ctx) + ")",
+            return new Out(extJavaName(extTypeGet) + "." + name + "(" + extensionSelf(target, tt, extTypeGet, ctx) + ")",
                     eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
         }
         // Cascade suppression: the receiver already fell to `dynamic` from a reported
@@ -21458,7 +21464,7 @@ public final class JavaEmitter {
         if (extCls != null) {
             MethodDecl eg = extCls.getter(name);
             String self = extensionSelf(target, tt, extCls, ctx);
-            return new Out(extCls.name + "." + name + "(" + self + ")",
+            return new Out(extJavaName(extCls) + "." + name + "(" + self + ")",
                     eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
         }
         // An extension METHOD torn off (`f.catchError(completer.completeErrorIfPending)`):
@@ -22471,8 +22477,8 @@ public final class JavaEmitter {
                 Out once = new Out(receiverOnce(tgt, ctx), tgt.type);
                 String setSelf = extensionSelf(once, tgt.type, extTypeSet, ctx);
                 String getSelf = extensionSelf(once, tgt.type, extTypeGet, ctx);
-                return voidSetterWrite(a, extTypeSet.name + "." + pg.name, setSelf,
-                        extTypeGet.name + "." + pg.name + "(" + getSelf + ")", pt, ctx);
+                return voidSetterWrite(a, extJavaName(extTypeSet) + "." + pg.name, setSelf,
+                        extJavaName(extTypeGet) + "." + pg.name + "(" + getSelf + ")", pt, ctx);
             }
             if (!a.op.equals("=")) {
                 extTypeSet = null;
@@ -22484,12 +22490,12 @@ public final class JavaEmitter {
                 String self = extensionSelf(tgt, tgt.type, extTypeSet, ctx);
                 String value = coerce(emitExpr(a.rhs, pt, ctx), pt, ctx);
                 if (ctx.statementExpr == a) {
-                    return new Out(extTypeSet.name + "." + pg.name + "(" + self + ", " + value + ")", pt);
+                    return new Out(extJavaName(extTypeSet) + "." + pg.name + "(" + self + ", " + value + ")", pt);
                 }
                 String jt = declarableType(pt, false, ctx);
                 String v = ctx.newTemp();
                 ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + value + ";");
-                ctx.writer().line(extTypeSet.name + "." + pg.name + "(" + self + ", " + v + ");");
+                ctx.writer().line(extJavaName(extTypeSet) + "." + pg.name + "(" + self + ", " + v + ");");
                 return new Out(v, pt);
             }
             if (tgt.type != null) {
@@ -22529,19 +22535,19 @@ public final class JavaEmitter {
                         }
                         if (ge != null) {
                             Out recv = new Out(receiverOnce(tgt, ctx), tgt.type);
-                            return voidSetterWrite(a, ext.name + "." + pg.name, extensionSelf(recv, flow, ext, ctx),
-                                    ge.name + "." + pg.name + "(" + extensionSelf(recv, flow, ge, ctx) + ")", pt, ctx);
+                            return voidSetterWrite(a, extJavaName(ext) + "." + pg.name, extensionSelf(recv, flow, ext, ctx),
+                                    extJavaName(ge) + "." + pg.name + "(" + extensionSelf(recv, flow, ge, ctx) + ")", pt, ctx);
                         }
                     } else {
                         String self = extensionSelf(tgt, tgt.type, ext, ctx);
                         String value = coerce(emitExpr(a.rhs, pt, ctx), pt, ctx);
                         if (ctx.statementExpr == a) {
-                            return new Out(ext.name + "." + pg.name + "(" + self + ", " + value + ")", pt);
+                            return new Out(extJavaName(ext) + "." + pg.name + "(" + self + ", " + value + ")", pt);
                         }
                         String jt = declarableType(pt, false, ctx);
                         String v = ctx.newTemp();
                         ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + value + ";");
-                        ctx.writer().line(ext.name + "." + pg.name + "(" + self + ", " + v + ");");
+                        ctx.writer().line(extJavaName(ext) + "." + pg.name + "(" + self + ", " + v + ");");
                         return new Out(v, pt);
                     }
                 }
@@ -27015,7 +27021,7 @@ public final class JavaEmitter {
             MethodDecl m = ext == null ? null : ext.method(c.name);
             if (m != null && m.isStatic) {
                 TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
-                return new Out(ext.name + "." + c.name + "(" + methodArgs(m.params, c.args, ctx) + ")", rt);
+                return new Out(extJavaName(ext) + "." + c.name + "(" + methodArgs(m.params, c.args, ctx) + ")", rt);
             }
             return null;
         }
@@ -27031,11 +27037,13 @@ public final class JavaEmitter {
         if (em == null || em.isStatic || em.isGetter || em.isSetter) {
             return null;
         }
-        Out recv = emitExpr(app.args.positional.get(0), null, ctx);
+        // An extension type's constructor gives its argument the representation as its
+        // context type, as any call does (`Fn((x) => x + 1).call2(1)` types x as int).
+        Out recv = emitExpr(app.args.positional.get(0), ext.isExtensionType ? ext.extensionOn : null, ctx);
         TypeRef rtype = recv.type == null ? ext.extensionOn : recv.type;
         String rest = methodArgs(extensionCallbackParams(ext, em.params, rtype), c.args, ctx);
         String self = extensionSelf(recv, rtype, ext, ctx);
-        return new Out(ext.name + "." + c.name + "(" + self + (rest.isEmpty() ? "" : ", " + rest) + ")",
+        return new Out(extJavaName(ext) + "." + c.name + "(" + self + (rest.isEmpty() ? "" : ", " + rest) + ")",
                 em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
     }
 
@@ -27390,6 +27398,12 @@ public final class JavaEmitter {
             if (sm != null) {
                 return new Out("$self." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
             }
+            // a method of the extension type the extension is on (`extension Neg on Id`)
+            if (ctx.extensionSelfType.extensionType != null && resolveTopLevel(n, ctx) == null
+                    && (ctx.currentExtension == null || ctx.currentExtension.method(n) == null)
+                    && extensionTypeMember(ctx.extensionSelfType, n, false) != null) {
+                return emitMethodCallOn(self, c, ctx);
+            }
             // an instance method of a program class (or interface) the extension is on
             ClassDecl onCls = programClass(ctx.extensionSelfType.name, ctx);
             if (onCls != null && resolveTopLevel(n, ctx) == null
@@ -27404,9 +27418,31 @@ public final class JavaEmitter {
             }
             ClassDecl extCls = ctx.currentExtension != null && ctx.currentExtension.method(n) != null
                     ? ctx.currentExtension : findUserExtension(ctx.extensionSelfType.name, n, false, ctx);
+            if (extCls == null && ctx.currentExtension != null && ctx.currentExtension.getter(n) != null
+                    && resolveTopLevel(n, ctx) == null) {
+                // `f(x)` where f is a getter of the extension (an extension type's
+                // function-typed representation): call the value it answers
+                Ast.ThisExpr self0 = new Ast.ThisExpr();
+                self0.file = c.file;
+                self0.line = c.line;
+                self0.col = c.col;
+                PropertyGet g = new PropertyGet();
+                g.file = c.file;
+                g.line = c.line;
+                g.col = c.col;
+                g.target = self0;
+                g.name = n;
+                Call inv = new Call();
+                inv.file = c.file;
+                inv.line = c.line;
+                inv.col = c.col;
+                inv.target = g;
+                inv.args = c.args;
+                return emitExpr(inv, expected, ctx);
+            }
             if (extCls != null) {
                 MethodDecl em = extCls.method(n);
-                return new Out(extCls.name + "." + n + "($self"
+                return new Out(extJavaName(extCls) + "." + n + "($self"
                         + (c.args.positional.isEmpty() && c.args.named.isEmpty() ? "" : ", "
                         + methodArgs(em.params, c.args, ctx)) + ")",
                         em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
@@ -27482,8 +27518,13 @@ public final class JavaEmitter {
             }
             return new Out("new " + simple + "(" + msg + ")", new TypeRef("Exception"));
         }
-        // constructor of program class
+        // constructor of program class -- unless the name is an extension type here
+        // (`a.Id(5)` beside b.dart's `class Id`): its primary constructor is a function.
         ClassDecl pc = program.classes.get(n);
+        if (pc != null && program.extensionTypeIn(ctx.callPrefix == null ? n : ctx.callPrefix + "." + n,
+                ctx.library()) != null) {
+            pc = null;
+        }
         if (pc != null) {
             List<TypeRef> ta = inferredWitnessTypeArgs(pc, c.typeArgs, expected); 
             if ((ta == null || ta.isEmpty()) && !pc.typeParams.isEmpty()) {
@@ -27848,7 +27889,7 @@ public final class JavaEmitter {
         if (extTypeM != null) {
             MethodDecl em = extTypeM.method(c.name);
             String rest = methodArgs(extensionCallbackParams(extTypeM, em.params, tt), c.args, ctx);
-            return new Out(extTypeM.name + "." + c.name + "(" + extensionSelf(target, tt, extTypeM, ctx)
+            return new Out(extJavaName(extTypeM) + "." + c.name + "(" + extensionSelf(target, tt, extTypeM, ctx)
                     + (rest.isEmpty() ? "" : ", " + rest) + ")",
                     em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
         }
@@ -28492,7 +28533,7 @@ public final class JavaEmitter {
             MethodDecl em = extCls.method(n);
             String rest = methodArgs(extensionCallbackParams(extCls, em.params, tt), c.args, ctx);
             String self = extensionSelf(target, tt, extCls, ctx);
-            return new Out(extCls.name + "." + n + "(" + self
+            return new Out(extJavaName(extCls) + "." + n + "(" + self
                     + (rest.isEmpty() ? "" : ", " + rest) + ")",
                     em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
         }
@@ -36252,12 +36293,26 @@ public final class JavaEmitter {
         return names.isEmpty() ? t : substTypeParams(t, names, args);
     }
 
+    /// The Java class an extension is emitted as: its Dart name, unless a program class or
+    /// another extension has that name too (`extension type Id` in a.dart beside `class Id`
+    /// in b.dart), when it takes the library-path prefix a colliding class does.
+    private String extJavaName(Ast.ClassDecl ext) {
+        boolean collides = program.classesByName.containsKey(ext.name) || program.enumsByName.containsKey(ext.name);
+        for (Ast.ClassDecl o : program.extensions) {
+            collides |= o != ext && ext.name.equals(o.name);
+        }
+        if (!collides || ext.ownerLibrary == null) {
+            return ext.name;
+        }
+        return unrenamedClash(libPathPrefix(ext.ownerLibrary) + ext.name);
+    }
+
     private String stubExtensionSimpleName(Ast.ClassDecl ext, Ctx ctx) {
         if (ext.javaName != null) {
             ctx.importClass(ext.javaName);
             return ext.javaName.substring(ext.javaName.lastIndexOf('.') + 1);
         }
-        return ext.name;
+        return extJavaName(ext);
     }
 
     private void importEnum(String dartName, Ctx ctx) {

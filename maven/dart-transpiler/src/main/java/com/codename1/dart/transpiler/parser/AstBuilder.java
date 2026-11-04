@@ -2097,6 +2097,10 @@ public final class AstBuilder {
         ObjectPattern o = new ObjectPattern();
         pos(o, ctx);
         o.type = new TypeRef(ctx.typeName().getText());
+        if (currentLib != null) {
+            // erased like any other type mention when it names an extension type
+            currentLib.namedTypes.add(o.type);
+        }
         if (ctx.typeArguments() != null) {
             for (Dart2Parser.TypeContext t : ctx.typeArguments().typeList().type()) {
                 o.type.args.add(buildType(t));

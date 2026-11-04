@@ -167,6 +167,7 @@ public final class Program {
             register(part, part);
         }
         lowerExtensionStatics();
+        lowerExtensionStaticTearOffs();
         separateLibraryPrivateMembers();
         separateLibraryPrivateTypedefs();
         restoreShadowedAliases();
@@ -372,19 +373,21 @@ public final class Program {
      * same name wins, as in {@link #expandRecordTypedefs}.
      */
     private void eraseExtensionTypes() {
-        Map<String, Ast.ClassDecl> ext = new java.util.HashMap<String, Ast.ClassDecl>();
+        boolean any = false;
         for (Ast.ClassDecl c : extensions) {
-            if (c.isExtensionType && !classesByName.containsKey(c.name)) {
-                ext.put(c.name, c);
-            }
+            any |= c.isExtensionType;
         }
-        if (ext.isEmpty()) {
+        if (!any) {
             return;
         }
         for (Ast.Library lib : libraries) {
             for (Ast.TypeRef t : lib.namedTypes) {
-                for (int depth = 0; depth < 16 && t.name != null && ext.containsKey(t.name); depth++) {
-                    Ast.ClassDecl et = ext.get(t.name);
+                Ast.Library scope = lib;
+                Ast.ClassDecl et;
+                for (int depth = 0; depth < 16 && t.name != null
+                        && (et = extensionTypeIn(t.name, scope)) != null; depth++) {
+                    // the representation is written in the extension type's own library
+                    scope = et.ownerLibrary;
                     if (t.extensionType == null) {
                         t.extensionType = et;
                     }
@@ -408,10 +411,85 @@ public final class Program {
                     }
                     t.name = rep.name;
                     t.args = args;
+                    // `extension type Fn(int Function(int) f)`: the function shape is the
+                    // type, so a closure passed where an Fn is expected gets its context
+                    t.funcParams = rep.funcParams;
+                    t.funcReturn = rep.funcReturn;
+                    t.funcRequired = rep.funcRequired;
+                    t.funcNamed = rep.funcNamed;
+                    t.funcNamedRequired = rep.funcNamedRequired;
+                    t.funcTypeParams = rep.funcTypeParams;
                     t.nullable = t.nullable || rep.nullable;
                 }
             }
         }
+    }
+
+    /**
+     * The extension type {@code written} (`Id` or `p.Id`) names in {@code lib}, or null when
+     * it names none or a class of that name is what the library sees. Decided per library:
+     * `a.Id` is a's extension type even when b.dart declares a class Id.
+     */
+    public Ast.ClassDecl extensionTypeIn(String written, Ast.Library lib) {
+        int dot = written.indexOf('.');
+        String prefix = dot > 0 ? written.substring(0, dot) : null;
+        String name = dot > 0 ? written.substring(dot + 1) : written;
+        if (name.indexOf('.') >= 0) {
+            return null;
+        }
+        List<Ast.ClassDecl> candidates = new ArrayList<Ast.ClassDecl>();
+        for (Ast.ClassDecl c : extensions) {
+            if (c.isExtensionType && c.name.equals(name)) {
+                candidates.add(c);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        List<Ast.ClassDecl> classesNamed = classesByName.get(name);
+        if (prefix != null) {
+            String uri = lib == null ? null : lib.prefixImports.get(prefix);
+            if (uri == null) {
+                return null;
+            }
+            Ast.Library target = resolveImportedLibrary(lib, uri);
+            if (classesNamed != null) {
+                for (Ast.ClassDecl c : classesNamed) {
+                    if (provides(target, name, c.ownerLibrary)) {
+                        return null;
+                    }
+                }
+            }
+            for (Ast.ClassDecl c : candidates) {
+                if (provides(target, name, c.ownerLibrary)) {
+                    return c;
+                }
+            }
+            return null;
+        }
+        for (Ast.ClassDecl c : candidates) {
+            if (c.ownerLibrary == lib) {
+                return c;
+            }
+        }
+        if (classesNamed != null && (lib == null || visibleUnprefixed(name, lib))) {
+            return null;
+        }
+        if (lib != null) {
+            for (Ast.Directive d : lib.importDirectives) {
+                Ast.Library target = d.admits(name) && d.prefix == null
+                        ? resolveImportedLibrary(lib, d.uri) : null;
+                for (Ast.ClassDecl c : candidates) {
+                    if (target != null && provides(target, name, c.ownerLibrary)) {
+                        return c;
+                    }
+                }
+            }
+        }
+        // Not visible by the imports (an import graph the program does not model, such as
+        // a part or an orphan library): the only extension type of the name, when no class
+        // of that name exists anywhere, as before.
+        return classesNamed == null && candidates.size() == 1 ? candidates.get(0) : null;
     }
 
     /**
@@ -1136,7 +1214,191 @@ public final class Program {
         }
         Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
         for (Ast.Library lib : libraries) {
-            lowerStaticsIn(lib, null, byName, owners, new LocalScopes(), seen);
+            lowerStaticsIn(lib, null, extensionsSeenBy(lib, byName), owners, new LocalScopes(), seen);
+        }
+    }
+
+    /**
+     * The extensions with hoisted statics {@code lib} can name, keyed as it writes them:
+     * `E` for one it declares or imports unprefixed, `p.E` for one an `import .. as p`
+     * provides. Resolved per library, so two libraries' same-named extensions do not meet.
+     */
+    private Map<String, Ast.ClassDecl> extensionsSeenBy(Ast.Library lib, Map<String, Ast.ClassDecl> all) {
+        return extensionsSeenBy(lib, all, false);
+    }
+
+    private static boolean hasStaticMethod(Ast.ClassDecl c) {
+        for (Ast.MethodDecl m : c.methods) {
+            if (m.isStatic && !m.isGetter && !m.isSetter) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Map<String, Ast.ClassDecl> extensionsSeenBy(Ast.Library lib, Map<String, Ast.ClassDecl> all,
+            boolean staticMethods) {
+        Map<String, Ast.ClassDecl> seen = new java.util.HashMap<String, Ast.ClassDecl>();
+        Map<String, Integer> counts = new java.util.HashMap<String, Integer>();
+        for (Ast.ClassDecl c : extensions) {
+            if (staticMethods ? hasStaticMethod(c) : !c.hoistedStatics.isEmpty()) {
+                Integer n = counts.get(c.name);
+                counts.put(c.name, n == null ? 1 : n + 1);
+            }
+        }
+        for (Ast.ClassDecl c : extensions) {
+            if (staticMethods ? !hasStaticMethod(c) : c.hoistedStatics.isEmpty()) {
+                continue;
+            }
+            if (c.ownerLibrary == lib) {
+                seen.put(c.name, c);
+                continue;
+            }
+            for (Ast.Directive d : lib.importDirectives) {
+                if (!d.admits(c.name)) {
+                    continue;
+                }
+                Ast.Library target = resolveImportedLibrary(lib, d.uri);
+                if (target != null && provides(target, c.name, c.ownerLibrary)) {
+                    String key = d.prefix == null ? c.name : d.prefix + "." + c.name;
+                    if (d.prefix != null || !seen.containsKey(key)) {
+                        seen.put(key, c);
+                    }
+                }
+            }
+        }
+        for (Map.Entry<String, Ast.ClassDecl> e : all.entrySet()) {
+            // an import graph the program does not model (parts, orphans): a name only one
+            // extension has, as before
+            if (!seen.containsKey(e.getKey()) && counts.get(e.getKey()) == 1) {
+                seen.put(e.getKey(), e.getValue());
+            }
+        }
+        return seen;
+    }
+
+    /**
+     * A tear-off of an extension's static method (`var f = E.make;`) becomes the closure
+     * `(n) => E.make(n)`: an extension is no value, and its statics are emitted as static
+     * methods of a class, so the call form is the one every path already resolves.
+     */
+    private void lowerExtensionStaticTearOffs() {
+        Map<String, Ast.ClassDecl> all = new java.util.HashMap<String, Ast.ClassDecl>();
+        for (Ast.ClassDecl c : extensions) {
+            if (hasStaticMethod(c)) {
+                all.put(c.name, c);
+            }
+        }
+        if (all.isEmpty()) {
+            return;
+        }
+        Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+        for (Ast.Library lib : libraries) {
+            Map<String, Ast.ClassDecl> scope = extensionsSeenBy(lib, all, true);
+            for (Map.Entry<String, Ast.ClassDecl> e : new ArrayList<Map.Entry<String, Ast.ClassDecl>>(scope.entrySet())) {
+                if (e.getKey().indexOf('.') >= 0) {
+                    scope.remove(e.getKey());
+                }
+            }
+            if (!scope.isEmpty()) {
+                tearOffsIn(lib, scope, seen);
+            }
+        }
+    }
+
+    private static Object staticTearOff(Object o, Map<String, Ast.ClassDecl> scope) {
+        if (!(o instanceof Ast.PropertyGet) || ((Ast.PropertyGet) o).nullAware
+                || !(((Ast.PropertyGet) o).target instanceof Ast.Ident)) {
+            return o;
+        }
+        Ast.PropertyGet pg = (Ast.PropertyGet) o;
+        Ast.Ident t = (Ast.Ident) pg.target;
+        Ast.ClassDecl e = scope.get(t.name);
+        Ast.MethodDecl m = e == null || t.typeArgs != null ? null : e.method(pg.name);
+        if (m == null || !m.isStatic || m.isGetter || m.isSetter || !m.typeParams.isEmpty()) {
+            return o;
+        }
+        Ast.Lambda l = new Ast.Lambda();
+        l.file = pg.file;
+        l.line = pg.line;
+        l.col = pg.col;
+        Ast.Call call = new Ast.Call();
+        call.file = pg.file;
+        call.line = pg.line;
+        call.col = pg.col;
+        Ast.Ident target = new Ast.Ident();
+        target.file = pg.file;
+        target.line = pg.line;
+        target.col = pg.col;
+        target.name = t.name;
+        call.target = target;
+        call.name = m.name;
+        for (Ast.Param p : m.params) {
+            Ast.Param q = new Ast.Param();
+            q.file = pg.file;
+            q.line = pg.line;
+            q.col = pg.col;
+            q.type = p.type;
+            q.name = p.name;
+            q.named = p.named;
+            q.required = p.required;
+            q.optional = p.optional;
+            q.defaultValue = p.defaultValue;
+            l.params.add(q);
+            Ast.Ident a = new Ast.Ident();
+            a.file = pg.file;
+            a.line = pg.line;
+            a.col = pg.col;
+            a.name = p.name;
+            if (p.named) {
+                Ast.NamedArg na = new Ast.NamedArg();
+                na.name = p.name;
+                na.value = a;
+                call.args.named.add(na);
+            } else {
+                call.args.positional.add(a);
+            }
+        }
+        l.exprBody = call;
+        return l;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void tearOffsIn(Object o, Map<String, Ast.ClassDecl> scope, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof List) {
+            List<Object> l = (List<Object>) o;
+            for (int i = 0; i < l.size(); i++) {
+                Object e = l.get(i);
+                Object r = staticTearOff(e, scope);
+                if (r != e) {
+                    l.set(i, r);
+                }
+                tearOffsIn(r, scope, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        for (java.lang.reflect.Field f : childFields(o.getClass())) {
+            try {
+                Object v = f.get(o);
+                Object r = staticTearOff(v, scope);
+                if (r != v) {
+                    try {
+                        f.set(o, r);
+                        v = r;
+                    } catch (IllegalArgumentException ex) {
+                        // a field typed narrower than Expr: left as written
+                    }
+                }
+                tearOffsIn(v, scope, seen);
+            } catch (IllegalAccessException ex) {
+                throw new IllegalStateException(ex);
+            }
         }
     }
 
@@ -1176,6 +1438,24 @@ public final class Program {
             Ast.Ident t = (Ast.Ident) pg.target;
             Ast.ClassDecl e = byName.get(t.name);
             if (e != null && t.typeArgs == null && e.hoistedStatics.containsKey(pg.name) && !locals.declares(t.name)) {
+                Ast.Ident id = new Ast.Ident();
+                id.file = pg.file;
+                id.line = pg.line;
+                id.col = pg.col;
+                id.name = e.hoistedStatics.get(pg.name);
+                return id;
+            }
+        }
+        if (o instanceof Ast.PropertyGet && !((Ast.PropertyGet) o).nullAware
+                && ((Ast.PropertyGet) o).target instanceof Ast.PropertyGet
+                && ((Ast.PropertyGet) ((Ast.PropertyGet) o).target).target instanceof Ast.Ident) {
+            // `p.E.f` through an import prefix
+            Ast.PropertyGet pg = (Ast.PropertyGet) o;
+            Ast.PropertyGet mid = (Ast.PropertyGet) pg.target;
+            Ast.Ident p = (Ast.Ident) mid.target;
+            Ast.ClassDecl e = byName.get(p.name + "." + mid.name);
+            if (e != null && !mid.nullAware && p.typeArgs == null && e.hoistedStatics.containsKey(pg.name)
+                    && !locals.declares(p.name)) {
                 Ast.Ident id = new Ast.Ident();
                 id.file = pg.file;
                 id.line = pg.line;
