@@ -19139,6 +19139,11 @@ public final class JavaEmitter {
         if (dynamicIntoTyped(o, t)) {
             return elementCode(o, t, ctx);
         }
+        if (t != null && t.is("Iterable") && o.type != null && (o.type.is("List") || o.type.is("Set"))) {
+            // `Map<String, Iterable<int>> m = {'z': [8]}`: the runtime List/Set is not a
+            // DartIterable, so the entry is bridged as any List flowing into an Iterable is.
+            return coerce(o, t, ctx);
+        }
         // `<String, Object>{'f': g}` with g typed only `Function`: bound to its own SAM,
         // as a list element is, or javac sees a method reference with no target.
         String fo = fnIntoObjectSlot(o, t, ctx);
@@ -23695,6 +23700,12 @@ public final class JavaEmitter {
         ctx.pushWriter(ctx.currentIndent());
         Out r = emitExpr(b.right, genericCtorValueSlot(b.right, ctx), ctx);
         String rLifted = ctx.popWriter();
+        if (NUMERIC_BOUND_OPS.contains(b.op)) {
+            // `T extends num` operand: Dart types `n * 2` by T's bound, so it is a num
+            // product; Java erases T, so the value is viewed as the bound first.
+            l = numericBoundView(l, ctx);
+            r = numericBoundView(r, ctx);
+        }
         if (!rLifted.isEmpty() && !(b.left instanceof IntLit || b.left instanceof StringLit
                 || b.left instanceof BoolLit || b.left instanceof NullLit)) {
             // `f() + await g()`: the right operand lifted statements, which would run
@@ -27997,9 +28008,16 @@ public final class JavaEmitter {
         if (extTypeM != null) {
             MethodDecl em = extTypeM.method(c.name);
             String rest = methodArgs(extensionCallbackParams(extTypeM, em.params, tt), c.args, ctx);
+            TypeRef ert = etMemberType(tt, extTypeM, em.returnType);
+            if (!em.typeParams.isEmpty()) {
+                // `Boxed<R> map<R>(R Function(T) f)`: the method's own R is the written type
+                // argument, or inferred from the call (the closure was just emitted)
+                ert = c.typeArgs.size() == em.typeParams.size()
+                        ? substTypeParams(ert, em.typeParams, c.typeArgs)
+                        : bindMethodTypeParams(ert, em, c, ctx);
+            }
             return new Out(extJavaName(extTypeM) + "." + c.name + "(" + extensionSelf(target, tt, extTypeM, ctx)
-                    + (rest.isEmpty() ? "" : ", " + rest) + ")",
-                    etMemberType(tt, extTypeM, em.returnType));
+                    + (rest.isEmpty() ? "" : ", " + rest) + ")", ert);
         }
         String n = c.name;
         // Cascade suppression: the receiver's type already fell to `dynamic` because a
@@ -28448,6 +28466,11 @@ public final class JavaEmitter {
                 if (!m.typeParams.isEmpty() && c.typeArgs.size() == m.typeParams.size()) {
                     // `open<int>(..)`: the method's own type arguments, as written.
                     seen = substTypeParams(seen, m.typeParams, c.typeArgs);
+                } else if (!m.typeParams.isEmpty() && c.typeArgs.isEmpty()) {
+                    // `box.map((x) => 'n$x')` with `Box<R> map<R>(R Function(T) f)`: R is
+                    // inferred from the call (an argument, or the closure just emitted), as
+                    // Dart infers it, never left as a variable the caller does not declare.
+                    seen = bindMethodTypeParams(seen, m, c, ctx);
                 }
                 if (pinnedCallBox(pc, m, ctx) != null) {
                     // The implementer's return as this call sees it: `shelf.open<int>()` is a
@@ -36191,7 +36214,10 @@ public final class JavaEmitter {
         // plain alias; one still spelled so came from a stub (`super.key` is Flutter's Key),
         // and is that stub's class, not the program typedef that happens to share its name.
         if (userTd != null && userTd.aliased != null && !userTd.aliased.name.startsWith("Rec$")
-                && stubs.classes.containsKey(t.name)) {
+                && (stubs.classes.containsKey(t.name) || program.classesByName.containsKey(t.name))) {
+            // ... and a program class of the name (`Label` while another library, imported
+            // with a prefix, aliases `Label = double`): Program left it unexpanded because
+            // the class is what that library's scope sees.
             userTd = null;
         }
         if (userTd != null && userTd.aliased != null) {
@@ -39108,6 +39134,40 @@ public final class JavaEmitter {
      * is not a bounded type parameter of the enclosing class (or the bound is not a class
      * this emitter can resolve members on).
      */
+    private static final Set<String> NUMERIC_BOUND_OPS = new HashSet<String>(java.util.Arrays.asList(
+            "+", "-", "*", "/", "~/", "%", "<", ">", "<=", ">="));
+
+    /**
+     * {@code o} viewed as its type's bound when that type is a type parameter bounded by
+     * num, int or double ({@code T extends num}), so arithmetic and comparison read it as
+     * the number it is; {@code o} itself otherwise.
+     */
+    private Out numericBoundView(Out o, Ctx ctx) {
+        TypeRef tt = o.type;
+        if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null) {
+            return o;
+        }
+        TypeRef bound = null;
+        java.util.Map<String, TypeRef> mb = ctx.methodTypeParamBounds;
+        ClassDecl cc = ctx.currentClass;
+        if (mb != null && mb.containsKey(tt.name)) {
+            bound = mb.get(tt.name);
+        } else if (cc != null && cc.typeParamBounds != null && cc.typeParams.contains(tt.name)) {
+            bound = cc.typeParamBounds.get(tt.name);
+        } else if (ctx.currentExtension != null && ctx.currentExtension.typeParamBounds != null
+                && ctx.currentExtension.typeParams.contains(tt.name)) {
+            // `extension type Num<T extends num>(T n)`: its members are static methods
+            // generic in the extension's own T
+            bound = ctx.currentExtension.typeParamBounds.get(tt.name);
+        }
+        if (bound == null || bound.args.size() != 0 || !(bound.is("num") || bound.is("int") || bound.is("double"))) {
+            return o;
+        }
+        TypeRef seen = new TypeRef(bound.name);
+        seen.nullable = tt.nullable || bound.nullable;
+        return new Out("((" + javaType(seen, true, ctx) + ") (Object) " + paren(o.code) + ")", seen);
+    }
+
     private Out typeParamBoundView(Out target, Ctx ctx) {
         TypeRef tt = target.type;
         ClassDecl cc = ctx.currentClass;

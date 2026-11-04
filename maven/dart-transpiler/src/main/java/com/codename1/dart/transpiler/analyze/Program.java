@@ -572,9 +572,15 @@ public final class Program {
     private void expandRecordTypedefs() {
         for (Ast.Library lib : libraries) {
             for (Ast.TypeRef t : lib.namedTypes) {
-                // through chains (`typedef Id = Key; typedef Key = String`)
-                for (int depth = 0; depth < 8 && expandAliasTypedef(t); depth++) {
-                    // expanded one level
+                // through chains (`typedef Id = Key; typedef Key = String`); each level is
+                // written in the library that declares the alias, and resolved there
+                Ast.Library scope = lib;
+                for (int depth = 0; depth < 8 && scope != null; depth++) {
+                    Ast.TypedefDecl td = typedefIn(t.name, scope);
+                    if (td == null || !expandAliasTypedef(t, td)) {
+                        break;
+                    }
+                    scope = typedefOwner(td);
                 }
             }
         }
@@ -587,12 +593,11 @@ public final class Program {
      * so `Key k; k.toUpperCase()` is a String's member. A function type is left to the
      * emitter's typedef signatures. False when {@code t} names no such typedef.
      */
-    private boolean expandAliasTypedef(Ast.TypeRef t) {
-        Ast.TypedefDecl td = t.name == null ? null : typedefs.get(t.name);
+    private boolean expandAliasTypedef(Ast.TypeRef t, Ast.TypedefDecl td) {
         if (td == null || td.aliased == null || td.aliased.name == null || td.aliased == Ast.TypeRef.DYNAMIC
                 || td.aliased.funcParams != null || td.aliased.funcReturn != null
                 || "Function".equals(td.aliased.name) || td.aliased.name.equals(t.name)
-                || t.funcParams != null || classesByName.containsKey(t.name)) {
+                || t.funcParams != null) {
             return false;
         }
         if (td.typeParams.size() != t.args.size() && !(t.args.isEmpty())) {
@@ -614,8 +619,18 @@ public final class Program {
             return true;
         }
         List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+        Ast.Library owner = null;
         for (Ast.TypeRef a : td.aliased.args) {
-            args.add(substRecordArg(a, subst));
+            Ast.TypeRef b = substRecordArg(a, subst);
+            if (b != a && !b.args.isEmpty()) {
+                // a substituted copy is in no library's named types: expand it here, in the
+                // alias's own library, as the original would have been
+                if (owner == null) {
+                    owner = typedefOwner(td);
+                }
+                expandCopy(b, owner);
+            }
+            args.add(b);
         }
         t.name = td.aliased.name;
         t.args = args;
@@ -632,6 +647,131 @@ public final class Program {
         return true;
     }
 
+    private void expandCopy(Ast.TypeRef t, Ast.Library scope) {
+        for (int depth = 0; depth < 8 && scope != null; depth++) {
+            Ast.TypedefDecl td = typedefIn(t.name, scope);
+            if (td == null || !expandAliasTypedef(t, td)) {
+                break;
+            }
+            scope = typedefOwner(td);
+        }
+        for (Ast.TypeRef a : t.args) {
+            if (a != null && a.name != null && a.funcParams == null) {
+                expandCopy(a, scope);
+            }
+        }
+    }
+
+    /** The library whose declarations include {@code td} (parts are merged into their owner). */
+    private Ast.Library typedefOwner(Ast.TypedefDecl td) {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl x : lib.typedefs) {
+                if (x == td) {
+                    return lib;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The typedef {@code written} (`Id` or `p.Id`) names in {@code lib}'s own scope, or null
+     * when it names none there -- a class, enum or extension type of that name, a dart:core
+     * type (`Duration` while another library aliases `Duration`), or a typedef of another
+     * library that {@code lib} does not import. Dart resolves a type name through the
+     * library's declarations, then its unprefixed imports; a prefixed name through the
+     * prefix's import alone.
+     */
+    private Ast.TypedefDecl typedefIn(String written, Ast.Library lib) {
+        if (written == null || lib == null) {
+            return null;
+        }
+        int dot = written.indexOf('.');
+        String name = dot > 0 ? written.substring(dot + 1) : written;
+        if (name.indexOf('.') >= 0 || dot == 0) {
+            return null;
+        }
+        if (dot > 0) {
+            String uri = lib.prefixImports.get(written.substring(0, dot));
+            Ast.Library target = uri == null ? null : resolveImportedLibrary(lib, uri);
+            return target == null ? null : providedTypedef(target, name);
+        }
+        for (Ast.ClassDecl c : lib.classes) {
+            if (name.equals(c.name)) {
+                return null;
+            }
+        }
+        for (Ast.TypedefDecl x : lib.typedefs) {
+            if (name.equals(x.name)) {
+                return x;
+            }
+        }
+        if (declaresNonTypedef(lib, name)) {
+            return null;
+        }
+        List<Ast.ClassDecl> classesNamed = classesByName.get(name);
+        boolean unmodeled = false;
+        for (Ast.Directive d : lib.importDirectives) {
+            if (d.prefix != null || !d.admits(name)) {
+                continue;
+            }
+            Ast.Library target = resolveImportedLibrary(lib, d.uri);
+            if (target == null) {
+                unmodeled |= d.uri != null && !d.uri.startsWith("dart:");
+                continue;
+            }
+            if (classesNamed != null) {
+                for (Ast.ClassDecl c : classesNamed) {
+                    if (provides(target, name, c.ownerLibrary)) {
+                        return null;
+                    }
+                }
+            }
+            Ast.TypedefDecl x = providedTypedef(target, name);
+            if (x != null) {
+                return x;
+            }
+        }
+        if (unmodeled && classesNamed == null) {
+            // an import the program does not model (a stub package): the only typedef of
+            // the name, as the global table answered before scopes were modelled
+            Ast.TypedefDecl only = null;
+            for (Ast.Library l : libraries) {
+                for (Ast.TypedefDecl x : l.typedefs) {
+                    if (name.equals(x.name)) {
+                        if (only != null) {
+                            return null;
+                        }
+                        only = x;
+                    }
+                }
+            }
+            return only;
+        }
+        return null;
+    }
+
+    private boolean declaresNonTypedef(Ast.Library lib, String name) {
+        for (Ast.EnumDecl e : lib.enums) {
+            if (name.equals(e.name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The typedef of {@code name} that {@code target} declares or re-exports. */
+    private Ast.TypedefDecl providedTypedef(Ast.Library target, String name) {
+        for (Ast.Library l : libraries) {
+            for (Ast.TypedefDecl x : l.typedefs) {
+                if (name.equals(x.name) && provides(target, name, l)) {
+                    return x;
+                }
+            }
+        }
+        return null;
+    }
+
     private static Ast.TypeRef substRecordArg(Ast.TypeRef a, Map<String, Ast.TypeRef> subst) {
         if (a != null && a.name != null && a.args.isEmpty() && a.funcParams == null && subst.containsKey(a.name)) {
             Ast.TypeRef r = subst.get(a.name);
@@ -642,6 +782,29 @@ public final class Program {
                 return c;
             }
             return r;
+        }
+        if (a != null && a.name != null && !a.args.isEmpty() && a.funcParams == null && a.funcReturn == null) {
+            // `typedef Grid<T> = List<Row<T>>`: the inner type's own arguments are the outer
+            // alias's parameters too, so `Grid<int>` is `List<Row<int>>`
+            List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+            boolean changed = false;
+            for (Ast.TypeRef x : a.args) {
+                Ast.TypeRef y = substRecordArg(x, subst);
+                changed |= y != x;
+                args.add(y);
+            }
+            if (changed) {
+                Ast.TypeRef c = new Ast.TypeRef(a.name);
+                c.args.addAll(args);
+                c.nullable = a.nullable;
+                c.resolved = a.resolved;
+                c.runtimeOnly = a.runtimeOnly;
+                c.shadowsCore = a.shadowsCore;
+                c.extensionType = a.extensionType;
+                c.extensionTypeArgs = a.extensionTypeArgs;
+                c.aliasedFrom = a.aliasedFrom;
+                return c;
+            }
         }
         return a;
     }
