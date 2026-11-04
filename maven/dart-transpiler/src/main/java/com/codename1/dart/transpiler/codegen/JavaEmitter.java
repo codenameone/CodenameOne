@@ -281,8 +281,10 @@ public final class JavaEmitter {
                 continue;
             }
             int kind = m.isGetter ? SIG_GETTER : m.isSetter ? SIG_SETTER : SIG_METHOD;
-            InheritedSig sig = combinedSignature(inheritedSigs(c, m.name, kind,
-                    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ClassDecl, Boolean>())));
+            List<InheritedSig> cands = inheritedSigs(c, m.name, kind,
+                    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ClassDecl, Boolean>()));
+            InheritedSig sig = combinedSignature(cands);
+            reportNoCombinedSignature(c, m, m.name, cands, sig);
             if (sig == null) {
                 sig = objectMember(m.name, kind);
             }
@@ -315,7 +317,9 @@ public final class JavaEmitter {
             }
             java.util.Set<ClassDecl> seen = java.util.Collections.newSetFromMap(
                     new java.util.IdentityHashMap<ClassDecl, Boolean>());
-            InheritedSig sig = combinedSignature(inheritedSigs(c, f.name, SIG_GETTER, seen));
+            List<InheritedSig> getterCands = inheritedSigs(c, f.name, SIG_GETTER, seen);
+            InheritedSig sig = combinedSignature(getterCands);
+            reportNoCombinedSignature(c, f, f.name, getterCands, sig);
             if (sig == null) {
                 seen.clear();
                 sig = combinedSignature(inheritedSigs(c, f.name, SIG_SETTER, seen));
@@ -435,6 +439,15 @@ public final class JavaEmitter {
         if (cands.size() == 1) {
             return cands.get(0);
         }
+        InheritedSig best = strictCombinedSignature(cands);
+        return best != null ? best : cands.get(0);
+    }
+
+    /// The combined member signature of `cands`, or null when none exists.
+    private InheritedSig strictCombinedSignature(List<InheritedSig> cands) {
+        if (cands.size() == 1) {
+            return cands.get(0);
+        }
         for (InheritedSig a : cands) {
             boolean all = true;
             for (InheritedSig b : cands) {
@@ -447,7 +460,60 @@ public final class JavaEmitter {
                 return a;
             }
         }
-        return cands.get(0);
+        return null;
+    }
+
+    /// E0143: an untyped member (or field) whose inherited signatures have no combined
+    /// member signature -- `measure(x)` in a class implementing both `int measure(int)` and
+    /// `String measure(int)`. Dart rejects the program ("can't infer"); taking one candidate
+    /// would emit a Java override of one supertype that the other cannot accept. Reported
+    /// only when every candidate is made of plain, resolvable types: a type variable or a
+    /// generic type is compared by staticSubtype only approximately, and a false error there
+    /// would reject a valid program, so those keep the old first-candidate fallback.
+    private void reportNoCombinedSignature(ClassDecl c, Ast.Node at, String name, List<InheritedSig> cands,
+                                           InheritedSig chosen) {
+        if (cands.size() < 2 || chosen == null || strictCombinedSignature(cands) != null) {
+            return;
+        }
+        StringBuilder sigs = new StringBuilder();
+        for (InheritedSig s : cands) {
+            if (!plainSigPart(s.ret)) {
+                return;
+            }
+            for (TypeRef t : s.positional) {
+                if (!plainSigPart(t)) {
+                    return;
+                }
+            }
+            for (TypeRef t : s.named.values()) {
+                if (!plainSigPart(t)) {
+                    return;
+                }
+            }
+            sigs.append(sigs.length() > 0 ? ", " : "").append(s.ret == null ? "dynamic" : s.ret.name).append(" Function(");
+            for (int i = 0; i < s.positional.size(); i++) {
+                sigs.append(i > 0 ? ", " : "").append(s.positional.get(i) == null ? "dynamic" : s.positional.get(i).name);
+            }
+            sigs.append(')');
+        }
+        diags.error(at, "E0143", "Can't infer the type of " + c.name + "." + name
+                + ": the inherited signatures " + sigs + " have no combined member signature; declare its types");
+    }
+
+    private boolean plainSigPart(TypeRef t) {
+        if (t == null || isDynamicType(t) || t.is("void")) {
+            return true;
+        }
+        if (!t.args.isEmpty() || t.name == null || t.name.indexOf('.') >= 0) {
+            return false;
+        }
+        String n = t.name;
+        if ("int".equals(n) || "double".equals(n) || "num".equals(n) || "String".equals(n)
+                || "bool".equals(n) || "Object".equals(n) || "Null".equals(n)) {
+            return true;
+        }
+        ClassDecl d = program.classes.get(n);
+        return d != null && d.typeParams.isEmpty();
     }
 
     private boolean sigSubtype(InheritedSig a, InheritedSig b) {
@@ -3923,7 +3989,18 @@ public final class JavaEmitter {
             // `num get area`: Dart narrows the return covariantly, Java's long overrides no
             // Number. The base's boxed return is declared, and callers that know the subclass
             // read the typed value back through pinnedCallBox.
-            TypeRef over = overriddenProgramReturn(c, m, new HashSet<String>(), ctx);
+            // Not when another supertype declares the member with exactly this Java
+            // signature and this primitive return: `int measure(num)` implementing both
+            // `num measure(int)` and `int measure(num)` must keep long measure(Number) for
+            // the second; the first is met by the measure(long) bridge, whose Number return
+            // boxes the long (implementerBridges).
+            boolean primitiveSigDemanded = false;
+            for (IfaceSig sig : interfaceSigs(c, m, ctx)) {
+                if (implParams.equals(erasedParams(sig.params)) && sig.ret.equals(implRet)) {
+                    primitiveSigDemanded = true;
+                }
+            }
+            TypeRef over = primitiveSigDemanded ? null : overriddenProgramReturn(c, m, new HashSet<String>(), ctx);
             if (over != null && !over.is("void")) {
                 String baseRet = javaType(over, false, ctx);
                 if (!isJavaPrimitive(baseRet) && !"void".equals(baseRet) && !baseRet.equals(implRet)) {
@@ -3955,7 +4032,7 @@ public final class JavaEmitter {
     private String pinnedCallBox(ClassDecl pc, MethodDecl m, Ctx ctx) {
         for (ClassDecl k = pc; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             if (k.methods.contains(m)) {
-                if (k.isMixin || interfacePinnedReturn(k, m, ctx) == null) {
+                if (k.isMixin || (interfacePinnedReturn(k, m, ctx) == null && !bridgedToBoxedReturn(k, m, ctx))) {
                     return null;
                 }
                 TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
@@ -3963,6 +4040,28 @@ public final class JavaEmitter {
             }
         }
         return null;
+    }
+
+    /// Whether {@code m}, keeping a primitive Java return, also has an implementer bridge
+    /// under the same name whose return is boxed: `int measure(num)` implementing
+    /// `num measure(int)` gets a `Number measure(long)` bridge. Java overload resolution
+    /// picks that bridge for `c.measure(7L)`, so the caller casts the result back
+    /// (pinnedCallBox); the bridge forwards to the primary, so the value is the same.
+    private boolean bridgedToBoxedReturn(ClassDecl k, MethodDecl m, Ctx ctx) {
+        if (m.isStatic || m.isGetter || m.isSetter || m.returnType == null || m.returnType.is("var")) {
+            return false;
+        }
+        String implRet = javaType(m.returnType, false, ctx);
+        if (!isJavaPrimitive(implRet)) {
+            return false;
+        }
+        String implParams = erasedParams(implJavaParams(m, ctx));
+        for (IfaceSig sig : interfaceSigs(k, m, ctx)) {
+            if (!implParams.equals(erasedParams(sig.params)) && !isJavaPrimitive(sig.ret) && !"void".equals(sig.ret)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The Java return a field's get$ accessor must declare to override the program member
