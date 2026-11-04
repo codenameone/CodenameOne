@@ -1,0 +1,11 @@
+true
+G<int>(1)
+G<String>(s)
+N<int>(2)
+N<double>(2.5)
+1
+7
+9
+B
+false
+1

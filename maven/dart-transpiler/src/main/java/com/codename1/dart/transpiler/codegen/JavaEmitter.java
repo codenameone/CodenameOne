@@ -7379,12 +7379,15 @@ public final class JavaEmitter {
                     // value is handed over through Object.
                     String held = init.code;
                     String bare = genericTearOffLambdas.get(gl);
-                    String key = bare != null ? canonFunctionKey(bare, t, ctx) : null;
+                    String key = bare != null ? canonFunctionKey(bare, t, ctx) : genericCtorTearOffKeys.get(gl);
                     if (key != null) {
                         // Still the one Dart function: `f == identity` holds, as the canonical
                         // tear-off `identity` compares by the same key (DartRuntime.eq).
                         ctx.importClass("dart.runtime.DartRuntime");
-                        held = "DartRuntime.canonTearOff(\"" + key + "\", \"generic\", (Object) " + held + ")";
+                        // A constructor's key names no SAM, so the SAM it is held as is the
+                        // view: one object per Java type, all one Dart function by the key.
+                        String view = bare != null ? "generic" : javaType(t, false, ctx);
+                        held = "DartRuntime.canonTearOff(\"" + key + "\", \"" + view + "\", (Object) " + held + ")";
                     }
                     init = new Out("((" + javaType(t, false, ctx) + ") (Object) " + held + ")",
                             init.type, init.fn);
@@ -9634,6 +9637,257 @@ public final class JavaEmitter {
         ctx.importClass("dart.runtime.DartRuntime");
         String view = code.replaceAll("\\s+", " ");
         return new Out("DartRuntime.canonTearOff(\"" + key + "\", \"" + view + "\", " + code + ")", out.type, out.fn);
+    }
+
+    /// Dart's instantiate-to-bounds over {@code tps}: each variable starts at its bound
+    /// (dynamic when it declares none). A variable whose bound names only resolved
+    /// variables takes that bound with them substituted. When nothing resolves, the
+    /// variables on a dependency cycle (`T extends Comparable<T>`) have the members of
+    /// their own cycle replaced in their bounds -- by dynamic where they occur
+    /// covariantly or invariantly, by Never where they occur contravariantly -- and the
+    /// substitution goes on, so a variable merely depending on a cycle sees the cycle's
+    /// result (`U extends List<T>` gives `List<Comparable<dynamic>>`).
+    private static List<TypeRef> instantiateToBounds(List<String> tps, java.util.Map<String, TypeRef> bounds) {
+        int n = tps.size();
+        TypeRef[] cur = new TypeRef[n];
+        boolean[] done = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            TypeRef b = bounds.get(tps.get(i));
+            cur[i] = b != null ? b : new TypeRef("dynamic");
+        }
+        int left = n;
+        while (left > 0) {
+            boolean progress = false;
+            for (int i = 0; i < n; i++) {
+                if (done[i]) {
+                    continue;
+                }
+                boolean free = true;
+                for (int j = 0; j < n && free; j++) {
+                    free = done[j] || !namesAny(cur[i], java.util.Collections.singletonList(tps.get(j)));
+                }
+                if (free) {
+                    cur[i] = substTypeParams(cur[i], tps, java.util.Arrays.asList(cur));
+                    done[i] = true;
+                    left--;
+                    progress = true;
+                }
+            }
+            if (progress || left == 0) {
+                continue;
+            }
+            // reach[i][j]: the bound of i reaches j through unresolved bounds.
+            boolean[][] reach = new boolean[n][n];
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    reach[i][j] = !done[i] && !done[j]
+                            && namesAny(cur[i], java.util.Collections.singletonList(tps.get(j)));
+                }
+            }
+            for (int k = 0; k < n; k++) {
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < n; j++) {
+                        reach[i][j] |= reach[i][k] && reach[k][j];
+                    }
+                }
+            }
+            TypeRef[] next = cur.clone();
+            for (int i = 0; i < n; i++) {
+                if (done[i] || !reach[i][i]) {
+                    continue;
+                }
+                java.util.Set<String> scc = new java.util.HashSet<String>();
+                for (int j = 0; j < n; j++) {
+                    if (reach[i][j] && reach[j][i]) {
+                        scc.add(tps.get(j));
+                    }
+                }
+                next[i] = replaceByVariance(cur[i], scc, true);
+            }
+            cur = next;
+        }
+        return new ArrayList<TypeRef>(java.util.Arrays.asList(cur));
+    }
+
+    /// {@code t} with each bare occurrence of {@code vars} replaced by dynamic in a covariant
+    /// (or invariant) position and by Never in a contravariant one.
+    private static TypeRef replaceByVariance(TypeRef t, java.util.Set<String> vars, boolean covariant) {
+        if (t == null) {
+            return null;
+        }
+        if (t.args.isEmpty() && t.funcParams == null && t.funcReturn == null && vars.contains(t.name)) {
+            TypeRef r = new TypeRef(covariant ? "dynamic" : "Never");
+            r.nullable = !covariant && t.nullable;
+            return r;
+        }
+        TypeRef r = new TypeRef(t.name);
+        r.nullable = t.nullable;
+        r.resolved = t.resolved;
+        for (TypeRef a : t.args) {
+            r.args.add(replaceByVariance(a, vars, covariant));
+        }
+        if (t.funcParams != null) {
+            r.funcParams = new ArrayList<TypeRef>();
+            for (TypeRef p : t.funcParams) {
+                r.funcParams.add(replaceByVariance(p, vars, !covariant));
+            }
+        }
+        r.funcReturn = replaceByVariance(t.funcReturn, vars, covariant);
+        return r;
+    }
+
+    private boolean boundTopType(TypeRef t) {
+        if (t == null) {
+            return false;
+        }
+        if (t.funcParams != null || t.funcReturn != null) {
+            return false;
+        }
+        if (t.is("dynamic") || t.is("void") || t.is("Object") && t.nullable && t.args.isEmpty()) {
+            return true;
+        }
+        return t.is("FutureOr") && t.args.size() == 1 && boundTopType(t.args.get(0));
+    }
+
+    /// Dart's subtype relation for the types instantiate-to-bounds produces and the bounds
+    /// they are checked against: top and bottom types, nullability, FutureOr, function
+    /// types (positional parameters, contravariant), and class types through their
+    /// superclasses, interfaces and mixins with the arguments substituted. Null where the
+    /// type model cannot decide it (a class neither the program nor the stubs declare, a
+    /// function type with optional or named parameters).
+    private Boolean exactSubtype(TypeRef s, TypeRef t) {
+        if (s == null || t == null) {
+            return null;
+        }
+        if (boundTopType(t)) {
+            return Boolean.TRUE;
+        }
+        if (s.is("Never") && s.funcParams == null) {
+            return Boolean.valueOf(!s.nullable || t.nullable || t.is("Null"));
+        }
+        if (boundTopType(s)) {
+            return Boolean.FALSE;
+        }
+        if (t.is("FutureOr") && t.funcParams == null && t.args.size() == 1) {
+            TypeRef fut = new TypeRef("Future");
+            fut.args.add(t.args.get(0));
+            TypeRef inner = t.args.get(0);
+            if (t.nullable) {
+                inner = copyNullable(inner);
+                fut.nullable = true;
+            }
+            Boolean a = exactSubtype(s, inner);
+            if (Boolean.TRUE.equals(a)) {
+                return a;
+            }
+            Boolean b = exactSubtype(s, fut);
+            return Boolean.TRUE.equals(b) ? b : a == null || b == null ? null : Boolean.FALSE;
+        }
+        if (s.is("Null") && s.funcParams == null) {
+            return Boolean.valueOf(t.nullable || t.is("Null"));
+        }
+        if (s.nullable && !t.nullable) {
+            return Boolean.FALSE;
+        }
+        if (t.is("Object") && t.args.isEmpty() && t.funcParams == null) {
+            return Boolean.TRUE;
+        }
+        boolean sFn = s.funcParams != null || s.funcReturn != null;
+        boolean tFn = t.funcParams != null || t.funcReturn != null;
+        if (sFn || tFn) {
+            if (sFn && !tFn) {
+                return Boolean.valueOf(t.is("Function") && t.args.isEmpty());
+            }
+            if (!sFn) {
+                return Boolean.FALSE;
+            }
+            if (s.funcParams == null || t.funcParams == null || s.funcReturn == null || t.funcReturn == null
+                    || s.funcTypeParams != null && !s.funcTypeParams.isEmpty()
+                    || t.funcTypeParams != null && !t.funcTypeParams.isEmpty()) {
+                return null;
+            }
+            if (s.funcParams.size() != t.funcParams.size()) {
+                return Boolean.FALSE;
+            }
+            Boolean r = exactSubtype(s.funcReturn, t.funcReturn);
+            if (!Boolean.TRUE.equals(r)) {
+                return r;
+            }
+            for (int i = 0; i < s.funcParams.size(); i++) {
+                Boolean p = exactSubtype(t.funcParams.get(i), s.funcParams.get(i));
+                if (!Boolean.TRUE.equals(p)) {
+                    return p;
+                }
+            }
+            return Boolean.TRUE;
+        }
+        if (t.is("Never")) {
+            return Boolean.FALSE;
+        }
+        if (s.name == null || t.name == null) {
+            return null;
+        }
+        if ((s.is("int") || s.is("double")) && t.is("num")) {
+            return Boolean.TRUE;
+        }
+        TypeRef up = superInstantiation(s, t.name, new java.util.HashSet<String>());
+        if (up == null) {
+            return program.classes.containsKey(s.name) || stubs.classes.containsKey(s.name)
+                    ? Boolean.FALSE : null;
+        }
+        if (up.args.size() != t.args.size()) {
+            return up.args.isEmpty() || t.args.isEmpty() ? null : Boolean.FALSE;
+        }
+        for (int i = 0; i < t.args.size(); i++) {
+            Boolean a = exactSubtype(up.args.get(i), t.args.get(i));
+            if (!Boolean.TRUE.equals(a)) {
+                return a;
+            }
+        }
+        return Boolean.TRUE;
+    }
+
+    private static TypeRef copyNullable(TypeRef t) {
+        TypeRef r = new TypeRef(t.name);
+        r.args.addAll(t.args);
+        r.funcParams = t.funcParams;
+        r.funcReturn = t.funcReturn;
+        r.funcTypeParams = t.funcTypeParams;
+        r.resolved = t.resolved;
+        r.nullable = true;
+        return r;
+    }
+
+    /// {@code s} seen as its supertype named {@code sup} (superclass, interfaces and
+    /// mixins, each with the arguments carried down), or null when none is named so.
+    private TypeRef superInstantiation(TypeRef s, String sup, java.util.Set<String> seen) {
+        if (s.name.equals(sup)) {
+            return s;
+        }
+        if (!seen.add(s.name)) {
+            return null;
+        }
+        Ast.ClassDecl decl = program.classes.get(s.name);
+        if (decl == null) {
+            decl = stubs.classes.get(s.name);
+        }
+        if (decl == null) {
+            return null;
+        }
+        List<TypeRef> supers = new ArrayList<TypeRef>();
+        if (decl.superclass != null) {
+            supers.add(decl.superclass);
+        }
+        supers.addAll(decl.interfaces);
+        supers.addAll(decl.mixins);
+        for (TypeRef st : supers) {
+            TypeRef inst = substTypeParams(st, decl.typeParams, s.args);
+            TypeRef r = superInstantiation(inst, sup, seen);
+            if (r != null) {
+                return r;
+            }
+        }
+        return null;
     }
 
     /// Whether {@code t} names one of {@code names} anywhere (a bound naming its own class's
@@ -23016,13 +23270,48 @@ public final class JavaEmitter {
                     }
                 }
             }
+            List<TypeRef> declared = genericTearOffParamTypes.get(l);
+            if (t == null && declared != null) {
+                // `firstOf(<String>[..])` for `T firstOf<T>(List<T> xs)`: T is read off the
+                // argument's static type where the parameter's type names it.
+                int pos = 0;
+                for (int s = 0; s < l.params.size() && t == null; s++) {
+                    Param lp = l.params.get(s);
+                    Expr arg = null;
+                    if (lp.named) {
+                        for (NamedArg na : c.args.named) {
+                            if (na.name.equals(lp.name)) {
+                                arg = na.value;
+                            }
+                        }
+                    } else {
+                        arg = pos < c.args.positional.size() ? c.args.positional.get(pos) : null;
+                        pos++;
+                    }
+                    TypeRef at = arg == null ? null : elementTypeQuiet(arg, ctx);
+                    if (at != null && !at.is("var") && !isDynamicType(at)) {
+                        t = matchTypeVar(declared.get(s), at, l.typeParams.get(i));
+                    }
+                }
+            }
             String w = t == null ? null : witnessOf(t, ctx);
             any |= w != null;
             known.add(w == null ? null : t);
             ws.append(i == 0 ? "" : ", ").append(w == null ? "null" : w);
         }
+        lastGenericCallReturn = null;
         if (!any) {
             return new Out(recv, local);
+        }
+        if (!known.contains(null)) {
+            // The call's static result is the declared result at this instantiation, so
+            // `f(<String>[..]).length` reads a String.
+            TypeRef declRet = local.funcTypeParams != null && local.funcTypeParams.size() == known.size()
+                    && local.funcReturn != null
+                    ? substTypeParams(local.funcReturn, local.funcTypeParams, known)
+                    : genericTearOffReturns.containsKey(l)
+                    ? substTypeParams(genericTearOffReturns.get(l), l.typeParams, known) : null;
+            lastGenericCallReturn = declRet;
         }
         // Called at the instantiation's parameter types: a `List<T> xs` parameter of
         // `gl<int>(..)` takes the List<int> the argument is built as. The result stays the
@@ -23041,6 +23330,40 @@ public final class JavaEmitter {
         String sam = javaType(called, false, ctx);
         return new Out("((" + sam + ") dart.runtime.SignedFns.instantiate(" + recv
                 + ", new dart.runtime.TypeWitness[] {" + ws + "}))", called);
+    }
+
+    /// What the last instantiateGenericClosure computed as the call's static result (null
+    /// when an argument is unknown).
+    private TypeRef lastGenericCallReturn;
+
+    /// The type {@code pattern} (written in type variables) binds {@code tv} to when matched
+    /// against {@code actual}: `List<T>` against `List<String>` gives String. Null when
+    /// {@code pattern} does not name {@code tv} where {@code actual} has a part.
+    private TypeRef matchTypeVar(TypeRef pattern, TypeRef actual, String tv) {
+        if (pattern == null || actual == null) {
+            return null;
+        }
+        if (pattern.args.isEmpty() && pattern.funcParams == null && pattern.funcReturn == null
+                && tv.equals(pattern.name)) {
+            if (pattern.nullable && actual.nullable) {
+                TypeRef r = copyNonNull(actual);
+                r.nullable = false;
+                return r;
+            }
+            return actual;
+        }
+        TypeRef seen = pattern.name != null && actual.name != null && !pattern.name.equals(actual.name)
+                ? supertypeInstantiation(actual.name, actual.args, pattern.name) : actual;
+        if (seen == null || seen.args.size() != pattern.args.size()) {
+            return null;
+        }
+        for (int i = 0; i < pattern.args.size(); i++) {
+            TypeRef r = matchTypeVar(pattern.args.get(i), seen.args.get(i), tv);
+            if (r != null) {
+                return r;
+            }
+        }
+        return null;
     }
 
     /// The result type of a call of the generic closure {@code outer}, marked as holding the
@@ -24405,11 +24728,39 @@ public final class JavaEmitter {
             callee.name = n;
             String recv = emitIdent(callee, null, ctx).code;
             TypeRef callType = local;
+            TypeRef precise = null;
             if (local.genericClosure != null) {
                 Out inst = instantiateGenericClosure(recv, local, c, ctx);
                 recv = inst.code;
                 callType = inst.type;
+                precise = lastGenericCallReturn;
+                lastGenericCallReturn = null;
                 ret = withInnerGenericClosure(ret, local.genericClosure);
+            } else if (local.funcTypeParams != null && !local.funcTypeParams.isEmpty()
+                    && local.funcParams != null && local.funcReturn != null) {
+                // `T Function<T>(T) id = identity; id(5)`: the declared generic function
+                // type instantiated by the call's type arguments, written or inferred from
+                // the arguments' static types, gives the call's static result.
+                List<TypeRef> known = new ArrayList<TypeRef>();
+                for (int i = 0; i < local.funcTypeParams.size(); i++) {
+                    TypeRef t = c.typeArgs.size() == local.funcTypeParams.size() ? c.typeArgs.get(i) : null;
+                    for (int s = 0; t == null && s < local.funcParams.size() && s < c.args.positional.size(); s++) {
+                        TypeRef at = elementTypeQuiet(c.args.positional.get(s), ctx);
+                        if (at != null && !at.is("var") && !isDynamicType(at)) {
+                            t = matchTypeVar(local.funcParams.get(s), at, local.funcTypeParams.get(i));
+                        }
+                    }
+                    known.add(t);
+                }
+                if (!known.contains(null)) {
+                    precise = substTypeParams(local.funcReturn, local.funcTypeParams, known);
+                }
+            }
+            if (precise != null && !precise.is("void") && !isDynamicType(precise)
+                    && !mentionsTypeVariable(precise, ctx) && !(isDynamicType(local) && local.funcParams == null)) {
+                // The closure is erased; its result is converted to the instantiated type.
+                Out raw = new Out(fnCall(recv, callType, c.args, ctx), TypeRef.DYNAMIC);
+                return new Out(coerce(raw, precise, ctx), precise);
             }
             if (isDynamicType(local) && local.funcParams == null) {
                 // `d<String>('z')`, `d(true)` on a dynamic local: Dart's dynamic invocation,
@@ -33352,6 +33703,19 @@ public final class JavaEmitter {
     private Out staticTearOff(String cls, ClassDecl pinned, List<TypeRef> typeArgs, String name, Node posNode,
             Ctx ctx) {
         ClassDecl pc = pinned;
+        String prefix = posNode instanceof PropertyGet && ((PropertyGet) posNode).target instanceof PropertyGet
+                && isImportPrefix(((PropertyGet) ((PropertyGet) posNode).target).target, ctx)
+                ? ((Ident) ((PropertyGet) ((PropertyGet) posNode).target).target).name : null;
+        if (pc == null && prefix != null && !throughDartPrefix(((PropertyGet) posNode).target, ctx)) {
+            // A dart: prefix (`io.Directory`) names a stub class, never a program one.
+            // `a.Item.new`: only the class the prefix imports. A bare-name lookup would
+            // answer whichever library's Item this one (or the program) sees unprefixed.
+            pc = program.resolveClass(cls, ctx.library(), prefix);
+            if (pc == null) {
+                diags.error(posNode, "E0436", "No class " + cls + " is imported through prefix " + prefix);
+                return null;
+            }
+        }
         if (pc == null) {
             pc = program.resolveClass(cls, ctx.library());
         }
@@ -33437,18 +33801,40 @@ public final class JavaEmitter {
                     // is inferred downstream), `Function.apply(P.new,
                     // ..)`): Dart instantiates each type variable to its bound, which is
                     // dynamic when it declares none -- `pd(4)` builds P<dynamic>, never
-                    // P<Object>. A bound naming a type variable (F-bounded) reads dynamic.
+                    // P<Object>. Bounds naming other type variables go through Dart's
+                    // instantiate-to-bounds (`U extends List<T>` reads List<T's result>).
+                    List<TypeRef> toBounds = instantiateToBounds(tps, pc.typeParamBounds);
+                    // The result must still satisfy every bound. An F-bounded variable
+                    // (`T extends Comparable<T>`) gives T = Comparable<dynamic>, which is no
+                    // Comparable<Comparable<dynamic>>, so every call of the value
+                    // instantiated that way -- a dynamic call, Function.apply -- throws
+                    // TypeError in Dart, while `T extends FutureOr<T>` passes (its result is
+                    // a top type). The value itself is fine: only calling it fails.
+                    boolean fails = false;
+                    for (int i = 0; i < tps.size(); i++) {
+                        TypeRef b = pc.typeParamBounds.get(tps.get(i));
+                        if (b == null) {
+                            continue;
+                        }
+                        Boolean ok = exactSubtype(toBounds.get(i), substTypeParams(b, tps, toBounds));
+                        if (ok == null) {
+                            diags.error(posNode, "E0435", "Cannot decide whether instantiating " + cls
+                                    + " to its bounds satisfies the bound of " + tps.get(i) + ": " + b);
+                        } else if (!ok.booleanValue()) {
+                            fails = true;
+                        }
+                    }
+                    fBoundedToBounds |= fails;
                     inferred = new ArrayList<TypeRef>();
-                    for (String tp : tps) {
-                        TypeRef b = pc.typeParamBounds.get(tp);
-                        inferred.add(b != null && !mentionsTypeVariable(b, ctx) && !namesAny(b, tps) ? b : new TypeRef("dynamic"));
-                        // F-bounded (`T extends Comparable<T>`): instantiating to bounds gives
-                        // T = Comparable<dynamic>, which fails its own bound
-                        // (Comparable<dynamic> is no Comparable<Comparable<dynamic>>), so every
-                        // call of the value instantiated that way -- a dynamic call,
-                        // Function.apply -- throws TypeError in Dart. The value itself is fine:
-                        // `d is Function` holds; only calling it fails.
-                        fBoundedToBounds |= b != null && namesAny(b, tps);
+                    for (int i = 0; i < tps.size(); i++) {
+                        TypeRef a = toBounds.get(i);
+                        while (a.is("FutureOr") && a.args.size() == 1 && boundTopType(a.args.get(0))) {
+                            // NORM: FutureOr of a top type is that top type (`Fo<dynamic>`).
+                            a = a.args.get(0);
+                        }
+                        // A failing instantiation is never constructed (the call throws), so
+                        // its witness only has to compile.
+                        inferred.add(fails ? new TypeRef("dynamic") : a);
                     }
                 }
                 call.type.args.addAll(inferred);
@@ -33549,6 +33935,8 @@ public final class JavaEmitter {
     /// with optional or named parameters (those keep the existing tear-off path).
     private Lambda genericTearOffClosure(Expr e, Ctx ctx) {
         String canonBare = null;
+        String ctorKey = null;
+        TypeRef tearRet = null;
         List<String> tps;
         java.util.Map<String, TypeRef> bounds;
         List<Param> params;
@@ -33580,13 +33968,6 @@ public final class JavaEmitter {
             if (cd == null || cd.isFactory) {
                 return null;
             }
-            for (String tp : pc.typeParams) {
-                if (pc.typeParamBounds.get(tp) != null) {
-                    // A bounded class instantiates to its bound, which the generic
-                    // closure's unknown witness does not spell; staticTearOff handles it.
-                    return null;
-                }
-            }
             tps = pc.typeParams;
             bounds = pc.typeParamBounds;
             params = ctorParamsAsValues(pc, cd);
@@ -33598,6 +33979,11 @@ public final class JavaEmitter {
             }
             call.ctorName = pg.name.equals("new") ? null : pg.name;
             body = call;
+            tearRet = call.type;
+            // canonCtorTearOff's key, `new <class><args>.<ctor>`, with the diamond for the
+            // uninstantiated generic constructor: `G.new == G.new` holds across separate
+            // tear-offs, and no instantiation's key (`new G<int>.new`) equals it.
+            ctorKey = "new " + javaClassName(pc) + "<>." + pg.name;
         } else if (e instanceof Ident && ((Ident) e).typeArgs == null && ctx.lookup(((Ident) e).name) == null
                 && (ctx.currentClass == null || ctx.currentClass.method(((Ident) e).name) == null
                     && ctx.currentClass.field(((Ident) e).name) == null)) {
@@ -33607,14 +33993,10 @@ public final class JavaEmitter {
                 return null;
             }
             canonBare = Program.libClassName(owner.fileName) + "::" + fd.name;
-            for (String tp : fd.typeParams) {
-                if (fd.typeParamBounds.get(tp) != null) {
-                    return null;
-                }
-            }
             tps = fd.typeParams;
             bounds = fd.typeParamBounds;
             params = fd.params;
+            tearRet = fd.returnType;
             Call call = new Call();
             call.name = fd.name;
             for (String tp : tps) {
@@ -33634,37 +34016,77 @@ public final class JavaEmitter {
         l.typeParamBounds.putAll(bounds);
         l.typeVarSlots.add(null);
         Args args = body instanceof CtorCall ? ((CtorCall) body).args : ((Call) body).args;
+        List<TypeRef> declaredTypes = new ArrayList<TypeRef>();
         for (Param p : params) {
-            if (p.optional || p.named || p.type == null || p.type.is("var")) {
+            if (p.type == null || p.type.is("var") || p.optional || p.named) {
+                // An optional or named parameter makes emitLambdaIn build the closure
+                // through optionalParamLambda's adapter, not SignedFns.generic, so its body
+                // would have no witness for T: those keep the existing tear-off path.
                 return null;
             }
             Param lp = new Param();
-            lp.name = "p$" + p.name;
+            // Optional and named parameters keep their kind and their (constant) default,
+            // so an omitted one takes the default inside the closure and is forwarded as is.
+            lp.name = p.named ? p.name : "p$" + p.name;
             lp.line = e.line;
             lp.col = e.col;
+            lp.named = p.named;
+            lp.required = p.required;
+            lp.optional = p.optional;
+            lp.defaultValue = p.defaultValue;
             boolean bare = p.type.args.isEmpty() && p.type.funcParams == null && tps.contains(p.type.name);
-            l.typeVarSlots.add(bare ? p.type.name : null);
-            lp.type = bare ? TypeRef.DYNAMIC : p.type;
-            if (!bare && namesAny(p.type, tps)) {
-                return null;
+            if (!p.named) {
+                l.typeVarSlots.add(bare ? p.type.name : null);
             }
+            // A parameter naming T inside a bigger type (`List<T> xs`) is dynamic in the
+            // closure's signature, as a bare T is (the forwarded call checks it into the
+            // parameter's type); a call infers T from it (instantiateGenericClosure).
+            lp.type = bare || namesAny(p.type, tps) ? TypeRef.DYNAMIC : p.type;
+            declaredTypes.add(p.type);
             l.params.add(lp);
             Ident ref = new Ident();
             ref.name = lp.name;
             ref.line = e.line;
             ref.col = e.col;
-            args.positional.add(ref);
+            Expr fwd = ref;
+            if (!bare && namesAny(p.type, tps)) {
+                // Dart's own check of the argument against the parameter's type at this
+                // instantiation (`xs as List<T>`, T the closure's witness).
+                AsCast cast = new AsCast();
+                cast.operand = ref;
+                cast.type = p.type;
+                cast.line = e.line;
+                cast.col = e.col;
+                fwd = cast;
+            }
+            args.positional.add(fwd);
+        }
+        genericTearOffParamTypes.put(l, declaredTypes);
+        if (tearRet != null) {
+            genericTearOffReturns.put(l, tearRet);
         }
         body.line = e.line;
         body.col = e.col;
         l.exprBody = body;
         genericTearOffLambdas.put(l, canonBare);
+        if (ctorKey != null) {
+            genericCtorTearOffKeys.put(l, ctorKey);
+        }
         return l;
     }
 
     /// The closures genericTearOffClosure desugared a generic tear-off to, each with the
     /// `Lib::fn` its function is canonicalized by (null for a constructor).
     private final java.util.Map<Lambda, String> genericTearOffLambdas = new java.util.IdentityHashMap<Lambda, String>();
+
+    /// The declared parameter types (in its own type variables) of each closure
+    /// genericTearOffClosure built, in parameter order, and its declared result type.
+    private final java.util.Map<Lambda, List<TypeRef>> genericTearOffParamTypes =
+            new java.util.IdentityHashMap<Lambda, List<TypeRef>>();
+    private final java.util.Map<Lambda, TypeRef> genericTearOffReturns = new java.util.IdentityHashMap<Lambda, TypeRef>();
+
+    /// The canonCtorTearOff key of each generic constructor tear-off's closure.
+    private final java.util.Map<Lambda, String> genericCtorTearOffKeys = new java.util.IdentityHashMap<Lambda, String>();
 
     /** Set by staticTearOff when the next tear-off lambda instantiates an F-bounded class to bounds. */
     private boolean fBoundedToBounds;
