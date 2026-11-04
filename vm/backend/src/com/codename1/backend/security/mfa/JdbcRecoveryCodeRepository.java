@@ -75,10 +75,10 @@ public final class JdbcRecoveryCodeRepository implements RecoveryCodeRepository 
 
         @Override
         public Object run(Database db) throws Exception {
-            db.execute("DELETE FROM cn1_mfa_recovery_code WHERE username_key = ?",
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_mfa_recovery_code") + " WHERE username_key = ?",
                     new Object[] {user});
             for (String hash : codeHashes) {
-                db.execute("INSERT INTO cn1_mfa_recovery_code (username_key, code_hash) "
+                db.execute("INSERT INTO " + SecuritySchema.table("cn1_mfa_recovery_code") + " (username_key, code_hash) "
                         + "VALUES (?, ?)", new Object[] {user, hash});
             }
             return null;
@@ -92,7 +92,7 @@ public final class JdbcRecoveryCodeRepository implements RecoveryCodeRepository 
             return hashes;
         }
         try {
-            for (Object row : dataSource.query("SELECT code_hash FROM cn1_mfa_recovery_code "
+            for (Object row : dataSource.query("SELECT code_hash FROM " + SecuritySchema.table("cn1_mfa_recovery_code") + " "
                     + "WHERE username_key = ?", new Object[] {SecuritySchema.usernameKey(username)})) {
                 hashes.add((String) ((Map) row).get("code_hash"));
             }
@@ -108,7 +108,7 @@ public final class JdbcRecoveryCodeRepository implements RecoveryCodeRepository 
             return false;
         }
         try {
-            return dataSource.execute("DELETE FROM cn1_mfa_recovery_code WHERE username_key = ? "
+            return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_mfa_recovery_code") + " WHERE username_key = ? "
                     + "AND code_hash = ?", new Object[] {SecuritySchema.usernameKey(username),
                         codeHash}) == 1;
         } catch (IOException err) {
@@ -119,7 +119,7 @@ public final class JdbcRecoveryCodeRepository implements RecoveryCodeRepository 
     @Override
     public int count(String username) {
         try {
-            Map row = dataSource.queryOne("SELECT COUNT(*) AS n FROM cn1_mfa_recovery_code WHERE "
+            Map row = dataSource.queryOne("SELECT COUNT(*) AS n FROM " + SecuritySchema.table("cn1_mfa_recovery_code") + " WHERE "
                     + "username_key = ?", new Object[] {SecuritySchema.usernameKey(username)});
             Object n = row == null ? null : row.get("n");
             return n instanceof Number ? ((Number) n).intValue() : 0;

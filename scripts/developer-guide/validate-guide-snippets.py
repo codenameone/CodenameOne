@@ -15,7 +15,7 @@ TAG_RE = re.compile(r"(?:^|,)tag=([^,\]]+)")
 LISTING_DELIMITER_RE = re.compile(r"^-{4,}\s*$")
 TAG_BLOCK_RE = re.compile(r"// tag::([^\[]+)\[\]\n(.*?)\n// end::\1\[\]", re.S)
 JAVA_IDENTIFIER_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*\.java$")
-INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/", "../../scripts/savor/", "../../scripts/skirmish/", "../../scripts/parley/", "../../scripts/reel/", "../../scripts/hellocodenameone/")
+INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/", "../../scripts/savor/", "../../scripts/skirmish/", "../../scripts/dash/", "../../scripts/parley/", "../../scripts/reel/", "../../scripts/hellocodenameone/")
 
 
 def parse_args():
@@ -135,8 +135,8 @@ def validate_includes(includes):
     cache = {}
     java_snippets = []
     for item in includes:
-        # The Wayline, Savor, Skirmish and Parley chapters show the sample applications themselves,
-        # which are built and tested by wayline.yml, savor.yml, skirmish.yml and parley.yml, so they include its sources directly
+        # The Wayline, Savor, Skirmish, Dash and Parley chapters show the sample applications themselves,
+        # which are built and tested by wayline.yml, savor.yml, skirmish.yml, dash.yml and parley.yml, so they include its sources directly
         # rather than through copies under docs/demos that could drift from it.
         if not item["target"].startswith(INCLUDE_ROOTS):
             errors.append(
@@ -177,7 +177,7 @@ def validate_includes(includes):
             # compiled by its project's CSS goal, and the sample's workflow
             # builds the sample.
             relative_css_path = None
-            for css_dir in ("docs/demos/common/src/main/css", "scripts/skirmish/common/src/main/css"):
+            for css_dir in ("docs/demos/common/src/main/css", "scripts/skirmish/common/src/main/css", "scripts/dash/common/src/main/css"):
                 try:
                     relative_css_path = target_path.relative_to(Path(css_dir).resolve())
                     break

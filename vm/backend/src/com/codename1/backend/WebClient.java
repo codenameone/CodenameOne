@@ -61,10 +61,11 @@ import java.util.List;
 /// IOException saying so, and the request is not sent to it as HTTP/1.1. Without
 /// it the packaged binary offers HTTP/2 over TLS and falls back to HTTP/1.1 when
 /// the server declines; [Web.Result#getProtocol()] says which was used. The local
-/// Java SE runtime speaks HTTP/1.1 only (its client is HttpURLConnection, the
-/// one every JDK this runs on has), so there a client that REQUIRES HTTP/2 fails
-/// every request with an IOException that says so, rather than quietly
-/// succeeding over a protocol the caller ruled out.
+/// Java SE runtime makes an ordinary request with HttpURLConnection, which speaks
+/// HTTP/1.1 only, and a client that REQUIRES HTTP/2 with the JDK's
+/// `java.net.http` client (Java 11 or newer), so APNs and other HTTP/2-only
+/// services work in the development loop and in tests. There, [#open(String, String, List, long)] -- a
+/// streamed exchange -- is still HTTP/1.1 only and refuses such a client.
 public final class WebClient {
     private boolean requireHttp2;
     private ClientCertificate clientCertificate;

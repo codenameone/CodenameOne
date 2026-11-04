@@ -22,6 +22,8 @@
  */
 package com.codename1.backend;
 
+import com.codename1.impl.backend.CivilTime;
+
 /// The one date format HTTP/1.1 requires on the wire ("Sun, 06 Nov 1994 08:49:37
 /// GMT"), formatted and parsed from epoch milliseconds directly.
 ///
@@ -37,14 +39,8 @@ public final class Http1Date {
     private Http1Date() {
     }
 
-    // JavaAPI's Math has no floorDiv/floorMod, and integer division in Java
-    // truncates toward zero -- which for a pre-1970 timestamp gives the wrong day.
     private static long floorDiv(long x, long y) {
-        long q = x / y;
-        if ((x % y != 0) && ((x < 0) != (y < 0))) {
-            q--;
-        }
-        return q;
+        return CivilTime.floorDiv(x, y);
     }
 
     private static long floorMod(long x, long y) {
@@ -57,7 +53,8 @@ public final class Http1Date {
         int secondOfDay = (int) floorMod(seconds, 86400L);
         // 1970-01-01 was a Thursday, which is why DAYS starts there.
         int dayOfWeek = (int) floorMod(days, 7L);
-        int[] civil = civilFromDays(days);
+        int[] civil = new int[3];
+        CivilTime.civilFromDays(days, civil);
         StringBuilder out = new StringBuilder(29);
         out.append(DAYS[dayOfWeek]).append(", ");
         two(out, civil[2]).append(' ').append(MONTHS[civil[1] - 1]).append(' ');
@@ -124,11 +121,11 @@ public final class Http1Date {
             // one written. A second of 60 is allowed because a leap second is
             // spelled that way.
             if (day < 1 || year < 1 || hour < 0 || minute < 0 || second < 0
-                    || day > daysInMonth(year, month) || hour > 23 || minute > 59
+                    || day > CivilTime.daysInMonth(year, month) || hour > 23 || minute > 59
                     || second > 60) {
                 return -1;
             }
-            long days = daysFromCivil(year, month, day);
+            long days = CivilTime.daysFromCivil(year, month, day);
             // The weekday, which the shape test above never looked at: the first
             // three characters were accepted as-is, so "Xxx, 06 Nov 9999 ..." read
             // as a year-9999 date and StaticFiles.isNotModified() answered 304 to
@@ -168,52 +165,10 @@ public final class Http1Date {
         return out;
     }
 
-    /// Days in a month, so a date that does not exist is not silently moved.
-    private static int daysInMonth(int year, int month) {
-        switch (month) {
-            case 2:
-                boolean leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-                return leap ? 29 : 28;
-            case 4: case 6: case 9: case 11:
-                return 30;
-            default:
-                return 31;
-        }
-    }
-
     private static StringBuilder two(StringBuilder out, int value) {
         if (value < 10) {
             out.append('0');
         }
         return out.append(value);
-    }
-
-    /*
-     * Howard Hinnant's civil-date algorithms: exact for every date in range, with
-     * no leap-year special cases to get wrong. The shift moves the epoch to
-     * 0000-03-01 so February -- the only month whose length varies -- lands at the
-     * end of the year and drops out of the arithmetic.
-     */
-    private static int[] civilFromDays(long days) {
-        long z = days + 719468L;
-        long era = floorDiv(z, 146097L);
-        long doe = z - era * 146097L;
-        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-        long y = yoe + era * 400L;
-        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        long mp = (5 * doy + 2) / 153;
-        long d = doy - (153 * mp + 2) / 5 + 1;
-        long m = mp < 10 ? mp + 3 : mp - 9;
-        return new int[]{(int) (m <= 2 ? y + 1 : y), (int) m, (int) d};
-    }
-
-    private static long daysFromCivil(int year, int month, int day) {
-        long y = year - (month <= 2 ? 1 : 0);
-        long era = floorDiv(y, 400L);
-        long yoe = y - era * 400L;
-        long mp = month > 2 ? month - 3 : month + 9;
-        long doy = (153 * mp + 2) / 5 + day - 1;
-        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        return era * 146097L + doe - 719468L;
     }
 }

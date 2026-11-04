@@ -355,6 +355,14 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 #undef CN1_INCLUDE_OIDC
 #endif
 
+// A watch slice compiles these sources with the iOS app's switches too, and
+// watchOS has no CoreNFC either: an app that read NFC tags and carried a watch
+// companion failed the watch target on the CoreNFC import. Off, the natives
+// answer "unsupported", which is the truth on a watch.
+#if TARGET_OS_WATCH
+#undef CN1_INCLUDE_NFC
+#endif
+
 // CN1_INCLUDE_NEARBY gates the com.codename1.nearby native bridge
 // (CN1Nearby.{h,m}: Nearby Interaction ranging, MultipeerConnectivity
 // transport and AccessorySetupKit association). IPhoneBuilder uncomments this

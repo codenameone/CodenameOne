@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.aws;
 
+import com.codename1.impl.backend.CivilTime;
 import java.io.IOException;
 import java.util.Map;
 
@@ -411,7 +412,6 @@ public final class Credentials {
             int hour = Integer.parseInt(iso.substring(11, 13));
             int minute = Integer.parseInt(iso.substring(14, 16));
             int second = Integer.parseInt(iso.substring(17, 19));
-            int[] lengths = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
             // A DATE THAT EXISTS. Digits alone are not enough: the arithmetic below
             // is a running total, so February the 31st simply carries into March
             // and an hour of 99 adds four days. Both are LATER than the provider
@@ -422,26 +422,14 @@ public final class Credentials {
                     || hour > 23 || minute > 59 || second > 60) {
                 return 0;
             }
-            int maxDay = lengths[month - 1] + (month == 2 && isLeap(year) ? 1 : 0);
-            if (day > maxDay) {
+            if (day > CivilTime.daysInMonth(year, month)) {
                 return 0;
             }
-            long days = 0;
-            for (int y = 1970 ; y < year ; y++) {
-                days += isLeap(y) ? 366 : 365;
-            }
-            for (int m = 0 ; m < month - 1 ; m++) {
-                days += lengths[m] + (m == 1 && isLeap(year) ? 1 : 0);
-            }
-            days += day - 1;
+            long days = CivilTime.daysFromCivil(year, month, day);
             return ((days * 24L + hour) * 60L + minute) * 60L * 1000L + second * 1000L;
         } catch (NumberFormatException err) {
             return 0;
         }
-    }
-
-    private static boolean isLeap(int year) {
-        return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
     }
 
     /// Whether a field the credential endpoint returned is missing in any of the

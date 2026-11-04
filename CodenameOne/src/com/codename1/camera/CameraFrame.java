@@ -91,7 +91,10 @@ public final class CameraFrame {
     /// `CameraSessionOptions#frameFormat(FrameFormat)`. This is `null` for
     /// JPEG requests and may also be `null` when the current port cannot
     /// expose the requested raw format. In that case
-    /// {@link #getJpegBytes()} remains available as a fallback.
+    /// {@link #getJpegBytes()} remains available as a fallback. A port may
+    /// also answer a raw request in another raw format -- iOS captures BGRA
+    /// and has no NV21, so it delivers RGBA8888 -- so read {@link #getFormat()}
+    /// before interpreting these bytes.
     public byte[] getRawBytes() {
         return rawBytes;
     }

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.html;
 
+import com.codename1.xml.CharEntities;
 import java.util.Hashtable;
 
 /// This class contains several useful static methods for HTML
@@ -31,52 +32,6 @@ import java.util.Hashtable;
 ///
 /// the HTML package is no longer used or maintained and may be removed in a future revision
 public final class HTMLUtils {
-
-    /// The char entities strings supported in XML. When a char entity is found these will be compared against first.
-    private static final String[] XML_CHAR_ENTITIES = {
-            "lt", // lesser-than
-            "gt", // greater-than
-            "amp", // ampersand
-            "quot", //quotation mark
-            "apos", // apostrophe
-            //"bull", //bullet
-            //"euro" //euro
-    };
-    /// The numericals value of char entities strings above.
-    private static final int[] XML_CHAR_ENTITIES_VALS = {
-            60, // "lt", // lesser-than
-            62, // "gt", // greater-than
-            38, // "amp", // ampersand
-            34, // "quot", //quotation mark
-            39, // "apos", // apostrophe
-            //8226, // "bull", //bullet
-            //8364 // "euro"}; //euro
-    };
-    /// This is a list of ISO 8859-1 Symbols that can be used as HTML char entities
-    private static final String[] HTML_BASIC_CHAR_ENTITY_STRINGS = {
-            "nbsp", "iexcl", "cent", "pound", "curren", "yen", "brvbar", "sect", "uml", "copy", "ordf", "laquo", "not", "shy", "reg", "macr", "deg", "plusmn", "sup2", "sup3", "acute",
-            "micro", "para", "middot", "cedil", "sup1", "ordm", "raquo", "frac14", "frac12", "frac34", "iquest", "Agrave", "Aacute", "Acirc", "Atilde", "Auml", "Aring", "AElig",
-            "Ccedil", "Egrave", "Eacute", "Ecirc", "Euml", "Igrave", "Iacute", "Icirc", "Iuml", "ETH", "Ntilde", "Ograve", "Oacute", "Ocirc", "Otilde", "Ouml", "times", "Oslash",
-            "Ugrave", "Uacute", "Ucirc", "Uuml", "Yacute", "THORN", "szlig", "agrave", "aacute", "acirc", "atilde", "auml", "aring", "aelig", "ccedil", "egrave", "eacute", "ecirc",
-            "euml", "igrave", "iacute", "icirc", "iuml", "eth", "ntilde", "ograve", "oacute", "ocirc", "otilde", "ouml", "divide", "oslash", "ugrave", "uacute", "ucirc", "uuml",
-            "yacute", "thorn", "yuml"};
-    /// Common HTML 4 named entities outside the contiguous ISO-8859-1 range above. Keeping these in
-    /// the shared parser utility lets all tolerant HTMLParser clients decode modern pasted fragments
-    /// without maintaining their own entity tables.
-    private static final String[] HTML_EXTENDED_CHAR_ENTITY_STRINGS = {
-            "OElig", "oelig", "Scaron", "scaron", "Yuml", "fnof", "circ", "tilde",
-            "ensp", "emsp", "thinsp", "zwnj", "zwj", "lrm", "rlm", "ndash", "mdash",
-            "lsquo", "rsquo", "sbquo", "ldquo", "rdquo", "bdquo", "dagger", "Dagger", "bull",
-            "hellip", "permil", "prime", "Prime", "lsaquo", "rsaquo", "oline", "frasl", "euro",
-            "image", "weierp", "real", "trade", "alefsym"
-    };
-    private static final int[] HTML_EXTENDED_CHAR_ENTITY_VALUES = {
-            338, 339, 352, 353, 376, 402, 710, 732,
-            8194, 8195, 8201, 8204, 8205, 8206, 8207, 8211, 8212,
-            8216, 8217, 8218, 8220, 8221, 8222, 8224, 8225, 8226,
-            8230, 8240, 8242, 8243, 8249, 8250, 8254, 8260, 8364,
-            8465, 8472, 8476, 8482, 8501
-    };
 
     // Prevents instantiation - this class has static method only
     private HTMLUtils() {
@@ -126,71 +81,8 @@ public final class HTMLUtils {
     /// #### Returns
     ///
     /// A string containing a single char, or the original char entity string  (with & and ;) if the char entity couldn't be resolved
-    @SuppressWarnings("PMD.EmptyCatchBlock")
     public static String convertCharEntity(String charEntity, boolean lookupHTMLentities, Hashtable userDefinedCharEntities) {
-        int charCode = -1;
-        if (charEntity.startsWith("#")) { //numbered char entity
-            if (charEntity.startsWith("#x")) { //hex
-                try {
-                    charCode = Integer.parseInt(charEntity.substring(2), 16);
-                } catch (NumberFormatException nfe) {
-                    //if not a number - simply ignore char entity
-                }
-            } else {
-                try {
-                    charCode = Integer.parseInt(charEntity.substring(1));
-                } catch (NumberFormatException nfe) {
-                    //if not a number - simply ignore char entity
-                }
-            }
-        } else { //not numbered, rather a symbol
-            charCode = getCharEntityCode(charEntity, lookupHTMLentities, userDefinedCharEntities);
-        }
-
-        if (charCode != -1) {
-            return "" + (char) charCode;
-        } else {
-            throw new IllegalArgumentException("Unknown character entity - " + charEntity);
-            //notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY,null,null,null, "Unrecognized char entity: "+charEntity);
-            //return "&"+charEntity+";"; // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the & char (instead of &apos;)
-        }
-
-    }
-
-    private static int getCharEntityCode(String symbol, boolean html, Hashtable userDefined) {
-        // First tries the XML basic char entities
-        int val = -1;
-        for (int i = 0; i < XML_CHAR_ENTITIES.length; i++) {
-            if (symbol.equalsIgnoreCase(XML_CHAR_ENTITIES[i])) {
-                return XML_CHAR_ENTITIES_VALS[i];
-            }
-        }
-        if (val != -1) {
-            return val;
-        } else {
-            if (html) {
-                // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
-                val = getStringVal(symbol, HTML_BASIC_CHAR_ENTITY_STRINGS);
-                if (val != -1) {
-                    return val + 160;
-                }
-                val = getStringVal(symbol, HTML_EXTENDED_CHAR_ENTITY_STRINGS);
-                if (val != -1) {
-                    return HTML_EXTENDED_CHAR_ENTITY_VALUES[val];
-                }
-            }
-
-            // Not found in the standard symbol table, see if it is in the user defined symbols table
-            if (userDefined != null) {
-                Object charObj = userDefined.get(symbol);
-                if (charObj != null) {
-                    return ((Integer) charObj).intValue();
-                }
-            }
-
-            // Not found anywhere
-            return -1;
-        }
+        return CharEntities.convert(charEntity, lookupHTMLentities, userDefinedCharEntities);
     }
 
     /// Encodes the specified string to "percent-encoding" or URL encoding.

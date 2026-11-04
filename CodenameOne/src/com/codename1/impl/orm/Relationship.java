@@ -42,6 +42,8 @@ public final class Relationship {
     public final boolean orphanRemoval;
     public final boolean unique;
     public final boolean element;
+    /// The SQL type an element collection declares for its value column, empty for the default.
+    public final String elementType;
     public final int column;
     public final int cascade;
     public static final int PERSIST = 1;
@@ -69,7 +71,14 @@ public final class Relationship {
     public Relationship(String field, Class target, boolean many, boolean lazy, int column, String mappedBy,
             String joinTable, String joinColumn, String inverseJoinColumn, int cascade, boolean orphanRemoval,
             boolean unique, String mapKey, String orderColumn, String orderBy, boolean element) {
+        this(field, target, many, lazy, column, mappedBy, joinTable, joinColumn, inverseJoinColumn, cascade,
+                orphanRemoval, unique, mapKey, orderColumn, orderBy, element, "");
+    }
+    public Relationship(String field, Class target, boolean many, boolean lazy, int column, String mappedBy,
+            String joinTable, String joinColumn, String inverseJoinColumn, int cascade, boolean orphanRemoval,
+            boolean unique, String mapKey, String orderColumn, String orderBy, boolean element, String elementType) {
         this.element = element;
+        this.elementType = elementType == null ? "" : elementType;
         this.mapKey = mapKey;
         this.orderColumn = orderColumn;
         this.orderBy = orderBy;

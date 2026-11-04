@@ -25,6 +25,7 @@ package com.codename1.util.regex;
 /// The same shape as `java.util.regex.PatternSyntaxException`: a pattern that is not one, or
 /// that uses a construct this runtime does not have -- the description says
 /// which.
+@com.codename1.impl.SharedWithBackend
 public class PatternSyntaxException extends IllegalArgumentException {
 
     private final String description;
