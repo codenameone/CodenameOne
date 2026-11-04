@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Whole-program model: every parsed user library plus lookup tables.
@@ -850,6 +851,22 @@ public final class Program {
      * class. Its top-level {@code _x} keeps its name; top-level declarations are told apart
      * by library already.
      */
+    /// For each library (by file name) whose private names were renamed: renamed name to the
+    /// name as written. The generated classes of that library register it with the runtime
+    /// ({@code Symbol.spell}), so an Invocation's memberName prints the Dart spelling; a
+    /// `#_x` literal carries its own.
+    public final Map<String, Map<String, String>> privateSpellings = new java.util.HashMap<String, Map<String, String>>();
+
+    /// {@code candidate}, or it with {@code $} appended until no library spells it: a user
+    /// identifier may itself be written {@code _x$p2}.
+    private static String freshPrivateName(String candidate, Set<String> spelled) {
+        String n = candidate;
+        while (spelled.contains(n)) {
+            n = n + "$";
+        }
+        return n;
+    }
+
     private void separateLibraryPrivateMembers() {
         Map<String, List<Ast.Library>> declaring = new LinkedHashMap<String, List<Ast.Library>>();
         // Top-level names are excluded per library: renaming a member whose name a top-level
@@ -951,7 +968,7 @@ public final class Program {
                         m = new java.util.HashMap<String, String>();
                         memberRenames.put(lib, m);
                     }
-                    m.put(en.getKey(), en.getKey() + "$p" + libraries.indexOf(lib));
+                    m.put(en.getKey(), freshPrivateName(en.getKey() + "$p" + libraries.indexOf(lib), declaring.keySet()));
                     continue;
                 }
                 Map<String, String> m = renames.get(l.get(i));
@@ -959,7 +976,19 @@ public final class Program {
                     m = new java.util.HashMap<String, String>();
                     renames.put(l.get(i), m);
                 }
-                m.put(en.getKey(), en.getKey() + "$p" + libraries.indexOf(l.get(i)));
+                m.put(en.getKey(), freshPrivateName(en.getKey() + "$p" + libraries.indexOf(l.get(i)), declaring.keySet()));
+            }
+        }
+        for (Map<Ast.Library, Map<String, String>> all : java.util.Arrays.asList(memberRenames, renames)) {
+            for (Map.Entry<Ast.Library, Map<String, String>> en : all.entrySet()) {
+                Map<String, String> sp = privateSpellings.get(en.getKey().fileName);
+                if (sp == null) {
+                    sp = new TreeMap<String, String>();
+                    privateSpellings.put(en.getKey().fileName, sp);
+                }
+                for (Map.Entry<String, String> r : en.getValue().entrySet()) {
+                    sp.put(r.getValue(), r.getKey());
+                }
             }
         }
         for (Map.Entry<Ast.Library, Map<String, String>> en : memberRenames.entrySet()) {
@@ -977,9 +1006,10 @@ public final class Program {
      * as Dart resolves it lexically: a local of that name wins, then a member the enclosing
      * class (or extension) itself declares, then the top-level; an inherited member is never
      * in lexical scope, so with a top-level of the name present it is reached only through
-     * {@code this}. Locals are taken per function: any local of the name in the enclosing
-     * member shadows it throughout that member, which differs from Dart only for a member
-     * reference written before a same-named local in one body.
+     * {@code this}. Locals are scoped lexically, as Dart scopes them: a local shadows the
+     * member only inside the block (loop, catch clause, closure, case) that declares it and
+     * from its declaration on, so the member is still the one reached before it, in sibling
+     * blocks and in closures declared earlier.
      */
     private static void renamePrivateMembers(Ast.Library lib, Map<String, String> names) {
         Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
@@ -991,7 +1021,7 @@ public final class Program {
             for (Ast.MethodDecl m : c.methods) {
                 declared.add(m.name);
             }
-            renameMembersIn(c, names, declared, seen);
+            renameMembersIn(c, names, declared, new LocalScopes(), seen);
         }
         for (Ast.EnumDecl e : lib.enums) {
             Set<String> declared = new HashSet<String>();
@@ -1001,40 +1031,112 @@ public final class Program {
             for (Ast.MethodDecl m : e.methods) {
                 declared.add(m.name);
             }
-            renameMembersIn(e, names, declared, seen);
+            renameMembersIn(e, names, declared, new LocalScopes(), seen);
         }
         // Everything else (top-level functions and variables, typedefs) has no enclosing
         // class: a bare name there is never a member.
-        renameMembersIn(lib, names, java.util.Collections.<String>emptySet(), seen);
+        renameMembersIn(lib, names, java.util.Collections.<String>emptySet(), new LocalScopes(), seen);
     }
 
-    private static void renameMembersIn(Object o, Map<String, String> names, Set<String> inScope, Set<Object> seen) {
+    /// The local scopes open at a point of the walk, innermost last.
+    private static final class LocalScopes {
+        private final java.util.ArrayList<Set<String>> stack = new java.util.ArrayList<Set<String>>();
+
+        void push() {
+            stack.add(new HashSet<String>());
+        }
+
+        void pop() {
+            stack.remove(stack.size() - 1);
+        }
+
+        void declare(String name) {
+            if (name != null && !stack.isEmpty()) {
+                stack.get(stack.size() - 1).add(name);
+            }
+        }
+
+        boolean declares(String name) {
+            for (Set<String> s : stack) {
+                if (s.contains(name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /// Whether {@code o} opens a scope of its own for the locals it (or its body) declares.
+    private static boolean opensScope(Object o) {
+        return o instanceof Ast.Block || o instanceof Ast.MethodDecl || o instanceof Ast.CtorDecl
+                || o instanceof Ast.FunctionDecl || o instanceof Ast.Lambda || o instanceof Ast.ForStmt
+                || o instanceof Ast.ForInStmt || o instanceof Ast.CatchClause || o instanceof Ast.SwitchCase
+                || o instanceof Ast.SwitchExprCase || o instanceof Ast.ForElement;
+    }
+
+    private static void renameMembersIn(Object o, Map<String, String> names, Set<String> inScope,
+            LocalScopes locals, Set<Object> seen) {
         if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
             return;
         }
         if (o instanceof Iterable) {
             for (Object e : (Iterable<?>) o) {
-                renameMembersIn(e, names, inScope, seen);
+                renameMembersIn(e, names, inScope, locals, seen);
             }
             return;
         }
         if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
             return;
         }
+        if (o instanceof Ast.IfStmt && ((Ast.IfStmt) o).casePattern != null) {
+            // An if-case's pattern variables are in scope in its guard and then branch only.
+            Ast.IfStmt is = (Ast.IfStmt) o;
+            renameMembersIn(is.condition, names, inScope, locals, seen);
+            locals.push();
+            renameMembersIn(is.casePattern, names, inScope, locals, seen);
+            renameMembersIn(is.caseGuard, names, inScope, locals, seen);
+            renameMembersIn(is.thenStmt, names, inScope, locals, seen);
+            locals.pop();
+            renameMembersIn(is.elseStmt, names, inScope, locals, seen);
+            return;
+        }
+        if (o instanceof Ast.LocalFunc) {
+            // Its name is in scope in the enclosing block (and so in its own body).
+            locals.declare(((Ast.LocalFunc) o).name);
+        }
+        boolean scoped = opensScope(o) || o instanceof Ast.LocalFunc;
+        if (scoped) {
+            locals.push();
+        }
+        try {
+            renameMembersInNode(o, names, inScope, locals, seen);
+        } finally {
+            if (scoped) {
+                locals.pop();
+            }
+        }
+        // A variable is in scope from its declaration on (Dart rejects a use before it in the
+        // same block, so its own initializer never meets it).
+        if (o instanceof Ast.VarDeclStmt) {
+            locals.declare(((Ast.VarDeclStmt) o).name);
+        }
+    }
+
+    private static void renameMembersInNode(Object o, Map<String, String> names, Set<String> inScope,
+            LocalScopes locals, Set<Object> seen) {
+        if (o instanceof Ast.Param && !((Ast.Param) o).isThis && !((Ast.Param) o).isSuper) {
+            locals.declare(((Ast.Param) o).name);
+        } else if (o instanceof Ast.VariablePattern) {
+            locals.declare(((Ast.VariablePattern) o).name);
+        } else if (o instanceof Ast.ForInStmt) {
+            locals.declare(((Ast.ForInStmt) o).varName);
+        } else if (o instanceof Ast.CatchClause) {
+            locals.declare(((Ast.CatchClause) o).exceptionVar);
+            locals.declare(((Ast.CatchClause) o).stackVar);
+        }
         String sym = privateSymbol(o);
         if (sym != null && names.containsKey(sym)) {
-            ((Ast.StringLit) ((Ast.Call) o).args.positional.get(0)).parts.set(0, names.get(sym));
-        }
-        if (o instanceof Ast.MethodDecl || o instanceof Ast.CtorDecl) {
-            // A member's own locals shadow the class's members of the same name.
-            Set<String> locals = new HashSet<String>();
-            collectLocalNames(o, locals, java.util.Collections.newSetFromMap(
-                    new java.util.IdentityHashMap<Object, Boolean>()));
-            if (!locals.isEmpty()) {
-                Set<String> narrowed = new HashSet<String>(inScope);
-                narrowed.removeAll(locals);
-                inScope = narrowed;
-            }
+            renameSymbol((Ast.Call) o, names.get(sym));
         }
         String rename = null;
         if (o instanceof Ast.MethodDecl) {
@@ -1044,13 +1146,13 @@ public final class Program {
             // variable is reached from the library walk, where inScope is empty.
             rename = inScope.isEmpty() ? null : ((Ast.FieldDecl) o).name;
         } else if (o instanceof Ast.PropertyGet) {
-            rename = ((Ast.PropertyGet) o).target != null || inScope.contains(((Ast.PropertyGet) o).name)
+            rename = ((Ast.PropertyGet) o).target != null || memberInScope(((Ast.PropertyGet) o).name, inScope, locals)
                     ? ((Ast.PropertyGet) o).name : null;
         } else if (o instanceof Ast.Call) {
             Ast.Call c = (Ast.Call) o;
-            rename = c.target != null || inScope.contains(c.name) ? c.name : null;
+            rename = c.target != null || memberInScope(c.name, inScope, locals) ? c.name : null;
         } else if (o instanceof Ast.Ident) {
-            rename = inScope.contains(((Ast.Ident) o).name) ? ((Ast.Ident) o).name : null;
+            rename = memberInScope(((Ast.Ident) o).name, inScope, locals) ? ((Ast.Ident) o).name : null;
         } else if (o instanceof Ast.FieldInit) {
             rename = ((Ast.FieldInit) o).field;
         } else if (o instanceof Ast.Param && (((Ast.Param) o).isThis || ((Ast.Param) o).isSuper)) {
@@ -1088,7 +1190,7 @@ public final class Program {
                 }
                 try {
                     f.setAccessible(true);
-                    renameMembersIn(f.get(o), names, inScope, seen);
+                    renameMembersIn(f.get(o), names, inScope, locals, seen);
                 } catch (IllegalAccessException ex) {
                     throw new IllegalStateException(ex);
                 }
@@ -1096,45 +1198,21 @@ public final class Program {
         }
     }
 
-    /// The names a function body declares as locals: parameters (but not `this.x`),
-    /// variables, local functions and pattern variables.
-    private static void collectLocalNames(Object o, Set<String> out, Set<Object> seen) {
-        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
-            return;
-        }
-        if (o instanceof Iterable) {
-            for (Object e : (Iterable<?>) o) {
-                collectLocalNames(e, out, seen);
-            }
-            return;
-        }
-        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
-            return;
-        }
-        if (o instanceof Ast.Param && !((Ast.Param) o).isThis && !((Ast.Param) o).isSuper) {
-            out.add(((Ast.Param) o).name);
-        } else if (o instanceof Ast.VarDeclStmt) {
-            out.add(((Ast.VarDeclStmt) o).name);
-        } else if (o instanceof Ast.LocalFunc) {
-            out.add(((Ast.LocalFunc) o).name);
-        } else if (o instanceof Ast.VariablePattern) {
-            out.add(((Ast.VariablePattern) o).name);
-        }
-        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
-            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
-                int mod = f.getModifiers();
-                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive() || f.getType() == String.class
-                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
-                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
-                    continue;
-                }
-                try {
-                    f.setAccessible(true);
-                    collectLocalNames(f.get(o), out, seen);
-                } catch (IllegalAccessException ex) {
-                    throw new IllegalStateException(ex);
-                }
-            }
+    private static boolean memberInScope(String name, Set<String> inScope, LocalScopes locals) {
+        return inScope.contains(name) && !locals.declares(name);
+    }
+
+    /// Renames a `#_x` literal to {@code to}, keeping the name as written for its spelling:
+    /// the literal becomes {@code Symbol("_x$p2", "_x")}, so it equals only this library's
+    /// `#_x` but prints as Dart prints it.
+    private static void renameSymbol(Ast.Call c, String to) {
+        Ast.StringLit lit = (Ast.StringLit) c.args.positional.get(0);
+        String was = (String) lit.parts.get(0);
+        lit.parts.set(0, to);
+        if (c.args.positional.size() == 1) {
+            Ast.StringLit spelled = new Ast.StringLit();
+            spelled.parts.add(was);
+            c.args.positional.add(spelled);
         }
     }
 
@@ -1308,7 +1386,7 @@ public final class Program {
         }
         String sym = privateSymbol(o);
         if (sym != null && names.containsKey(sym)) {
-            ((Ast.StringLit) ((Ast.Call) o).args.positional.get(0)).parts.set(0, names.get(sym));
+            renameSymbol((Ast.Call) o, names.get(sym));
         }
         if (o instanceof Iterable) {
             for (Object e : (Iterable<?>) o) {

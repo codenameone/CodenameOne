@@ -32,16 +32,30 @@ public final class Symbol {
     /// setter's name for equality.
     private final boolean privateSetter;
 
+    /// The Dart spelling when it differs from {@link #name} (a renamed private name), or null.
+    private final String spelling;
+
     public Symbol(String name) {
         this(name, false);
     }
 
+    /// A `#_x` literal of a library whose `_x` was renamed: equal by the renamed name,
+    /// printed as written.
+    public Symbol(String name, String spelling) {
+        this(name, false, spelling);
+    }
+
     Symbol(String name, boolean setter) {
+        this(name, setter, null);
+    }
+
+    private Symbol(String name, boolean setter, String spelling) {
         if (name == null) {
             throw new ArgumentError("Symbol name must not be null");
         }
         this.name = name;
         this.privateSetter = setter && name.startsWith("_") && name.endsWith("=");
+        this.spelling = spelling;
     }
 
     /// The name this symbol was made from (`#a` is "a"); Function.apply places a named
@@ -60,28 +74,33 @@ public final class Symbol {
         return name.hashCode() * 31 + 0x5f;
     }
 
-    /// The name as Dart spells it. A private name that two libraries both use is renamed in
-    /// all but one of them ({@code _x$p2}, see the transpiler's
-    /// {@code Program.separateLibraryPrivateMembers}), and that suffix is the library
-    /// identity: it stays in {@link #name}, so {@code #_x} of one library is not equal to
-    /// {@code #_x} of another, but Dart prints neither with it. Only a private name ending in
-    /// {@code $p} and digits is shortened; a user identifier spelled that way is
-    /// indistinguishable from a renamed one, since Dart identifiers may contain {@code $}.
-    static String dartSpelling(String name) {
-        if (name.endsWith("=")) {
-            return dartSpelling(name.substring(0, name.length() - 1)) + "=";
+    /// Renamed private names (see the transpiler's
+    /// {@code Program.separateLibraryPrivateMembers}) to the names as written, registered
+    /// by the generated classes of each renaming library ({@link #spell}).
+    private static final java.util.HashMap<String, String> SPELLINGS = new java.util.HashMap<String, String>();
+
+    /// Registers pairs of renamed name, Dart spelling. Returns null, so an interface can
+    /// call it from a field initializer.
+    public static Object spell(String... pairs) {
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            SPELLINGS.put(pairs[i], pairs[i + 1]);
         }
-        if (name.length() < 4 || name.charAt(0) != '_') {
-            return name;
+        return null;
+    }
+
+    /// The name as Dart spells it: the one given with it, or the one registered for a
+    /// renamed private name. The renamed name stays in {@link #name} as the library
+    /// identity, so {@code #_x} of one library is not equal to {@code #_x} of another.
+    /// Nothing is inferred from the text, so a user name really spelled {@code _x$p2} prints
+    /// as written.
+    private String dartSpelling(String n) {
+        if (spelling != null) {
+            return spelling;
         }
-        int i = name.length();
-        while (i > 0 && name.charAt(i - 1) >= '0' && name.charAt(i - 1) <= '9') {
-            i--;
-        }
-        if (i == name.length() || i < 3 || name.charAt(i - 1) != 'p' || name.charAt(i - 2) != '$') {
-            return name;
-        }
-        return name.substring(0, i - 2);
+        boolean eq = n.endsWith("=");
+        String base = eq ? n.substring(0, n.length() - 1) : n;
+        String sp = SPELLINGS.get(base);
+        return sp == null ? n : eq ? sp + "=" : sp;
     }
 
     @Override

@@ -31,6 +31,7 @@ import com.codename1.dart.transpiler.ast.Ast;
 import com.codename1.dart.transpiler.ast.Ast.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1009,6 +1010,7 @@ public final class JavaEmitter {
         // Dart's `EnumType.values` is a `List<EnumType>`; expose it as a DartList field
         // (coexisting with Java's implicit values() method) so `.values.idx(i)` resolves.
         sb.append(";\n\n");
+        sb.append(privateSpellingInit("public enum ", e.file != null ? e.file : e.ownerLibrary != null ? e.ownerLibrary.fileName : null));
         sb.append("    public static final dart.core.DartList<").append(enumJava)
                 .append("> values = dart.core.DartList.<").append(enumJava).append(">of(")
                 .append(names).append(");\n\n");
@@ -4218,6 +4220,26 @@ public final class JavaEmitter {
         return subs;
     }
 
+    /// A class of a library whose private names were renamed ({@code _x$p2}) registers the
+    /// Dart spelling of each with the runtime when it is initialized; code of the library
+    /// runs only in its own classes, so the table is filled before any of its dynamic
+    /// accesses can make an Invocation. An interface cannot have a static block; a field
+    /// initializer is run when an implementing class is initialized, the interface having
+    /// default methods, or else when it runs none of the library's code at all.
+    private String privateSpellingInit(String decl, String dartFile) {
+        Map<String, String> sp = dartFile == null ? null : program.privateSpellings.get(dartFile);
+        if (sp == null || sp.isEmpty()) {
+            return "";
+        }
+        StringBuilder a = new StringBuilder();
+        for (Map.Entry<String, String> e : sp.entrySet()) {
+            a.append(a.length() == 0 ? "" : ", ").append(quote(e.getKey())).append(", ").append(quote(e.getValue()));
+        }
+        String call = "dart.core.Symbol.spell(" + a + ")";
+        return decl.contains(" interface ") ? "    Object $privateSpelling = " + call + ";\n\n"
+                : "    static {\n        " + call + ";\n    }\n\n";
+    }
+
     private GeneratedFile finishClassFile(String name, String decl, String ext, String impls,
                                           CharSequence body, Ctx ctx, String dartFile) {
         return finishClassFile(name, decl, ext, impls, null, body, ctx, dartFile);
@@ -4244,7 +4266,7 @@ public final class JavaEmitter {
         if (permits != null && !permits.isEmpty()) {
             sb.append(" permits ").append(permits);
         }
-        sb.append(" {\n\n").append(body).append("}\n");
+        sb.append(" {\n\n").append(privateSpellingInit(decl, dartFile)).append(body).append("}\n");
         return new GeneratedFile(name + ".java", sb.toString());
     }
 
@@ -35068,11 +35090,52 @@ public final class JavaEmitter {
         if (byName != null && byName.size() > 1) {
             collides = true;
         }
+        collides |= RESERVED_JAVA_NAMES.contains(c.name);
         if (!collides || c.ownerLibrary == null) {
-            return c.name;
+            return RESERVED_JAVA_NAMES.contains(c.name) ? c.name + "$" : c.name;
         }
         return libPathPrefix(c.ownerLibrary) + c.name;
     }
+
+    /// Simple names the generated code spells unqualified and expects to mean something
+    /// other than a program class: every public java.lang type (implicitly imported, so a
+    /// same-package user class named {@code Long} or {@code Override} would shadow it in
+    /// every generated file: {@code @Override} stops being an annotation and a boxed
+    /// {@code Long} becomes the user's class) and every runtime helper the emitter imports
+    /// by simple name. A program class or enum of such a name gets a library-prefixed Java
+    /// name instead, exactly like one colliding with a stub type; its Dart name (what
+    /// runtimeType, toString and enum values print) is the declaration's own and unchanged.
+    /// Qualifying the emitter's own references instead would mean auditing every string it
+    /// builds, and a missed one would fail only for an app that happens to use that name.
+    static final Set<String> RESERVED_JAVA_NAMES = new HashSet<String>(Arrays.asList(
+            // java.lang
+            "AbstractMethodError", "Appendable", "ArithmeticException", "ArrayIndexOutOfBoundsException",
+            "ArrayStoreException", "AssertionError", "AutoCloseable", "Boolean", "BootstrapMethodError", "Byte",
+            "CharSequence", "Character", "Class", "ClassCastException", "ClassCircularityError",
+            "ClassFormatError", "ClassLoader", "ClassNotFoundException", "ClassValue", "CloneNotSupportedException",
+            "Cloneable", "Comparable", "Compiler", "Deprecated", "Double", "Enum", "EnumConstantNotPresentException",
+            "Error", "Exception", "ExceptionInInitializerError", "Float", "FunctionalInterface",
+            "IllegalAccessError", "IllegalAccessException", "IllegalArgumentException", "IllegalCallerException",
+            "IllegalMonitorStateException", "IllegalStateException", "IllegalThreadStateException",
+            "IncompatibleClassChangeError", "IndexOutOfBoundsException", "InheritableThreadLocal",
+            "InstantiationError", "InstantiationException", "Integer", "InternalError", "InterruptedException",
+            "Iterable", "LayerInstantiationException", "LinkageError", "Long", "Math", "MatchException", "Module",
+            "ModuleLayer", "NegativeArraySizeException", "NoClassDefFoundError", "NoSuchFieldError",
+            "NoSuchFieldException", "NoSuchMethodError", "NoSuchMethodException", "NullPointerException", "Number",
+            "NumberFormatException", "Object", "OutOfMemoryError", "Override", "Package", "Process",
+            "ProcessBuilder", "ProcessHandle", "Readable", "Record", "ReflectiveOperationException", "Runnable",
+            "Runtime", "RuntimeException", "RuntimePermission", "SafeVarargs", "ScopedValue", "SecurityException",
+            "SecurityManager", "Short", "StackOverflowError", "StackTraceElement", "StackWalker", "StrictMath",
+            "String", "StringBuffer", "StringBuilder", "StringIndexOutOfBoundsException", "StringTemplate",
+            "SuppressWarnings", "System", "Thread", "ThreadDeath", "ThreadGroup", "ThreadLocal", "Throwable",
+            "TypeNotPresentException", "UnknownError", "UnsatisfiedLinkError", "UnsupportedClassVersionError",
+            "UnsupportedOperationException", "VerifyError", "VirtualMachineError", "Void", "WrongThreadException",
+            // runtime helpers imported by simple name (ctx.importClass)
+            "ArgumentError", "AsyncStar", "Await", "CoreExt", "CoreStatics", "DString", "DartComparable",
+            "DartCustomMap", "DartIterable", "DartList", "DartLongMap", "DartMap", "DartMath", "DartRuntime",
+            "DartSet", "DartThrown", "DartUri", "Duration", "Dyn", "Funcs", "Future", "IndexError", "List",
+            "Objects", "RangeError", "Ref", "RefBool", "RefDouble", "RefLong", "Stopwatch", "Stream",
+            "StreamIterator", "TearOff", "TypeWitness", "DynamicObject"));
 
     /** Camel-cased library path (dir + basename, no extension) used to disambiguate class names. */
     private String libPathPrefix(Library lib) {
@@ -35227,9 +35290,9 @@ public final class JavaEmitter {
         // class: one generated file can need both (a user `enum Color` beside a widget's
         // Color), and two imports of one simple name do not compile.
         boolean collides = (same != null && same.size() > 1) || program.classesByName.containsKey(e.name)
-                || stubs.isStubClass(e.name) || stubs.isStubEnum(e.name);
+                || stubs.isStubClass(e.name) || stubs.isStubEnum(e.name) || RESERVED_JAVA_NAMES.contains(e.name);
         if (!collides || e.ownerLibrary == null) {
-            return e.name;
+            return RESERVED_JAVA_NAMES.contains(e.name) ? e.name + "$" : e.name;
         }
         return libPathPrefix(e.ownerLibrary) + e.name;
     }
