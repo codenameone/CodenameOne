@@ -428,6 +428,45 @@ public final class DartRuntime {
     /// hold one entry per function and SAM, and no receiver: a static function has none.
     private static final java.util.Map<Object, String> CANON_FUNCTIONS = new java.util.IdentityHashMap<Object, String>();
 
+    /// Every view CANON_TEAR_OFFS holds of each function, by the function's key.
+    private static final java.util.Map<String, java.util.List<Object>> CANON_VIEWS =
+            new java.util.HashMap<String, java.util.List<Object>>();
+
+    private static final Object[] NO_VIEWS = new Object[0];
+
+    /// Whether {@code o} is one view of a canonical static, constructor or instantiated
+    /// tear-off (canonTearOff).
+    public static boolean isCanonView(Object o) {
+        return isTearOffCandidate(o) && CANON_FUNCTIONS.containsKey(o);
+    }
+
+    /// The OTHER views of the canonical function {@code o} is one view of; empty for
+    /// anything else. Each view is its own Java object with identity equals/hashCode
+    /// (a lambda per SAM, a signed wrapper, a generic closure), so a Java hash container
+    /// cannot see two of them as one key by itself: DartSet and DartMap probe these, the
+    /// way they probe a number's twins, so {@code {G.new, b}} with {@code b = G.new} has
+    /// one element, as in Dart. A wrapper class per SAM with key-based equals was not
+    /// enough: a view can be any user typedef's SAM, a Signed wrapper or a
+    /// SignedFns.generic closure, which no fixed wrapper family implements.
+    public static Object[] canonViews(Object o) {
+        if (!isTearOffCandidate(o)) {
+            return NO_VIEWS;
+        }
+        String fn = CANON_FUNCTIONS.get(o);
+        if (fn == null) {
+            return NO_VIEWS;
+        }
+        java.util.List<Object> views = CANON_VIEWS.get(fn);
+        Object[] out = new Object[views.size()];
+        int n = 0;
+        for (Object v : views) {
+            if (v != o) {
+                out[n++] = v;
+            }
+        }
+        return n == out.length ? out : java.util.Arrays.copyOf(out, n);
+    }
+
     /// Keeps the commonest comparisons, and every one in a program that tears off no static
     /// function, out of CANON_FUNCTIONS.
     private static boolean isTearOffCandidate(Object o) {
@@ -447,6 +486,12 @@ public final class DartRuntime {
         if (c == null) {
             CANON_TEAR_OFFS.put(key, made);
             CANON_FUNCTIONS.put(made, fn);
+            java.util.List<Object> views = CANON_VIEWS.get(fn);
+            if (views == null) {
+                views = new java.util.ArrayList<Object>(2);
+                CANON_VIEWS.put(fn, views);
+            }
+            views.add(made);
             return made;
         }
         return (T) c;

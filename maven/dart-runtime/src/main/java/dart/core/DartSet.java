@@ -113,7 +113,7 @@ public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified
      * on every numeric set paid for sets of NaN, which no Flutter application relies on.</p>
      */
     private Object storedElement(Object e) {
-        if (!(e instanceof Number) || super.contains(e)) {
+        if ((!(e instanceof Number) && !dart.runtime.DartRuntime.isCanonView(e)) || super.contains(e)) {
             return e;
         }
         for (Object twin : DartMap.numericTwins(e)) {

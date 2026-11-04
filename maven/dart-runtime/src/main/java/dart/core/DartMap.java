@@ -197,6 +197,10 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> implements dart.runtime.R
             }
             return NO_TWINS;
         }
+        if (!(key instanceof Number)) {
+            // The other views of one canonical function (DartRuntime.canonViews).
+            return dart.runtime.DartRuntime.canonViews(key);
+        }
         if (key instanceof Long || key instanceof Integer || key instanceof Short || key instanceof Byte) {
             // Every integral wrapper of the same value too, not just the double: a key that
             // arrived through Java interop or Map.from as an Integer, Short or Byte was never
@@ -244,7 +248,7 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> implements dart.runtime.R
      * {@code m[1.0] = 'b'} on a map holding 1 updates that entry and the key stays 1.
      */
     private Object storedKey(Object key) {
-        if (!(key instanceof Number) || super.containsKey(key)) {
+        if ((!(key instanceof Number) && !dart.runtime.DartRuntime.isCanonView(key)) || super.containsKey(key)) {
             return key;
         }
         for (Object twin : numericTwins(key)) {
