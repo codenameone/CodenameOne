@@ -79,6 +79,11 @@ public final class StageForm extends Form implements StageHost {
             if (titleArea != null) {
                 titleArea.setHidden(true);
             }
+            // With the title area hidden nothing kept the scene out of the
+            // status bar and the notch: on a phone its top row was drawn
+            // under the clock. A JavaFX scene knows nothing of either, so
+            // the window's content stays inside the safe area.
+            getContentPane().setSafeArea(true);
         } else {
             setBackCommand(new Command("Back") {
                 @Override
@@ -100,6 +105,20 @@ public final class StageForm extends Form implements StageHost {
         if (!SceneInput.pressed(core.scene(), core.rootPeer(), x, y)) {
             super.pointerPressed(x, y);
         }
+    }
+
+    /// A drag over the scene goes to it from the first pixel: the scene
+    /// tells a click from a drag by its own small threshold. Left to the
+    /// form, its components answered "not draggable" and Codename One held
+    /// every drag back until the finger had crossed 5% of the screen, a
+    /// lag a swipe on a phone shows plainly.
+    @Override
+    public int getDragRegionStatus(int x, int y) {
+        com.codename1.ui.Component peer = core.rootPeer();
+        if (peer != null && peer.contains(x, y)) {
+            return com.codename1.ui.Component.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        }
+        return super.getDragRegionStatus(x, y);
     }
 
     @Override

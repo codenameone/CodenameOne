@@ -26,11 +26,18 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 
+import java.util.List;
+import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.effect.BlurType;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.effect.Effect;
 import javafx.scene.effect.InnerShadow;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 
 /// Draws the two effects the layer draws: the shadow a [DropShadow] casts
@@ -74,6 +81,15 @@ public final class Effects {
         int behindX;
         int behindY;
         Image over;
+        /// What the pictures show has changed; they are drawn until new
+        /// ones are made after the frame.
+        boolean stale;
+        /// A rebuild after the frame is queued.
+        boolean scheduled;
+
+        boolean drawn() {
+            return behind != null || over != null;
+        }
     }
 
     /// How many pictures were made since the start; for tests, which
@@ -91,15 +107,82 @@ public final class Effects {
     /// Drops the pictures kept for a node and for everything above it,
     /// because what they show has changed.
     public static void invalidate(Node node) {
+        invalidate(node, false);
+    }
+
+    /// Drops the pictures kept for a node and for everything above it.
+    /// `paintOnly` says the change moved and resized nothing (a colour, a
+    /// pressed state): a shadow is made from the outline of what is drawn,
+    /// so an ancestor whose own background already covers its whole box
+    /// keeps its picture when the change lies inside that box. A press on
+    /// a button in a shadowed drawer re-blurred the whole drawer before.
+    public static void invalidate(Node node, boolean paintOnly) {
         if (live <= 0) {
             return;
         }
-        for (Node n = node; n != null; n = n.getParent()) {
+        Bounds within = null;
+        boolean contained = paintOnly;
+        Node below = null;
+        for (Node n = node; n != null; below = n, n = n.getParent()) {
+            if (contained && below != null) {
+                // The changed node's box in this node's coordinates.
+                within = within == null ? below.getBoundsInParent() : below.localToParent(within);
+            }
             if (n.cn1EffectCache() != null) {
-                n.cn1SetEffectCache(null);
-                live--;
+                if (n != node && contained && within != null && coversItsBox(n) && inside(within, n)) {
+                    continue;
+                }
+                Object kept = n.cn1EffectCache();
+                if (kept instanceof Kept && ((Kept) kept).drawn() && has(n)) {
+                    // Drawn on until the new picture is made; see kept().
+                    ((Kept) kept).stale = true;
+                } else {
+                    n.cn1SetEffectCache(null);
+                    live--;
+                }
+            }
+            // What a node with its own effect draws reaches past its box.
+            if (n.getEffect() != null) {
+                contained = false;
             }
         }
+    }
+
+    /// Whether a node's outline is its box: a region filled edge to edge
+    /// with an opaque colour, square cornered, unclipped and unshaped.
+    private static boolean coversItsBox(Node n) {
+        if (!(n instanceof Region) || n.getClip() != null || n.cn1PaintMatrix() != null) {
+            return false;
+        }
+        Region r = (Region) n;
+        if (r.getShape() != null) {
+            return false;
+        }
+        Background bg = r.getBackground();
+        if (bg == null) {
+            return false;
+        }
+        List<BackgroundFill> fills = bg.getFills();
+        for (int i = 0; i < fills.size(); i++) {
+            BackgroundFill f = fills.get(i);
+            Insets in = f.getInsets();
+            CornerRadii c = f.getRadii();
+            boolean square = c == null || (c.isUniform() && c.getTopLeftHorizontalRadius() == 0
+                    && c.getTopLeftVerticalRadius() == 0);
+            boolean edge = in == null || (in.getTop() <= 0 && in.getRight() <= 0 && in.getBottom() <= 0
+                    && in.getLeft() <= 0);
+            if (f.getFill() instanceof Color && ((Color) f.getFill()).isOpaque() && square && edge) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether bounds in a node's own coordinates lie within its box.
+    private static boolean inside(Bounds b, Node n) {
+        Bounds box = n.getLayoutBounds();
+        return b.getMinX() >= box.getMinX() && b.getMinY() >= box.getMinY() && b.getMaxX() <= box.getMaxX()
+                && b.getMaxY() <= box.getMaxY();
     }
 
     private static int passes(BlurType type) {
@@ -274,8 +357,18 @@ public final class Effects {
         Object cached = node.cn1EffectCache();
         if (cached instanceof Kept) {
             Kept k = (Kept) cached;
-            if (k.effect == effect && k.width == peer.getWidth() && k.height == peer.getHeight()
-                    && same(k.values, values)) {
+            boolean current = k.effect == effect && same(k.values, values);
+            if (current && !k.stale && k.width == peer.getWidth() && k.height == peer.getHeight()) {
+                return k;
+            }
+            if (current && k.drawn()) {
+                // A picture is made by painting the node into an image.
+                // Done in the middle of the screen's paint, that took the
+                // node itself out of the frame on iOS: the shadowed bottom
+                // bar of a phone app went blank on every page change. The
+                // old picture is drawn for this frame and the new one is
+                // made after it, outside any paint.
+                rebuildLater(k, node, peer);
                 return k;
             }
         }
@@ -292,6 +385,50 @@ public final class Effects {
         node.cn1SetEffectCache(k);
         build(k, node, peer);
         return k;
+    }
+
+    /// Rebuilds waiting for the end of the frame, in the order asked for.
+    private static final java.util.ArrayList<Object[]> PENDING = new java.util.ArrayList<Object[]>();
+    private static final Runnable REBUILD = new Runnable() {
+        @Override
+        public void run() {
+            rebuildPending();
+        }
+    };
+
+    private static void rebuildLater(Kept old, Node node, Component peer) {
+        if (old.scheduled) {
+            return;
+        }
+        old.scheduled = true;
+        if (PENDING.isEmpty()) {
+            com.codename1.ui.Display.getInstance().callSerially(REBUILD);
+        }
+        PENDING.add(new Object[] {old, node, peer});
+    }
+
+    /// Makes the pictures that changed since the last frame; what the call
+    /// queued after a paint runs, and what a test runs in its place.
+    public static void rebuildPending() {
+        Object[][] all = PENDING.toArray(new Object[PENDING.size()][]);
+        PENDING.clear();
+        for (int i = 0; i < all.length; i++) {
+            Kept old = (Kept) all[i][0];
+            Node node = (Node) all[i][1];
+            Component peer = (Component) all[i][2];
+            old.scheduled = false;
+            if (node.cn1EffectCache() != old || node.getEffect() != old.effect) {
+                continue;
+            }
+            Kept k = new Kept();
+            k.effect = old.effect;
+            k.values = old.values;
+            k.width = peer.getWidth();
+            k.height = peer.getHeight();
+            node.cn1SetEffectCache(k);
+            build(k, node, peer);
+            peer.repaint();
+        }
     }
 
     private static void build(Kept k, Node node, Component peer) {

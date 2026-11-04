@@ -69,6 +69,20 @@ public final class StageDialog extends Dialog implements StageHost {
         }
     }
 
+    /// A drag over the scene goes to it from the first pixel: the scene
+    /// tells a click from a drag by its own small threshold. Left to the
+    /// form, its components answered "not draggable" and Codename One held
+    /// every drag back until the finger had crossed 5% of the screen, a
+    /// lag a swipe on a phone shows plainly.
+    @Override
+    public int getDragRegionStatus(int x, int y) {
+        com.codename1.ui.Component peer = core.rootPeer();
+        if (peer != null && peer.contains(x, y)) {
+            return com.codename1.ui.Component.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        }
+        return super.getDragRegionStatus(x, y);
+    }
+
     @Override
     public void pointerDragged(int x, int y) {
         if (!SceneInput.dragged(core.scene(), core.rootPeer(), x, y)) {

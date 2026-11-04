@@ -27,6 +27,8 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityNode;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
@@ -61,6 +63,14 @@ public class ParentPeer extends Container implements FxPeer {
         PeerPaint.strip(this);
         setScrollable(false);
         setFocusable(false);
+    }
+
+    /// The activate action [Activation] added, if any.
+    private final AccessibilityAction[] tap = new AccessibilityAction[1];
+
+    @Override
+    public AccessibilityNode getSemantics() {
+        return Activation.sync(node, super.getSemantics(), tap);
     }
 
     @Override
@@ -347,6 +357,17 @@ public class ParentPeer extends Container implements FxPeer {
 
     /// Runs JavaFX layout from the peer of a root.
     static final class Bridge extends Layout {
+
+        /// JavaFX children overlap freely -- a labeled control's graphic
+        /// lies over the native component that draws its text -- and only a
+        /// layout that says so makes Codename One paint what lies above a
+        /// component that repaints alone. Without it a native button
+        /// redrawing its pressed state on a device painted over its own
+        /// icon, which stayed missing until something repainted the parent.
+        @Override
+        public boolean isOverlapSupported() {
+            return true;
+        }
 
         @Override
         public void layoutContainer(Container parent) {

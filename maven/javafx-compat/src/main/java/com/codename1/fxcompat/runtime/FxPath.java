@@ -770,28 +770,40 @@ public final class FxPath {
     /// `{a, b, c, d, tx, ty}`, where `x' = a*x + c*y + tx` and
     /// `y' = b*x + d*y + ty`.
     public GeneralPath toDevice(double[] m) {
+        return toDevice(m, false);
+    }
+
+    /// As [#toDevice(double[])]; with `snap`, the point every segment ends
+    /// at is rounded to a whole pixel, which a clip wants: Codename One
+    /// narrows a shape clip by each rectangle it paints into, and throws
+    /// when a segment ends a fraction of a pixel from a rectangle's edge.
+    /// Rounded, an end is on the edge or a pixel away from it. Control
+    /// points are kept, so a curve moves by half a pixel at most.
+    public GeneralPath toDevice(double[] m, boolean snap) {
         GeneralPath out = new GeneralPath();
         out.setWindingRule(evenOdd ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
         int p = 0;
         for (int i = 0; i < commandCount; i++) {
             switch (commands[i]) {
                 case MOVE:
-                    out.moveTo(tx(m, points[p], points[p + 1]), ty(m, points[p], points[p + 1]));
+                    out.moveTo(end(tx(m, points[p], points[p + 1]), snap), end(ty(m, points[p], points[p + 1]), snap));
                     p += 2;
                     break;
                 case LINE:
-                    out.lineTo(tx(m, points[p], points[p + 1]), ty(m, points[p], points[p + 1]));
+                    out.lineTo(end(tx(m, points[p], points[p + 1]), snap), end(ty(m, points[p], points[p + 1]), snap));
                     p += 2;
                     break;
                 case QUAD:
                     out.quadTo(tx(m, points[p], points[p + 1]), ty(m, points[p], points[p + 1]),
-                            tx(m, points[p + 2], points[p + 3]), ty(m, points[p + 2], points[p + 3]));
+                            end(tx(m, points[p + 2], points[p + 3]), snap),
+                            end(ty(m, points[p + 2], points[p + 3]), snap));
                     p += 4;
                     break;
                 case CUBIC:
                     out.curveTo(tx(m, points[p], points[p + 1]), ty(m, points[p], points[p + 1]),
                             tx(m, points[p + 2], points[p + 3]), ty(m, points[p + 2], points[p + 3]),
-                            tx(m, points[p + 4], points[p + 5]), ty(m, points[p + 4], points[p + 5]));
+                            end(tx(m, points[p + 4], points[p + 5]), snap),
+                            end(ty(m, points[p + 4], points[p + 5]), snap));
                     p += 6;
                     break;
                 default:
@@ -800,6 +812,10 @@ public final class FxPath {
             }
         }
         return out;
+    }
+
+    private static double end(double v, boolean snap) {
+        return snap ? Math.floor(v + 0.5) : v;
     }
 
     /// Returns this path with every point mapped through the affine

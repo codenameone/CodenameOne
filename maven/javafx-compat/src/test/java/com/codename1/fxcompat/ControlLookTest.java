@@ -351,6 +351,76 @@ public class ControlLookTest {
         assertNull(mark.getParent());
     }
 
+    /// A tab-bar button: its text under a graphic, squeezed narrower than
+    /// it would like. The theme's padding beside the text is given up before
+    /// any letter is, as it is for a button with no graphic; the graphic's
+    /// own room is not.
+    @Test
+    public void textUnderAGraphicKeepsItsLettersBeforeThePadding() {
+        javafx.scene.control.ToggleButton button = new javafx.scene.control.ToggleButton("Home");
+        javafx.scene.control.Label icon = new javafx.scene.control.Label("X");
+        icon.setFont(javafx.scene.text.Font.font(24));
+        button.setGraphic(icon);
+        button.setContentDisplay(ContentDisplay.TOP);
+        button.setGraphicTextGap(0);
+        StackPane root = new StackPane(button);
+        Scene scene = new Scene(root, 300, 100);
+        assertNotNull(scene);
+        com.codename1.ui.Label n = nativeLabel(button);
+        Style theme = com.codename1.ui.plaf.UIManager.getInstance().getComponentStyle(n.getUIID());
+        int pad = theme.getPaddingLeftNoRTL() + theme.getPaddingRightNoRTL();
+        assertTrue("the theme pads a toggle button", pad >= 8);
+        int text = n.getUnselectedStyle().getFont().stringWidth("Home");
+        double full = button.prefWidth(-1);
+        // Room for every letter and a quarter of the padding, no more.
+        double squeezed = Units.toLogical(text + pad / 2);
+        assertTrue(squeezed < full);
+        button.resize(squeezed, button.prefHeight(-1));
+        button.layout();
+        Style st = n.getUnselectedStyle();
+        int room = n.getWidth() - st.getPaddingLeftNoRTL() - st.getPaddingRightNoRTL();
+        assertTrue("room " + room + " for a text " + text + " wide", room >= text);
+        assertEquals("the preferred width still counts all of the padding", full, button.prefWidth(-1), 1.01);
+        double mid = icon.getBoundsInParent().getMinX() + icon.getBoundsInParent().getWidth() / 2;
+        assertEquals("the graphic stays centred over the text", button.getWidth() / 2, mid, 1.01);
+    }
+
+    @Test
+    public void aGraphicBesideTheTextKeepsItsRoomWhenSqueezed() {
+        javafx.scene.control.ToggleButton button = new javafx.scene.control.ToggleButton("Home");
+        Rectangle icon = new Rectangle(40, 16);
+        button.setGraphic(icon);
+        button.setContentDisplay(ContentDisplay.LEFT);
+        button.setGraphicTextGap(4);
+        StackPane root = new StackPane(button);
+        Scene scene = new Scene(root, 300, 100);
+        assertNotNull(scene);
+        com.codename1.ui.Label n = nativeLabel(button);
+        assertTrue("the minimum keeps the graphic and its gap", button.minWidth(-1) >= 44);
+        Style theme = com.codename1.ui.plaf.UIManager.getInstance().getComponentStyle(n.getUIID());
+        int pad = theme.getPaddingLeftNoRTL() + theme.getPaddingRightNoRTL();
+        int text = n.getUnselectedStyle().getFont().stringWidth("Home");
+        double squeezed = 44 + Units.toLogical(text + pad / 2);
+        assertTrue(squeezed < button.prefWidth(-1));
+        button.resize(squeezed, button.prefHeight(-1));
+        button.layout();
+        Style st = n.getUnselectedStyle();
+        int room = n.getWidth() - st.getPaddingLeftNoRTL() - st.getPaddingRightNoRTL();
+        assertTrue("room " + room + " for a text " + text + " wide", room >= text);
+        double textStart = Units.toLogical(st.getPaddingLeftNoRTL());
+        assertTrue("the graphic ends at " + icon.getBoundsInParent().getMaxX() + ", the text starts at " + textStart,
+                icon.getBoundsInParent().getMaxX() <= textStart + 0.5);
+        // At the width it advertises as its least, the graphic and its gap
+        // still fit before the text: fitting gives up only theme padding.
+        button.resize(button.minWidth(-1), button.prefHeight(-1));
+        button.layout();
+        st = n.getUnselectedStyle();
+        int squeezedRoom = n.getWidth() - st.getPaddingLeftNoRTL() - st.getPaddingRightNoRTL();
+        int ellipsis = n.getUnselectedStyle().getFont().stringWidth("...");
+        assertTrue("room " + squeezedRoom + " at the minimum, an ellipsis is " + ellipsis,
+                squeezedRoom >= ellipsis - 1);
+    }
+
     @Test
     public void theConstructorsWithAGraphicShowIt() {
         Rectangle a = new Rectangle(16, 16);
