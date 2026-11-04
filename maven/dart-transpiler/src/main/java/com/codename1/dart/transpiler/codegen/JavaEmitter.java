@@ -10589,12 +10589,27 @@ public final class JavaEmitter {
     /// moving through an Object, dynamic or Function slot is not instantiated, and keeps
     /// the uninstantiated key.
     private String slotInstantiationKey(Expr e, String key, String bare, TypeRef expected, Ctx ctx) {
-        if (key == null || !key.equals(bare) || !(e instanceof Ident) || expected == null
-                || ((Ident) e).typeArgs != null && !((Ident) e).typeArgs.isEmpty()) {
+        if (key == null || !key.equals(bare) || expected == null
+                || e instanceof Ident && ((Ident) e).typeArgs != null && !((Ident) e).typeArgs.isEmpty()) {
             return key;
         }
         TypeRef fnT = expected.funcParams != null ? expected : expandFunctionTypedef(expected);
         if (fnT == null || fnT.funcParams == null || fnT.funcTypeParams != null && !fnT.funcTypeParams.isEmpty()) {
+            return key;
+        }
+        if (e instanceof PropertyGet && ((PropertyGet) e).target instanceof Ident
+                && ctx.lookup(((Ident) ((PropertyGet) e).target).name) == null) {
+            // `String Function(int) s = C.sm`: a generic static method the slot instantiates,
+            // keyed as that instantiation, as a top-level function is.
+            ClassDecl owner = program.resolveClass(((Ident) ((PropertyGet) e).target).name, ctx.library());
+            MethodDecl md = owner == null ? null : owner.method(((PropertyGet) e).name);
+            if (md == null || !md.isStatic || md.typeParams.isEmpty() || md.isGetter) {
+                return key;
+            }
+            return instantiatedKey(bare, key,
+                    contextInstantiation(md.typeParams, md.params, md.returnType, fnT, md.typeParamBounds));
+        }
+        if (!(e instanceof Ident)) {
             return key;
         }
         String name = ((Ident) e).name;
@@ -10605,7 +10620,11 @@ public final class JavaEmitter {
         if (fd == null || fd.typeParams.isEmpty() || fd.isGetter) {
             return key;
         }
-        List<TypeRef> inst = contextInstantiation(fd.typeParams, fd.params, fd.returnType, fnT);
+        return instantiatedKey(bare, key,
+                contextInstantiation(fd.typeParams, fd.params, fd.returnType, fnT, fd.typeParamBounds));
+    }
+
+    private static String instantiatedKey(String bare, String key, List<TypeRef> inst) {
         if (inst == null) {
             return key;
         }
@@ -18297,7 +18316,7 @@ public final class JavaEmitter {
                 List<TypeRef> inst = fn.typeParams.isEmpty() ? null
                         : tearOffTypeArgs != null && tearOffTypeArgs.size() == fn.typeParams.size()
                         ? tearOffTypeArgs
-                        : contextInstantiation(fn.typeParams, ordered, fn.returnType, tearOffExpected);
+                        : contextInstantiation(fn.typeParams, ordered, fn.returnType, tearOffExpected, fn.typeParamBounds);
                 if (inst != null) {
                     for (int i = 0; i < ordered.size(); i++) {
                         ft.funcParams.set(i, substTypeParams(paramValueType(ordered.get(i)), fn.typeParams, inst));
@@ -18768,6 +18787,19 @@ public final class JavaEmitter {
                     pg.target instanceof Ident ? ((Ident) pg.target).name : null, ctx);
             if (top != null) {
                 return top;
+            }
+            if (program.typedefs.containsKey(pg.name)) {
+                // `p.Alias` for `typedef Alias = Thing;` in the prefixed library: the type
+                // literal the alias names, as the unprefixed `Alias` is.
+                Ident alias = new Ident();
+                alias.name = pg.name;
+                alias.file = pg.file;
+                alias.line = pg.line;
+                alias.col = pg.col;
+                Out lit = typedefLiteral(alias, ctx);
+                if (lit != null) {
+                    return lit;
+                }
             }
         }
         // `SomeEnum.values` - Dart exposes an enum's members as a GETTER, Java as a static
@@ -19601,6 +19633,31 @@ public final class JavaEmitter {
                         return ad;
                     }
                     return new Out(rt + "::" + name, new TypeRef("Function"), FnForm.methodRef(rt + "::" + name));
+                }
+                List<TypeRef> iInst = tm.typeParams.isEmpty() || methodWitnesses(tm).isEmpty()
+                        || posNode != memberTearOffNode ? null
+                        : contextInstantiation(tm.typeParams, tm.params, tm.returnType, memberTearOffExpected,
+                                tm.typeParamBounds);
+                List<String> iW = iInst == null ? null : instantiatedWitnessArgs(tm, tm.typeParams, iInst, ctx);
+                TypeRef iFt = iW == null ? null : tearOffType(tm, pc, tt);
+                if (iFt != null && iFt.funcParams != null) {
+                    // `String Function(int) s = c.im` for `String im<T>(T x) => '$T'`: the
+                    // slot instantiates it, and a closure over the receiver, evaluated once
+                    // here, passes the witnesses a method reference cannot.
+                    String rt = ctx.newTemp();
+                    ctx.writer().line("final " + tempReceiverType(tt, ctx) + " " + rt + " = " + target.code + ";");
+                    ctx.declare(rt, tt);
+                    List<String> ps = new ArrayList<String>();
+                    for (int i = 0; i < tm.params.size(); i++) {
+                        iFt.funcParams.set(i, substTypeParams(rawReceiverErased(asSeenFrom(tm.params.get(i).type,
+                                tm, null, pc, tt), pc, tt), tm.typeParams, iInst));
+                        ps.add(rt + "$a" + i);
+                    }
+                    iFt.funcReturn = substTypeParams(rawReceiverErased(asSeenFrom(tm.returnType, tm, null, pc, tt),
+                            pc, tt), tm.typeParams, iInst);
+                    String lam = "((" + String.join(", ", ps) + ") -> " + rt + "." + name + "("
+                            + joinArgs(iW, ps) + "))";
+                    return new Out(lam, iFt, FnForm.methodRef(lam));
                 }
                 String mref = target.code + "::" + name;
                 if (!tm.isStatic && hasBoundedTypeVarParam(tm.params, tm.typeParams, tm.typeParamBounds)) {
@@ -23492,6 +23549,15 @@ public final class JavaEmitter {
     }
 
     private List<TypeRef> contextInstantiation(List<String> tps, List<Param> params, TypeRef ret, TypeRef expected) {
+        return contextInstantiation(tps, params, ret, expected, null);
+    }
+
+    /// As above; with {@code bounds} (a generic function's or method's own declaration), a
+    /// type variable the function type context leaves unconstrained (`String Function() t =
+    /// tn` for `String tn<T>()`) is instantiated to its bound, dynamic when it declares none,
+    /// as Dart does, instead of leaving the instantiation unknown.
+    private List<TypeRef> contextInstantiation(List<String> tps, List<Param> params, TypeRef ret, TypeRef expected,
+                                               java.util.Map<String, TypeRef> bounds) {
         TypeRef ctxFn = expected == null ? null : expected.funcParams != null ? expected
                 : expandFunctionTypedef(expected) != null ? expandFunctionTypedef(expected)
                 : expandGenericFunctionTypedef(expected);
@@ -23506,14 +23572,39 @@ public final class JavaEmitter {
             unifyTypeVars(ret, ctxFn.funcReturn, tps, m);
         }
         List<TypeRef> out = new ArrayList<TypeRef>();
-        for (String tp : tps) {
-            TypeRef t = m.get(tp);
+        List<TypeRef> toBounds = null;
+        for (int i = 0; i < tps.size(); i++) {
+            TypeRef t = m.get(tps.get(i));
+            if (t == null && bounds != null) {
+                if (toBounds == null) {
+                    toBounds = instantiateToBounds(tps, bounds);
+                }
+                t = toBounds.get(i);
+            }
             if (t == null || t.is("var")) {
                 return null;
             }
             out.add(t);
         }
         return out;
+    }
+
+    /// The leading witness arguments of a generic method {@code decl} torn off at the
+    /// instantiation {@code inst}, or null when one it needs has no witness here.
+    private List<String> instantiatedWitnessArgs(Object decl, List<String> tps, List<TypeRef> inst, Ctx ctx) {
+        List<String> sb = new ArrayList<String>();
+        for (String n : methodWitnesses(decl)) {
+            int at = tps.indexOf(n);
+            String w = at < 0 ? null : witnessOf(inst.get(at), ctx);
+            if (w == null && !hardMethodWitness(decl, n)) {
+                w = "(dart.runtime.TypeWitness) null";
+            }
+            if (w == null) {
+                return null;
+            }
+            sb.add(w);
+        }
+        return sb;
     }
 
     /// One argument list: the leading witnesses, then the call's own arguments.
@@ -34360,6 +34451,34 @@ public final class JavaEmitter {
                             ft = inLibrary(ft, pc.ownerLibrary);
                         }
                         String mref = javaClassName(pc) + "::" + name;
+                        // `String Function(int) s = C.sm` for `static String sm<T>(T x) => '$T'`:
+                        // instantiated by the slot, as a generic top-level function is, and
+                        // handed the witnesses its body reads -- a method reference cannot pass
+                        // them, so a closure over its parameters does.
+                        List<TypeRef> sInst = md.typeParams.isEmpty() || methodWitnesses(md).isEmpty() ? null
+                                : tearOffTypeArgs != null && tearOffTypeArgs.size() == md.typeParams.size()
+                                ? tearOffTypeArgs
+                                : contextInstantiation(md.typeParams, md.params, md.returnType,
+                                        ctorTearOffExpected, md.typeParamBounds);
+                        List<String> sW = sInst == null ? null
+                                : instantiatedWitnessArgs(md, md.typeParams, sInst, ctx);
+                        if (sW != null) {
+                            TypeRef ift = new TypeRef("Function");
+                            ift.funcParams = new ArrayList<TypeRef>();
+                            List<String> ps = new ArrayList<String>();
+                            for (int i = 0; i < md.params.size(); i++) {
+                                ift.funcParams.add(substTypeParams(paramValueType(md.params.get(i)), md.typeParams, sInst));
+                                ps.add("$a" + i);
+                            }
+                            ift.funcReturn = substTypeParams(md.returnType, md.typeParams, sInst);
+                            if (pc.ownerLibrary != null && pc.ownerLibrary != ctx.library()) {
+                                ift = inLibrary(ift, pc.ownerLibrary);
+                            }
+                            tearOffReturn = null;
+                            String lam = "((" + String.join(", ", ps) + ") -> " + javaClassName(pc) + "."
+                                    + name + "(" + joinArgs(sW, ps) + "))";
+                            return new Out(lam, ift, FnForm.methodRef(lam));
+                        }
                         if (tearOffTypeArgs == null) {
                             String checked = boundCheckedMethodTearOff(md, javaClassName(pc), name, ctx);
                             if (checked != null) {
