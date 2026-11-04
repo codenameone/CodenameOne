@@ -4356,6 +4356,52 @@ public class JavaSEPort extends CodenameOneImplementation {
          */
         int blitCounter;
         
+        /// The last complete frame, kept only while the simulator recorder runs.
+        private BufferedImage presented;
+
+        /// While recording, copies the screen as a paint pass finishes. The
+        /// recorder runs on its own thread and must never read `buffer`
+        /// directly: outside buffer safe mode that IS the image the EDT is
+        /// painting into, and a frame read mid-paint comes out torn, with
+        /// regions still cleared to white.
+        private void keepPresentedFrame() {
+            com.codename1.impl.javase.record.SimulatorRecorder rec = simulatorRecorder;
+            if (rec == null || !rec.isRecording() || edtBuffer == null) {
+                if (presented != null) {
+                    synchronized (bufferLock) {
+                        presented = null;
+                    }
+                }
+                return;
+            }
+            synchronized (bufferLock) {
+                if (presented == null || presented.getWidth() != edtBuffer.getWidth()
+                        || presented.getHeight() != edtBuffer.getHeight()) {
+                    presented = new BufferedImage(edtBuffer.getWidth(), edtBuffer.getHeight(),
+                            BufferedImage.TYPE_INT_RGB);
+                }
+                java.awt.Graphics g = presented.getGraphics();
+                g.drawImage(edtBuffer, 0, 0, null);
+                g.dispose();
+            }
+        }
+
+        /// A copy of the last complete frame for the recorder, or null when no
+        /// frame has been kept yet.
+        BufferedImage presentedFrame() {
+            synchronized (bufferLock) {
+                if (presented == null) {
+                    return null;
+                }
+                BufferedImage out = new BufferedImage(presented.getWidth(), presented.getHeight(),
+                        BufferedImage.TYPE_INT_RGB);
+                java.awt.Graphics g = out.getGraphics();
+                g.drawImage(presented, 0, 0, null);
+                g.dispose();
+                return out;
+            }
+        }
+
         /**
          * Snapshot of what this canvas last painted, used by the windowed screenshot
          * tests: the ordinary screenshot path can only see the primary surface.
@@ -4379,6 +4425,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(menuDisplayed){
                 return;
             }
+            keepPresentedFrame();
             long blitStartNanos = BLIT_TRACE ? System.nanoTime() : 0;
             long bufferDoneNanos = 0;
 
@@ -12844,7 +12891,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (canvas == null) {
             return null;
         }
-        BufferedImage buf = canvas.buffer;
+        BufferedImage buf = canvas.presentedFrame();
+        if (buf == null) {
+            buf = canvas.buffer;
+        }
         Rectangle sc = getScreenCoordinates();
         if (buf == null) {
             return null;

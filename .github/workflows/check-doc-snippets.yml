@@ -18,6 +18,7 @@ on:
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
       - 'scripts/skirmish/**'
+      - 'scripts/dash/**'
       - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'docs/website/content/blog/**'
       - 'CodenameOne/src/**/*.java'

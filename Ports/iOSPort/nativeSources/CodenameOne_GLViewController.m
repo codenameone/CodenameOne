@@ -3305,9 +3305,10 @@ static CodenameOne_GLViewController *sharedSingleton;
     return currentMutableTransform;
 }
 
-#if !TARGET_OS_OSX
-// Outside the per-target layout branches below: viewSafeAreaInsetsDidChange
-// calls it on every UIKit target, Mac Catalyst and tvOS included.
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH
+// Outside the size-publishing branches below: viewSafeAreaInsetsDidChange calls
+// it on every UIKit slice, Catalyst and tvOS included, and those take the
+// other branch.
 // Reads the window's safe-area insets into the globals the Java side asks for.
 // Answers whether any of them changed.
 - (BOOL)cn1ReadSafeAreaInsets {

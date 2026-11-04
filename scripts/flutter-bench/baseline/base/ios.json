@@ -2,15 +2,15 @@
  "gallery": {
   "code_bytes": {
    "runs": 1,
-   "value": 18275000
+   "value": 18275008
   },
   "install_bytes": {
    "runs": 1,
-   "value": 113723845
+   "value": 113723853
   },
   "wire_bytes": {
    "runs": 1,
-   "value": 83900342
+   "value": 83900851
   }
  }
 }

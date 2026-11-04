@@ -1846,7 +1846,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // reserved key did not come from this framework.
 }
 
-#if TARGET_OS_WATCH
+// The watch half needs the surfaces natives, which exist only in an app that uses widgets
+// (CN1_USE_WIDGETS). A watch companion without them, which is most of them, would not
+// compile; it has no complication for a mirror to refresh, so it takes the no-op below.
+#if TARGET_OS_WATCH && defined(CN1_USE_WIDGETS)
 /// Applies a mirrored timeline: persist it where the complication extension reads, then ask
 /// WidgetKit to re-render.
 ///
@@ -1972,8 +1975,9 @@ static dispatch_queue_t cn1MirrorQueue(void) {
 }
 #else
 - (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {
-    // Only the watch consumes a mirror. Reaching here on the phone means the payload came back
-    // the way it went, which nothing sends.
+    // Only a watch with widgets consumes a mirror. Reaching here on the phone means the payload
+    // came back the way it went, which nothing sends; on a watch without widgets there is no
+    // complication to refresh.
     (void)info;
 }
 #endif
