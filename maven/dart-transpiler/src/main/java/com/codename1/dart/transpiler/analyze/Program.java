@@ -167,7 +167,6 @@ public final class Program {
             register(part, part);
         }
         lowerExtensionStatics();
-        lowerExtensionStaticTearOffs();
         separateLibraryPrivateMembers();
         separateLibraryPrivateTypedefs();
         restoreShadowedAliases();
@@ -421,7 +420,31 @@ public final class Program {
                     t.funcTypeParams = rep.funcTypeParams;
                     t.nullable = t.nullable || rep.nullable;
                 }
+                pinPrefixedRepresentation(t, scope, lib);
             }
+        }
+    }
+
+    /**
+     * An erasure that ended on a name written with an import prefix (`s.Shape`) in another
+     * library than {@code lib}: the prefix is that library's, so the class is resolved there
+     * and pinned, and the name loses the prefix {@code lib} may not have (or may bind to
+     * another library).
+     */
+    private void pinPrefixedRepresentation(Ast.TypeRef t, Ast.Library scope, Ast.Library lib) {
+        int dot = t.name == null ? -1 : t.name.indexOf('.');
+        if (scope == lib || dot <= 0 || t.resolved != null) {
+            return;
+        }
+        String prefix = t.name.substring(0, dot);
+        String bare = t.name.substring(dot + 1);
+        if (scope == null || !scope.prefixImports.containsKey(prefix) || bare.indexOf('.') >= 0) {
+            return;
+        }
+        Ast.ClassDecl c = resolveClass(bare, scope, prefix);
+        if (c != null) {
+            t.name = bare;
+            t.resolved = c;
         }
     }
 
@@ -640,6 +663,24 @@ public final class Program {
      * missed a re-exported declaration, and resolution fell back to whichever same-named
      * declaration was registered last.
      */
+    /**
+     * The extension {@code prefix.name} names in {@code lib}: the one the prefix's import
+     * provides, or null when it provides none (or a class of that name).
+     */
+    public Ast.ClassDecl extensionThroughPrefix(String prefix, String name, Ast.Library lib) {
+        String uri = lib == null ? null : lib.prefixImports.get(prefix);
+        Ast.Library target = uri == null ? null : resolveImportedLibrary(lib, uri);
+        if (target == null) {
+            return null;
+        }
+        for (Ast.ClassDecl c : extensions) {
+            if (c.name.equals(name) && provides(target, name, c.ownerLibrary)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
     public boolean provides(Ast.Library lib, String name, Ast.Library owner) {
         return provides(lib, name, owner, new HashSet<Ast.Library>());
     }
@@ -1224,30 +1265,16 @@ public final class Program {
      * provides. Resolved per library, so two libraries' same-named extensions do not meet.
      */
     private Map<String, Ast.ClassDecl> extensionsSeenBy(Ast.Library lib, Map<String, Ast.ClassDecl> all) {
-        return extensionsSeenBy(lib, all, false);
-    }
-
-    private static boolean hasStaticMethod(Ast.ClassDecl c) {
-        for (Ast.MethodDecl m : c.methods) {
-            if (m.isStatic && !m.isGetter && !m.isSetter) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private Map<String, Ast.ClassDecl> extensionsSeenBy(Ast.Library lib, Map<String, Ast.ClassDecl> all,
-            boolean staticMethods) {
         Map<String, Ast.ClassDecl> seen = new java.util.HashMap<String, Ast.ClassDecl>();
         Map<String, Integer> counts = new java.util.HashMap<String, Integer>();
         for (Ast.ClassDecl c : extensions) {
-            if (staticMethods ? hasStaticMethod(c) : !c.hoistedStatics.isEmpty()) {
+            if (!c.hoistedStatics.isEmpty()) {
                 Integer n = counts.get(c.name);
                 counts.put(c.name, n == null ? 1 : n + 1);
             }
         }
         for (Ast.ClassDecl c : extensions) {
-            if (staticMethods ? !hasStaticMethod(c) : c.hoistedStatics.isEmpty()) {
+            if (c.hoistedStatics.isEmpty()) {
                 continue;
             }
             if (c.ownerLibrary == lib) {
@@ -1275,131 +1302,6 @@ public final class Program {
             }
         }
         return seen;
-    }
-
-    /**
-     * A tear-off of an extension's static method (`var f = E.make;`) becomes the closure
-     * `(n) => E.make(n)`: an extension is no value, and its statics are emitted as static
-     * methods of a class, so the call form is the one every path already resolves.
-     */
-    private void lowerExtensionStaticTearOffs() {
-        Map<String, Ast.ClassDecl> all = new java.util.HashMap<String, Ast.ClassDecl>();
-        for (Ast.ClassDecl c : extensions) {
-            if (hasStaticMethod(c)) {
-                all.put(c.name, c);
-            }
-        }
-        if (all.isEmpty()) {
-            return;
-        }
-        Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
-        for (Ast.Library lib : libraries) {
-            Map<String, Ast.ClassDecl> scope = extensionsSeenBy(lib, all, true);
-            for (Map.Entry<String, Ast.ClassDecl> e : new ArrayList<Map.Entry<String, Ast.ClassDecl>>(scope.entrySet())) {
-                if (e.getKey().indexOf('.') >= 0) {
-                    scope.remove(e.getKey());
-                }
-            }
-            if (!scope.isEmpty()) {
-                tearOffsIn(lib, scope, seen);
-            }
-        }
-    }
-
-    private static Object staticTearOff(Object o, Map<String, Ast.ClassDecl> scope) {
-        if (!(o instanceof Ast.PropertyGet) || ((Ast.PropertyGet) o).nullAware
-                || !(((Ast.PropertyGet) o).target instanceof Ast.Ident)) {
-            return o;
-        }
-        Ast.PropertyGet pg = (Ast.PropertyGet) o;
-        Ast.Ident t = (Ast.Ident) pg.target;
-        Ast.ClassDecl e = scope.get(t.name);
-        Ast.MethodDecl m = e == null || t.typeArgs != null ? null : e.method(pg.name);
-        if (m == null || !m.isStatic || m.isGetter || m.isSetter || !m.typeParams.isEmpty()) {
-            return o;
-        }
-        Ast.Lambda l = new Ast.Lambda();
-        l.file = pg.file;
-        l.line = pg.line;
-        l.col = pg.col;
-        Ast.Call call = new Ast.Call();
-        call.file = pg.file;
-        call.line = pg.line;
-        call.col = pg.col;
-        Ast.Ident target = new Ast.Ident();
-        target.file = pg.file;
-        target.line = pg.line;
-        target.col = pg.col;
-        target.name = t.name;
-        call.target = target;
-        call.name = m.name;
-        for (Ast.Param p : m.params) {
-            Ast.Param q = new Ast.Param();
-            q.file = pg.file;
-            q.line = pg.line;
-            q.col = pg.col;
-            q.type = p.type;
-            q.name = p.name;
-            q.named = p.named;
-            q.required = p.required;
-            q.optional = p.optional;
-            q.defaultValue = p.defaultValue;
-            l.params.add(q);
-            Ast.Ident a = new Ast.Ident();
-            a.file = pg.file;
-            a.line = pg.line;
-            a.col = pg.col;
-            a.name = p.name;
-            if (p.named) {
-                Ast.NamedArg na = new Ast.NamedArg();
-                na.name = p.name;
-                na.value = a;
-                call.args.named.add(na);
-            } else {
-                call.args.positional.add(a);
-            }
-        }
-        l.exprBody = call;
-        return l;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void tearOffsIn(Object o, Map<String, Ast.ClassDecl> scope, Set<Object> seen) {
-        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
-            return;
-        }
-        if (o instanceof List) {
-            List<Object> l = (List<Object>) o;
-            for (int i = 0; i < l.size(); i++) {
-                Object e = l.get(i);
-                Object r = staticTearOff(e, scope);
-                if (r != e) {
-                    l.set(i, r);
-                }
-                tearOffsIn(r, scope, seen);
-            }
-            return;
-        }
-        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
-            return;
-        }
-        for (java.lang.reflect.Field f : childFields(o.getClass())) {
-            try {
-                Object v = f.get(o);
-                Object r = staticTearOff(v, scope);
-                if (r != v) {
-                    try {
-                        f.set(o, r);
-                        v = r;
-                    } catch (IllegalArgumentException ex) {
-                        // a field typed narrower than Expr: left as written
-                    }
-                }
-                tearOffsIn(v, scope, seen);
-            } catch (IllegalAccessException ex) {
-                throw new IllegalStateException(ex);
-            }
-        }
     }
 
     private static final Map<Class<?>, List<java.lang.reflect.Field>> CHILD_FIELDS =

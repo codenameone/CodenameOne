@@ -20422,6 +20422,13 @@ public final class JavaEmitter {
     }
 
     private Out emitPropertyGet0(PropertyGet pg, Ctx ctx) {
+        // `E.make`, `p.E.make`, `E.gen<int>`: an extension's static method torn off is the
+        // canonical static tear-off a class's is (staticTearOff), so `E.make == E.make` and
+        // `identical(E.make, E.make)` hold. A local named E hides the extension.
+        Out extTear = extensionStaticTearOff(pg, ctx);
+        if (extTear != null) {
+            return extTear;
+        }
         // `ids.map(int.parse)`: a tear-off of the numeric parsers, as the method reference
         // the call form already lowers to (see emitPrimitiveStaticCall).
         if (pg.target instanceof Ident && (pg.name.equals("parse") || pg.name.equals("tryParse"))) {
@@ -27005,6 +27012,45 @@ public final class JavaEmitter {
         return any;
     }
 
+    /// The extension a static access's target names: `E` as this library sees it (null
+    /// when a local or a class of that name hides it), `p.E` through an import prefix, or
+    /// the extension a desugared call was pinned to.
+    private ClassDecl extensionTarget(Expr target, Ctx ctx) {
+        if (target instanceof Ident) {
+            Ident t = (Ident) target;
+            if (t.pinnedClass != null) {
+                return program.extensions.contains(t.pinnedClass) ? t.pinnedClass : null;
+            }
+            return t.typeArgs == null ? extensionNamed(t.name, ctx) : null;
+        }
+        if (target instanceof PropertyGet && !((PropertyGet) target).nullAware
+                && isImportPrefix(((PropertyGet) target).target, ctx)) {
+            return program.extensionThroughPrefix(((Ident) ((PropertyGet) target).target).name,
+                    ((PropertyGet) target).name, ctx.library());
+        }
+        return null;
+    }
+
+    private Out extensionStaticTearOff(PropertyGet pg, Ctx ctx) {
+        if (pg.nullAware) {
+            return null;
+        }
+        ClassDecl ext = extensionTarget(pg.target, ctx);
+        MethodDecl m = ext == null ? null : ext.method(pg.name);
+        if (m == null || !m.isStatic || m.isGetter || m.isSetter) {
+            return null;
+        }
+        List<TypeRef> saved = tearOffTypeArgs;
+        if (pg.typeArgs != null) {
+            tearOffTypeArgs = pg.typeArgs;
+        }
+        try {
+            return staticTearOff(ext.name, ext, null, pg.name, pg, ctx);
+        } finally {
+            tearOffTypeArgs = saved;
+        }
+    }
+
     /**
      * {@code Ext.staticMember(..)} and an explicit extension application
      * {@code Ext(receiver).member(..)}. An extension is not a class in the program tables, so
@@ -27016,8 +27062,8 @@ public final class JavaEmitter {
         if (c.name == null) {
             return null;
         }
-        if (c.target instanceof Ident) {
-            ClassDecl ext = extensionNamed(((Ident) c.target).name, ctx);
+        if (c.target instanceof Ident || c.target instanceof PropertyGet) {
+            ClassDecl ext = extensionTarget(c.target, ctx);
             MethodDecl m = ext == null ? null : ext.method(c.name);
             if (m != null && m.isStatic) {
                 TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
@@ -36296,6 +36342,23 @@ public final class JavaEmitter {
     /// The Java class an extension is emitted as: its Dart name, unless a program class or
     /// another extension has that name too (`extension type Id` in a.dart beside `class Id`
     /// in b.dart), when it takes the library-path prefix a colliding class does.
+    /// Whether a generic static method's tear-off needs no instantiation of its own. An
+    /// extension's always gets one, keyed by its type arguments (`E.gen<int>` is not
+    /// `E.gen<String>`), though its statics take no witness arguments (staticWitnessArgs).
+    private boolean staticWitnessFree(ClassDecl c, MethodDecl md) {
+        return !program.extensions.contains(c) && methodWitnesses(md).isEmpty();
+    }
+
+    private List<String> staticWitnessArgs(ClassDecl c, MethodDecl md, List<TypeRef> inst, Ctx ctx) {
+        return program.extensions.contains(c) ? new ArrayList<String>()
+                : instantiatedWitnessArgs(md, md.typeParams, inst, ctx);
+    }
+
+    /// The Java class a program class's or an extension's static members live in.
+    private String staticOwnerName(ClassDecl c) {
+        return program.extensions.contains(c) ? extJavaName(c) : javaClassName(c);
+    }
+
     private String extJavaName(Ast.ClassDecl ext) {
         boolean collides = program.classesByName.containsKey(ext.name) || program.enumsByName.containsKey(ext.name);
         for (Ast.ClassDecl o : program.extensions) {
@@ -36808,13 +36871,13 @@ public final class JavaEmitter {
                     // A non-generic one too: as a method reference it is canonicalized by the
                     // function it names, as a top-level function is, so `C.st == C.st`.
                     List<TypeRef> oInst = !hasOptionalParam(md) || md.typeParams.isEmpty()
-                            || methodWitnesses(md).isEmpty() ? null
+                            || staticWitnessFree(pc, md) ? null
                             : tearOffTypeArgs != null && tearOffTypeArgs.size() == md.typeParams.size()
                             ? tearOffTypeArgs
                             : contextInstantiation(md.typeParams, md.params, md.returnType,
                                     ctorTearOffExpected, md.typeParamBounds);
                     String oKey = oInst == null ? null
-                            : instantiationKeyExpr(javaClassName(pc) + "::" + name, oInst, ctx);
+                            : instantiationKeyExpr(staticOwnerName(pc) + "::" + name, oInst, ctx);
                     if (oKey != null) {
                         // `String Function(int, [int?]) s = C.so` for `static String so<T>(T x,
                         // [T? y])`: the adapter calls `C.so<int>(..)`, handing the body its
@@ -36859,18 +36922,18 @@ public final class JavaEmitter {
                             // one does not see) a bare name could mean a different class.
                             ft = inLibrary(ft, pc.ownerLibrary);
                         }
-                        String mref = javaClassName(pc) + "::" + name;
+                        String mref = staticOwnerName(pc) + "::" + name;
                         // `String Function(int) s = C.sm` for `static String sm<T>(T x) => '$T'`:
                         // instantiated by the slot, as a generic top-level function is, and
                         // handed the witnesses its body reads -- a method reference cannot pass
                         // them, so a closure over its parameters does.
-                        List<TypeRef> sInst = md.typeParams.isEmpty() || methodWitnesses(md).isEmpty() ? null
+                        List<TypeRef> sInst = md.typeParams.isEmpty() || staticWitnessFree(pc, md) ? null
                                 : tearOffTypeArgs != null && tearOffTypeArgs.size() == md.typeParams.size()
                                 ? tearOffTypeArgs
                                 : contextInstantiation(md.typeParams, md.params, md.returnType,
                                         ctorTearOffExpected, md.typeParamBounds);
                         List<String> sW = sInst == null ? null
-                                : instantiatedWitnessArgs(md, md.typeParams, sInst, ctx);
+                                : staticWitnessArgs(pc, md, sInst, ctx);
                         if (sW != null) {
                             TypeRef ift = new TypeRef("Function");
                             ift.funcParams = new ArrayList<TypeRef>();
@@ -36884,15 +36947,15 @@ public final class JavaEmitter {
                                 ift = inLibrary(ift, pc.ownerLibrary);
                             }
                             tearOffReturn = null;
-                            String lam = "((" + String.join(", ", ps) + ") -> " + javaClassName(pc) + "."
+                            String lam = "((" + String.join(", ", ps) + ") -> " + staticOwnerName(pc) + "."
                                     + name + "(" + joinArgs(sW, ps) + "))";
                             // One canonical value per instantiation: `C.sm == C.sm`.
                             String keyed = keyedInstantiatedTearOff(lam, null,
-                                    instantiationKeyExpr(javaClassName(pc) + "::" + name, sInst, ctx), sInst, ift, ctx);
+                                    instantiationKeyExpr(staticOwnerName(pc) + "::" + name, sInst, ctx), sInst, ift, ctx);
                             return new Out(lam, ift, FnForm.methodRef(keyed));
                         }
                         if (tearOffTypeArgs == null) {
-                            String checked = boundCheckedMethodTearOff(md, javaClassName(pc), name, ctx);
+                            String checked = boundCheckedMethodTearOff(md, staticOwnerName(pc), name, ctx);
                             if (checked != null) {
                                 mref = checked;
                             }
