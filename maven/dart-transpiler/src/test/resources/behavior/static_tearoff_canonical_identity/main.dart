@@ -43,6 +43,8 @@ void main() {
   map[b] = 'b';
   map[o] = 'o';
   print('map ${map.length} ${map[twice]}');
+  Object? Function(int) wide = twice;
+  print('wide ${wide == a} ${identical(wide, o)} ${wide.hashCode == a.hashCode} ${<Object>{a, b, o, wide}.length} ${wide(5)}');
 
   Opt oa = addOpt;
   Function ob = addOpt;

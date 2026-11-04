@@ -426,7 +426,9 @@ public final class DartRuntime {
     /// eq compare (CANON_FUNCTIONS), so all of them stay one Dart function.
     @SuppressWarnings("unchecked")
     public static <T> T canonTearOff(String fn, String view, T made) {
-        String key = fn + '|' + view;
+        // Keyed by the ERASED SAM: `Funcs.Func1<Long, Object>` and `Funcs.Func1<Long, Long>`
+        // are one Java type at run time, so one object serves both views of the function.
+        String key = fn + '|' + eraseTypeArgs(view);
         Object c = CANON_TEAR_OFFS.get(key);
         if (c == null) {
             CANON_TEAR_OFFS.put(key, made);
@@ -434,6 +436,25 @@ public final class DartRuntime {
             return made;
         }
         return (T) c;
+    }
+
+    private static String eraseTypeArgs(String view) {
+        if (view.indexOf('<') < 0) {
+            return view;
+        }
+        StringBuilder sb = new StringBuilder(view.length());
+        int depth = 0;
+        for (int i = 0; i < view.length(); i++) {
+            char c = view.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            } else if (depth == 0) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     /// Removes the first element of {@code list} that is Dart {@code ==} to {@code value}:

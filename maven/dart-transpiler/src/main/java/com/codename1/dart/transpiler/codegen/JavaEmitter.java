@@ -9508,7 +9508,7 @@ public final class JavaEmitter {
                     && (expected.is("Object") || expected.is("Function") || isDynamicType(expected)), ctx);
             if (expected != null && (expected.funcParams != null
                     || expected.name != null && typedefDecl(expected.name) != null)) {
-                out = identifySignedTearOff(e, out, ctx);
+                out = identifySignedTearOff(e, out, expected, ctx);
             }
             out = valueTearOff(e, out, expected, ctx);
         }
@@ -9541,7 +9541,102 @@ public final class JavaEmitter {
                 out = new Out("((" + functionSam(expected, ctx) + ") (Object) " + paren(out.code) + ")", expected);
             }
         }
-        return out;
+        return canonCtorTearOff(e, out, expected, ctx);
+    }
+
+    /// A constructor tear-off (`P.new`, `P.named`, `G<int>.new`, or `G.new` instantiated
+    /// by its slot) as one Dart function: Dart makes `P.new == P.new` and
+    /// `G<int>.new == G<int>.new` true, and `G<int>.new == G<String>.new` false. It is
+    /// canonicalized by the class, the constructor and the instantiation, so only an
+    /// instantiation that is a compile-time constant is: one that reads a type variable's
+    /// witness is a new function per instantiation and stays a fresh closure.
+    private Out canonCtorTearOff(Expr e, Out out, TypeRef expected, Ctx ctx) {
+        if (out == null || out.fromError || !(e instanceof PropertyGet)
+                || !(((PropertyGet) e).target instanceof Ident)) {
+            return out;
+        }
+        String name = ((PropertyGet) e).name;
+        String cls = ((Ident) ((PropertyGet) e).target).name;
+        if (ctx.lookup(cls) != null) {
+            return out;
+        }
+        ClassDecl pc = program.resolveClass(cls, ctx.library());
+        if (pc == null || program.enums.containsKey(cls) || !(name.equals("new") || pc.namedCtor(name) != null)) {
+            return out;
+        }
+        TypeRef r = out.type != null ? out.type.funcReturn : null;
+        if ((r == null || !pc.typeParams.isEmpty() && r.args.isEmpty()) && expected != null) {
+            r = expected.funcReturn;
+        }
+        if (r == null || !pc.typeParams.isEmpty() && r.args.size() != pc.typeParams.size()
+                || readsTypeVarWitness(r, ctx) || mentionsTypeVariable(r, ctx)) {
+            return out;
+        }
+        String code = out.code;
+        if (code.indexOf('"') >= 0 || code.indexOf('\\') >= 0 || BARE_LAMBDA.matcher(code).matches()
+                || code.startsWith("DartRuntime.canonTearOff(")) {
+            return out;
+        }
+        String key = "new " + javaType(r, false, ctx) + "." + name;
+        if (key.indexOf('"') >= 0) {
+            return out;
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        String view = code.replaceAll("\\s+", " ");
+        return new Out("DartRuntime.canonTearOff(\"" + key + "\", \"" + view + "\", " + code + ")", out.type, out.fn);
+    }
+
+    private boolean mentionsTypeVariable(TypeRef t, Ctx ctx) {
+        if (t == null) {
+            return false;
+        }
+        if (isTypeVariable(t, ctx)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsTypeVariable(a, ctx)) {
+                return true;
+            }
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (mentionsTypeVariable(a, ctx)) {
+                    return true;
+                }
+            }
+        }
+        return mentionsTypeVariable(t.funcReturn, ctx);
+    }
+
+    /// The function key a static or top-level tear-off is canonicalized by. A generic
+    /// function's instantiations are different functions in Dart (`gen<int> == gen<int>`,
+    /// `gen<int> != gen<String>`), so a generic one is keyed by the instantiated type it
+    /// is held as too; null when that type is not a compile-time constant (it reads a
+    /// type variable), and the tear-off is then left as it is.
+    private String canonFunctionKey(String bare, TypeRef t, Ctx ctx) {
+        int cc = bare.indexOf("::");
+        if (cc < 0) {
+            return bare;
+        }
+        String q = bare.substring(0, cc);
+        String n = bare.substring(cc + 2);
+        List<String> tps = null;
+        Ast.FunctionDecl fd = program.functions.get(n);
+        if (fd != null && !program.classes.containsKey(q.substring(q.lastIndexOf('.') + 1))) {
+            tps = fd.typeParams;
+        } else {
+            ClassDecl c = program.classes.get(q.substring(q.lastIndexOf('.') + 1));
+            MethodDecl md = c != null ? c.method(n) : null;
+            tps = md != null ? md.typeParams : null;
+        }
+        if (tps == null || tps.isEmpty()) {
+            return bare;
+        }
+        if (t == null || t.funcParams == null || readsTypeVarWitness(t, ctx) || mentionsTypeVariable(t, ctx)) {
+            return null;
+        }
+        String k = bare + "<" + javaType(t, false, ctx) + ">";
+        return k.indexOf('"') >= 0 ? null : k;
     }
 
     private static final java.util.regex.Pattern FUNCS_SAM = java.util.regex.Pattern.compile(
@@ -9984,7 +10079,7 @@ public final class JavaEmitter {
     /// identical to the same function held as any other type. The SAM is still the one sk
     /// produces: the reference is made inside the lambda, against the receiver passed in,
     /// so the call's target type (a generic `where(seen.add)` included) still decides it.
-    private Out identifySignedTearOff(Expr e, Out out, Ctx ctx) {
+    private Out identifySignedTearOff(Expr e, Out out, TypeRef expected, Ctx ctx) {
         if (out == null || out.fromError || out.code.indexOf('"') >= 0
                 || !(e instanceof Ident || e instanceof PropertyGet)) {
             return out;
@@ -10001,11 +10096,54 @@ public final class JavaEmitter {
         ctx.importClass("dart.runtime.DartRuntime");
         if (STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null) {
             String sam = m.group(1).substring(m.group(1).lastIndexOf('.') + 1);
-            return new Out("DartRuntime.canonTearOff(\"" + recv + "::" + name + "\", \"" + sam + "\", "
-                    + out.code + ")", out.type, out.fn);
+            String key = canonFunctionKey(recv + "::" + name, out.type, ctx);
+            if (key == null) {
+                return out;
+            }
+            String code = "DartRuntime.canonTearOff(\"" + key + "\", \"" + sam + "\", " + out.code + ")";
+            if (hasBottomParam(expected)) {
+                // `dynamic Function(Never) f = twice`: the slot's SAM takes Object where the
+                // function takes int, which javac refuses to infer. Erased, the value is the
+                // same object whatever its type arguments, and Never is never passed, so the
+                // signed SAM is made from the function alone and cast through Object.
+                String jt = functionSamProbe(expected, ctx) != null ? functionSam(expected, ctx) : null;
+                if (jt != null) {
+                    code = "((" + jt + ") (Object) " + code + ")";
+                }
+            }
+            return new Out(code, out.type, out.fn);
         }
         // An instance-method tear-off: valueTearOff.
         return out;
+    }
+
+    /// A canonical static tear-off (DartRuntime.canonTearOff) held as another SAM: rebuilt
+    /// from its method reference it would be a new object, unequal to and hashed apart from
+    /// every other view of the function, so the canonical value itself is cast, through
+    /// Object, since erasure makes every instantiation of its SAM the same object. Null when
+    /// {@code o} is not one.
+    private String canonRecast(Out o, String sam) {
+        if (o == null || o.code == null || !CANON_VALUE.matcher(o.code).lookingAt()) {
+            return null;
+        }
+        return "((" + sam + ") (Object) " + paren(o.code) + ")";
+    }
+
+    private static final java.util.regex.Pattern CANON_VALUE = java.util.regex.Pattern.compile(
+            "(?:\\(\\([\\w$.<>, ?&]+\\) (?:\\(Object\\) )?\\(?)?DartRuntime\\.canonTearOff\\(");
+
+    /// A function type with a parameter of a bottom type (Never, Null): a slot of it holds
+    /// a function of any parameter type, which Java's SAM type arguments cannot express.
+    private static boolean hasBottomParam(TypeRef t) {
+        if (t == null || t.funcParams == null) {
+            return false;
+        }
+        for (TypeRef p : t.funcParams) {
+            if (p != null && (p.is("Never") || p.is("Null"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static final java.util.regex.Pattern STATIC_TEAR_OFF = java.util.regex.Pattern.compile(
@@ -10074,6 +10212,10 @@ public final class JavaEmitter {
             if (ctx.lookup(q) != null) {
                 return out;
             }
+            String fnKey = canonFunctionKey(bare, out.type, ctx);
+            if (fnKey == null) {
+                return out;
+            }
             int amp = cast.indexOf(" & ");
             if (amp > 0) {
                 // `(Funcs.FuncN<..> & DartFnSigs.Mk) C::f`: made as the signed SAM that is both
@@ -10089,11 +10231,11 @@ public final class JavaEmitter {
                     String targs = lt < 0 ? "" : samPart.substring(lt);
                     int n = Integer.parseInt(sf.group(2)) + (sf.group(1) != null ? 0 : 1);
                     String num = signedSamFor(samHead, n, mm.group(2))[0].substring(1);
-                    return new Out("DartRuntime.canonTearOff(\"" + bare + "\", \"s" + num + "\", "
+                    return new Out("DartRuntime.canonTearOff(\"" + fnKey + "\", \"s" + num + "\", "
                             + mm.group(1) + "." + targs + "s" + num + "(" + bare + "))", out.type, out.fn);
                 }
             }
-            return new Out("DartRuntime.canonTearOff(\"" + bare + "\", \"" + cast + "\", " + out.code + ")", out.type, out.fn);
+            return new Out("DartRuntime.canonTearOff(\"" + fnKey + "\", \"" + cast + "\", " + out.code + ")", out.type, out.fn);
         }
         // An instance-method tear-off: valueTearOff.
         return out;
@@ -12197,6 +12339,10 @@ public final class JavaEmitter {
             // it. Through Object: the slot may be another instantiation of the same erased
             // SAM (`void Function(num)` held as `void Function(int)`), as Dart allows.
             return "(" + type + ") (Object) " + paren(o.code);
+        }
+        String canon = canonRecast(o, type);
+        if (canon != null) {
+            return canon.substring(1, canon.length() - 1);
         }
         if (isFuncsSamName(type)) {
             return "(" + type + ") (" + type + " & " + f.marker + ") " + paren(f.bare);
@@ -17325,6 +17471,10 @@ public final class JavaEmitter {
         FnForm f = top.fn;
         if (!f.sam.equals(have)) {
             return top;
+        }
+        String canon = canonRecast(top, want);
+        if (canon != null) {
+            return new Out(canon, expected, top.fn);
         }
         String rr = recastRunTimeSigned(want, f);
         if (rr != null) {
@@ -33549,6 +33699,10 @@ public final class JavaEmitter {
                 widened.funcReturn = TypeRef.DYNAMIC;
                 String wj = javaType(widened, false, ctx);
                 if (!wj.equals(ownSam)) {
+                    String canon = canonRecast(o, wj);
+                    if (canon != null) {
+                        return canon;
+                    }
                     String rr = recastRunTimeSigned(wj, f);
                     if (rr != null) {
                         return "(" + rr + ")";

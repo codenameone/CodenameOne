@@ -1,0 +1,10 @@
+wide true true true 6
+never true true 8
+set 1
+ctor new true true
+ctor named true false
+ctor views true true 5
+gctor true false
+gctor inferred true 6
+gen inst true false
+gen inferred true 7

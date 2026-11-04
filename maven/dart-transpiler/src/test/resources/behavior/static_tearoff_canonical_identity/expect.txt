@@ -12,6 +12,7 @@ views eq true true true
 views hash true true
 set size 1
 map 1 o
+wide true true true 1 10
 opt views true true 1
 static opt views true true 1
 static calls 6 3 g 4 3
