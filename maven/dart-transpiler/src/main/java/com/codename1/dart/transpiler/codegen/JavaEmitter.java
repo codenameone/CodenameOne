@@ -3928,7 +3928,7 @@ public final class JavaEmitter {
         if (inherits && !hasDynamicMembers(superDeclOf(c, c.superclass))) {
             return false;
         }
-        TypeRef self = new TypeRef(c.name);
+        TypeRef self = TypeRef.own(new TypeRef(c.name));
         for (String tp : c.typeParams) {
             self.args.add(new TypeRef(tp));
         }
@@ -4563,7 +4563,7 @@ public final class JavaEmitter {
         appendParams(sb, c, ct.params, ctx);
         sb.append(") {\n");
         ctx.pushWriter(2);
-        ctx.methodReturnType = new TypeRef(c.name);
+        ctx.methodReturnType = TypeRef.own(new TypeRef(c.name));
         java.util.Set<String> savedWitnessLocals = ctx.witnessLocals;
         boolean savedStatic = ctx.staticMember;
         ctx.witnessLocals = new HashSet<String>(witnessParams(c));
@@ -5878,9 +5878,19 @@ public final class JavaEmitter {
      * method reference to one. A generic method, or one with an untyped parameter or
      * return, stays a plain Function as before.
      */
+    private static boolean namesClass(TypeRef t, ClassDecl pc) {
+        // `expected.is(pc.name)` asked by spelling, and with `class String {}` in scope the
+        // spelling `String` means dart:core's String unless the reference is marked as the
+        // program class (shadowsCore) or pinned to it.
+        if (t == null || pc == null || t.name == null || !t.name.equals(pc.name)) {
+            return false;
+        }
+        return !TypeRef.CORE_NAMES.contains(pc.name) || t.shadowsCore || t.resolved == pc;
+    }
+
     /// The type of `this` in class c: c applied to its own type variables.
     private static TypeRef selfType(ClassDecl c) {
-        TypeRef t = new TypeRef(c.name);
+        TypeRef t = TypeRef.own(new TypeRef(c.name));
         for (String tp : c.typeParams) {
             t.args.add(new TypeRef(tp));
         }
@@ -10542,6 +10552,7 @@ public final class JavaEmitter {
         TypeRef r = new TypeRef(t.name);
         r.nullable = t.nullable;
         r.resolved = t.resolved;
+        r.shadowsCore = t.shadowsCore;
         for (TypeRef a : t.args) {
             r.args.add(replaceByVariance(a, vars, covariant));
         }
@@ -10673,6 +10684,7 @@ public final class JavaEmitter {
         r.funcReturn = t.funcReturn;
         r.funcTypeParams = t.funcTypeParams;
         r.resolved = t.resolved;
+        r.shadowsCore = t.shadowsCore;
         r.nullable = true;
         return r;
     }
@@ -12066,7 +12078,7 @@ public final class JavaEmitter {
             if (ctx.extensionSelfType != null) {
                 return new Out("$self", ctx.extensionSelfType);
             }
-            return new Out("this", ctx.currentClass != null ? new TypeRef(ctx.currentClass.name) : TypeRef.DYNAMIC);
+            return new Out("this", ctx.currentClass != null ? TypeRef.own(new TypeRef(ctx.currentClass.name)) : TypeRef.DYNAMIC);
         }
         if (e instanceof SuperExpr) {
             String member = ctx.superMember;
@@ -12332,12 +12344,13 @@ public final class JavaEmitter {
                     // against Iterable<int>, and javac gets the witness.
                     TypeRef ctype = cc.type;
                     CtorDecl ccCtor = pc.namedCtor(cc.ctorName);
-                    List<TypeRef> fca = !ccCtor.isFactory && expected != null && expected.is(pc.name)
+                    List<TypeRef> fca = !ccCtor.isFactory && expected != null && namesClass(expected, pc)
                             && expected.args.size() == pc.typeParams.size() ? null
                             : factoryClassArgs(pc, ccCtor, cc.type.args, cc.args, ctx);
                     if (fca != null) {
                         ctype = TypeRef.of(cc.type.name, fca.toArray(new TypeRef[0]));
                         ctype.resolved = cc.type.resolved;
+                        ctype.shadowsCore = cc.type.shadowsCore;
                     }
                     List<TypeRef> inferredArgs = argInferredWitnessTypeArgs(pc, pc.namedCtor(cc.ctorName),
                             ctype.args, cc.args, ctx);
@@ -12378,7 +12391,7 @@ public final class JavaEmitter {
                     return new Out(javaClassName(pc) + "." + jw + javaIdent(cc.ctorName) + "("
                             + (na.isEmpty() ? stripTrailingComma(tw) : tw + na) + ")",
                             explicit ? ctype
-: new TypeRef(cc.type.name));
+: TypeRef.own(new TypeRef(cc.type.name)));
                 }
                 Ast.ClassDecl sc = stubs.classes.get(cc.type.name);
                 if (sc != null) {
@@ -15427,7 +15440,7 @@ public final class JavaEmitter {
                 return null;
             }
         }
-        TypeRef self = new TypeRef(pc.name);
+        TypeRef self = TypeRef.own(new TypeRef(pc.name));
         for (String tp : pc.typeParams) {
             self.args.add(new TypeRef(tp));
         }
@@ -21865,6 +21878,11 @@ public final class JavaEmitter {
         if (cur == null || to == null || cur.name == null || cur.name.equals(to.name)) {
             return true;
         }
+        if (cur.runtimeOnly || to.runtimeOnly || cur.name.indexOf('.') > 0) {
+            // `core.Object o` beside a program class Object: dart:core's type, never the
+            // program class the bare name resolves to, so the program-class test is moot.
+            return true;
+        }
         ClassDecl a = program.resolveClass(to.name, ctx.library());
         ClassDecl b = program.resolveClass(cur.name, ctx.library());
         if (a == null || b == null || !isProgramClassDecl(a) || !isProgramClassDecl(b)) {
@@ -23604,6 +23622,7 @@ public final class JavaEmitter {
         TypeRef c = new TypeRef(t.name);
         c.nullable = t.nullable;
         c.resolved = t.resolved;
+        c.shadowsCore = t.shadowsCore;
         c.line = t.line;
         c.col = t.col;
         for (TypeRef a : t.args) {
@@ -24646,6 +24665,7 @@ public final class JavaEmitter {
         c.nullable = t.nullable;
         c.resolved = t.resolved;
         c.runtimeOnly = t.runtimeOnly;
+        c.shadowsCore = t.shadowsCore;
         c.aliasedFrom = t.aliasedFrom;
         c.funcRequired = t.funcRequired;
         c.funcNamed = t.funcNamed;
@@ -25955,6 +25975,7 @@ public final class JavaEmitter {
             copy.nullable = true;
             copy.resolved = base.resolved;
             copy.runtimeOnly = base.runtimeOnly;
+            copy.shadowsCore = base.shadowsCore;
             copy.aliasedFrom = base.aliasedFrom;
             copy.funcParams = base.funcParams;
             copy.funcReturn = base.funcReturn;
@@ -26274,6 +26295,14 @@ public final class JavaEmitter {
                 && ctx.lookup(((Ident) c.target).name) == null
                 && (ctx.currentClass == null || ctx.currentClass.field(((Ident) c.target).name) == null)) {
             Out prim = emitPrimitiveStaticCall(((Ident) c.target).name, c, ctx);
+            if (prim != null) {
+                return prim;
+            }
+        }
+        // `core.int.parse(s)` / `core.double.tryParse(s)`: the same primitive statics through
+        // a dart:core import prefix, which a program class `int` in scope cannot take.
+        if (c.name != null && throughDartPrefix(c.target, ctx)) {
+            Out prim = emitPrimitiveStaticCall(((PropertyGet) c.target).name, c, ctx);
             if (prim != null) {
                 return prim;
             }
@@ -26867,7 +26896,7 @@ public final class JavaEmitter {
         // `toString()` with no receiver in a class extending a dart:core error: the Java
         // class inherits (or overrides) the core error's toString, which is Dart's.
         if (ctx.currentClass != null && n.equals("toString") && c.args.positional.isEmpty()
-                && c.args.named.isEmpty() && coreErrorAncestorType(new TypeRef(ctx.currentClass.name)) != null) {
+                && c.args.named.isEmpty() && coreErrorAncestorType(TypeRef.own(new TypeRef(ctx.currentClass.name))) != null) {
             return new Out("this.toString()", TypeRef.STRING);
         }
         diags.error(c, "E0135", "Cannot resolve function or constructor '" + n
@@ -27216,7 +27245,7 @@ public final class JavaEmitter {
                             em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
                 }
             }
-            ClassDecl pc = program.classes.get(cls);
+            ClassDecl pc = throughDartPrefix(c.target, ctx) ? null : program.classes.get(cls);
             if (pc != null) {
                 // The Java name, which is library-prefixed when the class shares its name
                 // with a stub (an app's own User beside firebase_auth's): the raw Dart name
@@ -27268,7 +27297,7 @@ public final class JavaEmitter {
                     TypeRef namedCtx = callExpected(c, ctx);
                     // A generative one yields to a context naming the class (`Box<num> b =
                     // Box.named(3)` is a Box<num>), as Dart's downward inference does.
-                    boolean ctxBinds = !named.isFactory && namedCtx != null && namedCtx.is(pc.name)
+                    boolean ctxBinds = !named.isFactory && namedCtx != null && namesClass(namedCtx, pc)
                             && namedCtx.args.size() == pc.typeParams.size();
                     List<TypeRef> fca = written.isEmpty() && !ctxBinds
                             ? factoryClassArgs(pc, named, written, c.args, ctx) : null;
@@ -27300,7 +27329,7 @@ public final class JavaEmitter {
                         na = canonicalArgs(named, pc, c.args, ctx);
                     }
                     TypeRef made = written.size() == pc.typeParams.size() && !written.isEmpty()
-                            ? TypeRef.of(cls, written.toArray(new TypeRef[0])) : new TypeRef(cls);
+                            ? TypeRef.own(TypeRef.of(cls, written.toArray(new TypeRef[0]))) : TypeRef.own(new TypeRef(cls));
                     return new Out(jcls + "." + javaIdent(n) + "(" + (na.isEmpty() ? stripTrailingComma(tw)
                             : tw + na) + ")", made);
                 }
@@ -29639,7 +29668,9 @@ public final class JavaEmitter {
      * class; a core type with an unknown member is reported here, by name.
      */
     private Out emitCoreStaticCall(String cls, Call c, Ctx ctx) {
-        if (program.classes.containsKey(cls)) {
+        // `core.List.filled(..)` through `import 'dart:core' as core` names dart:core's List
+        // even where a program class List is in scope.
+        if (program.classes.containsKey(cls) && !throughDartPrefix(c.target, ctx)) {
             return null;
         }
         String n = c.name;
@@ -30198,6 +30229,9 @@ public final class JavaEmitter {
             TypeRef constructed = typeArgs != null && !typeArgs.isEmpty()
                     && typeArgs.size() == pc.typeParams.size()
                     ? TypeRef.of(className, typeArgs.toArray(new TypeRef[0])) : new TypeRef(className);
+            // pc is the program class the call constructs: a dart:core name it spells is
+            // that class (`class String {}`, `String('ab')`), not dart:core's.
+            TypeRef.own(constructed);
             if (pinnedCls != null || prefixProvides(ctx.library(), ctorPrefix, pc)) {
                 constructed.resolved = pc;
             }
@@ -30210,6 +30244,7 @@ public final class JavaEmitter {
                     typeArgs = fca;
                     TypeRef inferredType = TypeRef.of(className, fca.toArray(new TypeRef[0]));
                     inferredType.resolved = constructed.resolved;
+                    inferredType.shadowsCore = constructed.shadowsCore;
                     constructed = inferredType;
                 }
             }
@@ -30691,6 +30726,7 @@ public final class JavaEmitter {
         TypeRef out = new TypeRef(t.name);
         out.nullable = t.nullable;
         out.resolved = t.resolved;
+        out.shadowsCore = t.shadowsCore;
         for (TypeRef a : t.args) {
             out.args.add(substituteTypeParams(a, subst));
         }
@@ -32135,7 +32171,7 @@ public final class JavaEmitter {
             if (fca == null) {
                 return null;
             }
-            TypeRef t = TypeRef.of(pc.name, fca.toArray(new TypeRef[0]));
+            TypeRef t = TypeRef.own(TypeRef.of(pc.name, fca.toArray(new TypeRef[0])));
             t.resolved = pc;
             return t;
         } finally {
@@ -35093,6 +35129,7 @@ public final class JavaEmitter {
         }
         TypeRef inst = TypeRef.of(tt.name, bounds);
         inst.resolved = tt.resolved;
+        inst.shadowsCore = tt.shadowsCore;
         return "(" + castTo(javaType(inst, false, ctx), code) + ")";
     }
 
@@ -35180,6 +35217,11 @@ public final class JavaEmitter {
     /// Qualifying the emitter's own references instead would mean auditing every string it
     /// builds, and a missed one would fail only for an app that happens to use that name.
     static final Set<String> RESERVED_JAVA_NAMES = new HashSet<String>(Arrays.asList(
+            // Java keywords a Dart class may be named (`import 'dart:core' hide int;
+            // class int {}`): never a legal Java class name.
+            "int", "double", "long", "short", "byte", "char", "float", "boolean", "native",
+            "synchronized", "transient", "volatile", "strictfp", "package", "private",
+            "protected", "public", "goto", "instanceof", "throws", "char",
             // java.lang
             "AbstractMethodError", "Appendable", "ArithmeticException", "ArrayIndexOutOfBoundsException",
             "ArrayStoreException", "AssertionError", "AutoCloseable", "Boolean", "BootstrapMethodError", "Byte",
@@ -35477,6 +35519,7 @@ public final class JavaEmitter {
         // Java classes, and two Dart types.
         TypeRef bareLit = new TypeRef(dartName);
         bareLit.resolved = lit.resolved;
+        bareLit.shadowsCore = lit.shadowsCore;
         String jt = javaType(bareLit, true, ctx);
         int lt = jt.indexOf('<');
         String raw = lt >= 0 ? jt.substring(0, lt) : jt;
@@ -35660,7 +35703,7 @@ public final class JavaEmitter {
             if (isCtor) {
                 params = cd != null ? cd.params : new ArrayList<Param>();
                 CtorCall call = new CtorCall();
-                call.type = new TypeRef(cls);
+                call.type = TypeRef.own(new TypeRef(cls));
                 // Pinned to the class resolved here, so the call does not resolve the bare name
                 // again as this library sees it (an unprefixed import's class of that name).
                 call.type.resolved = pc;
@@ -35679,7 +35722,7 @@ public final class JavaEmitter {
                         // infers T through the constructor's parameters from the slot's
                         // parameter types (`G(this.v)` with T v gives T = int), as it does
                         // for a generic function's instantiation (contextInstantiation).
-                        TypeRef self = new TypeRef(cls);
+                        TypeRef self = TypeRef.own(new TypeRef(cls));
                         for (String tp : tps) {
                             self.args.add(new TypeRef(tp));
                         }
@@ -35976,7 +36019,7 @@ public final class JavaEmitter {
             bounds = pc.typeParamBounds;
             params = ctorParamsAsValues(pc, cd);
             CtorCall call = new CtorCall();
-            call.type = new TypeRef(pc.name);
+            call.type = TypeRef.own(new TypeRef(pc.name));
             call.type.resolved = pc;
             for (String tp : tps) {
                 call.type.args.add(new TypeRef(tp));
@@ -36387,6 +36430,7 @@ public final class JavaEmitter {
         // current library (a frame's resume cast then named another library's class).
         c.runtimeOnly = t.runtimeOnly;
         c.resolved = t.resolved;
+        c.shadowsCore = t.shadowsCore;
         c.funcParams = t.funcParams;
         c.funcReturn = t.funcReturn;
         c.funcTypeParams = t.funcTypeParams;
@@ -36403,6 +36447,10 @@ public final class JavaEmitter {
         }
         if (t.resolved != null) {
             return t.resolved;
+        }
+        if (TypeRef.CORE_NAMES.contains(t.name) && !t.shadowsCore) {
+            // dart:core's type, not a program class that shadows the name elsewhere
+            return null;
         }
         return t.runtimeOnly ? null : program.classes.get(t.name);
     }
@@ -36421,6 +36469,7 @@ public final class JavaEmitter {
         c.nullable = false;
         c.runtimeOnly = t.runtimeOnly;
         c.resolved = t.resolved;
+        c.shadowsCore = t.shadowsCore;
         // An inline function type keeps its signature (in boxType too): without it a
         // callback read through `a?.f` lost its return type, and a value-returning
         // `?.call()` was emitted as a statement that dropped the value.

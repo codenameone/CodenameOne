@@ -169,6 +169,7 @@ public final class Program {
         separateLibraryPrivateMembers();
         separateLibraryPrivateTypedefs();
         restoreShadowedAliases();
+        markShadowedCoreTypes();
         expandRecordTypedefs();
         // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
         // abstract base whose only abstract member is `iterator`, exactly IterableBase. The
@@ -336,6 +337,26 @@ public final class Program {
             for (Ast.TypeRef t : lib.aliasedTypes) {
                 if (t.aliasedFrom != null && !t.runtimeOnly && visibleUnprefixed(t.aliasedFrom, lib)) {
                     t.name = t.aliasedFrom;
+                }
+            }
+        }
+    }
+
+    /**
+     * A type written with a dart:core name ({@code String}, {@code int}, {@code List}, ...)
+     * that a program class of that name declared in, or imported unprefixed into, the
+     * library takes instead (dart:core hidden or prefixed, or the class declared locally).
+     * It is marked {@code shadowsCore}, so {@code TypeRef.is("String")} -- which the
+     * emitter asks everywhere to mean dart:core's String -- answers false for it.
+     */
+    private void markShadowedCoreTypes() {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                if (t.name != null && !t.runtimeOnly && Ast.TypeRef.CORE_NAMES.contains(t.name)
+                        && visibleUnprefixed(t.name, lib)) {
+                    // Only the flag: {@code resolved} reaches a whole class declaration, which
+                    // the reflective AST walks would then follow from every type reference.
+                    t.shadowsCore = true;
                 }
             }
         }

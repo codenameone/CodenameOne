@@ -106,9 +106,32 @@ public final class Ast {
             return t;
         }
 
+        /// Whether this is the type named {@code n}. For a dart:core name it means dart:core's
+        /// type: a written name that a program class of that name shadows
+        /// ({@link #shadowsCore}, set by Program.markShadowedCoreTypes) is not it.
         public boolean is(String n) {
-            return name.equals(n);
+            return name.equals(n) && !(shadowsCore && CORE_NAMES.contains(n));
         }
+
+        /// A dart:core name this reference spells that resolves, in its library, to a program
+        /// class of the same name instead (`import 'dart:core' hide String; class String {}`).
+        public boolean shadowsCore;
+
+        /// {@code t}, named for a program class (one the emitter holds as a declaration), marked
+        /// as the program class where its name is a dart:core one.
+        public static TypeRef own(TypeRef t) {
+            if (t != null && CORE_NAMES.contains(t.name)) {
+                t.shadowsCore = true;
+            }
+            return t;
+        }
+
+        /// The dart:core type names the emitter tests by spelling through {@link #is}.
+        public static final java.util.Set<String> CORE_NAMES = new java.util.HashSet<String>(
+                java.util.Arrays.asList("String", "Object", "int", "double", "num", "bool", "List",
+                        "Map", "Set", "Iterable", "Iterator", "Future", "Stream", "Type", "Enum",
+                        "Comparable", "Duration", "DateTime", "Null", "Function", "Record", "Symbol",
+                        "Pattern", "RegExp", "Uri", "StackTrace", "Error", "Exception"));
 
         public TypeRef arg(int i) {
             return i < args.size() ? args.get(i) : DYNAMIC;

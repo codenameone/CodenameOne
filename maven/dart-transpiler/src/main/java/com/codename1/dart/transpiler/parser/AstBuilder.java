@@ -2676,6 +2676,9 @@ public final class AstBuilder {
             CtorCall cc = new CtorCall();
             pos(cc, ctx);
             cc.type = new TypeRef(ci.typeName().getText());
+            if (currentLib != null) {
+                currentLib.namedTypes.add(cc.type);
+            }
             int pdot = cc.type.name.indexOf('.');
             String puri = pdot > 0 ? prefixImports.get(cc.type.name.substring(0, pdot)) : null;
             if (puri != null && puri.startsWith("dart:")) {
@@ -2732,6 +2735,9 @@ public final class AstBuilder {
         cc.isConst = isConst;
         if (d.typeIdentifier() != null) {
             cc.type = new TypeRef(d.typeIdentifier().getText());
+            if (currentLib != null) {
+                currentLib.namedTypes.add(cc.type);
+            }
         } else if (d.qualifiedName() != null) {
             // X.named -- type X, named ctor; p.X or p.X.named through an import prefix.
             // The prefix only selects the library, and the emitter resolves the bare class
@@ -2741,13 +2747,22 @@ public final class AstBuilder {
             int dot = text.indexOf('.');
             if (dot < 0) {
                 cc.type = new TypeRef(text);
+                if (currentLib != null) {
+                    currentLib.namedTypes.add(cc.type);
+                }
             } else {
                 cc.type = new TypeRef(text.substring(0, dot));
+                if (currentLib != null) {
+                    currentLib.namedTypes.add(cc.type);
+                }
                 cc.ctorName = text.substring(dot + 1);
             }
             markRuntimePrefix(cc.type, d.qualifiedName().getText());
         } else {
             cc.type = new TypeRef(withoutImportPrefix(d.typeName().getText()));
+            if (currentLib != null) {
+                currentLib.namedTypes.add(cc.type);
+            }
             markRuntimePrefix(cc.type, d.typeName().getText());
             if (d.typeArguments() != null) {
                 for (Dart2Parser.TypeContext t : d.typeArguments().typeList().type()) {
@@ -2896,6 +2911,9 @@ public final class AstBuilder {
             call.ctorName = dot < 0 ? null : text.substring(dot + 1);
         }
         call.type = new TypeRef(className);
+        if (currentLib != null) {
+            currentLib.namedTypes.add(call.type);
+        }
         pos(call.type, des);
         if (des.typeArguments() != null) {
             for (Dart2Parser.TypeContext a : des.typeArguments().typeList().type()) {
