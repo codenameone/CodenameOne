@@ -5833,6 +5833,16 @@ public final class JavaEmitter {
         return t;
     }
 
+    /// `b.map` with `b` a Box whose type arguments were not recorded: the class's own type
+    /// variables are no type in scope at the tear-off, so they read as their erasure
+    /// (dynamic), never as the bare name `T` Java cannot resolve there.
+    private TypeRef rawReceiverErased(TypeRef t, ClassDecl pc, TypeRef tt) {
+        if (t == null || pc == null || pc.typeParams.isEmpty() || tt == null || !tt.args.isEmpty()) {
+            return t;
+        }
+        return substTypeParams(t, pc.typeParams, java.util.Collections.<TypeRef>emptyList());
+    }
+
     private TypeRef tearOffType(MethodDecl m, ClassDecl pc, TypeRef tt) {
         TypeRef f = new TypeRef("Function");
         if (m.returnType == null || m.params.size() > MAX_FN_ARITY) {
@@ -5846,11 +5856,11 @@ public final class JavaEmitter {
             if (p.named || p.optional || p.type == null || p.type.is("var")) {
                 return f;
             }
-            TypeRef pt = asSeenFrom(p.type, m, null, pc, tt);
+            TypeRef pt = rawReceiverErased(asSeenFrom(p.type, m, null, pc, tt), pc, tt);
             ps.add(m.typeParams.isEmpty() ? pt : substTypeParams(pt, m.typeParams, none));
         }
         f.funcParams = ps;
-        TypeRef rt = asSeenFrom(m.returnType, m, null, pc, tt);
+        TypeRef rt = rawReceiverErased(asSeenFrom(m.returnType, m, null, pc, tt), pc, tt);
         f.funcReturn = m.typeParams.isEmpty() ? rt : substTypeParams(rt, m.typeParams, none);
         return f;
     }
@@ -9684,7 +9694,25 @@ public final class JavaEmitter {
         if (pc == null || program.enums.containsKey(cls) || !(name.equals("new") || pc.namedCtor(name) != null)) {
             return out;
         }
+        // `G<Object>.new`: an explicit instantiation is another Dart function than the
+        // uninstantiated `G.new` (and than `G<Object?>.new`), so it is keyed by the type
+        // arguments as written (see explicitInstantiationKey).
+        List<TypeRef> writtenArgs = ((Ident) ((PropertyGet) e).target).typeArgs;
+        String explicitKey = null;
+        if (writtenArgs != null && !writtenArgs.isEmpty()) {
+            StringBuilder ek = new StringBuilder("new ").append(javaClassName(pc)).append("<!");
+            for (int i = 0; i < writtenArgs.size(); i++) {
+                ek.append(i == 0 ? "" : ", ").append(writtenArgs.get(i));
+            }
+            explicitKey = ek.append(">.").append(name).toString();
+            if (explicitKey.indexOf('"') >= 0 || explicitKey.indexOf('\\') >= 0) {
+                explicitKey = null;
+            }
+        }
         String slotKey = genericCtorSlotKeys.get(e);
+        if (slotKey != null && explicitKey != null) {
+            slotKey = explicitKey;
+        }
         if (slotKey != null && !out.code.startsWith("DartRuntime.canonTearOff(")) {
             // The view only has to tell the Java types apart; the code is that, escaped.
             ctx.importClass("dart.runtime.DartRuntime");
@@ -9706,7 +9734,7 @@ public final class JavaEmitter {
             // by the element type, or an Object parameter): the uninstantiated generic
             // constructor, under the key its generic closure has (genericCtorTearOffKeys),
             // so it is the same Dart function however the slot types it.
-            key = "new " + javaClassName(pc) + "<>." + name;
+            key = explicitKey != null ? explicitKey : "new " + javaClassName(pc) + "<>." + name;
         } else if (r == null || !pc.typeParams.isEmpty() && r.args.size() != pc.typeParams.size()
                 || readsTypeVarWitness(r, ctx) || mentionsTypeVariable(r, ctx)) {
             return out;
@@ -10534,6 +10562,25 @@ public final class JavaEmitter {
         return null;
     }
 
+    /// `gen<dynamic>`, `gen<Object>`: an explicit instantiation whose type is the erasure
+    /// canonFunctionKey keys as the uninstantiated generic itself. In Dart it is another
+    /// function value (`gen<dynamic> != gen`, `gen<Object> != gen<Object?>`), and the type
+    /// arguments are written, so it is keyed by them as Dart spells them. A slot-inferred
+    /// erased instantiation (`Object Function(Object) f = gen`) still shares the
+    /// uninstantiated key: nothing in the emitted value tells the two apart.
+    private static String explicitInstantiationKey(Expr e, String key, String bare) {
+        List<TypeRef> written = e instanceof Ident ? ((Ident) e).typeArgs : null;
+        if (key == null || written == null || written.isEmpty() || !key.equals(bare)) {
+            return key;
+        }
+        StringBuilder k = new StringBuilder(bare).append("<!");
+        for (int i = 0; i < written.size(); i++) {
+            k.append(i == 0 ? "" : ", ").append(written.get(i));
+        }
+        String r = k.append('>').toString();
+        return r.indexOf('"') >= 0 || r.indexOf('\\') >= 0 ? key : r;
+    }
+
     private static final java.util.regex.Pattern SIGNED_TEAR_OFF = java.util.regex.Pattern.compile(
             "((?:[\\w$]+\\.)*DartFnSigs\\.s\\d+)\\((.+)::([\\w$]+)\\)");
 
@@ -10562,7 +10609,8 @@ public final class JavaEmitter {
         ctx.importClass("dart.runtime.DartRuntime");
         if (STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null) {
             String sam = m.group(1).substring(m.group(1).lastIndexOf('.') + 1);
-            String key = canonFunctionKey(recv + "::" + name, out.type, ctx);
+            String key = explicitInstantiationKey(e, canonFunctionKey(recv + "::" + name, out.type, ctx),
+                    recv + "::" + name);
             if (key == null) {
                 return out;
             }
@@ -10693,7 +10741,7 @@ public final class JavaEmitter {
             if (ctx.lookup(q) != null) {
                 return out;
             }
-            String fnKey = canonFunctionKey(bare, out.type, ctx);
+            String fnKey = explicitInstantiationKey(e, canonFunctionKey(bare, out.type, ctx), bare);
             if (fnKey == null) {
                 return out;
             }
@@ -16398,7 +16446,10 @@ public final class JavaEmitter {
         boolean allFns = elem == null;
         boolean fnsDiffer = false;
         for (Expr e : l.elements) {
-            Out o = typeLiteralAsValue(emitExpr(e, elem, ctx), ctx);
+            // `[Box.new, Box.named]`: a generic constructor torn off with no context is
+            // instantiated to its bounds (Box<dynamic>), as in a Function slot.
+            Out o = typeLiteralAsValue(emitExpr(e, elem == null && isGenericCtorTearOff(e, ctx)
+                    ? new TypeRef("Function") : elem, ctx), ctx);
             if (allFns && o.type != null && o.type.funcParams != null) {
                 fnsDiffer |= fnElems != null && !fnShape(fnElems).equals(fnShape(o.type));
                 fnElems = fnElems == null ? o.type : upperBound(fnElems, o.type);
@@ -18103,7 +18154,8 @@ public final class JavaEmitter {
                         ? TypeRef.DYNAMIC : fn.returnType;
                 return new Out(Program.libClassName(owner.fileName) + "." + n + "()", rt);
             }
-            String ref = Program.libClassName(owner.fileName) + "::" + n;
+            // `main` is emitted as `main$` (the Java entry point is the generated runner's).
+            String ref = Program.libClassName(owner.fileName) + "::" + (n.equals("main") ? "main$" : n);
             TypeRef ft = new TypeRef("Function");
             ft.funcParams = new ArrayList<TypeRef>();
             // A generic function's tear-off (`identity<int>` instantiates it, and Java
@@ -20422,7 +20474,9 @@ public final class JavaEmitter {
                 return new Out(target.code + ".putLong(" + key + ", " + rhsCode + ")", vt);
             }
             // `types[Box<int>] = v`: a type literal key is the Type it denotes.
+            String fnKey = target.type.is("Map") ? fnIntoObjectSlot(idx, TypeRef.of("Object"), ctx) : null;
             String key = idx.type != null && isClassRef(idx.type) ? classLiteral(idx, ctx)
+                    : fnKey != null ? fnKey
                     : target.type.is("Map") ? boxIfPrimitive(idx, ctx) : idx.code;
             if (postfixValue(a, ctx)) {
                 final String tc = target.code;
@@ -24979,7 +25033,15 @@ public final class JavaEmitter {
                     && !mentionsTypeVariable(precise, ctx) && !(isDynamicType(local) && local.funcParams == null)) {
                 // The closure is erased; its result is converted to the instantiated type.
                 Out raw = new Out(fnCall(recv, callType, c.args, ctx), TypeRef.DYNAMIC);
-                return new Out(coerce(raw, precise, ctx), precise);
+                String cc = coerce(raw, precise, ctx);
+                if (cc.equals(raw.code) && precise.name != null && precise.name.startsWith("Rec$")
+                        && !precise.args.isEmpty()) {
+                    // `pf<int, String>(1, 'b')` for `(T, U) pair<T, U>(..)`: the erased closure
+                    // built a Rec$2<Object, Object>; the record is the same object at the
+                    // instantiated type, which Java generics call unrelated.
+                    cc = "((" + javaType(precise, false, ctx) + ") (Object) (" + raw.code + "))";
+                }
+                return new Out(cc, precise);
             }
             if (isDynamicType(local) && local.funcParams == null) {
                 // `d<String>('z')`, `d(true)` on a dynamic local: Dart's dynamic invocation,
@@ -33790,7 +33852,12 @@ public final class JavaEmitter {
                 return "dart.runtime.TypeWitness.value(" + w + ")";
             }
         }
-        String jt = javaType(new TypeRef(dartName), true, ctx);
+        // The class the literal resolved to (`base.Widget` through an import prefix), not
+        // the one a bare `Widget` means here: two libraries' same-named classes are two
+        // Java classes, and two Dart types.
+        TypeRef bareLit = new TypeRef(dartName);
+        bareLit.resolved = lit.resolved;
+        String jt = javaType(bareLit, true, ctx);
         int lt = jt.indexOf('<');
         String raw = lt >= 0 ? jt.substring(0, lt) : jt;
         String simple = raw.substring(raw.lastIndexOf('.') + 1);
@@ -34168,6 +34235,25 @@ public final class JavaEmitter {
     /// call or Function.apply runs the value built with every witness unknown, which is
     /// what instantiating to bounds gives. Null for anything else, and for a signature
     /// with optional or named parameters (those keep the existing tear-off path).
+    /// Whether {@code e} tears off a constructor of a generic program class (`Box.new`,
+    /// `Box.named`, `p.Box.f`) with no type arguments written.
+    private boolean isGenericCtorTearOff(Expr e, Ctx ctx) {
+        if (!(e instanceof PropertyGet)) {
+            return false;
+        }
+        PropertyGet pg = (PropertyGet) e;
+        ClassDecl pc = null;
+        if (pg.target instanceof Ident && ((Ident) pg.target).typeArgs == null
+                && ctx.lookup(((Ident) pg.target).name) == null) {
+            pc = programClass(((Ident) pg.target).name, ctx);
+        } else if (pg.target instanceof PropertyGet && isImportPrefix(((PropertyGet) pg.target).target, ctx)) {
+            pc = program.resolveClass(((PropertyGet) pg.target).name, ctx.library(),
+                    ((Ident) ((PropertyGet) pg.target).target).name);
+        }
+        return pc != null && !pc.typeParams.isEmpty() && !program.enums.containsKey(pc.name)
+                && (pg.name.equals("new") || pc.namedCtor(pg.name) != null);
+    }
+
     private Lambda genericTearOffClosure(Expr e, Ctx ctx) {
         String canonBare = null;
         String ctorKey = null;
@@ -34227,7 +34313,7 @@ public final class JavaEmitter {
             if (fd == null || fd.typeParams.isEmpty() || fd.isGetter || fd.isSetter) {
                 return null;
             }
-            canonBare = Program.libClassName(owner.fileName) + "::" + fd.name;
+            canonBare = Program.libClassName(owner.fileName) + "::" + (fd.name.equals("main") ? "main$" : fd.name);
             tps = fd.typeParams;
             bounds = fd.typeParamBounds;
             params = fd.params;
@@ -34746,6 +34832,108 @@ public final class JavaEmitter {
      * into an {@code Object...} varargs slot (e.g. DartMap.of / DartList.of), where a bare
      * lambda has no functional target and javac reports "Object is not a functional interface".
      */
+    /// A function value the emitter built as a bare lambda or method reference, flowing
+    /// into a slot whose Java type is Object (an element of a `List<Object>` or
+    /// `List<Function>`, a key of a `Map<Function, int>`): javac gives such a lambda no
+    /// target, so it is first bound to its own SAM and then viewed through Object. Null
+    /// when the value needs nothing (already cast, not a function, or a typed slot).
+    private String fnIntoObjectSlot(Out o, TypeRef slot, Ctx ctx) {
+        if (o == null || o.type == null || o.code == null
+                || o.type.funcParams == null && !o.type.is("Function")) {
+            return null;
+        }
+        String c = o.code.trim();
+        // Only a bare lambda or method reference needs a SAM; checked before the slot's
+        // Java type is rendered, which imports what it names.
+        if (!isBareLambda(c) && !c.matches("[A-Za-z_$][A-Za-z0-9_$.]*::[A-Za-z_$][A-Za-z0-9_$]*")) {
+            return null;
+        }
+        if (slot != null) {
+            java.util.Map<String, String> before = new java.util.HashMap<String, String>(ctx.imports);
+            boolean objectSlot = "Object".equals(javaType(slot, true, ctx));
+            ctx.imports.keySet().retainAll(before.keySet());
+            if (!objectSlot) {
+                return null;
+            }
+        }
+        if (o.type.funcParams == null) {
+            // Typed only `Function` (a constructor tear-off of a generic class, whose type
+            // arguments are inferred per call): the lambda's own arity names the SAM, every
+            // parameter and the result Object, as a dynamic call reaches it.
+            if (!o.type.is("Function")) {
+                return null;
+            }
+            int n;
+            boolean isVoid = false;
+            if (isBareLambda(c)) {
+                if (c.contains(") -> {") && !c.contains("return ")) {
+                    return null;
+                }
+                String ps = c.substring(1, c.indexOf(')')).trim();
+                n = ps.isEmpty() ? 0 : ps.split(",").length;
+            } else if (c.matches("[A-Z][A-Za-z0-9_$.]*::[A-Za-z_$][A-Za-z0-9_$]*")) {
+                // A top-level function typed only `Function` (a generic async one, whose
+                // erased SAM was not spelled): its declaration gives the arity.
+                String fname = c.substring(c.indexOf("::") + 2);
+                FunctionDecl fd = program.functions.get(fname.equals("main$") ? "main" : fname);
+                if (fd == null || fd.isGetter || fd.isSetter) {
+                    return null;
+                }
+                for (Param p : fd.params) {
+                    if (p.named || p.optional || p.defaultValue != null) {
+                        return null;
+                    }
+                }
+                n = fd.params.size();
+                isVoid = fd.returnType != null && fd.returnType.is("void") && !fd.isAsync;
+            } else {
+                return null;
+            }
+            if (n > 4) {
+                return null;
+            }
+            if (isVoid) {
+                StringBuilder vs = new StringBuilder("Funcs.VoidFunc").append(n);
+                for (int i = 0; i < n; i++) {
+                    vs.append(i == 0 ? "<" : ", ").append("Object");
+                }
+                ctx.importClass("dart.runtime.Funcs");
+                String v = vs.append(n == 0 ? "" : ">").toString();
+                return "DartRuntime.canonTearOff(\"" + c + "\", \"" + v + "\", " + castToBare(v, o) + ")";
+            }
+            StringBuilder sam = new StringBuilder("Funcs.Func").append(n).append('<');
+            for (int i = 0; i < n; i++) {
+                sam.append("Object, ");
+            }
+            ctx.importClass("dart.runtime.Funcs");
+            String fs = sam.append("Object>").toString();
+            if (!isBareLambda(c)) {
+                ctx.importClass("dart.runtime.DartRuntime");
+                return "DartRuntime.canonTearOff(\"" + c + "\", \"" + fs + "\", " + castToBare(fs, o) + ")";
+            }
+            return "((Object) (" + castToBare(fs, o) + "))";
+        }
+        boolean bare = isBareLambda(c) || c.matches("[A-Za-z_$][A-Za-z0-9_$.]*::[A-Za-z_$][A-Za-z0-9_$]*");
+        if (!bare) {
+            return null;
+        }
+        String sam = javaType(copyNonNull(o.type), false, ctx);
+        if ("Object".equals(sam)) {
+            sam = javaType(copyNonNull(eraseGenericFunctionType(o.type)), false, ctx);
+        }
+        if ("Object".equals(sam)) {
+            return null;
+        }
+        if (!isBareLambda(c) && Character.isUpperCase(c.charAt(0))) {
+            // A static method reference (`DartRuntime::print`, `MainLib::main$`): one Dart
+            // value however often torn off, so `{print, print}` holds one element.
+            ctx.importClass("dart.runtime.DartRuntime");
+            return "DartRuntime.canonTearOff(\"" + c + "\", \"" + sam.replace("\"", "\\\"") + "\", "
+                    + castToBare(sam, o) + ")";
+        }
+        return "((Object) (" + castToBare(sam, o) + "))";
+    }
+
     /** Whether code is a Java lambda with no cast in front of it: {@code (a, b) -> ...}. */
     private static boolean isBareLambda(String code) {
         if (!code.startsWith("(")) {
@@ -34843,6 +35031,10 @@ public final class JavaEmitter {
      * convert to `G&lt;Object&gt;`. The unchecked raw cast mirrors Dart's `dynamic` covariance.
      */
     private String elementCode(Out o, TypeRef elem, Ctx ctx) {
+        String fo = fnIntoObjectSlot(o, elem, ctx);
+        if (fo != null) {
+            return fo;
+        }
         if (elem != null && isFunctionValued(elem)) {
             return funcCast(o, elem, ctx);
         }
@@ -34913,6 +35105,10 @@ public final class JavaEmitter {
     String coerce(Out o, TypeRef target, Ctx ctx) {
         if (target == null) {
             return o.code;
+        }
+        String fnObj = fnIntoObjectSlot(o, target, ctx);
+        if (fnObj != null) {
+            return fnObj;
         }
         // A dynamic value landing in a function-typed slot (`fs.add(f as dynamic)` for a
         // `List<void Function(Object)>`): Dart's implicit downcast, the checked cast an

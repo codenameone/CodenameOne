@@ -1,0 +1,19 @@
+Box<dynamic>(1)
+Box<dynamic>(s)
+Box<dynamic>(1)
+Box<dynamic>(s)
+Box<dynamic>(1)
+Box<dynamic>(s)
+Box<dynamic>(1)
+Box<dynamic>(s)
+Box<dynamic>(1)
+Box<dynamic>(s)
+Box<int>(1) Box<String>(x)
+Num<num>(2.5)
+Num<num>(3)
+true
+true
+true
+Box<int>(1)
+[Box<int>(1), Box<int>(2)]
+[Box<int>(1), Box<int>(2)]
