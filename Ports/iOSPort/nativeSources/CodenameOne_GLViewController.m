@@ -3306,10 +3306,9 @@ static CodenameOne_GLViewController *sharedSingleton;
 }
 
 #if !TARGET_OS_OSX && !TARGET_OS_WATCH
-// Every UIKit slice needs this: viewSafeAreaInsetsDidChange calls it on
-// Catalyst and tvOS too, where the Metal branch below replaces the layout
-// hooks. Defined inside that branch's #elif it was missing there and the
-// Catalyst build failed on the call.
+// Outside the size-publishing branches below: viewSafeAreaInsetsDidChange calls
+// it on every UIKit slice, Catalyst and tvOS included, and those take the
+// other branch.
 // Reads the window's safe-area insets into the globals the Java side asks for.
 // Answers whether any of them changed.
 - (BOOL)cn1ReadSafeAreaInsets {

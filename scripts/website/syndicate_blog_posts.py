@@ -392,10 +392,22 @@ def render_post_links(body: str, posts: list[Post], today: dt.date) -> str:
     return _POST_LINK_RE.sub(repl, body)
 
 
+# Hugo code-fence attributes (```java {class="cn1-no-try"}) drive website-only
+# behaviour such as hiding the playground "Try it" button. Other platforms do not
+# understand them: dev.to treats the whole info string as the language and drops
+# highlighting. Keep the language, drop the attribute block.
+_FENCE_ATTRS_RE = re.compile(r"^([ \t]*(?:`{3,}|~{3,})[ \t]*[\w+#.-]*)[ \t]*\{[^}\n]*\}[ \t]*$", re.MULTILINE)
+
+
+def strip_fence_attributes(body: str) -> str:
+    return _FENCE_ATTRS_RE.sub(r"\1", body)
+
+
 def render_syndicated_body(post: Post, posts: list[Post] | None = None, today: dt.date | None = None) -> str:
     body = post.body.strip("\n")
     body = _HUGO_FOOTER_RE.sub("", body)
     body = render_mermaid_as_images(body)
+    body = strip_fence_attributes(body)
     body = render_post_links(body, posts or [], today or dt.date.today())
     body = _HUGO_SHORTCODE_RE.sub("", body).rstrip()
     body = absolutize_links(body)

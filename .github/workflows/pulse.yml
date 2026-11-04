@@ -517,8 +517,10 @@ jobs:
           if [[ "$WORKSPACE" != *.xcworkspace ]]; then
             XCB_CONTAINER_FLAG="-project"
           fi
+          # No -sdk: it forces every target of the scheme onto the iPhone SDK, the
+          # embedded watch app included, whose watch-only icon then has nothing to
+          # compile for. The destination picks each target's own SDK.
           xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
-            -sdk iphonesimulator \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$DERIVED_DATA" \

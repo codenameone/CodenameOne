@@ -352,7 +352,12 @@ public class SimulatorWindowModeVerifier {
     }
 
     private static int countSingleWindowDevicePixels(Args args, BufferedImage image) {
-        if (!"single".equals(args.mode)) {
+        // Multi-window mode puts the device in a window of its own, which can
+        // map before it paints: a capture then shows the two menu strips over
+        // an empty frame, which is not flat, so only this count catches it.
+        // Measured: the stored multi references hold about 60k (portrait) and
+        // 101k (landscape) dark device pixels here, the empty frame none.
+        if (!"single".equals(args.mode) && !"multi".equals(args.mode)) {
             return -1;
         }
         int xMax = Math.min(image.getWidth(), 560);
