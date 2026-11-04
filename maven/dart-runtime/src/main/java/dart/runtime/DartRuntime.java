@@ -510,6 +510,28 @@ public final class DartRuntime {
         return (T) c;
     }
 
+    /// The identity key of function {@code fn} instantiated at the type arguments whose
+    /// witnesses are {@code ws}: `C.sm` held as `String Function(int)` is one Dart function,
+    /// equal wherever it is torn off at int, and another at String. Built from the witness
+    /// values, never from a type variable's name, so a tear-off inside a generic body is
+    /// keyed by what the variable is bound to at that moment. A witness prints its Dart
+    /// type; its Java class rides along so two libraries' classes of one name stay apart.
+    public static String instKey(String fn, TypeWitness... ws) {
+        StringBuilder sb = new StringBuilder(fn).append('<');
+        for (int i = 0; i < ws.length; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            TypeWitness w = ws[i];
+            if (w == null) {
+                sb.append("dynamic");
+            } else {
+                sb.append(w.toString()).append('@').append(w.type().getName());
+            }
+        }
+        return sb.append('>').toString();
+    }
+
     private static String eraseTypeArgs(String view) {
         if (view.indexOf('<') < 0) {
             return view;

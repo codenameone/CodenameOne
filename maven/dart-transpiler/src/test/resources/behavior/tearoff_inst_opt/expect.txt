@@ -1,0 +1,10 @@
+im int:1:null im int:1:2 im String:a:b
+true false false false true
+nm int:3:null nm int:3:4
+true true 1 3
+true true false true true
+im double:1.5:null
+nm double:1.5:2.5
+true true false 2 topo int:1:2
+true false true true
+true true true true 1 so int:5:null

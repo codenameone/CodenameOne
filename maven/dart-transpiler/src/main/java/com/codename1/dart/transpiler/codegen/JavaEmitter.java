@@ -9629,6 +9629,10 @@ public final class JavaEmitter {
         if (!(e instanceof Lambda) && out != null && out.fn != null && out.fn.kind == FnKind.METHOD_REF
                 && out.fn.marker == null && !out.fn.doubleCast) {
             out = signTearOff(e, out, expected, ctx);
+            Out keyed = keyInstantiatedTearOff(out, ctx);
+            if (keyed != out) {
+                return keyed;
+            }
             // A bound tear-off only where the value is held as an Object (`Object o = l.add`):
             // boundTearOff's result type is inferred, and a consumer wanting another SAM
             // (`where(seen.add)`) then fails inference where the plain reference compiled.
@@ -10346,6 +10350,17 @@ public final class JavaEmitter {
     /// its adapter is canonicalized (DartRuntime.canonTearOff): Dart makes `C.f == C.f` and
     /// `identical(C.f, C.f)` true, which a fresh lambda per tear-off was not.
     private String adapterStaticKey;
+
+    /// A Java expression keying the next adapter instead of adapterStaticKey (static) or
+    /// the method name (bound): an instantiation keyed by its witnesses' run-time values.
+    private String adapterStaticKeyExpr;
+    private String adapterTearOffKeyExpr;
+    private boolean adapterStaticKeyCanon;
+
+    /// Set while methodTearOffAdapter adapts a generic method at this instantiation: its
+    /// type variables are replaced by these, and the call names them, so it passes the
+    /// witnesses its body reads.
+    private List<TypeRef> adapterInstantiation;
 
     private static final java.util.regex.Pattern MARKER_CAST = java.util.regex.Pattern.compile(
             "((?:[\\w$]+\\.)*DartFnSigs)\\.(M\\d+)");
@@ -18335,6 +18350,11 @@ public final class JavaEmitter {
                     adapterStaticKey = !wargs.isEmpty() ? null
                             : inst == null ? lib.replace(".", "::")
                             : canonFunctionKey(lib.replace(".", "::"), ft, ctx);
+                    // With witnesses the key is built at run time from them (instKey).
+                    adapterStaticKeyExpr = wargs.isEmpty() || inst == null ? null
+                            : instantiationKeyExpr(lib.replace(".", "::"), inst, ctx);
+                    adapterStaticKeyCanon = adapterStaticKeyExpr != null && !mentionsTypeVariable(ft, ctx)
+                            && !readsTypeVarWitness(ft, ctx);
                     Out ad = tearOffAdapter(ordered, ft.funcParams, ft.funcReturn,
                             names -> lib + "(" + joinArgs(wargs, names) + ")", ctx);
                     if (ad != null) {
@@ -18398,6 +18418,14 @@ public final class JavaEmitter {
                         if (canon != null && canon.code.startsWith("DartRuntime.canonTearOff(")) {
                             return canon;
                         }
+                    }
+                    if (inst != null && !wargs.isEmpty() && !boundEntry) {
+                        // Handed its witnesses, the closure is one value per instantiation,
+                        // keyed by their run-time values (instKey): `a == b` for `a = gen,
+                        // b = gen` in one `String Function(int)` slot type.
+                        keyedInstantiatedTearOff(ref, null,
+                                instantiationKeyExpr(Program.libClassName(owner.fileName).replace(".", "::")
+                                        + "::" + n, inst, ctx), inst, ft, ctx);
                     }
                     // A cast would pin the erased Func<Object..>; a bare reference takes
                     // whatever instantiation the context names, and ft types a local.
@@ -19613,7 +19641,28 @@ public final class JavaEmitter {
                     String rt = ctx.newTemp();
                     ctx.writer().line("final " + tempReceiverType(tt, ctx) + " " + rt + " = " + target.code + ";");
                     ctx.declare(rt, tt);
-                    Out ad = methodTearOffAdapter(tm, rt, name, posNode, ctx, pc, tt);
+                    List<TypeRef> oInst = tm.typeParams.isEmpty() || methodWitnesses(tm).isEmpty()
+                            || posNode != memberTearOffNode ? null
+                            : contextInstantiation(tm.typeParams, tm.params, tm.returnType, memberTearOffExpected,
+                                    tm.typeParamBounds);
+                    String oKey = oInst == null ? null : instantiationKeyExpr(name, oInst, ctx);
+                    Out ad = null;
+                    if (oKey != null) {
+                        // `String Function(int, [int]) s = c.im` for `String im<T>(T x, [T? y])`:
+                        // the slot instantiates it, and the adapter calls `rt.im<int>(..)`,
+                        // so the body gets its witnesses; keyed by receiver and instantiation.
+                        adapterInstantiation = oInst;
+                        adapterTearOffKeyExpr = oKey;
+                        try {
+                            ad = methodTearOffAdapter(tm, rt, name, posNode, ctx, pc, tt);
+                        } finally {
+                            adapterInstantiation = null;
+                            adapterTearOffKeyExpr = null;
+                        }
+                    }
+                    if (ad == null) {
+                        ad = methodTearOffAdapter(tm, rt, name, posNode, ctx, pc, tt);
+                    }
                     if (ad == null && !tm.typeParams.isEmpty() && posNode == memberTearOffNode
                             && (memberTearOffExpected == null || isDynamicType(memberTearOffExpected)
                             || memberTearOffExpected.is("Object") || memberTearOffExpected.is("Function")
@@ -19657,7 +19706,10 @@ public final class JavaEmitter {
                             pc, tt), tm.typeParams, iInst);
                     String lam = "((" + String.join(", ", ps) + ") -> " + rt + "." + name + "("
                             + joinArgs(iW, ps) + "))";
-                    return new Out(lam, iFt, FnForm.methodRef(lam));
+                    // Keyed by the receiver, the method and the instantiation: `c.im == c.im`.
+                    String keyed = keyedInstantiatedTearOff(lam, rt,
+                            instantiationKeyExpr(name, iInst, ctx), iInst, iFt, ctx);
+                    return new Out(lam, iFt, FnForm.methodRef(keyed));
                 }
                 String mref = target.code + "::" + name;
                 if (!tm.isStatic && hasBoundedTypeVarParam(tm.params, tm.typeParams, tm.typeParamBounds)) {
@@ -23605,6 +23657,104 @@ public final class JavaEmitter {
             sb.add(w);
         }
         return sb;
+    }
+
+    /// The Java expression for the identity key of {@code fn} torn off at the instantiation
+    /// {@code inst} (DartRuntime.instKey): every type argument, not only those the body
+    /// reads, as the witness value in scope -- so `C.sm` at a type variable T is keyed by
+    /// what T is bound to on this call, never by the name T. Null when one has no witness.
+    private String instantiationKeyExpr(String fn, List<TypeRef> inst, Ctx ctx) {
+        StringBuilder sb = new StringBuilder("dart.runtime.DartRuntime.instKey(").append(quote(fn));
+        for (TypeRef t : inst) {
+            String w = witnessOf(t, ctx);
+            if (w == null) {
+                return null;
+            }
+            sb.append(", (dart.runtime.TypeWitness) ").append(w);
+        }
+        return sb.append(")").toString();
+    }
+
+    /// {@code lam}, a closure for a generic function torn off at an instantiation, as a
+    /// value with Dart's equality: a TearOff equal to every other one of the same function
+    /// at the same instantiation, from the same receiver for an instance method. A top-level
+    /// or static function ({@code recv} null) at a constant instantiation is also canonical,
+    /// one object per key and view, since Dart canonicalizes that constant (`identical(a,
+    /// b)`); one instantiated at a type variable is a new, equal function each time, as in
+    /// Dart. {@code lam} unchanged when no key or SAM can be named.
+    private String keyedInstantiatedTearOff(String lam, String recv, String keyExpr, List<TypeRef> inst,
+                                            TypeRef ft, Ctx ctx) {
+        String sam = keyExpr == null || ft == null || ft.funcParams == null ? null : functionSam(ft, ctx);
+        if (sam == null || !FUNCS_SAM.matcher(sam).matches()) {
+            return lam;
+        }
+        boolean canon = recv == null;
+        for (TypeRef t : inst) {
+            canon &= !readsTypeVarWitness(t, ctx) && !mentionsTypeVariable(t, ctx);
+        }
+        // Keyed once signTearOff has signed it (keyInstantiatedTearOff): the value class
+        // must be the signed SAM's own when the slot signs it, so the marker survives.
+        instKeyedLambdas.put(lam, new String[] {recv, keyExpr, canon ? "canon" : null, sam});
+        return lam;
+    }
+
+    /// Instantiated generic tear-off closures awaiting their key (keyedInstantiatedTearOff):
+    /// the closure's code to {receiver or null, key expression, "canon" or null, SAM}.
+    private final java.util.Map<String, String[]> instKeyedLambdas = new java.util.HashMap<String, String[]>();
+
+    private static final java.util.regex.Pattern SIGNED_CALL = java.util.regex.Pattern.compile(
+            "((?:[\\w$]+\\.)*DartFnSigs)\\.s(\\d+)\\((.+)\\)");
+
+    /// {@code out}, a signed or plain instantiated tear-off closure, as its keyed value: the
+    /// signed SAM's bK (or TearOff's fN/vN) over the receiver and the key, canonical per
+    /// key and view when the instantiation is a constant of a static function.
+    private Out keyInstantiatedTearOff(Out out, Ctx ctx) {
+        String[] k = out == null || out.fn == null || out.fn.bare == null || out.fromError ? null
+                : instKeyedLambdas.get(out.fn.bare);
+        if (k == null) {
+            return out;
+        }
+        String lam = out.fn.bare;
+        String sam = k[3];
+        int lt = sam.indexOf('<');
+        String targs = lt < 0 ? "" : sam.substring(lt);
+        String head = (k[0] != null ? k[0] : "(Object) null") + ", " + k[1] + ", ";
+        String code = out.code;
+        String view;
+        String value;
+        java.util.regex.Matcher sc = SIGNED_CALL.matcher(code);
+        java.util.regex.Matcher cm = code.startsWith("((") && code.endsWith(") " + lam + ")")
+                ? MARKER_CAST.matcher(code.substring(2, code.length() - lam.length() - 3)
+                .replaceFirst("^.* & ", "")) : null;
+        if (sc.matches() && sc.group(3).equals(lam)) {
+            view = sam + " & " + sc.group(1) + ".M" + sc.group(2);
+            value = "((" + sam + ") (Object) " + sc.group(1) + ".b" + sc.group(2) + "(" + head + "(" + sc.group(1)
+                    + ".S" + sc.group(2) + targs + ") " + lam + "))";
+        } else if (cm != null && code.indexOf(" & ") > 0 && cm.matches()) {
+            String samPart = code.substring(2, code.indexOf(" & "));
+            java.util.regex.Matcher sf = FUNCS_SAM.matcher(samPart);
+            if (!sf.matches()) {
+                return out;
+            }
+            int n = Integer.parseInt(sf.group(2)) + (sf.group(1) != null ? 0 : 1);
+            String[] ss = signedSamFor(samPart.indexOf('<') < 0 ? samPart : samPart.substring(0, samPart.indexOf('<')),
+                    n, cm.group(2));
+            String num = ss[0].substring(1);
+            view = samPart + " & " + cm.group(1) + "." + cm.group(2);
+            value = "((" + samPart + ") (Object) " + cm.group(1) + ".b" + num + "(" + head + "(" + cm.group(1)
+                    + ".S" + num + targs + ") " + lam + "))";
+        } else {
+            java.util.regex.Matcher fm = FUNCS_SAM.matcher(sam);
+            fm.matches();
+            ctx.importClass("dart.runtime.TearOff");
+            view = sam;
+            value = "((" + sam + ") TearOff." + (fm.group(1) != null ? "v" : "f") + fm.group(2) + "(" + head
+                    + "(" + sam + ") " + lam + "))";
+        }
+        if (k[2] != null) {
+            value = "((" + sam + ") DartRuntime.canonTearOff(" + k[1] + ", \"" + view + "\", (Object) " + value + "))";
+        }
+        return new Out(value, out.type, null);
     }
 
     /// One argument list: the leading witnesses, then the call's own arguments.
@@ -32188,14 +32338,16 @@ public final class JavaEmitter {
 
     private Out methodTearOffAdapter(MethodDecl md, final String recv, final String name, final Node pos, Ctx ctx,
                                      ClassDecl recvDecl, TypeRef recvType) {
-        if (!hasOptionalParam(md) || !md.typeParams.isEmpty() && !eraseAdapterTypeParams
+        final List<TypeRef> inst = adapterInstantiation;
+        adapterInstantiation = null;
+        if (!hasOptionalParam(md) || !md.typeParams.isEmpty() && !eraseAdapterTypeParams && inst == null
                 || md.returnType == null) {
             return null;
         }
         List<TypeRef> types = new ArrayList<TypeRef>();
         java.util.List<TypeRef> dyns = new ArrayList<TypeRef>();
         for (int i = 0; i < md.typeParams.size(); i++) {
-            dyns.add(TypeRef.DYNAMIC);
+            dyns.add(inst != null ? inst.get(i) : TypeRef.DYNAMIC);
         }
         for (Param p : md.params) {
             types.add(md.typeParams.isEmpty() ? paramValueType(p)
@@ -32233,6 +32385,9 @@ public final class JavaEmitter {
         return tearOffAdapter(md.params, types, retType, names -> {
             Call call = new Call().at(pos.file, pos.line, pos.col);
             call.name = name;
+            if (inst != null) {
+                call.typeArgs = new ArrayList<TypeRef>(inst);
+            }
             if (recv != null) {
                 Ident t = new Ident();
                 t.name = recv;
@@ -32427,6 +32582,12 @@ public final class JavaEmitter {
         adapterTearOffKey = null;
         String staticKey = adapterStaticKey;
         adapterStaticKey = null;
+        String staticKeyExpr = adapterStaticKeyExpr;
+        adapterStaticKeyExpr = null;
+        boolean staticKeyCanon = adapterStaticKeyCanon;
+        adapterStaticKeyCanon = false;
+        String tearKeyExpr = adapterTearOffKeyExpr;
+        adapterTearOffKeyExpr = null;
         List<Param> ordered = new ArrayList<Param>();
         List<TypeRef> otypes = new ArrayList<TypeRef>();
         int required = 0;
@@ -32528,12 +32689,18 @@ public final class JavaEmitter {
                 + indentStr(ctx.currentIndent()) + "}";
         String code = "((" + sam + ") (" + raw + (marker != null ? " & " + marker : "") + ") " + lambda + ")";
         java.util.regex.Matcher rawSam = FUNCS_SAM.matcher(raw);
-        if (tearKey != null && SIMPLE_RECEIVER.matcher(tearKey[0]).matches() && tearKey[1].matches("[\\w$]+")
-                && rawSam.matches()) {
+        boolean boundKeyed = tearKey != null && SIMPLE_RECEIVER.matcher(tearKey[0]).matches()
+                && tearKey[1].matches("[\\w$]+");
+        // A static instantiation handed its witnesses is a value keyed by their run-time
+        // values, with no receiver, built as a bound one is; canonical too when the
+        // instantiation is a constant (keyedInstantiatedTearOff).
+        boolean staticKeyed = tearKey == null && staticKeyExpr != null;
+        if ((boundKeyed || staticKeyed) && rawSam.matches()) {
             // A bound method's adapter is the tear-off's value (valueTearOff): equal to every
             // other tear-off of that method from that receiver. Signed, it is the signed SAM's
             // own value class, so the marker survives on the value.
-            String head = tearKey[0] + ", \"" + tearKey[1] + "\", ";
+            String head = staticKeyed ? "(Object) null, " + staticKeyExpr + ", "
+                    : tearKey[0] + ", " + (tearKeyExpr != null ? tearKeyExpr : "\"" + tearKey[1] + "\"") + ", ";
             int n = ordered.size() + (rawSam.group(1) != null ? 0 : 1);
             java.util.regex.Matcher mm = marker != null ? MARKER_CAST.matcher(marker) : null;
             if (mm != null && mm.matches()) {
@@ -32549,7 +32716,12 @@ public final class JavaEmitter {
                         + head + "(" + raw + ") " + lambda + "))";
             }
         }
-        if (staticKey != null && tearKey == null && staticKey.indexOf('"') < 0) {
+        if (staticKeyed) {
+            if (staticKeyCanon && code.indexOf(staticKeyExpr) >= 0) {
+                code = "((" + sam + ") DartRuntime.canonTearOff(" + staticKeyExpr + ", \"" + sam
+                        + (marker != null ? " & " + marker : "") + "\", (Object) " + code + "))";
+            }
+        } else if (staticKey != null && tearKey == null && staticKey.indexOf('"') < 0) {
             // One object per static function and view, as a method reference's is.
             code = "DartRuntime.canonTearOff(\"" + staticKey + "\", \"" + sam
                     + (marker != null ? " & " + marker : "") + "\", " + code + ")";
@@ -34430,6 +34602,38 @@ public final class JavaEmitter {
                     tps = java.util.Collections.<String>emptyList();
                     // A non-generic one too: as a method reference it is canonicalized by the
                     // function it names, as a top-level function is, so `C.st == C.st`.
+                    List<TypeRef> oInst = !hasOptionalParam(md) || pinned != null || md.typeParams.isEmpty()
+                            || methodWitnesses(md).isEmpty() ? null
+                            : tearOffTypeArgs != null && tearOffTypeArgs.size() == md.typeParams.size()
+                            ? tearOffTypeArgs
+                            : contextInstantiation(md.typeParams, md.params, md.returnType,
+                                    ctorTearOffExpected, md.typeParamBounds);
+                    String oKey = oInst == null ? null
+                            : instantiationKeyExpr(javaClassName(pc) + "::" + name, oInst, ctx);
+                    if (oKey != null) {
+                        // `String Function(int, [int?]) s = C.so` for `static String so<T>(T x,
+                        // [T? y])`: the adapter calls `C.so<int>(..)`, handing the body its
+                        // witnesses, and the value is keyed by the instantiation.
+                        boolean canon = true;
+                        for (TypeRef t : oInst) {
+                            canon &= !readsTypeVarWitness(t, ctx) && !mentionsTypeVariable(t, ctx);
+                        }
+                        adapterInstantiation = oInst;
+                        adapterStaticKeyExpr = oKey;
+                        adapterStaticKeyCanon = canon;
+                        Out ad;
+                        try {
+                            ad = methodTearOffAdapter(md, cls, name, posNode, ctx);
+                        } finally {
+                            adapterInstantiation = null;
+                            adapterStaticKeyExpr = null;
+                            adapterStaticKeyCanon = false;
+                        }
+                        if (ad != null) {
+                            tearOffReturn = null;
+                            return ad;
+                        }
+                    }
                     if (!hasOptionalParam(md) && md.params.size() <= MAX_FN_ARITY
                             && md.returnType != null) {
                         // A generic static method (`Box.keep<T>`) tears off as a generic
@@ -34477,7 +34681,10 @@ public final class JavaEmitter {
                             tearOffReturn = null;
                             String lam = "((" + String.join(", ", ps) + ") -> " + javaClassName(pc) + "."
                                     + name + "(" + joinArgs(sW, ps) + "))";
-                            return new Out(lam, ift, FnForm.methodRef(lam));
+                            // One canonical value per instantiation: `C.sm == C.sm`.
+                            String keyed = keyedInstantiatedTearOff(lam, null,
+                                    instantiationKeyExpr(javaClassName(pc) + "::" + name, sInst, ctx), sInst, ift, ctx);
+                            return new Out(lam, ift, FnForm.methodRef(keyed));
                         }
                         if (tearOffTypeArgs == null) {
                             String checked = boundCheckedMethodTearOff(md, javaClassName(pc), name, ctx);
