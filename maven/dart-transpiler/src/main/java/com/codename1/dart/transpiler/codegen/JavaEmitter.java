@@ -182,33 +182,323 @@ public final class JavaEmitter {
         return mapped;
     }
 
-    /// A method declared with no return type (`toString() => 'x';`, `foo() => 1;`) takes
-    /// the return type of the member it overrides, as Dart infers it, and is `dynamic`
-    /// otherwise (left as `var`). With nothing above it in the program, the members every
-    /// class inherits from dart:core's Object still apply: an untyped `toString()` returns
-    /// String, or its Java method would not override `Object.toString()`.
+    /// Dart's override inference (the language specification's "Type inference of
+    /// overriding members"): an instance member written without a return type, a parameter
+    /// type, or (for a field) a type takes it from the member it overrides -- a member of a
+    /// program class, of a framework stub class (the Flutter stubs: an untyped
+    /// `build(context)` is `Widget build(BuildContext)`), or of dart:core's Object (`==`,
+    /// `toString`, `hashCode`, `noSuchMethod`, `runtimeType`). With several supertypes the
+    /// overridden signature is their combined member signature: the one candidate whose
+    /// signature is a subtype of every other's. An untyped part with nothing above it stays
+    /// `dynamic` (left as `var`).
     private void inferUntypedMethodReturns() {
-        List<ClassDecl> all = new ArrayList<ClassDecl>();
+        java.util.Set<ClassDecl> done = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<ClassDecl, Boolean>());
         for (List<ClassDecl> same : program.classesByName.values()) {
-            all.addAll(same);
+            for (ClassDecl c : same) {
+                inferOverrides(c, done);
+            }
         }
-        for (ClassDecl c : all) {
-            Ctx ctx = new Ctx(c);
-            for (MethodDecl m : c.methods) {
-                if (m.isStatic || m.isSetter || m.returnType == null || !m.returnType.is("var")) {
-                    continue;
-                }
-                TypeRef over = overriddenProgramReturn(c, m, new HashSet<String>(), ctx);
-                if (over == null && !m.isGetter && m.name.equals("toString") && m.params.isEmpty()) {
-                    over = new TypeRef("String");
-                } else if (over == null && m.isGetter && m.name.equals("hashCode")) {
-                    over = new TypeRef("int");
-                }
-                if (over != null) {
-                    m.returnType = over;
+    }
+
+    /// One overridden member's signature: its return (or, for a field or setter, its value
+    /// type) and its parameter types, positional in order and named by name. A null entry
+    /// is a part the supertype left untyped.
+    private static final class InheritedSig {
+        TypeRef ret;
+        final List<TypeRef> positional = new ArrayList<TypeRef>();
+        final Map<String, TypeRef> named = new java.util.HashMap<String, TypeRef>();
+    }
+
+    private static final int SIG_METHOD = 0;
+    private static final int SIG_GETTER = 1;
+    private static final int SIG_SETTER = 2;
+
+    private static boolean untypedRef(TypeRef t) {
+        return t == null || t.is("var");
+    }
+
+    private boolean isProgramClass(ClassDecl d) {
+        List<ClassDecl> same = program.classesByName.get(d.name);
+        if (same != null) {
+            for (ClassDecl o : same) {
+                if (o == d) {
+                    return true;
                 }
             }
         }
+        return false;
+    }
+
+    private static List<TypeRef> directSupers(ClassDecl c) {
+        List<TypeRef> supers = new ArrayList<TypeRef>();
+        if (c.superclass != null) {
+            supers.add(c.superclass);
+        }
+        supers.addAll(c.interfaces);
+        supers.addAll(c.mixins);
+        return supers;
+    }
+
+    /// The declaration `st`, written as a supertype of `from`, names: a program class, else
+    /// a stub class (or an SDK declaration).
+    private ClassDecl inheritedDecl(ClassDecl from, TypeRef st) {
+        if (st == null || st.name == null) {
+            return null;
+        }
+        ClassDecl d = isProgramClass(from) ? superDeclOf(from, st) : null;
+        if (d != null && d != from) {
+            return d;
+        }
+        String n = st.name.substring(st.name.lastIndexOf('.') + 1);
+        d = stubs.classes.get(n);
+        if (d == null) {
+            d = stubs.sdkClasses.get(n);
+        }
+        return d == from ? null : d;
+    }
+
+    private void inferOverrides(ClassDecl c, java.util.Set<ClassDecl> done) {
+        if (c == null || c.extensionOn != null || !done.add(c)) {
+            return;
+        }
+        // Supertypes first, so an untyped member above is already typed when read here.
+        for (TypeRef st : directSupers(c)) {
+            ClassDecl sp = inheritedDecl(c, st);
+            if (sp != null && isProgramClass(sp)) {
+                inferOverrides(sp, done);
+            }
+        }
+        for (MethodDecl m : c.methods) {
+            if (m.isStatic) {
+                continue;
+            }
+            boolean untyped = !m.isSetter && untypedRef(m.returnType);
+            for (Param p : m.params) {
+                untyped |= untypedRef(p.type) && !p.isThis && !p.isSuper;
+            }
+            if (!untyped) {
+                continue;
+            }
+            int kind = m.isGetter ? SIG_GETTER : m.isSetter ? SIG_SETTER : SIG_METHOD;
+            InheritedSig sig = combinedSignature(inheritedSigs(c, m.name, kind,
+                    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ClassDecl, Boolean>())));
+            if (sig == null) {
+                sig = objectMember(m.name, kind);
+            }
+            if (sig == null) {
+                continue;
+            }
+            if (!m.isSetter && untypedRef(m.returnType) && !untypedRef(sig.ret) && !isCoreNever(sig.ret)) {
+                m.returnType = sig.ret;
+            }
+            int pos = 0;
+            for (Param p : m.params) {
+                TypeRef t;
+                if (m.isSetter) {
+                    t = sig.ret;
+                } else if (p.named) {
+                    t = sig.named.get(p.name);
+                } else {
+                    t = pos < sig.positional.size() ? sig.positional.get(pos) : null;
+                    pos++;
+                }
+                if (untypedRef(p.type) && !p.isThis && !p.isSuper && !untypedRef(t)) {
+                    p.type = t;
+                }
+            }
+        }
+        // A field with no type overriding a getter (or setter) takes that member's type.
+        for (FieldDecl f : c.fields) {
+            if (f.isStatic || !untypedRef(f.type)) {
+                continue;
+            }
+            java.util.Set<ClassDecl> seen = java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<ClassDecl, Boolean>());
+            InheritedSig sig = combinedSignature(inheritedSigs(c, f.name, SIG_GETTER, seen));
+            if (sig == null) {
+                seen.clear();
+                sig = combinedSignature(inheritedSigs(c, f.name, SIG_SETTER, seen));
+            }
+            if (sig == null) {
+                sig = objectMember(f.name, SIG_GETTER);
+            }
+            if (sig != null && !untypedRef(sig.ret) && !isCoreNever(sig.ret)) {
+                f.type = sig.ret;
+            }
+        }
+    }
+
+    /// The signatures, one per direct supertype of `c` that has it, of the member `c`'s
+    /// `name` of `kind` overrides, each in `c`'s own type variables.
+    private List<InheritedSig> inheritedSigs(ClassDecl c, String name, int kind, java.util.Set<ClassDecl> seen) {
+        List<InheritedSig> out = new ArrayList<InheritedSig>();
+        if (!seen.add(c)) {
+            return out;
+        }
+        for (TypeRef st : directSupers(c)) {
+            ClassDecl sp = inheritedDecl(c, st);
+            if (sp == null) {
+                continue;
+            }
+            InheritedSig s = declaredSig(sp, name, kind);
+            if (s == null) {
+                s = combinedSignature(inheritedSigs(sp, name, kind, seen));
+            }
+            if (s == null) {
+                continue;
+            }
+            if (!st.args.isEmpty() && st.args.size() == sp.typeParams.size()) {
+                s = substSig(s, sp.typeParams, st.args);
+            }
+            out.add(s);
+        }
+        return out;
+    }
+
+    private static InheritedSig substSig(InheritedSig s, List<String> names, List<TypeRef> args) {
+        InheritedSig o = new InheritedSig();
+        o.ret = s.ret == null ? null : substTypeParams(s.ret, names, args);
+        for (TypeRef t : s.positional) {
+            o.positional.add(t == null ? null : substTypeParams(t, names, args));
+        }
+        for (Map.Entry<String, TypeRef> e : s.named.entrySet()) {
+            o.named.put(e.getKey(), e.getValue() == null ? null : substTypeParams(e.getValue(), names, args));
+        }
+        return o;
+    }
+
+    /// What `d` itself declares for `name` of `kind`, as a getter, setter or field for the
+    /// accessors (a field is both), or null.
+    private InheritedSig declaredSig(ClassDecl d, String name, int kind) {
+        for (MethodDecl sm : d.methods) {
+            if (sm.isStatic || !sm.name.equals(name)) {
+                continue;
+            }
+            boolean match = kind == SIG_GETTER ? sm.isGetter : kind == SIG_SETTER ? sm.isSetter
+                    : !sm.isGetter && !sm.isSetter;
+            if (!match) {
+                continue;
+            }
+            InheritedSig s = new InheritedSig();
+            if (kind == SIG_SETTER) {
+                s.ret = sm.params.isEmpty() || untypedRef(sm.params.get(0).type) ? null : sm.params.get(0).type;
+                return s;
+            }
+            s.ret = untypedRef(sm.returnType) ? null : sm.returnType;
+            for (Param p : sm.params) {
+                TypeRef t = untypedRef(p.type) ? null : p.type;
+                if (p.named) {
+                    s.named.put(p.name, t);
+                } else {
+                    s.positional.add(t);
+                }
+            }
+            return s;
+        }
+        if (kind != SIG_METHOD) {
+            FieldDecl f = d.field(name);
+            if (f != null && !f.isStatic && (kind == SIG_GETTER || !f.isFinal && !f.isConst)) {
+                InheritedSig s = new InheritedSig();
+                TypeRef t = f.type;
+                if (untypedRef(t) && f.initializer != null && isProgramClass(d)) {
+                    t = fieldType(f, new Ctx(d));
+                    t = t == null || isDynamicType(t) ? null : t;
+                }
+                s.ret = untypedRef(t) ? null : t;
+                return s;
+            }
+            // A getter with no getter above it takes the type of the setter it overrides, and
+            // the other way round.
+            if (kind == SIG_GETTER || kind == SIG_SETTER) {
+                for (MethodDecl sm : d.methods) {
+                    if (!sm.isStatic && sm.name.equals(name) && (kind == SIG_GETTER ? sm.isSetter : sm.isGetter)) {
+                        InheritedSig s = new InheritedSig();
+                        TypeRef t = kind == SIG_GETTER
+                                ? (sm.params.isEmpty() ? null : sm.params.get(0).type) : sm.returnType;
+                        s.ret = untypedRef(t) ? null : t;
+                        return s;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Dart's combined member signature of `cands`: the one whose signature is a subtype of
+    /// every other's (return covariant, parameters contravariant). With none, the program is
+    /// a Dart compile error; the first candidate is taken.
+    private InheritedSig combinedSignature(List<InheritedSig> cands) {
+        if (cands.isEmpty()) {
+            return null;
+        }
+        if (cands.size() == 1) {
+            return cands.get(0);
+        }
+        for (InheritedSig a : cands) {
+            boolean all = true;
+            for (InheritedSig b : cands) {
+                if (a != b && !sigSubtype(a, b)) {
+                    all = false;
+                    break;
+                }
+            }
+            if (all) {
+                return a;
+            }
+        }
+        return cands.get(0);
+    }
+
+    private boolean sigSubtype(InheritedSig a, InheritedSig b) {
+        if (!sigPartSubtype(a.ret, b.ret)) {
+            return false;
+        }
+        for (int i = 0; i < b.positional.size(); i++) {
+            if (i < a.positional.size() && !sigPartSubtype(b.positional.get(i), a.positional.get(i))) {
+                return false;
+            }
+        }
+        for (Map.Entry<String, TypeRef> e : b.named.entrySet()) {
+            if (a.named.containsKey(e.getKey()) && !sigPartSubtype(e.getValue(), a.named.get(e.getKey()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean sigPartSubtype(TypeRef sub, TypeRef sup) {
+        if (sup == null || isDynamicType(sup)) {
+            return true;
+        }
+        if (sub == null) {
+            return false;
+        }
+        return sub.is("void") && sup.is("void") || staticSubtype(sub, sup)
+                || sub.name != null && sub.name.equals(sup.name) && sub.args.equals(sup.args);
+    }
+
+    /// The member of dart:core's Object every class inherits, for `name` of `kind`, or null.
+    private static InheritedSig objectMember(String name, int kind) {
+        InheritedSig s = new InheritedSig();
+        if (kind == SIG_METHOD && name.equals("$eq")) {
+            s.ret = new TypeRef("bool");
+            s.positional.add(new TypeRef("Object"));
+        } else if (kind == SIG_METHOD && name.equals("toString")) {
+            s.ret = new TypeRef("String");
+        } else if (kind == SIG_METHOD && name.equals("noSuchMethod")) {
+            // `dynamic noSuchMethod(Invocation)`: the parameter is left dynamic, which the
+            // runtime's Invocation is assignable to, so only the arity is inherited.
+            s.ret = null;
+            s.positional.add(null);
+        } else if (kind == SIG_GETTER && name.equals("hashCode")) {
+            s.ret = new TypeRef("int");
+        } else if (kind == SIG_GETTER && name.equals("runtimeType")) {
+            s.ret = new TypeRef("Type");
+        } else {
+            return null;
+        }
+        return s;
     }
 
     /// The pub packages `lib` imports, `firebase_app_check` for

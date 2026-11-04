@@ -59,6 +59,8 @@ abstract class State<T> {
   external BuildContext get context;
   external void setState(VoidCallback fn);
   external void initState();
+  external void didChangeDependencies();
+  external void didUpdateWidget(T oldWidget);
   external void dispose();
   Widget build(BuildContext context);
 }
