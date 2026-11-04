@@ -193,7 +193,20 @@ class SpinnerNode extends Node {
     }
 
     public int getSelectedIndex() {
-        return (int) (flatScrollPos / calcFlatListHeight() * listModel.getSize());
+        // Round to the nearest row rather than truncating. setSelectedIndex stores
+        // index * rowH, and dividing that by (rowH * size) then multiplying by size
+        // lands just below the integer for some indices (6 / 365 * 365 = 5.999...),
+        // so a truncating cast selected the row above (issue #6165).
+        double rowH = renderer.getPreferredH();
+        int size = listModel.getSize();
+        if (rowH <= 0 || size <= 0) {
+            return 0;
+        }
+        int index = (int) Math.floor(flatScrollPos / rowH + 0.5);
+        if (index < 0) {
+            return 0;
+        }
+        return index >= size ? size - 1 : index;
     }
 
     public void setSelectedIndex(int index) {
