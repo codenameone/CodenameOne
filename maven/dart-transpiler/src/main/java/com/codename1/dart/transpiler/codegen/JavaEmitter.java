@@ -15862,6 +15862,18 @@ public final class JavaEmitter {
             // witness carries the element arguments, which TypeWitness.test compares with
             // what the collection recorded, as `is List<String>` does.
             nested = ", " + coll[1] + (t.args.size() > 1 ? ", " + coll[2] : "");
+        } else if (nested.isEmpty() && t.funcParams == null) {
+            // A program class that keeps no witnesses (`Box<int>` for a `class Box<E>` that
+            // never reads E): the arguments still name the type, so `'$T'` prints
+            // Box<int>, not Box<dynamic>; an instance test of it stays the class test.
+            ClassDecl pc = classOfRef(t);
+            if (pc == null && !t.runtimeOnly && t.name != null && t.name.indexOf('.') > 0) {
+                // Written through an import prefix (`p.Box<int>`).
+                pc = program.resolveClass(t.name.substring(t.name.lastIndexOf('.') + 1), ctx.library());
+            }
+            if (pc != null && !pc.typeParams.isEmpty() && pc.typeParams.size() == t.args.size()) {
+                nested = reifiedArgWitnesses(t, ctx);
+            }
         }
         return "dart.runtime.TypeWitness.of(" + erasedJavaType(t, ctx) + ".class, " + nullable + nested + ")";
     }
@@ -19248,7 +19260,17 @@ public final class JavaEmitter {
                     && ((Ident) ((PropertyGet) posNode).target).typeArgs != null) {
                 clsArgs = ((Ident) ((PropertyGet) posNode).target).typeArgs;
             }
-            Out tear = staticTearOff(cls, tt.arg(0).resolved, clsArgs, name, posNode, ctx);
+            // `K.s<int>`: the explicit instantiation of a generic static method.
+            List<TypeRef> savedTearOffTypeArgs = tearOffTypeArgs;
+            if (posNode instanceof PropertyGet && ((PropertyGet) posNode).typeArgs != null) {
+                tearOffTypeArgs = ((PropertyGet) posNode).typeArgs;
+            }
+            Out tear;
+            try {
+                tear = staticTearOff(cls, tt.arg(0).resolved, clsArgs, name, posNode, ctx);
+            } finally {
+                tearOffTypeArgs = savedTearOffTypeArgs;
+            }
             if (tear != null) {
                 return tear;
             }
@@ -22611,6 +22633,9 @@ public final class JavaEmitter {
                 b.args.addAll(a.args);
                 b.funcParams = a.funcParams;
                 b.funcReturn = a.funcReturn;
+                // `T x` against `Object?` binds T to Object?, the top type that prints with
+                // its `?` (`'$T'`), not Object; other nullability stays the argument's own.
+                b.nullable = a.is("Object") && a.args.isEmpty() && a.nullable && !p.nullable;
                 m.put(p.name, b);
             }
             return;
@@ -23752,7 +23777,7 @@ public final class JavaEmitter {
                     + "(" + sam + ") " + lam + "))";
         }
         if (k[2] != null) {
-            value = "((" + sam + ") DartRuntime.canonTearOff(" + k[1] + ", \"" + view + "\", (Object) " + value + "))";
+            value = "((" + sam + ") dart.runtime.DartRuntime.canonTearOff(" + k[1] + ", \"" + view + "\", (Object) " + value + "))";
         }
         return new Out(value, out.type, null);
     }
@@ -34602,7 +34627,7 @@ public final class JavaEmitter {
                     tps = java.util.Collections.<String>emptyList();
                     // A non-generic one too: as a method reference it is canonicalized by the
                     // function it names, as a top-level function is, so `C.st == C.st`.
-                    List<TypeRef> oInst = !hasOptionalParam(md) || pinned != null || md.typeParams.isEmpty()
+                    List<TypeRef> oInst = !hasOptionalParam(md) || md.typeParams.isEmpty()
                             || methodWitnesses(md).isEmpty() ? null
                             : tearOffTypeArgs != null && tearOffTypeArgs.size() == md.typeParams.size()
                             ? tearOffTypeArgs

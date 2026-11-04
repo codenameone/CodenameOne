@@ -2524,6 +2524,14 @@ public final class AstBuilder {
                 for (Dart2Parser.TypeContext t : s.typeArguments().typeList().type()) {
                     id.typeArgs.add(buildType(t));
                 }
+            } else if (base instanceof PropertyGet && ((PropertyGet) base).typeArgs == null) {
+                // `K.s<int>`: a generic static method instantiated explicitly, which the
+                // tear-off is keyed and witnessed by.
+                PropertyGet pg = (PropertyGet) base;
+                pg.typeArgs = new ArrayList<TypeRef>();
+                for (Dart2Parser.TypeContext t : s.typeArguments().typeList().type()) {
+                    pg.typeArgs.add(buildType(t));
+                }
             }
             return base;
         }

@@ -701,6 +701,9 @@ public final class Ast {
         public Expr target;
         public String name;
         public boolean nullAware;
+        // `K.s<int>` / `p.K.s<int>` without a call: the explicit instantiation's type
+        // arguments; null otherwise
+        public List<TypeRef> typeArgs;
     }
 
     /** target.name(args) — method call, or function/ctor call when target == null. */
