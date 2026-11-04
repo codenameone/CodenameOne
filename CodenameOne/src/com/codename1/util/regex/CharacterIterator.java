@@ -19,6 +19,7 @@ package com.codename1.util.regex;
 
 /// Encapsulates different types of character sources - String, InputStream, ...
 /// Defines a set of common methods
+@com.codename1.impl.SharedWithBackend
 public interface CharacterIterator {
     /// #### Returns
     ///

@@ -74,7 +74,9 @@ final class RepositoryGenerator {
         Set<String> custom = new HashSet<String>();
         for (MethodInfo method : repository.getMethods()) {
             if (method.isStatic() || method.isSynthetic()) continue;
-            if (!method.isAbstract()) throw invalid(method.getName() + ": default methods are unsupported");
+            // A default method is the interface's own code and is inherited as it is;
+            // it reaches the generated methods through `this`, as in Spring Data.
+            if (!method.isAbstract()) continue;
             try { methods.append(generator.method(method)); custom.add(method.getName()); }
             catch (IllegalArgumentException error) { throw invalid(method.getName() + ": " + error.getMessage()); }
         }
@@ -86,7 +88,13 @@ final class RepositoryGenerator {
             {"deleteById", "public void deleteById(" + k + " id) { requireTransaction(); " + e + " value=session.find(" + e + ".class,id); if(value!=null) session.remove(value); }"},
             {"findAll", "public java.util.List<" + e + "> findAll() { return session.query(" + e + ".class).list(); }"},
             {"count", "public long count() { return session.query(" + e + ".class).count(); }"},
-            {"existsById", "public boolean existsById(" + k + " id) { return session.find(" + e + ".class,id)!=null; }"}
+            {"existsById", "public boolean existsById(" + k + " id) { return session.find(" + e + ".class,id)!=null; }"},
+            {"delete", "public void delete(" + e + " entity) { requireTransaction(); if(entity==null) throw new IllegalArgumentException(\"entity is null\"); if(session.contains(entity)) { session.remove(entity); return; } " + e + " value=session.merge(entity); if(value!=null) session.remove(value); }"},
+            {"deleteAll", "public void deleteAll() { requireTransaction(); for(" + e + " value : session.query(" + e + ".class).list()) session.remove(value); }"},
+            {"deleteAll", "public void deleteAll(Iterable<? extends " + e + "> entities) { requireTransaction(); if(entities==null) throw new IllegalArgumentException(\"entities is null\"); for(" + e + " value : entities) delete(value); }"},
+            {"saveAll", "public java.util.List<" + e + "> saveAll(Iterable<? extends " + e + "> entities) { if(entities==null) throw new IllegalArgumentException(\"entities is null\"); java.util.List<" + e + "> out=new java.util.ArrayList<" + e + ">(); for(" + e + " value : entities) out.add(session.merge(value)); return out; }"},
+            {"findAllById", "public java.util.List<" + e + "> findAllById(Iterable<" + k + "> ids) { if(ids==null) throw new IllegalArgumentException(\"ids is null\"); java.util.List<" + e + "> out=new java.util.ArrayList<" + e + ">(); for(" + k + " id : ids) { " + e + " value=session.find(" + e + ".class,id); if(value!=null) out.add(value); } return out; }"},
+            {"flush", "public void flush() { session.flush(); }"}
         };
         for (String[] method : defaults) if (!custom.contains(method[0])) methods.append(method[1]).append('\n');
         int dot = repository.getBinaryName().lastIndexOf('.');
@@ -124,7 +132,9 @@ final class RepositoryGenerator {
             return declaration(method, args, entityType) + "return session.find(" + entityType + ".class,p0,com.codename1.orm.session.LockMode." + mode[1] + ");}\n";
         }
         if (name.equals("findById") || name.equals("save") || name.equals("insert") || name.equals("deleteById")
-                || name.equals("findAll") || name.equals("count") || name.equals("existsById")) {
+                || name.equals("findAll") || name.equals("count") || name.equals("existsById")
+                || name.equals("delete") || name.equals("deleteAll") || name.equals("saveAll")
+                || name.equals("findAllById") || name.equals("flush")) {
             throw invalid("Use the inherited CRUD method; only findById may be redeclared with @Lock");
         }
         boolean list = result.getClassName().equals("java.util.List");

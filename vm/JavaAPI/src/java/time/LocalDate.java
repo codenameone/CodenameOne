@@ -27,6 +27,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalAdjuster;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalUnit;
 import java.util.function.LongFunction;
@@ -34,7 +35,7 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 /// A date of the ISO calendar with no time and no zone, such as 2007-12-03.
-public final class LocalDate implements ChronoLocalDate {
+public final class LocalDate implements ChronoLocalDate, TemporalAdjuster {
     /// -999999999-01-01, the earliest date.
     public static final LocalDate MIN = new LocalDate(-999999999, 1, 1);
     /// +999999999-12-31, the latest date.
@@ -266,6 +267,28 @@ public final class LocalDate implements ChronoLocalDate {
 
     private long getProlepticMonth() {
         return (year * 12L + month - 1);
+    }
+
+    /// This date moved by `adjuster`, for example
+    /// `TemporalAdjusters.lastDayOfMonth()`.
+    public LocalDate with(TemporalAdjuster adjuster) {
+        if (adjuster instanceof LocalDate) {
+            return (LocalDate) adjuster;
+        }
+        Temporal t = adjuster.adjustInto(this);
+        if (t instanceof LocalDate) {
+            return (LocalDate) t;
+        }
+        throw new DateTimeException("Adjuster did not return a LocalDate");
+    }
+
+    /// This date, as the adjustment of another `LocalDate`.
+    @Override
+    public Temporal adjustInto(Temporal temporal) {
+        if (temporal instanceof LocalDate) {
+            return this;
+        }
+        throw new DateTimeException("Cannot adjust " + temporal + " to a LocalDate");
     }
 
     public LocalDate withYear(int year) {

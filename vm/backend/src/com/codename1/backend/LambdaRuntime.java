@@ -105,6 +105,7 @@ public final class LambdaRuntime {
                                   String requestId, Span span) {
         String result;
         try {
+            com.codename1.backend.log.MDC.clear();
             result = handler.handle(next.getBodyAsString(), requestId);
         } catch (Exception err) {
             // The span stays open through the error report too, as it does through

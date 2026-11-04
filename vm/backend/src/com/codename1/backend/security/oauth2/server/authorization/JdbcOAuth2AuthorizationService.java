@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security.oauth2.server.authorization;
 
+import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
 import com.codename1.backend.Json;
@@ -77,12 +78,12 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
         try {
             // An update that changes nothing counts no row on MySQL, so "no row"
             // alone does not say the grant is new: it is asked for.
-            if (dataSource.execute("UPDATE cn1_oauth2_authorization SET registered_client_id = ?, "
+            if (dataSource.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_authorization") + " SET registered_client_id = ?, "
                     + "principal_name = ?, grant_type = ?, scopes = ?, status = ?, "
                     + "attributes = ?, expires_at = ? WHERE id = ?", values) == 0
-                    && dataSource.queryOne("SELECT id FROM cn1_oauth2_authorization WHERE id = ?",
+                    && dataSource.queryOne("SELECT id FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE id = ?",
                             new Object[] {a.getId()}) == null) {
-                dataSource.execute("INSERT INTO cn1_oauth2_authorization (registered_client_id, "
+                dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_oauth2_authorization") + " (registered_client_id, "
                         + "principal_name, grant_type, scopes, status, attributes, expires_at, "
                         + "id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {
                             values[0], values[1], values[2], values[3], values[4], values[5],
@@ -101,7 +102,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
         try {
             Map row = dataSource.queryOne("SELECT id, registered_client_id, principal_name, "
                     + "grant_type, scopes, status, attributes, created_at, expires_at FROM "
-                    + "cn1_oauth2_authorization WHERE id = ?", new Object[] {id});
+                    + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE id = ?", new Object[] {id});
             if (row == null) {
                 return null;
             }
@@ -132,9 +133,9 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
         try {
             // The grant first: a secret whose grant is gone is worth nothing,
             // whichever of these another process sees half done.
-            dataSource.execute("DELETE FROM cn1_oauth2_authorization WHERE id = ?",
+            dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE id = ?",
                     new Object[] {id});
-            dataSource.execute("DELETE FROM cn1_oauth2_token WHERE authorization_id = ?",
+            dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE authorization_id = ?",
                     new Object[] {id});
         } catch (IOException err) {
             throw failed("remove a grant", err);
@@ -144,7 +145,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
     @Override
     public void addToken(String authorizationId, String kind, String tokenHash, long expiresAt) {
         try {
-            dataSource.execute("INSERT INTO cn1_oauth2_token (token_hash, authorization_id, "
+            dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_oauth2_token") + " (token_hash, authorization_id, "
                     + "kind, used, expires_at, polled_at) VALUES (?, ?, ?, 0, ?, 0)",
                     new Object[] {tokenHash, authorizationId, kind, Long.valueOf(expiresAt)});
         } catch (IOException err) {
@@ -186,32 +187,32 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
             Object[] grant = {id, OAuth2Authorization.ACTIVE, Long.valueOf(now)};
             // A portable row lock, including SQLite. MySQL may report zero for
             // this unchanged value, so existence is checked while holding it.
-            db.execute("UPDATE cn1_oauth2_authorization SET expires_at = expires_at "
+            db.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_authorization") + " SET expires_at = expires_at "
                     + "WHERE id = ? AND status = ? AND expires_at > ?", grant);
-            if (db.queryOne("SELECT id FROM cn1_oauth2_authorization WHERE id = ? "
+            if (db.queryOne("SELECT id FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE id = ? "
                     + "AND status = ? AND expires_at > ?", grant) == null) {
                 return Boolean.FALSE;
             }
             if (hash != null) {
                 if (reuse) {
                     Object[] token = {hash, id, REFRESH_TOKEN, Long.valueOf(now)};
-                    db.execute("UPDATE cn1_oauth2_token SET expires_at = CASE WHEN expires_at < ? "
+                    db.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_token") + " SET expires_at = CASE WHEN expires_at < ? "
                             + "THEN ? ELSE expires_at END WHERE token_hash = ? AND authorization_id = ? "
                             + "AND kind = ? AND used = 0 AND expires_at > ?", new Object[] {
                                 Long.valueOf(expiresAt), Long.valueOf(expiresAt), hash, id,
                                 REFRESH_TOKEN, Long.valueOf(now)});
-                    if (db.queryOne("SELECT token_hash FROM cn1_oauth2_token WHERE token_hash = ? "
+                    if (db.queryOne("SELECT token_hash FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE token_hash = ? "
                             + "AND authorization_id = ? AND kind = ? AND used = 0 AND expires_at > ?",
                             token) == null) {
                         return Boolean.FALSE;
                     }
                 } else {
-                    db.execute("INSERT INTO cn1_oauth2_token (token_hash, authorization_id, "
+                    db.execute("INSERT INTO " + SecuritySchema.table("cn1_oauth2_token") + " (token_hash, authorization_id, "
                             + "kind, used, expires_at, polled_at) VALUES (?, ?, ?, 0, ?, 0)",
                             new Object[] {hash, id, REFRESH_TOKEN, Long.valueOf(expiresAt)});
                 }
             }
-            db.execute("UPDATE cn1_oauth2_authorization SET expires_at = CASE WHEN expires_at < ? "
+            db.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_authorization") + " SET expires_at = CASE WHEN expires_at < ? "
                     + "THEN ? ELSE expires_at END WHERE id = ?",
                     new Object[] {Long.valueOf(expiresAt), Long.valueOf(expiresAt), id});
             return Boolean.TRUE;
@@ -225,7 +226,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
         }
         try {
             Map row = dataSource.queryOne("SELECT authorization_id, used, expires_at, polled_at "
-                    + "FROM cn1_oauth2_token WHERE token_hash = ? AND kind = ?",
+                    + "FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE token_hash = ? AND kind = ?",
                     new Object[] {tokenHash, kind});
             return row == null ? null : new StoredToken(String.valueOf(row.get("authorization_id")),
                     number(row.get("used")) != 0, number(row.get("expires_at")),
@@ -241,7 +242,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
             return false;
         }
         try {
-            return dataSource.execute("UPDATE cn1_oauth2_token SET used = 1, polled_at = ? "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_token") + " SET used = 1, polled_at = ? "
                     + "WHERE token_hash = ? AND kind = ? AND used = 0 AND expires_at > ?",
                     new Object[] {Long.valueOf(now), tokenHash, kind, Long.valueOf(now)}) == 1;
         } catch (IOException err) {
@@ -252,7 +253,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
     @Override
     public void touchToken(String kind, String tokenHash, long now) {
         try {
-            dataSource.execute("UPDATE cn1_oauth2_token SET polled_at = ? WHERE token_hash = ? "
+            dataSource.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_token") + " SET polled_at = ? WHERE token_hash = ? "
                     + "AND kind = ?", new Object[] {Long.valueOf(now), tokenHash, kind});
         } catch (IOException err) {
             throw failed("record a poll", err);
@@ -266,7 +267,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
         }
         long before = now < intervalMillis ? 0 : now - intervalMillis;
         try {
-            return dataSource.execute("UPDATE cn1_oauth2_token SET polled_at = ? WHERE token_hash = ? "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_token") + " SET polled_at = ? WHERE token_hash = ? "
                     + "AND kind = ? AND used = 0 AND expires_at > ? "
                     + "AND (polled_at = 0 OR polled_at <= ?)",
                     new Object[] {Long.valueOf(now), tokenHash, kind, Long.valueOf(now),
@@ -279,7 +280,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
     @Override
     public boolean extendToken(String kind, String tokenHash, long now, long expiresAt) {
         try {
-            return dataSource.execute("UPDATE cn1_oauth2_token SET expires_at = CASE WHEN expires_at < ? "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_token") + " SET expires_at = CASE WHEN expires_at < ? "
                     + "THEN ? ELSE expires_at END WHERE token_hash = ? AND kind = ? AND used = 0 "
                     + "AND expires_at > ?", new Object[] {Long.valueOf(expiresAt), Long.valueOf(expiresAt),
                         tokenHash, kind, Long.valueOf(now)}) == 1;
@@ -303,7 +304,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
             // The status in the condition is what makes one answer win; the
             // attributes written are this caller's reading with its own added,
             // and nothing else writes a pending grant's.
-            return dataSource.execute("UPDATE cn1_oauth2_authorization SET status = ?, "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_authorization") + " SET status = ?, "
                     + "principal_name = ?, attributes = ? WHERE id = ? AND status = ?",
                     new Object[] {approved ? OAuth2Authorization.ACTIVE
                             : OAuth2Authorization.DENIED, approved ? principalName : "",
@@ -320,23 +321,23 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
         try {
             // Found by the index on expires_at, a bounded number at a time, and
             // deleted by key: a purge never holds more than one row.
-            List tokens = dataSource.query("SELECT token_hash FROM cn1_oauth2_token WHERE "
+            List tokens = dataSource.query("SELECT token_hash FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE "
                     + "expires_at < ? ORDER BY expires_at LIMIT " + bound,
                     new Object[] {Long.valueOf(now)});
             for (Object row : tokens) {
-                purged += dataSource.execute("DELETE FROM cn1_oauth2_token WHERE token_hash = ? "
+                purged += dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE token_hash = ? "
                         + "AND expires_at < ?", new Object[] {((Map) row).get("token_hash"),
                             Long.valueOf(now)});
             }
-            List grants = dataSource.query("SELECT id FROM cn1_oauth2_authorization WHERE "
+            List grants = dataSource.query("SELECT id FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE "
                     + "expires_at < ? ORDER BY expires_at LIMIT " + bound,
                     new Object[] {Long.valueOf(now)});
             for (Object row : grants) {
                 Object id = ((Map) row).get("id");
                 // Conditional again: a refresh may have moved the expiry since.
-                if (dataSource.execute("DELETE FROM cn1_oauth2_authorization WHERE id = ? AND "
+                if (dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE id = ? AND "
                         + "expires_at < ?", new Object[] {id, Long.valueOf(now)}) == 1) {
-                    dataSource.execute("DELETE FROM cn1_oauth2_token WHERE authorization_id = ?",
+                    dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE authorization_id = ?",
                             new Object[] {id});
                     purged++;
                 }

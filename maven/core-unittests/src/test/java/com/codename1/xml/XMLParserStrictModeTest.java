@@ -29,6 +29,7 @@ import java.io.StringReader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Strict mode keeps OOXML exactly as written; the default mode is unchanged.
@@ -120,5 +121,216 @@ class XMLParserStrictModeTest {
         assertEquals(1, r.getChildrenByTagName("name").size());
         assertEquals("good", r.getFirstChildByTagName("name").getChildAt(0).getText());
         assertNull(r.getFirstChildByTagName("NAME"));
+    }
+
+    private static String failure(String xml) {
+        return assertThrows(XMLParseException.class, () -> rejecting().parse(new StringReader(xml))).getMessage();
+    }
+
+    private static XMLParser rejecting() {
+        XMLParser p = new XMLParser();
+        p.setRejectMalformed(true);
+        return p;
+    }
+
+    @Test
+    void rejectingDecodesSupplementaryReferences() {
+        Element r = rejecting().parse(new StringReader("<r>b&#x1F600;</r>"));
+        assertEquals("b\ud83d\ude00", r.getChildAt(0).getText());
+        assertTrue(rejecting().isRejectMalformed());
+    }
+
+    @Test
+    void turningRejectOffRestoresTheModeSetStrictChose() {
+        XMLParser p = rejecting();
+        assertTrue(!p.isStrict());
+        p.setRejectMalformed(false);
+        assertTrue(!p.isStrict());
+        // lenient again: case folded, nothing thrown
+        assertEquals("doc", p.parse(new StringReader("<Doc>b&c</Doc>")).getTagName());
+        XMLParser q = new XMLParser();
+        q.setStrict(true);
+        q.setRejectMalformed(true);
+        q.setRejectMalformed(false);
+        assertTrue(q.isStrict());
+        assertEquals("Doc", q.parse(new StringReader("<Doc/>")).getTagName());
+    }
+
+    @Test
+    void anIoErrorWithACallbackThatStopsStillReturnsThePartialTree() {
+        java.io.Reader r = new java.io.Reader() {
+            private boolean sent;
+
+            public int read(char[] b, int o, int l) throws java.io.IOException {
+                if (sent) {
+                    throw new java.io.IOException("boom");
+                }
+                sent = true;
+                "<a><b/></a>".getChars(0, 11, b, o);
+                return 11;
+            }
+
+            public void close() {
+            }
+        };
+        final int[] seen = new int[1];
+        XMLParser p = new XMLParser();
+        p.setParserCallback((id, tag, attribute, value, description) -> {
+            if (id == ParserCallback.ERROR_IO) {
+                seen[0]++;
+            }
+            return false;
+        });
+        Element e = p.parse(r);
+        assertEquals(1, seen[0]);
+        assertEquals("a", e.getTagName());
+    }
+
+    @Test
+    void strictAloneStaysTolerant() {
+        // Mappers.fromXml parses this way: what master accepted still parses.
+        XMLParser p = new XMLParser();
+        p.setStrict(true);
+        Element r = p.parse(new StringReader("<a>x&nbsp;y</a>"));
+        assertEquals("a", r.getTagName());
+        assertTrue(r.getChildAt(0).getText().startsWith("x"));
+        assertEquals("a", p.parse(new StringReader("<a/><b/>")).getTagName());
+        XMLParser q = new XMLParser();
+        q.setStrict(true);
+        q.setParserCallback((id, tag, attribute, value, description) -> true);
+        assertEquals("a", q.parse(new StringReader("<a/><b/>")).getTagName());
+    }
+
+    @Test
+    void errorsNameTheLineAndColumn() {
+        XMLParseException e = assertThrows(XMLParseException.class,
+                () -> rejecting().parse(new StringReader("<a>\n<b>\n  </c>")));
+        assertEquals(3, e.getLine());
+        assertTrue(e.getMessage().startsWith("line 3, column "), e.getMessage());
+        assertTrue(e.getColumn() > 0);
+    }
+
+    @Test
+    void controlCharactersAreRefused() {
+        assertTrue(failure("<a>x\u0001</a>").contains("control character"));
+        assertTrue(failure("<a v='\u0007'/>").contains("control character"));
+        assertTrue(failure("<a>&#1;</a>").contains("control character"));
+        assertTrue(failure("<a>&#X41;</a>").contains("lowercase x"));
+        assertEquals("\t\nA", rejecting().parse(new StringReader("<a>&#9;&#10;&#x41;</a>")).getChildAt(0).getText());
+    }
+
+    @Test
+    void ioErrorsKeepTheirCause() {
+        java.io.IOException boom = new java.io.IOException("boom");
+        java.io.Reader r = new java.io.Reader() {
+            public int read(char[] b, int o, int l) throws java.io.IOException {
+                throw boom;
+            }
+
+            public void close() {
+            }
+        };
+        XMLParseException e = assertThrows(XMLParseException.class, () -> rejecting().parse(r));
+        assertSame(boom, e.getCause());
+    }
+
+    @Test
+    void doctypeCommentsAndInstructionsAreSkippedWhole() {
+        Element r = rejecting().parse(new StringReader("<!DOCTYPE r [<!-- it's ]> --><?pi \"]>?>]><r/>"));
+        assertEquals("r", r.getTagName());
+    }
+
+    @Test
+    void malformedDocumentsAreRefused() {
+        assertTrue(failure("<a><b></a>").contains("does not match"));
+        assertTrue(failure("<a><b>").contains("end of document"));
+        assertTrue(failure("<a></a></b>").contains("no open element"));
+        assertTrue(failure("<a/><b/>").contains("second root"));
+        assertTrue(failure("<a/>junk").contains("outside the root"));
+        assertTrue(failure("junk<a/>").contains("outside the root"));
+        assertTrue(failure("<a x=1/>").contains("not quoted"));
+        assertTrue(failure("<a x='1' x='2'/>").contains("duplicate attribute"));
+        assertTrue(failure("<a x='<'/>").contains("< in the value"));
+        assertTrue(failure("<a><!-- open</a>").contains("unterminated comment"));
+        assertTrue(failure("<a><![CDATA[x</a>").contains("unterminated CDATA"));
+        assertTrue(failure("").contains("no root"));
+        assertTrue(failure("<a x='1").contains("end of document"));
+    }
+
+    @Test
+    void badEntitiesAreRefused() {
+        assertTrue(failure("<a>&nbsp;</a>").contains("undefined entity &nbsp;"));
+        assertTrue(failure("<a>&AMP;</a>").contains("undefined entity"));
+        assertTrue(failure("<a>b&c</a>").contains("unterminated entity"));
+        assertTrue(failure("<a x='&bogus;'/>").contains("undefined entity"));
+        assertTrue(failure("<a>&#0;</a>").contains("undefined entity"));
+        assertTrue(failure("<a>&#xD800;</a>").contains("undefined entity"));
+        assertTrue(failure("<a>&#x110000;</a>").contains("undefined entity"));
+        // the lenient mode keeps what it cannot decode, as it always has
+        assertEquals("b&c", parse("<a>b&c</a>", false, false).getChildAt(0).getText());
+    }
+
+    @Test
+    void anEntityTheApplicationAddsIsDefined() {
+        XMLParser p = new XMLParser();
+        p.setRejectMalformed(true);
+        p.addCharEntity("nbsp", 160);
+        assertEquals("\u00a0", p.parse(new StringReader("<a>&nbsp;</a>")).getChildAt(0).getText());
+    }
+
+    @Test
+    void doctypeEntitiesAreNeverExpanded() {
+        String xxe = "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">"
+                + "<!ENTITY a \"]>\">]><r>&xxe;</r>";
+        assertTrue(failure(xxe).contains("undefined entity &xxe;"));
+        String bomb = "<!DOCTYPE r [<!ENTITY a \"aaaa\"><!ENTITY b \"&a;&a;&a;\">]><r>&b;</r>";
+        assertTrue(failure(bomb).contains("undefined entity &b;"));
+        Element r = rejecting().parse(new StringReader("<!DOCTYPE r [<!ENTITY a \"x\">]>\n<r>ok</r>"));
+        assertEquals("ok", r.getChildAt(0).getText());
+    }
+
+    @Test
+    void nestingIsCapped() {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < 10000; i++) {
+            b.append("<a>");
+        }
+        assertTrue(failure(b.toString()).contains("nested deeper than 256"));
+        XMLParser p = new XMLParser();
+        p.setRejectMalformed(true);
+        p.setMaxDepth(2);
+        assertEquals(2, p.getMaxDepth());
+        assertEquals("b", p.parse(new StringReader("<a><b/></a>")).getChildAt(0).getTagName());
+        XMLParseException e = assertThrows(XMLParseException.class,
+                () -> p.parse(new StringReader("<a><b><c/></b></a>")));
+        assertTrue(e.getMessage().contains("nested deeper than 2"));
+        assertThrows(IllegalArgumentException.class, () -> p.setMaxDepth(0));
+    }
+
+    @Test
+    void aByteOrderMarkAndTheDeclarationAreSkipped() {
+        Element r = rejecting().parse(new StringReader("\ufeff<?xml version=\"1.0\"?>\n<r/>\n"));
+        assertEquals("r", r.getTagName());
+    }
+
+    @Test
+    void eventModeIsStrictToo() {
+        XMLParser p = new XMLParser();
+        p.setRejectMalformed(true);
+        assertThrows(XMLParseException.class, () -> p.eventParser(new StringReader("<a><b></a>")));
+        assertThrows(XMLParseException.class, () -> p.eventParser(new StringReader("  ")));
+    }
+
+    @Test
+    void elementHelpers() {
+        Element r = parse("<r><i n='1'> x <![CDATA[y]]> </i><j/><i n='2'/></r>", true, false);
+        assertSame(r.getFirstChildByTagName("i"), r.child("i"));
+        assertEquals(2, r.children("i").size());
+        assertEquals("2", r.children("i").get(1).getAttribute("n"));
+        assertTrue(r.children("none").isEmpty());
+        assertNull(r.child("none"));
+        assertEquals("x y", r.childText("i"));
+        assertEquals("", r.childText("j"));
+        assertNull(r.childText("none"));
     }
 }

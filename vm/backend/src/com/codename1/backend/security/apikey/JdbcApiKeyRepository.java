@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security.apikey;
 
+import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.security.Clock;
 import java.io.IOException;
@@ -81,7 +82,7 @@ public final class JdbcApiKeyRepository implements ApiKeyRepository {
             return null;
         }
         try {
-            Map row = dataSource.queryOne("SELECT " + COLUMNS + " FROM cn1_api_key WHERE "
+            Map row = dataSource.queryOne("SELECT " + COLUMNS + " FROM " + SecuritySchema.table("cn1_api_key") + " WHERE "
                     + "key_hash = ?", new Object[] {hash});
             return row == null ? null : read(row);
         } catch (IOException err) {
@@ -104,7 +105,7 @@ public final class JdbcApiKeyRepository implements ApiKeyRepository {
             }
             scopes.append(scopes.length() == 0 ? "" : " ").append(scope);
         }
-        dataSource.execute("INSERT INTO cn1_api_key (key_hash, id, owner, scopes, prefix, "
+        dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_api_key") + " (key_hash, id, owner, scopes, prefix, "
                 + "last_four, revoked, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {
                     key.getHash(), key.getId(), key.getOwner(), scopes.toString(), key.getPrefix(),
                     key.getLastFour(), Integer.valueOf(key.isRevoked() ? 1 : 0),
@@ -116,19 +117,19 @@ public final class JdbcApiKeyRepository implements ApiKeyRepository {
     /// @return whether this call revoked it: false when there is no such key, or
     /// it was revoked already
     public boolean revoke(String id) throws IOException {
-        return dataSource.execute("UPDATE cn1_api_key SET revoked = 1 WHERE id = ? AND "
+        return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_api_key") + " SET revoked = 1 WHERE id = ? AND "
                 + "revoked = 0", new Object[] {id}) == 1;
     }
 
     /// Forgets the key with this id altogether.
     public boolean delete(String id) throws IOException {
-        return dataSource.execute("DELETE FROM cn1_api_key WHERE id = ?", new Object[] {id}) == 1;
+        return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_api_key") + " WHERE id = ?", new Object[] {id}) == 1;
     }
 
     /// The keys of one owner, oldest first.
     public List<ApiKey> findByOwner(String owner) throws IOException {
         List<ApiKey> out = new ArrayList<ApiKey>();
-        for (Object row : dataSource.query("SELECT " + COLUMNS + " FROM cn1_api_key WHERE "
+        for (Object row : dataSource.query("SELECT " + COLUMNS + " FROM " + SecuritySchema.table("cn1_api_key") + " WHERE "
                 + "owner = ? ORDER BY created_at, id", new Object[] {owner})) {
             out.add(read((Map) row));
         }

@@ -18,6 +18,7 @@
 package com.codename1.util.regex;
 
 /// This is a class that contains utility helper methods for this package.
+@com.codename1.impl.SharedWithBackend
 public abstract class REUtil {
     /// complex:
     private static final String complexPrefix = "complex:";

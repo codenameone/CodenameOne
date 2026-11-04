@@ -809,6 +809,13 @@ final class BackendTestGenerator {
             sb.append("        new ").append(OrmAnnotationProcessor.BACKEND_BOOTSTRAP_BINARY)
               .append("();\n");
         }
+        String registry = BackendJsonCodecs.REGISTRY.replace('.', '/');
+        if (ctx.lookup(registry) != null
+                || RestControllerAnnotationProcessor.resolveClass(ctx, registry) != null) {
+            // As the generated main installs it: Json.read(body, Release.class).
+            sb.append("        com.codename1.impl.backend.JsonCodec.install(new ")
+              .append(BackendJsonCodecs.REGISTRY).append("());\n");
+        }
         sb.append("    }\n\n");
         sb.append("    public com.codename1.impl.backend.BackendApplication createApplication() {\n")
           .append("        return new ").append(spec.wiringBinary).append("();\n    }\n\n");

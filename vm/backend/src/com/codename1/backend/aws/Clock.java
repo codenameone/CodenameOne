@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.aws;
 
+import com.codename1.impl.backend.CivilTime;
+
 /// The ISO basic timestamp AWS signs with: yyyyMMdd'T'HHmmss'Z', always UTC.
 ///
 /// Written out by hand rather than through SimpleDateFormat because the translated
@@ -29,9 +31,6 @@ package com.codename1.backend.aws;
 /// Arabic-Indic digit or a locale that renders the year differently produces a
 /// signature the service cannot reproduce, and the only symptom is a 403.
 final class Clock {
-    private static final int[] DAYS_IN_MONTH =
-            {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
     private Clock() {
     }
 
@@ -44,36 +43,11 @@ final class Clock {
         if (millis < 0 && (millis % 1000L) != 0) {
             seconds--; // floor, so a pre-epoch instant does not round toward zero
         }
-        long days = floorDiv(seconds, 86400L);
+        long days = CivilTime.floorDiv(seconds, 86400L);
         int secondOfDay = (int) (seconds - days * 86400L);
 
-        int year = 1970;
-        while (true) {
-            int length = isLeap(year) ? 366 : 365;
-            if (days >= length) {
-                days -= length;
-                year++;
-            } else if (days < 0) {
-                year--;
-                days += isLeap(year) ? 366 : 365;
-            } else {
-                break;
-            }
-        }
-        int month = 0;
-        while (true) {
-            int length = DAYS_IN_MONTH[month] + (month == 1 && isLeap(year) ? 1 : 0);
-            if (days < length) {
-                break;
-            }
-            days -= length;
-            month++;
-        }
-
         StringBuilder out = new StringBuilder(16);
-        pad(out, year, 4);
-        pad(out, month + 1, 2);
-        pad(out, (int) days + 1, 2);
+        CivilTime.appendDate(out, days, (char) 0);
         out.append('T');
         pad(out, secondOfDay / 3600, 2);
         pad(out, (secondOfDay / 60) % 60, 2);
@@ -82,23 +56,7 @@ final class Clock {
         return out.toString();
     }
 
-    private static long floorDiv(long value, long divisor) {
-        long q = value / divisor;
-        if ((value % divisor != 0) && ((value < 0) != (divisor < 0))) {
-            q--;
-        }
-        return q;
-    }
-
-    private static boolean isLeap(int year) {
-        return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-    }
-
     private static void pad(StringBuilder out, int value, int width) {
-        String text = String.valueOf(value);
-        for (int iter = text.length() ; iter < width ; iter++) {
-            out.append('0');
-        }
-        out.append(text);
+        CivilTime.pad(out, value, width);
     }
 }

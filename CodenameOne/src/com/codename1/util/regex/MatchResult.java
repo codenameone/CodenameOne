@@ -23,6 +23,7 @@
 package com.codename1.util.regex;
 
 /// What one match found: the same shape as `java.util.regex.MatchResult`.
+@com.codename1.impl.SharedWithBackend
 public interface MatchResult {
 
     int start();

@@ -52,8 +52,12 @@ import java.lang.annotation.Target;
 ///   not change what is stored. A `TIMESTAMP WITH TIME ZONE` column is read with
 ///   the offset the server sends.
 /// - Precision is the **millisecond**, which is all a Date holds. A column with
-///   finer precision has the extra digits dropped on read; one with coarser
-///   precision rounds or truncates on write, as that engine does.
+///   finer precision has the extra digits dropped on read. A coarser column,
+///   such as a plain MySQL `DATETIME`, is accepted only when the field declares
+///   it, `@Column(type = "DATETIME")`: the declaration is the opt-in to losing
+///   the milliseconds. The engine then rounds or truncates on write, as it does
+///   for Hibernate, so on MySQL a value may read back one second later. MySQL's
+///   `TIMESTAMP` is still refused, since it ends in 2038.
 /// - On SQLite, which has no native date type, the value is text in the form
 ///   `2026-10-16 09:30:00.000`, which sorts in time order. Rows written in a
 ///   different textual form are read when they are ISO 8601, but compare as text

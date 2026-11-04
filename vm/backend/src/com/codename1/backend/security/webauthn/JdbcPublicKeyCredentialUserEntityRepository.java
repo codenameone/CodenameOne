@@ -76,7 +76,7 @@ public final class JdbcPublicKeyCredentialUserEntityRepository
 
     private PublicKeyCredentialUserEntity byName(String username) throws IOException {
         return entity(dataSource.queryOne("SELECT username, user_id, display_name FROM "
-                + "cn1_webauthn_user WHERE username_key = ?",
+                + SecuritySchema.table("cn1_webauthn_user") + " WHERE username_key = ?",
                 new Object[] {SecuritySchema.usernameKey(username)}));
     }
 
@@ -87,7 +87,7 @@ public final class JdbcPublicKeyCredentialUserEntityRepository
         }
         try {
             return entity(dataSource.queryOne("SELECT username, user_id, display_name FROM "
-                    + "cn1_webauthn_user WHERE user_id = ?",
+                    + SecuritySchema.table("cn1_webauthn_user") + " WHERE user_id = ?",
                     new Object[] {Base64Url.encode(id)}));
         } catch (IOException err) {
             throw failed(err);
@@ -114,7 +114,7 @@ public final class JdbcPublicKeyCredentialUserEntityRepository
                 return first;
             }
             try {
-                dataSource.execute("INSERT INTO cn1_webauthn_user (username_key, username, "
+                dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_webauthn_user") + " (username_key, username, "
                         + "user_id, display_name, created_at) VALUES (?, ?, ?, ?, ?)",
                         new Object[] {SecuritySchema.usernameKey(user.getName()), user.getName(),
                             Base64Url.encode(user.getId()), user.getDisplayName(),
@@ -140,7 +140,7 @@ public final class JdbcPublicKeyCredentialUserEntityRepository
             return;
         }
         try {
-            dataSource.execute("DELETE FROM cn1_webauthn_user WHERE user_id = ?",
+            dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_webauthn_user") + " WHERE user_id = ?",
                     new Object[] {Base64Url.encode(id)});
         } catch (IOException err) {
             throw failed(err);

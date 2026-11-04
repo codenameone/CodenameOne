@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.Reader;
 
 /// Encapsulates java.io.Reader as CharacterIterator
+@com.codename1.impl.SharedWithBackend
 public final class ReaderCharacterIterator implements CharacterIterator {
     /// Underlying reader
     private final Reader reader;
