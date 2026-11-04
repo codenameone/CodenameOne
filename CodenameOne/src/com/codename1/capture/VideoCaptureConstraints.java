@@ -168,25 +168,17 @@ public class VideoCaptureConstraints {
     ///
     @Override
     public String toString() {
-        return "VideoCaptureConstraints{" + getWidth() + "x" + getHeight() + " @ " + getMaxLength() + "s, " + getQualityString() + " " + getMaxFileSizeString() + "}";
-    }
-
-    private String getQualityString() {
-        switch (getQuality()) {
-            case QUALITY_LOW:
-                return "Low quality";
-            case QUALITY_HIGH:
-                return "High quality";
-            default:
-                return "";
+        // Never compiles: asking the platform can wait (a host query on the web), and
+        // a description must not. Before compiling, the preferred values are what
+        // the constraints say.
+        if (!compiled) {
+            return "VideoCaptureConstraints{preferred " + preferredWidth + "x" + preferredHeight + " @ "
+                    + preferredMaxLength + "s, quality " + preferredQuality + ", max file size "
+                    + preferredMaxFileSize + "}";
         }
-    }
-
-    private String getMaxFileSizeString() {
-        if (getMaxFileSize() > 0) {
-            return "<=" + getMaxFileSize() + " bytes";
-        }
-        return "";
+        String quality = this.quality == QUALITY_LOW ? "Low quality" : this.quality == QUALITY_HIGH ? "High quality" : "";
+        return "VideoCaptureConstraints{" + width + "x" + height + " @ " + maxLength + "s, " + quality
+                + (maxFileSize > 0 ? " <=" + maxFileSize + " bytes" : " ") + "}";
     }
 
     @Override

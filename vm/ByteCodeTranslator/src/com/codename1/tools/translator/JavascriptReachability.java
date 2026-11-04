@@ -357,6 +357,20 @@ final class JavascriptReachability {
          * optimization for the ordinary "abstract base declares it abstractly"
          * shape.
          */
+        /// The body a virtual call on a receiver of exactly `type` runs, or null.
+        BytecodeMethod resolveOn(String type, String name, String desc) {
+            if (!instantiated.contains(type) || !isConcreteReceiver(type)) {
+                return null;
+            }
+            return walkUp(type, name, desc);
+        }
+
+        /// Whether an object of exactly `type` can exist: allocated somewhere the
+        /// analysis kept. A type that cannot is never a receiver.
+        boolean isInstantiated(String type) {
+            return instantiated.contains(type);
+        }
+
         private boolean isConcreteReceiver(String type) {
             ByteCodeClass cls = byName.get(type);
             return cls != null && !cls.isIsInterface() && !cls.isIsAbstract();

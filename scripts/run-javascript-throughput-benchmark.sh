@@ -251,8 +251,10 @@ SUSPENSION_REPORT="$(dirname "$DIST")/$(basename "$DIST")-suspension-report.txt"
 [ -f "$SUSPENSION_REPORT" ] || SUSPENSION_REPORT="$(find "$OUT" -name '*suspension-report.txt' -print -quit || true)"
 
 BUNDLE_BYTES=$(cat "$DIST"/translated_app*.js | wc -c | tr -d ' ')
-YIELDS=$(cat "$DIST"/translated_app*.js | grep -o 'yield\*' | wc -l | tr -d ' ')
-GENERATORS=$(cat "$DIST"/translated_app*.js | grep -o 'function\*' | wc -l | tr -d ' ')
+# ``|| true`` again: a bundle with no generators at all is a result, and grep's
+# exit 1 on no match would otherwise end the script under pipefail.
+YIELDS=$(cat "$DIST"/translated_app*.js | { grep -o 'yield\*' || true; } | wc -l | tr -d ' ')
+GENERATORS=$(cat "$DIST"/translated_app*.js | { grep -o 'function\*' || true; } | wc -l | tr -d ' ')
 
 exec 3>&1
 BASELINE="$BASELINE" JSON_OUT="$JSON_OUT" RAW="$RAW" REPORT="$SUSPENSION_REPORT" \

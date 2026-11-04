@@ -544,6 +544,149 @@ final class JavascriptMethodGenerator {
      * via the JSO bridge, not via bytecode visible to the
      * INVOKEVIRTUAL / INVOKEINTERFACE scan above).
      */
+    /// The method's fused StringBuilder instructions, or null unless EVERY one of them
+    /// is in the body being emitted: a site fused at one instruction and not at the
+    /// next would hand a box to a real StringBuilder call.
+    private static Map<Instruction, Integer> presentBuilderFusion(BytecodeMethod method, List<Instruction> instructions) {
+        Map<Instruction, Integer> fusion = method.getJsBuilderFusion();
+        if (fusion == null) {
+            return null;
+        }
+        int present = 0;
+        for (Instruction instruction : instructions) {
+            if (fusion.containsKey(instruction)) {
+                present++;
+            }
+        }
+        return present == fusion.size() ? fusion : null;
+    }
+
+    /// {@code sN} or {@code lN}: a name that can be read twice with no effect.
+    private static boolean isSlotOrLocal(String expression) {
+        if (expression.length() < 2 || (expression.charAt(0) != 's' && expression.charAt(0) != 'l')) {
+            return false;
+        }
+        for (int i = 1; i < expression.length(); i++) {
+            if (!Character.isDigit(expression.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A call on a fused StringBuilder (JavascriptBuilderFusion): the box's text is
+    /// a JavaScript string, and every alias of the builder is the same box.
+    private static boolean appendFusedBuilderInvoke(StringBuilder out, int kind, StraightLineContext ctx) {
+        switch (kind) {
+            case JavascriptBuilderFusion.INIT_EMPTY:
+                ctx.pop();
+                return true;
+            case JavascriptBuilderFusion.INIT_STRING: {
+                String text = ctx.pop();
+                String box = ctx.pop();
+                out.append(ctx.flushPendingFieldReads());
+                // new StringBuilder(null) throws, as text.length() does in the Java constructor.
+                out.append("  ").append(box).append(".__sbv = jvm.toNativeString(_nn(").append(text).append("));\n");
+                return true;
+            }
+            case JavascriptBuilderFusion.TO_STRING: {
+                String box = ctx.pop();
+                out.append("  ").append(ctx.push("jvm.newJavaString(" + box + ".__sbv)")).append(";\n");
+                return true;
+            }
+            case JavascriptBuilderFusion.LENGTH: {
+                String box = ctx.pop();
+                out.append("  ").append(ctx.push(box + ".__sbv.length")).append(";\n");
+                return true;
+            }
+            default:
+                break;
+        }
+        String value = ctx.pop();
+        String box = ctx.pop();
+        String text;
+        switch (kind) {
+            case JavascriptBuilderFusion.APPEND_STRING:
+                // null appends "null". A String holding its native text is read
+                // directly: the call costs stringBuilding 8%.
+                text = isSlotOrLocal(value)
+                        ? "(" + value + " != null && " + value + ".__nativeString != null ? " + value
+                                + ".__nativeString : jvm.toNativeString(" + value + "))"
+                        : "jvm.toNativeString(" + value + ")";
+                break;
+            case JavascriptBuilderFusion.APPEND_INT:
+                text = "(" + value + " | 0)";
+                break;
+            case JavascriptBuilderFusion.APPEND_CHAR:
+                text = "String.fromCharCode(" + value + ")";
+                break;
+            case JavascriptBuilderFusion.APPEND_BOOLEAN:
+                text = "(" + value + " ? \"true\" : \"false\")";
+                break;
+            case JavascriptBuilderFusion.APPEND_LONG:
+                text = "_LtoStr(" + value + ")";
+                break;
+            default:
+                throw new IllegalStateException("Unknown fused StringBuilder call " + kind);
+        }
+        out.append(ctx.flushPendingFieldReads());
+        out.append("  ").append(box).append(".__sbv += ").append(text).append(";\n");
+        // append returns its receiver.
+        out.append("  ").append(ctx.push(box)).append(";\n");
+        return true;
+    }
+
+    private static volatile java.util.Set<String> bridgeNamedTokens;
+
+    /// Every cn1_ token the runtime and bridge JavaScript names: methods it binds or
+    /// calls, fields it reads and writes.
+    private static java.util.Set<String> bridgeNamedTokens() {
+        java.util.Set<String> named = bridgeNamedTokens;
+        if (named == null) {
+            named = new java.util.HashSet<String>(JavascriptBundleWriter.collectBridgeReferencedCn1Tokens());
+            bridgeNamedTokens = named;
+        }
+        return named;
+    }
+
+    /// The field access a call can be replaced with on this target, or null. On top of
+    /// the C backend's proof: never a method the runtime or bridge JS names (bindNative
+    /// can replace its body, or the host looks it up), never on a JSObject bridge type,
+    /// and a static fold only when the field lives in the method's own class, so the
+    /// call's class initialization is the field read's.
+    static Field jsInlinableFieldAccess(Invoke invoke) {
+        Field f = invoke.asInlinableFieldAccess();
+        if (f == null) {
+            return null;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (idx == null) {
+            return null;
+        }
+        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
+        ByteCodeClass ownerCls = idx.get(owner);
+        if (ownerCls == null || isJsoBridgeType(ownerCls, idx)) {
+            return null;
+        }
+        if (f.getOpcode() == Opcodes.GETSTATIC
+                && !owner.equals(JavascriptNameUtil.sanitizeClassName(f.getOwner()))) {
+            return null;
+        }
+        java.util.Set<String> named = bridgeNamedTokens();
+        String did = JavascriptNameUtil.dispatchMethodIdentifier(invoke.getName(), invoke.getDesc());
+        if (named.contains(did)) {
+            return null;
+        }
+        for (ByteCodeClass c = ownerCls; c != null; c = c.getBaseClassObject()) {
+            String id = JavascriptNameUtil.methodIdentifier(c.getClsName(), invoke.getName(), invoke.getDesc());
+            if (named.contains(id) || named.contains(id + "__impl")
+                    || NATIVE_METHOD_IDENTIFIERS.contains(id)) {
+                return null;
+            }
+        }
+        return f;
+    }
+
     private static boolean isJsoBridgeType(ByteCodeClass cls, Map<String, ByteCodeClass> idx) {
         java.util.Set<String> seen = new java.util.HashSet<String>();
         java.util.Deque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
@@ -703,6 +846,13 @@ final class JavascriptMethodGenerator {
         return method.isSynchronizedMethod() && method.isJavascriptSuspending();
     }
 
+    /// The monitor enter for the method being emitted. Only a generator emits one
+    /// (a monitor makes its method suspending), and it parks on a contended
+    /// monitor with ``yield* _me``.
+    private static String monitorEnterCall(String target) {
+        return "yield* _me(" + target + ")";
+    }
+
     /**
      * True when the given invoke's callee is (or must be conservatively
      * treated as) suspending. Virtual / interface dispatches go through
@@ -753,6 +903,12 @@ final class JavascriptMethodGenerator {
         }
         if (m == null) {
             m = model.directTarget(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+            // Type flow can classify the site synchronous where the cone's one body is
+            // a generator (the body is unreachable from here); a direct call would then
+            // hand back the raw generator, so leave it to the driving dispatcher.
+            if (m != null && m.isJavascriptSuspending() && !isInvokeSuspending(invoke)) {
+                m = null;
+            }
         }
         if (m == null) {
             return null;
@@ -773,6 +929,42 @@ final class JavascriptMethodGenerator {
         return target == null ? signatureAnswer : target.booleanValue();
     }
 
+    /// A direct call from a generator to a detached method (see
+    /// `appendDetachedMethod`) runs its body in place with `yield*`, so a
+    /// thread that can wait still waits; only a synchronous caller detaches.
+    private static boolean isDetachedBodyCall(Invoke invoke) {
+        if (!currentEmissionMethodSuspending) {
+            return false;
+        }
+        BytecodeMethod m;
+        if (invoke.getOpcode() == Opcodes.INVOKESPECIAL) {
+            m = resolveDirectInvokeTarget(invoke);
+        } else if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL) {
+            // javac 11+ calls a private method with invokevirtual (nestmates);
+            // it still has exactly one target, so it is called directly here.
+            m = privateTarget(invoke);
+        } else {
+            return false;
+        }
+        return m != null && m.isJavascriptDetachedBody() && !m.isJavascriptSuspending();
+    }
+
+    private static BytecodeMethod privateTarget(Invoke invoke) {
+        Map<String, ByteCodeClass> idx = classIndex;
+        ByteCodeClass cls = idx == null || invoke.getOwner() == null ? null
+                : idx.get(JavascriptNameUtil.sanitizeClassName(invoke.getOwner()));
+        if (cls == null) {
+            return null;
+        }
+        for (BytecodeMethod m : cls.getMethods()) {
+            if (m.isPrivate() && !m.isStatic() && !m.isEliminated()
+                    && invoke.getName().equals(m.getMethodName()) && invoke.getDesc().equals(m.getSignature())) {
+                return m;
+            }
+        }
+        return null;
+    }
+
     private static boolean isInvokeSuspending(Invoke invoke) {
         int op = invoke.getOpcode();
         if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
@@ -790,7 +982,7 @@ final class JavascriptMethodGenerator {
             JavascriptSuspensionAnalysis.DispatchModel model =
                     JavascriptSuspensionAnalysis.exportedDispatchModel;
             if (model != null) {
-                return model.isDispatchSuspending(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+                return model.isDispatchSuspending(invoke);
             }
             // Analysis disabled (-Dparparvm.js.suspension.off): unchanged
             // historical behaviour.
@@ -1617,12 +1809,46 @@ final class JavascriptMethodGenerator {
             // dataflow patterns the emitter can't see across
             // instructions (e.g., ALOAD + GETFIELD ≈ push X.Y).
             StringBuilder methodOut = new StringBuilder();
-            appendMethodImpl(methodOut, regs, cls, method);
+            if (method.isJavascriptDetachedBody() && !method.isJavascriptSuspending()) {
+                appendDetachedMethod(methodOut, regs, cls, method);
+            } else {
+                appendMethodImpl(methodOut, regs, cls, method);
+            }
             out.append(applyMethodPeephole(methodOut));
         } finally {
             currentEmissionClass = null;
             currentEmissionMethodSuspending = false;
         }
+    }
+
+    /// `@JavaScriptDetached` with a body that can wait: the body is emitted as the
+    /// generator `<name>__det`, and `<name>` -- the identifier every caller and the
+    /// dispatch table use -- is a plain function that runs it through `cn1_detach`,
+    /// synchronously until it really waits and on a new green thread after that.
+    private static void appendDetachedMethod(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method) {
+        String name = jsMethodIdentifier(cls, method);
+        String bodyName = name + "__det";
+        StringBuilder body = new StringBuilder();
+        method.setJavascriptSuspending(true);
+        try {
+            appendMethodImpl(body, regs, cls, method);
+        } finally {
+            method.setJavascriptSuspending(false);
+        }
+        String header = "function* " + name + "(";
+        int at = body.indexOf(header);
+        if (at < 0) {
+            throw new IllegalStateException("@JavaScriptDetached body not emitted as a generator: " + name);
+        }
+        body.replace(at, at + header.length(), "function* " + bodyName + "(");
+        out.append(body);
+        StringBuilder params = new StringBuilder("__cn1ThisObject");
+        for (int i = 0; i < method.getArguments().size(); i++) {
+            params.append(", __cn1Arg").append(i + 1);
+        }
+        out.append("function ").append(name).append("(").append(params).append("){\n")
+                .append("  cn1_detach(").append(bodyName).append("(").append(params).append("));\n")
+                .append("  return null;\n}\n");
     }
 
     /**
@@ -3159,7 +3385,7 @@ final class JavascriptMethodGenerator {
             // the monitor is contended; the non-contended case is a
             // fast no-yield. See parparvm_runtime.js ``_me`` /
             // ``monitorEnter``.
-            out.append("  yield* _me(__cn1Monitor);\n");
+            out.append("  ").append(monitorEnterCall("__cn1Monitor")).append(";\n");
             out.append("  try {\n");
         }
         out.append("  while (true) {\n");
@@ -3725,6 +3951,7 @@ final class JavascriptMethodGenerator {
                 walk = walk.getBaseClassObject();
             }
             ctx.captureInitializedClassesSeed();
+            ctx.builderFusion = presentBuilderFusion(method, instructions);
             if (!method.isStatic()) {
                 setup.append("  let l0 = __cn1ThisObject;\n");
                 ctx.localsInitialized[0] = true;
@@ -3820,7 +4047,7 @@ final class JavascriptMethodGenerator {
             }
             if (emitsMonitor(method)) {
                 body.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
-                body.append("  yield* _me(__cn1Monitor);\n");
+                body.append("  ").append(monitorEnterCall("__cn1Monitor")).append(";\n");
                 body.append("  try {\n");
             }
             body.append(instructionBody);
@@ -4793,8 +5020,8 @@ final class JavascriptMethodGenerator {
             // ``data[off + i++]`` read the post-increment value (observed as
             // the UTF-8 decoder skipping byte 0 and wedging boot).
             out.append(ctx.flushPendingLocal(iinc.getVar()));
-            out.append("  l").append(iinc.getVar()).append(" = (l").append(iinc.getVar()).append(" || 0) + ")
-                    .append(iinc.getAmount()).append(";\n");
+            out.append("  l").append(iinc.getVar()).append(" = ((l").append(iinc.getVar()).append(" || 0) + ")
+                    .append(iinc.getAmount()).append(") | 0;\n");
             return true;
         }
         if (instruction instanceof Ldc) {
@@ -4804,7 +5031,7 @@ final class JavascriptMethodGenerator {
             return appendStraightLineTypeInstruction(out, (TypeInstruction) instruction, ctx);
         }
         if (instruction instanceof Field) {
-            return appendStraightLineFieldInstruction(out, (Field) instruction, ctx);
+            return appendStraightLineFieldInstruction(out, (Field) instruction, ctx, false);
         }
         if (instruction instanceof Invoke) {
             return appendStraightLineInvokeInstruction(out, (Invoke) instruction, instructions, index, ctx);
@@ -5046,10 +5273,13 @@ final class JavascriptMethodGenerator {
                 out.append("  ").append(ctx.push(v2)).append(";\n");
                 return true;
             }
+            // Wrapped on the way out too: a sum left past int32 becomes a heap
+            // double in V8, and an array or local that once held one stays
+            // double-typed (arraySequential measured 3x slower without it).
             case Opcodes.IADD:
-                return emitBinary(out, ctx, "((%s|0) + (%s|0))");
+                return emitBinary(out, ctx, "(((%s|0) + (%s|0)) | 0)");
             case Opcodes.ISUB:
-                return emitBinary(out, ctx, "((%s|0) - (%s|0))");
+                return emitBinary(out, ctx, "(((%s|0) - (%s|0)) | 0)");
             case Opcodes.IMUL:
                 // Math.imul, never (a|0) * (b|0): a product past 2^53 is rounded
                 // as a double before |0 truncates it, so 0x7fffffff * 0x7fffffff
@@ -5080,7 +5310,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.DMUL:
                 return emitBinary(out, ctx, "(%s * %s)");
             case Opcodes.IDIV:
-                return emitBinary(out, ctx, "(((%s|0) / (%s|0)) | 0)");
+                return emitBinary(out, ctx, "_Id(%s, %s)");
             case Opcodes.LDIV:
                 return emitBinary(out, ctx, "_Ldiv(%s, %s)");
             case Opcodes.FDIV:
@@ -5088,7 +5318,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.DDIV:
                 return emitBinary(out, ctx, "(%s / %s)");
             case Opcodes.IREM:
-                return emitBinary(out, ctx, "((%s|0) %% (%s|0))");
+                return emitBinary(out, ctx, "_Ir(%s, %s)");
             case Opcodes.LREM:
                 return emitBinary(out, ctx, "_Lrem(%s, %s)");
             case Opcodes.FREM:
@@ -5129,7 +5359,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.LXOR:
                 return emitBinary(out, ctx, "_Lxor(%s, %s)");
             case Opcodes.I2L:
-                return emitUnary(out, ctx, "_Li2l(%s)");
+                return emitUnary(out, ctx, "(%s | 0)");
             // A long reaches a float in one rounding, which is not what
             // rounding its double would give; the runtime's _Ll2f does that.
             case Opcodes.L2F:
@@ -5200,7 +5430,7 @@ final class JavascriptMethodGenerator {
                 // thread may have run since they were deferred.
                 String target = ctx.pop();
                 out.append(ctx.flushPendingFieldReads());
-                out.append("  yield* _me(").append(target).append(");\n");
+                out.append("  ").append(monitorEnterCall(target)).append(";\n");
                 return true;
             }
             case Opcodes.MONITOREXIT: {
@@ -5459,6 +5689,12 @@ final class JavascriptMethodGenerator {
         String typeName = JavascriptNameUtil.runtimeTypeName(instruction.getTypeName());
         switch (instruction.getOpcode()) {
             case Opcodes.NEW:
+                if (ctx.builderKind(instruction) == JavascriptBuilderFusion.NEW) {
+                    // A fused StringBuilder: a box around its text. Nothing of the
+                    // class is touched, so there is no initializer to run.
+                    out.append("  ").append(ctx.push("{__sbv: \"\"}")).append(";\n");
+                    return true;
+                }
                 // ``_O`` initializes the class itself, but only through the
                 // SYNCHRONOUS driver. Emit the guard ahead of it so a
                 // suspending <clinit> runs on the trampoline; ``_O``'s own
@@ -5518,7 +5754,8 @@ final class JavascriptMethodGenerator {
         return "_primClass(\"" + token + "\")";
     }
 
-    private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx) {
+    private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx,
+                                                             boolean folded) {
         String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
         String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
@@ -5553,12 +5790,22 @@ final class JavascriptMethodGenerator {
             }
             case Opcodes.GETFIELD: {
                 String target = ctx.pop();
+                // A folded getter replaced an invoke, and an invoke on null throws a
+                // Java NPE; a bare property read would throw a JS TypeError instead,
+                // which no Java catch for NullPointerException sees.
+                if (folded) {
+                    target = "_nn(" + target + ")";
+                }
                 out.append("  ").append(ctx.push(target + "[\"" + propertyName + "\"]")).append(";\n");
                 return true;
             }
             case Opcodes.PUTFIELD: {
                 String value = ctx.pop();
                 String target = ctx.pop();
+                if (folded) {
+                    // Same as the folded getter above: a Java NPE, not a TypeError.
+                    target = "_nn(" + target + ")";
+                }
                 out.append(ctx.flushPendingFieldReads());
                 out.append("  ").append(target).append("[\"").append(propertyName).append("\"] = ").append(value).append(";\n");
                 return true;
@@ -5655,6 +5902,21 @@ final class JavascriptMethodGenerator {
 
     private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke,
             List<Instruction> instructions, int index, StraightLineContext ctx) {
+        // Trivial getters and setters, folded to the field access they perform:
+        // the C backend's fold (Invoke.asInlinableFieldAccess), which proves the
+        // target monomorphic and reads its RAW body -- JS bodies are never
+        // rewritten in place, so the verdict cannot depend on emission order. The
+        // field op has the call's exact stack effect and dereferences the same
+        // receiver; the receiver goes through _nn so a null one throws a Java
+        // NullPointerException rather than a JS TypeError.
+        int builderKind = ctx.builderKind(invoke);
+        if (builderKind != 0) {
+            return appendFusedBuilderInvoke(out, builderKind, ctx);
+        }
+        Field folded = jsInlinableFieldAccess(invoke);
+        if (folded != null) {
+            return appendStraightLineFieldInstruction(out, folded, ctx, true);
+        }
         String declaredOwner = invoke.getOwner();
         String directOwner = resolveDirectInvokeOwner(invoke);
         String owner = JavascriptNameUtil.sanitizeClassName(directOwner);
@@ -5686,7 +5948,8 @@ final class JavascriptMethodGenerator {
         // pending field read must materialise BEFORE the call, which may
         // mutate the field it reads.
         out.append(ctx.flushPendingFieldReads());
-        if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
+        if ((invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE)
+                && !isDetachedBodyCall(invoke)) {
             // Straight-line INVOKEVIRTUAL / INVOKEINTERFACE: emit one cn1_iv*
             // helper call instead of __classDef/resolveVirtual boilerplate.
             // See appendCompactVirtualDispatch for the shared emission rules.
@@ -5786,6 +6049,10 @@ final class JavascriptMethodGenerator {
         // ``yield*`` ceremony so the cooperative scheduler can interleave
         // them with other threads.
         String yieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
+        if (isDetachedBodyCall(invoke)) {
+            invokedName = methodId + "__det";
+            yieldPrefix = "yield* ";
+        }
         if (JavascriptIncremental.isExternal(JavascriptNameUtil.sanitizeClassName(methodOwner))) {
             // Incremental translation: whether the host function is a generator is not
             // known here; its adapter drives either kind (see JavascriptIncremental).
@@ -5857,6 +6124,16 @@ final class JavascriptMethodGenerator {
         private int sp;
         private int maxObservedStack;
         private int nextTempId;
+        // Fused StringBuilder instructions (JavascriptBuilderFusion), or null.
+        private Map<Instruction, Integer> builderFusion;
+
+        private int builderKind(Instruction instruction) {
+            if (builderFusion == null) {
+                return 0;
+            }
+            Integer kind = builderFusion.get(instruction);
+            return kind == null ? 0 : kind.intValue();
+        }
 
         private StraightLineContext(int maxLocals, int maxStack) {
             this.localsInitialized = new boolean[Math.max(1, maxLocals)];
@@ -7273,7 +7550,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a * b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IDIV:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(((a|0) / (b|0)) | 0); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Id(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LDIV:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Ldiv(a, b)); pc = ").append(index + 1).append("; break; }\n");
@@ -7285,7 +7562,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a / b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IREM:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) % (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Ir(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LREM:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lrem(a, b)); pc = ").append(index + 1).append("; break; }\n");
@@ -7437,7 +7714,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let value = stack.q(); let idx = stack.q(); let arr = stack.q(); _T(arr, idx, value); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.MONITORENTER:
-                out.append("        yield* _me(stack.q()); pc = ").append(index + 1).append("; break;\n");
+                out.append("        ").append(monitorEnterCall("stack.q()")).append("; pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.MONITOREXIT:
                 out.append("        _mx(stack.q()); pc = ").append(index + 1).append("; break;\n");
@@ -7813,7 +8090,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 throw new IllegalArgumentException("Unsupported invoke opcode " + invoke.getOpcode());
         }
 
-        if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
+        if ((invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE)
+                && !isDetachedBodyCall(invoke)) {
             // CHA verdict for this call site: a sync signature uses the
             // non-generator ``cn1_ivs*`` family with no ``yield*`` (so a
             // method whose every virtual call is sync can itself be a plain
@@ -7936,6 +8214,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 ? (isInvokeTargetNative(invoke) ? methodId : methodBodyId)
                 : methodId;
         String interpYieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
+        if (isDetachedBodyCall(invoke)) {
+            invokedName = methodId + "__det";
+            interpYieldPrefix = "yield* ";
+        }
         if (JavascriptIncremental.isExternal(JavascriptNameUtil.sanitizeClassName(methodOwner))) {
             invokedName = JavascriptIncremental.adapterFor(methodId);
             interpYieldPrefix = "yield* ";
@@ -11684,6 +11966,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     /// Local slots of the method being emitted whose class is known exactly, or null.
     private static Map<Integer, String> currentExactLocals;
 
+
     /// The slots every store to which is ``new X(...)`` -- an ASTORE right after the
     /// ``X.<init>`` call -- mapped to X; parameters, whose first value comes from the
     /// caller, never qualify. A virtual call on such a local reaches X's own body however
@@ -11890,8 +12173,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     /// Emits the allocation function of every class newObjectExpression handed out. Runs
     /// after every class has been generated, and its output goes after every class
     /// registration, so each function can capture its classDef once at load. The identity
-    /// comes from the runtime's cn1Ids counter, not jvm.nextIdentity: see the note on
-    /// cn1Ids in parparvm_runtime.js.
+    /// starts at 0 and is assigned on first use by the runtime's identityHash: see the
+    /// note on cn1Ids in parparvm_runtime.js.
     ///
     /// The property order is newObject's -- __class, __classDef, __id, __monitor, then the
     /// instance fields base class first, each class's in declaration order, filtered by the
@@ -11918,18 +12201,23 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             String defVar = "$Ad" + Integer.toString(ordinal++, 36);
             out.append("const ").append(defVar).append(" = _Od(\"").append(className).append("\");\n");
             out.append("function ").append(allocationFunctionName(className)).append("(){\n");
-            out.append("return {__class: \"").append(className).append("\", __classDef: ").append(defVar)
-                    .append(", __id: cn1Ids.n++, __monitor: null");
+            // No __id or __monitor slot: both are added on first use (identityHash,
+            // monitorEnter), and two slots on every object cost objectAllocation 14%.
+            out.append("return {__class: \"").append(className).append("\", __classDef: ").append(defVar);
             java.util.Set<String> refs = referencedInstanceFields;
             for (ByteCodeClass c : chain) {
                 for (ByteCodeField field : c.getFields()) {
                     if (field.isStaticField()) {
                         continue;
                     }
-                    if (refs != null && !refs.contains(c.getClsName() + "\0" + field.getFieldName())) {
+                    String prop = JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName());
+                    // A field only the runtime touches (StringBuilder's count, value,
+                    // capacity, wide) is still declared: added later, each was a hidden
+                    // class transition on every object of the class.
+                    if (refs != null && !refs.contains(c.getClsName() + "\0" + field.getFieldName())
+                            && !bridgeNamedTokens().contains(prop)) {
                         continue;
                     }
-                    String prop = JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName());
                     ALLOCATION_FUNCTION_KEYS.add(prop);
                     String desc = field.getRuntimeDescriptor();
                     boolean primitive = desc != null && !desc.isEmpty() && isPrimitiveDescriptor(desc);

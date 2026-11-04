@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -1268,6 +1269,46 @@ final class JavascriptBundleWriter {
      * JS-aware rewrite -- the hoist pass cannot accidentally truncate or
      * splice an escaped string.
      */
+    /// True when the double-quoted literal at {@code [open, close]} is the key of a
+    /// member access -- {@code x["name"]}, {@code f()["name"]}, {@code a[0]["name"]} --
+    /// and is a valid identifier, so {@code x.name} means the same. An array literal
+    /// ({@code = ["name"]}, {@code (["name"]}) has no operand before the bracket.
+    private static final Set<String> OPERATOR_KEYWORDS = new HashSet<String>(Arrays.asList(
+            "return", "typeof", "in", "of", "case", "void", "delete", "else", "do",
+            "new", "throw", "yield", "await", "instanceof"));
+
+    private static boolean isMemberKey(String src, int open, int close) {
+        if (open < 2 || close <= open + 1 || close + 1 >= src.length() || src.charAt(open - 1) != '['
+                || src.charAt(close + 1) != ']') {
+            return false;
+        }
+        char first = src.charAt(open + 1);
+        if (first >= '0' && first <= '9') {
+            return false;
+        }
+        char before = src.charAt(open - 2);
+        if (before == ')' || before == ']') {
+            return true;
+        }
+        // An identifier operand, not a number: ``1["x"]`` would become ``1.x``.
+        int k = open - 2;
+        while (k >= 0 && isHoistableIdentChar(src.charAt(k))) {
+            k--;
+        }
+        if (k == open - 2) {
+            return false;
+        }
+        // A keyword is not an operand: ``return["a"]`` is an array literal, and
+        // ``return.a`` would not parse.
+        if (OPERATOR_KEYWORDS.contains(src.substring(k + 1, open - 1))) {
+            return false;
+        }
+        char lead = src.charAt(k + 1);
+        return !(lead >= '0' && lead <= '9') && (k < 0 || src.charAt(k) != '.' || k == 0
+                || isHoistableIdentChar(src.charAt(k - 1)) || src.charAt(k - 1) == ')'
+                || src.charAt(k - 1) == ']');
+    }
+
     private static boolean isHoistableIdentChar(char c) {
         // The translator's mangle scheme also emits {@code $}-prefixed
         // names ({@code $a}, {@code $XX}, ...) and these appear inside
@@ -1339,7 +1380,7 @@ final class JavascriptBundleWriter {
         return before == '{' || before == ',';
     }
 
-    private static String hoistStringConstants(String src, int[] aliasCounter) {
+    static String hoistStringConstants(String src, int[] aliasCounter) {
         // First pass: walk the source, find every "..." literal that is
         // a pure identifier of length >= 4. Skip single-quoted strings
         // and template literals (JS-port currently emits a few of each
@@ -1373,7 +1414,7 @@ final class JavascriptBundleWriter {
                     break;
                 }
                 int bodyLen = j - i - 1;
-                if (pure && bodyLen >= 4) {
+                if (pure && bodyLen >= 4 && !isMemberKey(src, i, j)) {
                     String body = src.substring(i + 1, j);
                     Integer prev = counts.get(body);
                     counts.put(body, prev == null ? 1 : prev + 1);
@@ -1458,10 +1499,11 @@ final class JavascriptBundleWriter {
         // Publish the advanced counter so the next chunk starts past this one's
         // aliases (keeps the const names unique across the concatenated bundle).
         aliasCounter[0] = aliasIdx;
-        if (aliases.isEmpty()) {
-            return src;
+        // No early return when nothing is aliased: the pass below also writes
+        // member keys as dotted accesses, which every chunk needs.
+        if (!aliases.isEmpty()) {
+            prelude.append(";\n");
         }
-        prelude.append(";\n");
 
         // Second pass: rebuild the file, substituting "BODY" -> alias
         // wherever we previously matched a hoistable double-quoted body.
@@ -1499,6 +1541,17 @@ final class JavascriptBundleWriter {
                 if (pure && bodyLen >= 4) {
                     String body = src.substring(i + 1, j);
                     alias = aliases.get(body);
+                }
+                if (pure && isMemberKey(src, i, j)) {
+                    // ``o["name"]`` becomes ``o.name``, never ``o[_qN]``. A
+                    // top-level const of another script is not a constant
+                    // to V8: the keyed load through it stayed generic, and
+                    // V8 could no longer scalar-replace an object whose
+                    // fields were read that way (valueEscape 20% slower).
+                    out.setLength(out.length() - 1);
+                    out.append('.').append(src, i + 1, j);
+                    i = j + 2;
+                    continue;
                 }
                 if (alias != null) {
                     // A quoted literal in key position -- ``{"count": 0`` or
@@ -2278,6 +2331,7 @@ final class JavascriptBundleWriter {
                 while (l.find()) {
                     bump(counts, l.group(1), 1);
                 }
+                countLookupOnlyConstants(src, counts);
             }
         }
         for (Map.Entry<String, int[]> entry : counts.entrySet()) {
@@ -2287,6 +2341,88 @@ final class JavascriptBundleWriter {
             }
         }
         return tokens;
+    }
+
+    /**
+     * Counts a {@code const ID = "cn1_..."} declaration as a lookup when every
+     * other mention of {@code ID} in the same source is the method argument of
+     * a {@code resolveVirtual} call. port.js names its hot UI lookups this way
+     * ({@code layoutContainer}, {@code shouldRenderSelection}), and counting
+     * the literal as a mention made each one signature-wide suspending: via
+     * {@code Display.shouldRenderSelection()} that reached
+     * {@code Component.getStyle()} and most of the paint path.
+     *
+     * Only {@code const}, which cannot be reassigned, and only when no use is
+     * anything else: an identifier that also feeds an assignment such as
+     * {@code cls.methods[id] = fn} keeps its token. Uses are matched by name
+     * over the whole source, so a shadowing name elsewhere can only add uses
+     * that are not lookups, which keeps the token -- the safe direction.
+     */
+    private static void countLookupOnlyConstants(String src, Map<String, int[]> counts) {
+        com.codename1.tools.translator.regex.Pattern decl = com.codename1.tools.translator.regex.Pattern.compile(
+                "const\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*[\"'](cn1_[A-Za-z0-9_]+)[\"']\\s*;");
+        com.codename1.tools.translator.regex.Matcher d = decl.matcher(src);
+        while (d.find()) {
+            String id = d.group(1);
+            int uses = 0;
+            int lookups = 0;
+            int from = 0;
+            while (true) {
+                int at = src.indexOf(id, from);
+                if (at < 0) {
+                    break;
+                }
+                from = at + id.length();
+                if (isIdentChar(src, at - 1) || isIdentChar(src, from) || at == d.start(1)) {
+                    continue;
+                }
+                uses++;
+                if (isResolveVirtualMethodArgument(src, at, from)) {
+                    lookups++;
+                }
+            }
+            if (uses > 0 && uses == lookups) {
+                bump(counts, d.group(2), 1);
+            }
+        }
+    }
+
+    private static boolean isIdentChar(String src, int i) {
+        if (i < 0 || i >= src.length()) {
+            return false;
+        }
+        char c = src.charAt(i);
+        return Character.isLetterOrDigit(c) || c == '_' || c == '$';
+    }
+
+    // ``resolveVirtual(<receiver without , or parens>, ID)``, the same shape the
+    // literal lookup pattern accepts.
+    private static boolean isResolveVirtualMethodArgument(String src, int start, int end) {
+        int after = skipSpaceAndComments(src, end);
+        if (after >= src.length() || src.charAt(after) != ')') {
+            return false;
+        }
+        int i = start - 1;
+        while (i >= 0 && Character.isWhitespace(src.charAt(i))) {
+            i--;
+        }
+        if (i < 0 || src.charAt(i) != ',') {
+            return false;
+        }
+        i--;
+        while (i >= 0 && src.charAt(i) != '(') {
+            char c = src.charAt(i);
+            if (c == ',' || c == ')' || c == ';' || c == '\n') {
+                return false;
+            }
+            i--;
+        }
+        String head = "resolveVirtual";
+        int j = i - 1;
+        while (j >= 0 && Character.isWhitespace(src.charAt(j))) {
+            j--;
+        }
+        return j + 1 >= head.length() && src.startsWith(head, j + 1 - head.length());
     }
 
     /**
