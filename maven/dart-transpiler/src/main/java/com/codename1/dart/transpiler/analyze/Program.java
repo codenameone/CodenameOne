@@ -166,6 +166,7 @@ public final class Program {
             register(part, part);
         }
         separateLibraryPrivateMembers();
+        separateLibraryPrivateTypedefs();
         restoreShadowedAliases();
         expandRecordTypedefs();
         // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
@@ -765,6 +766,11 @@ public final class Program {
         if (ext.ownerLibrary == from) {
             return true;
         }
+        if (!ext.unnamedExtension && ext.name != null && ext.name.startsWith("_")) {
+            // A private extension is visible only in its own library (parts included): no
+            // import or export reaches it.
+            return false;
+        }
         for (Ast.Directive d : from.importDirectives) {
             if (exportsExtension(resolveImportedLibrary(from, d.uri), d, ext, new HashSet<Ast.Library>())) {
                 return true;
@@ -907,6 +913,107 @@ public final class Program {
         for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
             renamePrivate(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
                     new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+    }
+
+    /**
+     * A private typedef ({@code typedef _Fn = ...}) or extension declared in two libraries
+     * names two different things, but the {@link #typedefs} table is keyed by name alone and
+     * an extension is emitted as a Java class of its own name, so the last one answered for
+     * both. Classes, enums and mixins keep their names and are
+     * told apart by library (see {@code JavaEmitter.javaClassName}); an alias leaves no
+     * runtime trace, so every library but the first to declare the name simply has it
+     * renamed ({@code _Fn$t2}) throughout its own declarations, as
+     * {@link #separateLibraryPrivateMembers} does for members.
+     */
+    private void separateLibraryPrivateTypedefs() {
+        // Extensions are reached as list elements; ClassDecl-typed fields are skipped below.
+        Map<String, Ast.Library> first = new java.util.HashMap<String, Ast.Library>();
+        Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        for (Ast.Library lib : libraries) {
+            List<String> declared = new ArrayList<String>();
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                declared.add(t.name);
+            }
+            for (Ast.ClassDecl c : lib.classes) {
+                if (c.extensionOn != null && !c.unnamedExtension) {
+                    declared.add(c.name);
+                }
+            }
+            for (String name : declared) {
+                if (name == null || !name.startsWith("_")) {
+                    continue;
+                }
+                Ast.Library owner = first.get(name);
+                if (owner == null) {
+                    first.put(name, lib);
+                } else if (owner != lib) {
+                    Map<String, String> m = renames.get(lib);
+                    if (m == null) {
+                        m = new java.util.HashMap<String, String>();
+                        renames.put(lib, m);
+                    }
+                    m.put(name, name + "$t" + libraries.indexOf(lib));
+                }
+            }
+        }
+        if (renames.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
+            renameTypeNames(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+        typedefs.clear();
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                if (!typedefs.containsKey(t.name) || !t.name.startsWith("_")) {
+                    typedefs.put(t.name, t);
+                }
+            }
+        }
+    }
+
+    /** Renames type names (type references, typedef declarations, identifiers) under {@code o}. */
+    private static void renameTypeNames(Object o, Map<String, String> names, Set<Object> seen) {
+        if (o == null || o instanceof String || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                renameTypeNames(e, names, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)
+                && !(o instanceof Ast.TypeRef)) {
+            return;
+        }
+        boolean named = o instanceof Ast.TypeRef || o instanceof Ast.TypedefDecl || o instanceof Ast.Ident
+                || o instanceof Ast.Call
+                || o instanceof Ast.ClassDecl && ((Ast.ClassDecl) o).extensionOn != null;
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive()
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(o);
+                    if (f.getType() == String.class) {
+                        if (named && "name".equals(f.getName()) && names.containsKey(v)) {
+                            f.set(o, names.get(v));
+                        }
+                    } else {
+                        renameTypeNames(v, names, seen);
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
         }
     }
 

@@ -7504,9 +7504,22 @@ public final class JavaEmitter {
                 }
             }
         }
-        saved.removeAll(ctx.writeCaptured);
-        ctx.nonNull.removeAll(ctx.writeCaptured);
-        ctx.nonNull.removeAll(ctx.reassigned);
+        // Demote through Ctx.demote so field-path keys rooted at a write-captured (or
+        // reassigned) local go too: `a.b` must not stay promoted once a closure may assign `a`.
+        java.util.Set<String> dropped = new HashSet<String>(ctx.writeCaptured);
+        dropped.addAll(ctx.reassigned);
+        for (String n : dropped) {
+            ctx.demote(n);
+        }
+        for (String n : ctx.writeCaptured) {
+            saved.remove(n);
+            for (java.util.Iterator<String> it = saved.iterator(); it.hasNext();) {
+                String k = it.next();
+                if (k.startsWith(n) && k.length() > n.length() && k.charAt(n.length()) == '.') {
+                    it.remove();
+                }
+            }
+        }
         return saved;
     }
 
@@ -12448,7 +12461,13 @@ public final class JavaEmitter {
                 String targetLifted = ctx.popWriter();
                 boolean accessor = target.code.endsWith("()") && target.code.contains(".get$");
                 if ((id.operand instanceof PropertyGet
-                        && target.code.endsWith("." + ((PropertyGet) id.operand).name + "()"))
+                        && (target.code.endsWith("." + ((PropertyGet) id.operand).name + "()")
+                        // an extension getter's static form, `Ext.p($self)`
+                        || target.code.endsWith(")")
+                        && target.code.contains("." + ((PropertyGet) id.operand).name + "(")
+                        && target.type != null && findExtensionSetter(promotedOperandType(
+                                ((PropertyGet) id.operand).target, flowType(((PropertyGet) id.operand).target, ctx), ctx),
+                                ((PropertyGet) id.operand).name, ctx) != null))
                         || (accessor && !statement)) {
                     // `x.prop++` through a getter/setter pair (an app or stub property): the
                     // read is a call, and `x.prop()++` is not Java. Lowered as `x.prop += 1`,
@@ -21475,41 +21494,44 @@ public final class JavaEmitter {
                             a.op.equals("=") ? null : recv + "." + pg.name + "()", pt, ctx);
                 }
             }
-            if (tgt.type != null && a.op.equals("=") && findAppSetter(
+            if (tgt.type != null && findAppSetter(
                     program.resolveClass(tgt.type.name, ctx.library()), pg.name) == null) {
-                // An extension setter, `x.s = v`: the extension's static `Ext.s($self, v)`,
-                // chosen by the receiver's PROMOTED type as methods and getters are.
+                // An extension setter, `x.s = v` (or `x.s += v`, `x.s++`): the extension's
+                // static `Ext.s($self, v)`, chosen by the receiver's PROMOTED type as methods
+                // and getters are -- the nearest supertype's, generic extensions (`on List<T>`)
+                // included. A compound reads through the extension getter the same type picks.
                 TypeRef flow = promotedOperandType(pg.target, tgt.type, ctx);
-                MethodDecl es = null;
-                ClassDecl ext = null;
-                for (ClassDecl e : program.extensions) {
-                    if (e.extensionOn == null || !e.extensionOn.name.equals(tgt.type.name)
-                            || !e.typeParams.isEmpty() || !e.extensionOn.args.isEmpty()
-                            || ctx.library() != null && !program.extensionVisible(e, ctx.library())
-                            || flow.nullable && !e.extensionOn.nullable) {
-                        continue;
-                    }
-                    for (MethodDecl m : e.methods) {
-                        if (m.isSetter && !m.isStatic && m.name.equals(pg.name) && m.params.size() == 1
-                                && (es == null || ext.extensionOn.nullable && !e.extensionOn.nullable)) {
-                            es = m;
-                            ext = e;
-                        }
-                    }
-                }
+                ClassDecl ext = findExtensionSetter(flow, pg.name, ctx);
+                MethodDecl es = ext == null ? null : extensionSetter(ext, pg.name);
                 if (es != null) {
                     TypeRef pt = es.params.get(0).type == null || es.params.get(0).type.is("var")
                             ? TypeRef.DYNAMIC : es.params.get(0).type;
-                    String self = extensionSelf(tgt, tgt.type, ext, ctx);
-                    String value = coerce(emitExpr(a.rhs, pt, ctx), pt, ctx);
-                    if (ctx.statementExpr == a) {
-                        return new Out(ext.name + "." + pg.name + "(" + self + ", " + value + ")", pt);
+                    if (!ext.typeParams.isEmpty()) {
+                        pt = extensionMemberType(pt, ext, flow);
                     }
-                    String jt = declarableType(pt, false, ctx);
-                    String v = ctx.newTemp();
-                    ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + value + ";");
-                    ctx.writer().line(ext.name + "." + pg.name + "(" + self + ", " + v + ");");
-                    return new Out(v, pt);
+                    if (!a.op.equals("=")) {
+                        ClassDecl ge = findUserExtension(flow.name, pg.name, true, ctx);
+                        if (ge != null) {
+                            ge = mostSpecificExtension(ge, flow, pg.name, true);
+                            ge = nullabilitySpecificExtension(ge, flow.nullable, pg.name, true, ctx);
+                        }
+                        if (ge != null) {
+                            Out recv = new Out(receiverOnce(tgt, ctx), tgt.type);
+                            return voidSetterWrite(a, ext.name + "." + pg.name, extensionSelf(recv, flow, ext, ctx),
+                                    ge.name + "." + pg.name + "(" + extensionSelf(recv, flow, ge, ctx) + ")", pt, ctx);
+                        }
+                    } else {
+                        String self = extensionSelf(tgt, tgt.type, ext, ctx);
+                        String value = coerce(emitExpr(a.rhs, pt, ctx), pt, ctx);
+                        if (ctx.statementExpr == a) {
+                            return new Out(ext.name + "." + pg.name + "(" + self + ", " + value + ")", pt);
+                        }
+                        String jt = declarableType(pt, false, ctx);
+                        String v = ctx.newTemp();
+                        ctx.writer().line((jt != null ? jt : "var") + " " + v + " = " + value + ";");
+                        ctx.writer().line(ext.name + "." + pg.name + "(" + self + ", " + v + ");");
+                        return new Out(v, pt);
+                    }
                 }
             }
             if ((ctx.statementExpr != a || !a.op.equals("=")) && !isRepeatable(tgt)) {
@@ -22059,6 +22081,14 @@ public final class JavaEmitter {
      * @param read  the getter read for a compound write, null for {@code =}
      */
     private Out voidSetterWrite(Assign a, String call, String read, TypeRef pt, Ctx ctx) {
+        return voidSetterWrite(a, call, null, read, pt, ctx);
+    }
+
+    /// As above; {@code self}, when non-null, is the receiver passed first (an extension's
+    /// static setter `Ext.s($self, v)`).
+    private Out voidSetterWrite(Assign a, String callee, String self, String read, TypeRef pt, Ctx ctx) {
+        String call = self == null ? callee : callee + "(" + self + ", ";
+        String close = ")";
         boolean statement = ctx.statementExpr == a;
         String jt = declarableType(pt, false, ctx);
         if (jt == null) {
@@ -22068,19 +22098,116 @@ public final class JavaEmitter {
         if (!statement && ctx.postfixAssign == a && read != null) {
             String old = ctx.newTemp();
             w.line(jt + " " + old + " = " + read + ";");
-            w.line(call + "(" + compoundValue(old, pt, a, ctx) + ");");
+            w.line(open(call, self) + compoundValue(old, pt, a, ctx) + close + ";");
             return new Out(old, pt);
         }
         String value = read == null
                 ? coerce(emitExpr(a.rhs, pt, ctx), pt, ctx)
                 : compoundValue(read, pt, a, ctx);
         if (statement) {
-            return new Out(call + "(" + value + ")", pt);
+            return new Out(open(call, self) + value + close, pt);
         }
         String v = ctx.newTemp();
         w.line(jt + " " + v + " = " + value + ";");
-        w.line(call + "(" + v + ");");
+        w.line(open(call, self) + v + close + ";");
         return new Out(v, pt);
+    }
+
+    private static String open(String call, String self) {
+        return self == null ? call + "(" : call;
+    }
+
+    /// The visible extension declaring an instance setter {@code name} for a receiver of
+    /// type {@code t}: its own type's first, then the nearest supertype's, as Dart's most
+    /// specific rule picks; a nullable receiver only takes an extension on a nullable type.
+    private ClassDecl findExtensionSetter(TypeRef t, String name, Ctx ctx) {
+        if (t == null || t.name == null) {
+            return null;
+        }
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<String>();
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        queue.add(t.name);
+        seen.add(t.name);
+        while (!queue.isEmpty()) {
+            String cur = queue.poll();
+            ClassDecl best = null;
+            for (ClassDecl e : program.extensions) {
+                if (e.extensionOn == null || !cur.equals(e.extensionOn.name) || extensionSetter(e, name) == null
+                        || ctx.library() != null && !program.extensionVisible(e, ctx.library())
+                        || t.nullable && !e.extensionOn.nullable) {
+                    continue;
+                }
+                if (best == null || extensionSpecificity(e, t) > extensionSpecificity(best, t)) {
+                    best = e;
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+            ClassDecl pc = program.classes.get(cur);
+            Ast.ClassDecl sc = pc != null ? pc : stubs.classes.get(cur);
+            List<TypeRef> edges = new ArrayList<TypeRef>();
+            if (sc != null) {
+                if (sc.superclass != null) {
+                    edges.add(sc.superclass);
+                }
+                edges.addAll(sc.interfaces);
+                edges.addAll(sc.mixins);
+            }
+            if ("List".equals(cur) || "Set".equals(cur) || "Queue".equals(cur)) {
+                edges.add(new TypeRef("Iterable"));
+            }
+            edges.add(new TypeRef("Object"));
+            for (TypeRef x : edges) {
+                if (x != null && x.name != null && seen.add(x.name)) {
+                    queue.add(x.name);
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Higher for an extension whose `on` type fits {@code t} more exactly: concrete type
+    /// arguments equal to the receiver's beat type variables, non-null beats nullable.
+    private static int extensionSpecificity(ClassDecl e, TypeRef t) {
+        int score = e.extensionOn.nullable == t.nullable ? 1 : 0;
+        for (int i = 0; i < e.extensionOn.args.size(); i++) {
+            TypeRef ea = e.extensionOn.args.get(i);
+            if (e.typeParams.contains(ea.name)) {
+                continue;
+            }
+            if (i < t.args.size() && t.args.get(i) != null && ea.name.equals(t.args.get(i).name)) {
+                score += 2;
+            } else {
+                return -1;
+            }
+        }
+        return score;
+    }
+
+    private static MethodDecl extensionSetter(ClassDecl e, String name) {
+        for (MethodDecl m : e.methods) {
+            if (m.isSetter && !m.isStatic && m.name.equals(name) && m.params.size() == 1) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /// A generic extension's member type with its type variables bound from the receiver
+    /// ({@code T} of `on List<T>` is String for a List<String>); unbound ones stay dynamic.
+    private static TypeRef extensionMemberType(TypeRef t, ClassDecl ext, TypeRef recv) {
+        List<TypeRef> args = new ArrayList<TypeRef>();
+        for (String tp : ext.typeParams) {
+            TypeRef bound = TypeRef.DYNAMIC;
+            for (int i = 0; i < ext.extensionOn.args.size() && recv != null && i < recv.args.size(); i++) {
+                if (tp.equals(ext.extensionOn.args.get(i).name) && recv.args.get(i) != null) {
+                    bound = recv.args.get(i);
+                }
+            }
+            args.add(bound);
+        }
+        return substTypeParams(t, ext.typeParams, args);
     }
 
     /** An operand emitted by {@link #emitLazyOperand}, and the statements it lifted. */
