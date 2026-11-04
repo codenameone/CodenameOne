@@ -5794,7 +5794,7 @@ public final class JavaEmitter {
 
     private TypeRef tearOffType(MethodDecl m, ClassDecl pc, TypeRef tt) {
         TypeRef f = new TypeRef("Function");
-        if (m.returnType == null || m.params.size() > 5) {
+        if (m.returnType == null || m.params.size() > MAX_FN_ARITY) {
             return f;
         }
         // A generic method's own type variables are erased to their bounds, as a generic
@@ -7860,8 +7860,8 @@ public final class JavaEmitter {
      */
     private void emitLocalFunc(Ast.LocalFunc lf, Ctx ctx) {
         int arity = lf.params.size();
-        if (arity > 5) {
-            diags.error(lf, "E0139", "Nested functions with more than 5 parameters are not supported yet");
+        if (arity > MAX_FN_ARITY) {
+            diags.error(lf, "E0139", "Nested functions with more than " + MAX_FN_ARITY + " parameters are not supported yet");
             return;
         }
         String samType = funcSamType(lf.returnType, lf.params, ctx);
@@ -9577,7 +9577,9 @@ public final class JavaEmitter {
         if (ctx.lookup(cls) != null) {
             return out;
         }
-        ClassDecl pc = program.resolveClass(cls, ctx.library());
+        // `a.Item.new`: the class the import prefix pinned, not the one a bare `Item` means.
+        ClassDecl pinnedCls = ((Ident) ((PropertyGet) e).target).pinnedClass;
+        ClassDecl pc = pinnedCls != null ? pinnedCls : program.resolveClass(cls, ctx.library());
         if (pc == null || program.enums.containsKey(cls) || !(name.equals("new") || pc.namedCtor(name) != null)) {
             return out;
         }
@@ -11064,7 +11066,14 @@ public final class JavaEmitter {
                         return future;
                     }
                 }
-                ClassDecl pc = cc.type.runtimeOnly ? null : program.classes.get(cc.type.name);
+                // The class the call's own type names: one an import prefix pinned
+                // (`a.Item.named` beside an unprefixed `Item` of another library), else the
+                // one this library sees, else any.
+                ClassDecl pc = cc.type.runtimeOnly ? null : cc.type.resolved != null ? cc.type.resolved
+                        : programClass(cc.type.name, ctx);
+                if (pc == null && !cc.type.runtimeOnly) {
+                    pc = program.classes.get(cc.type.name);
+                }
                 if (pc != null && pc.namedCtor(cc.ctorName) != null) {
                     // `Stack.of([1, 2, 3])` with `factory Stack.of(Iterable<T>)`: the arguments
                     // bind T as in an ordinary generic call, and from there it is spelled as if
@@ -11074,6 +11083,7 @@ public final class JavaEmitter {
                     List<TypeRef> fca = factoryClassArgs(pc, pc.namedCtor(cc.ctorName), cc.type.args, cc.args, ctx);
                     if (fca != null) {
                         ctype = TypeRef.of(cc.type.name, fca.toArray(new TypeRef[0]));
+                        ctype.resolved = cc.type.resolved;
                     }
                     List<TypeRef> inferredArgs = argInferredWitnessTypeArgs(pc, pc.namedCtor(cc.ctorName),
                             ctype.args, cc.args, ctx);
@@ -12225,7 +12235,7 @@ public final class JavaEmitter {
             boolean spellArgs, Ctx ctx) {
         String jt = functionSam(samType, ctx);
         if (jt == null || spellArgs && jt.indexOf('?') >= 0 || !isFuncsSamName(jt) || samType.funcParams == null
-                || samType.funcParams.size() > 5) {
+                || samType.funcParams.size() > MAX_FN_ARITY) {
             return null;
         }
         int lt = jt.indexOf('<');
@@ -12430,12 +12440,17 @@ public final class JavaEmitter {
     }
 
     /// The Funcs SAM interfaces, by qualified name: every interface javaType spells for an
-    /// inline function type (Func0..Func5, VoidFunc0..VoidFunc5).
+    /// inline function type (Func0..FuncN, VoidFunc0..VoidFuncN, N = MAX_FN_ARITY).
+    /// The widest function the dart.runtime.Funcs SAM families (Funcs, TearOff, SignedFns,
+    /// TypeWitness, Dyn, Zone) are generated for: every tear-off, closure and signed value
+    /// up to this many parameters is a Funcs SAM.
+    static final int MAX_FN_ARITY = 16;
+
     private static final java.util.Set<String> FUNCS_SAMS = funcsSams();
 
     private static java.util.Set<String> funcsSams() {
         java.util.Set<String> out = new HashSet<String>();
-        for (int n = 0; n <= 5; n++) {
+        for (int n = 0; n <= MAX_FN_ARITY; n++) {
             out.add("dart.runtime.Funcs.Func" + n);
             out.add("dart.runtime.Funcs.VoidFunc" + n);
         }
@@ -12624,7 +12639,7 @@ public final class JavaEmitter {
     /// instantiate-to-bound test without type arguments, and against the instantiation
     /// when the value is instantiated (selfBoundGenericTearOff).
     private String boundCheckedMethodTearOff(MethodDecl md, String recv, String name, boolean untyped, Ctx ctx) {
-        if (md.typeParams.isEmpty() || hasOptionalParam(md) || md.params.size() > 5
+        if (md.typeParams.isEmpty() || hasOptionalParam(md) || md.params.size() > MAX_FN_ARITY
                 || !hasBoundedTypeVarParam(md.params, md.typeParams, md.typeParamBounds)) {
             return null;
         }
@@ -12669,7 +12684,7 @@ public final class JavaEmitter {
     /// when no parameter has such a bound in the supported `G<T>` shape.
     private String selfBoundGenericTearOff(List<Param> params, List<String> tps, Map<String, TypeRef> bounds,
             List<String> ps, List<String> plainArgs, String callee, TypeRef returnType, Ctx ctx) {
-        if (params.size() > 5) {
+        if (params.size() > MAX_FN_ARITY) {
             return null;
         }
         String tws = "$sbtw";
@@ -17642,7 +17657,7 @@ public final class JavaEmitter {
             ft.funcParams = new ArrayList<TypeRef>();
             // A generic function's tear-off (`identity<int>` instantiates it, and Java
             // erases that) is typed with its type parameters as dynamic.
-            boolean simple = fn.params.size() <= 5
+            boolean simple = fn.params.size() <= MAX_FN_ARITY
                     && fn.returnType != null && !fn.returnType.is("var") && !fn.isAsync;
             boolean defaults = false;
             List<Param> ordered = new ArrayList<Param>();
@@ -17674,12 +17689,19 @@ public final class JavaEmitter {
                     defaults = true;
                 }
                 TypeRef pt = paramValueType(fp);
+                if (owner != null && owner != ctx.library()) {
+                    // Its signature's names are its own library's (`a.describe(Item i)` read
+                    // where a bare `Item` is another library's class).
+                    pt = inLibrary(pt, owner);
+                }
                 ft.funcParams.add(fn.typeParams.isEmpty() ? pt
                         : substTypeParams(pt, fn.typeParams, java.util.Collections.<TypeRef>emptyList()));
             }
             if (simple) {
-                ft.funcReturn = fn.typeParams.isEmpty() ? fn.returnType
-                        : substTypeParams(fn.returnType, fn.typeParams, java.util.Collections.<TypeRef>emptyList());
+                TypeRef ownRet = owner != null && owner != ctx.library() ? inLibrary(fn.returnType, owner)
+                        : fn.returnType;
+                ft.funcReturn = fn.typeParams.isEmpty() ? ownRet
+                        : substTypeParams(ownRet, fn.typeParams, java.util.Collections.<TypeRef>emptyList());
                 // A generic function its context instantiates (`Fn<int> f = id`): typed, and
                 // so signed, at those type arguments, and handed its witnesses when it takes
                 // them (`List<T> one<T>(T x)` builds a List<T>).
@@ -17783,7 +17805,7 @@ public final class JavaEmitter {
         if (sfn == null && stubVar == null) {
             sfn = stubs.functions.get(n);
         }
-        if (sfn != null && sfn.javaName != null && !sfn.isGetter && sfn.params.size() <= 5) {
+        if (sfn != null && sfn.javaName != null && !sfn.isGetter && sfn.params.size() <= MAX_FN_ARITY) {
             int dot = sfn.javaName.lastIndexOf('.');
             String cls = sfn.javaName.substring(0, dot);
             ctx.importClass(cls);
@@ -31286,7 +31308,7 @@ public final class JavaEmitter {
     /// when the adapter's SAM is no Funcs one.
     private String signAdaptedNamedClosure(Out adapted, Lambda l, Ctx ctx) {
         String jt = adapted.type != null ? functionSam(adapted.type, ctx) : null;
-        if (jt == null || !isFuncsSamName(jt) || l.params.size() > 5) {
+        if (jt == null || !isFuncsSamName(jt) || l.params.size() > MAX_FN_ARITY) {
             return null;
         }
         StringBuilder named = new StringBuilder();
@@ -31316,7 +31338,7 @@ public final class JavaEmitter {
         for (Param p : l.params) {
             opt |= p.optional || p.named;
         }
-        if (!opt || l.params.size() > 5 || l.isAsync || l.isAsyncStar || l.isSyncStar) {
+        if (!opt || l.params.size() > MAX_FN_ARITY || l.isAsync || l.isAsyncStar || l.isSyncStar) {
             return null;
         }
         final List<Param> ordered = orderedParams(l.params);
@@ -31456,7 +31478,7 @@ public final class JavaEmitter {
             }
         }
         optional = required < ordered.size();
-        if (!optional || ordered.size() > 5) {
+        if (!optional || ordered.size() > MAX_FN_ARITY) {
             return null;
         }
         ctx.importClass("dart.runtime.DartRuntime");
@@ -31526,7 +31548,13 @@ public final class JavaEmitter {
         // The adapter is the function value, so it carries the signature (Signed): its
         // lambda's target is the raw SAM intersected with the marker.
         adapterNullReturn = nullReturn;
-        String marker = functionTypeTested ? adapterMarker(ordered, otypes, ret, ctx) : null;
+        // A named parameter is placed by name (Dyn.invokeNamed, Function.apply), which reads
+        // the names off the marker: such an adapter is signed even when nothing tests a type.
+        boolean namedParam = false;
+        for (Param op : ordered) {
+            namedParam |= op.named;
+        }
+        String marker = functionTypeTested || namedParam ? adapterMarker(ordered, otypes, ret, ctx) : null;
         adapterNullReturn = false;
         String lambda = "(" + lp + ") -> {\n" + pro + lifted + ind
                 + (isVoid ? statementize(body) + ";" : "return " + body + ";") + "\n"
@@ -33290,6 +33318,9 @@ public final class JavaEmitter {
                 params = cd != null ? cd.params : new ArrayList<Param>();
                 CtorCall call = new CtorCall();
                 call.type = new TypeRef(cls);
+                // Pinned to the class resolved here, so the call does not resolve the bare name
+                // again as this library sees it (an unprefixed import's class of that name).
+                call.type.resolved = pc;
                 List<TypeRef> inferred = typeArgs;
                 if ((inferred == null || inferred.isEmpty()) && !tps.isEmpty() && posNode != null
                         && posNode == ctorTearOffNode && ctorTearOffExpected != null) {
@@ -33381,7 +33412,7 @@ public final class JavaEmitter {
                     tps = java.util.Collections.<String>emptyList();
                     // A non-generic one too: as a method reference it is canonicalized by the
                     // function it names, as a top-level function is, so `C.st == C.st`.
-                    if (!hasOptionalParam(md) && md.params.size() <= 5
+                    if (!hasOptionalParam(md) && md.params.size() <= MAX_FN_ARITY
                             && md.returnType != null) {
                         // A generic static method (`Box.keep<T>`) tears off as a generic
                         // top-level function does: a bare method reference, which takes
@@ -33569,7 +33600,7 @@ public final class JavaEmitter {
             ft.funcReturn = tearOffReturn != null ? tearOffReturn : TypeRef.DYNAMIC;
         }
         tearOffReturn = null;
-        if (!simple || ft.funcParams.size() > 5 || (!tps.isEmpty() && typeArgs.isEmpty())) {
+        if (!simple || ft.funcParams.size() > MAX_FN_ARITY || (!tps.isEmpty() && typeArgs.isEmpty())) {
             // an uninstantiated generic constructor is left for the call site to target-type.
             // Its body is a block that returns, so it is not also void-compatible: as a bare
             // `new C<>(p)` expression it matched both Future.then(Func1) and then(VoidFunc1)

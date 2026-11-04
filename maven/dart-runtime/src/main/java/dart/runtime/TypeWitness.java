@@ -533,6 +533,72 @@ public final class TypeWitness {
             return (Funcs.VoidFunc5<Object, Object, Object, Object, Object>) (a, b, c, d, e) ->
                     Dyn.invoke(f, a, b, c, d, e);
         }
+        if (target == Funcs.Func6.class) {
+            return (Funcs.Func6<Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5);
+        }
+        if (target == Funcs.VoidFunc6.class) {
+            return (Funcs.VoidFunc6<Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5);
+        }
+        if (target == Funcs.Func7.class) {
+            return (Funcs.Func7<Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6);
+        }
+        if (target == Funcs.VoidFunc7.class) {
+            return (Funcs.VoidFunc7<Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6);
+        }
+        if (target == Funcs.Func8.class) {
+            return (Funcs.Func8<Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+        if (target == Funcs.VoidFunc8.class) {
+            return (Funcs.VoidFunc8<Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+        if (target == Funcs.Func9.class) {
+            return (Funcs.Func9<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+        if (target == Funcs.VoidFunc9.class) {
+            return (Funcs.VoidFunc9<Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+        if (target == Funcs.Func10.class) {
+            return (Funcs.Func10<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+        if (target == Funcs.VoidFunc10.class) {
+            return (Funcs.VoidFunc10<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+        if (target == Funcs.Func11.class) {
+            return (Funcs.Func11<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+        if (target == Funcs.VoidFunc11.class) {
+            return (Funcs.VoidFunc11<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+        if (target == Funcs.Func12.class) {
+            return (Funcs.Func12<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+        if (target == Funcs.VoidFunc12.class) {
+            return (Funcs.VoidFunc12<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+        if (target == Funcs.Func13.class) {
+            return (Funcs.Func13<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+        if (target == Funcs.VoidFunc13.class) {
+            return (Funcs.VoidFunc13<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+        if (target == Funcs.Func14.class) {
+            return (Funcs.Func14<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+        if (target == Funcs.VoidFunc14.class) {
+            return (Funcs.VoidFunc14<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+        if (target == Funcs.Func15.class) {
+            return (Funcs.Func15<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+        if (target == Funcs.VoidFunc15.class) {
+            return (Funcs.VoidFunc15<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+        if (target == Funcs.Func16.class) {
+            return (Funcs.Func16<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
+        }
+        if (target == Funcs.VoidFunc16.class) {
+            return (Funcs.VoidFunc16<Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object>) (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15) -> Dyn.invoke(f, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
+        }
         // A slot typed by an interface outside the canonical shapes: the value passed the
         // Dart test, so it is handed over as it is.
         return f;
@@ -809,7 +875,18 @@ public final class TypeWitness {
 
     private static boolean voidSam(Class<?> c) {
         return c == Funcs.VoidFunc0.class || c == Funcs.VoidFunc1.class || c == Funcs.VoidFunc2.class
-                || c == Funcs.VoidFunc3.class || c == Funcs.VoidFunc4.class || c == Funcs.VoidFunc5.class;
+                || c == Funcs.VoidFunc3.class || c == Funcs.VoidFunc4.class || c == Funcs.VoidFunc5.class
+                || c == Funcs.VoidFunc6.class
+                || c == Funcs.VoidFunc7.class
+                || c == Funcs.VoidFunc8.class
+                || c == Funcs.VoidFunc9.class
+                || c == Funcs.VoidFunc10.class
+                || c == Funcs.VoidFunc11.class
+                || c == Funcs.VoidFunc12.class
+                || c == Funcs.VoidFunc13.class
+                || c == Funcs.VoidFunc14.class
+                || c == Funcs.VoidFunc15.class
+                || c == Funcs.VoidFunc16.class;
     }
 
     /// The Dart spelling of this type: `Box<int>`, `int?`, `Map<String, Box<int>?>`.

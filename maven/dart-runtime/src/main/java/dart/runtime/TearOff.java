@@ -310,4 +310,444 @@ public abstract class TearOff implements BoundTearOff {
     public static <R, F> F let(R recv, Funcs.Func1<? super R, F> body) {
         return body.call(recv);
     }
+
+    private static final class F6<T0, T1, T2, T3, T4, T5, T6> extends TearOff implements Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> {
+        private final Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> f;
+
+        F6(Object recv, String key, Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T6 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5) {
+            return f.call(a0, a1, a2, a3, a4, a5);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6> Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> f6(Object recv, String key, Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> f) {
+        return new F6<T0, T1, T2, T3, T4, T5, T6>(recv, key, f);
+    }
+
+    private static final class V6<T0, T1, T2, T3, T4, T5> extends TearOff implements Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> {
+        private final Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> f;
+
+        V6(Object recv, String key, Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5) {
+            f.call(a0, a1, a2, a3, a4, a5);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5> Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> v6(Object recv, String key, Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> f) {
+        return new V6<T0, T1, T2, T3, T4, T5>(recv, key, f);
+    }
+
+    private static final class F7<T0, T1, T2, T3, T4, T5, T6, T7> extends TearOff implements Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> {
+        private final Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> f;
+
+        F7(Object recv, String key, Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T7 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7> Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> f7(Object recv, String key, Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> f) {
+        return new F7<T0, T1, T2, T3, T4, T5, T6, T7>(recv, key, f);
+    }
+
+    private static final class V7<T0, T1, T2, T3, T4, T5, T6> extends TearOff implements Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> {
+        private final Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> f;
+
+        V7(Object recv, String key, Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6) {
+            f.call(a0, a1, a2, a3, a4, a5, a6);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6> Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> v7(Object recv, String key, Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> f) {
+        return new V7<T0, T1, T2, T3, T4, T5, T6>(recv, key, f);
+    }
+
+    private static final class F8<T0, T1, T2, T3, T4, T5, T6, T7, T8> extends TearOff implements Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> {
+        private final Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> f;
+
+        F8(Object recv, String key, Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T8 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8> Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> f8(Object recv, String key, Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> f) {
+        return new F8<T0, T1, T2, T3, T4, T5, T6, T7, T8>(recv, key, f);
+    }
+
+    private static final class V8<T0, T1, T2, T3, T4, T5, T6, T7> extends TearOff implements Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> {
+        private final Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> f;
+
+        V8(Object recv, String key, Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7> Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> v8(Object recv, String key, Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> f) {
+        return new V8<T0, T1, T2, T3, T4, T5, T6, T7>(recv, key, f);
+    }
+
+    private static final class F9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> extends TearOff implements Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+        private final Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f;
+
+        F9(Object recv, String key, Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T9 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f9(Object recv, String key, Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f) {
+        return new F9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9>(recv, key, f);
+    }
+
+    private static final class V9<T0, T1, T2, T3, T4, T5, T6, T7, T8> extends TearOff implements Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> {
+        private final Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> f;
+
+        V9(Object recv, String key, Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8> Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> v9(Object recv, String key, Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> f) {
+        return new V9<T0, T1, T2, T3, T4, T5, T6, T7, T8>(recv, key, f);
+    }
+
+    private static final class F10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> extends TearOff implements Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+        private final Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f;
+
+        F10(Object recv, String key, Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T10 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f10(Object recv, String key, Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f) {
+        return new F10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(recv, key, f);
+    }
+
+    private static final class V10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> extends TearOff implements Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+        private final Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f;
+
+        V10(Object recv, String key, Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> v10(Object recv, String key, Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f) {
+        return new V10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9>(recv, key, f);
+    }
+
+    private static final class F11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> extends TearOff implements Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+        private final Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f;
+
+        F11(Object recv, String key, Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T11 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f11(Object recv, String key, Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f) {
+        return new F11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(recv, key, f);
+    }
+
+    private static final class V11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> extends TearOff implements Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+        private final Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f;
+
+        V11(Object recv, String key, Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> v11(Object recv, String key, Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f) {
+        return new V11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(recv, key, f);
+    }
+
+    private static final class F12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> extends TearOff implements Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> {
+        private final Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f;
+
+        F12(Object recv, String key, Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T12 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f12(Object recv, String key, Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f) {
+        return new F12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(recv, key, f);
+    }
+
+    private static final class V12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> extends TearOff implements Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+        private final Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f;
+
+        V12(Object recv, String key, Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> v12(Object recv, String key, Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f) {
+        return new V12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(recv, key, f);
+    }
+
+    private static final class F13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> extends TearOff implements Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> {
+        private final Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f;
+
+        F13(Object recv, String key, Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T13 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f13(Object recv, String key, Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f) {
+        return new F13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(recv, key, f);
+    }
+
+    private static final class V13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> extends TearOff implements Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> {
+        private final Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f;
+
+        V13(Object recv, String key, Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> v13(Object recv, String key, Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f) {
+        return new V13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(recv, key, f);
+    }
+
+    private static final class F14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> extends TearOff implements Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> {
+        private final Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f;
+
+        F14(Object recv, String key, Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T14 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f14(Object recv, String key, Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f) {
+        return new F14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(recv, key, f);
+    }
+
+    private static final class V14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> extends TearOff implements Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> {
+        private final Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f;
+
+        V14(Object recv, String key, Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> v14(Object recv, String key, Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f) {
+        return new V14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(recv, key, f);
+    }
+
+    private static final class F15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> extends TearOff implements Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> {
+        private final Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f;
+
+        F15(Object recv, String key, Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T15 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f15(Object recv, String key, Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f) {
+        return new F15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(recv, key, f);
+    }
+
+    private static final class V15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> extends TearOff implements Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> {
+        private final Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f;
+
+        V15(Object recv, String key, Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> v15(Object recv, String key, Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f) {
+        return new V15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(recv, key, f);
+    }
+
+    private static final class F16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> extends TearOff implements Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> {
+        private final Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> f;
+
+        F16(Object recv, String key, Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public T16 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14, T15 a15) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> f16(Object recv, String key, Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> f) {
+        return new F16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>(recv, key, f);
+    }
+
+    private static final class V16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> extends TearOff implements Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> {
+        private final Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f;
+
+        V16(Object recv, String key, Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f) {
+            super(recv, key);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14, T15 a15) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
+        }
+    }
+
+    /// {@code f}, a tear-off of method {@code key} of {@code recv}, as a value equal to every
+    /// other tear-off of that method from that receiver.
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> v16(Object recv, String key, Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f) {
+        return new V16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(recv, key, f);
+    }
 }

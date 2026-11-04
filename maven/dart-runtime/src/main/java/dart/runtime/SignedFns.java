@@ -158,7 +158,40 @@ public final class SignedFns {
         if (f instanceof Funcs.Func4 || f instanceof Funcs.VoidFunc4) {
             return 4;
         }
-        return 5;
+        if (f instanceof Funcs.Func5 || f instanceof Funcs.VoidFunc5) {
+            return 5;
+        }
+        if (f instanceof Funcs.Func6 || f instanceof Funcs.VoidFunc6) {
+            return 6;
+        }
+        if (f instanceof Funcs.Func7 || f instanceof Funcs.VoidFunc7) {
+            return 7;
+        }
+        if (f instanceof Funcs.Func8 || f instanceof Funcs.VoidFunc8) {
+            return 8;
+        }
+        if (f instanceof Funcs.Func9 || f instanceof Funcs.VoidFunc9) {
+            return 9;
+        }
+        if (f instanceof Funcs.Func10 || f instanceof Funcs.VoidFunc10) {
+            return 10;
+        }
+        if (f instanceof Funcs.Func11 || f instanceof Funcs.VoidFunc11) {
+            return 11;
+        }
+        if (f instanceof Funcs.Func12 || f instanceof Funcs.VoidFunc12) {
+            return 12;
+        }
+        if (f instanceof Funcs.Func13 || f instanceof Funcs.VoidFunc13) {
+            return 13;
+        }
+        if (f instanceof Funcs.Func14 || f instanceof Funcs.VoidFunc14) {
+            return 14;
+        }
+        if (f instanceof Funcs.Func15 || f instanceof Funcs.VoidFunc15) {
+            return 15;
+        }
+        return 16;
     }
 
     /// A closure with named parameters, given the names a dynamic call places its
@@ -220,6 +253,72 @@ public final class SignedFns {
         }
         if (f instanceof Funcs.VoidFunc5) {
             return new V5((Funcs.VoidFunc5) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func6) {
+            return new F6((Funcs.Func6) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc6) {
+            return new V6((Funcs.VoidFunc6) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func7) {
+            return new F7((Funcs.Func7) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc7) {
+            return new V7((Funcs.VoidFunc7) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func8) {
+            return new F8((Funcs.Func8) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc8) {
+            return new V8((Funcs.VoidFunc8) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func9) {
+            return new F9((Funcs.Func9) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc9) {
+            return new V9((Funcs.VoidFunc9) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func10) {
+            return new F10((Funcs.Func10) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc10) {
+            return new V10((Funcs.VoidFunc10) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func11) {
+            return new F11((Funcs.Func11) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc11) {
+            return new V11((Funcs.VoidFunc11) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func12) {
+            return new F12((Funcs.Func12) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc12) {
+            return new V12((Funcs.VoidFunc12) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func13) {
+            return new F13((Funcs.Func13) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc13) {
+            return new V13((Funcs.VoidFunc13) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func14) {
+            return new F14((Funcs.Func14) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc14) {
+            return new V14((Funcs.VoidFunc14) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func15) {
+            return new F15((Funcs.Func15) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc15) {
+            return new V15((Funcs.VoidFunc15) f, sig, required, named);
+        }
+        if (f instanceof Funcs.Func16) {
+            return new F16((Funcs.Func16) f, sig, required, named);
+        }
+        if (f instanceof Funcs.VoidFunc16) {
+            return new V16((Funcs.VoidFunc16) f, sig, required, named);
         }
         throw new IllegalArgumentException("not a closure: " + f);
     }
@@ -486,6 +585,17 @@ public final class SignedFns {
             case 3: r = isVoid ? new NV3() : new N3(); break;
             case 4: r = isVoid ? new NV4() : new N4(); break;
             case 5: r = isVoid ? new NV5() : new N5(); break;
+            case 6: r = isVoid ? new NV6() : new N6(); break;
+            case 7: r = isVoid ? new NV7() : new N7(); break;
+            case 8: r = isVoid ? new NV8() : new N8(); break;
+            case 9: r = isVoid ? new NV9() : new N9(); break;
+            case 10: r = isVoid ? new NV10() : new N10(); break;
+            case 11: r = isVoid ? new NV11() : new N11(); break;
+            case 12: r = isVoid ? new NV12() : new N12(); break;
+            case 13: r = isVoid ? new NV13() : new N13(); break;
+            case 14: r = isVoid ? new NV14() : new N14(); break;
+            case 15: r = isVoid ? new NV15() : new N15(); break;
+            case 16: r = isVoid ? new NV16() : new N16(); break;
             default: throw new IllegalArgumentException("too many parameters: " + n);
         }
         r.wide = (Signed) wide;
@@ -645,6 +755,622 @@ public final class SignedFns {
         @Override
         public void call(Object a, Object b, Object c, Object d, Object e) {
             fwd(a, b, c, d, e);
+        }
+    }
+
+    private static final class F6<T0, T1, T2, T3, T4, T5, T6> extends Base implements Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> {
+        private final Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> f;
+
+        F6(Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T6 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5) {
+            return f.call(a0, a1, a2, a3, a4, a5);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6> Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> func6(Funcs.Func6<T0, T1, T2, T3, T4, T5, T6> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F6<>(f, sig, required, named);
+    }
+
+    private static final class V6<T0, T1, T2, T3, T4, T5> extends Base implements Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> {
+        private final Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> f;
+
+        V6(Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5) {
+            f.call(a0, a1, a2, a3, a4, a5);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5> Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> voidFunc6(Funcs.VoidFunc6<T0, T1, T2, T3, T4, T5> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V6<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N6 extends Narrowed implements Funcs.Func6 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5) {
+            return fwd(a0, a1, a2, a3, a4, a5);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV6 extends Narrowed implements Funcs.VoidFunc6 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5) {
+            fwd(a0, a1, a2, a3, a4, a5);
+        }
+    }
+
+    private static final class F7<T0, T1, T2, T3, T4, T5, T6, T7> extends Base implements Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> {
+        private final Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> f;
+
+        F7(Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T7 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7> Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> func7(Funcs.Func7<T0, T1, T2, T3, T4, T5, T6, T7> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F7<>(f, sig, required, named);
+    }
+
+    private static final class V7<T0, T1, T2, T3, T4, T5, T6> extends Base implements Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> {
+        private final Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> f;
+
+        V7(Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6) {
+            f.call(a0, a1, a2, a3, a4, a5, a6);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6> Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> voidFunc7(Funcs.VoidFunc7<T0, T1, T2, T3, T4, T5, T6> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V7<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N7 extends Narrowed implements Funcs.Func7 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV7 extends Narrowed implements Funcs.VoidFunc7 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6) {
+            fwd(a0, a1, a2, a3, a4, a5, a6);
+        }
+    }
+
+    private static final class F8<T0, T1, T2, T3, T4, T5, T6, T7, T8> extends Base implements Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> {
+        private final Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> f;
+
+        F8(Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T8 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8> Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> func8(Funcs.Func8<T0, T1, T2, T3, T4, T5, T6, T7, T8> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F8<>(f, sig, required, named);
+    }
+
+    private static final class V8<T0, T1, T2, T3, T4, T5, T6, T7> extends Base implements Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> {
+        private final Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> f;
+
+        V8(Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7> Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> voidFunc8(Funcs.VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V8<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N8 extends Narrowed implements Funcs.Func8 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV8 extends Narrowed implements Funcs.VoidFunc8 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7);
+        }
+    }
+
+    private static final class F9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> extends Base implements Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+        private final Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f;
+
+        F9(Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T9 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> func9(Funcs.Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F9<>(f, sig, required, named);
+    }
+
+    private static final class V9<T0, T1, T2, T3, T4, T5, T6, T7, T8> extends Base implements Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> {
+        private final Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> f;
+
+        V9(Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8> Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> voidFunc9(Funcs.VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V9<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N9 extends Narrowed implements Funcs.Func9 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV9 extends Narrowed implements Funcs.VoidFunc9 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+    }
+
+    private static final class F10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> extends Base implements Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+        private final Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f;
+
+        F10(Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T10 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> func10(Funcs.Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F10<>(f, sig, required, named);
+    }
+
+    private static final class V10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> extends Base implements Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+        private final Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f;
+
+        V10(Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> voidFunc10(Funcs.VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V10<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N10 extends Narrowed implements Funcs.Func10 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV10 extends Narrowed implements Funcs.VoidFunc10 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+        }
+    }
+
+    private static final class F11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> extends Base implements Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+        private final Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f;
+
+        F11(Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T11 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> func11(Funcs.Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F11<>(f, sig, required, named);
+    }
+
+    private static final class V11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> extends Base implements Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+        private final Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f;
+
+        V11(Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> voidFunc11(Funcs.VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V11<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N11 extends Narrowed implements Funcs.Func11 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV11 extends Narrowed implements Funcs.VoidFunc11 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
+        }
+    }
+
+    private static final class F12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> extends Base implements Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> {
+        private final Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f;
+
+        F12(Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T12 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> func12(Funcs.Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F12<>(f, sig, required, named);
+    }
+
+    private static final class V12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> extends Base implements Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+        private final Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f;
+
+        V12(Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> voidFunc12(Funcs.VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V12<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N12 extends Narrowed implements Funcs.Func12 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV12 extends Narrowed implements Funcs.VoidFunc12 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        }
+    }
+
+    private static final class F13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> extends Base implements Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> {
+        private final Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f;
+
+        F13(Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T13 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> func13(Funcs.Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F13<>(f, sig, required, named);
+    }
+
+    private static final class V13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> extends Base implements Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> {
+        private final Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f;
+
+        V13(Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> voidFunc13(Funcs.VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V13<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N13 extends Narrowed implements Funcs.Func13 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV13 extends Narrowed implements Funcs.VoidFunc13 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
+        }
+    }
+
+    private static final class F14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> extends Base implements Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> {
+        private final Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f;
+
+        F14(Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T14 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> func14(Funcs.Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F14<>(f, sig, required, named);
+    }
+
+    private static final class V14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> extends Base implements Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> {
+        private final Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f;
+
+        V14(Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> voidFunc14(Funcs.VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V14<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N14 extends Narrowed implements Funcs.Func14 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12, Object a13) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV14 extends Narrowed implements Funcs.VoidFunc14 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12, Object a13) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+        }
+    }
+
+    private static final class F15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> extends Base implements Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> {
+        private final Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f;
+
+        F15(Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T15 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> func15(Funcs.Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F15<>(f, sig, required, named);
+    }
+
+    private static final class V15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> extends Base implements Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> {
+        private final Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f;
+
+        V15(Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> voidFunc15(Funcs.VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V15<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N15 extends Narrowed implements Funcs.Func15 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12, Object a13, Object a14) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV15 extends Narrowed implements Funcs.VoidFunc15 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12, Object a13, Object a14) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14);
+        }
+    }
+
+    private static final class F16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> extends Base implements Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> {
+        private final Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> f;
+
+        F16(Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public T16 call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14, T15 a15) {
+            return f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> func16(Funcs.Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new F16<>(f, sig, required, named);
+    }
+
+    private static final class V16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> extends Base implements Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> {
+        private final Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f;
+
+        V16(Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f, TypeWitness[] sig, int required, String[] named) {
+            super(sig, required, named);
+            this.f = f;
+        }
+
+        @Override
+        public void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14, T15 a15) {
+            f.call(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
+        }
+    }
+
+    /// `f` signed with `sig` (return witness, then each parameter's; see Signed).
+    public static <T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> voidFunc16(Funcs.VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> f, TypeWitness[] sig, int required,
+            String[] named) {
+        return new V16<>(f, sig, required, named);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class N16 extends Narrowed implements Funcs.Func16 {
+        @Override
+        public Object call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12, Object a13, Object a14, Object a15) {
+            return fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final class NV16 extends Narrowed implements Funcs.VoidFunc16 {
+        @Override
+        public void call(Object a0, Object a1, Object a2, Object a3, Object a4, Object a5, Object a6, Object a7, Object a8, Object a9, Object a10, Object a11, Object a12, Object a13, Object a14, Object a15) {
+            fwd(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
         }
     }
 }

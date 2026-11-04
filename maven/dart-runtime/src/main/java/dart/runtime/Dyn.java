@@ -897,7 +897,18 @@ public final class Dyn {
         return f instanceof Funcs.Func0 || f instanceof Funcs.Func1 || f instanceof Funcs.Func2
                 || f instanceof Funcs.Func3 || f instanceof Funcs.Func4 || f instanceof Funcs.Func5
                 || f instanceof Funcs.VoidFunc0 || f instanceof Funcs.VoidFunc1 || f instanceof Funcs.VoidFunc2
-                || f instanceof Funcs.VoidFunc3 || f instanceof Funcs.VoidFunc4 || f instanceof Funcs.VoidFunc5;
+                || f instanceof Funcs.VoidFunc3 || f instanceof Funcs.VoidFunc4 || f instanceof Funcs.VoidFunc5
+                || f instanceof Funcs.Func6 || f instanceof Funcs.VoidFunc6
+                || f instanceof Funcs.Func7 || f instanceof Funcs.VoidFunc7
+                || f instanceof Funcs.Func8 || f instanceof Funcs.VoidFunc8
+                || f instanceof Funcs.Func9 || f instanceof Funcs.VoidFunc9
+                || f instanceof Funcs.Func10 || f instanceof Funcs.VoidFunc10
+                || f instanceof Funcs.Func11 || f instanceof Funcs.VoidFunc11
+                || f instanceof Funcs.Func12 || f instanceof Funcs.VoidFunc12
+                || f instanceof Funcs.Func13 || f instanceof Funcs.VoidFunc13
+                || f instanceof Funcs.Func14 || f instanceof Funcs.VoidFunc14
+                || f instanceof Funcs.Func15 || f instanceof Funcs.VoidFunc15
+                || f instanceof Funcs.Func16 || f instanceof Funcs.VoidFunc16;
     }
 
     /// Dart's {@code Function.apply(f, positional, named)}. The positional list is spread
@@ -1110,6 +1121,105 @@ public final class Dyn {
                 }
                 if (f instanceof Funcs.VoidFunc5) {
                     ((Funcs.VoidFunc5) f).call(a[0], a[1], a[2], a[3], a[4]);
+                    return null;
+                }
+                break;
+            case 6:
+                if (f instanceof Funcs.Func6) {
+                    return ((Funcs.Func6) f).call(a[0], a[1], a[2], a[3], a[4], a[5]);
+                }
+                if (f instanceof Funcs.VoidFunc6) {
+                    ((Funcs.VoidFunc6) f).call(a[0], a[1], a[2], a[3], a[4], a[5]);
+                    return null;
+                }
+                break;
+            case 7:
+                if (f instanceof Funcs.Func7) {
+                    return ((Funcs.Func7) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
+                }
+                if (f instanceof Funcs.VoidFunc7) {
+                    ((Funcs.VoidFunc7) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
+                    return null;
+                }
+                break;
+            case 8:
+                if (f instanceof Funcs.Func8) {
+                    return ((Funcs.Func8) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+                }
+                if (f instanceof Funcs.VoidFunc8) {
+                    ((Funcs.VoidFunc8) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+                    return null;
+                }
+                break;
+            case 9:
+                if (f instanceof Funcs.Func9) {
+                    return ((Funcs.Func9) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
+                }
+                if (f instanceof Funcs.VoidFunc9) {
+                    ((Funcs.VoidFunc9) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
+                    return null;
+                }
+                break;
+            case 10:
+                if (f instanceof Funcs.Func10) {
+                    return ((Funcs.Func10) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+                }
+                if (f instanceof Funcs.VoidFunc10) {
+                    ((Funcs.VoidFunc10) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+                    return null;
+                }
+                break;
+            case 11:
+                if (f instanceof Funcs.Func11) {
+                    return ((Funcs.Func11) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]);
+                }
+                if (f instanceof Funcs.VoidFunc11) {
+                    ((Funcs.VoidFunc11) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]);
+                    return null;
+                }
+                break;
+            case 12:
+                if (f instanceof Funcs.Func12) {
+                    return ((Funcs.Func12) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11]);
+                }
+                if (f instanceof Funcs.VoidFunc12) {
+                    ((Funcs.VoidFunc12) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11]);
+                    return null;
+                }
+                break;
+            case 13:
+                if (f instanceof Funcs.Func13) {
+                    return ((Funcs.Func13) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]);
+                }
+                if (f instanceof Funcs.VoidFunc13) {
+                    ((Funcs.VoidFunc13) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]);
+                    return null;
+                }
+                break;
+            case 14:
+                if (f instanceof Funcs.Func14) {
+                    return ((Funcs.Func14) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13]);
+                }
+                if (f instanceof Funcs.VoidFunc14) {
+                    ((Funcs.VoidFunc14) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13]);
+                    return null;
+                }
+                break;
+            case 15:
+                if (f instanceof Funcs.Func15) {
+                    return ((Funcs.Func15) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14]);
+                }
+                if (f instanceof Funcs.VoidFunc15) {
+                    ((Funcs.VoidFunc15) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14]);
+                    return null;
+                }
+                break;
+            case 16:
+                if (f instanceof Funcs.Func16) {
+                    return ((Funcs.Func16) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15]);
+                }
+                if (f instanceof Funcs.VoidFunc16) {
+                    ((Funcs.VoidFunc16) f).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15]);
                     return null;
                 }
                 break;

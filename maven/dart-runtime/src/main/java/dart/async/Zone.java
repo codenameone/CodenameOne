@@ -343,6 +343,105 @@ public final class Zone {
                     return null;
                 }
                 break;
+            case 6:
+                if (fn instanceof dart.runtime.Funcs.Func6) {
+                    return ((dart.runtime.Funcs.Func6) fn).call(a[0], a[1], a[2], a[3], a[4], a[5]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc6) {
+                    ((dart.runtime.Funcs.VoidFunc6) fn).call(a[0], a[1], a[2], a[3], a[4], a[5]);
+                    return null;
+                }
+                break;
+            case 7:
+                if (fn instanceof dart.runtime.Funcs.Func7) {
+                    return ((dart.runtime.Funcs.Func7) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc7) {
+                    ((dart.runtime.Funcs.VoidFunc7) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
+                    return null;
+                }
+                break;
+            case 8:
+                if (fn instanceof dart.runtime.Funcs.Func8) {
+                    return ((dart.runtime.Funcs.Func8) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc8) {
+                    ((dart.runtime.Funcs.VoidFunc8) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+                    return null;
+                }
+                break;
+            case 9:
+                if (fn instanceof dart.runtime.Funcs.Func9) {
+                    return ((dart.runtime.Funcs.Func9) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc9) {
+                    ((dart.runtime.Funcs.VoidFunc9) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
+                    return null;
+                }
+                break;
+            case 10:
+                if (fn instanceof dart.runtime.Funcs.Func10) {
+                    return ((dart.runtime.Funcs.Func10) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc10) {
+                    ((dart.runtime.Funcs.VoidFunc10) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+                    return null;
+                }
+                break;
+            case 11:
+                if (fn instanceof dart.runtime.Funcs.Func11) {
+                    return ((dart.runtime.Funcs.Func11) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc11) {
+                    ((dart.runtime.Funcs.VoidFunc11) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]);
+                    return null;
+                }
+                break;
+            case 12:
+                if (fn instanceof dart.runtime.Funcs.Func12) {
+                    return ((dart.runtime.Funcs.Func12) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc12) {
+                    ((dart.runtime.Funcs.VoidFunc12) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11]);
+                    return null;
+                }
+                break;
+            case 13:
+                if (fn instanceof dart.runtime.Funcs.Func13) {
+                    return ((dart.runtime.Funcs.Func13) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc13) {
+                    ((dart.runtime.Funcs.VoidFunc13) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]);
+                    return null;
+                }
+                break;
+            case 14:
+                if (fn instanceof dart.runtime.Funcs.Func14) {
+                    return ((dart.runtime.Funcs.Func14) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc14) {
+                    ((dart.runtime.Funcs.VoidFunc14) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13]);
+                    return null;
+                }
+                break;
+            case 15:
+                if (fn instanceof dart.runtime.Funcs.Func15) {
+                    return ((dart.runtime.Funcs.Func15) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc15) {
+                    ((dart.runtime.Funcs.VoidFunc15) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14]);
+                    return null;
+                }
+                break;
+            case 16:
+                if (fn instanceof dart.runtime.Funcs.Func16) {
+                    return ((dart.runtime.Funcs.Func16) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15]);
+                }
+                if (fn instanceof dart.runtime.Funcs.VoidFunc16) {
+                    ((dart.runtime.Funcs.VoidFunc16) fn).call(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15]);
+                    return null;
+                }
+                break;
             default:
                 break;
         }
