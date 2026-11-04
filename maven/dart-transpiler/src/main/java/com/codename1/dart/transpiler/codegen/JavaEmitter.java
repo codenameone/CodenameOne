@@ -7295,6 +7295,16 @@ public final class JavaEmitter {
             Out init = null;
             TypeRef asyncFn = (declared == null || declared.is("var")) && v.initializer instanceof Lambda
                     ? asyncClosureType((Lambda) v.initializer, v.name, ctx) : null;
+            if (v.initializer != null && (declared == null || declared.is("var"))) {
+                // `final c = G.new` / `final f = identity`: a generic function value with
+                // nothing to instantiate it. Dart keeps it generic and each call infers its
+                // own type arguments (`c(1)` is a G<int>), so it is held as the generic
+                // closure `<T>(T v) => G<T>(v)` (see genericTearOffClosure).
+                Lambda gtear = genericTearOffClosure(v.initializer, ctx);
+                if (gtear != null) {
+                    v.initializer = gtear;
+                }
+            }
             if (v.initializer != null) {
                 // `var f = (int x) => x` / `Object g = (Object o) => ..`: no function type
                 // is imposed, so the local holds the closure by its own SAM, whose type
@@ -7361,6 +7371,24 @@ public final class JavaEmitter {
                             java.util.Collections.<TypeRef>emptyList());
                 }
                 t.genericClosure = gl;
+                if (genericTearOffLambdas.containsKey(gl) && init != null && !init.fromError) {
+                    // A generic tear-off's closure (genericTearOffClosure) is signed by its
+                    // own erased SAM, which spells its result as the signer sees it (`G<T>`
+                    // erased, or Object through an import prefix); the local's view of the
+                    // same erasure may differ in that type argument only, so the generic
+                    // value is handed over through Object.
+                    String held = init.code;
+                    String bare = genericTearOffLambdas.get(gl);
+                    String key = bare != null ? canonFunctionKey(bare, t, ctx) : null;
+                    if (key != null) {
+                        // Still the one Dart function: `f == identity` holds, as the canonical
+                        // tear-off `identity` compares by the same key (DartRuntime.eq).
+                        ctx.importClass("dart.runtime.DartRuntime");
+                        held = "DartRuntime.canonTearOff(\"" + key + "\", \"generic\", (Object) " + held + ")";
+                    }
+                    init = new Out("((" + javaType(t, false, ctx) + ") (Object) " + held + ")",
+                            init.type, init.fn);
+                }
             }
             if (ctx.frame != null && ctx.frame.fieldDecl == v) {
                 asyncLowering.emitFieldLocal(v, t, init, ctx);
@@ -9497,9 +9525,12 @@ public final class JavaEmitter {
             }
         }
         Out raw;
-        if (e instanceof PropertyGet && ((PropertyGet) e).target instanceof Ident) {
+        if (e instanceof PropertyGet && (((PropertyGet) e).target instanceof Ident
+                || ((PropertyGet) e).target instanceof PropertyGet
+                && isImportPrefix(((PropertyGet) ((PropertyGet) e).target).target, ctx))) {
             // `G.new` (or `G.named`) in a slot: staticTearOff reads the slot's type for the
-            // type arguments Dart infers from it (`G<int> Function(int) gi = G.new`).
+            // type arguments Dart infers from it (`G<int> Function(int) gi = G.new`), and
+            // `a.G.new` through an import prefix the same way.
             Expr prevNode = ctorTearOffNode;
             TypeRef prevExpected = ctorTearOffExpected;
             ctorTearOffNode = e;
@@ -23498,7 +23529,16 @@ public final class JavaEmitter {
             StringBuilder binds = new StringBuilder();
             for (int i = 0; i < l.typeParams.size(); i++) {
                 binds.append("dart.runtime.TypeWitness $tw$").append(l.typeParams.get(i))
-                        .append(" = ").append(twsName).append("[").append(i).append("]; ");
+                        .append(" = ").append(twsName).append("[").append(i).append("]");
+                if (genericTearOffLambdas.containsKey(l)) {
+                    // A generic tear-off's unknown witness (a dynamic call, Function.apply) is
+                    // its unbounded type parameter instantiated to bounds, dynamic, so it
+                    // builds a G<dynamic>, never a G<Object>. A written generic closure keeps
+                    // null: its bound checks read null as "unknown, do not check".
+                    binds.append(" != null ? ").append(twsName).append("[").append(i)
+                            .append("] : dart.runtime.TypeWitness.DYNAMIC");
+                }
+                binds.append("; ");
             }
             genericWitnessLambdas.add(l);
             String built = signed;
@@ -33402,6 +33442,13 @@ public final class JavaEmitter {
                     for (String tp : tps) {
                         TypeRef b = pc.typeParamBounds.get(tp);
                         inferred.add(b != null && !mentionsTypeVariable(b, ctx) && !namesAny(b, tps) ? b : new TypeRef("dynamic"));
+                        // F-bounded (`T extends Comparable<T>`): instantiating to bounds gives
+                        // T = Comparable<dynamic>, which fails its own bound
+                        // (Comparable<dynamic> is no Comparable<Comparable<dynamic>>), so every
+                        // call of the value instantiated that way -- a dynamic call,
+                        // Function.apply -- throws TypeError in Dart. The value itself is fine:
+                        // `d is Function` holds; only calling it fails.
+                        fBoundedToBounds |= b != null && namesAny(b, tps);
                     }
                 }
                 call.type.args.addAll(inferred);
@@ -33491,6 +33538,136 @@ public final class JavaEmitter {
         }
         return null;
     }
+
+    /// The generic closure a tear-off of a generic constructor (`G.new`, `G.named`,
+    /// `a.G.new`) or a generic top-level function (`identity`) desugars to where nothing
+    /// instantiates it: `<T>(T v) => G<T>(v)`. It is built through SignedFns.generic, as a
+    /// generic local function is, so a call of the local infers its type arguments from its
+    /// arguments (instantiateGenericClosure) and passes their witnesses, while a dynamic
+    /// call or Function.apply runs the value built with every witness unknown, which is
+    /// what instantiating to bounds gives. Null for anything else, and for a signature
+    /// with optional or named parameters (those keep the existing tear-off path).
+    private Lambda genericTearOffClosure(Expr e, Ctx ctx) {
+        String canonBare = null;
+        List<String> tps;
+        java.util.Map<String, TypeRef> bounds;
+        List<Param> params;
+        Expr body;
+        if (e instanceof PropertyGet) {
+            PropertyGet pg = (PropertyGet) e;
+            ClassDecl pc = null;
+            if (pg.target instanceof Ident && ((Ident) pg.target).typeArgs == null
+                    && ctx.lookup(((Ident) pg.target).name) == null) {
+                pc = programClass(((Ident) pg.target).name, ctx);
+            } else if (pg.target instanceof PropertyGet
+                    && isImportPrefix(((PropertyGet) pg.target).target, ctx)) {
+                pc = program.resolveClass(((PropertyGet) pg.target).name, ctx.library(),
+                        ((Ident) ((PropertyGet) pg.target).target).name);
+            }
+            if (pc == null || pc.typeParams.isEmpty() || program.enums.containsKey(pc.name)) {
+                return null;
+            }
+            CtorDecl cd = null;
+            if (pg.name.equals("new")) {
+                for (CtorDecl c : pc.ctors) {
+                    if (c.name == null) {
+                        cd = c;
+                    }
+                }
+            } else {
+                cd = pc.namedCtor(pg.name);
+            }
+            if (cd == null || cd.isFactory) {
+                return null;
+            }
+            for (String tp : pc.typeParams) {
+                if (pc.typeParamBounds.get(tp) != null) {
+                    // A bounded class instantiates to its bound, which the generic
+                    // closure's unknown witness does not spell; staticTearOff handles it.
+                    return null;
+                }
+            }
+            tps = pc.typeParams;
+            bounds = pc.typeParamBounds;
+            params = ctorParamsAsValues(pc, cd);
+            CtorCall call = new CtorCall();
+            call.type = new TypeRef(pc.name);
+            call.type.resolved = pc;
+            for (String tp : tps) {
+                call.type.args.add(new TypeRef(tp));
+            }
+            call.ctorName = pg.name.equals("new") ? null : pg.name;
+            body = call;
+        } else if (e instanceof Ident && ((Ident) e).typeArgs == null && ctx.lookup(((Ident) e).name) == null
+                && (ctx.currentClass == null || ctx.currentClass.method(((Ident) e).name) == null
+                    && ctx.currentClass.field(((Ident) e).name) == null)) {
+            Library owner = program.resolveFunctionOwner(((Ident) e).name, ctx.library(), null);
+            FunctionDecl fd = owner != null ? functionInLibrary(owner, ((Ident) e).name) : null;
+            if (fd == null || fd.typeParams.isEmpty() || fd.isGetter || fd.isSetter) {
+                return null;
+            }
+            canonBare = Program.libClassName(owner.fileName) + "::" + fd.name;
+            for (String tp : fd.typeParams) {
+                if (fd.typeParamBounds.get(tp) != null) {
+                    return null;
+                }
+            }
+            tps = fd.typeParams;
+            bounds = fd.typeParamBounds;
+            params = fd.params;
+            Call call = new Call();
+            call.name = fd.name;
+            for (String tp : tps) {
+                call.typeArgs.add(new TypeRef(tp));
+            }
+            body = call;
+        } else {
+            return null;
+        }
+        if (params.size() > MAX_FN_ARITY) {
+            return null;
+        }
+        Lambda l = new Lambda();
+        l.line = e.line;
+        l.col = e.col;
+        l.typeParams = new ArrayList<String>(tps);
+        l.typeParamBounds.putAll(bounds);
+        l.typeVarSlots.add(null);
+        Args args = body instanceof CtorCall ? ((CtorCall) body).args : ((Call) body).args;
+        for (Param p : params) {
+            if (p.optional || p.named || p.type == null || p.type.is("var")) {
+                return null;
+            }
+            Param lp = new Param();
+            lp.name = "p$" + p.name;
+            lp.line = e.line;
+            lp.col = e.col;
+            boolean bare = p.type.args.isEmpty() && p.type.funcParams == null && tps.contains(p.type.name);
+            l.typeVarSlots.add(bare ? p.type.name : null);
+            lp.type = bare ? TypeRef.DYNAMIC : p.type;
+            if (!bare && namesAny(p.type, tps)) {
+                return null;
+            }
+            l.params.add(lp);
+            Ident ref = new Ident();
+            ref.name = lp.name;
+            ref.line = e.line;
+            ref.col = e.col;
+            args.positional.add(ref);
+        }
+        body.line = e.line;
+        body.col = e.col;
+        l.exprBody = body;
+        genericTearOffLambdas.put(l, canonBare);
+        return l;
+    }
+
+    /// The closures genericTearOffClosure desugared a generic tear-off to, each with the
+    /// `Lib::fn` its function is canonicalized by (null for a constructor).
+    private final java.util.Map<Lambda, String> genericTearOffLambdas = new java.util.IdentityHashMap<Lambda, String>();
+
+    /** Set by staticTearOff when the next tear-off lambda instantiates an F-bounded class to bounds. */
+    private boolean fBoundedToBounds;
 
     /** The declared return type of the static method the next tear-off lambda calls. */
     private TypeRef tearOffReturn;
@@ -33606,6 +33783,21 @@ public final class JavaEmitter {
         body.line = posNode.line;
         body.col = posNode.col;
         l.exprBody = body;
+        if (fBoundedToBounds && body instanceof CtorCall) {
+            // See staticTearOff: an F-bounded class instantiated to its bounds fails its own
+            // bound check, so the call throws TypeError instead of constructing.
+            fBoundedToBounds = false;
+            Call te = new Call();
+            te.name = "TypeError";
+            te.line = posNode.line;
+            te.col = posNode.col;
+            ThrowExpr th = new ThrowExpr();
+            th.value = te;
+            th.line = posNode.line;
+            th.col = posNode.col;
+            l.exprBody = th;
+        }
+        fBoundedToBounds = false;
         TypeRef ft = new TypeRef("Function");
         ft.funcParams = new ArrayList<TypeRef>();
         boolean simple = true;
