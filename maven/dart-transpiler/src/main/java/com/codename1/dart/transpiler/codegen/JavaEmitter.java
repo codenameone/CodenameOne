@@ -164,6 +164,7 @@ public final class JavaEmitter {
     private final Map<String, String> dartFileOf = new java.util.HashMap<String, String>();
 
     public List<GeneratedFile> emit() {
+        inferUntypedMethodReturns();
         pinMemberTypesToOwnLibraries();
         List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
         if (!closureSignatures.isEmpty() || !signedSams.isEmpty() || !callbackTearOffs.isEmpty()) {
@@ -179,6 +180,35 @@ public final class JavaEmitter {
             mapped.add(dart == null ? g : new GeneratedFile(g.relativePath, DartLineTable.apply(g.content, dart)));
         }
         return mapped;
+    }
+
+    /// A method declared with no return type (`toString() => 'x';`, `foo() => 1;`) takes
+    /// the return type of the member it overrides, as Dart infers it, and is `dynamic`
+    /// otherwise (left as `var`). With nothing above it in the program, the members every
+    /// class inherits from dart:core's Object still apply: an untyped `toString()` returns
+    /// String, or its Java method would not override `Object.toString()`.
+    private void inferUntypedMethodReturns() {
+        List<ClassDecl> all = new ArrayList<ClassDecl>();
+        for (List<ClassDecl> same : program.classesByName.values()) {
+            all.addAll(same);
+        }
+        for (ClassDecl c : all) {
+            Ctx ctx = new Ctx(c);
+            for (MethodDecl m : c.methods) {
+                if (m.isStatic || m.isSetter || m.returnType == null || !m.returnType.is("var")) {
+                    continue;
+                }
+                TypeRef over = overriddenProgramReturn(c, m, new HashSet<String>(), ctx);
+                if (over == null && !m.isGetter && m.name.equals("toString") && m.params.isEmpty()) {
+                    over = new TypeRef("String");
+                } else if (over == null && m.isGetter && m.name.equals("hashCode")) {
+                    over = new TypeRef("int");
+                }
+                if (over != null) {
+                    m.returnType = over;
+                }
+            }
+        }
     }
 
     /// The pub packages `lib` imports, `firebase_app_check` for
@@ -1883,7 +1913,7 @@ public final class JavaEmitter {
             // narrowing an Iterable member is a Java interface value (IterableMixin/SetMixin),
             // never the DartIterable class, so it is pinned and wrapped the same way.
             boolean programCollection = m.returnType != null && m.returnType.name != null
-                    && program.classes.containsKey(m.returnType.name)
+                    && classOfRef(m.returnType) != null
                     && !classOfRef(m.returnType).isMixin
                     && appliedCollectionMixin(m.returnType.name) != null;
             if (!m.isStatic && !m.isSetter && (isCoreListOrSet(m.returnType) || programCollection)) {
@@ -5481,8 +5511,10 @@ public final class JavaEmitter {
      * sees the pinned type.
      */
     private String programCollectionPin(ClassDecl c, MethodDecl m, Ctx ctx) {
+        // classOfRef, not the bare name: `core.String` beside a user `class String` (under
+        // `hide String`) names dart:core's String, which is no program class.
         if (c == null || c.isMixin || m == null || m.isStatic || m.isSetter || m.returnType == null
-                || m.returnType.name == null || !program.classes.containsKey(m.returnType.name)
+                || m.returnType.name == null || classOfRef(m.returnType) == null
                 || classOfRef(m.returnType).isMixin
                 || appliedCollectionMixin(m.returnType.name) == null
                 || overriddenIterableReturn(c, m, new HashSet<String>()) != null) {
@@ -21336,11 +21368,21 @@ public final class JavaEmitter {
         TypeRef promotedBefore = a.lhs instanceof Ident && !"=".equals(a.op) && !"??=".equals(a.op)
                 && ctx.lookup(((Ident) a.lhs).name) != null ? ctx.promotedType(((Ident) a.lhs).name) : null;
         Out o = emitAssignFlow(a, ctx);
+        TypeRef operandType = watch ? ctx.watchedTypes.get(a.rhs) : null;
+        if (promotedBefore != null && isNumeric(promotedBefore) && operandType != null
+                && isNumeric(operandType) && !staticSubtype(operandType, promotedBefore)) {
+            // `q += 1.5` on a num local promoted to int: the value written is a double, so q
+            // is demoted to num, exactly as a plain assignment of one would demote it. Judged
+            // by the operand's type: the compound's own Out is typed by the declared slot.
+            ctx.restorePromotion(((Ident) a.lhs).name, null);
+        }
         if (promotedBefore != null && isNumeric(promotedBefore) && ctx.statementExpr != a && o.type != null
-                && !isNumeric(o.type) && !o.code.startsWith("$")) {
+                && !isNumeric(o.type) && !o.code.startsWith("$")
+                && ctx.promotedType(((Ident) a.lhs).name) != null) {
             // `--x` / `x += 1` as a value on a local promoted to a number: the Java assignment
             // writes the declared (Object) slot, so its value is Object, while Dart's is the
-            // promoted number (and x stays promoted, the value being of that type).
+            // promoted number (and x stays promoted, the value being of that type). Not when
+            // the assignment demoted x (`q += 1.5` on an int): the value is then no Long.
             o = new Out("((" + javaType(promotedBefore, true, ctx) + ") (" + o.code + "))", promotedBefore);
         }
         TypeRef emitted = watch ? ctx.watchedTypes.remove(a.rhs) : null;
@@ -21351,6 +21393,14 @@ public final class JavaEmitter {
                 // An assignment re-promotes or demotes, by the static type assigned. Either
                 // way the field paths read through the old value (`n.f`) no longer hold.
                 ctx.demote(n);
+                // The `is` promotion survives only an assignment of a subtype of the promoted
+                // type (`w = w + 1` on an int). Anything else demotes the local to its declared
+                // type: `p = 'now'` on a local promoted to int must not be read, or type-tested,
+                // through the stale `(Long)` cast afterwards.
+                TypeRef promoted = ctx.promotedType(n);
+                if (promoted != null && !staticSubtype(emitted != null ? emitted : o.type, promoted)) {
+                    ctx.restorePromotion(n, null);
+                }
                 if (nn) {
                     promoteNonNull(n, ctx);
                 } else {
@@ -26181,7 +26231,12 @@ public final class JavaEmitter {
         if (c.name != null && isImportPrefix(c.target, ctx)
                 && (program.functions.containsKey(c.name) || program.classes.containsKey(c.name)
                     || stubs.isStubClass(c.name) || stubs.functions.containsKey(c.name)
-                    || prefixedLibraryFunction(((Ident) c.target).name, c.name, ctx))) {
+                    || prefixedLibraryFunction(((Ident) c.target).name, c.name, ctx)
+                    || "dart:core".equals(ctx.library() == null ? null
+                            : ctx.library().prefixImports.get(((Ident) c.target).name)))) {
+            // `core.print(x)` / `core.identical(a, b)` through `import 'dart:core' as core`:
+            // dart:core's top-level functions are the emitter's own builtins, in no function
+            // table, and the bare call is exactly what the prefix names.
             Call bare = new Call();
             bare.file = c.file;
             bare.line = c.line;
@@ -26201,7 +26256,11 @@ public final class JavaEmitter {
             // The prefix picks the library: a.Foo() and b.Foo() are different classes
             // when both libraries declare Foo. Dropping it let import order decide both.
             String outer = ctx.callPrefix;
-            ctx.callPrefix = ((Ident) c.target).name;
+            // A dart:core function (`core.print(String())`) consumes no prefix, so none is
+            // set: left pending it would bind the first constructor in its arguments to
+            // dart:core instead of the user class the bare name means here.
+            boolean coreFunction = "dart:core".equals(puri) && Character.isLowerCase(c.name.charAt(0));
+            ctx.callPrefix = coreFunction ? outer : ((Ident) c.target).name;
             try {
                 return emitBareCall(bare, expected, ctx);
             } finally {
@@ -35092,9 +35151,22 @@ public final class JavaEmitter {
         }
         collides |= RESERVED_JAVA_NAMES.contains(c.name);
         if (!collides || c.ownerLibrary == null) {
-            return RESERVED_JAVA_NAMES.contains(c.name) ? c.name + "$" : c.name;
+            return RESERVED_JAVA_NAMES.contains(c.name) ? unrenamedClash(c.name + "$") : c.name;
         }
-        return libPathPrefix(c.ownerLibrary) + c.name;
+        return unrenamedClash(libPathPrefix(c.ownerLibrary) + c.name);
+    }
+
+    /// A renamed class or enum must not take a name a program type already has as its own:
+    /// `class Long` in main.dart becomes `MainLong`, and a user `class MainLong` beside it
+    /// would then be the same generated file, one overwriting the other. Every program class
+    /// and enum keeps its Dart name unless renamed itself, so a renamed candidate that equals
+    /// any program type's Dart name is suffixed with `$` until it does not.
+    private String unrenamedClash(String candidate) {
+        String n = candidate;
+        while (program.classesByName.containsKey(n) || program.enumsByName.containsKey(n)) {
+            n = n + "$";
+        }
+        return n;
     }
 
     /// Simple names the generated code spells unqualified and expects to mean something
@@ -35292,9 +35364,9 @@ public final class JavaEmitter {
         boolean collides = (same != null && same.size() > 1) || program.classesByName.containsKey(e.name)
                 || stubs.isStubClass(e.name) || stubs.isStubEnum(e.name) || RESERVED_JAVA_NAMES.contains(e.name);
         if (!collides || e.ownerLibrary == null) {
-            return RESERVED_JAVA_NAMES.contains(e.name) ? e.name + "$" : e.name;
+            return RESERVED_JAVA_NAMES.contains(e.name) ? unrenamedClash(e.name + "$") : e.name;
         }
-        return libPathPrefix(e.ownerLibrary) + e.name;
+        return unrenamedClash(libPathPrefix(e.ownerLibrary) + e.name);
     }
 
     /**

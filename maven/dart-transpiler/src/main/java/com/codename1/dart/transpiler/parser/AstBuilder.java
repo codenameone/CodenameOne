@@ -912,9 +912,36 @@ public final class AstBuilder {
         }
     }
 
+    /// True when a `constructorSignature` with a body is really an untyped method: a bare
+    /// name (no `.named` part) that is not the enclosing class's name, and no initializer
+    /// list (which only a constructor may have).
+    private static boolean untypedMethodNotCtor(Dart2Parser.ConstructorNameContext name,
+                                                Dart2Parser.MethodSignatureContext sig, ClassDecl cd) {
+        return name.identifier() == null && cd.name != null && sig.initializers() == null
+                && !name.typeIdentifier().getText().equals(cd.name);
+    }
+
     private void buildMethodWithBody(Dart2Parser.MethodSignatureContext sig,
                                      Dart2Parser.FunctionBodyContext body,
                                      boolean override, ClassDecl cd) {
+        if (sig.constructorSignature() != null
+                && untypedMethodNotCtor(sig.constructorSignature().constructorName(), sig, cd)) {
+            // Grammar ambiguity: `toString() => 'x';` (no declared return type) matches
+            // constructorSignature, whose typeIdentifier is any name. Only the class's own
+            // name opens a constructor; anything else is a method whose return type is
+            // left to inference (the override's, else dynamic) -- TypeRef.VAR.
+            Dart2Parser.ConstructorSignatureContext cs = sig.constructorSignature();
+            MethodDecl m = new MethodDecl();
+            pos(m, sig);
+            m.isStatic = sig.STATIC_() != null;
+            m.isOverride = override;
+            m.name = cs.constructorName().typeIdentifier().getText();
+            m.returnType = TypeRef.VAR;
+            buildParams(cs.formalParameterList(), m.params);
+            buildFunctionBodyIntoMethod(body, m);
+            cd.methods.add(m);
+            return;
+        }
         if (sig.constructorSignature() != null) {
             CtorDecl ctor = new CtorDecl();
             pos(ctor, sig);
