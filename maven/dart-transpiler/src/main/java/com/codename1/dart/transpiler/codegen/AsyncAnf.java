@@ -1484,7 +1484,10 @@ final class AsyncAnf {
         List<Field> fs = new ArrayList<Field>();
         for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
             for (Field f : k.getDeclaredFields()) {
+                // A ClassDecl field (TypeRef.extensionType, Ident.pinnedClass) is a
+                // back-reference into a cyclic declaration graph, never a child.
                 if (!Modifier.isStatic(f.getModifiers()) && !"inferFrom".equals(f.getName())
+                            && !ClassDecl.class.isAssignableFrom(f.getType())
                             && (Node.class.isAssignableFrom(f.getType())
                         || List.class.isAssignableFrom(f.getType()))) {
                     f.setAccessible(true);

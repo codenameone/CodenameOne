@@ -8414,7 +8414,9 @@ public final class JavaEmitter {
         for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
             for (java.lang.reflect.Field f : k.getDeclaredFields()) {
                 if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType().isPrimitive()
-                        || f.getType() == String.class || f.getType() == TypeRef.class) {
+                        || f.getType() == String.class || f.getType() == TypeRef.class
+                        // a ClassDecl (Ident.pinnedClass) is a back-reference, not a child
+                        || ClassDecl.class.isAssignableFrom(f.getType())) {
                     continue;
                 }
                 try {
@@ -10250,6 +10252,13 @@ public final class JavaEmitter {
             if (fd != null && !fd.isGetter && fd.typeParams.isEmpty()
                     && (fd.returnType == null || fd.returnType.is("var") || fd.returnType.is("dynamic"))) {
                 return TypeRef.DYNAMIC;
+            }
+            // An extension type's constructor function (`Id(6)`) answers its extension type
+            // too: the representation the other paths fall back to has lost the marker, so
+            // `pick(Id(6), Id(7)).describe()` bound T to a bare int and missed Id's member.
+            if (fd != null && !fd.isGetter && fd.typeParams.isEmpty() && fd.returnType != null
+                    && fd.returnType.extensionType != null) {
+                return fd.returnType;
             }
         }
         return null;
@@ -13362,9 +13371,10 @@ public final class JavaEmitter {
                         // an extension getter's static form, `Ext.p($self)`
                         || target.code.endsWith(")")
                         && target.code.contains("." + ((PropertyGet) id.operand).name + "(")
-                        && target.type != null && findExtensionSetter(promotedOperandType(
+                        && target.type != null && (extensionTypeSetterOwner(flowType(((PropertyGet) id.operand).target, ctx),
+                                ((PropertyGet) id.operand).name) != null || findExtensionSetter(promotedOperandType(
                                 ((PropertyGet) id.operand).target, flowType(((PropertyGet) id.operand).target, ctx), ctx),
-                                ((PropertyGet) id.operand).name, ctx) != null))
+                                ((PropertyGet) id.operand).name, ctx) != null)))
                         || (accessor && !statement)) {
                     // `x.prop++` through a getter/setter pair (an app or stub property): the
                     // read is a call, and `x.prop()++` is not Java. Lowered as `x.prop += 1`,
@@ -22449,7 +22459,24 @@ public final class JavaEmitter {
             // `h.n = v` on a receiver typed as an extension type declaring `set n`: the
             // extension type's setter, statically, even where the representation has an
             // `n` of its own.
-            ClassDecl extTypeSet = a.op.equals("=") ? extensionTypeSetterOwner(tgt.type, pg.name) : null;
+            ClassDecl extTypeSet = extensionTypeSetterOwner(tgt.type, pg.name);
+            ClassDecl extTypeGet = a.op.equals("=") || extTypeSet == null ? null
+                    : extensionTypeMember(tgt.type, pg.name, true);
+            if (extTypeSet != null && extTypeGet != null) {
+                // `h.n += v`, `h.n++` (lowered to `+= 1`): read through the extension type's
+                // getter and write through its setter, the receiver evaluated once.
+                MethodDecl es = extensionSetter(extTypeSet, pg.name);
+                TypeRef pt = es.params.get(0).type == null || es.params.get(0).type.is("var")
+                        ? TypeRef.DYNAMIC : es.params.get(0).type;
+                Out once = new Out(receiverOnce(tgt, ctx), tgt.type);
+                String setSelf = extensionSelf(once, tgt.type, extTypeSet, ctx);
+                String getSelf = extensionSelf(once, tgt.type, extTypeGet, ctx);
+                return voidSetterWrite(a, extTypeSet.name + "." + pg.name, setSelf,
+                        extTypeGet.name + "." + pg.name + "(" + getSelf + ")", pt, ctx);
+            }
+            if (!a.op.equals("=")) {
+                extTypeSet = null;
+            }
             if (extTypeSet != null) {
                 MethodDecl es = extensionSetter(extTypeSet, pg.name);
                 TypeRef pt = es.params.get(0).type == null || es.params.get(0).type.is("var")
@@ -24649,7 +24676,9 @@ public final class JavaEmitter {
         for (Class<?> k = node.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
             for (java.lang.reflect.Field f : k.getDeclaredFields()) {
                 if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType().isPrimitive()
-                        || f.getType() == String.class || f.getType() == TypeRef.class) {
+                        || f.getType() == String.class || f.getType() == TypeRef.class
+                        // a ClassDecl (Ident.pinnedClass) is a back-reference, not a child
+                        || ClassDecl.class.isAssignableFrom(f.getType())) {
                     continue;
                 }
                 try {

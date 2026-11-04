@@ -166,6 +166,7 @@ public final class Program {
             libraries.add(part);
             register(part, part);
         }
+        lowerExtensionStatics();
         separateLibraryPrivateMembers();
         separateLibraryPrivateTypedefs();
         restoreShadowedAliases();
@@ -1108,6 +1109,199 @@ public final class Program {
         // Everything else (top-level functions and variables, typedefs) has no enclosing
         // class: a bare name there is never a member.
         renameMembersIn(lib, names, java.util.Collections.<String>emptySet(), new LocalScopes(), seen);
+    }
+
+    /**
+     * Points every reference to an extension's static field at the top-level variable
+     * AstBuilder.hoistStaticFields made of it: `E.f` (and `E.f = v`, `E.f += v`, `E.f++`,
+     * which hold the same PropertyGet) becomes that variable, and so does a bare `f` that no
+     * local shadows inside E's members and its statics' initializers, where a bare call of a
+     * static method of E also gets E as its explicit target (the initializer now sits
+     * outside E). A local named E hides the extension, as in Dart.
+     */
+    private void lowerExtensionStatics() {
+        Map<String, Ast.ClassDecl> byName = new java.util.HashMap<String, Ast.ClassDecl>();
+        Map<Object, Ast.ClassDecl> owners = new java.util.IdentityHashMap<Object, Ast.ClassDecl>();
+        for (Ast.ClassDecl c : extensions) {
+            if (!c.hoistedStatics.isEmpty()) {
+                byName.put(c.name, c);
+                owners.put(c, c);
+                for (Ast.FieldDecl f : c.hoistedFields) {
+                    owners.put(f, c);
+                }
+            }
+        }
+        if (byName.isEmpty()) {
+            return;
+        }
+        Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+        for (Ast.Library lib : libraries) {
+            lowerStaticsIn(lib, null, byName, owners, new LocalScopes(), seen);
+        }
+    }
+
+    private static final Map<Class<?>, List<java.lang.reflect.Field>> CHILD_FIELDS =
+            new java.util.HashMap<Class<?>, List<java.lang.reflect.Field>>();
+
+    /// The fields of a node class that hold child nodes; back-references (a ClassDecl,
+    /// a type) are not children.
+    private static synchronized List<java.lang.reflect.Field> childFields(Class<?> c) {
+        List<java.lang.reflect.Field> fs = CHILD_FIELDS.get(c);
+        if (fs == null) {
+            fs = new ArrayList<java.lang.reflect.Field>();
+            for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
+                for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                    Class<?> t = f.getType();
+                    if (!java.lang.reflect.Modifier.isStatic(f.getModifiers()) && !"inferFrom".equals(f.getName())
+                            && !Ast.ClassDecl.class.isAssignableFrom(t) && !Ast.TypeRef.class.isAssignableFrom(t)
+                            && !Ast.Library.class.isAssignableFrom(t)
+                            && (Ast.Node.class.isAssignableFrom(t) || List.class.isAssignableFrom(t)
+                            || t == Ast.Args.class || t == Ast.NamedArg.class)) {
+                        f.setAccessible(true);
+                        fs.add(f);
+                    }
+                }
+            }
+            CHILD_FIELDS.put(c, fs);
+        }
+        return fs;
+    }
+
+    /// {@code o} as it reads after the rewrite: an `E.f` is replaced, a bare `f` renamed.
+    private static Object lowerStaticRef(Object o, Ast.ClassDecl ext, Map<String, Ast.ClassDecl> byName,
+            LocalScopes locals) {
+        if (o instanceof Ast.PropertyGet && !((Ast.PropertyGet) o).nullAware
+                && ((Ast.PropertyGet) o).target instanceof Ast.Ident) {
+            Ast.PropertyGet pg = (Ast.PropertyGet) o;
+            Ast.Ident t = (Ast.Ident) pg.target;
+            Ast.ClassDecl e = byName.get(t.name);
+            if (e != null && t.typeArgs == null && e.hoistedStatics.containsKey(pg.name) && !locals.declares(t.name)) {
+                Ast.Ident id = new Ast.Ident();
+                id.file = pg.file;
+                id.line = pg.line;
+                id.col = pg.col;
+                id.name = e.hoistedStatics.get(pg.name);
+                return id;
+            }
+        }
+        if (ext != null && o instanceof Ast.Ident) {
+            Ast.Ident id = (Ast.Ident) o;
+            if (ext.hoistedStatics.containsKey(id.name) && !locals.declares(id.name)) {
+                id.name = ext.hoistedStatics.get(id.name);
+            }
+        }
+        return o;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void lowerStaticsIn(Object o, Ast.ClassDecl ext, Map<String, Ast.ClassDecl> byName,
+            Map<Object, Ast.ClassDecl> owners, LocalScopes locals, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof List) {
+            List<Object> l = (List<Object>) o;
+            for (int i = 0; i < l.size(); i++) {
+                Object e = l.get(i);
+                Object r = lowerStaticRef(e, ext, byName, locals);
+                if (r != e) {
+                    l.set(i, r);
+                }
+                lowerStaticsIn(r, ext, byName, owners, locals, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        Ast.ClassDecl own = owners.get(o);
+        if (own != null) {
+            ext = own;
+        }
+        if (o instanceof Ast.FieldDecl && own != null && ((Ast.FieldDecl) o).initializer != null) {
+            // The initializer of a hoisted static now sits outside E: E's statics get E.
+            qualifyStaticCalls(((Ast.FieldDecl) o).initializer, own,
+                    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+        if (o instanceof Ast.LocalFunc) {
+            locals.declare(((Ast.LocalFunc) o).name);
+        }
+        boolean scoped = opensScope(o) || o instanceof Ast.LocalFunc;
+        if (scoped) {
+            locals.push();
+        }
+        try {
+            if (o instanceof Ast.Param && !((Ast.Param) o).isThis && !((Ast.Param) o).isSuper) {
+                locals.declare(((Ast.Param) o).name);
+            } else if (o instanceof Ast.VariablePattern) {
+                locals.declare(((Ast.VariablePattern) o).name);
+            } else if (o instanceof Ast.ForInStmt) {
+                locals.declare(((Ast.ForInStmt) o).varName);
+            } else if (o instanceof Ast.CatchClause) {
+                locals.declare(((Ast.CatchClause) o).exceptionVar);
+                locals.declare(((Ast.CatchClause) o).stackVar);
+            }
+            for (java.lang.reflect.Field f : childFields(o.getClass())) {
+                Object v;
+                try {
+                    v = f.get(o);
+                    Object r = lowerStaticRef(v, ext, byName, locals);
+                    if (r != v) {
+                        f.set(o, r);
+                        v = r;
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                } catch (IllegalArgumentException ex) {
+                    // An Ident does not fit a field typed narrower than Expr: left as written.
+                    continue;
+                }
+                lowerStaticsIn(v, ext, byName, owners, locals, seen);
+            }
+        } finally {
+            if (scoped) {
+                locals.pop();
+            }
+        }
+        if (o instanceof Ast.VarDeclStmt) {
+            locals.declare(((Ast.VarDeclStmt) o).name);
+        }
+    }
+
+    /// Gives every bare call of one of {@code ext}'s static methods under {@code o} the
+    /// explicit target `E`.
+    private static void qualifyStaticCalls(Object o, Ast.ClassDecl ext, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof List) {
+            for (Object e : (List<?>) o) {
+                qualifyStaticCalls(e, ext, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        if (o instanceof Ast.Call && ((Ast.Call) o).target == null && ((Ast.Call) o).name != null) {
+            Ast.Call c = (Ast.Call) o;
+            Ast.MethodDecl m = ext.method(c.name);
+            if (m != null && m.isStatic) {
+                Ast.Ident t = new Ast.Ident();
+                t.file = c.file;
+                t.line = c.line;
+                t.col = c.col;
+                t.name = ext.name;
+                c.target = t;
+            }
+        }
+        for (java.lang.reflect.Field f : childFields(o.getClass())) {
+            try {
+                qualifyStaticCalls(f.get(o), ext, seen);
+            } catch (IllegalAccessException ex) {
+                throw new IllegalStateException(ex);
+            }
+        }
     }
 
     /// The local scopes open at a point of the walk, innermost last.

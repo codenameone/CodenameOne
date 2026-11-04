@@ -157,7 +157,12 @@ final class AsyncLowering {
             for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
                 for (Field f : k.getDeclaredFields()) {
                     // Args is no Node: a call's arguments hold awaits too.
+                    // A ClassDecl field is a back-reference, never a child: TypeRef.extensionType
+                    // and Ident.pinnedClass reach a whole declaration, whose own types point back
+                    // at it, and the walk recursed until the stack overflowed (async main
+                    // mentioning an extension type).
                     if (!Modifier.isStatic(f.getModifiers()) && !"inferFrom".equals(f.getName())
+                            && !ClassDecl.class.isAssignableFrom(f.getType())
                             && (Node.class.isAssignableFrom(f.getType())
                             || List.class.isAssignableFrom(f.getType()) || f.getType() == Args.class)) {
                         f.setAccessible(true);

@@ -240,6 +240,14 @@ public final class Ast {
         public boolean isSealed;                  // Dart 3: sealed class C { }
         public boolean isMixin;                   // mixin M { }
         public List<TypeRef> mixinOn = new ArrayList<TypeRef>();  // mixin M on S1, S2
+        /// An extension's (or extension type's) static fields, hoisted to top-level variables
+        /// of its library by AstBuilder: field name to the variable's name. Program rewrites
+        /// `E.f` and a bare `f` in E's members to that variable.
+        public java.util.Map<String, String> hoistedStatics = new java.util.LinkedHashMap<String, String>();
+        /// The variables {@link #hoistedStatics} names, whose initializers read E's scope. An
+        /// array, not a List: the reflective AST walks must not reach them a second time as
+        /// members of E (they are the library's top-level variables).
+        public FieldDecl[] hoistedFields = new FieldDecl[0];
         public TypeRef extensionOn;               // extension X on T { } — non-null marks an extension
         /** An `extension on T` with no name: no show combinator can import it, no hide drop it. */
         public boolean unnamedExtension;

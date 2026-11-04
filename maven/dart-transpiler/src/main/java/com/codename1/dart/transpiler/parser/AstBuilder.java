@@ -259,6 +259,7 @@ public final class AstBuilder {
             for (int i = 0; i < members.size(); i++) {
                 buildMember(members.get(i), metas.size() > i ? metas.get(i) : null, cd);
             }
+            hoistStaticFields(cd, lib);
             lib.classes.add(cd);
         } else if (ctx.mixinDeclaration() != null) {
             Dart2Parser.MixinDeclarationContext mx = ctx.mixinDeclaration();
@@ -530,6 +531,29 @@ public final class AstBuilder {
                 call.args = c.redirect.args;
                 result = call;
             }
+            if (c.isFactory && c.body != null && c.body.statements.size() == 1
+                    && c.body.statements.get(0) instanceof ReturnStmt
+                    && ((ReturnStmt) c.body.statements.get(0)).value instanceof CtorCall
+                    && ((CtorCall) ((ReturnStmt) c.body.statements.get(0)).value).type.name.equals(cd.name)) {
+                // A redirecting factory (`factory Id.of(int v) = Id;` / `= Id.named;`):
+                // buildRedirectingFactory wrote `return new Id(v)`, but an extension type has
+                // no class to construct -- its constructors are the static functions made
+                // here, so the redirect calls the one it names.
+                ReturnStmt ret = (ReturnStmt) c.body.statements.get(0);
+                CtorCall cc = (CtorCall) ret.value;
+                Call call = new Call();
+                call.file = c.file;
+                call.line = c.line;
+                call.col = c.col;
+                if (cc.ctorName == null && primaryName == null) {
+                    call.name = cd.name;
+                } else {
+                    call.target = ident(cd.name, et);
+                    call.name = cc.ctorName == null ? primaryName : cc.ctorName;
+                }
+                call.args = cc.args;
+                ret.value = call;
+            }
             if (c.isFactory || c.body != null && result == null) {
                 // A factory's body already returns the value; a redirecting factory
                 // (`factory Id.of(int v) = Id;`) has none and is not lowered.
@@ -544,7 +568,43 @@ public final class AstBuilder {
             cd.methods.add(m);
         }
         cd.ctors.clear();
+        hoistStaticFields(cd, lib);
         lib.classes.add(cd);
+    }
+
+    /**
+     * An extension's static fields are top-level variables of its library under a name no
+     * Dart declaration can spell (`Id$count`; `_Id$count` when either name is private, so
+     * the library-privacy pass separates it like any private). Both are lazily initialized
+     * globals in Dart, so a top-level variable gives `static int n = f();`, `const`, `final`,
+     * assignment, compound assignment and `++` their exact semantics. The references are
+     * rewritten in Program.lowerExtensionStatics, once every extension is known.
+     */
+    private static void hoistStaticFields(ClassDecl cd, Library lib) {
+        for (java.util.Iterator<FieldDecl> it = cd.fields.iterator(); it.hasNext();) {
+            FieldDecl f = it.next();
+            if (!f.isStatic) {
+                continue;
+            }
+            it.remove();
+            boolean priv = cd.name.startsWith("_") || f.name.startsWith("_");
+            String mangled = (priv ? "_" : "") + stripUnderscores(cd.name) + "$" + stripUnderscores(f.name);
+            cd.hoistedStatics.put(f.name, mangled);
+            f.name = mangled;
+            f.isStatic = false;
+            FieldDecl[] grown = java.util.Arrays.copyOf(cd.hoistedFields, cd.hoistedFields.length + 1);
+            grown[cd.hoistedFields.length] = f;
+            cd.hoistedFields = grown;
+            lib.topLevelVars.add(f);
+        }
+    }
+
+    private static String stripUnderscores(String s) {
+        int i = 0;
+        while (i < s.length() - 1 && s.charAt(i) == '_') {
+            i++;
+        }
+        return s.substring(i);
     }
 
     private Ident ident(String name, org.antlr.v4.runtime.ParserRuleContext at) {
