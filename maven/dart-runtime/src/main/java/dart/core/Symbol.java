@@ -27,12 +27,21 @@ package dart.core;
 /// of one name are equal; toString is {@code Symbol("a")}, as the VM prints it.
 public final class Symbol {
     private final String name;
+    /// The member name of an invocation of a private setter: the VM prints it without its
+    /// {@code =} (a {@code Symbol('_x=')} made by hand keeps it), though it still is the
+    /// setter's name for equality.
+    private final boolean privateSetter;
 
     public Symbol(String name) {
+        this(name, false);
+    }
+
+    Symbol(String name, boolean setter) {
         if (name == null) {
             throw new ArgumentError("Symbol name must not be null");
         }
         this.name = name;
+        this.privateSetter = setter && name.startsWith("_") && name.endsWith("=");
     }
 
     /// The name this symbol was made from (`#a` is "a"); Function.apply places a named
@@ -51,8 +60,33 @@ public final class Symbol {
         return name.hashCode() * 31 + 0x5f;
     }
 
+    /// The name as Dart spells it. A private name that two libraries both use is renamed in
+    /// all but one of them ({@code _x$p2}, see the transpiler's
+    /// {@code Program.separateLibraryPrivateMembers}), and that suffix is the library
+    /// identity: it stays in {@link #name}, so {@code #_x} of one library is not equal to
+    /// {@code #_x} of another, but Dart prints neither with it. Only a private name ending in
+    /// {@code $p} and digits is shortened; a user identifier spelled that way is
+    /// indistinguishable from a renamed one, since Dart identifiers may contain {@code $}.
+    static String dartSpelling(String name) {
+        if (name.endsWith("=")) {
+            return dartSpelling(name.substring(0, name.length() - 1)) + "=";
+        }
+        if (name.length() < 4 || name.charAt(0) != '_') {
+            return name;
+        }
+        int i = name.length();
+        while (i > 0 && name.charAt(i - 1) >= '0' && name.charAt(i - 1) <= '9') {
+            i--;
+        }
+        if (i == name.length() || i < 3 || name.charAt(i - 1) != 'p' || name.charAt(i - 2) != '$') {
+            return name;
+        }
+        return name.substring(0, i - 2);
+    }
+
     @Override
     public String toString() {
-        return "Symbol(\"" + name + "\")";
+        String n = privateSetter ? name.substring(0, name.length() - 1) : name;
+        return "Symbol(\"" + dartSpelling(n) + "\")";
     }
 }

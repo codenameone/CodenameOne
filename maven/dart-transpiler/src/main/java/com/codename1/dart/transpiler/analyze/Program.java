@@ -842,6 +842,13 @@ public final class Program {
      * declarations ({@code _x$p1}); the name is private, so nothing outside the library can
      * spell it. Type, top-level and constructor names are left alone, as are stub libraries,
      * whose members map onto Java names.
+     *
+     * <p>A library that also declares the name at top level (or as a type) has only its
+     * MEMBER references renamed, by resolution rather than spelling
+     * ({@link #renamePrivateMembers}): member declarations, {@code o._x}, {@code #_x}, field
+     * initializers and a bare {@code _x} that Dart resolves to a member of the enclosing
+     * class. Its top-level {@code _x} keeps its name; top-level declarations are told apart
+     * by library already.
      */
     private void separateLibraryPrivateMembers() {
         Map<String, List<Ast.Library>> declaring = new LinkedHashMap<String, List<Ast.Library>>();
@@ -849,17 +856,21 @@ public final class Program {
         // declaration of the SAME library also has would rename that declaration's references
         // too. Another library declaring only the member is still separated.
         Map<Ast.Library, Set<String>> excludedBy = new java.util.IdentityHashMap<Ast.Library, Set<String>>();
+        Map<Ast.Library, Set<String>> enumEntriesBy = new java.util.IdentityHashMap<Ast.Library, Set<String>>();
         for (Ast.Library lib : libraries) {
             Set<String> excluded = new HashSet<String>();
             excludedBy.put(lib, excluded);
             for (Ast.ClassDecl c : lib.classes) {
                 excluded.add(c.name);
             }
+            Set<String> entries = new HashSet<String>();
+            enumEntriesBy.put(lib, entries);
             for (Ast.EnumDecl e : lib.enums) {
                 excluded.add(e.name);
                 // Enum values keep their names (renamePrivate does not reach them); they are
                 // reached through their enum, so another library's `_x` cannot meet them.
                 excluded.addAll(e.entries);
+                entries.addAll(e.entries);
             }
             for (Ast.TypedefDecl t : lib.typedefs) {
                 excluded.add(t.name);
@@ -913,21 +924,34 @@ public final class Program {
             }
         }
         Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        Map<Ast.Library, Map<String, String>> memberRenames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
         for (Map.Entry<String, List<Ast.Library>> en : declaring.entrySet()) {
             List<Ast.Library> l = en.getValue();
             if (l.size() < 2) {
                 continue;
             }
-            // A library that cannot rename the name keeps it; every other one is renamed.
+            // A library that cannot rename the name at all (an enum value) keeps it; failing
+            // that the first library does. Every other one is renamed: wholly when it has no
+            // top-level of that name, otherwise its member references only.
             Ast.Library keeper = l.get(0);
             for (Ast.Library lib : l) {
-                if (excludedBy.get(lib).contains(en.getKey())) {
+                if (enumEntriesBy.get(lib).contains(en.getKey())) {
                     keeper = lib;
                     break;
                 }
             }
             for (int i = 0; i < l.size(); i++) {
-                if (l.get(i) == keeper || excludedBy.get(l.get(i)).contains(en.getKey())) {
+                Ast.Library lib = l.get(i);
+                if (lib == keeper || enumEntriesBy.get(lib).contains(en.getKey())) {
+                    continue;
+                }
+                if (excludedBy.get(lib).contains(en.getKey())) {
+                    Map<String, String> m = memberRenames.get(lib);
+                    if (m == null) {
+                        m = new java.util.HashMap<String, String>();
+                        memberRenames.put(lib, m);
+                    }
+                    m.put(en.getKey(), en.getKey() + "$p" + libraries.indexOf(lib));
                     continue;
                 }
                 Map<String, String> m = renames.get(l.get(i));
@@ -938,9 +962,179 @@ public final class Program {
                 m.put(en.getKey(), en.getKey() + "$p" + libraries.indexOf(l.get(i)));
             }
         }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : memberRenames.entrySet()) {
+            renamePrivateMembers(en.getKey(), en.getValue());
+        }
         for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
             renamePrivate(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
                     new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+    }
+
+    /**
+     * Renames the member references to {@code names} in {@code lib}, leaving its top-level
+     * declarations of those names and their references alone. A bare identifier is resolved
+     * as Dart resolves it lexically: a local of that name wins, then a member the enclosing
+     * class (or extension) itself declares, then the top-level; an inherited member is never
+     * in lexical scope, so with a top-level of the name present it is reached only through
+     * {@code this}. Locals are taken per function: any local of the name in the enclosing
+     * member shadows it throughout that member, which differs from Dart only for a member
+     * reference written before a same-named local in one body.
+     */
+    private static void renamePrivateMembers(Ast.Library lib, Map<String, String> names) {
+        Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+        for (Ast.ClassDecl c : lib.classes) {
+            Set<String> declared = new HashSet<String>();
+            for (Ast.FieldDecl f : c.fields) {
+                declared.add(f.name);
+            }
+            for (Ast.MethodDecl m : c.methods) {
+                declared.add(m.name);
+            }
+            renameMembersIn(c, names, declared, seen);
+        }
+        for (Ast.EnumDecl e : lib.enums) {
+            Set<String> declared = new HashSet<String>();
+            for (Ast.FieldDecl f : e.fields) {
+                declared.add(f.name);
+            }
+            for (Ast.MethodDecl m : e.methods) {
+                declared.add(m.name);
+            }
+            renameMembersIn(e, names, declared, seen);
+        }
+        // Everything else (top-level functions and variables, typedefs) has no enclosing
+        // class: a bare name there is never a member.
+        renameMembersIn(lib, names, java.util.Collections.<String>emptySet(), seen);
+    }
+
+    private static void renameMembersIn(Object o, Map<String, String> names, Set<String> inScope, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                renameMembersIn(e, names, inScope, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        String sym = privateSymbol(o);
+        if (sym != null && names.containsKey(sym)) {
+            ((Ast.StringLit) ((Ast.Call) o).args.positional.get(0)).parts.set(0, names.get(sym));
+        }
+        if (o instanceof Ast.MethodDecl || o instanceof Ast.CtorDecl) {
+            // A member's own locals shadow the class's members of the same name.
+            Set<String> locals = new HashSet<String>();
+            collectLocalNames(o, locals, java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+            if (!locals.isEmpty()) {
+                Set<String> narrowed = new HashSet<String>(inScope);
+                narrowed.removeAll(locals);
+                inScope = narrowed;
+            }
+        }
+        String rename = null;
+        if (o instanceof Ast.MethodDecl) {
+            rename = ((Ast.MethodDecl) o).name;
+        } else if (o instanceof Ast.FieldDecl) {
+            // Only class and enum fields are reached with a class in scope; a top-level
+            // variable is reached from the library walk, where inScope is empty.
+            rename = inScope.isEmpty() ? null : ((Ast.FieldDecl) o).name;
+        } else if (o instanceof Ast.PropertyGet) {
+            rename = ((Ast.PropertyGet) o).target != null || inScope.contains(((Ast.PropertyGet) o).name)
+                    ? ((Ast.PropertyGet) o).name : null;
+        } else if (o instanceof Ast.Call) {
+            Ast.Call c = (Ast.Call) o;
+            rename = c.target != null || inScope.contains(c.name) ? c.name : null;
+        } else if (o instanceof Ast.Ident) {
+            rename = inScope.contains(((Ast.Ident) o).name) ? ((Ast.Ident) o).name : null;
+        } else if (o instanceof Ast.FieldInit) {
+            rename = ((Ast.FieldInit) o).field;
+        } else if (o instanceof Ast.Param && (((Ast.Param) o).isThis || ((Ast.Param) o).isSuper)) {
+            rename = ((Ast.Param) o).name;
+        } else if (o instanceof Ast.PatternField) {
+            rename = ((Ast.PatternField) o).name;
+        }
+        if (rename != null && names.containsKey(rename)) {
+            String to = names.get(rename);
+            if (o instanceof Ast.MethodDecl) {
+                ((Ast.MethodDecl) o).name = to;
+            } else if (o instanceof Ast.FieldDecl) {
+                ((Ast.FieldDecl) o).name = to;
+            } else if (o instanceof Ast.PropertyGet) {
+                ((Ast.PropertyGet) o).name = to;
+            } else if (o instanceof Ast.Call) {
+                ((Ast.Call) o).name = to;
+            } else if (o instanceof Ast.Ident) {
+                ((Ast.Ident) o).name = to;
+            } else if (o instanceof Ast.FieldInit) {
+                ((Ast.FieldInit) o).field = to;
+            } else if (o instanceof Ast.Param) {
+                ((Ast.Param) o).name = to;
+            } else {
+                ((Ast.PatternField) o).name = to;
+            }
+        }
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive() || f.getType() == String.class
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    renameMembersIn(f.get(o), names, inScope, seen);
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+    }
+
+    /// The names a function body declares as locals: parameters (but not `this.x`),
+    /// variables, local functions and pattern variables.
+    private static void collectLocalNames(Object o, Set<String> out, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                collectLocalNames(e, out, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        if (o instanceof Ast.Param && !((Ast.Param) o).isThis && !((Ast.Param) o).isSuper) {
+            out.add(((Ast.Param) o).name);
+        } else if (o instanceof Ast.VarDeclStmt) {
+            out.add(((Ast.VarDeclStmt) o).name);
+        } else if (o instanceof Ast.LocalFunc) {
+            out.add(((Ast.LocalFunc) o).name);
+        } else if (o instanceof Ast.VariablePattern) {
+            out.add(((Ast.VariablePattern) o).name);
+        }
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive() || f.getType() == String.class
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    collectLocalNames(f.get(o), out, seen);
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
         }
     }
 

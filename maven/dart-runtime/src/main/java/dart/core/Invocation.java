@@ -72,7 +72,7 @@ public final class Invocation {
     public static Invocation setter(String name, Object value) {
         DartList<Object> pos = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         pos.add(value);
-        return new Invocation(new Symbol(name + "="), DartList.unmodifiable(pos),
+        return new Invocation(new Symbol(name + "=", true), DartList.unmodifiable(pos),
                 new DartMap<Symbol, Object>(), SETTER);
     }
 

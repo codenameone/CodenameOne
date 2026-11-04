@@ -9607,11 +9607,11 @@ public final class JavaEmitter {
                 }
                 if (ctx.frame != null && ctx.frame.patternFields) {
                     binds.add(asyncLowering.patternBinding(v.name, v.type, jt, "(" + jt + ") " + seen, ctx));
-                    return seen + " instanceof " + erasedJavaType(v.type, ctx);
+                    return typeTestSubject(seen) + " instanceof " + erasedJavaType(v.type, ctx);
                 }
                 binds.add(jt + " " + nm + " = (" + jt + ") " + seen + ";");
                 // Tested erased: Java has no instanceof for a parameterized type.
-                return seen + " instanceof " + erasedJavaType(v.type, ctx);
+                return typeTestSubject(seen) + " instanceof " + erasedJavaType(v.type, ctx);
             }
             TypeRef bt = v.type != null ? v.type : subjType;
             String jt = javaType(bt, false, ctx);
@@ -9659,13 +9659,13 @@ public final class JavaEmitter {
             CastPattern c = (CastPattern) p;
             String jt = javaType(c.type, true, ctx);
             String cast = "((" + jt + ") " + subj + ")";
-            return joinAnd(subj + " instanceof " + erasedJavaType(c.type, ctx),
+            return joinAnd(typeTestSubject(subj) + " instanceof " + erasedJavaType(c.type, ctx),
                     patternMatch(c.inner, cast, c.type, ctx, binds));
         }
         if (p instanceof ObjectPattern) {
             ObjectPattern o = (ObjectPattern) p;
             String jt = javaType(o.type, true, ctx);
-            String cond = subj + " instanceof " + erasedJavaType(o.type, ctx);
+            String cond = typeTestSubject(subj) + " instanceof " + erasedJavaType(o.type, ctx);
             String cast = "((" + jt + ") " + subj + ")";
             // `io.WebSocketException(message: ...)` names the runtime type even where a
             // program class of that simple name is in scope: read it as the runtime's.
@@ -9725,7 +9725,7 @@ public final class JavaEmitter {
             // result only matches when containsKey says the key is really there.
             MapPattern mp = (MapPattern) p;
             String cast = "((java.util.Map) " + subj + ")";
-            String cond = subj + " instanceof java.util.Map";
+            String cond = typeTestSubject(subj) + " instanceof java.util.Map";
             if (mp.type != null) {
                 // `<K, V>{...}` matches only a Map<K, V> (Dart: the subject is tested
                 // against the pattern's map type), with the same reified test as
@@ -9758,7 +9758,7 @@ public final class JavaEmitter {
                 }
             }
             int fixed = rest < 0 ? l.elements.size() : l.elements.size() - 1;
-            String cond = subj + " instanceof List && " + cast + ".size() " + (rest < 0 ? "==" : ">=")
+            String cond = typeTestSubject(subj) + " instanceof List && " + cast + ".size() " + (rest < 0 ? "==" : ">=")
                     + " " + fixed;
             for (int i = 0; i < l.elements.size(); i++) {
                 Pattern el = l.elements.get(i);
@@ -9804,7 +9804,7 @@ public final class JavaEmitter {
             }
             String cn = registerRecordShape(positional.size(), namedNames);
             String cast = "((" + cn + ") " + subj + ")";
-            String cond = subj + " instanceof " + cn;
+            String cond = typeTestSubject(subj) + " instanceof " + cn;
             // A subject statically typed as this record shape gives each field its static
             // type, so an untyped `final (a, b) = (x, y)` binds `a` and `b` as the record's
             // component types rather than as dynamic.
@@ -9918,15 +9918,28 @@ public final class JavaEmitter {
         return !(n.equals("int") || n.equals("double") || n.equals("num") || n.equals("bool"));
     }
 
+    /// The operand of an emitted {@code instanceof}, widened to {@code Object}. The subject is
+    /// often typed by a promotion -- a cast ({@code ((String) x)}) or a switch temp declared
+    /// with the scrutinee's promoted type -- and Dart allows testing it against an unrelated
+    /// type ({@code x is int} where x is promoted to String, which is simply false), while
+    /// javac rejects {@code instanceof} between provably incompatible static types. Testing
+    /// the Object-typed value is always legal and answers the same.
+    private static String typeTestSubject(String subj) {
+        if (subj.startsWith("((Object) ")) {
+            return subj;
+        }
+        return "((Object) " + subj + ")";
+    }
+
     private String instanceofCheck(String subj, TypeRef type, Ctx ctx) {
         if (isReferenceType(type)) {
-            return subj + " instanceof " + erasedJavaType(type, ctx);
+            return typeTestSubject(subj) + " instanceof " + erasedJavaType(type, ctx);
         }
         // primitive-typed variable pattern over a dynamic subject: check the boxed form
         String boxed = type.is("bool") ? "Boolean"
                 : type.is("double") ? "Double"
                 : type.is("num") ? "Number" : "Long";
-        return subj + " instanceof " + boxed;
+        return typeTestSubject(subj) + " instanceof " + boxed;
     }
 
     /** Casts/unboxes a scrutinee temp to the target bind type when they differ. */
@@ -9948,13 +9961,16 @@ public final class JavaEmitter {
             return subj;
         }
         String jt = javaType(to, false, ctx);
+        // A pattern can match a subject promoted to an unrelated type (see typeTestSubject),
+        // so the cast goes through Object.
+        String o = from == null || from.is("dynamic") || from.is("Object") ? subj : typeTestSubject(subj);
         if (to.is("int")) {
-            return "((Number) " + subj + ").longValue()";
+            return "((Number) " + o + ").longValue()";
         }
         if (to.is("double")) {
-            return "((Number) " + subj + ").doubleValue()";
+            return "((Number) " + o + ").doubleValue()";
         }
-        return "(" + jt + ") " + subj;
+        return "(" + jt + ") " + o;
     }
 
     private String numericValue(String subj, TypeRef subjType) {
@@ -12845,7 +12861,7 @@ public final class JavaEmitter {
                     check = "dart.core.DartList.isListOfW(" + subject + ", dart.runtime.TypeWitness.of("
                             + erasedJavaType(el, ctx) + ".class, " + el.nullable + "))";
                 } else {
-                    check = subject + " instanceof " + erased;
+                    check = typeTestSubject(subject) + " instanceof " + erased;
                 }
             }
             return new Out(t.negated ? "!(" + check + ")" : "(" + check + ")", TypeRef.BOOL);
@@ -21295,7 +21311,16 @@ public final class JavaEmitter {
         if (watch) {
             ctx.watchedTypes.put(a.rhs, null);
         }
+        TypeRef promotedBefore = a.lhs instanceof Ident && !"=".equals(a.op) && !"??=".equals(a.op)
+                && ctx.lookup(((Ident) a.lhs).name) != null ? ctx.promotedType(((Ident) a.lhs).name) : null;
         Out o = emitAssignFlow(a, ctx);
+        if (promotedBefore != null && isNumeric(promotedBefore) && ctx.statementExpr != a && o.type != null
+                && !isNumeric(o.type) && !o.code.startsWith("$")) {
+            // `--x` / `x += 1` as a value on a local promoted to a number: the Java assignment
+            // writes the declared (Object) slot, so its value is Object, while Dart's is the
+            // promoted number (and x stays promoted, the value being of that type).
+            o = new Out("((" + javaType(promotedBefore, true, ctx) + ") (" + o.code + "))", promotedBefore);
+        }
         TypeRef emitted = watch ? ctx.watchedTypes.remove(a.rhs) : null;
         if (a.lhs instanceof Ident && ctx.lookup(((Ident) a.lhs).name) != null) {
             String n = ((Ident) a.lhs).name;
