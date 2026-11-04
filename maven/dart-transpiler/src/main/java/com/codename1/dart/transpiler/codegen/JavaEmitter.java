@@ -1541,6 +1541,7 @@ public final class JavaEmitter {
         ClassDecl syn = enumClass(e);
         String enumJava = javaEnumName(e);
         Ctx ctx = new Ctx(syn);
+        typedefScope = ctx.library();
         StringBuilder body = new StringBuilder();
         if (!enumJava.equals(e.name)) {
             // Renamed in Java (MainColor for a user `Color`): a List<Color>'s runtimeType
@@ -2011,6 +2012,7 @@ public final class JavaEmitter {
     private GeneratedFile emitLibClass(Library lib) {
         Ctx ctx = new Ctx(null);
         ctx.currentLibrary = lib;
+        typedefScope = lib;
         String cls = Program.libClassName(lib.fileName);
         StringBuilder body = new StringBuilder();
         for (FieldDecl v : lib.topLevelVars) {
@@ -2068,6 +2070,7 @@ public final class JavaEmitter {
     private GeneratedFile emitExtension(ClassDecl ext) {
         Ctx ctx = new Ctx(null);
         ctx.currentLibrary = ext.ownerLibrary;
+        typedefScope = ext.ownerLibrary;
         ctx.extensionSelfType = ext.extensionOn;
         ctx.currentExtension = ext;
         StringBuilder body = new StringBuilder();
@@ -2233,6 +2236,7 @@ public final class JavaEmitter {
      */
     private GeneratedFile emitMixin(ClassDecl mx) {
         Ctx ctx = new Ctx(mx);
+        typedefScope = ctx.library();
         StringBuilder body = new StringBuilder();
         for (FieldDecl f : mx.fields) {
             TypeRef ft = fieldType(f, ctx);
@@ -2381,6 +2385,7 @@ public final class JavaEmitter {
 
     private GeneratedFile emitClass(ClassDecl c) {
         Ctx ctx = new Ctx(c);
+        typedefScope = ctx.library();
         StringBuilder body = new StringBuilder();
 
         // fields -- Dart initializes statics lazily and order-independently, but Java runs
@@ -13310,6 +13315,10 @@ public final class JavaEmitter {
         if (e instanceof Unary) {
             Unary u = (Unary) e;
             Out o = emitExpr(u.operand, null, ctx);
+            if (u.op.equals("-") || u.op.equals("~")) {
+                // `-v` on `T extends int`: typed by T's bound, as the binary operators are
+                o = numericBoundView(o, ctx);
+            }
             if (isDynamic(o.type)) {
                 // Java's unary operators do not apply to Object; dispatch on the value.
                 ctx.importClass("dart.runtime.DartRuntime");
@@ -15205,7 +15214,7 @@ public final class JavaEmitter {
             return false;
         }
         if (program.resolveClass(n, ctx.library()) != null || program.classesByName.containsKey(n)
-                || program.enums.containsKey(n) || program.typedefs.containsKey(n)
+                || program.enums.containsKey(n) || userTypedef(n) != null
                 || stubs.isStubClass(n) || stubs.isStubEnum(n) || typedefSig(n) != null) {
             return false;
         }
@@ -15525,10 +15534,10 @@ public final class JavaEmitter {
             lit.args.addAll(((Ident) o).typeArgs);
             noteReifiedType(lit);
         }
-        if (o instanceof Ident && program.typedefs.containsKey(((Ident) o).name)
-                && program.typedefs.get(((Ident) o).name).aliased != null) {
+        if (o instanceof Ident && userTypedef(((Ident) o).name) != null
+                && userTypedef(((Ident) o).name).aliased != null) {
             // A typedef as a value (`IntHolder` for Holder<int>) is the aliased type literal.
-            noteReifiedType(program.typedefs.get(((Ident) o).name).aliased);
+            noteReifiedType(userTypedef(((Ident) o).name).aliased);
         }
         if (o instanceof List) {
             for (Object e : (List<?>) o) {
@@ -20215,7 +20224,7 @@ public final class JavaEmitter {
                         || findInheritedField(ctx.currentClass, n) != null)) {
             return false;
         }
-        return program.classes.containsKey(n) || program.enums.containsKey(n) || program.typedefs.containsKey(n)
+        return program.classes.containsKey(n) || program.enums.containsKey(n) || userTypedef(n) != null
                 || stubs.isStubClass(n) || stubs.isStubEnum(n) || CORE_STATIC_RECEIVERS.contains(n)
                 || n.equals("Future") || n.equals("Duration") || n.equals("Iterable");
     }
@@ -20508,7 +20517,8 @@ public final class JavaEmitter {
             if (top != null) {
                 return top;
             }
-            if (program.typedefs.containsKey(pg.name)) {
+            Ast.TypedefDecl prefixed = program.typedefIn(((Ident) pg.target).name + "." + pg.name, ctx.library());
+            if (prefixed != null) {
                 // `p.Alias` for `typedef Alias = Thing;` in the prefixed library: the type
                 // literal the alias names, as the unprefixed `Alias` is.
                 Ident alias = new Ident();
@@ -20516,7 +20526,7 @@ public final class JavaEmitter {
                 alias.file = pg.file;
                 alias.line = pg.line;
                 alias.col = pg.col;
-                Out lit = typedefLiteral(alias, ctx);
+                Out lit = typedefLiteral(alias, prefixed, ctx);
                 if (lit != null) {
                     return lit;
                 }
@@ -23645,7 +23655,7 @@ public final class JavaEmitter {
                             + " : " + fnArmTo(right, fb, ctx) + ")", fb);
                 }
                 return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
-                        ifNullType(left.type, right.type));
+                        ifNullType(left.type, right.type, ctx));
             }
             String tmp = ctx.newTemp();
             if (jt == null) {
@@ -23670,7 +23680,7 @@ public final class JavaEmitter {
                         + fnArmTo(new Out(tmp, copyNonNull(left.type)), fb, ctx) + " : " + fnArmTo(right, fb, ctx) + ")", fb);
             }
             return new Out("((" + tmp + " = " + left.code + ") != null ? " + tmp + " : " + right.code + ")",
-                    ifNullType(left.type, right.type));
+                    ifNullType(left.type, right.type, ctx));
         }
         if (b.op.equals("&&")) {
             // `x is T && x.member`: the left `is` guard flow-promotes x to T for the right operand.
@@ -24369,7 +24379,10 @@ public final class JavaEmitter {
     /// left off a generic typedef are dynamic, as Dart instantiates to bounds. Null when
     /// {@code id} names no program typedef.
     private Out typedefLiteral(Ident id, Ctx ctx) {
-        Ast.TypedefDecl td = program.typedefs.get(id.name);
+        return typedefLiteral(id, userTypedef(id.name), ctx);
+    }
+
+    private Out typedefLiteral(Ident id, Ast.TypedefDecl td, Ctx ctx) {
         if (td == null) {
             return null;
         }
@@ -24410,7 +24423,7 @@ public final class JavaEmitter {
         if (t.name == null || !t.args.isEmpty() || t.funcReturn != null || t.funcParams != null) {
             return null;
         }
-        Ast.TypedefDecl td = program.typedefs.get(t.name);
+        Ast.TypedefDecl td = userTypedef(t.name);
         if (td == null || !td.typeParams.isEmpty()) {
             return null;
         }
@@ -24438,9 +24451,28 @@ public final class JavaEmitter {
         return ft;
     }
 
+    /// The library whose declarations are being emitted: a typedef name is resolved in its
+    /// scope (its own typedefs, its imports and their re-exports), never in a program-wide
+    /// table keyed by bare name, which answers with whichever library declared it last.
+    private Library typedefScope;
+
+    /// The program typedef {@code name} (`Op` or `p.Op`) denotes in {@link #typedefScope}'s
+    /// scope; else the one typedef of that name in the program table. That table is exact:
+    /// Program gave every name two typedefs share, or that a library writes without seeing
+    /// it, a name of its own (`separateAmbiguousTypedefNames`), so a bare name left in it
+    /// denotes one declaration wherever it was written -- including a member type written in
+    /// the library that declares the member and read while emitting another one.
+    private Ast.TypedefDecl userTypedef(String name) {
+        if (name == null) {
+            return null;
+        }
+        Ast.TypedefDecl td = typedefScope != null ? program.typedefIn(name, typedefScope) : null;
+        return td != null ? td : program.typedefs.get(name);
+    }
+
     /** A user typedef by name, else a stub library's function typedef. */
     private Ast.TypedefDecl typedefDecl(String name) {
-        Ast.TypedefDecl td = program.typedefs.get(name);
+        Ast.TypedefDecl td = userTypedef(name);
         return td != null || name == null ? td : stubs.typedefs.get(name);
     }
 
@@ -33683,7 +33715,7 @@ public final class JavaEmitter {
         String n = t.name;
         return stubs.isStubClass(n) || stubs.isStubEnum(n)
                 || program.classes.containsKey(n) || program.enums.containsKey(n)
-                || TYPEDEFS.containsKey(n) || program.typedefs.containsKey(n)
+                || TYPEDEFS.containsKey(n) || userTypedef(n) != null
                 || CONCRETE_CORE.contains(n);
     }
 
@@ -33983,6 +34015,23 @@ public final class JavaEmitter {
      * core types are compared, as nothing else can implement them; numbers keep the
      * left side's type.
      */
+    /// The static type of `a ?? b`, UP(NonNull(A), B), where Dart's UP replaces a type
+    /// variable by its bound when the other side is not that variable: `v ?? 0` for
+    /// `T extends num?` is UP(num, int), a num -- not an Object.
+    private TypeRef ifNullType(TypeRef lt, TypeRef rt, Ctx ctx) {
+        if (lt != null && rt != null && lt.name != null && !lt.name.equals(rt.name)) {
+            TypeRef lb = numericTypeVarBound(lt, ctx);
+            TypeRef rb = numericTypeVarBound(rt, ctx);
+            if (lb != null || rb != null) {
+                TypeRef l2 = lb != null ? new TypeRef(lb.name) : lt;
+                TypeRef r2 = rb != null ? new TypeRef(rb.name) : rt;
+                r2.nullable = rb != null ? rt.nullable : r2.nullable;
+                return ifNullType(l2, r2);
+            }
+        }
+        return ifNullType(lt, rt);
+    }
+
     private TypeRef ifNullType(TypeRef lt, TypeRef rt) {
         TypeRef base = copyNonNull(lt);
         if (lt == null || rt == null || rt.is("Null") || rt.is("dynamic") || rt.is("var")
@@ -35536,12 +35585,16 @@ public final class JavaEmitter {
                 c = new Ctx(null);
                 c.currentLibrary = (Library) owner;
             }
+            // the initializer's type names are written in the field's own library
+            Library savedScope = typedefScope;
+            typedefScope = c.library();
             c.pushWriter(2);
             try {
                 Out o = emitExpr(f.initializer, null, c);
                 t = o == null ? null : o.type;
             } finally {
                 c.popWriter();
+                typedefScope = savedScope;
             }
         } catch (RuntimeException ex) {
             t = null;
@@ -36010,17 +36063,7 @@ public final class JavaEmitter {
 
     /** True when t is a method or class type variable whose bound is num, int or double. */
     private boolean numBoundedTypeVar(TypeRef t, Ctx ctx) {
-        if (t == null || !t.args.isEmpty() || t.name == null) {
-            return false;
-        }
-        TypeRef bound = ctx.methodTypeParamBounds == null ? null : ctx.methodTypeParamBounds.get(t.name);
-        if (bound == null && ctx.currentClass != null && ctx.currentClass.typeParams.contains(t.name)) {
-            bound = ctx.currentClass.typeParamBounds.get(t.name);
-        }
-        if (bound == null && ctx.currentExtension != null && ctx.currentExtension.typeParams.contains(t.name)) {
-            bound = ctx.currentExtension.typeParamBounds.get(t.name);
-        }
-        return bound != null && (bound.is("num") || bound.is("int") || bound.is("double"));
+        return numericTypeVarBound(t, ctx) != null;
     }
 
     /** True for dart:core's Never (not a program class of that name). */
@@ -39143,29 +39186,51 @@ public final class JavaEmitter {
      * the number it is; {@code o} itself otherwise.
      */
     private Out numericBoundView(Out o, Ctx ctx) {
-        TypeRef tt = o.type;
-        if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null) {
+        TypeRef bound = numericTypeVarBound(o.type, ctx);
+        if (bound == null) {
             return o;
         }
-        TypeRef bound = null;
-        java.util.Map<String, TypeRef> mb = ctx.methodTypeParamBounds;
-        ClassDecl cc = ctx.currentClass;
-        if (mb != null && mb.containsKey(tt.name)) {
-            bound = mb.get(tt.name);
-        } else if (cc != null && cc.typeParamBounds != null && cc.typeParams.contains(tt.name)) {
-            bound = cc.typeParamBounds.get(tt.name);
-        } else if (ctx.currentExtension != null && ctx.currentExtension.typeParamBounds != null
-                && ctx.currentExtension.typeParams.contains(tt.name)) {
-            // `extension type Num<T extends num>(T n)`: its members are static methods
-            // generic in the extension's own T
-            bound = ctx.currentExtension.typeParamBounds.get(tt.name);
-        }
-        if (bound == null || bound.args.size() != 0 || !(bound.is("num") || bound.is("int") || bound.is("double"))) {
-            return o;
-        }
+        // An operand of a num operator is non-nullable in any program Dart accepts: a `T`
+        // whose bound is `num?` reaches one only promoted or as `v ?? 0`, whose static type
+        // is NonNull(T), so the view is the bound without its `?`.
         TypeRef seen = new TypeRef(bound.name);
-        seen.nullable = tt.nullable || bound.nullable;
         return new Out("((" + javaType(seen, true, ctx) + ") (Object) " + paren(o.code) + ")", seen);
+    }
+
+    /// The num, int or double bound of the type parameter {@code t} names (a method's own,
+    /// the enclosing class's or extension's), following a bound that is itself a type
+    /// parameter (`U extends T`, `T extends num`); null when {@code t} is no such parameter.
+    private TypeRef numericTypeVarBound(TypeRef t, Ctx ctx) {
+        TypeRef tt = t;
+        for (int depth = 0; depth < 8; depth++) {
+            if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null
+                    || tt.funcParams != null) {
+                return null;
+            }
+            TypeRef bound = null;
+            java.util.Map<String, TypeRef> mb = ctx.methodTypeParamBounds;
+            ClassDecl cc = ctx.currentClass;
+            if (mb != null && mb.containsKey(tt.name)) {
+                bound = mb.get(tt.name);
+            } else if (cc != null && cc.typeParamBounds != null && cc.typeParams.contains(tt.name)) {
+                bound = cc.typeParamBounds.get(tt.name);
+            } else if (ctx.currentExtension != null && ctx.currentExtension.typeParamBounds != null
+                    && ctx.currentExtension.typeParams.contains(tt.name)) {
+                // `extension type Num<T extends num>(T n)`: its members are static methods
+                // generic in the extension's own T
+                bound = ctx.currentExtension.typeParamBounds.get(tt.name);
+            } else {
+                return null;
+            }
+            if (bound == null || !bound.args.isEmpty()) {
+                return null;
+            }
+            if (bound.is("num") || bound.is("int") || bound.is("double")) {
+                return bound;
+            }
+            tt = bound;
+        }
+        return null;
     }
 
     private Out typeParamBoundView(Out target, Ctx ctx) {

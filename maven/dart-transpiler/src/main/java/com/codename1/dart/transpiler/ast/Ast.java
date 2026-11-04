@@ -376,6 +376,9 @@ public final class Ast {
      */
     public static class TypedefDecl extends Node {
         public String name;
+        /// The name as declared when Program gave the typedef a unique one ({@code name}),
+        /// so a reference by the declared name still resolves in a scope that sees it.
+        public String declaredName;
         public List<String> typeParams = new ArrayList<String>();
         public List<TypeRef> paramTypes;          // non-null for a function-type alias
         public TypeRef returnType;                // non-null for a function-type alias

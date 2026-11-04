@@ -173,6 +173,7 @@ public final class Program {
         markShadowedCoreTypes();
         eraseExtensionTypes();
         expandRecordTypedefs();
+        separateAmbiguousTypedefNames();
         // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
         // abstract base whose only abstract member is `iterator`, exactly IterableBase. The
         // Java dart.core.DartIterable is a concrete wrapper over a java.lang.Iterable, not a
@@ -682,7 +683,7 @@ public final class Program {
      * library's declarations, then its unprefixed imports; a prefixed name through the
      * prefix's import alone.
      */
-    private Ast.TypedefDecl typedefIn(String written, Ast.Library lib) {
+    public Ast.TypedefDecl typedefIn(String written, Ast.Library lib) {
         if (written == null || lib == null) {
             return null;
         }
@@ -702,7 +703,7 @@ public final class Program {
             }
         }
         for (Ast.TypedefDecl x : lib.typedefs) {
-            if (name.equals(x.name)) {
+            if (name.equals(x.name) || name.equals(x.declaredName)) {
                 return x;
             }
         }
@@ -710,14 +711,16 @@ public final class Program {
             return null;
         }
         List<Ast.ClassDecl> classesNamed = classesByName.get(name);
-        boolean unmodeled = false;
+        // An import the program does not model (a stub package such as Flutter) provides no
+        // program typedef, so a name it alone could supply resolves to no typedef: the stub
+        // class it names (Flutter's `Key`) is what the library sees, never the typedef of a
+        // library it does not import.
         for (Ast.Directive d : lib.importDirectives) {
             if (d.prefix != null || !d.admits(name)) {
                 continue;
             }
             Ast.Library target = resolveImportedLibrary(lib, d.uri);
             if (target == null) {
-                unmodeled |= d.uri != null && !d.uri.startsWith("dart:");
                 continue;
             }
             if (classesNamed != null) {
@@ -731,22 +734,6 @@ public final class Program {
             if (x != null) {
                 return x;
             }
-        }
-        if (unmodeled && classesNamed == null) {
-            // an import the program does not model (a stub package): the only typedef of
-            // the name, as the global table answered before scopes were modelled
-            Ast.TypedefDecl only = null;
-            for (Ast.Library l : libraries) {
-                for (Ast.TypedefDecl x : l.typedefs) {
-                    if (name.equals(x.name)) {
-                        if (only != null) {
-                            return null;
-                        }
-                        only = x;
-                    }
-                }
-            }
-            return only;
         }
         return null;
     }
@@ -764,7 +751,7 @@ public final class Program {
     private Ast.TypedefDecl providedTypedef(Ast.Library target, String name) {
         for (Ast.Library l : libraries) {
             for (Ast.TypedefDecl x : l.typedefs) {
-                if (name.equals(x.name) && provides(target, name, l)) {
+                if ((name.equals(x.name) || name.equals(x.declaredName)) && provides(target, name, l)) {
                     return x;
                 }
             }
@@ -1959,6 +1946,103 @@ public final class Program {
         for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
             renameTypeNames(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
                     new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+        typedefs.clear();
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                if (!typedefs.containsKey(t.name) || !t.name.startsWith("_")) {
+                    typedefs.put(t.name, t);
+                }
+            }
+        }
+    }
+
+    /**
+     * Gives every typedef whose bare name is ambiguous across the program a name of its own,
+     * so the {@link #typedefs} table, keyed by name, answers with exactly the declaration a
+     * reference denotes. A name is ambiguous when two libraries declare it (`typedef Op =
+     * int Function(int)` beside another library's `typedef Op = String`), or when a library
+     * writes it without seeing any typedef of that name (Flutter's `Key` while a library it
+     * does not import declares `typedef Key = String`). Each library's references are
+     * renamed to what they resolve to in that library's own scope ({@link #typedefIn}), so a
+     * member type written in one library and read while emitting another keeps the meaning
+     * it had where it was written. An alias leaves no runtime trace, so the new name is never
+     * observable.
+     */
+    private void separateAmbiguousTypedefNames() {
+        Map<String, List<Ast.TypedefDecl>> byName = new java.util.HashMap<String, List<Ast.TypedefDecl>>();
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                if (t.name == null) {
+                    continue;
+                }
+                List<Ast.TypedefDecl> l = byName.get(t.name);
+                if (l == null) {
+                    l = new ArrayList<Ast.TypedefDecl>();
+                    byName.put(t.name, l);
+                }
+                l.add(t);
+            }
+        }
+        Set<String> ambiguous = new java.util.HashSet<String>();
+        for (Map.Entry<String, List<Ast.TypedefDecl>> en : byName.entrySet()) {
+            if (en.getValue().size() > 1) {
+                ambiguous.add(en.getKey());
+            }
+        }
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                if (t.name != null && byName.containsKey(t.name) && typedefIn(t.name, lib) == null) {
+                    ambiguous.add(t.name);
+                }
+            }
+        }
+        if (ambiguous.isEmpty()) {
+            return;
+        }
+        Map<Ast.TypedefDecl, String> canonical = new java.util.IdentityHashMap<Ast.TypedefDecl, String>();
+        for (String n : ambiguous) {
+            for (Ast.TypedefDecl t : byName.get(n)) {
+                canonical.put(t, n + "$a" + libraries.indexOf(typedefOwner(t)));
+                t.declaredName = n;
+            }
+        }
+        // Each library's renames, decided before any is applied: typedefIn reads names.
+        Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        for (Ast.Library lib : libraries) {
+            Map<String, String> m = new java.util.HashMap<String, String>();
+            Set<String> written = new java.util.HashSet<String>();
+            for (Ast.TypeRef t : lib.namedTypes) {
+                if (t.name != null) {
+                    written.add(t.name);
+                }
+            }
+            for (String n : ambiguous) {
+                written.add(n);
+            }
+            for (String w : written) {
+                int dot = w.indexOf('.');
+                if (!ambiguous.contains(dot > 0 ? w.substring(dot + 1) : w)) {
+                    continue;
+                }
+                Ast.TypedefDecl td = typedefIn(w, lib);
+                if (td != null && canonical.containsKey(td)) {
+                    // a prefixed reference becomes the bare unique name, which the table answers
+                    m.put(w, canonical.get(td));
+                }
+            }
+            if (!m.isEmpty()) {
+                renames.put(lib, m);
+            }
+        }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
+            renameTypeNames(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+        for (Map.Entry<Ast.TypedefDecl, String> en : canonical.entrySet()) {
+            // a declaration whose own library never names it is renamed here; the name as
+            // declared still resolves a reference written later (`p.Op` as a value)
+            en.getKey().name = en.getValue();
         }
         typedefs.clear();
         for (Ast.Library lib : libraries) {
