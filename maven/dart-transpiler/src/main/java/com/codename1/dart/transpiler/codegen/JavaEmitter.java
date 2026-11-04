@@ -166,6 +166,7 @@ public final class JavaEmitter {
     public List<GeneratedFile> emit() {
         inferUntypedMethodReturns();
         pinMemberTypesToOwnLibraries();
+        computeBoxedReturnSets();
         List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
         if (!closureSignatures.isEmpty() || !signedSams.isEmpty() || !callbackTearOffs.isEmpty()) {
             pruned.add(closureSignatureFile(pruned));
@@ -199,6 +200,178 @@ public final class JavaEmitter {
                 inferOverrides(c, done);
             }
         }
+    }
+
+    /// The program methods (getters included) whose Java return is boxed because they share
+    /// an override set with a declaration whose Java return is a reference type. An override
+    /// set is every declaration of one member name and kind that overrides, or is overridden
+    /// by, another, transitively across superclasses, `$I` interfaces, mixins and abstract
+    /// forms: `double f()` in S and `num f()` in T, both inherited by `class U extends S
+    /// implements T`, are one set, and Java's `double f()` cannot coexist with `Number f()`
+    /// in U. Boxing every primitive declaration of such a set (Double, Long, Boolean) makes
+    /// each one a covariant override of all the others; call sites unbox by the static Dart
+    /// type (boxedSetCallCast). Sets whose returns are all primitive, or all references, are
+    /// untouched and keep their primitive returns.
+    private final java.util.Set<MethodDecl> boxedReturnMembers = java.util.Collections.newSetFromMap(
+            new java.util.IdentityHashMap<MethodDecl, Boolean>());
+
+    private void computeBoxedReturnSets() {
+        final Map<Object, Object> parent = new java.util.IdentityHashMap<Object, Object>();
+        final Map<Object, ClassDecl> ownerOf = new java.util.IdentityHashMap<Object, ClassDecl>();
+        Map<ClassDecl, Map<String, List<Object>>> perClass = new java.util.IdentityHashMap<ClassDecl, Map<String, List<Object>>>();
+        for (List<ClassDecl> same : program.classesByName.values()) {
+            for (ClassDecl c : same) {
+                if (c.extensionOn != null) {
+                    continue;
+                }
+                Map<String, List<Object>> byKey = new java.util.HashMap<String, List<Object>>();
+                collectOverrideDecls(c, byKey, ownerOf, java.util.Collections.newSetFromMap(
+                        new java.util.IdentityHashMap<ClassDecl, Boolean>()));
+                perClass.put(c, byKey);
+                for (List<Object> decls : byKey.values()) {
+                    for (int i = 1; i < decls.size(); i++) {
+                        Object a = ufFind(parent, decls.get(0));
+                        Object b = ufFind(parent, decls.get(i));
+                        if (a != b) {
+                            parent.put(b, a);
+                        }
+                    }
+                }
+            }
+        }
+        Map<Object, List<Object>> sets = new java.util.IdentityHashMap<Object, List<Object>>();
+        for (Object d : new ArrayList<Object>(parent.keySet())) {
+            Object r = ufFind(parent, d);
+            List<Object> l = sets.get(r);
+            if (l == null) {
+                l = new ArrayList<Object>();
+                sets.put(r, l);
+            }
+            l.add(d);
+        }
+        for (List<Object> set : sets.values()) {
+            boolean hasRef = false;
+            List<MethodDecl> prims = new ArrayList<MethodDecl>();
+            for (Object d : set) {
+                ClassDecl owner = ownerOf.get(d);
+                TypeRef rt = d instanceof MethodDecl ? ((MethodDecl) d).returnType : ((FieldDecl) d).type;
+                if (rt == null || rt.is("var")) {
+                    hasRef = true;
+                    continue;
+                }
+                if (rt.is("void") || isCoreNever(rt)) {
+                    // Never is below every return and is emitted on its own terms
+                    // (`Never get lazy => throw ...` beside `bool get lazy`).
+                    continue;
+                }
+                String jt = javaType(rt, false, new Ctx(owner));
+                if (!isJavaPrimitive(jt)) {
+                    hasRef = true;
+                } else if (d instanceof MethodDecl) {
+                    prims.add((MethodDecl) d);
+                }
+            }
+            if (hasRef) {
+                boxedReturnMembers.addAll(prims);
+            }
+        }
+        // Every Java method a class emits under a boxed member -- its own, a mixin's copy,
+        // an abstract or $I form -- declares the boxed return.
+        for (Map.Entry<ClassDecl, Map<String, List<Object>>> e : perClass.entrySet()) {
+            for (Map.Entry<String, List<Object>> k : e.getValue().entrySet()) {
+                for (Object d : k.getValue()) {
+                    if (d instanceof MethodDecl && boxedReturnMembers.contains(d)) {
+                        java.util.Set<String> keys = boxedReturnKeys.get(e.getKey());
+                        if (keys == null) {
+                            keys = new HashSet<String>();
+                            boxedReturnKeys.put(e.getKey(), keys);
+                        }
+                        keys.add(k.getKey());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    private final Map<ClassDecl, java.util.Set<String>> boxedReturnKeys =
+            new java.util.IdentityHashMap<ClassDecl, java.util.Set<String>>();
+
+    /// Whether class `c`'s Java member `name` (a getter when `getter`) returns boxed because
+    /// its override set does (computeBoxedReturnSets).
+    private boolean boxedReturnKey(ClassDecl c, String name, boolean getter) {
+        java.util.Set<String> keys = c == null ? null : boxedReturnKeys.get(c);
+        return keys != null && keys.contains((getter ? "g:" : "m:") + name);
+    }
+
+    private static Object ufFind(Map<Object, Object> parent, Object d) {
+        Object p = parent.get(d);
+        if (p == null) {
+            parent.put(d, d);
+            return d;
+        }
+        while (p != d) {
+            d = p;
+            p = parent.get(d);
+        }
+        return d;
+    }
+
+    /// Every declaration of a member in `c` and its program supertypes, transitively, keyed
+    /// by name and kind; a field is a getter (and, when mutable, a setter, which has no
+    /// return and is left out).
+    private void collectOverrideDecls(ClassDecl c, Map<String, List<Object>> byKey, Map<Object, ClassDecl> ownerOf,
+                                      java.util.Set<ClassDecl> seen) {
+        if (c == null || !seen.add(c) || !isProgramClass(c)) {
+            return;
+        }
+        for (MethodDecl m : c.methods) {
+            if (m.isStatic || m.isSetter || m.name.startsWith("$") || "hashCode".equals(m.name)
+                    || "compareTo".equals(m.name) || "toString".equals(m.name)) {
+                continue;
+            }
+            addOverrideDecl(byKey, (m.isGetter ? "g:" : "m:") + m.name, m, c, ownerOf);
+        }
+        for (FieldDecl f : c.fields) {
+            if (!f.isStatic && !"hashCode".equals(f.name)) {
+                addOverrideDecl(byKey, "g:" + f.name, f, c, ownerOf);
+            }
+        }
+        for (TypeRef st : directSupers(c)) {
+            collectOverrideDecls(inheritedDecl(c, st), byKey, ownerOf, seen);
+        }
+    }
+
+    private static void addOverrideDecl(Map<String, List<Object>> byKey, String key, Object d, ClassDecl owner,
+                                        Map<Object, ClassDecl> ownerOf) {
+        List<Object> l = byKey.get(key);
+        if (l == null) {
+            l = new ArrayList<Object>();
+            byKey.put(key, l);
+        }
+        l.add(d);
+        ownerOf.put(d, owner);
+    }
+
+    /// Whether `m`'s Java return is boxed by its override set (computeBoxedReturnSets).
+    private boolean inBoxedReturnSet(MethodDecl m) {
+        return m != null && boxedReturnMembers.contains(m);
+    }
+
+    /// `code`, a call of `m` whose override set boxed its Java return, unboxed back to the
+    /// primitive its static Dart type `seen` is; `code` itself otherwise.
+    private String boxedSetCallCast(MethodDecl m, TypeRef seen, String code, Ctx ctx) {
+        if (!inBoxedReturnSet(m) || seen == null) {
+            return code;
+        }
+        String prim = javaType(seen, false, ctx);
+        return isJavaPrimitive(prim) ? "((" + prim + ") (" + javaType(seen, true, ctx) + ") (Object) " + code + ")"
+                : code;
+    }
+
+    private static String boxedJava(String prim) {
+        return "long".equals(prim) ? "Long" : "double".equals(prim) ? "Double" : "boolean".equals(prim) ? "Boolean"
+                : "int".equals(prim) ? "Integer" : prim;
     }
 
     /// One overridden member's signature: its return (or, for a field or setter, its value
@@ -283,8 +456,8 @@ public final class JavaEmitter {
             int kind = m.isGetter ? SIG_GETTER : m.isSetter ? SIG_SETTER : SIG_METHOD;
             List<InheritedSig> cands = inheritedSigs(c, m.name, kind,
                     java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ClassDecl, Boolean>()));
-            InheritedSig sig = combinedSignature(cands);
-            reportNoCombinedSignature(c, m, m.name, cands, sig);
+            InheritedSig sig = combinedSignature(c, cands);
+            reportNoCombinedSignature(c, m, m.name, cands);
             if (sig == null) {
                 sig = objectMember(m.name, kind);
             }
@@ -318,11 +491,11 @@ public final class JavaEmitter {
             java.util.Set<ClassDecl> seen = java.util.Collections.newSetFromMap(
                     new java.util.IdentityHashMap<ClassDecl, Boolean>());
             List<InheritedSig> getterCands = inheritedSigs(c, f.name, SIG_GETTER, seen);
-            InheritedSig sig = combinedSignature(getterCands);
-            reportNoCombinedSignature(c, f, f.name, getterCands, sig);
+            InheritedSig sig = combinedSignature(c, getterCands);
+            reportNoCombinedSignature(c, f, f.name, getterCands);
             if (sig == null) {
                 seen.clear();
-                sig = combinedSignature(inheritedSigs(c, f.name, SIG_SETTER, seen));
+                sig = combinedSignature(c, inheritedSigs(c, f.name, SIG_SETTER, seen));
             }
             if (sig == null) {
                 sig = objectMember(f.name, SIG_GETTER);
@@ -347,7 +520,7 @@ public final class JavaEmitter {
             }
             InheritedSig s = declaredSig(sp, name, kind);
             if (s == null) {
-                s = combinedSignature(inheritedSigs(sp, name, kind, seen));
+                s = combinedSignature(sp, inheritedSigs(sp, name, kind, seen));
             }
             if (s == null) {
                 continue;
@@ -429,29 +602,21 @@ public final class JavaEmitter {
         return null;
     }
 
-    /// Dart's combined member signature of `cands`: the one whose signature is a subtype of
-    /// every other's (return covariant, parameters contravariant). With none, the program is
-    /// a Dart compile error; the first candidate is taken.
-    private InheritedSig combinedSignature(List<InheritedSig> cands) {
+    /// Dart's combined member signature of `cands`, each written in `scope`'s type
+    /// variables: the one whose signature is a subtype of every other's (return covariant,
+    /// parameters contravariant). Null when there is none -- a Dart compile error, which
+    /// reportNoCombinedSignature reports; no candidate is guessed.
+    private InheritedSig combinedSignature(ClassDecl scope, List<InheritedSig> cands) {
         if (cands.isEmpty()) {
             return null;
         }
         if (cands.size() == 1) {
             return cands.get(0);
         }
-        InheritedSig best = strictCombinedSignature(cands);
-        return best != null ? best : cands.get(0);
-    }
-
-    /// The combined member signature of `cands`, or null when none exists.
-    private InheritedSig strictCombinedSignature(List<InheritedSig> cands) {
-        if (cands.size() == 1) {
-            return cands.get(0);
-        }
         for (InheritedSig a : cands) {
             boolean all = true;
             for (InheritedSig b : cands) {
-                if (a != b && !sigSubtype(a, b)) {
+                if (a != b && !sigSubtype(scope, a, b)) {
                     all = false;
                     break;
                 }
@@ -465,34 +630,19 @@ public final class JavaEmitter {
 
     /// E0143: an untyped member (or field) whose inherited signatures have no combined
     /// member signature -- `measure(x)` in a class implementing both `int measure(int)` and
-    /// `String measure(int)`. Dart rejects the program ("can't infer"); taking one candidate
-    /// would emit a Java override of one supertype that the other cannot accept. Reported
-    /// only when every candidate is made of plain, resolvable types: a type variable or a
-    /// generic type is compared by staticSubtype only approximately, and a false error there
-    /// would reject a valid program, so those keep the old first-candidate fallback.
-    private void reportNoCombinedSignature(ClassDecl c, Ast.Node at, String name, List<InheritedSig> cands,
-                                           InheritedSig chosen) {
-        if (cands.size() < 2 || chosen == null || strictCombinedSignature(cands) != null) {
+    /// `String measure(int)`, or `List<int> get v` and `List<String> get v`. Dart rejects the
+    /// program ("can't infer"); taking one candidate would emit a Java override of one
+    /// supertype that the other cannot accept.
+    private void reportNoCombinedSignature(ClassDecl c, Ast.Node at, String name, List<InheritedSig> cands) {
+        if (cands.size() < 2 || combinedSignature(c, cands) != null) {
             return;
         }
         StringBuilder sigs = new StringBuilder();
         for (InheritedSig s : cands) {
-            if (!plainSigPart(s.ret)) {
-                return;
-            }
-            for (TypeRef t : s.positional) {
-                if (!plainSigPart(t)) {
-                    return;
-                }
-            }
-            for (TypeRef t : s.named.values()) {
-                if (!plainSigPart(t)) {
-                    return;
-                }
-            }
-            sigs.append(sigs.length() > 0 ? ", " : "").append(s.ret == null ? "dynamic" : s.ret.name).append(" Function(");
+            sigs.append(sigs.length() > 0 ? ", " : "").append(s.ret == null ? "dynamic" : s.ret.toString())
+                    .append(" Function(");
             for (int i = 0; i < s.positional.size(); i++) {
-                sigs.append(i > 0 ? ", " : "").append(s.positional.get(i) == null ? "dynamic" : s.positional.get(i).name);
+                sigs.append(i > 0 ? ", " : "").append(s.positional.get(i) == null ? "dynamic" : s.positional.get(i).toString());
             }
             sigs.append(')');
         }
@@ -500,48 +650,128 @@ public final class JavaEmitter {
                 + ": the inherited signatures " + sigs + " have no combined member signature; declare its types");
     }
 
-    private boolean plainSigPart(TypeRef t) {
-        if (t == null || isDynamicType(t) || t.is("void")) {
-            return true;
-        }
-        if (!t.args.isEmpty() || t.name == null || t.name.indexOf('.') >= 0) {
-            return false;
-        }
-        String n = t.name;
-        if ("int".equals(n) || "double".equals(n) || "num".equals(n) || "String".equals(n)
-                || "bool".equals(n) || "Object".equals(n) || "Null".equals(n)) {
-            return true;
-        }
-        ClassDecl d = program.classes.get(n);
-        return d != null && d.typeParams.isEmpty();
-    }
-
-    private boolean sigSubtype(InheritedSig a, InheritedSig b) {
-        if (!sigPartSubtype(a.ret, b.ret)) {
+    private boolean sigSubtype(ClassDecl scope, InheritedSig a, InheritedSig b) {
+        if (!sigPartSubtype(scope, a.ret, b.ret)) {
             return false;
         }
         for (int i = 0; i < b.positional.size(); i++) {
-            if (i < a.positional.size() && !sigPartSubtype(b.positional.get(i), a.positional.get(i))) {
+            if (i < a.positional.size() && !sigPartSubtype(scope, b.positional.get(i), a.positional.get(i))) {
                 return false;
             }
         }
         for (Map.Entry<String, TypeRef> e : b.named.entrySet()) {
-            if (a.named.containsKey(e.getKey()) && !sigPartSubtype(e.getValue(), a.named.get(e.getKey()))) {
+            if (a.named.containsKey(e.getKey()) && !sigPartSubtype(scope, e.getValue(), a.named.get(e.getKey()))) {
                 return false;
             }
         }
         return true;
     }
 
-    private boolean sigPartSubtype(TypeRef sub, TypeRef sup) {
+    private boolean sigPartSubtype(ClassDecl scope, TypeRef sub, TypeRef sup) {
         if (sup == null || isDynamicType(sup)) {
             return true;
         }
         if (sub == null) {
             return false;
         }
-        return sub.is("void") && sup.is("void") || staticSubtype(sub, sup)
-                || sub.name != null && sub.name.equals(sup.name) && sub.args.equals(sup.args);
+        return exactSubtype(sub, sup, scope, 0);
+    }
+
+    /// Dart's subtype relation over the static type model, exact for what a member
+    /// signature holds: a type variable of `scope` is below what its bound is below, a
+    /// generic class is below each supertype its declaration names, instantiated with its
+    /// own type arguments, and type arguments are covariant.
+    private boolean exactSubtype(TypeRef sub, TypeRef sup, ClassDecl scope, int depth) {
+        if (sup == null || isDynamicType(sup) || sup.is("void")) {
+            return true;
+        }
+        if (sub == null || isDynamicType(sub) || sub.is("void")) {
+            return sup.is("Object") && sup.args.isEmpty() && sup.nullable;
+        }
+        if (depth > 32) {
+            return false;
+        }
+        if (sub.is("Never") && sub.args.isEmpty()) {
+            return true;
+        }
+        if (sub.is("Null") && sub.args.isEmpty()) {
+            return sup.nullable || sup.is("Null");
+        }
+        if (sub.funcReturn != null || sup.funcReturn != null || sub.funcParams != null || sup.funcParams != null) {
+            return staticSubtype(sub, sup);
+        }
+        if (sub.name == null || sup.name == null) {
+            return false;
+        }
+        boolean subVar = scope != null && sub.args.isEmpty() && scope.typeParams.contains(sub.name);
+        boolean supVar = scope != null && sup.args.isEmpty() && scope.typeParams.contains(sup.name);
+        if (sub.nullable && !sup.nullable) {
+            return false;
+        }
+        if (sub.name.equals(sup.name) && (subVar || supVar)) {
+            return true;
+        }
+        if (subVar) {
+            TypeRef bound = scope.typeParamBounds.get(sub.name);
+            if (bound == null) {
+                return sup.is("Object") && sup.args.isEmpty() && sup.nullable;
+            }
+            if (sub.nullable && !bound.nullable) {
+                bound = copyNullable(bound);
+            }
+            return exactSubtype(bound, sup, scope, depth + 1);
+        }
+        if (supVar) {
+            return false;
+        }
+        if (sup.is("Object") && sup.args.isEmpty()) {
+            return true;
+        }
+        if (sup.is("FutureOr") && sup.args.size() == 1) {
+            return exactSubtype(sub, sup.args.get(0), scope, depth + 1)
+                    || exactSubtype(sub, TypeRef.of("Future", sup.args.get(0)), scope, depth + 1);
+        }
+        if (sup.is("num") && sup.args.isEmpty() && (sub.is("int") || sub.is("double"))) {
+            return true;
+        }
+        String subName = sub.name.substring(sub.name.lastIndexOf('.') + 1);
+        String supName = sup.name.substring(sup.name.lastIndexOf('.') + 1);
+        if (subName.equals(supName)) {
+            for (int i = 0; i < sub.args.size() && i < sup.args.size(); i++) {
+                if (!exactSubtype(sub.args.get(i), sup.args.get(i), scope, depth + 1)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        ClassDecl d = scope != null ? superDeclOf(scope, sub) : null;
+        if (d == null || !subName.equals(d.name)) {
+            d = program.classes.get(subName);
+        }
+        if (d == null) {
+            d = stubs.classes.get(subName);
+        }
+        if (d == null) {
+            d = stubs.sdkClasses.get(subName);
+        }
+        if (d == null) {
+            // Nothing declares it: the conservative model is all there is.
+            return staticSubtype(sub, sup);
+        }
+        for (TypeRef st : directSupers(d)) {
+            TypeRef inst = st;
+            if (!d.typeParams.isEmpty()) {
+                List<TypeRef> args = new ArrayList<TypeRef>();
+                for (int i = 0; i < d.typeParams.size(); i++) {
+                    args.add(i < sub.args.size() ? sub.args.get(i) : TypeRef.DYNAMIC);
+                }
+                inst = substTypeParams(st, d.typeParams, args);
+            }
+            if (exactSubtype(inst, sup, scope, depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The member of dart:core's Object every class inherits, for `name` of `kind`, or null.
@@ -3650,6 +3880,9 @@ public final class JavaEmitter {
             }
             TypeRef rt = sm.returnType == null || sm.returnType.is("var") ? TypeRef.DYNAMIC : sm.returnType;
             sig.ret = rt.is("void") ? "void" : ifaceJava(rt, im, args, ctx);
+            if (isJavaPrimitive(sig.ret) && boxedReturnKey(im, sm.name, sm.isGetter)) {
+                sig.ret = boxedJava(sig.ret);
+            }
             out.add(sig);
         }
         if (im.superclass != null) {
@@ -3930,6 +4163,9 @@ public final class JavaEmitter {
         }
         TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
         String implRet = rt.is("void") ? "void" : javaType(rt, false, ctx);
+        if (isJavaPrimitive(implRet) && boxedReturnKey(c, m.name, m.isGetter)) {
+            return boxedJava(implRet);
+        }
         String implParams = erasedParams(implJavaParams(m, ctx));
         for (IfaceSig sig : interfaceSigs(c, m, ctx)) {
             if (implParams.equals(erasedParams(sig.params)) && !sig.ret.equals(implRet)
@@ -4105,7 +4341,7 @@ public final class JavaEmitter {
     /// own typed value when its Java return was pinned to an overridden member's.
     private String pinnedGetterRead(ClassDecl pc, MethodDecl g, String code, Ctx ctx) {
         String box = pinnedCallBox(pc, g, ctx);
-        return box == null ? code : "((" + box + ") (Object) " + code + ")";
+        return box == null ? code : boxedSetCallCast(g, g.returnType, "((" + box + ") (Object) " + code + ")", ctx);
     }
 
     private final java.util.Set<String> interfaceBridgesDone = new java.util.HashSet<String>();
@@ -7143,6 +7379,9 @@ public final class JavaEmitter {
                         || (!m.isStatic && overridesTypeVarReturn(ctx.currentClass, m.name, m.isGetter, ctx)), ctx));
         if (neverGeneric) {
             rjt = "$Never";
+        }
+        if (!m.isStatic && !m.isSetter && isJavaPrimitive(rjt) && boxedReturnKey(ctx.currentClass, m.name, m.isGetter)) {
+            rjt = boxedJava(rjt);
         }
         m.emittedReturn = rjt;
         sb.append(rjt).append(' ').append(m.name).append('(');
@@ -27834,7 +28073,7 @@ public final class JavaEmitter {
                         }
                         castTo = substTypeParams(seen, m.typeParams, dyn);
                     }
-                    callCode = "((" + javaType(castTo, true, ctx) + ") (Object) " + callCode + ")";
+                    callCode = boxedSetCallCast(m, castTo, "((" + javaType(castTo, true, ctx) + ") (Object) " + callCode + ")", ctx);
                 } else if (seen != null && programCollectionPin(pc, m, ctx) != null) {
                     seen = TypeRef.of(programCollectionPin(pc, m, ctx), seen.args.toArray(new TypeRef[0]));
                 } else if (narrowedCollectionReturn(pc, m)) {

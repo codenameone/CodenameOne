@@ -73,4 +73,41 @@ public class CombinedSignatureDiagnosticTest {
         TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
         assertEquals(0, count(r, "E0143"), r.diags.asList().toString());
     }
+    @Test
+    public void conflictingGenericSignaturesAreDiagnosed() {
+        // List<int> and List<String> are unrelated, and so are T (bounded by num) and String.
+        String src =
+                "abstract class A { List<int> items(); }\n"
+              + "abstract class B { List<String> items(); }\n"
+              + "class C implements A, B {\n"
+              + "  items() => throw 0;\n"
+              + "}\n"
+              + "abstract class G<T extends num> { T get v; }\n"
+              + "abstract class H { String get v; }\n"
+              + "class I<T extends num> implements G<T>, H { get v => throw 0; }\n"
+              + "void main() { print(1); }\n";
+        TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
+        assertEquals(2, count(r, "E0143"), "expected E0143 at items and at v: " + r.diags.asList());
+    }
+
+    @Test
+    public void aGenericCombinedSignatureIsNotDiagnosed() {
+        // List<int> is below Iterable<num> (covariant arguments through List's own
+        // supertypes), and a T bounded by int is below num: both are combined signatures.
+        String src =
+                "abstract class A { Iterable<num> items(); }\n"
+              + "abstract class B { List<int> items(); }\n"
+              + "class C implements A, B {\n"
+              + "  items() => [1, 2];\n"
+              + "}\n"
+              + "abstract class G<T extends int> { T get v; }\n"
+              + "abstract class H { num get v; }\n"
+              + "class I<T extends int> implements G<T>, H {\n"
+              + "  final T x; I(this.x);\n"
+              + "  get v => x;\n"
+              + "}\n"
+              + "void main() { print(C().items()); print(I<int>(3).v); }\n";
+        TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
+        assertEquals(0, count(r, "E0143"), r.diags.asList().toString());
+    }
 }
