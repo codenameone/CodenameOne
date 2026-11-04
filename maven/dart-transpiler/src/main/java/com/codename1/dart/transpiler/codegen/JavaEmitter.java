@@ -7158,24 +7158,115 @@ public final class JavaEmitter {
         for (int i = 0; i < b.statements.size(); i++) {
             Stmt s = b.statements.get(i);
             emitStatement(s, ctx);
-            if (s instanceof VarDeclStmt && !((VarDeclStmt) s).isLate) {
-                VarDeclStmt v = (VarDeclStmt) s;
-                if (v.type != null && v.type.nullable && !v.type.is("var") && nonNullInitializer(v.initializer)
-                        && !assignsName(b.statements.subList(i + 1, b.statements.size()), v.name, 0)) {
-                    // `String? b = 'x';`: Dart promotes b to String by the initialization, so
-                    // `sh(b)` binds T to String. Only while nothing later assigns b.
-                    ctx.nonNullByInit.add(v.name);
-                }
+            if (s instanceof VarDeclStmt
+                    && assignsName(b.statements.subList(i + 1, b.statements.size()), ((VarDeclStmt) s).name, 0)) {
+                // Assigned somewhere in its scope: a closure cannot rely on a promotion of it.
+                ctx.reassigned.add(((VarDeclStmt) s).name);
             }
         }
     }
 
-    /// An initializer whose static type is non-nullable by its form alone.
-    private boolean nonNullInitializer(Expr e) {
-        return e instanceof StringLit || e instanceof IntLit || e instanceof DoubleLit || e instanceof BoolLit
-                || e instanceof ListLit || e instanceof MapLit || e instanceof SetLit || e instanceof CtorCall
-                || e instanceof Call && ((Call) e).target == null && ((Call) e).name != null
-                && program.classes.containsKey(((Call) e).name);
+    // ------------------------------------------------------------------
+    // Null-safety flow promotion of locals (ctx.nonNull), following Dart's
+    // flow analysis: an initializer or assignment whose static type is
+    // non-nullable promotes, `x != null` / `x == null` guards promote in the
+    // branch they hold in (and after an if whose other branch leaves), joins
+    // keep only what every reaching branch promotes, a loop demotes what it
+    // assigns before it starts, and a local assigned inside a closure is
+    // write-captured: never promoted again.
+    // ------------------------------------------------------------------
+
+    /// The static type of {@code e}, with a promoted local read as non-nullable.
+    private TypeRef flowType(Expr e, Ctx ctx) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        TypeRef t = elementTypeQuiet(e, ctx);
+        if (t != null && t.nullable && e instanceof Ident && ctx.nonNull.contains(((Ident) e).name)) {
+            t = copyNonNull(t);
+        }
+        return t;
+    }
+
+    /// Whether the static type of {@code e} is known and non-nullable: the type its emission
+    /// produced ({@code emitted}, null when unseen), else what the quiet inference reports.
+    private boolean staticallyNonNull(Expr e, TypeRef emitted, Ctx ctx) {
+        TypeRef t = emitted != null ? emitted : flowType(e, ctx);
+        Expr u = e;
+        while (u instanceof ParenExpr) {
+            u = ((ParenExpr) u).inner;
+        }
+        if (u instanceof NullLit) {
+            return false;
+        }
+        if (t != null && t.nullable && u instanceof Ident && ctx.nonNull.contains(((Ident) u).name)) {
+            t = copyNonNull(t);
+        }
+        return t != null && t != TypeRef.DYNAMIC && !t.nullable && !t.is("dynamic") && !t.is("Null")
+                && !t.is("void") && !t.is("Object?");
+    }
+
+    private void promoteNonNull(String name, Ctx ctx) {
+        if (!ctx.writeCaptured.contains(name) && ctx.lookup(name) != null) {
+            ctx.nonNull.add(name);
+        }
+    }
+
+    /// Demotes every promoted local that {@code o} assigns.
+    private void demoteAssigned(Object o, Ctx ctx) {
+        for (java.util.Iterator<String> it = ctx.nonNull.iterator(); it.hasNext();) {
+            if (assignsName(o, it.next(), 0)) {
+                it.remove();
+            }
+        }
+    }
+
+    /// Promotes the locals {@code cond} proves non-null when it evaluates to {@code whenTrue}.
+    private void nullGuardPromotions(Expr cond, boolean whenTrue, Ctx ctx) {
+        while (cond instanceof ParenExpr) {
+            cond = ((ParenExpr) cond).inner;
+        }
+        if (cond instanceof Unary && "!".equals(((Unary) cond).op)) {
+            nullGuardPromotions(((Unary) cond).operand, !whenTrue, ctx);
+            return;
+        }
+        if (!(cond instanceof Binary)) {
+            return;
+        }
+        Binary b = (Binary) cond;
+        if (whenTrue && "&&".equals(b.op) || !whenTrue && "||".equals(b.op)) {
+            nullGuardPromotions(b.left, whenTrue, ctx);
+            nullGuardPromotions(b.right, whenTrue, ctx);
+            return;
+        }
+        boolean ne = "!=".equals(b.op);
+        if (!ne && !"==".equals(b.op) || ne != whenTrue) {
+            return;
+        }
+        Expr x = b.right instanceof NullLit ? b.left : b.left instanceof NullLit ? b.right : null;
+        while (x instanceof ParenExpr) {
+            x = ((ParenExpr) x).inner;
+        }
+        if (x instanceof Ident) {
+            promoteNonNull(((Ident) x).name, ctx);
+        }
+    }
+
+    /// Records the closure {@code l}'s writes to enclosing locals (write capture) and returns the
+    /// promotions to restore after it; inside it, only locals never assigned stay promoted.
+    private java.util.Set<String> enterClosureFlow(Lambda l, Ctx ctx) {
+        java.util.Set<String> saved = new HashSet<String>(ctx.nonNull);
+        for (Map<String, TypeRef> sc : ctx.scopes) {
+            for (String n : sc.keySet()) {
+                if (assignsName(l, n, 0)) {
+                    ctx.writeCaptured.add(n);
+                }
+            }
+        }
+        saved.removeAll(ctx.writeCaptured);
+        ctx.nonNull.removeAll(ctx.writeCaptured);
+        ctx.nonNull.removeAll(ctx.reassigned);
+        return saved;
     }
 
     /// Whether anything under {@code o} assigns (or increments) the local {@code name}.
@@ -7230,6 +7321,33 @@ public final class JavaEmitter {
     }
 
     void emitStatement(Stmt s, Ctx ctx) {
+        if (s instanceof WhileStmt || s instanceof ForStmt || s instanceof ForInStmt || s instanceof TryStmt
+                || s instanceof SwitchStmt) {
+            // A loop demotes what it assigns before its first pass, and only what held at
+            // entry survives it. A try or switch is joined the same, conservatively.
+            demoteAssigned(s, ctx);
+            java.util.Set<String> entry = new HashSet<String>(ctx.nonNull);
+            emitStatementFlow(s, ctx);
+            ctx.nonNull.retainAll(entry);
+            return;
+        }
+        Expr init = s instanceof VarDeclStmt ? ((VarDeclStmt) s).initializer : null;
+        if (init != null) {
+            ctx.watchedTypes.put(init, null);
+        }
+        emitStatementFlow(s, ctx);
+        TypeRef emitted = init != null ? ctx.watchedTypes.remove(init) : null;
+        if (s instanceof VarDeclStmt && !((VarDeclStmt) s).isLate) {
+            VarDeclStmt v = (VarDeclStmt) s;
+            if (v.type != null && v.type.nullable && v.initializer != null
+                    && staticallyNonNull(v.initializer, emitted, ctx)) {
+                // `String? b = f();` with f returning String: the initialization promotes b.
+                promoteNonNull(v.name, ctx);
+            }
+        }
+    }
+
+    private void emitStatementFlow(Stmt s, Ctx ctx) {
         if (s != null && !(s instanceof Block)) {
             lineMark(s, ctx);
         }
@@ -7758,6 +7876,8 @@ public final class JavaEmitter {
             w.line("if (" + c.code + ") {");
             ctx.indent(1);
             ctx.pushScope();
+            java.util.Set<String> preFlow = new HashSet<String>(ctx.nonNull);
+            nullGuardPromotions(i.condition, true, ctx);
             // `if (x is T)` flow-promotes x to T inside the then-branch.
             List<Object[]> undo = applyGuardPromotions(i.condition, ctx);
             emitStatement(unwrapBlock(i.thenStmt), ctx);
@@ -7767,6 +7887,10 @@ public final class JavaEmitter {
             // `x is! T` false in the else branch, and after the if when the then branch
             // always leaves (`if (x is! T) return ...;`): x is a T from there on.
             boolean thenLeaves = stmtTerminates(i.thenStmt);
+            java.util.Set<String> thenFlow = thenLeaves ? null : new HashSet<String>(ctx.nonNull);
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(preFlow);
+            nullGuardPromotions(i.condition, false, ctx);
             if (i.elseStmt != null) {
                 w.line("} else {");
                 ctx.indent(1);
@@ -7779,6 +7903,16 @@ public final class JavaEmitter {
                 ctx.indent(-1);
             }
             w.line("}");
+            // The join: what every branch that reaches past the if promotes.
+            boolean elseLeaves = i.elseStmt != null && stmtTerminates(i.elseStmt);
+            if (elseLeaves && thenFlow != null) {
+                ctx.nonNull.clear();
+                ctx.nonNull.addAll(thenFlow);
+            } else if (!elseLeaves && thenFlow != null) {
+                ctx.nonNull.retainAll(thenFlow);
+            } else if (elseLeaves) {
+                ctx.nonNull.retainAll(preFlow);
+            }
             if (thenLeaves && i.elseStmt == null) {
                 List<Object[]> neg = new ArrayList<Object[]>();
                 collectNegativePromotions(i.condition, ctx, neg);
@@ -7819,6 +7953,11 @@ public final class JavaEmitter {
             }
             ctx.pushScope();
             ctx.pushBreakTarget(null);
+            if (!wh.isDo) {
+                // `while (x != null)`: the test holds on entry to every pass of the body (the
+                // loop already demoted what its body assigns).
+                nullGuardPromotions(wh.condition, true, ctx);
+            }
             emitStatement(unwrapBlock(wh.body), ctx);
             ctx.popBreakTarget();
             ctx.popScope();
@@ -9661,6 +9800,14 @@ public final class JavaEmitter {
      * instead, so the guard propagates until the chain ends.
      */
     Out emitExpr(Expr e, TypeRef expected, Ctx ctx) {
+        Out o = emitExprIn(e, expected, ctx);
+        if (!ctx.watchedTypes.isEmpty() && ctx.watchedTypes.containsKey(e) && o != null) {
+            ctx.watchedTypes.put(e, o.type);
+        }
+        return o;
+    }
+
+    private Out emitExprIn(Expr e, TypeRef expected, Ctx ctx) {
         if (programFnSlot && expected != null && expected.funcParams != null && expected.funcReturn != null
                 && expected.funcReturn.is("dynamic") && (e instanceof Ident || e instanceof PropertyGet)
                 && isVoidMethodTearOff(e, ctx)) {
@@ -15669,7 +15816,7 @@ public final class JavaEmitter {
                         at = new TypeRef(((Call) a).name);
                         at.args.addAll(((Call) a).typeArgs);
                     }
-                    if (at != null && at.nullable && a instanceof Ident && ctx.nonNullByInit.contains(((Ident) a).name)) {
+                    if (at != null && at.nullable && a instanceof Ident && ctx.nonNull.contains(((Ident) a).name)) {
                         at = copyNonNull(at);
                     }
                     unifyThroughSupers(p.type, at, tps, m, 0);
@@ -20668,6 +20815,30 @@ public final class JavaEmitter {
     }
 
     private Out emitAssign(Assign a, Ctx ctx) {
+        boolean watch = a.lhs instanceof Ident && !ctx.watchedTypes.containsKey(a.rhs);
+        if (watch) {
+            ctx.watchedTypes.put(a.rhs, null);
+        }
+        Out o = emitAssignFlow(a, ctx);
+        TypeRef emitted = watch ? ctx.watchedTypes.remove(a.rhs) : null;
+        if (a.lhs instanceof Ident && ctx.lookup(((Ident) a.lhs).name) != null) {
+            String n = ((Ident) a.lhs).name;
+            boolean nn = staticallyNonNull(a.rhs, emitted, ctx);
+            if ("=".equals(a.op)) {
+                // An assignment re-promotes or demotes, by the static type assigned.
+                if (nn) {
+                    promoteNonNull(n, ctx);
+                } else {
+                    ctx.nonNull.remove(n);
+                }
+            } else if ("??=".equals(a.op) && nn) {
+                promoteNonNull(n, ctx);
+            }
+        }
+        return o;
+    }
+
+    private Out emitAssignFlow(Assign a, Ctx ctx) {
         Out shorted = emitShortedAssign(a, ctx);
         if (shorted != null) {
             return shorted;
@@ -23641,6 +23812,16 @@ public final class JavaEmitter {
     private boolean lastLambdaVoidAsValue;
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
+        java.util.Set<String> flow = enterClosureFlow(l, ctx);
+        try {
+            return emitLambdaFlow(l, expected, ctx);
+        } finally {
+            ctx.nonNull.clear();
+            ctx.nonNull.addAll(flow);
+        }
+    }
+
+    private Out emitLambdaFlow(Lambda l, TypeRef expected, Ctx ctx) {
         if (l.boundRecv != null) {
             return emitBoundTearOff(l, expected, ctx);
         }
@@ -37637,11 +37818,19 @@ public final class JavaEmitter {
             return true;
         }
 
-        /// Nullable locals promoted to non-null by their initializer (emitStatements).
-        final java.util.Set<String> nonNullByInit = new HashSet<String>();
+        /// Nullable locals flow-promoted to non-null here (see flowType).
+        final java.util.Set<String> nonNull = new HashSet<String>();
+        /// Expressions whose emitted static type a flow rule is waiting for (emitExpr).
+        final Map<Expr, TypeRef> watchedTypes = new java.util.IdentityHashMap<Expr, TypeRef>();
+        /// Locals some closure assigns: never promoted again.
+        final java.util.Set<String> writeCaptured = new HashSet<String>();
+        /// Locals assigned somewhere in their scope after the declaration.
+        final java.util.Set<String> reassigned = new HashSet<String>();
 
         void declare(String name, TypeRef type) {
-            nonNullByInit.remove(name);
+            nonNull.remove(name);
+            writeCaptured.remove(name);
+            reassigned.remove(name);
             if (!scopes.isEmpty()) {
                 scopes.get(scopes.size() - 1).put(name, type);
             }
