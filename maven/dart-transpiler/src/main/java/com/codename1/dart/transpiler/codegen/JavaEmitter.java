@@ -9633,7 +9633,8 @@ public final class JavaEmitter {
             // boundTearOff's result type is inferred, and a consumer wanting another SAM
             // (`where(seen.add)`) then fails inference where the plain reference compiled.
             out = identifyTearOff(e, out, expected != null && expected.funcParams == null
-                    && (expected.is("Object") || expected.is("Function") || isDynamicType(expected)), ctx);
+                    && (expected.is("Object") || expected.is("Function") || isDynamicType(expected)),
+                    expected, ctx);
             if (expected != null && (expected.funcParams != null
                     || expected.name != null && typedefDecl(expected.name) != null)) {
                 out = identifySignedTearOff(e, out, expected, ctx);
@@ -10581,6 +10582,41 @@ public final class JavaEmitter {
         return r.indexOf('"') >= 0 || r.indexOf('\\') >= 0 ? key : r;
     }
 
+    /// `Object Function(Object) f = gen`: a generic function inferred into a non-generic
+    /// function-typed slot is instantiated there, at the arguments the slot's type binds --
+    /// the same value as `gen<Object>` and another one than `gen`. The slot's type is known
+    /// here, so the value is keyed as that explicit instantiation. A generic value only
+    /// moving through an Object, dynamic or Function slot is not instantiated, and keeps
+    /// the uninstantiated key.
+    private String slotInstantiationKey(Expr e, String key, String bare, TypeRef expected, Ctx ctx) {
+        if (key == null || !key.equals(bare) || !(e instanceof Ident) || expected == null
+                || ((Ident) e).typeArgs != null && !((Ident) e).typeArgs.isEmpty()) {
+            return key;
+        }
+        TypeRef fnT = expected.funcParams != null ? expected : expandFunctionTypedef(expected);
+        if (fnT == null || fnT.funcParams == null || fnT.funcTypeParams != null && !fnT.funcTypeParams.isEmpty()) {
+            return key;
+        }
+        String name = ((Ident) e).name;
+        if (ctx.lookup(name) != null) {
+            return key;
+        }
+        FunctionDecl fd = functionInLibrary(ctx.library(), name);
+        if (fd == null || fd.typeParams.isEmpty() || fd.isGetter) {
+            return key;
+        }
+        List<TypeRef> inst = contextInstantiation(fd.typeParams, fd.params, fd.returnType, fnT);
+        if (inst == null) {
+            return key;
+        }
+        StringBuilder k = new StringBuilder(bare).append("<!");
+        for (int i = 0; i < inst.size(); i++) {
+            k.append(i == 0 ? "" : ", ").append(inst.get(i));
+        }
+        String r = k.append('>').toString();
+        return r.indexOf('"') >= 0 || r.indexOf('\\') >= 0 ? key : r;
+    }
+
     private static final java.util.regex.Pattern SIGNED_TEAR_OFF = java.util.regex.Pattern.compile(
             "((?:[\\w$]+\\.)*DartFnSigs\\.s\\d+)\\((.+)::([\\w$]+)\\)");
 
@@ -10611,6 +10647,7 @@ public final class JavaEmitter {
             String sam = m.group(1).substring(m.group(1).lastIndexOf('.') + 1);
             String key = explicitInstantiationKey(e, canonFunctionKey(recv + "::" + name, out.type, ctx),
                     recv + "::" + name);
+            key = slotInstantiationKey(e, key, recv + "::" + name, expected, ctx);
             if (key == null) {
                 return out;
             }
@@ -10706,6 +10743,15 @@ public final class JavaEmitter {
                 o = new Out(o.code, t, o.fn);
             }
         }
+        if (o != null && o.fn != null && o.fn.kind == FnKind.METHOD_REF && o.code.equals(o.fn.bare)
+                && o.type != null && o.type.funcParams == null && o.type.is("Function")) {
+            // `xs[2] == g` with g a generic async function typed only `Function`: the same
+            // canonical value an Object slot holds, so it compares equal to it.
+            String fo = fnIntoObjectSlot(o, null, ctx);
+            if (fo != null) {
+                return new Out(fo, o.type);
+            }
+        }
         if (o != null && o.fn == null && o.type != null && o.type.funcParams != null && o.type.funcReturn != null
                 && BARE_LAMBDA.matcher(o.code).matches() && functionSamProbe(o.type, ctx) != null) {
             // A closure (an extension tear-off, say) is no Object either until it has a SAM.
@@ -10724,6 +10770,10 @@ public final class JavaEmitter {
             "(?s)(?:\\([\\w$, ]*\\)|[\\w$]+) -> .*");
 
     private Out identifyTearOff(Expr e, Out out, boolean bound, Ctx ctx) {
+        return identifyTearOff(e, out, bound, null, ctx);
+    }
+
+    private Out identifyTearOff(Expr e, Out out, boolean bound, TypeRef expected, Ctx ctx) {
         if (out == null || out.fn == null || out.fromError || out.code.indexOf('"') >= 0) {
             return out;
         }
@@ -10742,6 +10792,7 @@ public final class JavaEmitter {
                 return out;
             }
             String fnKey = explicitInstantiationKey(e, canonFunctionKey(bare, out.type, ctx), bare);
+            fnKey = slotInstantiationKey(e, fnKey, bare, expected, ctx);
             if (fnKey == null) {
                 return out;
             }
@@ -11556,7 +11607,10 @@ public final class JavaEmitter {
                     // written -- the result is a Stack<int>, the list argument is converted
                     // against Iterable<int>, and javac gets the witness.
                     TypeRef ctype = cc.type;
-                    List<TypeRef> fca = factoryClassArgs(pc, pc.namedCtor(cc.ctorName), cc.type.args, cc.args, ctx);
+                    CtorDecl ccCtor = pc.namedCtor(cc.ctorName);
+                    List<TypeRef> fca = !ccCtor.isFactory && expected != null && expected.is(pc.name)
+                            && expected.args.size() == pc.typeParams.size() ? null
+                            : factoryClassArgs(pc, ccCtor, cc.type.args, cc.args, ctx);
                     if (fca != null) {
                         ctype = TypeRef.of(cc.type.name, fca.toArray(new TypeRef[0]));
                         ctype.resolved = cc.type.resolved;
@@ -14215,13 +14269,27 @@ public final class JavaEmitter {
      * Null when written arguments exist or any variable stays unbound.
      */
     private List<TypeRef> factoryClassArgs(ClassDecl pc, CtorDecl ct, List<TypeRef> written, Args args, Ctx ctx) {
-        if (pc == null || ct == null || !ct.isFactory || args == null || pc.typeParams.isEmpty()
+        // A generative constructor binds them the same way (`Box(3)` is a Box<int>), its
+        // `this.value` formals typed by the field they initialize.
+        java.util.Set<String> nulled = new HashSet<String>();
+        if (pc == null || ct == null || ct.redirect != null || args == null || pc.typeParams.isEmpty()
                 || written != null && !written.isEmpty()) {
             return null;
         }
         java.util.Map<String, TypeRef> bound = new java.util.HashMap<String, TypeRef>();
         int pos = 0;
-        for (Ast.Param p : ct.params) {
+        for (Ast.Param p0 : ct.params) {
+            Ast.Param p = p0;
+            if ((p.type == null || p.type.is("var")) && p.isThis) {
+                FieldDecl f = pc.field(p.name);
+                if (f == null || f.type == null) {
+                    continue;
+                }
+                p = new Ast.Param();
+                p.name = p0.name;
+                p.named = p0.named;
+                p.type = f.type;
+            }
             Expr arg = null;
             if (p.named) {
                 for (NamedArg na : args.named) {
@@ -14232,6 +14300,12 @@ public final class JavaEmitter {
             } else {
                 arg = pos < args.positional.size() ? args.positional.get(pos) : null;
                 pos++;
+            }
+            if (arg instanceof NullLit && p.type != null && p.type.args.isEmpty() && p.type.funcParams == null
+                    && pc.typeParams.contains(p.type.name)) {
+                // `Box(null, 3)` binds T to int?: null joins the other arguments as Null.
+                nulled.add(p.type.name);
+                continue;
             }
             if (arg == null || arg instanceof Lambda || p.type == null || p.type.funcParams != null
                     || !mentionsAnyTypeParam(p.type, pc.typeParams)) {
@@ -14246,7 +14320,12 @@ public final class JavaEmitter {
         }
         List<TypeRef> out = new ArrayList<TypeRef>();
         for (String tp : pc.typeParams) {
-            out.add(bound.get(tp));
+            TypeRef b = bound.get(tp);
+            if (b != null && nulled.contains(tp) && !b.nullable) {
+                b = copyNullable(b);
+                b.nullable = true;
+            }
+            out.add(b);
         }
         return fullyInferred(out, pc, ctx) ? out : null;
     }
@@ -17368,7 +17447,13 @@ public final class JavaEmitter {
             // A type literal entry (`{Holder<int>: 'h'}`) is its Type value.
             return classLiteral(o, ctx);
         }
-        return dynamicIntoTyped(o, t) ? elementCode(o, t, ctx) : funcCast(o, t, ctx);
+        if (dynamicIntoTyped(o, t)) {
+            return elementCode(o, t, ctx);
+        }
+        // `<String, Object>{'f': g}` with g typed only `Function`: bound to its own SAM,
+        // as a list element is, or javac sees a method reference with no target.
+        String fo = fnIntoObjectSlot(o, t, ctx);
+        return fo != null ? fo : funcCast(o, t, ctx);
     }
 
     private boolean dynamicIntoTyped(Out o, TypeRef t) {
@@ -25833,7 +25918,13 @@ public final class JavaEmitter {
                     // String>: members read through it (bind's StreamSink<S>) see the arguments.
                     List<TypeRef> written = c.target instanceof Ident && ((Ident) c.target).typeArgs != null
                             ? ((Ident) c.target).typeArgs : c.typeArgs;
-                    List<TypeRef> fca = written.isEmpty() ? factoryClassArgs(pc, named, written, c.args, ctx) : null;
+                    TypeRef namedCtx = callExpected(c, ctx);
+                    // A generative one yields to a context naming the class (`Box<num> b =
+                    // Box.named(3)` is a Box<num>), as Dart's downward inference does.
+                    boolean ctxBinds = !named.isFactory && namedCtx != null && namedCtx.is(pc.name)
+                            && namedCtx.args.size() == pc.typeParams.size();
+                    List<TypeRef> fca = written.isEmpty() && !ctxBinds
+                            ? factoryClassArgs(pc, named, written, c.args, ctx) : null;
                     if (fca != null) {
                         // `Stack.of([1, 2, 3])`: the arguments bound T, as Dart infers a generic
                         // factory's class arguments; from here they are spelled as if written.
@@ -28240,6 +28331,24 @@ public final class JavaEmitter {
                     return emitExpr(cc, ctxType, ctx);
                 }
             }
+            if (c.typeArgs.isEmpty() && (cls.equals("List") || cls.equals("Set")) && n.equals("of")
+                    && pos.size() == 1 && c.args.named.isEmpty()) {
+                // `List.of([1, 2])` is a List<int>: `of` takes an Iterable<E>, so E is read from
+                // the source, unlike `from`'s plain Iterable, which stays List<dynamic>.
+                TypeRef st = genericArgTypeQuiet(pos.get(0), ctx);
+                if (st != null && !st.nullable && st.args.size() == 1
+                        && (st.is("List") || st.is("Set") || st.is("Iterable"))
+                        && !isDynamicType(st.arg(0)) && !st.arg(0).is("var") && typeVarsInScope(st.arg(0), ctx)) {
+                    CtorCall cc = new CtorCall();
+                    cc.file = c.file;
+                    cc.line = c.line;
+                    cc.col = c.col;
+                    cc.type = TypeRef.of(cls, st.arg(0));
+                    cc.ctorName = cls.equals("List") ? "from" : n;
+                    cc.args = c.args;
+                    return emitExpr(cc, cc.type, ctx);
+                }
+            }
             if (c.typeArgs.isEmpty() && (cls.equals("List") || cls.equals("Set"))
                     && (n.equals("of") || n.equals("from")) && pos.size() == 1 && c.args.named.isEmpty()) {
                 // No type argument: a List<dynamic> copy, whatever the source's element type.
@@ -28740,6 +28849,18 @@ public final class JavaEmitter {
                     ? TypeRef.of(className, typeArgs.toArray(new TypeRef[0])) : new TypeRef(className);
             if (pinnedCls != null || prefixProvides(ctx.library(), ctorPrefix, pc)) {
                 constructed.resolved = pc;
+            }
+            if ((typeArgs == null || typeArgs.isEmpty()) && ctx.ctorContextArgs == null && ct != null
+                    && !ct.isFactory) {
+                // `Box(3)` with no context is a Box<int>: Dart infers the class arguments
+                // from the arguments, so members read through it see int, not a bare T.
+                List<TypeRef> fca = factoryClassArgs(pc, ct, typeArgs, args, ctx);
+                if (fca != null) {
+                    typeArgs = fca;
+                    TypeRef inferredType = TypeRef.of(className, fca.toArray(new TypeRef[0]));
+                    inferredType.resolved = constructed.resolved;
+                    constructed = inferredType;
+                }
             }
             String twArgs = witnessArgs(pc, argInferredWitnessTypeArgs(pc, ct, typeArgs, args, ctx), posNode, ctx);
             if (ct != null && ct.isFactory) {
@@ -30624,6 +30745,53 @@ public final class JavaEmitter {
     }
 
     /** An argument's static type read without emitting, as generic inference binds from it. */
+    /**
+     * The type of an argument that is itself an uninstantiated generic constructor call,
+     * with its class arguments read from its own arguments: in {@code Box(Box(1))} the
+     * inner call is a Box<int>, so the outer binds T to Box<int>. Null otherwise.
+     */
+    private int ctorCallTypeDepth;
+
+    private TypeRef inferredCtorCallTypeQuiet(Expr bare, Ctx ctx) {
+        if (!(bare instanceof Call) || ctorCallTypeDepth > 4) {
+            return null;
+        }
+        Call c = (Call) bare;
+        if (c.typeArgs != null && !c.typeArgs.isEmpty() || c.name == null) {
+            return null;
+        }
+        ClassDecl pc;
+        CtorDecl ct;
+        if (c.target == null) {
+            if (ctx.lookup(c.name) != null) {
+                return null;
+            }
+            pc = programClass(c.name, ctx);
+            ct = pc != null ? pc.defaultCtor() : null;
+        } else if (c.target instanceof Ident && (((Ident) c.target).typeArgs == null
+                || ((Ident) c.target).typeArgs.isEmpty()) && ctx.lookup(((Ident) c.target).name) == null) {
+            pc = programClass(((Ident) c.target).name, ctx);
+            ct = pc != null ? pc.namedCtor(c.name) : null;
+        } else {
+            return null;
+        }
+        if (pc == null || ct == null) {
+            return null;
+        }
+        ctorCallTypeDepth++;
+        try {
+            List<TypeRef> fca = factoryClassArgs(pc, ct, null, c.args, ctx);
+            if (fca == null) {
+                return null;
+            }
+            TypeRef t = TypeRef.of(pc.name, fca.toArray(new TypeRef[0]));
+            t.resolved = pc;
+            return t;
+        } finally {
+            ctorCallTypeDepth--;
+        }
+    }
+
     private TypeRef genericArgTypeQuiet(Expr bare, Ctx ctx) {
         while (bare instanceof ParenExpr) {
             bare = ((ParenExpr) bare).inner;
@@ -30632,6 +30800,9 @@ public final class JavaEmitter {
                 ? TypeRef.of("List", ((ListLit) bare).elementType)
                 : bare instanceof ListLit || bare instanceof SetLit ? untypedLiteralType(bare, ctx)
                 : inferExprTypeQuiet(bare, ctx);
+        if (at == null) {
+            at = inferredCtorCallTypeQuiet(bare, ctx);
+        }
         if (at == null) {
             // `f(1)` / `f('a')` of `Future<T> f<T>(T x)`: a literal argument binds T
             // to the literal's own type, as Dart's inference does.
@@ -34879,17 +35050,36 @@ public final class JavaEmitter {
                 if (fd == null || fd.isGetter || fd.isSetter) {
                     return null;
                 }
+                boolean optional = false;
                 for (Param p : fd.params) {
-                    if (p.named || p.optional || p.defaultValue != null) {
+                    optional |= p.named || p.optional || p.defaultValue != null;
+                }
+                if (optional) {
+                    // Optional or named parameters: a full-arity adapter that restores what a
+                    // dynamic caller omits, signed so `Function.apply` and named arguments
+                    // reach it, and canonicalized by the function it names.
+                    if (fd.params.size() > MAX_FN_ARITY) {
                         return null;
                     }
+                    List<TypeRef> erased = new ArrayList<TypeRef>();
+                    for (int i = 0; i < fd.params.size(); i++) {
+                        erased.add(TypeRef.DYNAMIC);
+                    }
+                    final String target = c.replace("::", ".");
+                    adapterStaticKey = c;
+                    Out ad = tearOffAdapter(fd.params, erased,
+                            fd.returnType != null && fd.returnType.is("void") && !fd.isAsync
+                                    ? fd.returnType : TypeRef.DYNAMIC,
+                            names -> target + "(" + String.join(", ", names) + ")", ctx);
+                    adapterStaticKey = null;
+                    return ad == null ? null : "((Object) " + ad.code + ")";
                 }
                 n = fd.params.size();
                 isVoid = fd.returnType != null && fd.returnType.is("void") && !fd.isAsync;
             } else {
                 return null;
             }
-            if (n > 4) {
+            if (n > MAX_FN_ARITY) {
                 return null;
             }
             if (isVoid) {
