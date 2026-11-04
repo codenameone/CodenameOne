@@ -1712,18 +1712,21 @@ public final class JavaEmitter {
         return isLateChecked(f, owner) && f.initializer != null;
     }
 
-    private static String emitLateAccessors(FieldDecl f, String jt) {
-        return emitLateAccessors(f, jt, null, null);
+    private static String emitLateAccessors(FieldDecl f, String jt, String getRet) {
+        return emitLateAccessors(f, jt, getRet, null, null);
     }
 
-    private static String emitLateAccessors(FieldDecl f, String jt, String initLifted, String initCode) {
+    /// A late field's get$/set$ pair. {@code getRet} is the get$ return when the field's
+    /// override set boxes it (pinnedFieldGetter: `late final int x` over an untyped `late
+    /// final x`, whose accessor returns Object), else null for {@code jt}.
+    private static String emitLateAccessors(FieldDecl f, String jt, String getRet, String initLifted, String initCode) {
         String st = f.isStatic ? "static " : "";
         String vis = f.isStatic && f.name.startsWith("_") ? "    " : "    public ";
         String flag = f.name + "$late";
         String self = f.isStatic ? "" : "this.";
         StringBuilder b = new StringBuilder();
         b.append("    private ").append(st).append("boolean ").append(flag).append(";\n");
-        b.append(vis).append(st).append(jt).append(" get$").append(f.name).append("() {\n")
+        b.append(vis).append(st).append(getRet != null ? getRet : jt).append(" get$").append(f.name).append("() {\n")
                 .append("        if (!").append(flag).append(") {\n");
         if (initCode != null) {
             // Lazy initializer: computed once, on the first read that finds it unset.
@@ -2321,7 +2324,7 @@ public final class JavaEmitter {
                 Out init = emitExpr(f.initializer, ft, ctx);
                 String lifted = ctx.popWriter();
                 body.append(";\n");
-                body.append(emitLateAccessors(f, jt, lifted, coerce(init, ft, ctx)));
+                body.append(emitLateAccessors(f, jt, pinnedFieldGetter(c, f, ctx), lifted, coerce(init, ft, ctx)));
                 body.append('\n');
                 continue;
             } else if (f.initializer != null) {
@@ -2343,7 +2346,7 @@ public final class JavaEmitter {
                 body.append(";\n");
             }
             if (isLateChecked(f, c)) {
-                body.append(emitLateAccessors(f, jt));
+                body.append(emitLateAccessors(f, jt, pinnedFieldGetter(c, f, ctx)));
                 body.append('\n');
                 continue;
             }
@@ -2611,7 +2614,7 @@ public final class JavaEmitter {
                     ctx.pushWriter(3);
                     Out init = emitExpr(f.initializer, ft, ctx);
                     String lifted = ctx.popWriter();
-                    body.append(";\n").append(emitLateAccessors(f, jt, lifted, coerce(init, ft, ctx)))
+                    body.append(";\n").append(emitLateAccessors(f, jt, pinnedFieldGetter(c, f, ctx), lifted, coerce(init, ft, ctx)))
                             .append('\n');
                 } else if (f.initializer != null && !f.isStatic && dartOrder(c)) {
                     // Run by $mixinFieldInit$ when Dart's order reaches the mixin
@@ -3605,6 +3608,15 @@ public final class JavaEmitter {
                         || findSetterInChain(c, st.name) != null) {
                     continue;
                 }
+                if (mixinAccessorOverField(c, st.name, false)) {
+                    FieldDecl sf = findFieldInChain(c, st.name);
+                    if (sf != null && !sf.isFinal && !sf.isConst && firstBridgeHead(c, "set$" + st.name + "()")) {
+                        sb.append("    public void set$").append(st.name).append('(')
+                                .append(javaType(fieldType(sf, ctx), false, ctx)).append(" v) {\n        ")
+                                .append(st.name).append("(v);\n    }\n\n");
+                    }
+                    continue;
+                }
                 FieldDecl f = findFieldInChain(c, st.name);
                 if (f != null && !f.isFinal && !f.isConst) {
                     sb.append("    public void ").append(st.name).append('(')
@@ -3614,6 +3626,18 @@ public final class JavaEmitter {
             }
             for (MethodDecl g : im.methods) {
                 if (!g.isGetter || g.isStatic || !done.add(g.name) || findGetterInChain(c, g.name) != null) {
+                    continue;
+                }
+                if (mixinAccessorOverField(c, g.name, true)) {
+                    // The mixin's getter is the member; a read through the superclass's
+                    // field accessor (`M1 m = U(); m.k`) must reach it too.
+                    FieldDecl sf = findFieldInChain(c, g.name);
+                    if (sf != null && firstBridgeHead(c, "get$" + g.name + "()")) {
+                        String fj = pinnedFieldGetter(c, sf, ctx);
+                        sb.append("    public ").append(fj != null ? fj : javaType(fieldType(sf, ctx), false, ctx))
+                                .append(" get$").append(g.name).append("() {\n        return ").append(g.name)
+                                .append("();\n    }\n\n");
+                    }
                     continue;
                 }
                 FieldDecl f = findFieldInChain(c, g.name);
@@ -38504,6 +38528,31 @@ public final class JavaEmitter {
             return c.superclass.arg(0);
         }
         return null;
+    }
+
+    /// Whether a mixin applied to {@code c}, or to a superclass below the one declaring the
+    /// field {@code name}, declares the getter (or, when {@code !getter}, the setter) of that
+    /// name: `class U extends S with M` where S has `var k` and M `int get k`. M's member
+    /// wins over S's field in Dart, and the applied mixin copy already emits it, so no field
+    /// bridge may be written beside it (it would be a second `k()`).
+    private boolean mixinAccessorOverField(ClassDecl c, String name, boolean getter) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+            if (k.field(name) != null) {
+                return false;
+            }
+            for (TypeRef mixRef : k.mixins) {
+                ClassDecl mx = classOfRef(mixRef);
+                if (mx == null) {
+                    continue;
+                }
+                for (MethodDecl m : mx.methods) {
+                    if (!m.isStatic && m.name.equals(name) && (getter ? m.isGetter : m.isSetter)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** Finds a mixin-contributed member (field or method) for a program class hierarchy. */

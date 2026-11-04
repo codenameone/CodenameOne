@@ -26,8 +26,9 @@ abstract class Key {}
 
 @ConstKeyed()
 @JavaName('com.codename1.flutter.ValueKey')
-class ValueKey extends Key {
-  external const ValueKey(Object value);
+class ValueKey<T> extends Key {
+  external const ValueKey(T value);
+  external T get value;
 }
 
 @JavaName('com.codename1.flutter.BuildContext')
@@ -53,6 +54,7 @@ abstract class BuildContext {
 @JavaName('com.codename1.flutter.Widget')
 abstract class Widget {
   external const Widget({Key? key});
+  external Key? get key;
 }
 
 @ConstKeyed()

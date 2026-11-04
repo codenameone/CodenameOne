@@ -116,7 +116,7 @@ public class BehaviorTest {
             }
         }
         TestSupport.Result r = TestSupport.transpile(sources.toArray(new String[0][]), stubEntries, extraStubs);
-        assertTrue(!r.diags.hasErrors(), "diagnostics: " + r.diags.asList());
+        assertTrue(!r.diags.hasErrors(), dir.getName() + ": diagnostics: " + r.diags.asList());
 
         File work = Files.createTempDirectory("dart-behavior-" + dir.getName()).toFile();
         File srcDir = new File(work, "src/" + TestSupport.PKG.replace('.', '/'));
@@ -167,7 +167,7 @@ public class BehaviorTest {
         javac.add(classes.getAbsolutePath());
         javac.addAll(javacArgs);
         Object[] compileResult = TestSupport.run(javac, work);
-        assertEquals(0, compileResult[0], "javac failed:\n" + compileResult[1]);
+        assertEquals(0, compileResult[0], dir.getName() + ": javac failed:\n" + compileResult[1]);
 
         List<String> java = new ArrayList<String>();
         java.add(new File(java17, "bin/java").getAbsolutePath());
@@ -178,7 +178,7 @@ public class BehaviorTest {
         java.add(classes.getAbsolutePath() + File.pathSeparator + rtClasspath);
         java.add("Runner");
         Object[] runResult = TestSupport.run(java, work);
-        assertEquals(0, runResult[0], "execution failed:\n" + runResult[1]);
+        assertEquals(0, runResult[0], dir.getName() + ": execution failed:\n" + runResult[1]);
 
         String expected = TestSupport.read(new File(dir, "expect.txt"));
         assertEquals(expected.trim().replace("\r\n", "\n"),

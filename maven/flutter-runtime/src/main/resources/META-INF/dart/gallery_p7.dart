@@ -689,6 +689,7 @@ class DateRangePickerDialog extends Widget {
 @JavaName('com.codename1.flutter.ObjectKey')
 class ObjectKey extends Key {
   external ObjectKey(Object? value);
+  external Object? get value;
 }
 
 // ======================================================================

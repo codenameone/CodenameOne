@@ -40,6 +40,13 @@ public abstract class Widget implements dart.runtime.ConstCanon.Keyed {
         this.key = v;
     }
 
+    /**
+     * The Dart {@code Widget.key} getter: the key this widget was built with, or null.
+     */
+    public Key key() {
+        return key;
+    }
+
     public Key getKey() {
         return key;
     }
