@@ -10569,8 +10569,13 @@ public final class JavaEmitter {
         }
         PropertyGet pg = (PropertyGet) e;
         if (isImportPrefix(pg.target, ctx)) {
-            // `lib.identity`: a top-level function through an import prefix.
-            FunctionDecl fn = program.functions.get(pg.name);
+            // `lib.identity`: a top-level function through an import prefix -- the one the
+            // prefix's library provides, not whichever library's registered the bare name.
+            String pfx = ((Ident) pg.target).name;
+            FunctionDecl fn = functionInLibrary(program.resolveFunctionOwner(pg.name, ctx.library(), pfx), pg.name);
+            if (fn == null) {
+                fn = program.functions.get(pg.name);
+            }
             return fn != null && !fn.typeParams.isEmpty() ? fn : null;
         }
         if (pg.target instanceof Ident && ctx.lookup(((Ident) pg.target).name) == null
@@ -11199,8 +11204,13 @@ public final class JavaEmitter {
                 diags.error(e, "E0126", "Cannot resolve named constructor " + cc.type.name + "." + cc.ctorName);
                 return new Out("null", TypeRef.DYNAMIC);
             }
-            return emitCtorCall(cc.type.name, inferredWitnessTypeArgs(
-                    program.classes.get(cc.type.name), cc.type.args, expected), cc.args, e, ctx);
+            // A call pinned to its class (a constructor tear-off through an import prefix,
+            // `a.Item.new` beside an unprefixed `Item` of another library) builds that class.
+            ClassDecl pinnedCtor = cc.type.runtimeOnly ? null : cc.type.resolved;
+            List<TypeRef> wta = inferredWitnessTypeArgs(pinnedCtor != null ? pinnedCtor
+                    : program.classes.get(cc.type.name), cc.type.args, expected);
+            ctorCallPinned = pinnedCtor;
+            return emitCtorCall(cc.type.name, wta, cc.args, e, ctx);
         }
         if (e instanceof IndexGet) {
             if (((IndexGet) e).target instanceof SuperExpr) {
@@ -17645,7 +17655,12 @@ public final class JavaEmitter {
         String prefixUri = prefix != null && ctx.library() != null ? ctx.library().prefixImports.get(prefix) : null;
         if (program.functions.containsKey(n) && !(prefixUri != null && prefixUri.startsWith("dart:"))) {
             Library owner = program.resolveFunctionOwner(n, ctx.library(), prefix);
-            FunctionDecl fn = program.functions.get(n);
+            // The owner's own declaration: `a.describe` beside an imported `b.describe` is
+            // a's, whose parameters differ; the flat map holds whichever registered last.
+            FunctionDecl fn = functionInLibrary(owner, n);
+            if (fn == null) {
+                fn = program.functions.get(n);
+            }
             if (fn.isGetter) {
                 // top-level getter access: `x` -> `OwnerLib.x()`
                 TypeRef rt = fn.returnType == null || fn.returnType.is("var")
@@ -28001,7 +28016,13 @@ public final class JavaEmitter {
         return javaName + ".class";
     }
 
+    /// Set just before emitCtorCall by a CtorCall whose type is pinned to a class; consumed
+    /// (and cleared) on entry, so a nested constructor call never sees it.
+    private ClassDecl ctorCallPinned;
+
     private Out emitCtorCall(String className, List<TypeRef> typeArgs, Args args, Node posNode, Ctx ctx) {
+        ClassDecl pinnedCls = ctorCallPinned;
+        ctorCallPinned = null;
         // dart:core intrinsics whose Java stub has no matching named-arg constructor:
         // route to the canonical factory rather than the generic allocate-then-setters path.
         if (className.equals("Duration")) {
@@ -28024,13 +28045,13 @@ public final class JavaEmitter {
         // so a name shared by several files (`Backdrop` in pages/ vs studies/shrine/) binds to
         // the one this library actually imports.
         String ctorPrefix = takeCallPrefix(ctx);
-        ClassDecl pc = program.resolveClass(className, ctx.library(), ctorPrefix);
+        ClassDecl pc = pinnedCls != null ? pinnedCls : program.resolveClass(className, ctx.library(), ctorPrefix);
         // An app class may share a name with a stub type (new_gallery's routes.dart `Path`
         // vs dart:ui `Path`). Prefer the app class only when it is actually visible to the
         // current library (declared or imported); otherwise fall through to the stub.
         // `p.Name(...)` through a prefix whose library provides the app class names that
         // class, whatever an unprefixed `Name` would mean here.
-        if (pc != null && stubs.isStubClass(className) && !prefixProvides(ctx.library(), ctorPrefix, pc)
+        if (pc != null && pinnedCls == null && stubs.isStubClass(className) && !prefixProvides(ctx.library(), ctorPrefix, pc)
                 && !classVisibleFrom(pc, ctx.library())) {
             pc = null;
         }
@@ -28043,7 +28064,7 @@ public final class JavaEmitter {
             TypeRef constructed = typeArgs != null && !typeArgs.isEmpty()
                     && typeArgs.size() == pc.typeParams.size()
                     ? TypeRef.of(className, typeArgs.toArray(new TypeRef[0])) : new TypeRef(className);
-            if (prefixProvides(ctx.library(), ctorPrefix, pc)) {
+            if (pinnedCls != null || prefixProvides(ctx.library(), ctorPrefix, pc)) {
                 constructed.resolved = pc;
             }
             String twArgs = witnessArgs(pc, argInferredWitnessTypeArgs(pc, ct, typeArgs, args, ctx), posNode, ctx);
