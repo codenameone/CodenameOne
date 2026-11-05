@@ -26,8 +26,7 @@ Run it on the JVM while you work on it, with the arguments in a property:
 
 [source,bash]
 ----
-./mvnw cn1:backend -Dcn1.backend.args="--count 2 Ada"
-./gradlew runBackend -Pcn1.backend.args="--count 2 Ada"
+include::../demos/common/src/main/snippets/developer-guide/command-line-applications.sh[tag=command-line-applications-bash-001,indent=0]
 ----
 
 `mixinStandardHelpOptions` adds `-h`/`--help` and `-V`/`--version`, and the help
@@ -35,13 +34,7 @@ is written from the annotations:
 
 [source,text]
 ----
-Usage: greet [-hlV] [--count=<count>] <name>
-Prints a greeting.
-      <name>                  Who to greet.
-  -c, --count=<count>         How many times. Default: 1
-  -l, --loud                  Shout it.
-  -h, --help                  Show this help message and exit.
-  -V, --version               Print version information and exit.
+include::../demos/common/src/main/snippets/developer-guide/command-line-applications.txt[tag=command-line-applications-text-001,indent=0]
 ----
 
 Nothing is read by reflection. The build reads the annotations and generates
@@ -122,16 +115,12 @@ always under `CLICOLOR_FORCE`, never on a terminal that declares itself
 
 === Testing
 
-A command is an ordinary class, and the generated `CliApplication` holds the
-models of every top-level command, so a test runs the command line exactly as the
-binary would:
-
-[source,java,role=cn1-no-try]
-----
-int code = CommandLine.run("greet", CliApplication.commands(),
-        new String[] {"--count", "2", "Ada"});
-assertEquals(0, code);
-----
+A command is an ordinary class. The build generates `CliApplication`, in the
+package of your top-level command, and its `commands()` lists the models of every
+top-level command. The generated class appears after the main sources compile, so
+your tests can use it. A test runs the command line exactly as the binary would:
+`CommandLine.run("greet", CliApplication.commands(), new String[] {"--count", "2", "Ada"})`
+returns the exit code, here `0`.
 
 === Building the executable
 
