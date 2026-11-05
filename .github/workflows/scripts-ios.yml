@@ -1214,7 +1214,10 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15
-    timeout-minutes: 60
+    # Measured: the sample build takes 15-22 min and the tvOS screenshot run
+    # 28-33 min on a hosted macos-15, so 60 left nothing for a slow runner and
+    # cancelled the suite mid-run on unrelated branches.
+    timeout-minutes: 90
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
