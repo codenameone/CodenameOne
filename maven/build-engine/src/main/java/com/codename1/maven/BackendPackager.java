@@ -404,6 +404,24 @@ public class BackendPackager {
             throw new BuildExecutionException("Could not re-scan the backend classes after "
                     + "generating the entity daos: " + err.getMessage(), err);
         }
+        // The @Command classes next, before the controllers, in the order the
+        // processor services file runs them: the controller pass reads what this
+        // one records to fold the commands into its entry point, and a module with
+        // commands and no controller takes this pass's CliApplication as its own.
+        com.codename1.maven.processors.CommandAnnotationProcessor commands =
+                new com.codename1.maven.processors.CommandAnnotationProcessor();
+        try {
+            commands.start(ctx);
+            for (AnnotatedClass cls : index.values()) {
+                if (!cls.getClassAnnotations().isEmpty()) {
+                    commands.processClass(cls, ctx);
+                }
+            }
+            commands.finish(ctx);
+        } catch (ProcessingException err) {
+            throw new BuildExecutionException("Could not process @Command: "
+                    + err.getMessage(), err);
+        }
         try {
             processor.start(ctx);
             for (AnnotatedClass cls : index.values()) {
@@ -451,7 +469,7 @@ public class BackendPackager {
         }
         if (mainClass == null || mainClass.length() == 0) {
             mainClass = name;
-            getLog().info("cn1: entry point " + name + ", generated from @RestController");
+            getLog().info("cn1: entry point " + name + ", generated from the module's annotations");
         }
     }
 
@@ -462,7 +480,7 @@ public class BackendPackager {
     private void requireMainClass(File classes) throws BuildFailureException {
         if (mainClass == null || mainClass.length() == 0) {
             throw new BuildFailureException("No entry point: set <mainClass>, or annotate "
-                    + "a class with @RestController and let the bootstrap be generated "
+                    + "a class with @RestController or @Command and let the entry point be generated "
                     + "from it");
         }
         if (new File(classes, mainClass.replace('.', '/') + ".class").isFile()) {

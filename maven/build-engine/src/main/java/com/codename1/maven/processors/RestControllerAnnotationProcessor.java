@@ -210,6 +210,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// Whether the generated entry point registers server-side daos. Settled
     /// when the entry point is written; see [#hasGeneratedDaos].
     private boolean daos;
+    /// The generated `CliApplication` of this module's `@Command` classes, or
+    /// null; set by [CommandAnnotationProcessor], which runs first.
+    private String cliApplication;
+    /// The name the command-line help prints, or null.
+    private String cliName;
 
     /// The beans this build resolved, once [#finish] has asked for them.
     BackendBeans beans;
@@ -1714,6 +1719,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             catch (IllegalArgumentException error) { ctx.error(error.getMessage()); return; }
         }
         daos = hasGeneratedDaos(ctx);
+        Object cli = ctx.getAttribute(CommandAnnotationProcessor.CLI_APPLICATION_ATTRIBUTE);
+        cliApplication = cli instanceof String ? (String) cli : null;
+        Object name = ctx.getAttribute(CommandAnnotationProcessor.CLI_NAME_ATTRIBUTE);
+        cliName = name instanceof String ? (String) name : null;
         sources.put(wiring, generateWiring(entryPackage));
         sources.put(bootstrap, generateBootstrap(entryPackage));
         try {
@@ -3325,7 +3334,30 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("@com.codename1.backend.annotations.Generated\n");
         sb.append("public final class BackendApplication {\n\n");
         sb.append("    private BackendApplication() {\n    }\n\n");
+        // The command line first. With no arguments -- how every backend has
+        // always been started -- it is the server, untouched. With arguments
+        // it goes to the module's @Command classes, the server being their
+        // "serve" sibling; a module with no commands still answers --help and
+        // otherwise starts the server whatever it was passed, as it always did.
+        String appName = cliName != null ? cliName : "server";
         sb.append("    public static void main(String[] args) throws Exception {\n");
+        sb.append("        int code = com.codename1.cli.CommandLine.serve(")
+          .append(quote(appName)).append(", ")
+          .append(cliApplication != null ? cliApplication + ".commands()" : "null")
+          .append(", new Cn1Server(), args);\n");
+        sb.append("        if (code >= 0) {\n");
+        sb.append("            System.out.flush();\n");
+        sb.append("            System.err.flush();\n");
+        sb.append("            System.exit(code);\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static final class Cn1Server implements "
+                + "com.codename1.cli.CommandLine.Server {\n");
+        sb.append("        public void serve() throws Exception {\n");
+        sb.append("            cn1Serve();\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static void cn1Serve() throws Exception {\n");
         if (daos) {
             // The generated daos are reachable from here and from nowhere else.
             // The translator drops a class nothing references, so this line is

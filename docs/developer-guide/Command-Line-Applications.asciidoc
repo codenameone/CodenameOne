@@ -1,0 +1,160 @@
+[[command-line-applications]]
+== Command-line applications
+
+A command-line tool is a backend with no server in it. It uses the same runtime,
+the same build and the same packaging, so a tool written in Java starts in
+milliseconds as a single native executable, with no JVM to install beside it. The
+arguments are declared with annotations whose names follow picocli, the most
+widely used Java library for the job, so a picocli command usually needs nothing
+more than its imports changed.
+
+The Initializr's *Command-line tool* project type creates one, for Maven or for
+Gradle.
+
+=== A command
+
+A command is a class annotated `@Command` that implements `Runnable`, or
+`Callable<Integer>` when it decides its own exit code. Each field annotated
+`@Option` or `@Parameters` receives an argument:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/cli/Greet.java[tag=cli-command,indent=0]
+----
+
+Run it on the JVM while you work on it, with the arguments in a property:
+
+[source,bash]
+----
+./mvnw cn1:backend -Dcn1.backend.args="--count 2 Ada"
+./gradlew runBackend -Pcn1.backend.args="--count 2 Ada"
+----
+
+`mixinStandardHelpOptions` adds `-h`/`--help` and `-V`/`--version`, and the help
+is written from the annotations:
+
+[source,text]
+----
+Usage: greet [-hlV] [--count=<count>] <name>
+Prints a greeting.
+      <name>                  Who to greet.
+  -c, --count=<count>         How many times. Default: 1
+  -l, --loud                  Shout it.
+  -h, --help                  Show this help message and exit.
+  -V, --version               Print version information and exit.
+----
+
+Nothing is read by reflection. The build reads the annotations and generates
+the code that fills each field and the application's `main`, so a mistake in a
+declaration is a build error rather than a surprise at run time: two options with
+the same name, a field type there is no conversion for, positional indexes that
+overlap, a command with nothing to run, or a static or final field.
+
+=== Options and parameters
+
+The command line is parsed the way picocli and the POSIX conventions parse it:
+
+* Short options cluster: `-lc 2` is `-l -c 2`, and `-c2` is `-c 2`.
+* A long option takes its value after a space or an equals sign: `--count 2`,
+  `--count=2`.
+* `--` ends the options; every argument that follows is a positional
+  parameter, even one that starts with a dash.
+* `@file` reads arguments from a file, one or more per line.
+* A boolean option is a flag. With `negatable = true` it also has a `--no-` form,
+  and the help shows `--[no-]color`.
+
+A field's type decides how its value is converted: the primitives and their
+wrappers, `String`, `File`, and any enum (an unknown value names the ones it
+accepts). An array, `List`, `Collection` or `Set` collects every occurrence of an
+option, and `split = ","` divides one value into several. Any other type needs a
+converter, and anything the converter throws is reported as an invalid value:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/cli/Ports.java[tag=cli-converter,indent=0]
+----
+
+`defaultValue` applies when the argument is absent, and is converted like an
+argument. It can name an environment variable, with a fallback after `:-`:
+`defaultValue = "${env:NOTES_FILE:-notes.txt}"`.
+
+`@Parameters` takes the arguments that aren't options. With `index` it takes
+one position or a range (`"0"`, `"1..*"`); a collection field with no index takes
+them all. `arity` sets how many values an option or parameter takes, as in
+picocli: `"1"`, `"0..1"`, `"2..*"`.
+
+=== Subcommands
+
+A tool with several verbs, as in `git commit`, lists them in `subcommands`. Each
+is a command of its own; `@ParentCommand` hands it the command above it, so
+options given before the verb are shared, and `@Spec` hands it its own model:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/cli/Notes.java[tag=cli-group,indent=0]
+----
+
+`notes -f work.txt add --tag home,urgent buy milk` runs `add`; `notes ls` runs
+`show` by its alias. A subcommand may come anywhere after the parent's options,
+and `notes --help` lists the subcommands.
+
+A module may also declare several top-level commands without a group. They
+become the subcommands of one command named after the application, which is the
+`cn1.cli.name` setting in `application.properties`, or the project's name.
+
+=== Exit codes and output
+
+The process exits with:
+
+* 0 when the command finishes;
+* the value `call()` returns, for a `Callable<Integer>`, or `getExitCode()` for a
+  command that implements `IExitCodeGenerator`;
+* 1 when the command throws; the exception's message is printed to standard error;
+* 2 when the command line doesn't parse; the error and the usage are printed to
+  standard error.
+
+`com.codename1.cli.Console` helps with terminal output. `Console.width()` is the
+width help is wrapped to, from `COLUMNS`. `Console.style(text, Style.BOLD,
+Style.RED)` adds ANSI colour only when colour is wanted: never under `NO_COLOR`,
+always under `CLICOLOR_FORCE`, and never on a terminal that declares itself
+`dumb`.
+
+=== Testing
+
+A command is an ordinary class, and the generated `CliApplication` holds the
+models of every top-level command, so a test runs the command line exactly as the
+binary would:
+
+[source,java,role=cn1-no-try]
+----
+int code = CommandLine.run("greet", CliApplication.commands(),
+        new String[] {"--count", "2", "Ada"});
+assertEquals(0, code);
+----
+
+=== Building the executable
+
+`./mvnw cn1:backend-package`, or `./gradlew backendPackage`, translates the tool
+to C and compiles it with clang into one executable for the machine it runs on,
+Linux or macOS. Build on each platform you ship to; a continuous integration
+matrix with one runner per platform is the usual way. The executable needs no
+JVM and no other files.
+
+The tool compiles against the backend's class library, the subset of the JDK
+that the native runtime provides: collections, strings, `java.io` files and
+streams, `java.time`, and the backend's own networking, database and
+cryptography APIs. Packaging the tool reports any class outside that subset.
+
+=== Commands in a backend
+
+The annotations work in a server too, with no setting to turn them on. A backend
+whose module also declares `@Command` classes gets a command line: its
+administration tasks, such as a data import, a user reset or a report, sit next to
+the server and share its code.
+
+* With no arguments the binary starts the server, exactly as it did before.
+* `serve` starts it as well, and `--help` lists `serve` and every command.
+* Any other command runs and exits, and the server never starts.
+
+A backend with no commands still accepts `--help`, and ignores any other
+argument, so existing deployments are unaffected.

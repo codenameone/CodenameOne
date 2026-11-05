@@ -8,7 +8,9 @@
 #  3. its runBackend serves the template's /healthz on the JVM;
 #  4. backendPackage translates it to a native binary (skipped without clang,
 #     unless CN1_BACKEND_PACKAGE_REQUIRED=1), and the binary serves /healthz.
-#  5. its migration tasks say so when there is nothing to migrate, and apply,
+#  5. "Command-line tool" runs its command with arguments, on the JVM and as a
+#     native binary, with picocli's exit codes and generated help;
+#  6. its migration tasks say so when there is nothing to migrate, and apply,
 #     list and validate a script once there is one.
 #
 # Needs the reactor installed (mvn install) and a JDK 17+; see inc/gradle.sh.
@@ -110,6 +112,47 @@ elif [ "${CN1_BACKEND_PACKAGE_REQUIRED:-}" = "1" ]; then
   fail "backendPackage needs clang, and CN1_BACKEND_PACKAGE_REQUIRED=1 forbids skipping it"
 else
   echo "   skipped: no clang on PATH"
+fi
+
+echo "== Command-line tool"
+CLI="$WORKDIR/cli/launcherprobe"
+mkdir -p "$CLI"
+unzip -q "$WORKDIR/fixtures/GRADLE-COMMAND_LINE-INTELLIJ.zip" -d "$CLI"
+use_local_plugin "$CLI"
+[ -n "$(find "$CLI/src/main/java" -name Hello.java)" ] || fail "no Hello.java command"
+[ -z "$(find "$CLI/src" -name Api.java)" ] || fail "a command-line tool should not have a controller"
+run_gradle "$CLI" runBackend "-Pcn1.backend.args=--count 2 --loud Ada" > "$WORKDIR/cli-run.log" 2>&1 \
+  || { cat "$WORKDIR/cli-run.log"; fail "runBackend with arguments"; }
+[ "$(grep -c '^HELLO, ADA!$' "$WORKDIR/cli-run.log")" = "2" ] \
+  || { cat "$WORKDIR/cli-run.log"; fail "the command did not run with its arguments on the JVM"; }
+run_gradle "$CLI" test > "$WORKDIR/cli-test.log" 2>&1 || { cat "$WORKDIR/cli-test.log"; fail "the tool's tests"; }
+# binary -- runs the packaged tool through every outcome a caller sees
+check_cli_binary() {
+  local bin="$1" out code
+  out="$("$bin" -c 3 Ada)" || fail "the binary failed on valid arguments"
+  [ "$(printf '%s\n' "$out" | grep -c '^Hello, Ada$')" = "3" ] || fail "the binary printed: $out"
+  out="$("$bin" --help)" || fail "--help did not exit 0"
+  printf '%s\n' "$out" | grep -q 'Usage: ' || fail "--help printed no usage: $out"
+  printf '%s\n' "$out" | grep -q -- '--count=<count>' || fail "--help did not list --count: $out"
+  out="$("$bin" --version)" || fail "--version did not exit 0"
+  printf '%s\n' "$out" | grep -q ' 1.0$' || fail "--version printed: $out"
+  set +e
+  "$bin" --no-such-option Ada > "$WORKDIR/cli-bad.log" 2>&1; code=$?
+  "$bin" > "$WORKDIR/cli-missing.log" 2>&1; local missing=$?
+  set -e
+  [ "$code" = "2" ] || { cat "$WORKDIR/cli-bad.log"; fail "an unknown option exited $code, not 2"; }
+  grep -q "Unknown option: '--no-such-option'" "$WORKDIR/cli-bad.log" || { cat "$WORKDIR/cli-bad.log"; fail "unknown option message"; }
+  [ "$missing" = "2" ] || { cat "$WORKDIR/cli-missing.log"; fail "a missing parameter exited $missing, not 2"; }
+}
+if command -v clang > /dev/null 2>&1; then
+  run_gradle "$CLI" backendPackage > "$WORKDIR/cli-package.log" 2>&1 || { cat "$WORKDIR/cli-package.log"; fail "backendPackage for the tool"; }
+  [ -x "$CLI/build/launcherprobe" ] || { cat "$WORKDIR/cli-package.log"; fail "no executable at $CLI/build/launcherprobe"; }
+  echo "   $(du -h "$CLI/build/launcherprobe" | cut -f1) binary"
+  check_cli_binary "$CLI/build/launcherprobe"
+elif [ "${CN1_BACKEND_PACKAGE_REQUIRED:-}" = "1" ]; then
+  fail "backendPackage needs clang, and CN1_BACKEND_PACKAGE_REQUIRED=1 forbids skipping it"
+else
+  echo "   native binary skipped: no clang on PATH"
 fi
 
 echo "== migrations"

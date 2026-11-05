@@ -19,7 +19,8 @@ name: Gradle build smoke
 #                                from ./gradlew settings
 #   gradle-initializr-test.sh    the initializr's Gradle downloads build; the
 #                                backend-only one runs, packages, and its native
-#                                binary serves /healthz
+#                                binary serves /healthz; the command-line one
+#                                runs its command on the JVM and natively
 #
 # The framework builds on JDK 8 as everywhere else; Gradle runs on the matrix JDK,
 # the floor Gradle projects support and the current LTS, and on both the Gradle
@@ -34,6 +35,11 @@ on:
       - 'maven/codenameone-gradle-plugin/**'
       - 'maven/codenameone-gradle-plugin-marker/**'
       - 'maven/integration-tests/gradle-*.sh'
+      # The command-line tool stage of gradle-initializr-test.sh is the only
+      # place a @Command app is packaged and run natively, so its own tree runs it.
+      - 'vm/backend/src/com/codename1/cli/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/processors/CommandAnnotationProcessor.java'
+      - 'maven/build-engine/src/main/resources/com/codename1/project/templates/gradle/cli/**'
       # Run with DISPLAY cleared: a CSS compiler change that reaches for a
       # display must fail on its own pull request (CLAUDE.md, headless CSS).
       - 'maven/css-compiler/**'

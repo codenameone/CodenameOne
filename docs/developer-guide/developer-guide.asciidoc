@@ -147,6 +147,8 @@ include::Backend-MCP.asciidoc[]
 
 include::Backend-Operations.asciidoc[]
 
+include::Command-Line-Applications.asciidoc[]
+
 include::Wayline-Users-Guide.asciidoc[]
 
 include::Wayline-Implementors-Guide.asciidoc[]
