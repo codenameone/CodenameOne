@@ -73,7 +73,9 @@ final class BackendHttp extends PyHttp {
                 String to = origin(next);
                 boolean upgrade = from.regionMatches(true, 0, "http://", 0, 7)
                         && to.regionMatches(true, 0, "https://", 0, 8)
-                        && from.substring(7).equalsIgnoreCase(to.substring(8));
+                        && from.substring(7).equalsIgnoreCase(to.substring(8))
+                        // origin() dropped a default port; any port left is not one.
+                        && from.substring(7).lastIndexOf(':') <= from.substring(7).lastIndexOf(']');
                 if (!from.equalsIgnoreCase(to) && !upgrade) {
                     sent = without(sent, "Authorization", "Cookie", null);
                 }
