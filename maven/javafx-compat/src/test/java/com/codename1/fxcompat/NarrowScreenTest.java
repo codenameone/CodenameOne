@@ -111,6 +111,22 @@ public class NarrowScreenTest {
     }
 
     @Test
+    public void aSafeAreaTopInsetMovesTheSceneDownAndIsFilledWithTheRootsBackground() {
+        Pane root = new Pane();
+        root.setStyle("-fx-background-color: #102030;");
+        Container content = shown(root);
+        // A safe area is padding on the content pane, the status bar's
+        // height at the top; the bottom is left to the scene.
+        content.getUnselectedStyle().setPadding(40, 30, 0, 0);
+        content.revalidate();
+        assertEquals(content.getHeight() - 40, root.getHeight(), 0.01);
+        assertEquals(content.getWidth(), root.getWidth(), 0.01);
+        assertEquals(40, content.getComponentAt(0).getY());
+        assertEquals(0x102030, content.getUnselectedStyle().getBgColor());
+        assertEquals((byte) 0xff, content.getUnselectedStyle().getBgTransparency());
+    }
+
+    @Test
     public void aRootWiderThanTheFormAtItsLeastIsLaidOutThatWideAndScrolls() {
         Pane root = new Pane();
         int wide = Display.getInstance().getDisplayWidth() + 500;
@@ -363,5 +379,29 @@ public class NarrowScreenTest {
         assertEquals(0, changes[0]);
         assertTrue(content.isScrollableX());
         assertEquals(wide, root.getWidth(), 1);
+    }
+
+    /// A label is drawn with none of the theme's padding, and its graphic
+    /// is placed the same way: a theme that pads a label, as the iOS one
+    /// does, put the icon of a titled card that far in, over the letters.
+    @Test
+    public void aLabelsGraphicIgnoresTheThemesPaddingOfALabel() {
+        java.util.Hashtable<String, Object> theme = new java.util.Hashtable<String, Object>();
+        theme.put("Label.padding", "10,10,40,40");
+        theme.put("Label.padUnit", new byte[] {0, 0, 0, 0});
+        com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        try {
+            javafx.scene.control.Label icon = new javafx.scene.control.Label("ab");
+            javafx.scene.control.Label title = new javafx.scene.control.Label("Title", icon);
+            shown(new javafx.scene.layout.VBox(title));
+            assertEquals(0, icon.getLayoutX(), 0.5);
+            com.codename1.ui.Label n = (com.codename1.ui.Label) title.cn1Native();
+            assertEquals("the text starts after the graphic and the gap",
+                    com.codename1.fxcompat.runtime.Units.toPixels(icon.getWidth() + title.getGraphicTextGap()),
+                    n.getStyle().getPaddingLeftNoRTL(), 1);
+        } finally {
+            theme.put("Label.padding", "0,0,0,0");
+            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(theme);
+        }
     }
 }

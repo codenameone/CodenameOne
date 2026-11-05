@@ -24,6 +24,10 @@
 package com.codename1.ui;
 
 
+import com.codename1.io.Util;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Hashtable;
 
@@ -403,6 +407,124 @@ public class Font extends CN {
         fontReturnedHeight = h;
         derivedFontCache.put(fileName + "_" + h + "_" + Font.STYLE_PLAIN, f);
         return f;
+    }
+
+    /// Returns true if the underlying platform can create a TrueType or OpenType font
+    /// from data in memory, see `#createTrueTypeFontFromData(String, InputStream)`.
+    ///
+    /// #### Returns
+    ///
+    /// true if fonts can be created from a stream or a byte array on this platform
+    public static boolean isTrueTypeStreamSupported() {
+        return Display.impl.isTrueTypeStreamSupported();
+    }
+
+    /// Creates a TrueType or OpenType font from data, for a font that was downloaded,
+    /// stored in `Storage` or generated at runtime rather than packaged in the src
+    /// root of the project.
+    ///
+    /// The stream is read fully and is closed by this method. The returned font
+    /// behaves like one created by `#createTrueTypeFont(String, String)`: derive
+    /// it to the size and weight you need.
+    ///
+    /// ```java
+    /// Label label = new Label("Handlee");
+    /// Font handlee = null;
+    /// try {
+    ///     InputStream in = Storage.getInstance().createInputStream("Handlee-Regular.ttf");
+    ///     handlee = Font.createTrueTypeFontFromData("Handlee", in);
+    /// } catch (IOException err) {
+    ///     Log.e(err);
+    /// }
+    /// if (handlee != null) {
+    ///     label.getAllStyles().setFont(handlee.derive(Display.getInstance().convertToPixels(4), Font.STYLE_PLAIN));
+    /// }
+    /// ```
+    ///
+    /// The font name identifies the font in the font cache: a second call with the
+    /// same name returns the font the first call created without reading the data.
+    /// Use a distinct name for each distinct font.
+    ///
+    /// This is not an overload of `createTrueTypeFont` on purpose: applications
+    /// call `createTrueTypeFont(name, null)` for an installed font, and a second
+    /// two-argument overload would make that call ambiguous.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontName`: a name that identifies this font
+    ///
+    /// - `data`: the content of a .ttf or .otf file
+    ///
+    /// #### Returns
+    ///
+    /// the font, or null when the platform can't create fonts from data
+    /// (see `#isTrueTypeStreamSupported()`)
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if reading the stream fails
+    public static Font createTrueTypeFontFromData(String fontName, InputStream data) throws IOException {
+        try {
+            return createTrueTypeFontFromData(fontName, Util.readInputStream(data));
+        } finally {
+            Util.cleanup(data);
+        }
+    }
+
+    /// Creates a TrueType or OpenType font from the bytes of a font file, see
+    /// `#createTrueTypeFontFromData(String, InputStream)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontName`: a name that identifies this font
+    ///
+    /// - `data`: the content of a .ttf or .otf file
+    ///
+    /// #### Returns
+    ///
+    /// the font, or null when the platform can't create fonts from data
+    ///
+    /// Fonts are cached by name and content together: calling this again with the same name and
+    /// the same bytes answers the font made the first time, while the same name with different
+    /// bytes makes a new font.
+    ///
+    /// On the JavaScript port the browser loads the font asynchronously, so the bytes are only
+    /// checked for a font header here; a font that has a valid header but is corrupt is not
+    /// reported as null and renders in the browser's fallback font.
+    public static Font createTrueTypeFontFromData(String fontName, byte[] data) {
+        if (fontName == null || data == null) {
+            throw new IllegalArgumentException("Font name and data are required");
+        }
+        if (!Display.impl.isTrueTypeStreamSupported()) {
+            return null;
+        }
+        // A prefix keeps a font made from data apart from a file-based font that
+        // happens to use the same name, in both this cache and the derive cache.
+        // The length and a hash of the bytes are part of the key, so the same name given
+        // different bytes is a different font rather than the one cached first.
+        String id = "data:" + fontName + ":" + data.length + ":" + Integer.toHexString(hashBytes(data));
+        Font f = derivedFontCache.get(id);
+        if (f != null) {
+            return f;
+        }
+        Object font = Display.impl.loadTrueTypeFontFromData(fontName, data);
+        if (font == null) {
+            return null;
+        }
+        f = new Font(font);
+        f.ttf = true;
+        f.fontUniqueId = id;
+        derivedFontCache.put(id, f);
+        return f;
+    }
+
+    /// A cheap hash of a font's bytes for the data-font cache key.
+    private static int hashBytes(byte[] data) {
+        int h = 1;
+        for (byte b : data) {
+            h = 31 * h + b;
+        }
+        return h;
     }
 
     /// Creates a new font instance based on the platform specific string name of the

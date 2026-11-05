@@ -90,7 +90,14 @@ public class Hyperlink extends ButtonBase {
 
     @Override
     protected Component cn1CreateNative() {
-        com.codename1.ui.Button b = new com.codename1.ui.Button();
+        com.codename1.ui.Button b = new com.codename1.ui.Button() {
+            @Override
+            public void repaint() {
+                if (!repaintThroughNode()) {
+                    super.repaint();
+                }
+            }
+        };
         Style s = com.codename1.fxcompat.runtime.PeerPaint.allStyles(b);
         s.setBorder(Border.createEmpty());
         s.setBgTransparency(0);

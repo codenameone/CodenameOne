@@ -1,0 +1,33 @@
+200 {'msg': 'hi', 'tag': 't1'} 1 t1
+['tagger-in', 'timing-in /hello', 'timing-out 200', 'tagger-out']
+cors None
+404 {'detail': 'nope'} t1 ['tagger-in', 'timing-in /missing', 'timing-out 404', 'tagger-out']
+403 blocked by t1 None ['tagger-in']
+200 1000 gzip Origin, Accept-Encoding
+200 1000 None 1000
+200 gzip
+200 https://good.example true X-Tag Origin, Accept-Encoding
+200 None true
+200 OK https://good.example GET, POST Accept, Accept-Language, Content-Language, Content-Type, X-Custom 600 Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network
+400 Disallowed CORS origin, method, headers
+['tagger-in', 'timing-in /hello', 'timing-out 200', 'tagger-out', 'tagger-in', 'timing-in /hello', 'timing-out 200', 'tagger-out']
+400 Invalid host header
+ok
+ok
+307 http://www.site.com/
+* Origin
+200 * DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT, QUERY X-A, X-B 60
+raised boom
+500
+echo a
+echo b
+['disconnect 1000']
+echo c
+['disconnect 1000', 'disconnect 4000']
+{'room': 'lobby', 'limit': 1, 'path': '/rooms/lobby'}
+{'got': {'n': 1}, 'prefix': '>'}
+b'cba'
+closed 1001
+/reject refused 1008
+/nowhere refused 1000
+[]

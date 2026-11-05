@@ -1,0 +1,48 @@
+[0, 1, 2, 3, 4]
+285
+0 1 2
+[0, 1, 2, 3]
+None
+a
+caught boom
+stopped done
+1
+cleanup ran
+cleanup ran
+[1, 2]
+i1
+inner got hello
+i2
+outer got inner result
+[10, 20, 'end']
+[(0, 0), (0, 1), (2, 0), (2, 1), 'else']
+fin 0
+fin 1
+fin 2
+[0, 1, 'after']
+finally before return
+returned 5
+enter a
+enter b
+exit b KeyError
+exit a None
+['ab', 'suppressed']
+first
+11
+p
+q
+['P', 'Q']
+c
+got 1
+error inside
+pep479 generator raised StopIteration
+[0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+0 [1, 4, 9, 16]
+True False
+{'a': 'aa', 'b': 'bb'}
+[0, 10, 20]
+generator
+0 2 4
+[]
+[0, 1, 2] [0, 1, 2]
+[(1, 'b'), (2, 'b')]

@@ -1,0 +1,26 @@
+[['name', 'age', 'note'], ['Ada', '36', 'likes "math", engines'], ['Alan', '41', 'multi\nline'], ['', '', '']]
+[['a', 'b', 'c;d'], ['e', 'f', 'g']]
+ [[1.0, 2.5, 3.0]]
+[['a,b', 'c']] [['a', 'b"c']]
+[['x', 'y'], [], ['z']] [['unterminated']]
+Error ',' expected after '"'
+[['a\x00b']]
+'plain,"with,comma","with ""quote""","multi\nline",3,2.5,,\r\n1,2\r\na b, lead\r\n""\r\n'
+1 '"s","1","2.0","",""\n'
+2 '"s",1,2.0,"",""\n'
+4 '"s",1,2.0,,""\n'
+5 '"s","1","2.0",,""\n'
+'a\\,b,q\\",c\n'
+Error need to escape, but no escapechar set
+'id,name\n1,x\n2,\n,only\n'
+dict contains fields not in fieldnames: 'bogus'
+['id', 'name'] [{'id': '1', 'name': 'a'}, {'id': '2', 'name': 'b', 'rest': ['extra']}, {'id': '3', 'name': '?'}] 4
+['excel', 'excel-tab', 'pipes', 'unix'] | [['a', 'b']]
+unknown dialect
+TypeError "delimiter" must be a unicode character, not a string of length 2
+TypeError "quotechar" must be a unicode character or None, not int
+TypeError bad "quoting" value
+ValueError bad delimiter value
+; " True True
+1 , 131072 131072 10
+field larger than field limit (10)

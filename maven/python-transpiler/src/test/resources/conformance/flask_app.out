@@ -1,0 +1,213 @@
+200 200 OK
+content-type: text/html; charset=utf-8
+content-length: 13
+Hello, World!
+--
+200 200 OK
+User alice
+--
+200 200 OK
+content-type: application/json
+{"id":42,"type":"int"}
+--
+404 404 NOT FOUND
+<!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+--
+200 200 OK
+{"price":3.5}
+--
+200 200 OK
+file=a/b/c.txt
+--
+200 200 OK
+4
+--
+200 200 OK
+{"args":{"page":"3","tag":"a","x":" y"},"method":"GET","page":3,"path":"/echo","tags":["a","b"]}
+--
+200 200 OK
+{"args":{"k":"v"},"method":"POST","page":1,"path":"/echo","tags":[]}
+--
+200 200 OK
+{"a":"1","b":"two words"}
+--
+200 200 OK
+{"got":{"x":[1,2],"y":"z"},"silent":true}
+--
+400 400 BAD REQUEST
+<!doctype html>
+<html lang=en>
+<title>400 Bad Request</title>
+<h1>Bad Request</h1>
+<p>The browser (or proxy) sent a request that this server could not understand.</p>
+--
+415 415 UNSUPPORTED MEDIA TYPE
+<!doctype html>
+<html lang=en>
+<title>415 Unsupported Media Type</title>
+<h1>Unsupported Media Type</h1>
+<p>Did not attempt to load JSON data because the request Content-Type was not &#39;application/json&#39;.</p>
+--
+200 200 OK
+bytes
+--
+200 200 OK
+{"cookie":"zz","ct":null,"ua":"ua","x":"t1"}
+--
+308 308 PERMANENT REDIRECT
+location: http://localhost/slash/
+<!doctype html>
+<html lang=en>
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to the target URL: <a href="http://localhost/slash/">http://localhost/slash/</a>. If not, click the link.
+--
+200 200 OK
+slash
+--
+404 404 NOT FOUND
+<!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+--
+308 308 PERMANENT REDIRECT
+location: http://localhost/slash/?a=1
+<!doctype html>
+<html lang=en>
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to the target URL: <a href="http://localhost/slash/?a=1">http://localhost/slash/?a=1</a>. If not, click the link.
+--
+201 201 CREATED
+created
+--
+202 202 ACCEPTED
+x-extra: yes
+content-type: application/json
+{"a":1}
+--
+203 203 NON AUTHORITATIVE INFORMATION
+x-foo: bar
+content-type: text/plain; charset=utf-8
+set-cookie: sid=abc; Path=/
+custom
+--
+200 200 OK
+[1,2,{"a":null}]
+--
+404 404 NOT FOUND
+<!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+--
+403 403 FORBIDDEN
+<!doctype html>
+<html lang=en>
+<title>403 Forbidden</title>
+<h1>Forbidden</h1>
+<p>You don&#39;t have the permission to access the requested resource. It is either read-protected or not readable by the server.</p>
+--
+418 418 I'M A TEAPOT
+I am a teapot: 418
+--
+400 400 BAD REQUEST
+<!doctype html>
+<html lang=en>
+<title>400 Bad Request</title>
+<h1>Bad Request</h1>
+<p>The browser (or proxy) sent a request that this server could not understand.</p>
+--
+500 500 INTERNAL SERVER ERROR
+<!doctype html>
+<html lang=en>
+<title>500 Internal Server Error</title>
+<h1>Internal Server Error</h1>
+<p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>
+--
+500 500 INTERNAL SERVER ERROR
+<!doctype html>
+<html lang=en>
+<title>500 Internal Server Error</title>
+<h1>Internal Server Error</h1>
+<p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>
+--
+400 400 BAD REQUEST
+{"error":"bad value"}
+--
+404 404 NOT FOUND
+<!doctype html>
+<html lang=en>
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+--
+404 404 NOT FOUND
+content-type: application/json
+{"error":"not found","path":"/api/nowhere"}
+--
+405 405 METHOD NOT ALLOWED
+allow: GET, HEAD, OPTIONS
+<!doctype html>
+<html lang=en>
+<title>405 Method Not Allowed</title>
+<h1>Method Not Allowed</h1>
+<p>The method is not allowed for the requested URL.</p>
+--
+405 405 METHOD NOT ALLOWED
+allow: GET, HEAD, OPTIONS, POST, PUT
+<!doctype html>
+<html lang=en>
+<title>405 Method Not Allowed</title>
+<h1>Method Not Allowed</h1>
+<p>The method is not allowed for the requested URL.</p>
+--
+200 200 OK
+allow: GET, HEAD, OPTIONS, POST, PUT
+
+--
+200 200 OK
+content-type: text/html; charset=utf-8
+
+--
+302 302 FOUND
+location: /user/bob
+<!doctype html>
+<html lang=en>
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to the target URL: <a href="/user/bob">/user/bob</a>. If not, click the link.
+--
+200 200 OK
+User bob
+--
+403 403 FORBIDDEN
+x-seen: /blocked
+blocked
+--
+200 200 OK
+x-seen: /
+Hello, World!
+--
+200 200 OK
+{"endpoint":"api.thing","n":7,"url":"/api/v1/things/8"}
+--
+200 200 OK
+pong
+--
+405 405 METHOD NOT ALLOWED
+allow: OPTIONS, POST
+<!doctype html>
+<html lang=en>
+<title>405 Method Not Allowed</title>
+<h1>Method Not Allowed</h1>
+<p>The method is not allowed for the requested URL.</p>
+--
+/item/5 /echo?a=1&b=x+y /files/p/q

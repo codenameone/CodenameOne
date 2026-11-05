@@ -24,6 +24,8 @@ package com.codename1.fxcompat.runtime;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityNode;
 import com.codename1.ui.geom.Dimension;
 
 import javafx.scene.Node;
@@ -41,6 +43,14 @@ public class NodePeer extends Component implements FxPeer {
         this.node = node;
         PeerPaint.strip(this);
         setFocusable(false);
+    }
+
+    /// The activate action [Activation] added, if any.
+    private final AccessibilityAction[] tap = new AccessibilityAction[1];
+
+    @Override
+    public AccessibilityNode getSemantics() {
+        return Activation.sync(node, super.getSemantics(), tap);
     }
 
     @Override

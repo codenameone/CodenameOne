@@ -133,6 +133,21 @@ public final class EventHandlerManager implements EventDispatcher {
         remove(filters, type, filter);
     }
 
+    /// Returns whether a handler here sees a mouse press, release or click.
+    /// Filters do not count: a filter on every mouse event is how a
+    /// container tracks hovering or dragging, not a sign it can be pressed.
+    public boolean handlesClicks() {
+        if (handlers != null) {
+            for (java.util.Map.Entry<EventType<?>, ArrayList<EventHandler<?>>> e : handlers.entrySet()) {
+                if (!e.getValue().isEmpty() && Activation.seesClicks(e.getKey())) {
+                    return true;
+                }
+            }
+        }
+        return slots != null && (getSlot(MouseEvent.MOUSE_CLICKED) != null
+                || getSlot(MouseEvent.MOUSE_PRESSED) != null || getSlot(MouseEvent.MOUSE_RELEASED) != null);
+    }
+
     /// Returns the property behind a convenience handler such as
     /// `onAction`, creating it the first time.
     @SuppressWarnings("unchecked")

@@ -1214,12 +1214,9 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15
-    # 90, measured: completed runs of this job took 38-58 min (2026-11-03/04) and two
-    # cancels at 60 (flutter-port-gaps 41916686032, python-support 41887185704) were
-    # still mid-suite. The job runs TWO cold Xcode compiles of the translated app --
-    # the iOS app (15-22 min) and the tvOS target inside the screenshot step (up to
-    # 23 min) -- before ~13-16 min of the 188-screenshot suite, so a slow macOS runner
-    # alone lands at ~75 min. Not the screenshot count: that part was ~13 min.
+    # Measured: the sample build takes 15-22 min and the tvOS screenshot run
+    # 28-33 min on a hosted macos-15, so 60 left nothing for a slow runner and
+    # cancelled the suite mid-run on unrelated branches.
     timeout-minutes: 90
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -1368,8 +1365,7 @@ jobs:
           ./scripts/run-tv-ui-tests.sh \
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        # The tvOS xcodebuild (up to 23 min measured) plus the suite (~16 min).
-        timeout-minutes: 60
+        timeout-minutes: 45
 
       - name: Upload tvOS port status
         if: ${{ !cancelled() }}

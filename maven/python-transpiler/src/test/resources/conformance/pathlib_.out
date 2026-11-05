@@ -1,0 +1,33 @@
+/usr/lib/python3.tar.gz PurePosixPath('/usr/lib/python3.tar.gz') python3.tar.gz .gz ['.tar', '.gz'] python3.tar /usr/lib / / ('/', 'usr', 'lib', 'python3.tar.gz')
+['/usr/lib', '/usr', '/']
+/usr/lib/x.py /usr/lib/python3.tar.bz2 /usr/lib/y.gz /usr/lib/python3.tar
+a/b/c/d a/b/c x/y . a/b/c
+b/c True False
+../b
+'/a/b' is not in the subpath of '/c'
+True True False
+True True
+True True True
+[PurePosixPath('a'), PurePosixPath('a/z'), PurePosixPath('b')]
+ .  /
+file:///a True False
+Invalid suffix 'py'
+PosixPath PurePosixPath True
+alpha b'print(1)' 5
+['work/.hidden.py', 'work/a.txt', 'work/b.py', 'work/sub']
+['work/.hidden.py', 'work/b.py']
+['work/.hidden.py', 'work/b.py', 'work/sub/c.py', 'work/sub/deep/d.py']
+['work/sub/c.py']
+True True True False
+True True
+work/z.txt True False
+[Errno 2] No such file or directory: 'work/z.txt'
+[Errno 17] File exists: 'work'
+hi
+work ['sub'] ['.hidden.py', 'b.py', 'w.txt']
+work/sub ['deep'] ['c.py']
+work/sub/deep [] ['d.py']
+True True True False False
+['a.py', 'c.py'] (?s:.*\.py)\z (?s:[^a-c].)\z
+['work/b.py'] ['work/b.py', 'work/sub/c.py', 'work/sub/deep/d.py']
+['b.py'] ['work/sub/'] True a[*]b[?]

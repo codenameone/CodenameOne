@@ -22,6 +22,10 @@
  */
 package javafx.beans.value;
 
+import java.util.function.Function;
+
+import com.codename1.fxcompat.runtime.DerivedValue;
+
 import javafx.beans.Observable;
 
 /// A value that can be read and observed.
@@ -39,4 +43,21 @@ public interface ObservableValue<T> extends Observable {
 
     /// Returns the current value.
     T getValue();
+
+    /// Returns a value holding what `mapper` makes of this one, computed
+    /// when asked; a null value maps to null without calling `mapper`.
+    default <U> ObservableValue<U> map(Function<? super T, ? extends U> mapper) {
+        return DerivedValue.map(this, mapper);
+    }
+
+    /// Returns a value holding the value of the observable value `mapper`
+    /// makes of this one; null while this value or that one is null.
+    default <U> ObservableValue<U> flatMap(Function<? super T, ? extends ObservableValue<? extends U>> mapper) {
+        return DerivedValue.flatMap(this, mapper);
+    }
+
+    /// Returns a value holding this one, or `constant` while it is null.
+    default ObservableValue<T> orElse(T constant) {
+        return DerivedValue.orElse(this, constant);
+    }
 }

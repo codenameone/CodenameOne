@@ -42,10 +42,6 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
-import javafx.scene.layout.Border;
-import javafx.scene.layout.BorderStroke;
-import javafx.scene.layout.BorderStrokeStyle;
-import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.paint.Color;
 import javafx.util.Callback;
@@ -109,9 +105,12 @@ public class ListView<T> extends Control {
     /// Creates a list of some items.
     public ListView(ObservableList<T> items) {
         getStyleClass().add("list-view");
-        setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY)));
-        setBorder(new Border(new BorderStroke(Color.rgb(200, 200, 200), BorderStrokeStyle.SOLID, CornerRadii.EMPTY,
-                new BorderWidths(1))));
+        // The standard theme's frame is the outer of two fills, not a
+        // border, so a style sheet that gives the list a background of its
+        // own takes the frame away with it, as in JavaFX.
+        setBackground(new Background(new BackgroundFill(Color.rgb(200, 200, 200), CornerRadii.EMPTY, Insets.EMPTY),
+                new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, new Insets(1))));
+        setPadding(new Insets(1));
         flow = new RowFlow(new FlowRows());
         flow.stripes = true;
         cn1Children().add(flow);

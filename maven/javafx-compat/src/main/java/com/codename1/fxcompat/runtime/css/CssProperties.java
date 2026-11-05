@@ -86,7 +86,7 @@ public final class CssProperties {
     static {
         add(PAINT, "-fx-background-color", "-fx-border-color", "-fx-text-fill", "-fx-prompt-text-fill", "-fx-fill",
                 "-fx-stroke");
-        add(LENGTH, "-fx-min-width", "-fx-pref-width", "-fx-max-width", "-fx-min-height", "-fx-pref-height",
+        add(LENGTH, "-fx-fit-width", "-fx-fit-height", "-fx-min-width", "-fx-pref-width", "-fx-max-width", "-fx-min-height", "-fx-pref-height",
                 "-fx-max-height", "-fx-spacing", "-fx-hgap", "-fx-vgap", "-fx-graphic-text-gap", "-fx-stroke-width",
                 "-fx-stroke-dash-offset", "-fx-line-spacing", "-fx-translate-x", "-fx-translate-y", "-fx-size");
         add(NUMBER, "-fx-opacity", "-fx-rotate", "-fx-scale-x", "-fx-scale-y", "-fx-stroke-miter-limit");
@@ -94,7 +94,7 @@ public final class CssProperties {
         add(RADII, "-fx-background-radius", "-fx-border-radius");
         add(BOOLEAN, "-fx-managed", "-fx-snap-to-pixel", "-fx-fill-height", "-fx-fill-width", "-fx-wrap-text",
                 "-fx-underline", "-fx-strikethrough", "-fx-fit-to-width", "-fx-fit-to-height", "-fx-pannable",
-                "-fx-smooth", "-fx-scale-shape", "-fx-position-shape");
+                "-fx-smooth", "-fx-scale-shape", "-fx-position-shape", "-fx-preserve-ratio");
         add(TEXT, "-fx-shape");
         add(RAW, "-fx-background-image", "-fx-background-repeat", "-fx-background-position",
                 "-fx-background-size", "-fx-border-image-source", "-fx-border-image-slice",

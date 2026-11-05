@@ -32,6 +32,47 @@ families spell that collation differently. Which one is used comes from the
 server rather than from the URL scheme, so a `mysql://` URL pointed at MariaDB
 is still correct.
 
+==== Encrypted connections
+
+TLS is set on the URL. `sslmode=require` and its synonym `verify-full` demand
+TLS whose certificate chains to a trusted root and names the host the URL
+connects to. `sslmode=verify-ca` with `sslrootcert=<CA file>` verifies the chain
+up to that CA and doesn't check the host name, which is what a managed instance
+or a container with a generated certificate needs. `sslmode=prefer` uses TLS when
+the server offers it, and `sslmode=disable` is plaintext:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.properties[tag=backend-database-tls-001,indent=0]
+----
+
+MySQL's own spellings are accepted on any URL: `ssl-mode=DISABLED`, `PREFERRED`,
+`REQUIRED`, `VERIFY_CA` or `VERIFY_IDENTITY`, and `ssl-ca` for the CA file. An
+unknown mode is refused at start-up rather than read as `prefer`.
+
+Unlike libpq and MySQL Connector/J, `require` verifies here. Those clients read
+it to mean encrypt but trust any certificate, which an on-path peer satisfies with
+a certificate of its own. There is no setting that encrypts without verifying.
+
+==== Typed columns
+
+PostgreSQL and MySQL send DECIMAL, NUMERIC, date and time values as text, and
+they come back as the `String` the server sent, so an exact amount keeps every
+digit. `Database.columnTypes` says which columns those are, so code that maps
+rows to objects can parse each value by its kind:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database-column-types,indent=0]
+----
+
+The kinds are `decimal`, `date`, `datetime` (no zone), `datetimetz`
+(PostgreSQL's timestamp with time zone) and `time`. Every other column is null,
+because its value is already a `Long`, `Double`, `String` or `byte[]`. SQLite has
+no column types to report, so the call answers null there.
+
+==== Portable statements
+
 Statements are written once, in one portable form: `?` for every parameter, and
 plain unquoted names. PostgreSQL binds `$1` rather than `?`, and that difference
 stops inside `execute` and `query` rather than at every call site. SQL already
