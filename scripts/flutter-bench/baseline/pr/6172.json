@@ -1,0 +1,25 @@
+{
+ "pr": 6172,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 14004378
+     },
+     "reason": "JS emitter optimizations (#6163) read instance fields as o.name instead of through the hoisted o[_qN] alias table, which V8 can scalar-replace (valueEscape 20% faster). The longer identifiers grow the raw script by 2,453,423 bytes (code and install move by the same amount); gzip absorbs the repetition: the gallery's own wire_bytes, gated at 2%, went 80,131,522 -> 80,155,363 (+0.03%) in the same run. Parse cost scales with the raw size; the opt-in field mangler (mangleInstanceFieldProps) would win it back but is off by default because host-poked fields are not yet enumerated.",
+     "runs": 1,
+     "value": 16457801
+    },
+    "install_bytes": {
+     "from": {
+      "value": 109504181
+     },
+     "reason": "JS emitter optimizations (#6163) read instance fields as o.name instead of through the hoisted o[_qN] alias table, which V8 can scalar-replace (valueEscape 20% faster). The longer identifiers grow the raw script by 2,453,423 bytes (code and install move by the same amount); gzip absorbs the repetition: the gallery's own wire_bytes, gated at 2%, went 80,131,522 -> 80,155,363 (+0.03%) in the same run. Parse cost scales with the raw size; the opt-in field mangler (mangleInstanceFieldProps) would win it back but is off by default because host-poked fields are not yet enumerated.",
+     "runs": 1,
+     "value": 111957604
+    }
+   }
+  }
+ }
+}
