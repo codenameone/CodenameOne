@@ -1,0 +1,14 @@
+10 [20, 30] List<int>
+1 [2.5, 3] List<num>
+[a, b] List<String> c
+point 1,2
+map other
+name q
+explicit null
+map other
+not map
+if 1 two
+no c
+decl 1 two
+[1, 2]
+nested 1 2

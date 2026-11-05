@@ -88,6 +88,9 @@ public class GridContentRenderElement extends RenderElement {
         double mainSp = grid().getMainAxisSpacing() == null ? 0 : Dp.px(grid().getMainAxisSpacing());
         double crossSp = grid().getCrossAxisSpacing() == null ? 0 : Dp.px(grid().getCrossAxisSpacing());
 
+        if (grid().isHorizontal()) {
+            return layoutHorizontal(constraints, n, ratio, mainSp, crossSp);
+        }
         double width = constraints.hasBoundedWidth()
                 ? constraints.maxWidth()
                 : n * Dp.px(FALLBACK_CELL_LP) + (n - 1) * crossSp;
@@ -105,6 +108,30 @@ public class GridContentRenderElement extends RenderElement {
         }
         long rows = (count + n - 1) / n;
         double height = rows == 0 ? 0 : rows * cellH + (rows - 1) * mainSp;
+        return constraints.constrain(new Size(width, height));
+    }
+
+    /// The horizontal grid: crossAxisCount rows, the cells filling each column top
+    /// to bottom before the next column starts; childAspectRatio is still cross over
+    /// main extent, so a cell is its height divided by the ratio wide.
+    private Size layoutHorizontal(BoxConstraints constraints, long n, double ratio,
+                                  double mainSp, double crossSp) {
+        double height = constraints.hasBoundedHeight()
+                ? constraints.maxHeight()
+                : n * Dp.px(FALLBACK_CELL_LP) + (n - 1) * crossSp;
+        double cellH = Math.max(0, (height - (n - 1) * crossSp) / n);
+        double cellW = cellH / ratio;
+        List<RenderElement> kids = renderChildren();
+        int count = kids.size();
+        for (int i = 0; i < count; i++) {
+            RenderElement kid = kids.get(i);
+            long col = i / n;
+            long row = i % n;
+            kid.layout(BoxConstraints.tight(cellW, cellH));
+            setChildOffset(kid, col * (cellW + mainSp), row * (cellH + crossSp));
+        }
+        long cols = (count + n - 1) / n;
+        double width = cols == 0 ? 0 : cols * cellW + (cols - 1) * mainSp;
         return constraints.constrain(new Size(width, height));
     }
 }

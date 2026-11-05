@@ -24,54 +24,56 @@
 package com.codename1.flutter.material;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Color;
+import com.codename1.flutter.CrossAxisAlignment;
+import com.codename1.flutter.FontWeight;
+import com.codename1.flutter.MainAxisAlignment;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
+import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Container;
-
+import com.codename1.flutter.navigation.Navigator;
+import com.codename1.flutter.widgets.Center;
+import com.codename1.flutter.widgets.Kit;
 import dart.async.Future;
 import dart.core.DateTime;
+import dart.runtime.Funcs;
 
-/**
- * A material date-picker dialog — Flutter's {@code DatePickerDialog}. This
- * milestone renders a placeholder surface; the calendar grid and confirm/cancel
- * flow land in a later pass. The configured date range is retained.
- */
-public class DatePickerDialog extends StatelessWidget {
-
-    private String restorationId;
+/** Flutter's Material {@code DatePickerDialog}: a month calendar that pops the chosen date. */
+public class DatePickerDialog extends StatefulWidget {
     private DateTime initialDate;
     private DateTime firstDate;
     private DateTime lastDate;
-    private DateTime currentDate;
+    private String helpText;
+    private String cancelText;
+    private String confirmText;
 
-    public void restorationId(String v) {
-        this.restorationId = v;
-    }
-
-    public void initialDate(DateTime v) {
-        this.initialDate = v;
-    }
-
-    public void firstDate(DateTime v) {
-        this.firstDate = v;
-    }
-
-    public void lastDate(DateTime v) {
-        this.lastDate = v;
-    }
-
-    public void currentDate(DateTime v) {
-        this.currentDate = v;
-    }
+    public void restorationId(Object v) { }
+    public void initialDate(DateTime v) { this.initialDate = v; }
+    public void firstDate(DateTime v) { this.firstDate = v; }
+    public void lastDate(DateTime v) { this.lastDate = v; }
+    public void currentDate(DateTime v) { }
+    public void helpText(String v) { this.helpText = v; }
+    public void cancelText(String v) { this.cancelText = v; }
+    public void confirmText(String v) { this.confirmText = v; }
 
     @Override
-    public Widget build(BuildContext context) {
-        return new Container();
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public State<? extends StatefulWidget> createState() {
+        return (State) new CalendarPickerState(false, initialDate, null, firstDate, lastDate, helpText,
+                cancelText, confirmText);
     }
 
-    /** Top-level {@code showDatePicker(...)} — shows the dialog and completes with the chosen date. */
-    public static Future<DateTime> show(BuildContext context, DateTime initialDate,
-            DateTime firstDate, DateTime lastDate) {
-        return null;
+    /** Top-level {@code showDatePicker(...)}: completes with the chosen date, or null when cancelled. */
+    public static Future<DateTime> show(BuildContext context, DateTime initialDate, DateTime firstDate,
+            DateTime lastDate, DateTime currentDate, String helpText, String cancelText, String confirmText) {
+        DatePickerDialog d = new DatePickerDialog();
+        d.initialDate(initialDate);
+        d.firstDate(firstDate);
+        d.lastDate(lastDate);
+        d.helpText(helpText);
+        d.cancelText(cancelText);
+        d.confirmText(confirmText);
+        return PickerKit.show(context, d);
     }
 }

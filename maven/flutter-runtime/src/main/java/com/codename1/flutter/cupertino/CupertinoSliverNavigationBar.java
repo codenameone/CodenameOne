@@ -109,7 +109,7 @@ public class CupertinoSliverNavigationBar extends StatelessWidget {
             bar.leading(leading);
         }
         if (trailing != null) {
-            dart.core.DartList<Widget> actions = new dart.core.DartList<Widget>();
+            dart.core.DartList<Widget> actions = new dart.core.DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             actions.add(trailing);
             bar.actions(actions);
         }

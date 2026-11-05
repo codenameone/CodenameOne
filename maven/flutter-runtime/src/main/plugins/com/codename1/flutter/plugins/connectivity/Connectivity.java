@@ -45,7 +45,7 @@ public class Connectivity {
     }
 
     static DartList<ConnectivityResult> results(int type, boolean vpn) {
-        DartList<ConnectivityResult> out = new DartList<ConnectivityResult>();
+        DartList<ConnectivityResult> out = new DartList<ConnectivityResult>(dart.runtime.TypeWitness.of(ConnectivityResult.class, false));
         switch (type) {
             case NetworkManager.NETWORK_TYPE_WIFI:
                 out.add(ConnectivityResult.wifi);

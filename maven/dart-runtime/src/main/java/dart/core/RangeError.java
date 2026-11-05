@@ -28,9 +28,92 @@ package dart.core;
  * including list index errors.
  */
 public class RangeError extends ArgumentError {
+    private final Long start;
+    private final Long end;
+    /// Null for an error built from a finished text (the runtime's own guards).
+    private final String kind;
 
     public RangeError(String message) {
         super(message);
+        this.start = null;
+        this.end = null;
+        this.kind = null;
+    }
+
+    private RangeError(String message, String kind) {
+        super(null, false, null, message);
+        this.start = null;
+        this.end = null;
+        this.kind = kind;
+    }
+
+    /// Dart's `RangeError(message)`: no value, name or bounds, so it prints as
+    /// `RangeError: message`. The String constructor above is the runtime's own
+    /// guards, whose message is already the whole text.
+    public static RangeError ofMessage(String message) {
+        return new RangeError(message, "message");
+    }
+
+    private RangeError(Object value, String name, String message, Long start, Long end, String kind) {
+        super(value, true, name, message);
+        this.start = start;
+        this.end = end;
+        this.kind = kind;
+    }
+
+    /// A program subclass's `super(message)`, `super.range(..)` or `super.value(..)`:
+    /// Java cannot run the static factories as a super constructor, so `ctor` names the
+    /// Dart constructor ("message", "range" or "value") and the defaults are applied here.
+    protected RangeError(String ctor, Long value, Long min, Long max, String name, String message) {
+        super(value, !"message".equals(ctor), name, "message".equals(ctor) || message != null ? message
+                : "range".equals(ctor) ? "Invalid value" : "Value not in range");
+        this.start = min;
+        this.end = max;
+        this.kind = ctor;
+    }
+
+    public Long start() {
+        return start;
+    }
+
+    public Long end() {
+        return end;
+    }
+
+    @Override
+    protected String errorName() {
+        return "RangeError";
+    }
+
+    /// Dart's RangeError._errorExplanation, and IndexError's.
+    @Override
+    protected String errorExplanation() {
+        if ("index".equals(kind)) {
+            long len = end.longValue() + 1;
+            Object v = invalidValue();
+            if (v instanceof Number && ((Number) v).longValue() < 0) {
+                return ": index must not be negative";
+            }
+            return len == 0 ? ": no indices are valid" : ": index should be less than " + len;
+        }
+        if (start == null) {
+            return end == null ? "" : ": Not less than or equal to " + end;
+        }
+        if (end == null) {
+            return ": Not greater than or equal to " + start;
+        }
+        if (end.longValue() > start.longValue()) {
+            return ": Not in inclusive range " + start + ".." + end;
+        }
+        if (end.longValue() < start.longValue()) {
+            return ": Valid value range is empty";
+        }
+        return ": Only valid value is " + start;
+    }
+
+    @Override
+    public String toString() {
+        return kind == null ? getMessage() : super.toString();
     }
 
     /**
@@ -38,7 +121,7 @@ public class RangeError extends ArgumentError {
      */
     public static long checkValidIndex(long index, long length) {
         if (index < 0 || index >= length) {
-            throw new RangeError("RangeError (index): Invalid value: Not in inclusive range 0.." + (length - 1) + ": " + index);
+            throw range(index, Long.valueOf(0), Long.valueOf(length - 1), "index", null);
         }
         return index;
     }
@@ -65,26 +148,71 @@ public class RangeError extends ArgumentError {
     /** Dart's {@code RangeError.checkNotNegative}. */
     public static long checkNotNegative(long value, String name) {
         if (value < 0) {
-            throw new RangeError("Invalid value: Not greater than or equal to 0: " + value
-                    + (name == null ? "" : " (" + name + ")"));
+            throw range(value, Long.valueOf(0), null, name == null ? "index" : name, null);
         }
         return value;
     }
 
     public static void indexError(long index, long length) {
-        throw new RangeError("RangeError (index): Invalid value: Not in inclusive range 0.." + (length - 1) + ": " + index);
+        throw range(index, Long.valueOf(0), Long.valueOf(length - 1), "index", null);
     }
 
     public static long checkValueInInterval(long value, long minValue, long maxValue, String name) {
         if (value < minValue || value > maxValue) {
-            throw new RangeError("RangeError (" + name + "): Invalid value: Not in inclusive range "
-                    + minValue + ".." + maxValue + ": " + value);
+            throw range(value, Long.valueOf(minValue), Long.valueOf(maxValue), name, null);
         }
         return value;
     }
 
-    @Override
-    public String toString() {
-        return getMessage();
+    /// Dart's `RangeError.checkValidRange(start, end, length)`: `0 <= start <= length`
+    /// and, when given, `start <= end <= length`. Answers the effective end.
+    public static long checkValidRange(long start, Long end, long length) {
+        if (start < 0 || start > length) {
+            throw range(start, Long.valueOf(0), Long.valueOf(length), "start", null);
+        }
+        if (end == null) {
+            return length;
+        }
+        long e = end.longValue();
+        if (e < start || e > length) {
+            throw range(e, Long.valueOf(start), Long.valueOf(length), "end", null);
+        }
+        return e;
     }
+
+    public static long checkValidRange(long start, long end, long length) {
+        return checkValidRange(start, Long.valueOf(end), length);
+    }
+
+    public static long checkNotNegative(long value) {
+        return checkNotNegative(value, null);
+    }
+
+    public static long checkValidIndex(long index, Object indexable, String name, Long length) {
+        long len = length != null ? length.longValue()
+                : indexable instanceof java.util.Collection ? ((java.util.Collection<?>) indexable).size()
+                : indexable instanceof String ? ((String) indexable).length() : 0;
+        return checkValidIndex(index, len);
+    }
+
+    /// Dart's `RangeError.range(value, min, max, [name, message])`.
+    public static RangeError range(long value, Long min, Long max, String name, String message) {
+        return new RangeError(Long.valueOf(value), name, message == null ? "Invalid value" : message, min, max,
+                "range");
+    }
+
+    public static RangeError range(long value, Long min, Long max) {
+        return range(value, min, max, null, null);
+    }
+
+    /// Dart's `RangeError.value(value, [name, message])`.
+    public static RangeError value(long value, String name, String message) {
+        return new RangeError(Long.valueOf(value), name, message == null ? "Value not in range" : message, null,
+                null, "value");
+    }
+
+    public static RangeError index(long index, Object indexable, String name, String message, Long length) {
+        return new IndexError(index, indexable, name == null ? "index" : name, message, length);
+    }
+
 }

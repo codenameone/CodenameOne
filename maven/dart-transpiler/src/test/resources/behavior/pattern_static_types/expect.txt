@@ -1,0 +1,8 @@
+one part<a>
+main part<m>
+first part<d>
+part<r>part<s>
+part<r> part<s>
+Stack<int>
+Pair<String, int>
+true

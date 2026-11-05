@@ -88,6 +88,7 @@ public final class StreamIterator<T> {
             subscribe();
         }
         Completer<Boolean> c = new Completer<Boolean>();
+        c.future().resumeInline = true;
         Object outcome;
         java.util.List<Object> errs = forward == null ? null : new java.util.ArrayList<Object>();
         // Checking the queue and publishing the waiter is one step: an async* body
@@ -119,6 +120,12 @@ public final class StreamIterator<T> {
     public boolean next() {
         Boolean more = Await.await$(moveNext());
         return more != null && more.booleanValue();
+    }
+
+    /// True while a subscription is open: what an {@code await for} left early must
+    /// cancel (Dart's desugaring tests the same before awaiting the cancel).
+    public boolean isActive() {
+        return sub != null && !finished;
     }
 
     public Future<Object> cancel() {

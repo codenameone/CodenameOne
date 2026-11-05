@@ -90,11 +90,53 @@ public final class WidgetsBinding {
         SchedulerBinding.instance.addPostFrameCallback(callback);
     }
 
-    /** Dart's {@code addObserver}: register a binding observer. A no-op here. */
+    private final java.util.List<WidgetsBindingObserver> observers = new java.util.ArrayList<WidgetsBindingObserver>();
+    private AppLifecycleState lifecycleState = AppLifecycleState.resumed;
+
+    /** Dart's {@code addObserver}: register a binding observer. */
     public void addObserver(Object observer) {
+        if (observer instanceof WidgetsBindingObserver && !observers.contains(observer)) {
+            observers.add((WidgetsBindingObserver) observer);
+        }
     }
 
-    /** Dart's {@code removeObserver}: unregister a binding observer. A no-op. */
-    public void removeObserver(Object observer) {
+    /** Dart's {@code removeObserver}: unregister a binding observer. */
+    public boolean removeObserver(Object observer) {
+        return observers.remove(observer);
+    }
+
+    /** Flutter's {@code WidgetsBinding.lifecycleState}: the last state delivered. */
+    public AppLifecycleState lifecycleState() {
+        return lifecycleState;
+    }
+
+    /**
+     * Called from the application's Codename One {@code start()}: on a return from the
+     * background, delivers hidden, inactive and resumed, the order Flutter delivers them.
+     */
+    public void appStarted() {
+        if (lifecycleState == AppLifecycleState.paused) {
+            deliver(AppLifecycleState.hidden);
+            deliver(AppLifecycleState.inactive);
+            deliver(AppLifecycleState.resumed);
+        }
+    }
+
+    /** Called from the Codename One {@code stop()}: delivers inactive, hidden and paused. */
+    public void appStopped() {
+        if (lifecycleState == AppLifecycleState.resumed) {
+            deliver(AppLifecycleState.inactive);
+            deliver(AppLifecycleState.hidden);
+            deliver(AppLifecycleState.paused);
+        }
+    }
+
+    /** Delivers one state to every observer registered at the time. */
+    public void deliver(AppLifecycleState state) {
+        lifecycleState = state;
+        Object[] snapshot = observers.toArray();
+        for (Object o : snapshot) {
+            ((WidgetsBindingObserver) o).didChangeAppLifecycleState(state);
+        }
     }
 }

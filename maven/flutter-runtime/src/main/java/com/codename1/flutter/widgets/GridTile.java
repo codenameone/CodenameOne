@@ -69,7 +69,7 @@ public class GridTile extends StatelessWidget {
         if (header == null && footer == null) {
             return child;
         }
-        dart.core.DartList<Widget> layers = new dart.core.DartList<Widget>();
+        dart.core.DartList<Widget> layers = new dart.core.DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (child != null) {
             layers.add(Positioned.fill(null, null, null, null, null, child));
         }

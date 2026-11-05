@@ -65,9 +65,9 @@ public class MasonryGridViewRenderElement extends ScrollRenderElement {
             return null;
         }
 
-        DartList<DartList<Widget>> byColumn = new DartList<DartList<Widget>>();
+        DartList<DartList<Widget>> byColumn = new DartList<DartList<Widget>>(dart.runtime.TypeWitness.of(java.util.List.class, false, dart.runtime.TypeWitness.of(Widget.class, false)));
         for (int c = 0; c < columns; c++) {
-            byColumn.add(new DartList<Widget>());
+            byColumn.add(new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false)));
         }
         for (int i = 0; i < count; i++) {
             Widget item = g.getItemBuilder().call(this, Long.valueOf(i));
@@ -85,7 +85,7 @@ public class MasonryGridViewRenderElement extends ScrollRenderElement {
             return column(byColumn.get(0));
         }
 
-        DartList<Widget> row = new DartList<Widget>();
+        DartList<Widget> row = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int c = 0; c < columns; c++) {
             if (c > 0 && g.getCrossAxisSpacing() > 0) {
                 row.add(gap(g.getCrossAxisSpacing(), 0));

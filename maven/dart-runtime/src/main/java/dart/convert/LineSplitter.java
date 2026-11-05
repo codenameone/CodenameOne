@@ -39,18 +39,18 @@ public final class LineSplitter implements dart.async.StreamTransformer<String, 
     /** {@code stream.transform(const LineSplitter())}: a line split across chunks is joined. */
     @Override
     public dart.async.Stream<String> bind(final dart.async.Stream<String> source) {
-        // AsyncStar.over: subscribed inside listen() (a broadcast source's next event is
-        // not lost) and source errors forwarded without ending the stream, as Dart's do.
-        return dart.async.AsyncStar.over(source, new dart.runtime.Funcs.VoidFunc2<dart.async.StreamIterator<String>,
-                dart.async.AsyncStar.Sink<String>>() {
+        // Forward: subscribed inside listen() (a broadcast source's next event is not
+        // lost), source errors forwarded without ending the stream, as Dart's are.
+        return dart.async.Forward.bind(source, new dart.runtime.Funcs.Func0<dart.async.Forward<String, String>>() {
             @Override
-            public void call(dart.async.StreamIterator<String> it, dart.async.AsyncStar.Sink<String> sink) {
-                StringBuilder pending = new StringBuilder();
-                try {
-                    while (it.next()) {
-                        String chunk = it.current();
+            public dart.async.Forward<String, String> call() {
+                return new dart.async.Forward<String, String>() {
+                    private final StringBuilder pending = new StringBuilder();
+
+                    @Override
+                    protected void data(String chunk) {
                         if (chunk == null) {
-                            continue;
+                            return;
                         }
                         pending.append(chunk);
                         int start = 0;
@@ -61,7 +61,7 @@ public final class LineSplitter implements dart.async.StreamTransformer<String, 
                                     // A CR at the end of a chunk may be half of a CRLF.
                                     break;
                                 }
-                                sink.yield$(pending.substring(start, i));
+                                add(pending.substring(start, i));
                                 if (c == '\r' && pending.charAt(i + 1) == '\n') {
                                     i++;
                                 }
@@ -70,16 +70,18 @@ public final class LineSplitter implements dart.async.StreamTransformer<String, 
                         }
                         pending.delete(0, start);
                     }
-                    String rest = pending.toString();
-                    if (rest.endsWith("\r")) {
-                        rest = rest.substring(0, rest.length() - 1);
-                        sink.yield$(rest);
-                    } else if (rest.length() > 0) {
-                        sink.yield$(rest);
+
+                    @Override
+                    protected void done() {
+                        String rest = pending.toString();
+                        if (rest.endsWith("\r")) {
+                            add(rest.substring(0, rest.length() - 1));
+                        } else if (rest.length() > 0) {
+                            add(rest);
+                        }
+                        close();
                     }
-                } finally {
-                    it.cancel();
-                }
+                };
             }
         });
     }

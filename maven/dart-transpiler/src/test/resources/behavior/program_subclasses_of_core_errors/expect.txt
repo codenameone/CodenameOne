@@ -1,0 +1,15 @@
+no more work
+QueueClosed(jobs) no more work
+closed jobs: no more work
+stuck
+Bad state: stuck
+implicit Bad state: stuck / stuck
+as StateError: thrown
+as QueueClosed: io gone
+as ArgumentError: Invalid argument (count): must be positive: -3
+as SimpleArg: plain
+as RangeError: RangeError (slot): Invalid value: Not in inclusive range 0..9: 12
+as FormatException: bad token
+at 1 in a+b
+as Exception: AppFailure: disk
+as Error: Broken gear

@@ -1,0 +1,13 @@
+6
+ABC
+7
+<x>
+none
+empty named
+42
+got 60
+9
+24
+printed via apply
+true
+mismatch

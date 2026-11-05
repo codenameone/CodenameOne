@@ -1,0 +1,4 @@
+[fail:boom]
+v=7
+v=x
+[fail:boom, fail:late]

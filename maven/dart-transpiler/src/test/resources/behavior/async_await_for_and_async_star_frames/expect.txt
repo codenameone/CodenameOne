@@ -1,0 +1,47 @@
+a yield 0
+a yield 1
+a yield 2
+a yield 3
+a yield 4
+break at 4
+a finally
+sum finally 2
+sum 2
+b yield 0
+b yield 1
+b finally
+returned 1
+failing got 1
+caught StateError
+ctl 5
+ctl 6
+controller cancelled
+arg stop
+inner yield 0
+inner yield 1
+inner finally
+nested finally
+nested [100, 0, 1, 7, 8, 200]
+micro A
+x produce 0
+got x0
+micro B
+x produce 1
+got x1
+x produce 2
+got x2
+interleave done
+p yield 0
+listen 0
+p yield 1
+listen 1
+paused
+timer
+resuming
+p yield 2
+listen 2
+p yield 3
+listen 3
+p finally
+cancel complete
+empty []

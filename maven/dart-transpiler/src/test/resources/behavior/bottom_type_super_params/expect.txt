@@ -1,0 +1,7 @@
+7
+caught nothing here
+-1
+1 10
+a,b
+bad: not a number
+[2, 4, 6]

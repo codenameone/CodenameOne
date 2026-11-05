@@ -235,7 +235,7 @@ class ListViewReverseTest {
     }
 
     private static DartList<Widget> rows(int count, double height) {
-        DartList<Widget> children = new DartList<Widget>();
+        DartList<Widget> children = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < count; i++) {
             children.add(new ProbeBox(10, height));
         }

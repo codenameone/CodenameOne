@@ -1,0 +1,15 @@
+hi
+<->
+<x>
+true
+false
+String
+any
+true
+ok
+ok!
+y
+<->
+loose
+loose
+typed int

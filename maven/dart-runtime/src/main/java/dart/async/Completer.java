@@ -30,6 +30,16 @@ public class Completer<T> {
 
     private final Future<T> future = new Future<T>();
 
+    /// Records {@code w} as the type argument of {@code c}'s future: `Completer<String>()`
+    /// makes a Future<String>. The emitter wraps a construction whose T it knows; a null
+    /// witness records nothing.
+    public static <C extends Completer<?>> C reify(C c, dart.runtime.TypeWitness w) {
+        if (c != null) {
+            Future.reify(((Completer<?>) c).future, w);
+        }
+        return c;
+    }
+
     public Future<T> future() {
         return future;
     }
@@ -47,6 +57,12 @@ public class Completer<T> {
         future.completeError(error);
     }
 
+    /// Dart's {@code completeError(error, stackTrace)}: the trace travels with the error
+    /// to whoever handles it.
+    public void completeError(Object error, Object stackTrace) {
+        future.completeError(dart.core.StackTrace.carry(error, stackTrace));
+    }
+
     /**
      * Dart's {@code isCompleted}: true once complete or completeError has been
      * called -- including complete(aFuture) while that future is still pending.
@@ -56,5 +72,10 @@ public class Completer<T> {
      */
     public boolean isCompleted() {
         return future.isCompletedOrAdopting();
+    }
+
+    /// {@code Completer.sync()}: completion here is already synchronous.
+    public static <T> Completer<T> sync() {
+        return new Completer<T>();
     }
 }

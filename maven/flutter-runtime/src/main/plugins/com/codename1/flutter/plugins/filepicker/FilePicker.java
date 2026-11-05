@@ -140,7 +140,7 @@ public class FilePicker {
                     done.complete(null);
                     return;
                 }
-                DartList<PlatformFile> files = new DartList<PlatformFile>();
+                DartList<PlatformFile> files = new DartList<PlatformFile>(dart.runtime.TypeWitness.of(PlatformFile.class, false));
                 for (String p : paths) {
                     files.add(file(p, data));
                 }

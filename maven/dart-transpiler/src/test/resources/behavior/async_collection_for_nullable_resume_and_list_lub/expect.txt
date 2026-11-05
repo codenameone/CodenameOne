@@ -1,0 +1,11 @@
+[0, 2, 4, 6]
+[L0, L1] List<Object>
+List<List<Object>>
+List<int>
+true
+[1]|[a]
+List<List<num>>
+removed 1 missing null false true
+first -1
+b true false
+List<bool?>

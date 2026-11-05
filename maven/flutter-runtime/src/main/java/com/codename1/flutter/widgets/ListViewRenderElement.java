@@ -428,9 +428,9 @@ public class ListViewRenderElement extends ScrollRenderElement {
     @Override
     protected Widget buildContent() {
         ListView w = listView();
-        DartList<Widget> items = new DartList<Widget>();
+        DartList<Widget> items = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (!w.isBuilderMode()) {
-            items = w.getChildren() == null ? new DartList<Widget>() : w.getChildren();
+            items = w.getChildren() == null ? new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false)) : w.getChildren();
             return wrap(w, items);
         }
         if (!windowed()) {
@@ -517,7 +517,7 @@ public class ListViewRenderElement extends ScrollRenderElement {
      * other build.
      */
     private static DartList<Widget> reversedCopy(DartList<Widget> items) {
-        DartList<Widget> out = new DartList<Widget>();
+        DartList<Widget> out = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = items.size() - 1; i >= 0; i--) {
             out.add(items.get(i));
         }

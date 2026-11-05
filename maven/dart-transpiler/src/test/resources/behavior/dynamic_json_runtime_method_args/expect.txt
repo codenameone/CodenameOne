@@ -1,0 +1,11 @@
+a 3 [x] {m: 1}
+bad true
+3
+cast true
+from true
+addAll true 2
+1
+local true
+[1]
+lit true
+maplit true

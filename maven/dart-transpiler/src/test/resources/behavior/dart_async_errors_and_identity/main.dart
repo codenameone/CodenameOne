@@ -20,9 +20,11 @@ void main() {
   }
   f?.catchError((e) {
     print('caught through the future');
+    return -1;
   });
   failsAfterAwait().catchError((e) {
     print('caught after await');
+    return -2;
   });
 
   print([1] == [1]);

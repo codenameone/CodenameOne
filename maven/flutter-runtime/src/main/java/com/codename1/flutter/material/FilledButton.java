@@ -66,4 +66,25 @@ public class FilledButton extends ElevatedButton {
         }
         return b;
     }
+
+    /**
+     * {@code FilledButton.icon} with an {@code iconAlignment}: {@link IconAlignment#end}
+     * puts the icon after the label.
+     */
+    public static FilledButton icon(com.codename1.flutter.Key key, dart.runtime.Funcs.VoidFunc0 onPressed,
+            ButtonStyle style, com.codename1.flutter.Widget icon, com.codename1.flutter.Widget label,
+            IconAlignment iconAlignment) {
+        if (iconAlignment == IconAlignment.end && icon != null && label != null) {
+            com.codename1.flutter.widgets.Row row = new com.codename1.flutter.widgets.Row();
+            row.mainAxisSize(com.codename1.flutter.MainAxisSize.min);
+            row.children(dart.core.DartList.<com.codename1.flutter.Widget>of(label, icon));
+            FilledButton b = new FilledButton();
+            b.key(key);
+            b.onPressed(onPressed);
+            b.style(style);
+            b.child(row);
+            return b;
+        }
+        return icon(key, onPressed, style, icon, label);
+    }
 }

@@ -1,0 +1,3 @@
+swapped sink: [n1, n2, n3]
+reversed: [2, 3]
+keyed left: {3: 3}

@@ -1,0 +1,31 @@
+w4 d4 f4 f5 r1 p12 t1
+w3 d4 f3 f4 zero p9 t1
+0,3,6
+0
+[5, 3, 1]
+[0, 1, 2]
+start-1-small
+start-4-even8
+start-6-even12
+a0 fin0
+a1 state 3 fin0 outer StateError true
+a2 fmt fin0
+big 42; big 42
+neg-or-str; neg-or-str
+odd 5; int 6
+int 4; odd 5
+rec 3; rec 3
+rec 130; other0; rec 130
+long hello; neg-or-str
+other0; neg-or-str
+other0; other1
+List<int> [20, 120, 200] 340
+[0, 1, 5, 6] 4
+true {1, 2, 0}
+true {k12: 12, k20: 20}
+List<String> [a, b2]
+List<int> [] 0
+[0, -1, 5, 6] 4
+true {2}
+true {}
+List<String> [a]

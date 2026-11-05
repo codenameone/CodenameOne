@@ -27,9 +27,11 @@ package com.codename1.flutter;
  * A glyph in the CN1 material design icon font, identified by its codepoint
  * (one of the {@code FontImage.MATERIAL_*} char constants).
  */
-public final class IconData {
+// Not final: icon packs declare their own subclasses (`class MyIcons extends IconData`
+// with `const MyIcons(int cp) : super(cp, fontFamily: ...)`), as Flutter allows.
+public class IconData {
 
-    private final char codePoint;
+    private char codePoint;
     private String fontFamily;
 
     public IconData(char codePoint) {
@@ -45,7 +47,47 @@ public final class IconData {
         this((char) codePoint);
     }
 
-    public char codePoint() {
+    /**
+     * For subclasses (icon packs): {@code const MyIcons(int cp) : super(cp, fontFamily: ...)}
+     * reaches here, the transpiler then assigning each argument through its setter.
+     */
+    protected IconData() {
+        this((char) 0);
+    }
+
+    private String fontPackage;
+    private dart.core.DartList<String> fontFamilyFallback;
+
+    /** Flutter's {@code IconData.codePoint}, as the int Dart sees. */
+    private boolean matchTextDirection;
+
+    /** Flutter's {@code IconData.matchTextDirection}: mirror the glyph in right-to-left text. */
+    public boolean matchTextDirection() {
+        return matchTextDirection;
+    }
+
+    public void matchTextDirection(boolean v) {
+        this.matchTextDirection = v;
+    }
+
+    public long codePoint() {
+        return codePoint;
+    }
+
+    public void codePoint(long v) {
+        this.codePoint = (char) v;
+    }
+
+    /** Flutter's {@code IconData.fontPackage}: the package bundling the font, or null. */
+    public String fontPackage() {
+        return fontPackage;
+    }
+
+    public void fontPackage(String v) {
+        this.fontPackage = v;
+    }
+
+    public char codePointChar() {
         return codePoint;
     }
 
@@ -60,11 +102,30 @@ public final class IconData {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof IconData && ((IconData) o).codePoint == codePoint;
+        if (!(o instanceof IconData)) {
+            return false;
+        }
+        IconData d = (IconData) o;
+        // Flutter's IconData.== compares the code point, the font and the direction flag.
+        return d.codePoint == codePoint && same(d.fontFamily, fontFamily) && same(d.fontPackage, fontPackage)
+                && d.matchTextDirection == matchTextDirection;
+    }
+
+    private static boolean same(String a, String b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     @Override
     public int hashCode() {
-        return codePoint;
+        return codePoint * 31 + (fontFamily == null ? 0 : fontFamily.hashCode());
+    }
+
+    /// IconData.fontFamilyFallback: the fallback font families given to the constructor.
+    public dart.core.DartList<String> fontFamilyFallback() {
+        return fontFamilyFallback;
+    }
+
+    public void fontFamilyFallback(dart.core.DartList<String> v) {
+        this.fontFamilyFallback = v;
     }
 }

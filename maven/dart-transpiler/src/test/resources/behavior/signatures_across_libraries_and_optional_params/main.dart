@@ -1,0 +1,58 @@
+import 'a.dart' as a;
+import 'b.dart' as b;
+int add(int x, [int y = 0]) => x + y;
+num half(num x) => x / 2;
+T id<T>(T x) => x;
+class C { int m(int x) => x; static String s(Object o) => '$o'; }
+void main() {
+  print(a.mk() is List<a.Item>);
+  print(a.mk() is List<b.Item>);
+  print(b.mk() is List<a.Item>);
+  Object fa = a.fa;
+  print(fa is bool Function(a.Item));
+  print(fa is bool Function(b.Item));
+  var m = <a.Item, b.Item>{};
+  print(m is Map<a.Item, b.Item>);
+  print(m is Map<b.Item, a.Item>);
+  Object f1 = add;
+  print(f1 is int Function(int));
+  print(f1 is int Function(int, int));
+  print(f1 is int Function(int, int, int));
+  Object f2 = half;
+  print(f2 is num Function(int));
+  print(f2 is int Function(num));
+  print(f2 is Object? Function(Never));
+  Object f3 = (int? x) => x;
+  print(f3 is int? Function(int));
+  print(f3 is int Function(int));
+  Object f4 = C().m;
+  print(f4 is int Function(int));
+  print(f4 is int Function(String));
+  Object f5 = C.s;
+  print(f5 is String Function(int));
+  Object f6 = id;
+  print(f6 is int Function(int));
+  int Function(int) f7 = id;
+  Object o7 = f7;
+  print(o7 is int Function(int));
+  print(o7 is String Function(String));
+  Object f8 = ([String s = '']) => s;
+  print(f8 is String Function());
+  print(f8 is String Function(String));
+  Object f9 = ({int k = 0}) => k;
+  print(f9 is int Function());
+  print(f9 is int Function({int k}));
+  var l = <int>[1]; Object lo = l;
+  print(lo is List<num>); print(lo is List<double>);
+  try { (lo as List<num>).add(1.5); } catch (e) { print('TypeError ${e is TypeError}'); }
+  var ls = <Object>[1, 2];
+  print(ls is List<int>);
+  print(ls.cast<int>() is List<int>);
+  print([1, 2].map((e) => e).toList() is List<int>);
+  print([1, 'a'].whereType<int>().toList() is List<int>);
+  print({1}.toSet() is Set<int>);
+  print(<String, int>{}.keys is Iterable<String>);
+  Object fn = (int x) => '$x';
+  print(fn is Function);
+  print(fn.runtimeType);
+}

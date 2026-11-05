@@ -35,6 +35,29 @@ import dart.core.TypeError;
  */
 public final class DartRuntime {
 
+    /// The value a function VALUE is called with for an optional parameter the caller left
+    /// out. A Dart call through a function type fills no defaults -- the callee does -- and a
+    /// caller may pass `null` explicitly, which must arrive as null and not as the default.
+    /// Distinct from every Dart value; only tear-off and closure adapters ever see it.
+    private static final Object ABSENT = new Object();
+
+    /// The omitted-argument marker, typed for the slot it is passed to (never cast to it).
+    @SuppressWarnings("unchecked")
+    public static <T> T absent() {
+        return (T) ABSENT;
+    }
+
+    /// True when an adapter's raw argument is the omitted-argument marker.
+    public static boolean isAbsent(Object o) {
+        return o == ABSENT;
+    }
+
+    /// True for the marker or null: a non-nullable optional slot is passed null when omitted.
+    public static boolean isAbsentOrNull(Object o) {
+        return o == null || o == ABSENT;
+    }
+
+
     private DartRuntime() {
     }
 
@@ -107,6 +130,12 @@ public final class DartRuntime {
      * explicit isInstance, never a cast whose failure is caught. {@code nullable} is
      * {@code as T?}, which lets null through; {@code dartType} names T in the message.
      */
+    /// The program object behind a dart:collection mixin view ({@link dart.core.MixinView}),
+    /// or {@code value} itself: what an {@code is} test of a program class tests.
+    public static Object unview(Object value) {
+        return value instanceof dart.core.MixinView ? ((dart.core.MixinView) value).source() : value;
+    }
+
     @SuppressWarnings("unchecked")
     public static <T> T as(Object value, Class<T> type, boolean nullable, String dartType) {
         if (value == null) {
@@ -115,9 +144,81 @@ public final class DartRuntime {
             }
         } else if (type.isInstance(value)) {
             return (T) value;
+        } else if (value instanceof dart.core.MixinView
+                && type.isInstance(((dart.core.MixinView) value).source())) {
+            // A List/Set/Map/Iterable view of a program object applying a dart:collection
+            // mixin is that object in Dart: casting it back to the program's class answers
+            // the object itself, so its own fields and members are reached, not the view.
+            return (T) ((dart.core.MixinView) value).source();
         }
         throw new TypeError("type '" + typeName(value) + "' is not a subtype of type '"
                 + dartType + "' in type cast");
+    }
+
+    /// Dart's implicit downcast of a dynamic value to a parameterized List type
+    /// (`List<int> xs = d;`). Type arguments are reified in Dart, so the test is on the
+    /// list's recorded element type where there is one (DartList.isListOf) and on its
+    /// elements otherwise; a failure is a TypeError, never a ClassCastException. A
+    /// List<int> or List<double> slot is held as DartLongList / DartDoubleList, so a
+    /// boxed list that passes is handed over as the live view of itself (writes reach
+    /// the same list). {@code elem} is the erased element class, or null for an element
+    /// type no class can test (a type variable, a function, a nested generic), which is
+    /// then left to the erased check alone.
+    public static Object asListOf(Object value, Class<?> elem, boolean elemNullable, boolean nullable,
+                                  String dartType) {
+        if (value == null) {
+            if (nullable) {
+                return null;
+            }
+        } else if (value instanceof dart.core.MixinView && !(value instanceof java.util.List)) {
+            value = ((dart.core.MixinView) value).source();
+        }
+        if (value != null && (value instanceof java.util.List || value instanceof dart.collection.ListMixin)
+                && (elem == null || dart.core.DartList.isListOfW(value, dart.runtime.TypeWitness.of(elem, elemNullable)))) {
+            if (elem == Long.class && !elemNullable && !(value instanceof dart.core.DartLongList)
+                    && value instanceof dart.core.DartList) {
+                return dart.core.DartLongList.viewLongs(value);
+            }
+            if (elem == Double.class && !elemNullable && !(value instanceof dart.core.DartDoubleList)
+                    && value instanceof dart.core.DartList) {
+                return dart.core.DartDoubleList.viewDoubles(value);
+            }
+            if (value instanceof dart.collection.ListMixin && !(value instanceof java.util.List)) {
+                return as(value, java.util.List.class, nullable, dartType);
+            }
+            return value;
+        }
+        throw new TypeError("type '" + typeName(value) + "' is not a subtype of type '"
+                + dartType + "' in type cast");
+    }
+
+    /// The same downcast to a parameterized Map type. A witnessed `dynamic` key or value
+    /// type refutes a narrower target; an unwitnessed map is tested by its entries.
+    public static Object asMapOf(Object value, Class<?> key, Class<?> val, boolean nullable, String dartType) {
+        if (value == null && nullable) {
+            return null;
+        }
+        if (value instanceof java.util.Map
+                && !dart.core.DartMap.witnessRefutes(value, true, key)
+                && !dart.core.DartMap.witnessRefutes(value, false, val)) {
+            boolean ok = true;
+            for (Object o : ((java.util.Map<?, ?>) value).entrySet()) {
+                java.util.Map.Entry<?, ?> en = (java.util.Map.Entry<?, ?>) o;
+                if ((key != null && en.getKey() != null && !key.isInstance(en.getKey()))
+                        || (val != null && en.getValue() != null && !val.isInstance(en.getValue()))) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) {
+                return value;
+            }
+        }
+        if (value instanceof java.util.Map || value == null) {
+            throw new TypeError("type '" + typeName(value) + "' is not a subtype of type '"
+                    + dartType + "' in type cast");
+        }
+        return as(value, java.util.Map.class, nullable, dartType);
     }
 
     /**
@@ -171,6 +272,33 @@ public final class DartRuntime {
         }
         if (o instanceof Integer || o instanceof Short || o instanceof Byte) {
             return Long.valueOf(((Number) o).longValue()).hashCode();
+        }
+        return canonHash(o);
+    }
+
+    /// {@code System.identityHashCode(o)}, except for a view of a canonical static,
+    /// constructor or instantiated generic tear-off, which hashes by its function the way
+    /// identical() compares it: Set.identity and Map.identity see the views as one key.
+    public static int identityHash(Object o) {
+        if (isTearOffCandidate(o)) {
+            String k = CANON_FUNCTIONS.get(o);
+            if (k != null) {
+                return k.hashCode();
+            }
+        }
+        return System.identityHashCode(o);
+    }
+
+    /// {@code o.hashCode()}, except for a canonical static, constructor or instantiated
+    /// generic tear-off: its views (a signed SAM, a plain cast, one per erased SAM) are
+    /// separate Java objects that eq calls one Dart function, so they hash by that
+    /// function's key, the same name eq compares them by.
+    private static int canonHash(Object o) {
+        if (isTearOffCandidate(o)) {
+            String k = CANON_FUNCTIONS.get(o);
+            if (k != null) {
+                return k.hashCode();
+            }
         }
         return o.hashCode();
     }
@@ -236,9 +364,38 @@ public final class DartRuntime {
      * are values, not objects, in Dart, so two boxes of the same int (or of the same
      * double bits, or the same bool) are identical even when Java allocated them apart.
      */
+    /**
+     * The receiver of a library-private member read through an implicit interface:
+     * {@code other._x} where {@code other} may be an implementer from another library,
+     * which does not have that member. Dart answers NoSuchMethodError, as this does;
+     * an instance of the declaring class is returned unchanged for the caller to cast.
+     */
+    public static Object privateReceiver(Object target, Class<?> declaring, String member) {
+        if (declaring.isInstance(target)) {
+            return target;
+        }
+        throw new dart.core.NoSuchMethodError("Class '"
+                + (target == null ? "Null" : target.getClass().getSimpleName())
+                + "' has no instance getter '" + member + "'.");
+    }
+
     public static boolean identical(Object a, Object b) {
         if (a == b) {
             return true;
+        }
+        // A mixin-backed List/Iterable view stands for the object it was made from.
+        if (a instanceof dart.core.MixinView || b instanceof dart.core.MixinView) {
+            Object ua = a instanceof dart.core.MixinView ? ((dart.core.MixinView) a).source() : a;
+            Object ub = b instanceof dart.core.MixinView ? ((dart.core.MixinView) b).source() : b;
+            return ua == ub;
+        }
+        // One top-level or static function seen through two function types is two Java
+        // objects (one per SAM), but one Dart function: identical, see canonTearOff.
+        if (isTearOffCandidate(a) && isTearOffCandidate(b)) {
+            String ka = CANON_FUNCTIONS.get(a);
+            if (ka != null && ka.equals(CANON_FUNCTIONS.get(b))) {
+                return true;
+            }
         }
         if (a instanceof Long && b instanceof Long) {
             return ((Long) a).longValue() == ((Long) b).longValue();
@@ -265,7 +422,146 @@ public final class DartRuntime {
         if (a instanceof Number && b instanceof Number) {
             return numEq((Number) a, (Number) b);
         }
+        // An instance-method tear-off is a TearOff, whose equals is Dart's `==`; only the
+        // views of one static function need the canonical names below.
+        if (a != b && isTearOffCandidate(a) && isTearOffCandidate(b)) {
+            String ka = CANON_FUNCTIONS.get(a);
+            if (ka != null && ka.equals(CANON_FUNCTIONS.get(b))) {
+                return true;
+            }
+        }
         return a == null ? b == null : a.equals(b);
+    }
+
+    /// One object per top-level or static function and SAM it is held by, since Dart makes
+    /// `identical(f, f)` true for those.
+    private static final java.util.Map<String, Object> CANON_TEAR_OFFS = new java.util.HashMap<String, Object>();
+
+    /// The function each canonical tear-off in CANON_TEAR_OFFS names, by identity. Both maps
+    /// hold one entry per function and SAM, and no receiver: a static function has none.
+    private static final java.util.Map<Object, String> CANON_FUNCTIONS = new java.util.IdentityHashMap<Object, String>();
+
+    /// Every view CANON_TEAR_OFFS holds of each function, by the function's key.
+    private static final java.util.Map<String, java.util.List<Object>> CANON_VIEWS =
+            new java.util.HashMap<String, java.util.List<Object>>();
+
+    private static final Object[] NO_VIEWS = new Object[0];
+
+    /// Whether {@code o} is one view of a canonical static, constructor or instantiated
+    /// tear-off (canonTearOff).
+    public static boolean isCanonView(Object o) {
+        return isTearOffCandidate(o) && CANON_FUNCTIONS.containsKey(o);
+    }
+
+    /// The OTHER views of the canonical function {@code o} is one view of; empty for
+    /// anything else. Each view is its own Java object with identity equals/hashCode
+    /// (a lambda per SAM, a signed wrapper, a generic closure), so a Java hash container
+    /// cannot see two of them as one key by itself: DartSet and DartMap probe these, the
+    /// way they probe a number's twins, so {@code {G.new, b}} with {@code b = G.new} has
+    /// one element, as in Dart. A wrapper class per SAM with key-based equals was not
+    /// enough: a view can be any user typedef's SAM, a Signed wrapper or a
+    /// SignedFns.generic closure, which no fixed wrapper family implements.
+    public static Object[] canonViews(Object o) {
+        if (!isTearOffCandidate(o)) {
+            return NO_VIEWS;
+        }
+        String fn = CANON_FUNCTIONS.get(o);
+        if (fn == null) {
+            return NO_VIEWS;
+        }
+        java.util.List<Object> views = CANON_VIEWS.get(fn);
+        Object[] out = new Object[views.size()];
+        int n = 0;
+        for (Object v : views) {
+            if (v != o) {
+                out[n++] = v;
+            }
+        }
+        return n == out.length ? out : java.util.Arrays.copyOf(out, n);
+    }
+
+    /// Keeps the commonest comparisons, and every one in a program that tears off no static
+    /// function, out of CANON_FUNCTIONS.
+    private static boolean isTearOffCandidate(Object o) {
+        return o != null && !(o instanceof Number) && !(o instanceof String) && !CANON_FUNCTIONS.isEmpty();
+    }
+
+    /// {@code made} as the canonical tear-off of function {@code fn} held as SAM {@code view}:
+    /// the first one made for that pair is kept. Java gives each SAM its own object, so the
+    /// views of one function differ; each is recorded under {@code fn}, which identical and
+    /// eq compare (CANON_FUNCTIONS), so all of them stay one Dart function.
+    @SuppressWarnings("unchecked")
+    public static <T> T canonTearOff(String fn, String view, T made) {
+        // Keyed by the ERASED SAM: `Funcs.Func1<Long, Object>` and `Funcs.Func1<Long, Long>`
+        // are one Java type at run time, so one object serves both views of the function.
+        String key = fn + '|' + eraseTypeArgs(view);
+        Object c = CANON_TEAR_OFFS.get(key);
+        if (c == null) {
+            CANON_TEAR_OFFS.put(key, made);
+            CANON_FUNCTIONS.put(made, fn);
+            java.util.List<Object> views = CANON_VIEWS.get(fn);
+            if (views == null) {
+                views = new java.util.ArrayList<Object>(2);
+                CANON_VIEWS.put(fn, views);
+            }
+            views.add(made);
+            return made;
+        }
+        return (T) c;
+    }
+
+    /// The identity key of function {@code fn} instantiated at the type arguments whose
+    /// witnesses are {@code ws}: `C.sm` held as `String Function(int)` is one Dart function,
+    /// equal wherever it is torn off at int, and another at String. Built from the witness
+    /// values, never from a type variable's name, so a tear-off inside a generic body is
+    /// keyed by what the variable is bound to at that moment. A witness prints its Dart
+    /// type; its Java class rides along so two libraries' classes of one name stay apart.
+    public static String instKey(String fn, TypeWitness... ws) {
+        StringBuilder sb = new StringBuilder(fn).append('<');
+        for (int i = 0; i < ws.length; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            TypeWitness w = ws[i];
+            if (w == null) {
+                sb.append("dynamic");
+            } else {
+                sb.append(w.toString()).append('@').append(w.type().getName());
+            }
+        }
+        return sb.append('>').toString();
+    }
+
+    private static String eraseTypeArgs(String view) {
+        if (view.indexOf('<') < 0) {
+            return view;
+        }
+        StringBuilder sb = new StringBuilder(view.length());
+        int depth = 0;
+        for (int i = 0; i < view.length(); i++) {
+            char c = view.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            } else if (depth == 0) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /// Removes the first element of {@code list} that is Dart {@code ==} to {@code value}:
+    /// a tear-off (TearOff) already answers that through equals, but a number does not
+    /// (`1 == 1.0`), and the views of one static function are equal only to eq.
+    public static boolean removeEq(java.util.List<?> list, Object value) {
+        for (int i = 0; i < list.size(); i++) {
+            if (eq(list.get(i), value)) {
+                list.remove(i);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -298,7 +594,7 @@ public final class DartRuntime {
         return (double) l == d;
     }
 
-    private static boolean isIntegral(Number n) {
+    static boolean isIntegral(Number n) {
         return n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte;
     }
 
@@ -367,7 +663,25 @@ public final class DartRuntime {
                 }
             }
         }
+        if (a instanceof Number) {
+            // num declares the operator; a wrongly typed argument fails its parameter
+            // type (num for arithmetic, int for the bitwise operators an int declares),
+            // which is Dart's TypeError rather than a missing member.
+            boolean arith = op.equals("+") || op.equals("-") || op.equals("*") || op.equals("/")
+                    || op.equals("~/") || op.equals("%");
+            boolean bits = isIntegral((Number) a) && (op.equals("&") || op.equals("|") || op.equals("^")
+                    || op.equals("<<") || op.equals(">>") || op.equals(">>>"));
+            if (arith || bits) {
+                throw new TypeError("type '" + typeName(b) + "' is not a subtype of type '"
+                        + (arith ? "num" : "int") + "'");
+            }
+        }
         if (a instanceof String) {
+            if (op.equals("*")) {
+                if (!(b instanceof Number) || !isIntegral((Number) b)) {
+                    throw new TypeError("type '" + typeName(b) + "' is not a subtype of type 'int'");
+                }
+            }
             if (op.equals("+")) {
                 if (!(b instanceof String)) {
                     throw new TypeError("type '" + typeName(b) + "' is not a subtype of type 'String'");
@@ -400,8 +714,19 @@ public final class DartRuntime {
                     return d.$tdiv(((Number) b).longValue());
                 }
             }
+            if (op.equals("+") || op.equals("-") || op.equals("*") || op.equals("~/")) {
+                // Duration declares the operator; the argument fails its parameter type
+                // (Duration for + and -, num for *, int for ~/), which is Dart's TypeError.
+                throw new dart.core.TypeError("type '" + typeName(b) + "' is not a subtype of type '"
+                        + (op.equals("*") ? "num" : op.equals("~/") ? "int" : "Duration") + "'");
+            }
         }
         throw noOperator(op, a, b);
+    }
+
+    /** Evaluates its argument for its effect (a checked cast whose value is discarded). */
+    public static void discard(Object value) {
+        // nothing: the argument has already been evaluated
     }
 
     /** Dart's relational {@code op} ({@code < > <= >=}) on values of unknown static type. */
@@ -438,6 +763,9 @@ public final class DartRuntime {
             if (op.equals(">=")) {
                 return c >= 0;
             }
+        }
+        if (a instanceof Number && (op.equals("<") || op.equals(">") || op.equals("<=") || op.equals(">="))) {
+            throw new TypeError("type '" + typeName(b) + "' is not a subtype of type 'num'");
         }
         if (a instanceof dart.core.Duration && b instanceof dart.core.Duration) {
             int c = ((dart.core.Duration) a).compareTo((dart.core.Duration) b);
@@ -614,7 +942,97 @@ public final class DartRuntime {
                 + " List operators at run time. Give the operand a static type.");
     }
 
-    private static String typeName(Object o) {
+    /// The Dart names of the transpiled classes whose Java name differs (a class renamed so
+    /// it cannot clash with a runtime class): `Stack` emitted as `MainStack` still prints
+    /// as `Stack`. Filled by each such class's static initialiser.
+    private static final java.util.HashMap<Class<?>, String> DART_NAMES = new java.util.HashMap<Class<?>, String>();
+
+    /// Records that the transpiled class {@code c} is named {@code dartName} in Dart.
+    /// Answers {@code c}, so a type literal of a renamed class can record its name where it
+    /// is written (a class literal runs no static initialiser).
+    public static <T> Class<T> dartName(Class<T> c, String dartName) {
+        DART_NAMES.put(c, dartName);
+        return c;
+    }
+
+    /// The type-parameter counts of the transpiled generic classes, so a Type that is the
+    /// bare class (all arguments dynamic) prints them.
+    private static final java.util.HashMap<Class<?>, Integer> GENERIC_ARITY = new java.util.HashMap<Class<?>, Integer>();
+
+    static {
+        // The core generic types: their raw literals (`List`, `Map`) print `List<dynamic>`.
+        GENERIC_ARITY.put(dart.core.DartList.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.core.DartSet.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.core.DartIterable.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.core.DartMap.class, Integer.valueOf(2));
+        GENERIC_ARITY.put(dart.async.Future.class, Integer.valueOf(1));
+        GENERIC_ARITY.put(dart.async.Stream.class, Integer.valueOf(1));
+        // dart:core Uri is held by DartUri; a List<Uri> prints its element as Uri.
+        DART_NAMES.put(dart.core.DartUri.class, "Uri");
+    }
+
+    /// Records that the transpiled class {@code c} declares {@code arity} type parameters.
+    /// Answers {@code c}, so a type literal can record it where it is written.
+    public static <T> Class<T> genericArity(Class<T> c, int arity) {
+        GENERIC_ARITY.put(c, Integer.valueOf(arity));
+        return c;
+    }
+
+    /// The Dart name of the class {@code c} alone, without type arguments.
+    static String className(Class<?> c) {
+        // A Dart Type (`runtimeType`, a type witness) is a Class here; Dart prints the
+        // bare Dart type name, which for the boxed core types is not the Java one.
+        if (c == Long.class || c == Integer.class) {
+            return "int";
+        }
+        if (c == Double.class) {
+            return "double";
+        }
+        if (c == Number.class) {
+            // num's witness (a type argument `<num>`) is Number, Dart's num.
+            return "num";
+        }
+        if (c == Boolean.class) {
+            return "bool";
+        }
+        if (c == Void.class) {
+            // The runtime type of null (TypeWitness.runtimeType), and Null's witness.
+            return "Null";
+        }
+        if (c == dart.core.DartList.class) {
+            return "List";
+        }
+        if (c == dart.core.DartMap.class) {
+            return "Map";
+        }
+        if (c == dart.core.DartSet.class) {
+            return "Set";
+        }
+        if (c == dart.core.DartIterable.class) {
+            return "Iterable";
+        }
+        // The primitive-backed lists are how List<int> and List<double> are held, so
+        // their class stands for that whole type (a type argument's witness).
+        if (c == dart.core.DartLongList.class) {
+            return "List<int>";
+        }
+        if (c == dart.core.DartDoubleList.class) {
+            return "List<double>";
+        }
+        String dn = DART_NAMES.get(c);
+        if (dn != null) {
+            return dn;
+        }
+        String sn = c.getSimpleName();
+        if (c.isInterface() && sn.length() > 2 && sn.endsWith("$I")) {
+            // A class other classes implement is witnessed by its generated interface,
+            // `I$I` (the transpiler's suffix); its Dart name is the class's.
+            return sn.substring(0, sn.length() - 2);
+        }
+        return sn;
+    }
+
+    public static String typeName(Object o) {
         if (o == null) {
             return "Null";
         }
@@ -659,8 +1077,8 @@ public final class DartRuntime {
      * than left to the JVM: ParparVM answers 0 for an integer division or remainder by
      * zero instead of throwing, so the device would have printed 0 where Dart throws.
      */
-    private static dart.core.UnsupportedError integerDivisionByZero() {
-        return new dart.core.UnsupportedError("IntegerDivisionByZeroException");
+    private static dart.core.IntegerDivisionByZeroException integerDivisionByZero() {
+        return new dart.core.IntegerDivisionByZeroException();
     }
 
     /**
@@ -691,6 +1109,70 @@ public final class DartRuntime {
         throw new dart.core.NoSuchMethodError("Class '" + (n == null ? "Null" : n.getClass().getSimpleName()) + "' has no instance method 'toInt'.");
     }
 
+    /// The entry check of a parameter or field write whose type is a class type variable
+    /// (`void set(T x)` called on a `Box<num>` that is a `Box<int>`): Dart checks the
+    /// argument against the receiver's reified type argument, {@code w}. A null witness is
+    /// an argument the construction could not name, which is not tested.
+    public static void checkWitness(Object v, TypeWitness w) {
+        if (w != null && !w.test(v)) {
+            throw new TypeError("type '" + typeName(v) + "' is not a subtype of type '" + w + "'");
+        }
+    }
+
+    /// The entry of a generic function called with no type arguments whose variable's
+    /// default (its bound with the function's variables read as dynamic, {@code dflt})
+    /// does not satisfy the bound instantiated at that default ({@code bound}): Dart's
+    /// instantiate-to-bound fails, so the call is a TypeError whatever its arguments. A
+    /// self-referential `T extends Comparable<T>` is the case: `Comparable<dynamic>` is no
+    /// `Comparable<Comparable<dynamic>>`. The transpiler decides that from the type model;
+    /// this only throws. Declared to answer a witness so it can stand where one is read.
+    public static TypeWitness boundNotSatisfied(String dflt, String bound) {
+        throw new TypeError("type '" + dflt + "' is not a subtype of type '" + bound
+                + "' of the type variable's bound");
+    }
+
+    /// The caller-side check of an argument for a generic-covariant parameter (`void
+    /// take(T x)` called through a `D<num>` that is an `E extends D<int>`): {@code v}
+    /// tested against the receiver's witness {@code w}, then answered with its own static
+    /// type. It runs before the call, because javac's bridge into an override with a
+    /// narrower Java type casts first, and that cast is unchecked on ParparVM.
+    public static <T> T checkedArg(T v, TypeWitness w) {
+        checkWitness(v, w);
+        return v;
+    }
+
+    /// A dynamic call's argument for a parameter declared `int`: a double is a TypeError,
+    /// as in Dart, never truncated to the int a Java `longValue()` would make of it.
+    public static Number intArg(Number v) {
+        if (v instanceof Double || v instanceof Float) {
+            throw new TypeError("type '" + typeName(v) + "' is not a subtype of type 'int'");
+        }
+        return v;
+    }
+
+    /// `v as T` for a type variable T whose witness {@code w} is in scope (a generic
+    /// closure's or method's own): the checked cast, answering {@code v}. A null witness is
+    /// a type argument nobody could name, which is not tested.
+    public static Object asWitness(Object v, TypeWitness w) {
+        checkWitness(v, w);
+        return v;
+    }
+
+    /// `num.round()`, `floor()` and `ceil()` on a value typed only num: an int answers
+    /// itself, a double rounds as double's method does (UnsupportedError for NaN and the
+    /// infinities). {@code mode} is 'r', 'f' or 'c'.
+    public static long numRounded(Object n, char mode) {
+        if (n instanceof Double d) {
+            double v = d.doubleValue();
+            return mode == 'f' ? floor(v) : mode == 'c' ? ceil(v) : round(v);
+        }
+        if (n instanceof Number num) {
+            return num.longValue();
+        }
+        String m = mode == 'f' ? "floor" : mode == 'c' ? "ceil" : "round";
+        throw new dart.core.NoSuchMethodError("Class '" + (n == null ? "Null" : n.getClass().getSimpleName()) + "' has no instance method '" + m + "'.");
+    }
+
     public static double numToDouble(Object n) {
         if (n instanceof Number num) {
             return num.doubleValue();
@@ -700,7 +1182,7 @@ public final class DartRuntime {
 
     /// `x.hashCode` for an object the emitter has no declaration for.
     public static long hashCodeOf(Object o) {
-        return o == null ? 0 : o.hashCode();
+        return o == null ? 0 : canonHash(o);
     }
 
     /**
@@ -726,8 +1208,18 @@ public final class DartRuntime {
             return own.equals(e.name()) ? e.getDeclaringClass().getSimpleName() + "." + own : own;
         }
         if (v instanceof Class<?> c) {
-            // A Dart Type (`runtimeType`) is a Class here; Dart prints the bare type name.
-            return c.getSimpleName();
+            String n = className(c);
+            Integer arity = GENERIC_ARITY.get(c);
+            if (arity == null) {
+                return n;
+            }
+            // A generic class with no reified arguments is the class with dynamic ones:
+            // Dart prints the raw literal `Holder` as `Holder<dynamic>`.
+            StringBuilder sb = new StringBuilder(n).append('<');
+            for (int i = 0; i < arity; i++) {
+                sb.append(i == 0 ? "dynamic" : ", dynamic");
+            }
+            return sb.append('>').toString();
         }
         return v.toString();
     }
@@ -804,6 +1296,26 @@ public final class DartRuntime {
             end--;
         }
         digits = digits.substring(0, end);
+        // Java's Double.toString before JDK 19 is not always the SHORTEST round
+        // trip (JDK-4511638): 5e-324 printed as 4.9E-324, and some 17-digit
+        // outputs have a 16-digit twin. Try fewer digits while they still read
+        // back as the same double -- only for those two shapes, as the exact
+        // rounding is multi-word arithmetic.
+        double a = Math.abs(d);
+        while (digits.length() > 1 && (digits.length() >= 16 || a < 2.2250738585072014E-308)) {
+            Object[] r = roundedDigits(a, digits.length() - 1);
+            String c = (String) r[0];
+            int ce = ((Integer) r[1]).intValue();
+            if (Double.parseDouble(c.charAt(0) + "." + c.substring(1) + "0E" + ce) != a) {
+                break;
+            }
+            end = c.length();
+            while (end > 1 && c.charAt(end - 1) == '0') {
+                end--;
+            }
+            digits = c.substring(0, end);
+            n = ce + 1;
+        }
         int k = digits.length();
         StringBuilder out = new StringBuilder();
         if (d < 0) {
@@ -922,6 +1434,202 @@ public final class DartRuntime {
         return sb.append(digits, 0, split).append('.').append(digits, split, digits.length()).toString();
     }
 
+    /**
+     * Dart's {@code num.toStringAsPrecision(precision)}: {@code precision}
+     * significant digits (1 through 21) of the double's EXACT value, rounded
+     * half up as Dart's double-conversion does, in fixed notation unless the
+     * decimal exponent is below -6 or at least {@code precision}, when it is
+     * exponential (1.2e+2). The sign bit decides the sign, so -0.0 gives -0.
+     * Hand-written over the multi-word integers below: neither vm/JavaAPI nor
+     * Ports/CLDC11 has String.format or BigDecimal.
+     */
+    public static String toStringAsPrecision(double d, long precision) {
+        if (precision < 1 || precision > 21) {
+            throw new dart.core.RangeError("Invalid value: precision must be in 1..21: " + precision);
+        }
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return nonFinite(d);
+        }
+        int p = (int) precision;
+        StringBuilder sb = new StringBuilder();
+        if (Double.doubleToLongBits(d) < 0) {
+            sb.append('-');
+        }
+        String digits;
+        int e;
+        if (d == 0) {
+            digits = zeros(p);
+            e = 0;
+        } else {
+            Object[] r = roundedDigits(Math.abs(d), p);
+            digits = (String) r[0];
+            e = ((Integer) r[1]).intValue();
+        }
+        if (e < -6 || e >= p) {
+            return appendExponential(sb, digits, e);
+        }
+        if (e >= 0) {
+            sb.append(digits, 0, e + 1);
+            if (p > e + 1) {
+                sb.append('.').append(digits, e + 1, p);
+            }
+            return sb.toString();
+        }
+        return sb.append("0.").append(zeros(-e - 1)).append(digits).toString();
+    }
+
+    /** Dart's {@code num.toStringAsExponential()}: the shortest digits that read back as the value. */
+    public static String toStringAsExponential(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return nonFinite(d);
+        }
+        StringBuilder sb = new StringBuilder();
+        if (Double.doubleToLongBits(d) < 0) {
+            sb.append('-');
+        }
+        if (d == 0) {
+            return sb.append("0e+0").toString();
+        }
+        // Dart's toString already prints the shortest round-trip digits; read them
+        // back out of it rather than run a second shortest-digits algorithm.
+        String s = str(Math.abs(d));
+        int exp = 0;
+        int ePos = s.indexOf('e');
+        if (ePos >= 0) {
+            String es = s.substring(ePos + 1);
+            if (es.startsWith("+")) {
+                es = es.substring(1);
+            }
+            exp = Integer.parseInt(es);
+            s = s.substring(0, ePos);
+        }
+        int dot = s.indexOf('.');
+        String all = s;
+        if (dot >= 0) {
+            all = s.substring(0, dot) + s.substring(dot + 1);
+            exp -= s.length() - dot - 1;
+        }
+        int start = 0;
+        while (start < all.length() - 1 && all.charAt(start) == '0') {
+            start++;
+        }
+        int end = all.length();
+        while (end > start + 1 && all.charAt(end - 1) == '0') {
+            end--;
+            exp++;
+        }
+        String digits = all.substring(start, end);
+        return appendExponential(sb, digits, digits.length() - 1 + exp);
+    }
+
+    /** Dart's {@code num.toStringAsExponential(fractionDigits)}, for 0 through 20 digits. */
+    public static String toStringAsExponential(double d, long fractionDigits) {
+        if (fractionDigits < 0 || fractionDigits > 20) {
+            throw new dart.core.RangeError("Invalid value: fractionDigits must be in 0..20: "
+                    + fractionDigits);
+        }
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return nonFinite(d);
+        }
+        int p = (int) fractionDigits + 1;
+        StringBuilder sb = new StringBuilder();
+        if (Double.doubleToLongBits(d) < 0) {
+            sb.append('-');
+        }
+        if (d == 0) {
+            return appendExponential(sb, zeros(p), 0);
+        }
+        Object[] r = roundedDigits(Math.abs(d), p);
+        return appendExponential(sb, (String) r[0], ((Integer) r[1]).intValue());
+    }
+
+    /** Dart's {@code toStringAsExponential(null)}: the shortest form, as with no argument. */
+    public static String toStringAsExponentialOrShortest(double d, Long fractionDigits) {
+        return fractionDigits == null ? toStringAsExponential(d) : toStringAsExponential(d, fractionDigits.longValue());
+    }
+
+    /**
+     * Dart's {@code double.truncateToDouble()}: toward zero, keeping the sign, so
+     * -0.5 gives -0.0; NaN, the infinities and values already integral (every
+     * double of 2^52 or more) come back unchanged.
+     */
+    public static double truncateToDouble(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) >= 4503599627370496.0) {
+            return d;
+        }
+        double t = (double) (long) d;
+        return t == 0 && Double.doubleToLongBits(d) < 0 ? -0.0 : t;
+    }
+
+    private static String nonFinite(double d) {
+        return Double.isNaN(d) ? "NaN" : d > 0 ? "Infinity" : "-Infinity";
+    }
+
+    private static String zeros(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            sb.append('0');
+        }
+        return sb.toString();
+    }
+
+    private static String appendExponential(StringBuilder sb, String digits, int e) {
+        sb.append(digits.charAt(0));
+        if (digits.length() > 1) {
+            sb.append('.').append(digits, 1, digits.length());
+        }
+        return sb.append('e').append(e < 0 ? '-' : '+').append(Math.abs(e)).toString();
+    }
+
+    /**
+     * The first {@code p} significant digits of positive finite {@code a}, rounded
+     * half up from its exact binary value, and the decimal exponent of the first
+     * one, as {String, Integer}. m * 2^e with e < 0 is exactly m * 5^-e * 10^e.
+     */
+    private static Object[] roundedDigits(double a, int p) {
+        long bits = Double.doubleToLongBits(a);
+        int biased = (int) ((bits >>> 52) & 0x7ff);
+        long mantissa = bits & 0xfffffffffffffL;
+        int exp;
+        if (biased == 0) {
+            exp = -1074;
+        } else {
+            mantissa |= 1L << 52;
+            exp = biased - 1075;
+        }
+        int[] v = fromLong(mantissa);
+        int scale = 0;
+        if (exp >= 0) {
+            v = shiftLeft(v, exp);
+        } else {
+            for (int i = 0; i < -exp; i++) {
+                v = mulSmall(v, 5);
+            }
+            scale = exp;
+        }
+        String all = toDecimal(v);
+        int e = all.length() - 1 + scale;
+        if (all.length() <= p) {
+            return new Object[] {all + zeros(p - all.length()), Integer.valueOf(e)};
+        }
+        char[] c = all.substring(0, p).toCharArray();
+        if (all.charAt(p) >= '5') {
+            int i = p - 1;
+            while (i >= 0 && c[i] == '9') {
+                c[i] = '0';
+                i--;
+            }
+            if (i < 0) {
+                // 9.99 -> 10.0: one more leading digit, and the last one falls off.
+                c[0] = '1';
+                e++;
+            } else {
+                c[i]++;
+            }
+        }
+        return new Object[] {new String(c), Integer.valueOf(e)};
+    }
+
     // Minimal unsigned multi-word integers for toStringAsFixed: little-endian
     // 32-bit words in an int[], no leading-zero words except for zero itself.
 
@@ -1032,6 +1740,18 @@ public final class DartRuntime {
      */
     public static void print(Object v) {
         String s = str(v);
+        dart.async.Zone z = dart.async.Zone.current;
+        if (z != dart.async.Zone.root) {
+            // A zone may override print (ZoneSpecification.print); the root's own
+            // implementation, which every chain ends in, is printRaw.
+            z.print(s);
+            return;
+        }
+        printRaw(s);
+    }
+
+    /// The root zone's print: the pluggable sink, else standard output.
+    public static void printRaw(String s) {
         Funcs.VoidFunc1<String> sink = printSink;
         if (sink != null) {
             sink.call(s);
@@ -1097,6 +1817,16 @@ public final class DartRuntime {
      */
     public static boolean isDartException(Throwable t) {
         return !isDartError(t) && !(t instanceof dart.core.DartThrown);
+    }
+
+    /** Dart's {@code x is Error} for any value: the test {@code on Error} makes. */
+    public static boolean isDartErrorValue(Object o) {
+        return o instanceof Throwable && isDartError((Throwable) o);
+    }
+
+    /** Dart's {@code x is Exception} for any value: the test {@code on Exception} makes. */
+    public static boolean isDartExceptionValue(Object o) {
+        return o instanceof Throwable && isDartException((Throwable) o);
     }
 
     /** Marker for switch arms `dart analyze` proved unreachable. */

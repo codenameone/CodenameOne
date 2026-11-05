@@ -1,0 +1,15 @@
+1,234,567
+999
+1,000
+true
+true
+false
+quQ
+Invalid value
+Invalid value
+RangeError (index): Invalid value: Not in inclusive range 0..2: -1
+Invalid value
+{0, 1, 2}
+{}
+{a, b}
+{3, 4}

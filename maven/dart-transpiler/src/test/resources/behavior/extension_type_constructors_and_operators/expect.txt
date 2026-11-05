@@ -1,0 +1,28 @@
+6
+7
+false
+0
+-3
+3
+val=3
+true
+true
+2
+five
+3
+true
+7
+3
+true
+false
+0
+4.0
+8.0
+18
+zero
+big 8
+small
+true
+true
+[2, 4]
+13

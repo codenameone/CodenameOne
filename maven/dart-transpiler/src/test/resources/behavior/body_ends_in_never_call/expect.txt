@@ -1,0 +1,7 @@
+Unsupported operation: cannot remove from a read-only bag
+Unsupported operation: cannot remove the last element of a read-only bag
+Bad state: no name for 3
+zero
+2
+Invalid argument(s): not positive: -1
+Unsupported operation: cannot later remove from a read-only bag
