@@ -20,6 +20,7 @@ on:
       # The Bastion chapters, the same way; bastion.yml compiles and tests it.
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
+      - 'scripts/slate/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'
       - 'scripts/parley/**'
@@ -146,6 +147,7 @@ jobs:
               - 'scripts/reel/**'
               - 'scripts/bastion/**'
               - 'scripts/pulse/**'
+              - 'scripts/slate/**'
               - 'scripts/hellocodenameone/common/src/main/kmp/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
