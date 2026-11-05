@@ -101,4 +101,16 @@ public interface WebGLRenderingContext extends JSObject {
                     int border, int format, int type, byte[] pixels);
     void texParameteri(int target, int pname, int param);
     void deleteTexture(WebGLTexture texture);
+
+    WebGLFramebuffer createFramebuffer();
+    void bindFramebuffer(int target, WebGLFramebuffer framebuffer);
+    void framebufferTexture2D(int target, int attachment, int textarget, WebGLTexture texture, int level);
+    void framebufferRenderbuffer(int target, int attachment, int renderbuffertarget, WebGLRenderbuffer renderbuffer);
+    void deleteFramebuffer(WebGLFramebuffer framebuffer);
+    WebGLRenderbuffer createRenderbuffer();
+    void bindRenderbuffer(int target, WebGLRenderbuffer renderbuffer);
+    void renderbufferStorage(int target, int internalformat, int width, int height);
+    void deleteRenderbuffer(WebGLRenderbuffer renderbuffer);
+    void disableVertexAttribArray(int index);
+    void uniform2f(WebGLUniformLocation location, float x, float y);
 }

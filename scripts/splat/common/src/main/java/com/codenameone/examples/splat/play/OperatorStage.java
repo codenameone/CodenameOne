@@ -23,6 +23,7 @@ import com.codename1.gaming.GameView;
 import com.codename1.gaming.Model;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Material;
+import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.Primitives;
 
 /// An operator standing in a pool of light in a dark storage yard, marker in
@@ -72,12 +73,26 @@ public class OperatorStage extends GameView {
         }
     }
 
+    private static final int DUSK = 0xff3a3f4a;
+
     @Override
     protected void onSetup(GraphicsDevice d) {
         device = d;
         setClearColor(0xff0d1014);
-        getLight().setDirection(0.55f, -0.8f, -0.45f).setColor(0xffffe6c4).setAmbientColor(0xff4a525c);
-        getCamera().setPerspective(34f, 0.1f, 120f);
+        getLight().setDirection(0.55f, -0.8f, -0.45f).setColor(0xffffd2a0).setAmbientColor(0xff4a525c)
+                .setShadows(true).setShadowMap(1024, 6f).setShadowCenter(0f, 0f, -1f);
+        // the arena's atmosphere at dusk: the same engine look as a match,
+        // kept dark enough that the menu over it always reads
+        getEnvironment().setFog(DUSK, 0.03f, 0.08f).setHemisphere(0xff55657a, 0xff2a2620)
+                .setToneMapping(true).setExposure(1.05f)
+                .setSky(0xff141d2c, DUSK, 0xffff9a50, 0.35f);
+        setPostProcess(new PostProcess().setBloom(0.8f, 0.45f)
+                .setGrade(1.1f, 0.85f, 0xff0a121a, 0xfffff0dc).setVignette(0.55f).setGrain(0.03f));
+        getCamera().setPerspective(34f, 0.1f, 400f);
+        Model sky = new Model(Primitives.sphere(d, 300f, 16, 24, true), new Material(Material.Type.SKYBOX));
+        sky.getMaterial().getRenderState().setDepthWrite(false);
+        sky.setPosition(0f, 1.35f, 5.2f);
+        addModel(sky);
         getCamera().setPosition(0f, 1.35f, 5.2f);
         getCamera().setTarget(offset * 0.55f, 1.0f, 0f);
         Model floor = new Model(Primitives.quad(d, 1f), new Material(Material.Type.LAMBERT).setColor(0xff24282d));

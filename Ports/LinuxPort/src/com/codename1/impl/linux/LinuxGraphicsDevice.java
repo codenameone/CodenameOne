@@ -10,6 +10,7 @@
 package com.codename1.impl.linux;
 
 import com.codename1.gpu.Camera;
+import com.codename1.gpu.Environment;
 import com.codename1.gpu.GpuCapabilities;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.IndexBuffer;
@@ -17,26 +18,28 @@ import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.PrimitiveType;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
 import java.util.HashMap;
 import java.util.Map;
 
-/// Direct3D 11 implementation of the Codename One 3D `GraphicsDevice` for the
-/// native Linux port. Like the iOS Metal device, it owns no GPU state itself:
-/// it forwards every operation to a native D3D11 context (cn1_linux_d3d.cpp)
-/// through the `LinuxNative` bridge, passing vertex/index/uniform payloads as
-/// plain Java arrays that the native side copies into D3D buffers.
+/// OpenGL ES implementation of the Codename One 3D `GraphicsDevice` for the
+/// native Linux port. It owns no GPU state itself: it forwards every operation
+/// to a native EGL/GLES context (cn1_linux_gl.c) through the `LinuxNative`
+/// bridge, passing vertex/index/uniform payloads as plain Java arrays.
 ///
-/// Shaders are generated here in Java (`GlslShaderGenerator`): the material plus
-/// the mesh vertex format produce an HLSL source string the native context
-/// compiles once (D3DCompile) and caches as a pipeline keyed by the material
-/// shader key, the vertex stride and the render state.
+/// Shaders come from the shared core `GlslShaderGenerator` (GLSL ES 1.00): the
+/// material, the mesh vertex format and the environment produce a vertex and a
+/// fragment source the native context compiles once and caches as a pipeline.
+/// The shadow pass and the post process chain run natively against offscreen
+/// targets; this class decides when and with which shaders and parameters.
 class LinuxGraphicsDevice extends GraphicsDevice {
     /// Opaque handle to the native D3D11 context. Zero before creation / after
     /// disposal.
@@ -45,15 +48,33 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     private final Map<String, Long> pipelines = new HashMap<String, Long>();
 
     private final GpuCapabilities caps = new GpuCapabilities(
-            8192, 16, true, true, true, "Codename One OpenGL ES 3.0 (Linux)");
+            8192, 16, true, true, true, "Codename One OpenGL ES 3.0 (Linux)", true, true);
+
+    // Separates the vertex stage from the fragment stage in the source handed
+    // to the native compiler; must equal CN1_STAGE_SEP in cn1_linux_gl.c.
+    private static final String STAGE_SEPARATOR = "//@@CN1_FRAGMENT@@";
 
     private final float[] mvp = new float[16];
+    private final float[] shadowMatrix = new float[16];
 
-    // Uniform block layout must match the CN1Uniforms cbuffer emitted by
-    // GlslShaderGenerator and copied on the native side: 3 mat4 (48) + 5 vec4
-    // (20) + shininess (1), padded to a multiple of 4 floats (16 bytes).
-    private static final int UNIFORM_FLOATS = 72;
+    // The packed uniform array; the order must match CN1_UNIFORMS in
+    // cn1_linux_gl.c: u_mvp, u_model, u_normalMatrix, u_shadowMatrix (16 each),
+    // u_color(4), u_lightDir(3), u_lightColor(3), u_ambient(3), u_eye(3),
+    // u_shininess(1), u_fogColor(3), u_fog(3), u_sky(3), u_ground(3),
+    // u_exposure(1), u_pbr(2), u_emissive(3), u_zenith(3), u_horizon(3),
+    // u_sun(4), u_shadow(3).
+    private static final int UNIFORM_FLOATS = 112;
     private final float[] uniforms = new float[UNIFORM_FLOATS];
+
+    private long shadowPipeline;
+    private long brightPipeline;
+    private long blurPipeline;
+    private long compositePipeline;
+    private boolean inShadowPass;
+    private boolean shadowReady;
+    private int shadowSize;
+    private PostProcess activePost;
+    private final float[] postParams = new float[13];
 
     LinuxGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -94,20 +115,27 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         if (contextPeer == 0) {
             return;
         }
+        if (inShadowPass) {
+            drawShadowCaster(mesh, material, modelMatrix);
+            return;
+        }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        Environment env = getEnvironment();
+        boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
+                && material.isReceiveShadows();
 
         long vboHandle = uploadVertexBuffer(vb);
         if (vboHandle == 0) {
             return;
         }
-        long pipeline = getOrCreatePipeline(material, fmt);
+        long pipeline = getOrCreatePipeline(material, fmt, env, shadowed);
         if (pipeline == 0) {
             return;
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model);
+        packUniforms(material, model, env, shadowed);
 
         long texHandle = 0;
         int texFilter = 0;
@@ -131,12 +159,12 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             LinuxNative.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
                     ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS,
-                    texHandle, texFilter, texWrap);
+                    texHandle, texFilter, texWrap, shadowed ? 1 : 0);
         } else {
             LinuxNative.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
                     vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS,
-                    texHandle, texFilter, texWrap);
+                    texHandle, texFilter, texWrap, shadowed ? 1 : 0);
         }
     }
 
@@ -174,10 +202,13 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         return peer;
     }
 
-    private long getOrCreatePipeline(Material material, VertexFormat fmt) {
+    private long getOrCreatePipeline(Material material, VertexFormat fmt, Environment env,
+                                     boolean shadowed) {
         RenderState rs = material.getRenderState();
         String key = material.getShaderKey()
+                + "|" + GlslShaderGenerator.variantKey(env, shadowed)
                 + "|s" + fmt.getStrideBytes()
+                + "|f" + System.identityHashCode(fmt)
                 + "|b" + blendCode(rs.getBlendMode())
                 + "|c" + cullCode(rs.getCullMode())
                 + "|dt" + (rs.isDepthTest() ? 1 : 0)
@@ -186,18 +217,38 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         if (existing != null) {
             return existing.longValue();
         }
-        GlslShaderGenerator gen = new GlslShaderGenerator(material, fmt);
-        long pipeline = LinuxNative.gl3dGetOrCreatePipeline(
-                contextPeer, key, gen.getSource(),
+        GlslShaderGenerator gen = new GlslShaderGenerator(material, fmt, env, shadowed);
+        long pipeline = createPipeline(key, gen.getVertexSource(), gen.getFragmentSource(),
                 blendCode(rs.getBlendMode()), cullCode(rs.getCullMode()),
                 rs.isDepthTest() ? 1 : 0, rs.isDepthWrite() ? 1 : 0);
         pipelines.put(key, Long.valueOf(pipeline));
         return pipeline;
     }
 
-    // Packs the per-draw uniform block. Ordering matches the CN1Uniforms cbuffer
-    // in the generated HLSL.
-    private void packUniforms(Material material, float[] model) {
+    private long createPipeline(String key, String vertex, String fragment,
+                                int blend, int cull, int depthTest, int depthWrite) {
+        return LinuxNative.gl3dGetOrCreatePipeline(contextPeer, key,
+                vertex + STAGE_SEPARATOR + "\n" + fragment, blend, cull, depthTest, depthWrite);
+    }
+
+    private long namedPipeline(String key, String vertex, String fragment) {
+        Long existing = pipelines.get(key);
+        if (existing != null) {
+            return existing.longValue();
+        }
+        long p = createPipeline(key, vertex, fragment, 0, 0, 1, 1);
+        pipelines.put(key, Long.valueOf(p));
+        return p;
+    }
+
+    private static void rgb(float[] u, int o, int argb) {
+        u[o] = ((argb >> 16) & 0xff) / 255.0f;
+        u[o + 1] = ((argb >> 8) & 0xff) / 255.0f;
+        u[o + 2] = (argb & 0xff) / 255.0f;
+    }
+
+    // Packs the per-draw uniforms in the order of CN1_UNIFORMS in cn1_linux_gl.c.
+    private void packUniforms(Material material, float[] model, Environment env, boolean shadowed) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
@@ -213,6 +264,9 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         for (int i = 0; i < 16; i++) {
             uniforms[o++] = nm[i];
         }
+        for (int i = 0; i < 16; i++) {
+            uniforms[o++] = shadowed ? shadowMatrix[i] : 0.0f;
+        }
         int mc = material.getColor();
         uniforms[o++] = ((mc >> 16) & 0xff) / 255.0f;
         uniforms[o++] = ((mc >> 8) & 0xff) / 255.0f;
@@ -223,22 +277,149 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         uniforms[o++] = light.getDirectionX();
         uniforms[o++] = light.getDirectionY();
         uniforms[o++] = light.getDirectionZ();
-        uniforms[o++] = 0.0f;
-        int lc = light.getColor();
-        uniforms[o++] = ((lc >> 16) & 0xff) / 255.0f;
-        uniforms[o++] = ((lc >> 8) & 0xff) / 255.0f;
-        uniforms[o++] = (lc & 0xff) / 255.0f;
-        uniforms[o++] = 1.0f;
-        int ac = light.getAmbientColor();
-        uniforms[o++] = ((ac >> 16) & 0xff) / 255.0f;
-        uniforms[o++] = ((ac >> 8) & 0xff) / 255.0f;
-        uniforms[o++] = (ac & 0xff) / 255.0f;
-        uniforms[o++] = 1.0f;
+        rgb(uniforms, o, light.getColor());
+        o += 3;
+        rgb(uniforms, o, light.getAmbientColor());
+        o += 3;
         uniforms[o++] = cam != null ? cam.getEyeX() : 0.0f;
         uniforms[o++] = cam != null ? cam.getEyeY() : 0.0f;
         uniforms[o++] = cam != null ? cam.getEyeZ() : 0.0f;
-        uniforms[o++] = 1.0f;
         uniforms[o++] = material.getShininess();
+
+        rgb(uniforms, o, env.getFogColor());
+        o += 3;
+        uniforms[o++] = env.getFogDensity();
+        uniforms[o++] = env.getFogHeightFalloff();
+        uniforms[o++] = env.getFogBaseHeight();
+        rgb(uniforms, o, env.getSkyColor());
+        o += 3;
+        rgb(uniforms, o, env.getGroundColor());
+        o += 3;
+        uniforms[o++] = env.getExposure();
+        uniforms[o++] = material.getMetallic();
+        uniforms[o++] = material.getRoughness();
+        rgb(uniforms, o, material.getEmissive());
+        o += 3;
+        if (env.isSky()) {
+            rgb(uniforms, o, env.getZenithColor());
+            o += 3;
+            rgb(uniforms, o, env.getHorizonColor());
+            o += 3;
+            rgb(uniforms, o, env.getSunColor());
+            o += 3;
+            uniforms[o++] = env.getCloudCover();
+        } else {
+            o += 10;
+        }
+        if (shadowed) {
+            uniforms[o++] = light.getShadowBias();
+            uniforms[o++] = light.getShadowStrength();
+            uniforms[o++] = shadowSize > 0 ? 1.0f / shadowSize : 0.0f;
+        } else {
+            o += 3;
+        }
+    }
+
+    public boolean beginShadowPass(Light light) {
+        if (contextPeer == 0) {
+            return false;
+        }
+        if (shadowPipeline == 0) {
+            shadowPipeline = namedPipeline("cn1|shadow", GlslShaderGenerator.shadowVertex(),
+                    GlslShaderGenerator.shadowFragment());
+        }
+        int size = light.getShadowMapSize();
+        if (shadowPipeline == 0 || !LinuxNative.gl3dBeginShadowPass(contextPeer, size)) {
+            return false;
+        }
+        shadowSize = size;
+        light.computeShadowMatrix(shadowMatrix);
+        inShadowPass = true;
+        return true;
+    }
+
+    public void endShadowPass() {
+        if (!inShadowPass) {
+            return;
+        }
+        inShadowPass = false;
+        shadowReady = true;
+        LinuxNative.gl3dEndShadowPass(contextPeer);
+    }
+
+    // Depth only draw of one caster into the shadow map: the shadow program reads
+    // u_mvp (light space) and a_position only.
+    private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        if (!material.isCastShadows()
+                || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
+                || material.getType() == Material.Type.SKYBOX) {
+            return;
+        }
+        VertexBuffer vb = mesh.getVertices();
+        long vboHandle = uploadVertexBuffer(vb);
+        if (vboHandle == 0 || shadowPipeline == 0) {
+            return;
+        }
+        float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
+        Matrix4.multiply(shadowMatrix, model, mvp);
+        for (int i = 0; i < 16; i++) {
+            uniforms[i] = mvp[i];
+        }
+        int primitive = primitiveCode(mesh.getPrimitiveType());
+        int strideBytes = vb.getFormat().getStrideBytes();
+        if (mesh.isIndexed()) {
+            IndexBuffer ib = mesh.getIndices();
+            long iboHandle = uploadIndexBuffer(ib);
+            if (iboHandle == 0) {
+                return;
+            }
+            LinuxNative.gl3dDrawIndexed(contextPeer, shadowPipeline, vboHandle, strideBytes,
+                    iboHandle, ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0, 0);
+        } else {
+            LinuxNative.gl3dDrawArrays(contextPeer, shadowPipeline, vboHandle, strideBytes,
+                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0, 0);
+        }
+    }
+
+    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+        if (contextPeer == 0 || effects == null) {
+            return false;
+        }
+        if (compositePipeline == 0) {
+            String v = GlslShaderGenerator.postVertex();
+            brightPipeline = namedPipeline("cn1|bright", v, GlslShaderGenerator.brightFragment());
+            blurPipeline = namedPipeline("cn1|blur", v, GlslShaderGenerator.blurFragment());
+            compositePipeline = namedPipeline("cn1|composite", v,
+                    GlslShaderGenerator.compositeFragment());
+        }
+        if (compositePipeline == 0 || brightPipeline == 0 || blurPipeline == 0) {
+            return false;
+        }
+        if (!LinuxNative.gl3dBeginPost(contextPeer, effects.isBloom())) {
+            return false;
+        }
+        activePost = effects;
+        return true;
+    }
+
+    public void endPostProcess(float timeSeconds) {
+        PostProcess pp = activePost;
+        if (pp == null) {
+            return;
+        }
+        activePost = null;
+        float[] p = postParams;
+        p[0] = pp.getBloomThreshold();
+        p[1] = pp.getBloomIntensity();
+        p[2] = pp.getContrast();
+        p[3] = pp.getSaturation();
+        rgb(p, 4, pp.getShadowTint());
+        rgb(p, 7, pp.getHighlightTint());
+        p[10] = pp.getVignette();
+        p[11] = pp.getGrain();
+        p[12] = timeSeconds;
+        LinuxNative.gl3dEndPost(contextPeer, brightPipeline, blurPipeline, compositePipeline,
+                pp.isBloom(), p);
     }
 
     private static int primitiveCode(PrimitiveType type) {
@@ -314,6 +495,15 @@ class LinuxGraphicsDevice extends GraphicsDevice {
                 }
             }
             pipelines.clear();
+            // the native context owned the shadow and post targets and the
+            // programs; none of them outlives it
+            shadowPipeline = 0;
+            brightPipeline = 0;
+            blurPipeline = 0;
+            compositePipeline = 0;
+            inShadowPass = false;
+            shadowReady = false;
+            activePost = null;
             LinuxNative.gl3dDestroyContext(contextPeer);
             contextPeer = 0;
         }

@@ -23,6 +23,7 @@
 package com.codename1.impl.html5;
 
 import com.codename1.gpu.Camera;
+import com.codename1.gpu.Environment;
 import com.codename1.gpu.GpuCapabilities;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.IndexBuffer;
@@ -30,6 +31,7 @@ import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.PrimitiveType;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
@@ -38,7 +40,9 @@ import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.html5.js.webgl.WebGLBuffer;
+import com.codename1.html5.js.webgl.WebGLFramebuffer;
 import com.codename1.html5.js.webgl.WebGLProgram;
+import com.codename1.html5.js.webgl.WebGLRenderbuffer;
 import com.codename1.html5.js.webgl.WebGLRenderingContext;
 import com.codename1.html5.js.webgl.WebGLShader;
 import com.codename1.html5.js.webgl.WebGLTexture;
@@ -101,10 +105,43 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private static final int CLAMP_TO_EDGE = 0x812F;
     private static final int MAX_TEXTURE_SIZE = 0x0D33;
     private static final int MAX_VERTEX_ATTRIBS = 0x8869;
+    private static final int FRAMEBUFFER = 0x8D40;
+    private static final int RENDERBUFFER = 0x8D41;
+    private static final int COLOR_ATTACHMENT0 = 0x8CE0;
+    private static final int DEPTH_ATTACHMENT = 0x8D00;
+    private static final int DEPTH_COMPONENT16 = 0x81A5;
 
     private final WebGLRenderingContext gl;
     private final Map<String, ProgramEntry> programs = new HashMap<String, ProgramEntry>();
     private final GpuCapabilities capabilities;
+
+    // an offscreen colour target (and optional depth) for the shadow map and
+    // the post processing chain
+    private static final class Target {
+        WebGLFramebuffer fbo;
+        WebGLTexture tex;
+        WebGLRenderbuffer depth;
+        int width;
+        int height;
+    }
+
+    private ProgramEntry shadowProgram;
+    private ProgramEntry brightProgram;
+    private ProgramEntry blurProgram;
+    private ProgramEntry compositeProgram;
+    private Target shadowTarget;
+    private Target sceneTarget;
+    private Target bloomA;
+    private Target bloomB;
+    private WebGLBuffer quadVbo;
+    private boolean inShadowPass;
+    private boolean shadowReady;
+    private final float[] shadowMatrix = new float[16];
+    private PostProcess activePost;
+    // The canvas is the default framebuffer (null). The viewport is tracked
+    // here because reading it back would need a typed array across the bridge.
+    private final int[] viewport = new int[4];
+    private final int[] savedViewport = new int[4];
 
     /// Cached compiled program together with the locations the device binds.
     /// Attribute locations are GLint indices (-1 when absent); uniform locations
@@ -124,6 +161,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         WebGLUniformLocation uAmbient;
         WebGLUniformLocation uEye;
         WebGLUniformLocation uShininess;
+        final Map<String, WebGLUniformLocation> uniforms = new HashMap<String, WebGLUniformLocation>();
     }
 
     HTML5GraphicsDevice(WebGLRenderingContext gl) {
@@ -136,7 +174,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         if (maxAttribs <= 0) {
             maxAttribs = 8;
         }
-        this.capabilities = new GpuCapabilities(maxTex, maxAttribs, false, false, false, "WebGL");
+        this.capabilities = new GpuCapabilities(maxTex, maxAttribs, false, false, false, "WebGL", true, true);
     }
 
     public GpuCapabilities getCapabilities() {
@@ -200,14 +238,26 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     }
 
     public void setViewport(int x, int y, int width, int height) {
+        viewport[0] = x;
+        viewport[1] = y;
+        viewport[2] = width;
+        viewport[3] = height;
         gl.viewport(x, y, width, height);
     }
 
     public void draw(Mesh mesh, Material material, float[] modelMatrix) {
         VertexBuffer vertices = mesh.getVertices();
         VertexFormat format = vertices.getFormat();
-        ProgramEntry entry = getProgram(material, format);
+        if (inShadowPass) {
+            drawShadowCaster(mesh, material, modelMatrix);
+            return;
+        }
+        Environment env = getEnvironment();
+        boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
+                && material.isReceiveShadows();
+        ProgramEntry entry = getProgram(material, format, env, shadowed);
         gl.useProgram(entry.program);
+        applyEnvironment(entry, material, env, shadowed);
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
         Camera camera = getCamera();
@@ -413,15 +463,22 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
     }
 
-    private ProgramEntry getProgram(Material material, VertexFormat format) {
-        String key = material.getShaderKey() + "|" + formatKey(format);
+    private ProgramEntry getProgram(Material material, VertexFormat format, Environment env, boolean shadowed) {
+        String key = material.getShaderKey() + "|" + GlslShaderGenerator.variantKey(env, shadowed)
+                + "|" + formatKey(format);
         ProgramEntry entry = programs.get(key);
         if (entry != null) {
             return entry;
         }
-        GlslShaderGenerator gen = new GlslShaderGenerator(material, format);
-        WebGLShader vs = compileShader(VERTEX_SHADER, gen.getVertexSource());
-        WebGLShader fs = compileShader(FRAGMENT_SHADER, gen.getFragmentSource());
+        GlslShaderGenerator gen = new GlslShaderGenerator(material, format, env, shadowed);
+        entry = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+        programs.put(key, entry);
+        return entry;
+    }
+
+    private ProgramEntry buildProgram(String vertexSrc, String fragmentSrc) {
+        WebGLShader vs = compileShader(VERTEX_SHADER, vertexSrc);
+        WebGLShader fs = compileShader(FRAGMENT_SHADER, fragmentSrc);
         WebGLProgram program = gl.createProgram();
         gl.attachShader(program, vs);
         gl.attachShader(program, fs);
@@ -430,7 +487,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             String log = gl.getProgramInfoLog(program);
             throw new RuntimeException("WebGL program link failed: " + log);
         }
-        entry = new ProgramEntry();
+        ProgramEntry entry = new ProgramEntry();
         entry.program = program;
         entry.aPosition = gl.getAttribLocation(program, GlslShaderGenerator.A_POSITION);
         entry.aNormal = gl.getAttribLocation(program, GlslShaderGenerator.A_NORMAL);
@@ -445,8 +502,294 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         entry.uAmbient = gl.getUniformLocation(program, "u_ambient");
         entry.uEye = gl.getUniformLocation(program, "u_eye");
         entry.uShininess = gl.getUniformLocation(program, "u_shininess");
-        programs.put(key, entry);
         return entry;
+    }
+
+    private WebGLUniformLocation loc(ProgramEntry p, String name) {
+        if (p.uniforms.containsKey(name)) {
+            return p.uniforms.get(name);
+        }
+        WebGLUniformLocation l = gl.getUniformLocation(p.program, name);
+        p.uniforms.put(name, l);
+        return l;
+    }
+
+    private void uniformColor(ProgramEntry p, String name, int argb) {
+        WebGLUniformLocation l = loc(p, name);
+        if (l != null) {
+            gl.uniform3f(l, ((argb >> 16) & 0xff) / 255.0f, ((argb >> 8) & 0xff) / 255.0f,
+                    (argb & 0xff) / 255.0f);
+        }
+    }
+
+    private void uniform1(ProgramEntry p, String name, float v) {
+        WebGLUniformLocation l = loc(p, name);
+        if (l != null) {
+            gl.uniform1f(l, v);
+        }
+    }
+
+    private void uniform2(ProgramEntry p, String name, float a, float b) {
+        WebGLUniformLocation l = loc(p, name);
+        if (l != null) {
+            gl.uniform2f(l, a, b);
+        }
+    }
+
+    private void uniform3(ProgramEntry p, String name, float a, float b, float c) {
+        WebGLUniformLocation l = loc(p, name);
+        if (l != null) {
+            gl.uniform3f(l, a, b, c);
+        }
+    }
+
+    private void sampler(ProgramEntry p, String name, int unit, WebGLTexture tex) {
+        WebGLUniformLocation l = loc(p, name);
+        if (l != null) {
+            gl.activeTexture(TEXTURE0 + unit);
+            gl.bindTexture(TEXTURE_2D, tex);
+            gl.uniform1i(l, unit);
+            gl.activeTexture(TEXTURE0);
+        }
+    }
+
+    private void applyEnvironment(ProgramEntry p, Material material, Environment env, boolean shadowed) {
+        uniformColor(p, "u_fogColor", env.getFogColor());
+        uniform3(p, "u_fog", env.getFogDensity(), env.getFogHeightFalloff(), env.getFogBaseHeight());
+        uniformColor(p, "u_sky", env.getSkyColor());
+        uniformColor(p, "u_ground", env.getGroundColor());
+        uniform1(p, "u_exposure", env.getExposure());
+        uniform2(p, "u_pbr", material.getMetallic(), material.getRoughness());
+        if (env.isSky()) {
+            uniformColor(p, "u_zenith", env.getZenithColor());
+            uniformColor(p, "u_horizon", env.getHorizonColor());
+            int sun = env.getSunColor();
+            WebGLUniformLocation l = loc(p, "u_sun");
+            if (l != null) {
+                gl.uniform4f(l, ((sun >> 16) & 0xff) / 255f, ((sun >> 8) & 0xff) / 255f, (sun & 0xff) / 255f,
+                        env.getCloudCover());
+            }
+        }
+        uniformColor(p, "u_emissive", material.getEmissive());
+        if (shadowed) {
+            WebGLUniformLocation l = loc(p, "u_shadowMatrix");
+            if (l != null) {
+                gl.uniformMatrix4fv(l, false, shadowMatrix);
+            }
+            Light light = getLight();
+            uniform3(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
+                    1f / shadowTarget.width);
+            sampler(p, "u_shadowMap", 1, shadowTarget.tex);
+        }
+    }
+
+    private Target target(Target t, int w, int h, boolean depth, int filter) {
+        if (t != null && t.width == w && t.height == h) {
+            return t;
+        }
+        if (t != null) {
+            releaseTarget(t);
+        }
+        Target n = new Target();
+        n.width = w;
+        n.height = h;
+        n.tex = gl.createTexture();
+        gl.bindTexture(TEXTURE_2D, n.tex);
+        gl.texImage2D(TEXTURE_2D, 0, RGBA, w, h, 0, RGBA, UNSIGNED_BYTE, null);
+        gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, filter);
+        gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, filter);
+        gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE);
+        gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_EDGE);
+        gl.bindTexture(TEXTURE_2D, null);
+        n.fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(FRAMEBUFFER, n.fbo);
+        gl.framebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, n.tex, 0);
+        if (depth) {
+            n.depth = gl.createRenderbuffer();
+            gl.bindRenderbuffer(RENDERBUFFER, n.depth);
+            gl.renderbufferStorage(RENDERBUFFER, DEPTH_COMPONENT16, w, h);
+            gl.framebufferRenderbuffer(FRAMEBUFFER, DEPTH_ATTACHMENT, RENDERBUFFER, n.depth);
+            gl.bindRenderbuffer(RENDERBUFFER, null);
+        }
+        return n;
+    }
+
+    private void releaseTarget(Target t) {
+        if (t == null) {
+            return;
+        }
+        gl.deleteFramebuffer(t.fbo);
+        gl.deleteTexture(t.tex);
+        if (t.depth != null) {
+            gl.deleteRenderbuffer(t.depth);
+        }
+    }
+
+    private void saveTarget() {
+        System.arraycopy(viewport, 0, savedViewport, 0, 4);
+    }
+
+    private void restoreTarget() {
+        gl.bindFramebuffer(FRAMEBUFFER, null);
+        setViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
+    }
+
+    private void passInto(Target t) {
+        gl.bindFramebuffer(FRAMEBUFFER, t.fbo);
+        setViewport(0, 0, t.width, t.height);
+    }
+
+    public boolean beginShadowPass(Light light) {
+        if (shadowProgram == null) {
+            shadowProgram = buildProgram(GlslShaderGenerator.shadowVertex(),
+                    GlslShaderGenerator.shadowFragment());
+        }
+        saveTarget();
+        int size = light.getShadowMapSize();
+        // packed depth must not be interpolated between texels
+        shadowTarget = target(shadowTarget, size, size, true, NEAREST);
+        gl.bindFramebuffer(FRAMEBUFFER, shadowTarget.fbo);
+        setViewport(0, 0, size, size);
+        gl.clearColor(1f, 1f, 1f, 1f);
+        gl.depthMask(true);
+        gl.clear(COLOR_BUFFER_BIT | DEPTH_BUFFER_BIT);
+        light.computeShadowMatrix(shadowMatrix);
+        inShadowPass = true;
+        return true;
+    }
+
+    public void endShadowPass() {
+        if (!inShadowPass) {
+            return;
+        }
+        inShadowPass = false;
+        shadowReady = true;
+        restoreTarget();
+    }
+
+    private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
+                || material.getType() == Material.Type.SKYBOX) {
+            return;
+        }
+        VertexBuffer vb = mesh.getVertices();
+        VertexFormat fmt = vb.getFormat();
+        gl.useProgram(shadowProgram.program);
+        float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
+        float[] mvp = Matrix4.identity();
+        Matrix4.multiply(shadowMatrix, model, mvp);
+        if (shadowProgram.uMvp != null) {
+            gl.uniformMatrix4fv(shadowProgram.uMvp, false, mvp);
+        }
+        gl.enable(DEPTH_TEST);
+        gl.depthMask(true);
+        gl.disable(BLEND);
+        gl.disable(CULL_FACE);
+        WebGLBuffer vbo = uploadVertexBuffer(vb);
+        gl.bindBuffer(ARRAY_BUFFER, vbo);
+        bindAttributes(shadowProgram, fmt);
+        int mode = toGlPrimitive(mesh.getPrimitiveType());
+        if (mesh.isIndexed()) {
+            IndexBuffer ib = mesh.getIndices();
+            WebGLBuffer ibo = uploadIndexBuffer(ib);
+            gl.bindBuffer(ELEMENT_ARRAY_BUFFER, ibo);
+            gl.drawElements(mode, ib.getIndexCount(), UNSIGNED_SHORT, 0);
+        } else {
+            gl.drawArrays(mode, 0, vb.getVertexCount());
+        }
+        if (shadowProgram.aPosition >= 0) {
+            gl.disableVertexAttribArray(shadowProgram.aPosition);
+        }
+    }
+
+    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+        if (effects == null) {
+            return false;
+        }
+        if (compositeProgram == null) {
+            String v = GlslShaderGenerator.postVertex();
+            brightProgram = buildProgram(v, GlslShaderGenerator.brightFragment());
+            blurProgram = buildProgram(v, GlslShaderGenerator.blurFragment());
+            compositeProgram = buildProgram(v, GlslShaderGenerator.compositeFragment());
+        }
+        saveTarget();
+        int w = savedViewport[2];
+        int h = savedViewport[3];
+        if (w <= 0 || h <= 0) {
+            return false;
+        }
+        sceneTarget = target(sceneTarget, w, h, true, LINEAR);
+        if (effects.isBloom()) {
+            bloomA = target(bloomA, Math.max(1, w / 4), Math.max(1, h / 4), false, LINEAR);
+            bloomB = target(bloomB, bloomA.width, bloomA.height, false, LINEAR);
+        }
+        gl.bindFramebuffer(FRAMEBUFFER, sceneTarget.fbo);
+        setViewport(0, 0, w, h);
+        activePost = effects;
+        return true;
+    }
+
+    public void endPostProcess(float timeSeconds) {
+        PostProcess pp = activePost;
+        if (pp == null) {
+            return;
+        }
+        activePost = null;
+        gl.disable(DEPTH_TEST);
+        gl.depthMask(false);
+        gl.disable(BLEND);
+        gl.disable(CULL_FACE);
+        WebGLTexture bloomTex = sceneTarget.tex;
+        if (pp.isBloom()) {
+            passInto(bloomA);
+            gl.useProgram(brightProgram.program);
+            sampler(brightProgram, "u_scene", 0, sceneTarget.tex);
+            uniform1(brightProgram, "u_threshold", pp.getBloomThreshold());
+            uniform2(brightProgram, "u_texel", 1f / sceneTarget.width, 1f / sceneTarget.height);
+            drawQuad(brightProgram);
+            for (int i = 0; i < 2; i++) {
+                float spread = 1f + i;
+                passInto(bloomB);
+                gl.useProgram(blurProgram.program);
+                sampler(blurProgram, "u_scene", 0, bloomA.tex);
+                uniform2(blurProgram, "u_dir", spread / bloomA.width, 0f);
+                drawQuad(blurProgram);
+                passInto(bloomA);
+                sampler(blurProgram, "u_scene", 0, bloomB.tex);
+                uniform2(blurProgram, "u_dir", 0f, spread / bloomA.height);
+                drawQuad(blurProgram);
+            }
+            bloomTex = bloomA.tex;
+        }
+        restoreTarget();
+        ProgramEntry c = compositeProgram;
+        gl.useProgram(c.program);
+        sampler(c, "u_scene", 0, sceneTarget.tex);
+        sampler(c, "u_bloom", 1, bloomTex);
+        uniform1(c, "u_bloomIntensity", pp.isBloom() ? pp.getBloomIntensity() : 0f);
+        uniform2(c, "u_grade", pp.getContrast(), pp.getSaturation());
+        uniformColor(c, "u_lift", pp.getShadowTint());
+        uniformColor(c, "u_gain", pp.getHighlightTint());
+        uniform1(c, "u_vignette", pp.getVignette());
+        uniform1(c, "u_grain", pp.getGrain());
+        uniform1(c, "u_time", timeSeconds);
+        uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        drawQuad(c);
+        gl.depthMask(true);
+    }
+
+    private void drawQuad(ProgramEntry p) {
+        if (quadVbo == null) {
+            quadVbo = gl.createBuffer();
+            gl.bindBuffer(ARRAY_BUFFER, quadVbo);
+            gl.bufferData(ARRAY_BUFFER, new float[]{-1f, -1f, 0f, 1f, -1f, 0f, -1f, 1f, 0f, 1f, 1f, 0f},
+                    STATIC_DRAW);
+        }
+        gl.bindBuffer(ARRAY_BUFFER, quadVbo);
+        gl.enableVertexAttribArray(p.aPosition);
+        gl.vertexAttribPointer(p.aPosition, 3, FLOAT, false, 12, 0);
+        gl.drawArrays(TRIANGLE_STRIP, 0, 4);
+        gl.disableVertexAttribArray(p.aPosition);
     }
 
     private static String formatKey(VertexFormat format) {

@@ -178,11 +178,13 @@ public class ArenaView extends GameView {
         // that swallows the far side of the yard.
         getLight().setDirection(-0.55f, -0.62f, -0.3f).setColor(0xfffff0dc).setAmbientColor(0xff8a929c)
                 .setShadows(true).setShadowMap(2048, 24f).setShadowStyle(0.72f, 0.0012f);
+        // tag::splat-atmosphere[]
         getEnvironment().setFog(HAZE, 0.0075f, 0.05f).setHemisphere(0xffa9bdd2, 0xff4f5a3c)
                 .setToneMapping(true).setExposure(1.3f)
                 .setSky(0xff4f7fb8, HAZE, 0xfffff0d0, 0.45f);
         setPostProcess(new PostProcess().setBloom(0.78f, 0.55f)
                 .setGrade(1.12f, 0.86f, 0xff0b1720, 0xfffff2dc).setVignette(0.42f).setGrain(0.035f));
+        // end::splat-atmosphere[]
         getCamera().setPerspective(HIP_FOV, 0.03f, 400f);
         sphere = Primitives.sphere(d, 0.5f, 10, 14, false);
         // the sky is a shader on the inside of a sphere that follows the eye

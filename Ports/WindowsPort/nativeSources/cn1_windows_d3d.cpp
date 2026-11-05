@@ -57,6 +57,17 @@ struct CN1D3DPipeline {
     ID3D11DepthStencilState* depth;
 };
 
+// An auxiliary render target: the shadow map and the post processing buffers.
+struct CN1D3DTarget {
+    ID3D11Texture2D* tex;
+    ID3D11RenderTargetView* rtv;
+    ID3D11ShaderResourceView* srv;
+    ID3D11Texture2D* dsTex;
+    ID3D11DepthStencilView* dsv;
+    int width;
+    int height;
+};
+
 struct CN1D3DContext {
     ID3D11Device* device;
     ID3D11DeviceContext* ctx;
@@ -70,6 +81,18 @@ struct CN1D3DContext {
     ID3D11Buffer* cbuffer;
     // Cached samplers: [filterLinear][wrapRepeat].
     ID3D11SamplerState* samplers[2][2];
+    // The target ordinary draws and clears go to: the frame target, or the post
+    // processing scene target between gl3dBeginPost and gl3dEndPost.
+    ID3D11RenderTargetView* activeRtv;
+    ID3D11DepthStencilView* activeDsv;
+    CN1D3DTarget shadow;
+    CN1D3DTarget scene;
+    CN1D3DTarget bloomA;
+    CN1D3DTarget bloomB;
+    ID3D11Buffer* postCb;
+    ID3D11Buffer* quad;
+    D3D11_VIEWPORT savedVp;
+    int shadowOn;
 };
 
 template <typename T> static void cn1Release(T*& p) {
@@ -91,6 +114,73 @@ static void cn1D3DReleaseTargets(CN1D3DContext* c) {
     cn1Release(c->rtTex);
     cn1Release(c->dsv);
     cn1Release(c->dsTex);
+}
+
+static void cn1D3DReleaseTarget(CN1D3DTarget* t) {
+    cn1Release(t->srv);
+    cn1Release(t->rtv);
+    cn1Release(t->tex);
+    cn1Release(t->dsv);
+    cn1Release(t->dsTex);
+    t->width = 0;
+    t->height = 0;
+}
+
+// (Re)creates an auxiliary render target of the given colour format, with a
+// depth buffer when asked. The colour texture can also be sampled.
+static bool cn1D3DEnsureAux(CN1D3DContext* c, CN1D3DTarget* t, int w, int h, DXGI_FORMAT fmt, bool depth) {
+    if (w <= 0 || h <= 0) {
+        return false;
+    }
+    if (t->tex != NULL && t->width == w && t->height == h) {
+        return true;
+    }
+    cn1D3DReleaseTarget(t);
+    D3D11_TEXTURE2D_DESC td;
+    ZeroMemory(&td, sizeof(td));
+    td.Width = (UINT) w;
+    td.Height = (UINT) h;
+    td.MipLevels = 1;
+    td.ArraySize = 1;
+    td.Format = fmt;
+    td.SampleDesc.Count = 1;
+    td.Usage = D3D11_USAGE_DEFAULT;
+    td.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    if (FAILED(c->device->CreateTexture2D(&td, NULL, &t->tex)) ||
+            FAILED(c->device->CreateRenderTargetView(t->tex, NULL, &t->rtv)) ||
+            FAILED(c->device->CreateShaderResourceView(t->tex, NULL, &t->srv))) {
+        cn1D3DReleaseTarget(t);
+        return false;
+    }
+    if (depth) {
+        D3D11_TEXTURE2D_DESC ds = td;
+        ds.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        ds.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        if (FAILED(c->device->CreateTexture2D(&ds, NULL, &t->dsTex)) ||
+                FAILED(c->device->CreateDepthStencilView(t->dsTex, NULL, &t->dsv))) {
+            cn1D3DReleaseTarget(t);
+            return false;
+        }
+    }
+    t->width = w;
+    t->height = h;
+    return true;
+}
+
+static void cn1D3DUnbindPs(CN1D3DContext* c) {
+    ID3D11ShaderResourceView* none[2] = { NULL, NULL };
+    c->ctx->PSSetShaderResources(0, 2, none);
+}
+
+static void cn1D3DSetViewport(CN1D3DContext* c, int w, int h) {
+    D3D11_VIEWPORT vp;
+    vp.TopLeftX = 0.0f;
+    vp.TopLeftY = 0.0f;
+    vp.Width = (FLOAT) w;
+    vp.Height = (FLOAT) h;
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    c->ctx->RSSetViewports(1, &vp);
 }
 
 static bool cn1D3DEnsureTargets(CN1D3DContext* c, int w, int h) {
@@ -137,6 +227,8 @@ static bool cn1D3DEnsureTargets(CN1D3DContext* c, int w, int h) {
     if (FAILED(c->device->CreateDepthStencilView(c->dsTex, NULL, &c->dsv))) {
         return false;
     }
+    c->activeRtv = c->rtv;
+    c->activeDsv = c->dsv;
     c->ctx->OMSetRenderTargets(1, &c->rtv, c->dsv);
     return true;
 }
@@ -269,6 +361,12 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dDestroyContext___long(COD
         }
     }
     cn1Release(c->cbuffer);
+    cn1Release(c->postCb);
+    cn1Release(c->quad);
+    cn1D3DReleaseTarget(&c->shadow);
+    cn1D3DReleaseTarget(&c->scene);
+    cn1D3DReleaseTarget(&c->bloomA);
+    cn1D3DReleaseTarget(&c->bloomB);
     cn1Release(c->wic);
     if (g_cn1D3DContext == c->ctx) { g_cn1D3DContext = NULL; }
     if (g_cn1D3DDevice == c->device) { g_cn1D3DDevice = NULL; }
@@ -281,6 +379,8 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dBeginFrame___long_int_int
     CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
     if (!c) return;
     if (cn1D3DEnsureTargets(c, width, height)) {
+        c->activeRtv = c->rtv;
+        c->activeDsv = c->dsv;
         c->ctx->OMSetRenderTargets(1, &c->rtv, c->dsv);
     }
 }
@@ -301,16 +401,18 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dSetViewport___long_int_in
 JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dClear___long_int_boolean_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT argb, JAVA_BOOLEAN clearColor, JAVA_BOOLEAN clearDepth) {
     CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
     if (!c || !c->ctx) return;
-    if (clearColor && c->rtv) {
+    ID3D11RenderTargetView* rtv = c->activeRtv ? c->activeRtv : c->rtv;
+    ID3D11DepthStencilView* dsv = c->activeDsv ? c->activeDsv : c->dsv;
+    if (clearColor && rtv) {
         float col[4];
         col[0] = ((argb >> 16) & 0xff) / 255.0f;
         col[1] = ((argb >> 8) & 0xff) / 255.0f;
         col[2] = (argb & 0xff) / 255.0f;
         col[3] = ((argb >> 24) & 0xff) / 255.0f;
-        c->ctx->ClearRenderTargetView(c->rtv, col);
+        c->ctx->ClearRenderTargetView(rtv, col);
     }
-    if (clearDepth && c->dsv) {
-        c->ctx->ClearDepthStencilView(c->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    if (clearDepth && dsv) {
+        c->ctx->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
     }
 }
 
@@ -611,6 +713,17 @@ static void cn1D3DBind(CN1D3DContext* c, CN1D3DPipeline* p, ID3D11Buffer* vbo, i
         ctx->PSSetShaderResources(0, 1, &tex->srv);
         ctx->PSSetSamplers(0, 1, &samp);
     }
+    // The shadow map sits at t1/s1 with a point sampler (depth is not filtered);
+    // it is unbound whenever it is not sampled, so it is never bound while it is
+    // also a render target.
+    if (c->shadowOn && c->shadow.srv) {
+        ID3D11SamplerState* shs = cn1D3DSampler(c, 0, 0);
+        ctx->PSSetShaderResources(1, 1, &c->shadow.srv);
+        ctx->PSSetSamplers(1, 1, &shs);
+    } else {
+        ID3D11ShaderResourceView* none = NULL;
+        ctx->PSSetShaderResources(1, 1, &none);
+    }
 
     float blendFactor[4] = { 0, 0, 0, 0 };
     ctx->OMSetBlendState(p->blend, blendFactor, 0xffffffff);
@@ -642,6 +755,159 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dDrawArrays___long_long_lo
     if (!c || !c->ctx || !p || !vbo) return;
     cn1D3DBind(c, p, vbo, strideBytes, primitive, uniforms, uniformFloats, texturePeer, texFilter, texWrap);
     c->ctx->Draw((UINT) vertexCount, 0);
+}
+
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT size) {
+    CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
+    if (!c || !c->ctx || !c->activeRtv) return JAVA_FALSE;
+    if (!cn1D3DEnsureAux(c, &c->shadow, size, size, DXGI_FORMAT_R32_FLOAT, true)) return JAVA_FALSE;
+    c->shadowOn = 0;
+    ID3D11ShaderResourceView* none = NULL;
+    c->ctx->PSSetShaderResources(1, 1, &none);
+    UINT n = 1;
+    c->ctx->RSGetViewports(&n, &c->savedVp);
+    c->ctx->OMSetRenderTargets(1, &c->shadow.rtv, c->shadow.dsv);
+    cn1D3DSetViewport(c, size, size);
+    float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    c->ctx->ClearRenderTargetView(c->shadow.rtv, white);
+    c->ctx->ClearDepthStencilView(c->shadow.dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    return JAVA_TRUE;
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndShadowPass___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
+    CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
+    if (!c || !c->ctx) return;
+    c->ctx->OMSetRenderTargets(1, &c->activeRtv, c->activeDsv);
+    c->ctx->RSSetViewports(1, &c->savedVp);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dSetShadowSampling___long_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_BOOLEAN on) {
+    CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
+    if (!c) return;
+    c->shadowOn = on ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dBeginPost___long_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_BOOLEAN bloom) {
+    CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
+    if (!c || !c->ctx || !c->rtv || c->width <= 0 || c->height <= 0) return JAVA_FALSE;
+    int w = c->width;
+    int h = c->height;
+    if (!cn1D3DEnsureAux(c, &c->scene, w, h, DXGI_FORMAT_B8G8R8A8_UNORM, true)) return JAVA_FALSE;
+    if (bloom) {
+        int bw = w / 4 > 1 ? w / 4 : 1;
+        int bh = h / 4 > 1 ? h / 4 : 1;
+        if (!cn1D3DEnsureAux(c, &c->bloomA, bw, bh, DXGI_FORMAT_B8G8R8A8_UNORM, false) ||
+                !cn1D3DEnsureAux(c, &c->bloomB, bw, bh, DXGI_FORMAT_B8G8R8A8_UNORM, false)) {
+            return JAVA_FALSE;
+        }
+    }
+    cn1D3DUnbindPs(c);
+    c->activeRtv = c->scene.rtv;
+    c->activeDsv = c->scene.dsv;
+    c->ctx->OMSetRenderTargets(1, &c->activeRtv, c->activeDsv);
+    cn1D3DSetViewport(c, w, h);
+    return JAVA_TRUE;
+}
+
+// One full screen pass of the post chain: samples up to two textures with a
+// linear clamp sampler, writes rtv (no depth), constants are 24 floats.
+static void cn1D3DPostDraw(CN1D3DContext* c, CN1D3DPipeline* p, ID3D11RenderTargetView* rtv,
+        int w, int h, ID3D11ShaderResourceView* src0, ID3D11ShaderResourceView* src1,
+        const float* constants) {
+    ID3D11DeviceContext* ctx = c->ctx;
+    D3D11_MAPPED_SUBRESOURCE mapped;
+    if (SUCCEEDED(ctx->Map(c->postCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
+        memcpy(mapped.pData, constants, 24 * sizeof(float));
+        ctx->Unmap(c->postCb, 0);
+    }
+    ctx->OMSetRenderTargets(1, &rtv, NULL);
+    cn1D3DSetViewport(c, w, h);
+    UINT stride = 12;
+    UINT offset = 0;
+    ctx->IASetVertexBuffers(0, 1, &c->quad, &stride, &offset);
+    ctx->IASetInputLayout(p->layout);
+    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ctx->VSSetShader(p->vs, NULL, 0);
+    ctx->PSSetShader(p->ps, NULL, 0);
+    ctx->VSSetConstantBuffers(0, 1, &c->postCb);
+    ctx->PSSetConstantBuffers(0, 1, &c->postCb);
+    ID3D11SamplerState* samp = cn1D3DSampler(c, 1, 0);
+    ctx->PSSetSamplers(0, 1, &samp);
+    ctx->PSSetShaderResources(0, 1, &src0);
+    ctx->PSSetShaderResources(1, 1, &src1);
+    float blendFactor[4] = { 0, 0, 0, 0 };
+    ctx->OMSetBlendState(p->blend, blendFactor, 0xffffffff);
+    ctx->RSSetState(p->raster);
+    ctx->OMSetDepthStencilState(p->depth, 0);
+    ctx->Draw(4, 0);
+    cn1D3DUnbindPs(c);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_long_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_LONG brightPeer, JAVA_LONG blurPeer, JAVA_LONG compositePeer, JAVA_OBJECT params) {
+    CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
+    CN1D3DPipeline* bright = (CN1D3DPipeline*) (intptr_t) brightPeer;
+    CN1D3DPipeline* blur = (CN1D3DPipeline*) (intptr_t) blurPeer;
+    CN1D3DPipeline* comp = (CN1D3DPipeline*) (intptr_t) compositePeer;
+    if (!c || !c->ctx || !c->scene.srv || !bright || !blur || !comp || params == JAVA_NULL) return;
+    // Whatever happens, drawing returns to the frame target.
+    if (c->postCb == NULL) {
+        D3D11_BUFFER_DESC cbd;
+        ZeroMemory(&cbd, sizeof(cbd));
+        cbd.ByteWidth = 96;
+        cbd.Usage = D3D11_USAGE_DYNAMIC;
+        cbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        cbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        c->device->CreateBuffer(&cbd, NULL, &c->postCb);
+    }
+    if (c->quad == NULL) {
+        static const float verts[12] = { -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f,
+                -1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f };
+        D3D11_BUFFER_DESC bd;
+        ZeroMemory(&bd, sizeof(bd));
+        bd.ByteWidth = sizeof(verts);
+        bd.Usage = D3D11_USAGE_DEFAULT;
+        bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        D3D11_SUBRESOURCE_DATA init;
+        ZeroMemory(&init, sizeof(init));
+        init.pSysMem = verts;
+        c->device->CreateBuffer(&bd, &init, &c->quad);
+    }
+    c->activeRtv = c->rtv;
+    c->activeDsv = c->dsv;
+    if (c->postCb && c->quad) {
+        float k[24];
+        const JAVA_ARRAY_FLOAT* in = (const JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(params);
+        for (int i = 0; i < 16; i++) { k[i] = in[i]; }
+        for (int i = 16; i < 24; i++) { k[i] = 0.0f; }
+        k[13] = (float) c->scene.width;
+        k[14] = (float) c->scene.height;
+        ID3D11ShaderResourceView* bloomSrv = c->scene.srv;
+        if (in[15] > 0.5f && c->bloomA.srv && c->bloomB.srv) {
+            k[16] = 1.0f / (float) c->scene.width;
+            k[17] = 1.0f / (float) c->scene.height;
+            cn1D3DPostDraw(c, bright, c->bloomA.rtv, c->bloomA.width, c->bloomA.height,
+                    c->scene.srv, NULL, k);
+            k[16] = 0.0f;
+            k[17] = 0.0f;
+            for (int i = 0; i < 2; i++) {
+                float spread = 1.0f + (float) i;
+                k[20] = spread / (float) c->bloomA.width;
+                k[21] = 0.0f;
+                cn1D3DPostDraw(c, blur, c->bloomB.rtv, c->bloomB.width, c->bloomB.height,
+                        c->bloomA.srv, NULL, k);
+                k[20] = 0.0f;
+                k[21] = spread / (float) c->bloomA.height;
+                cn1D3DPostDraw(c, blur, c->bloomA.rtv, c->bloomA.width, c->bloomA.height,
+                        c->bloomB.srv, NULL, k);
+            }
+            k[20] = 0.0f;
+            k[21] = 0.0f;
+            bloomSrv = c->bloomA.srv;
+        }
+        cn1D3DPostDraw(c, comp, c->rtv, c->width, c->height, c->scene.srv, bloomSrv, k);
+    }
+    c->ctx->OMSetRenderTargets(1, &c->rtv, c->dsv);
+    cn1D3DSetViewport(c, c->width, c->height);
 }
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_gl3dCaptureFrame___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {

@@ -1123,10 +1123,24 @@ public final class LinuxNative {
 
     public static native void gl3dDrawIndexed(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
             long iboPeer, int indexCount, int primitive, float[] uniforms, int uniformFloats,
-            long texturePeer, int texFilter, int texWrap);
+            long texturePeer, int texFilter, int texWrap, int shadowMap);
     public static native void gl3dDrawArrays(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
-            long texturePeer, int texFilter, int texWrap);
+            long texturePeer, int texFilter, int texWrap, int shadowMap);
+
+    /** Binds a size x size packed-depth shadow target and clears it. */
+    public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    /** Restores the target and viewport that were bound at gl3dBeginShadowPass. */
+    public static native void gl3dEndShadowPass(long contextPeer);
+    /** Redirects subsequent draws into an offscreen scene target the size of the viewport. */
+    public static native boolean gl3dBeginPost(long contextPeer, boolean bloom);
+    /**
+     * Runs the bloom passes and the composite into the target saved at
+     * gl3dBeginPost. params: threshold, bloomIntensity, contrast, saturation,
+     * lift rgb, gain rgb, vignette, grain, time.
+     */
+    public static native void gl3dEndPost(long contextPeer, long brightPipeline, long blurPipeline,
+            long compositePipeline, boolean bloom, float[] params);
 
     // ---- SQLite bindings. Implemented in cn1_linux_db.c from the shared cn1_db_sqlite_impl.h. ----
 

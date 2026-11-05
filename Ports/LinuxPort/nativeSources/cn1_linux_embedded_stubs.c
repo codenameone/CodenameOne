@@ -476,13 +476,33 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dSetViewport___long_int_int_in
     (void) contextPeer; (void) x; (void) y; (void) width; (void) height;
     cn1LinuxStubOnce("gl3dSetViewport");
 }
-JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawIndexed___long_long_long_int_long_int_int_float_1ARRAY_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_LONG iboPeer, JAVA_INT indexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
-    (void) contextPeer; (void) pipelinePeer; (void) vboPeer; (void) strideBytes; (void) iboPeer; (void) indexCount; (void) primitive; (void) uniforms; (void) uniformFloats; (void) texturePeer; (void) texFilter; (void) texWrap;
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawIndexed___long_long_long_int_long_int_int_float_1ARRAY_int_long_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_LONG iboPeer, JAVA_INT indexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap, JAVA_INT shadowMap) {
+    (void) contextPeer; (void) pipelinePeer; (void) vboPeer; (void) strideBytes; (void) iboPeer; (void) indexCount; (void) primitive; (void) uniforms; (void) uniformFloats; (void) texturePeer; (void) texFilter; (void) texWrap; (void) shadowMap;
     cn1LinuxStubOnce("gl3dDrawIndexed");
 }
-JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_int_int_int_float_1ARRAY_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_INT vertexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
-    (void) contextPeer; (void) pipelinePeer; (void) vboPeer; (void) strideBytes; (void) vertexCount; (void) primitive; (void) uniforms; (void) uniformFloats; (void) texturePeer; (void) texFilter; (void) texWrap;
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_int_int_int_float_1ARRAY_int_long_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_INT vertexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap, JAVA_INT shadowMap) {
+    (void) contextPeer; (void) pipelinePeer; (void) vboPeer; (void) strideBytes; (void) vertexCount; (void) primitive; (void) uniforms; (void) uniformFloats; (void) texturePeer; (void) texFilter; (void) texWrap; (void) shadowMap;
     cn1LinuxStubOnce("gl3dDrawArrays");
+}
+
+/* shadows and post processing are unavailable without a GL context: false
+   makes the device draw the scene directly */
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT size) {
+    (void) contextPeer; (void) size;
+    return JAVA_FALSE;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndShadowPass___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer) {
+    (void) contextPeer;
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginPost___long_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_BOOLEAN bloom) {
+    (void) contextPeer; (void) bloom;
+    return JAVA_FALSE;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long_boolean_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG brightPeer, JAVA_LONG blurPeer, JAVA_LONG compositePeer, JAVA_BOOLEAN bloom, JAVA_OBJECT params) {
+    (void) contextPeer; (void) brightPeer; (void) blurPeer; (void) compositePeer; (void) bloom; (void) params;
 }
 #endif /* CN1_EMBEDDED_HAS_GL */
 

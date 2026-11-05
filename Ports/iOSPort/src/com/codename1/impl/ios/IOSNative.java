@@ -821,6 +821,11 @@ public class IOSNative {
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap);
 
+    native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    native void gl3dEndShadowPass(long contextPeer);
+    native boolean gl3dBeginPostProcess(long contextPeer, String mslSource, boolean bloom);
+    native void gl3dEndPostProcess(long contextPeer, float[] params);
+
     native void destroyAudioUnit(long peer);
 
     native long createAudioUnit(String path, int audioChannels, float sampleRate, float[] f);

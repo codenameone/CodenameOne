@@ -29,11 +29,14 @@
  * gl3dCaptureFrame reads the pixels back and PNG-encodes them. libepoxy supplies
  * the GLES/EGL entry points.
  *
- * The combined GLSL source from GlslShaderGenerator carries the vertex and
- * fragment stages separated by "//@@CN1_FRAGMENT@@"; gl3dGetOrCreatePipeline
- * splits, compiles and links them, and records which optional vertex attributes
- * (normal at location 1, texcoord at location 2) the shader declared so the draw
- * calls can set the interleaved attribute pointers.
+ * The shaders come from the core com.codename1.impl.gpu.GlslShaderGenerator
+ * (GLSL ES 1.00, which an ES 3.0 context accepts). LinuxGraphicsDevice joins the
+ * vertex and fragment stages with "//@@CN1_FRAGMENT@@"; gl3dGetOrCreatePipeline
+ * splits, compiles and links them (a_position/a_normal/a_texcoord are bound to
+ * locations 0/1/2), records which optional vertex attributes the shader declared
+ * and caches the named-uniform locations. Draws receive one packed float array
+ * whose layout is CN1_UNIFORMS below. The shadow pass and the post process chain
+ * (bright pass, blur, composite) run here against offscreen targets.
  */
 
 #define _GNU_SOURCE
@@ -55,26 +58,75 @@ extern int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outDat
 
 #define CN1_STAGE_SEP "//@@CN1_FRAGMENT@@"
 
+/* An offscreen colour target (plus optional depth) for the shadow map and the
+ * post processing chain. */
+typedef struct {
+    GLuint fbo;
+    GLuint tex;
+    GLuint depth;
+    int w, h;
+} CN1GlTarget;
+
 typedef struct {
     EGLDisplay dpy;
     EGLContext ctx;
     GLuint fbo;
     GLuint colorTex;
     GLuint depthRbo;
-    GLuint ubo;
     GLuint vao;
     int w, h;
+    CN1GlTarget shadow;
+    CN1GlTarget scene;
+    CN1GlTarget bloomA;
+    CN1GlTarget bloomB;
+    GLuint quadVbo;
+    GLint savedFbo;
+    GLint savedVp[4];
 } CN1GlContext;
+
+/* Layout of the packed uniform array a draw passes in; must match
+ * LinuxGraphicsDevice.packUniforms (112 floats). A size of 16 is a mat4. */
+typedef struct {
+    const char* name;
+    int size;
+} CN1GlUniformDef;
+
+static const CN1GlUniformDef CN1_UNIFORMS[] = {
+    {"u_mvp", 16}, {"u_model", 16}, {"u_normalMatrix", 16}, {"u_shadowMatrix", 16},
+    {"u_color", 4}, {"u_lightDir", 3}, {"u_lightColor", 3}, {"u_ambient", 3},
+    {"u_eye", 3}, {"u_shininess", 1}, {"u_fogColor", 3}, {"u_fog", 3},
+    {"u_sky", 3}, {"u_ground", 3}, {"u_exposure", 1}, {"u_pbr", 2},
+    {"u_emissive", 3}, {"u_zenith", 3}, {"u_horizon", 3}, {"u_sun", 4},
+    {"u_shadow", 3}
+};
+#define CN1_UNIFORM_COUNT ((int) (sizeof(CN1_UNIFORMS) / sizeof(CN1_UNIFORMS[0])))
+#define CN1_UNIFORM_FLOATS 112
 
 typedef struct {
     GLuint program;
     int hasNormal;
     int hasTexcoord;
     int blend, cull, depthTest, depthWrite;
+    GLint loc[CN1_UNIFORM_COUNT];
+    GLint uTexture;
+    GLint uShadowMap;
 } CN1GlPipeline;
 
 static int cn1GlMakeCurrent(CN1GlContext* c) {
     return eglMakeCurrent(c->dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, c->ctx);
+}
+
+static void cn1GlReleaseTarget(CN1GlTarget* t) {
+    if (t->fbo) {
+        glDeleteFramebuffers(1, &t->fbo);
+    }
+    if (t->tex) {
+        glDeleteTextures(1, &t->tex);
+    }
+    if (t->depth) {
+        glDeleteRenderbuffers(1, &t->depth);
+    }
+    memset(t, 0, sizeof(*t));
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateContext___R_long(CODENAME_ONE_THREAD_STATE) {
@@ -132,7 +184,6 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateContext___R_long(CODENA
     glGenFramebuffers(1, &c->fbo);
     glGenTextures(1, &c->colorTex);
     glGenRenderbuffers(1, &c->depthRbo);
-    glGenBuffers(1, &c->ubo);
     glGenVertexArrays(1, &c->vao);
     return (JAVA_LONG) (intptr_t) c;
 }
@@ -146,7 +197,13 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDestroyContext___long(CODENAM
     glDeleteFramebuffers(1, &c->fbo);
     glDeleteTextures(1, &c->colorTex);
     glDeleteRenderbuffers(1, &c->depthRbo);
-    glDeleteBuffers(1, &c->ubo);
+    cn1GlReleaseTarget(&c->shadow);
+    cn1GlReleaseTarget(&c->scene);
+    cn1GlReleaseTarget(&c->bloomA);
+    cn1GlReleaseTarget(&c->bloomB);
+    if (c->quadVbo) {
+        glDeleteBuffers(1, &c->quadVbo);
+    }
     glDeleteVertexArrays(1, &c->vao);
     eglMakeCurrent(c->dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroyContext(c->dpy, c->ctx);
@@ -365,7 +422,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
     char* sep;
     GLuint vs, fs, prog;
     GLint linkOk = 0;
-    GLuint blockIndex;
+    int i;
     CN1GlPipeline* p;
     (void) key;
     if (!c || glslSource == JAVA_NULL) {
@@ -392,6 +449,9 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
     prog = glCreateProgram();
     glAttachShader(prog, vs);
     glAttachShader(prog, fs);
+    glBindAttribLocation(prog, 0, "a_position");
+    glBindAttribLocation(prog, 1, "a_normal");
+    glBindAttribLocation(prog, 2, "a_texcoord");
     glLinkProgram(prog);
     glGetProgramiv(prog, GL_LINK_STATUS, &linkOk);
     glDeleteShader(vs);
@@ -404,16 +464,16 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
         free(vsrc);
         return 0;
     }
-    /* Bind the CN1Uniforms block to binding point 0 (the context UBO). */
-    blockIndex = glGetUniformBlockIndex(prog, "CN1Uniforms");
-    if (blockIndex != GL_INVALID_INDEX) {
-        glUniformBlockBinding(prog, blockIndex, 0);
-    }
     p = (CN1GlPipeline*) calloc(1, sizeof(CN1GlPipeline));
     p->program = prog;
+    for (i = 0; i < CN1_UNIFORM_COUNT; i++) {
+        p->loc[i] = glGetUniformLocation(prog, CN1_UNIFORMS[i].name);
+    }
+    p->uTexture = glGetUniformLocation(prog, "u_texture");
+    p->uShadowMap = glGetUniformLocation(prog, "u_shadowMap");
     /* Record which optional interleaved attributes the shader declared. */
-    p->hasNormal = strstr(vsrc, "in vec3 normal") != 0;
-    p->hasTexcoord = strstr(vsrc, "in vec2 texcoord") != 0;
+    p->hasNormal = strstr(vsrc, "attribute vec3 a_normal") != 0;
+    p->hasTexcoord = strstr(vsrc, "attribute vec2 a_texcoord") != 0;
     p->blend = blendMode;
     p->cull = cullMode;
     p->depthTest = depthTest;
@@ -436,6 +496,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dClear___long_int_boolean_bool
     }
     if (clearDepth) {
         glClearDepthf(1.0f);
+        glDepthMask(GL_TRUE);
         mask |= GL_DEPTH_BUFFER_BIT;
     }
     glClear(mask);
@@ -463,7 +524,8 @@ static GLenum cn1GlPrimitive(int primitive) {
 }
 
 static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int strideBytes,
-        float* uniforms, int uniformFloats, GLuint texture, int texFilter, int texWrap) {
+        float* uniforms, int uniformFloats, GLuint texture, int texFilter, int texWrap,
+        int useShadowMap) {
     glUseProgram(p->program);
 
     if (p->blend == 0) {
@@ -502,10 +564,25 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
     }
     glDepthMask(p->depthWrite ? GL_TRUE : GL_FALSE);
 
-    /* Uniform block upload. */
-    glBindBuffer(GL_UNIFORM_BUFFER, c->ubo);
-    glBufferData(GL_UNIFORM_BUFFER, (GLsizeiptr) uniformFloats * 4, uniforms, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, c->ubo);
+    /* Named uniforms from the packed array (locations were cached at link). */
+    if (uniformFloats >= CN1_UNIFORM_FLOATS) {
+        const float* u = uniforms;
+        int i;
+        for (i = 0; i < CN1_UNIFORM_COUNT; i++) {
+            GLint l = p->loc[i];
+            int n = CN1_UNIFORMS[i].size;
+            if (l >= 0) {
+                switch (n) {
+                    case 16: glUniformMatrix4fv(l, 1, GL_FALSE, u); break;
+                    case 4: glUniform4fv(l, 1, u); break;
+                    case 3: glUniform3fv(l, 1, u); break;
+                    case 2: glUniform2fv(l, 1, u); break;
+                    default: glUniform1f(l, u[0]); break;
+                }
+            }
+            u += n;
+        }
+    }
 
     /* Interleaved vertex attributes (position @0, normal @12, texcoord after). */
     glBindVertexArray(c->vao);
@@ -536,11 +613,19 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texFilter ? GL_LINEAR : GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texWrap ? GL_REPEAT : GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texWrap ? GL_REPEAT : GL_CLAMP_TO_EDGE);
-        glUniform1i(glGetUniformLocation(p->program, "cn1_tex"), 0);
+        if (p->uTexture >= 0) {
+            glUniform1i(p->uTexture, 0);
+        }
+    }
+    if (useShadowMap && c->shadow.tex && p->uShadowMap >= 0) {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, c->shadow.tex);
+        glUniform1i(p->uShadowMap, 1);
+        glActiveTexture(GL_TEXTURE0);
     }
 }
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawIndexed___long_long_long_int_long_int_int_float_1ARRAY_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_LONG iboPeer, JAVA_INT indexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawIndexed___long_long_long_int_long_int_int_float_1ARRAY_int_long_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_LONG iboPeer, JAVA_INT indexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap, JAVA_INT shadowMap) {
     CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
     CN1GlPipeline* p = (CN1GlPipeline*) (intptr_t) pipelinePeer;
     if (!c || !p || uniforms == JAVA_NULL) {
@@ -548,12 +633,12 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawIndexed___long_long_long_
     }
     cn1GlMakeCurrent(c);
     cn1GlBindDraw(c, p, (GLuint) vboPeer, strideBytes, (float*) CN1_ARRAY_DATA(uniforms),
-            uniformFloats, (GLuint) texturePeer, texFilter, texWrap);
+            uniformFloats, (GLuint) texturePeer, texFilter, texWrap, shadowMap);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (GLuint) iboPeer);
     glDrawElements(cn1GlPrimitive(primitive), indexCount, GL_UNSIGNED_SHORT, 0);
 }
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_int_int_int_float_1ARRAY_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_INT vertexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_int_int_int_float_1ARRAY_int_long_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_INT vertexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap, JAVA_INT shadowMap) {
     CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
     CN1GlPipeline* p = (CN1GlPipeline*) (intptr_t) pipelinePeer;
     if (!c || !p || uniforms == JAVA_NULL) {
@@ -561,6 +646,221 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_i
     }
     cn1GlMakeCurrent(c);
     cn1GlBindDraw(c, p, (GLuint) vboPeer, strideBytes, (float*) CN1_ARRAY_DATA(uniforms),
-            uniformFloats, (GLuint) texturePeer, texFilter, texWrap);
+            uniformFloats, (GLuint) texturePeer, texFilter, texWrap, shadowMap);
     glDrawArrays(cn1GlPrimitive(primitive), 0, vertexCount);
+}
+
+/* ------------------------------------------------- shadow pass and post */
+
+static void cn1GlSaveTarget(CN1GlContext* c) {
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &c->savedFbo);
+    glGetIntegerv(GL_VIEWPORT, c->savedVp);
+}
+
+static void cn1GlRestoreTarget(CN1GlContext* c) {
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint) c->savedFbo);
+    glViewport(c->savedVp[0], c->savedVp[1], c->savedVp[2], c->savedVp[3]);
+}
+
+/* (Re)creates an RGBA8 colour target, with a 16 bit depth renderbuffer when
+ * asked, unless one of that size exists. Leaves its FBO bound. */
+static int cn1GlEnsureTarget(CN1GlTarget* t, int w, int h, int depth, GLint filter) {
+    GLenum status;
+    if (t->fbo && t->w == w && t->h == h) {
+        glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
+        return 1;
+    }
+    cn1GlReleaseTarget(t);
+    t->w = w;
+    t->h = h;
+    glGenTextures(1, &t->tex);
+    glBindTexture(GL_TEXTURE_2D, t->tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glGenFramebuffers(1, &t->fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t->tex, 0);
+    if (depth) {
+        glGenRenderbuffers(1, &t->depth);
+        glBindRenderbuffer(GL_RENDERBUFFER, t->depth);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, t->depth);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    }
+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        cn1GlReleaseTarget(t);
+        return 0;
+    }
+    return 1;
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT size) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    if (!c || size <= 0) {
+        return JAVA_FALSE;
+    }
+    cn1GlMakeCurrent(c);
+    cn1GlSaveTarget(c);
+    /* packed depth must not be interpolated between texels */
+    if (!cn1GlEnsureTarget(&c->shadow, size, size, 1, GL_NEAREST)) {
+        cn1GlRestoreTarget(c);
+        return JAVA_FALSE;
+    }
+    glViewport(0, 0, size, size);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClearDepthf(1.0f);
+    glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    return JAVA_TRUE;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndShadowPass___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    if (c) {
+        cn1GlMakeCurrent(c);
+        cn1GlRestoreTarget(c);
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginPost___long_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_BOOLEAN bloom) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    int w, h;
+    if (!c) {
+        return JAVA_FALSE;
+    }
+    cn1GlMakeCurrent(c);
+    cn1GlSaveTarget(c);
+    w = c->savedVp[2];
+    h = c->savedVp[3];
+    if (w <= 0 || h <= 0) {
+        return JAVA_FALSE;
+    }
+    if (!cn1GlEnsureTarget(&c->scene, w, h, 1, GL_LINEAR)) {
+        cn1GlRestoreTarget(c);
+        return JAVA_FALSE;
+    }
+    if (bloom) {
+        int bw = w / 4 > 1 ? w / 4 : 1;
+        int bh = h / 4 > 1 ? h / 4 : 1;
+        if (!cn1GlEnsureTarget(&c->bloomA, bw, bh, 0, GL_LINEAR)
+                || !cn1GlEnsureTarget(&c->bloomB, bw, bh, 0, GL_LINEAR)) {
+            cn1GlRestoreTarget(c);
+            return JAVA_FALSE;
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, c->scene.fbo);
+    glViewport(0, 0, w, h);
+    return JAVA_TRUE;
+}
+
+static void cn1GlSampler(GLuint program, const char* name, int unit, GLuint tex) {
+    GLint l = glGetUniformLocation(program, name);
+    if (l >= 0) {
+        glActiveTexture(GL_TEXTURE0 + unit);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glUniform1i(l, unit);
+        glActiveTexture(GL_TEXTURE0);
+    }
+}
+
+static void cn1GlUniform1(GLuint program, const char* name, float a) {
+    GLint l = glGetUniformLocation(program, name);
+    if (l >= 0) glUniform1f(l, a);
+}
+
+static void cn1GlUniform2(GLuint program, const char* name, float a, float b) {
+    GLint l = glGetUniformLocation(program, name);
+    if (l >= 0) glUniform2f(l, a, b);
+}
+
+static void cn1GlUniform3(GLuint program, const char* name, float a, float b, float d) {
+    GLint l = glGetUniformLocation(program, name);
+    if (l >= 0) glUniform3f(l, a, b, d);
+}
+
+static void cn1GlPassInto(const CN1GlTarget* t) {
+    glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
+    glViewport(0, 0, t->w, t->h);
+}
+
+/* Full screen triangle strip with a_position in clip space. */
+static void cn1GlQuad(CN1GlContext* c) {
+    static const float quad[12] = {-1.f, -1.f, 0.f, 1.f, -1.f, 0.f, -1.f, 1.f, 0.f, 1.f, 1.f, 0.f};
+    glBindVertexArray(c->vao);
+    if (!c->quadVbo) {
+        glGenBuffers(1, &c->quadVbo);
+        glBindBuffer(GL_ARRAY_BUFFER, c->quadVbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, c->quadVbo);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*) 0);
+    glDisableVertexAttribArray(1);
+    glDisableVertexAttribArray(2);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+/* params: threshold, bloomIntensity, contrast, saturation, lift rgb, gain rgb,
+ * vignette, grain, time (13 floats). */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long_boolean_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG brightPeer, JAVA_LONG blurPeer, JAVA_LONG compositePeer, JAVA_BOOLEAN bloom, JAVA_OBJECT params) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    CN1GlPipeline* bright = (CN1GlPipeline*) (intptr_t) brightPeer;
+    CN1GlPipeline* blur = (CN1GlPipeline*) (intptr_t) blurPeer;
+    CN1GlPipeline* comp = (CN1GlPipeline*) (intptr_t) compositePeer;
+    const float* pr;
+    GLuint bloomTex;
+    int i;
+    if (!c || !comp || params == JAVA_NULL || !c->scene.fbo) {
+        return;
+    }
+    pr = (const float*) CN1_ARRAY_DATA(params);
+    cn1GlMakeCurrent(c);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+    bloomTex = c->scene.tex;
+    if (bloom && bright && blur && c->bloomA.fbo && c->bloomB.fbo) {
+        cn1GlPassInto(&c->bloomA);
+        glUseProgram(bright->program);
+        cn1GlSampler(bright->program, "u_scene", 0, c->scene.tex);
+        cn1GlUniform1(bright->program, "u_threshold", pr[0]);
+        cn1GlUniform2(bright->program, "u_texel", 1.0f / c->scene.w, 1.0f / c->scene.h);
+        cn1GlQuad(c);
+        for (i = 0; i < 2; i++) {
+            float spread = 1.0f + (float) i;
+            cn1GlPassInto(&c->bloomB);
+            glUseProgram(blur->program);
+            cn1GlSampler(blur->program, "u_scene", 0, c->bloomA.tex);
+            cn1GlUniform2(blur->program, "u_dir", spread / c->bloomA.w, 0.0f);
+            cn1GlQuad(c);
+            cn1GlPassInto(&c->bloomA);
+            cn1GlSampler(blur->program, "u_scene", 0, c->bloomB.tex);
+            cn1GlUniform2(blur->program, "u_dir", 0.0f, spread / c->bloomA.h);
+            cn1GlQuad(c);
+        }
+        bloomTex = c->bloomA.tex;
+    } else {
+        bloom = JAVA_FALSE;
+    }
+    cn1GlRestoreTarget(c);
+    glUseProgram(comp->program);
+    cn1GlSampler(comp->program, "u_scene", 0, c->scene.tex);
+    cn1GlSampler(comp->program, "u_bloom", 1, bloomTex);
+    cn1GlUniform1(comp->program, "u_bloomIntensity", bloom ? pr[1] : 0.0f);
+    cn1GlUniform2(comp->program, "u_grade", pr[2], pr[3]);
+    cn1GlUniform3(comp->program, "u_lift", pr[4], pr[5], pr[6]);
+    cn1GlUniform3(comp->program, "u_gain", pr[7], pr[8], pr[9]);
+    cn1GlUniform1(comp->program, "u_vignette", pr[10]);
+    cn1GlUniform1(comp->program, "u_grain", pr[11]);
+    cn1GlUniform1(comp->program, "u_time", pr[12]);
+    cn1GlUniform2(comp->program, "u_resolution", (float) c->scene.w, (float) c->scene.h);
+    cn1GlQuad(c);
+    glDepthMask(GL_TRUE);
 }

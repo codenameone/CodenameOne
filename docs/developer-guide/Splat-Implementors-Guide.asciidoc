@@ -152,6 +152,16 @@ view draws between the last two ticks:
 include::../../scripts/splat/common/src/main/java/com/codenameone/examples/splat/play/ArenaView.java[tag=splat-fixed-tick,indent=0]
 ----
 
+The look is the engine's, not a texture pack's: haze that thins with height,
+an open sky with clouds and the sun, shadows from the props and trees, and a
+colour grade with bloom on the paint. It is a dozen lines at the start of the
+view, and the menu backdrop uses the same calls with dusk colours:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/splat/common/src/main/java/com/codenameone/examples/splat/play/ArenaView.java[tag=splat-atmosphere,indent=0]
+----
+
 What ticks the match is a `Driver`. Practice, an online match and a replay are three
 drivers behind the same view and the same screen:
 
@@ -161,7 +171,10 @@ include::../../scripts/splat/common/src/main/java/com/codenameone/examples/splat
 ----
 
 The HUD is a plain component layered over the view, so it's styled from `theme.css`
-and respects the safe area like any other screen:
+and respects the safe area like any other screen. On a phone it is compact -- a
+small minimap, a two line killfeed, the hopper in one tab -- and on a desktop or
+tablet it shows everything. It steps aside entirely for the briefing and the
+result card, so nothing in a match ever draws over a menu:
 
 [source,java,role=cn1-no-try]
 ----

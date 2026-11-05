@@ -1133,6 +1133,21 @@ public final class WindowsNative {
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap);
 
+    /** Starts the shadow pass: binds a size x size R32_FLOAT depth map as the target and clears it; false if it cannot. */
+    public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    /** Ends the shadow pass and rebinds the scene target and viewport. */
+    public static native void gl3dEndShadowPass(long contextPeer);
+    /** Binds (or unbinds) the shadow map at t1/s1 for the following draws. */
+    public static native void gl3dSetShadowSampling(long contextPeer, boolean on);
+    /** Redirects drawing into an offscreen scene target (plus bloom targets if bloom); false if it cannot. */
+    public static native boolean gl3dBeginPost(long contextPeer, boolean bloom);
+    /**
+     * Runs bloom (bright, two blur rounds) and the composite into the frame target.
+     * The 16 float parameters are documented in WindowsGraphicsDevice.endPostProcess.
+     */
+    public static native void gl3dEndPost(long contextPeer, long brightPipeline, long blurPipeline,
+            long compositePipeline, float[] params);
+
     // ---- SQLite bindings. Implemented in cn1_windows_db.c from the shared cn1_db_sqlite_impl.h. ----
 
     /** True when a database file exists at this absolute path. */

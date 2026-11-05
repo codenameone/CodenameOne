@@ -197,8 +197,8 @@ public class AnimatedModel {
     ///
     /// - `type`: the lighting model
     public void setMaterialType(Material.Type type) {
-        for (int i = 0; i < parts.length; i++) {
-            parts[i].getMaterial().setType(type);
+        for (Model part : parts) {
+            part.getMaterial().setType(type);
         }
     }
 
