@@ -33,7 +33,7 @@ try {
 
 const url = process.env.URL;
 const out = process.env.OUT || 'target/web-e2e';
-const email = process.env.SLATE_USER || 'member@slate.example';
+const email = process.env.SLATE_USER || 'client@slate.example';
 const password = process.env.SLATE_PASSWORD || 'slate-demo';
 const admin = process.env.SLATE_ADMIN || 'owner@slate.example';
 // A cold runner translates nothing at this point, but it does parse several

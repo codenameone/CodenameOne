@@ -129,7 +129,7 @@ image::img/slate-book-booked.png["Booked, with a button to add the appointment t
 ==== Appointments
 
 // vale-skip: Microsoft.FirstPerson: the screen's own label.
-*My appointments* lists what's coming, a day at a time, and what's past. An
+The *My appointments* screen lists what's coming, a day at a time, and what's past. An
 appointment's screen shows when, where, who with and what was paid. It says
 exactly what cancelling costs right now: free until a stated time, or the deposit
 kept once that time has passed. It can open the appointment as

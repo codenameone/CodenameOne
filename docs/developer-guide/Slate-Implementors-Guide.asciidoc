@@ -83,7 +83,7 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 
 `SlotEngine` decides which starts can be booked. A start is offered only when
 every party the service needs is free -- the providers, one resource of the
-right kind, and the client themself -- and every rule the business set holds:
+right kind, and the client -- and every rule the business set holds:
 notice and horizon, buffers before and after, a provider's daily cap and breaks,
 travel time between locations, the client's gap between bookings and their
 bookings per day, and the shortest gap worth leaving on a provider's day. It reads
@@ -94,8 +94,8 @@ nothing and writes nothing, which is what lets each rule be tested by itself:
 include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/SlotEngine.java[tag=slate-slot-engine,indent=0]
 ----
 
-Starts are read off the business's local clock, so a day that changes to summer
-time has no slot at a time that doesn't exist:
+Starts are read off the business's local clock, so a day when the clocks go
+forward has no slot at a time that doesn't exist:
 
 [source,java,role=cn1-no-try]
 ----
@@ -269,7 +269,7 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 ----
 
 A client can also add a booking straight to their phone's calendar. The app keeps
-the ids of the events it wrote, so a reschedule moves its own event and a
+the ids of the events it wrote, so moving a booking moves its own event and a
 cancellation removes it:
 
 [source,java,role=cn1-no-try]

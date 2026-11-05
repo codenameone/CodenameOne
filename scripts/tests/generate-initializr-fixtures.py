@@ -91,6 +91,7 @@ FULL_STACK = {
     'REEL': ('api/CatalogApi.java', 'ui/WelcomeForm.java'),
     'BASTION': ('api/BankingApi.java', 'ui/HomeForm.java'),
     'PULSE': ('api/BookingApi.java', 'ui/WelcomeForm.java'),
+    'SLATE': ('api/AppointmentApi.java', 'ui/WelcomeForm.java'),
 }
 
 
@@ -104,6 +105,7 @@ TEMPLATE_HINT = {
     'BASTION': 'codename1.arg.ios.detectJailbreak=true',
     'REEL': None,
     'PULSE': 'codename1.arg.ios.NSHealthShareUsageDescription=',
+    'SLATE': 'codename1.arg.ios.NSCalendarsFullAccessUsageDescription=',
 }
 
 
@@ -143,7 +145,7 @@ def check_full_stack_fixture(archive, z, template):
     assert ('javase/pom.xml' in names) == full, archive.name
     for name in ['shared/src/main/java/com/example/probe/' + contract,
                  'backend/src/main/java/com/example/probe/SecurityConfig.java',
-                 'backend/src/main/resources/db/migration/' + ('V1__game.sql' if rules else 'V4__accounts.sql' if template == 'BASTION' else 'V2__accounts.sql' if template == 'PULSE' else 'V1__accounts.sql'),
+                 'backend/src/main/resources/db/migration/' + ('V1__game.sql' if rules else 'V4__accounts.sql' if template == 'BASTION' else 'V2__accounts.sql' if template in ('PULSE', 'SLATE') else 'V1__accounts.sql'),
                  'backend/server.sh',
                  'common/src/main/java/com/example/probe/LauncherProbe.java',
                  'common/src/main/java/com/example/probe/' + screen]:
