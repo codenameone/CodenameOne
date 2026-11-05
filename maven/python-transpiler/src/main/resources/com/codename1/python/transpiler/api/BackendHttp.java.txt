@@ -4,19 +4,28 @@ package @PACKAGE@;
 import com.codename1.backend.Web;
 import com.codename1.backend.WebClient;
 import com.codename1.python.runtime.PyHttp;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /// The HTTP client `requests` and `httpx` use in a backend build: the
 /// backend's own, over libcurl. Generated only into a backend build -- an
 /// application's is the network manager, which the backend's class library
 /// does not have.
 ///
-/// The backend's client always follows redirects itself, so a request made
-/// with `allow_redirects=False` still arrives at the final response.
+/// Redirects are followed here, not by the transport, so that
+/// `allow_redirects` means what it does under CPython and the response
+/// carries the URL it really came from. The transport's own policy depends
+/// on the headers sent, and `requests` always sends some.
 final class BackendHttp extends PyHttp {
+    /// What `requests` allows before giving up (`requests.models.DEFAULT_REDIRECT_LIMIT`).
+    private static final int MAX_REDIRECTS = 30;
+
     private BackendHttp() {
     }
 
@@ -29,35 +38,173 @@ final class BackendHttp extends PyHttp {
     @Override
     public Response send(String method, String url, String[] headers, byte[] body, int timeoutMillis,
             boolean followRedirects) throws IOException {
+        WebClient client = new WebClient();
+        try {
+            if (timeoutMillis > 0) {
+                client.setConnectTimeoutMillis(timeoutMillis);
+                client.setReadTimeoutMillis(timeoutMillis);
+            }
+            String[] sent = headers;
+            for (int hops = 0;; hops++) {
+                Response r = once(client, method, url, sent, body);
+                String location = followRedirects ? header(r, "Location") : null;
+                int status = r.status;
+                if (location == null || (status != 301 && status != 302 && status != 303
+                        && status != 307 && status != 308)) {
+                    return r;
+                }
+                if (hops >= MAX_REDIRECTS) {
+                    throw new IOException("Exceeded " + MAX_REDIRECTS + " redirects.");
+                }
+                String next = resolve(url, location);
+                // As requests does: 303 becomes a GET, and so does a POST
+                // answered 301 or 302; the body goes with the method.
+                if (status == 303 && !"HEAD".equals(method)
+                        || (status == 301 || status == 302) && "POST".equals(method)) {
+                    method = "GET";
+                    body = null;
+                    sent = without(sent, "Content-Length", "Content-Type", "Transfer-Encoding");
+                }
+                // Credentials stay with the host they were meant for.
+                if (!host(next).equalsIgnoreCase(host(url))) {
+                    sent = without(sent, "Authorization", "Cookie", null);
+                }
+                url = next;
+            }
+        } finally {
+            client.close();
+        }
+    }
+
+    private static Response once(WebClient client, String method, String url, String[] headers,
+            byte[] body) throws IOException {
         List lines = new ArrayList();
         for (int i = 0; i + 1 < headers.length; i += 2) {
             lines.add(headers[i] + ": " + headers[i + 1]);
         }
-        WebClient client = new WebClient();
-        Web.Result r;
+        boolean hasBody = body != null && body.length > 0;
+        Web.Exchange ex = client.open(method, url, lines, hasBody ? body.length : 0);
         try {
-            if (timeoutMillis > 0) {
-                client.setRequestTimeoutMillis(timeoutMillis);
+            if (hasBody) {
+                OutputStream out = ex.getRequestBody();
+                out.write(body);
+                out.close();
             }
-            r = client.request(method, url, lines, body);
+            int status = ex.getStatus();
+            if (status <= 0) {
+                throw new IOException("no response from " + url);
+            }
+            List all = new ArrayList();
+            Map values = ex.getHeaderValueMap();
+            for (Iterator it = values.keySet().iterator(); it.hasNext();) {
+                String name = String.valueOf(it.next());
+                Object v = values.get(name);
+                if (v instanceof List) {
+                    List l = (List) v;
+                    for (int i = 0; i < l.size(); i++) {
+                        all.add(name);
+                        all.add(String.valueOf(l.get(i)));
+                    }
+                }
+            }
+            InputStream in = ex.getResponseBody();
+            ByteArrayOutputStream data = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n = in.read(buf); n >= 0; n = in.read(buf)) {
+                data.write(buf, 0, n);
+            }
+            in.close();
+            return new Response(status, reason(status), url,
+                    (String[]) all.toArray(new String[all.size()]), data.toByteArray());
         } finally {
-            client.close();
+            ex.close();
         }
-        if (r.getStatus() <= 0) {
-            String error = r.getError();
-            throw new IOException(error == null ? "no response from " + url : error);
-        }
-        List all = new ArrayList();
-        for (Iterator it = r.getHeaders().keySet().iterator(); it.hasNext();) {
-            String name = String.valueOf(it.next());
-            List values = r.getHeaderValues(name);
-            for (int i = 0; values != null && i < values.size(); i++) {
-                all.add(name);
-                all.add(String.valueOf(values.get(i)));
+    }
+
+    private static String header(Response r, String name) {
+        for (int i = 0; i + 1 < r.headers.length; i += 2) {
+            if (r.headers[i].equalsIgnoreCase(name)) {
+                return r.headers[i + 1];
             }
         }
-        byte[] data = r.getBody();
-        return new Response(r.getStatus(), "", url, (String[]) all.toArray(new String[all.size()]),
-                data == null ? new byte[0] : data);
+        return null;
+    }
+
+    private static String[] without(String[] headers, String a, String b, String c) {
+        List kept = new ArrayList();
+        for (int i = 0; i + 1 < headers.length; i += 2) {
+            String n = headers[i];
+            if (n.equalsIgnoreCase(a) || n.equalsIgnoreCase(b) || c != null && n.equalsIgnoreCase(c)) {
+                continue;
+            }
+            kept.add(n);
+            kept.add(headers[i + 1]);
+        }
+        return (String[]) kept.toArray(new String[kept.size()]);
+    }
+
+    /// `location` against `base`: absolute, scheme-relative, rooted or relative.
+    static String resolve(String base, String location) {
+        if (location.indexOf("://") > 0) {
+            return location;
+        }
+        int scheme = base.indexOf("://");
+        String prefix = base.substring(0, scheme + 1);
+        if (location.startsWith("//")) {
+            return prefix + location;
+        }
+        int pathStart = base.indexOf('/', scheme + 3);
+        String origin = pathStart < 0 ? base : base.substring(0, pathStart);
+        if (location.startsWith("/")) {
+            return origin + location;
+        }
+        String path = pathStart < 0 ? "/" : base.substring(pathStart);
+        int cut = path.indexOf('?');
+        if (cut >= 0) {
+            path = path.substring(0, cut);
+        }
+        return origin + path.substring(0, path.lastIndexOf('/') + 1) + location;
+    }
+
+    private static String host(String url) {
+        int scheme = url.indexOf("://");
+        int end = url.indexOf('/', scheme + 3);
+        return (end < 0 ? url.substring(scheme + 3) : url.substring(scheme + 3, end));
+    }
+
+    /// The standard reason phrase; libcurl does not hand back the server's.
+    static String reason(int status) {
+        switch (status) {
+            case 200: return "OK";
+            case 201: return "Created";
+            case 202: return "Accepted";
+            case 204: return "No Content";
+            case 206: return "Partial Content";
+            case 301: return "Moved Permanently";
+            case 302: return "Found";
+            case 303: return "See Other";
+            case 304: return "Not Modified";
+            case 307: return "Temporary Redirect";
+            case 308: return "Permanent Redirect";
+            case 400: return "Bad Request";
+            case 401: return "Unauthorized";
+            case 403: return "Forbidden";
+            case 404: return "Not Found";
+            case 405: return "Method Not Allowed";
+            case 406: return "Not Acceptable";
+            case 408: return "Request Timeout";
+            case 409: return "Conflict";
+            case 410: return "Gone";
+            case 413: return "Content Too Large";
+            case 415: return "Unsupported Media Type";
+            case 422: return "Unprocessable Content";
+            case 429: return "Too Many Requests";
+            case 500: return "Internal Server Error";
+            case 501: return "Not Implemented";
+            case 502: return "Bad Gateway";
+            case 503: return "Service Unavailable";
+            case 504: return "Gateway Timeout";
+            default: return "";
+        }
     }
 }

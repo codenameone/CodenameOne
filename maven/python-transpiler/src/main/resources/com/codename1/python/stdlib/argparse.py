@@ -34,7 +34,9 @@ _UNRECOGNIZED_ARGS_ATTR = "_unrecognized_args"
 
 def _terminal_width():
     try:
-        columns = int(os.environ.get("COLUMNS", ""))
+        # By name: a native build cannot enumerate the environment, so
+        # os.environ is empty there while os.getenv still reads one variable.
+        columns = int(os.getenv("COLUMNS", ""))
         if columns > 0:
             return columns
     except (ValueError, TypeError):
@@ -77,9 +79,13 @@ def _action_name(argument):
         return "/".join(argument.option_strings)
     if argument.metavar not in (None, SUPPRESS):
         metavar = argument.metavar
-        if isinstance(metavar, tuple):
-            return "/".join(metavar)
-        return metavar
+        if not isinstance(metavar, tuple):
+            return metavar
+        if argument.nargs == ZERO_OR_MORE and len(metavar) == 2:
+            return "%s[, %s]" % metavar
+        if argument.nargs == ONE_OR_MORE:
+            return "%s[, %s]" % metavar
+        return ", ".join(metavar)
     if argument.dest not in (None, SUPPRESS):
         return argument.dest
     if argument.choices:
@@ -150,16 +156,13 @@ class HelpFormatter:
     def add_argument(self, action):
         if action.help is SUPPRESS:
             return
-        invocations = [self._format_action_invocation(action)]
+        # Each invocation is measured at its own indent, once.
+        longest = len(self._format_action_invocation(action)) + self._current_indent
         self._indent()
         for sub in action._get_subactions():
-            invocations.append(" " * self._current_indent + self._format_action_invocation(sub))
+            longest = max(longest, len(self._format_action_invocation(sub)) + self._current_indent)
         self._dedent()
-        longest = 0
-        for s in invocations:
-            if len(s) > longest:
-                longest = len(s)
-        self._action_max_length = max(self._action_max_length, longest + self._current_indent)
+        self._action_max_length = max(self._action_max_length, longest)
         self._section.items.append((self._format_action, (action,)))
 
     def add_arguments(self, actions):
@@ -311,7 +314,7 @@ class HelpFormatter:
 
     def _format_action_invocation(self, action):
         if not action.option_strings:
-            return self._metavar(action, self._default_metavar_for_positional(action), 1)[0]
+            return " ".join(self._metavar(action, self._default_metavar_for_positional(action), 1))
         if action.nargs == 0:
             return ", ".join(action.option_strings)
         args = self._format_args(action, self._default_metavar_for_optional(action))

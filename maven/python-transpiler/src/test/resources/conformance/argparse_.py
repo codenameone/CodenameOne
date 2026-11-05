@@ -111,3 +111,15 @@ w.add_argument("destination")
 w.print_usage()
 ns = argparse.Namespace(a=1, b="x")
 print(ns, "a" in ns, ns == argparse.Namespace(a=1, b="x"))
+
+m = argparse.ArgumentParser(prog="meta", exit_on_error=False)
+m.add_argument("pos", nargs=2, metavar=("A", "B"))
+print(m.format_help())
+try:
+    m.parse_args([])
+except argparse.ArgumentError as e:
+    print("error:", e)
+s = argparse.ArgumentParser(prog="subs")
+sp = s.add_subparsers(title="cmds", metavar="CMD")
+sp.add_parser("run", aliases=["r"], help="run it")
+print(s.format_help())

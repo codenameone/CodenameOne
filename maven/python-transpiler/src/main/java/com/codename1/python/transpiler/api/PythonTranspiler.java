@@ -777,6 +777,15 @@ public final class PythonTranspiler {
                 + "            PySql.install(new PySql() {\n"
                 + "                @Override\n"
                 + "                public PySql.Connection open(String name) throws IOException {\n"
+                // sqlite3.connect names a file, never a server: Database.open
+                // would take a postgres:// or mysql:// name as one.
+                + "                    if (name.indexOf(\"://\") >= 0) {\n"
+                + "                        throw new IOException(\"unable to open database file\");\n"
+                + "                    }\n"
+                // io.py's rooted /C:/x is C:/x on Windows, as BackendFileSystem maps it.
+                + "                    if (name.length() >= 3 && name.charAt(0) == '/' && name.charAt(2) == ':') {\n"
+                + "                        name = name.substring(1);\n"
+                + "                    }\n"
                 + "                    return new Conn(Database.open(name.length() == 0 ? \":memory:\" : name));\n"
                 + "                }\n"
                 + "            });\n"

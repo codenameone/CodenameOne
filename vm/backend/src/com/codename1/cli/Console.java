@@ -58,7 +58,8 @@ public final class Console {
 
     /// Whether [#style] adds color: never when `NO_COLOR` is set, always when
     /// `CLICOLOR_FORCE` is set to anything but `0`, and otherwise when `TERM`
-    /// names a terminal other than `dumb`.
+    /// names a terminal other than `dumb` and standard output is a terminal, so
+    /// output piped to a file or another program carries no escape codes.
     public static boolean colorEnabled() {
         String none = System.getenv("NO_COLOR");
         if (none != null && none.length() > 0) {
@@ -69,7 +70,12 @@ public final class Console {
             return true;
         }
         String term = System.getenv("TERM");
-        return term != null && term.length() > 0 && !"dumb".equals(term);
+        return term != null && term.length() > 0 && !"dumb".equals(term) && isTerminal();
+    }
+
+    /// Whether standard output is a terminal rather than a pipe or a file.
+    public static boolean isTerminal() {
+        return TerminalImpl.isTerminal(1);
     }
 
     /// The styles [#style] can apply.

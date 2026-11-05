@@ -79,6 +79,12 @@ public final class CommandLine {
     /// The exit code for a command line that does not parse.
     public static final int USAGE_ERROR = 2;
 
+    /// What [#serve] answers when the server ran rather than a command. Every
+    /// int a command can return is a valid exit code, negative ones included,
+    /// so the marker is the one value whose exit status is indistinguishable
+    /// from 0 anyway (`Integer.MIN_VALUE & 0xff` is 0).
+    public static final int SERVED = Integer.MIN_VALUE;
+
     /// The exit code for a command that threw.
     public static final int EXECUTION_ERROR = 1;
 
@@ -345,20 +351,20 @@ public final class CommandLine {
     ///
     /// #### Returns
     ///
-    /// the exit code, or -1 when the server ran and the process should end the
-    /// way a server's does.
+    /// the exit code, or [#SERVED] when the server ran and the process should
+    /// end the way a server's does.
     public static int serve(String appName, CommandSpec[] commands, Server server,
                             String[] args) throws Exception {
         if (args == null || args.length == 0
                 || ((commands == null || commands.length == 0)
                     && !isHelp(args))) {
             server.serve();
-            return -1;
+            return SERVED;
         }
         ServeBinding serve = new ServeBinding(server);
         CommandSpec root = root(appName, commands, serve.spec());
         int code = new CommandLine(root).execute(args);
-        return serve.ran ? -1 : code;
+        return serve.ran ? SERVED : code;
     }
 
     private static boolean isHelp(String[] args) {
@@ -376,7 +382,13 @@ public final class CommandLine {
             commands[0].addSubcommand(serve);
             return commands[0];
         }
-        CommandSpec group = new CommandSpec(appName, new String[0], new String[0], true, null);
+        // A generated group has no @Command of its own to carry a version, so
+        // it prints the first one its commands declare.
+        String[] version = new String[0];
+        for (int i = 0; i < count && version.length == 0; i++) {
+            version = commands[i].version();
+        }
+        CommandSpec group = new CommandSpec(appName, new String[0], version, true, null);
         if (serve != null) {
             group.addSubcommand(serve);
         }
@@ -488,15 +500,29 @@ public final class CommandLine {
 
     private static List<OptionSpec> allOptions(CommandSpec cmd) {
         List<OptionSpec> all = new ArrayList<OptionSpec>(cmd.options());
-        if (cmd.standardHelpOptions()) {
-            if (find(all, "-h") == null && find(all, "--help") == null) {
-                all.add(OptionSpec.helpOption());
-            }
-            if (find(all, "-V") == null && find(all, "--version") == null) {
-                all.add(OptionSpec.versionOption());
-            }
-        }
+        addStandardOptions(cmd, all);
         return all;
+    }
+
+    /// Adds the `--help` and `--version` options a command recognizes to
+    /// `options`, its declared ones. The parser and the help both call this, so
+    /// the help never lists an option the parser rejects. The build refuses a
+    /// declared option that reuses one of their names; the checks here cover a
+    /// spec built by hand. `--version` is left out of a generated group that has
+    /// no version to print, rather than printing nothing.
+    static void addStandardOptions(CommandSpec cmd, List<OptionSpec> options) {
+        if (!cmd.standardHelpOptions()) {
+            return;
+        }
+        boolean help = find(options, "-h") == null && find(options, "--help") == null;
+        boolean version = find(options, "-V") == null && find(options, "--version") == null
+                && (cmd.binding() != null || cmd.version().length > 0);
+        if (help) {
+            options.add(OptionSpec.helpOption());
+        }
+        if (version) {
+            options.add(OptionSpec.versionOption());
+        }
     }
 
     private static OptionSpec find(List<OptionSpec> options, String name) {
@@ -580,7 +606,11 @@ public final class CommandLine {
                 return next;
             }
             // The rest of the cluster is the value of the first option that takes one.
+            // `-c=2` and `-lc=2` give the value 2, as `--count=2` does.
             String rest = arg.substring(c + 1);
+            if (rest.startsWith("=")) {
+                rest = rest.substring(1);
+            }
             return occurrence(cmd, binding, s, options, values, args,
                     rest.length() == 0 ? null : rest, next, result);
         }
@@ -606,6 +636,14 @@ public final class CommandLine {
         if (o.flag()) {
             if (attached != null) {
                 record(cmd, binding, o, values, parseBoolean(cmd, o, attached));
+            } else if (o.arityMin() > 0) {
+                // arity = "1": the value is required, and must be true or false.
+                if (next >= args.length) {
+                    throw new ParameterException(cmd, "Missing required parameter for option '"
+                            + o.longestName() + "' (" + o.label() + ")");
+                }
+                record(cmd, binding, o, values, parseBoolean(cmd, o, args[next]));
+                return next + 1;
             } else if (o.arityMax() > 0 && next < args.length
                     && ("true".equalsIgnoreCase(args[next])
                         || "false".equalsIgnoreCase(args[next]))) {

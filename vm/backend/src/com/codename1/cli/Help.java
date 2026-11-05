@@ -39,7 +39,7 @@ final class Help {
         StringBuilder flags = new StringBuilder();
         for (OptionSpec o : options) {
             String shortName = shortName(o);
-            if (o.flag() && !o.required() && shortName != null) {
+            if (bare(o) && !o.required() && shortName != null) {
                 insertSorted(flags, shortName.charAt(1));
             }
         }
@@ -47,10 +47,10 @@ final class Help {
             synopsis.append(" [-").append(flags).append(']');
         }
         for (OptionSpec o : options) {
-            if (o.flag() && !o.required() && shortName(o) != null) {
+            if (bare(o) && !o.required() && shortName(o) != null) {
                 continue;
             }
-            String one = o.flag() ? o.longestName() : o.longestName() + "=" + o.label();
+            String one = bare(o) ? o.longestName() : o.longestName() + "=" + o.label();
             if (o.multiple()) {
                 one = one + "...";
             }
@@ -59,8 +59,8 @@ final class Help {
         List<PositionalParamSpec> params = visiblePositionals(cmd);
         for (PositionalParamSpec p : params) {
             String one = p.label() + (p.multiple() ? "..." : "");
-            boolean optional = !p.required() && (p.multiple() ? p.arityMin() == 0
-                    : p.defaultValue() != null);
+            boolean optional = !p.required() && (p.arityMin() == 0
+                    || !p.multiple() && p.defaultValue() != null);
             synopsis.append(' ').append(optional ? "[" + one + "]" : one);
         }
         if (!cmd.subcommands().isEmpty()) {
@@ -105,6 +105,12 @@ final class Help {
         return lower * 2 + (upper ? 1 : 0);
     }
 
+    /// Whether an option is written without a value: a flag, unless its arity
+    /// requires one (`arity = "1"` on a boolean).
+    private static boolean bare(OptionSpec o) {
+        return o.flag() && o.arityMin() == 0;
+    }
+
     private static List<OptionSpec> visibleOptions(CommandSpec cmd) {
         List<OptionSpec> out = new ArrayList<OptionSpec>();
         List<OptionSpec> declared = cmd.options();
@@ -113,10 +119,7 @@ final class Help {
                 out.add(d);
             }
         }
-        if (cmd.standardHelpOptions()) {
-            out.add(OptionSpec.helpOption());
-            out.add(OptionSpec.versionOption());
-        }
+        CommandLine.addStandardOptions(cmd, out);
         return out;
     }
 
@@ -164,7 +167,7 @@ final class Help {
         if (first && shortName != null) {
             sb.setLength(sb.length() - 2);
         }
-        if (!o.flag()) {
+        if (!bare(o)) {
             sb.append(first && shortName != null ? " " : "=").append(o.label());
         }
         return sb.toString();

@@ -3351,7 +3351,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
           .append(quote(appName)).append(", ")
           .append(cliApplication != null ? cliApplication + ".commands()" : "null")
           .append(", new Cn1Server(), args);\n");
-        sb.append("        if (code >= 0) {\n");
+        sb.append("        if (code != com.codename1.cli.CommandLine.SERVED) {\n");
         sb.append("            System.out.flush();\n");
         sb.append("            System.err.flush();\n");
         sb.append("            System.exit(code);\n");

@@ -116,8 +116,9 @@ The process exits with:
 `com.codename1.cli.Console` helps with terminal output. `Console.width()` is the
 width help is wrapped to, from `COLUMNS`. `Console.style(text, Style.BOLD,
 Style.RED)` adds ANSI colour only when colour is wanted: never under `NO_COLOR`,
-always under `CLICOLOR_FORCE`, and never on a terminal that declares itself
-`dumb`.
+always under `CLICOLOR_FORCE`, never on a terminal that declares itself
+`dumb`, and never when standard output is redirected to a file or a pipe.
+`Console.isTerminal()` answers that last question.
 
 === Testing
 

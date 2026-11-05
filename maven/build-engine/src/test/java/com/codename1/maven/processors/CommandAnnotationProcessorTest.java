@@ -203,7 +203,7 @@ public class CommandAnnotationProcessorTest {
             System.setErr(oldErr);
         }
         assertEquals(2, bare);
-        assertTrue(err.toString(), err.toString().contains("Usage: tool [-hV] [COMMAND]"));
+        assertTrue(err.toString(), err.toString().contains("Usage: tool [-h] [COMMAND]"));
         assertEquals(0, CommandLine.run("tool", commands(loader), new String[] {"beta"}));
         assertEquals("beta", loader.loadClass("com.example.Alpha").getField("last").get(null));
     }
@@ -294,17 +294,17 @@ public class CommandAnnotationProcessorTest {
         File classes = compile(greetSources());
         process(classes, new CommandAnnotationProcessor());
         ClassLoader loader = loader(classes);
-        assertEquals(-1, CommandLine.serve("app", commands(loader), server, new String[0]));
+        assertEquals(CommandLine.SERVED, CommandLine.serve("app", commands(loader), server, new String[0]));
         assertEquals(1, served[0]);
         // One top-level command: the server joins it as its "serve" subcommand.
-        assertEquals(-1, CommandLine.serve("app", commands(loader), server,
+        assertEquals(CommandLine.SERVED, CommandLine.serve("app", commands(loader), server,
                 new String[] {"serve"}));
         assertEquals(2, served[0]);
         assertEquals(0, CommandLine.serve("app", commands(loader), server,
                 new String[] {"bob"}));
         assertEquals(2, served[0]);
         // A backend with no commands keeps ignoring what it is passed.
-        assertEquals(-1, CommandLine.serve("app", null, server, new String[] {"--port=1"}));
+        assertEquals(CommandLine.SERVED, CommandLine.serve("app", null, server, new String[] {"--port=1"}));
         assertEquals(3, served[0]);
     }
 
@@ -358,7 +358,78 @@ public class CommandAnnotationProcessorTest {
         assertRefused("@Command public class Bad implements Runnable {\n"
                 + "  Bad(int x) {} public void run() {} }", "no constructor without");
         assertRefused("public class Bad {\n"
-                + "  @Option(names = \"-x\") int a; }", "not annotated @Command");
+                + "  @Option(names = \"-x\") int a; }", "not a concrete @Command class");
+    }
+
+    @Test
+    public void refusesDeclarationsThatCannotWork() throws Exception {
+        assertRefused("@Command(mixinStandardHelpOptions = true) public class Bad implements Runnable {\n"
+                + "  @Option(names = \"-V\") boolean verbose; public void run() {} }",
+                "mixinStandardHelpOptions already gives");
+        assertRefused("@Command public class Bad implements Runnable {\n"
+                + "  @Option(names = \"--x\", split = \",\") String x; public void run() {} }",
+                "holds one value");
+        assertRefused("@Command(subcommands = {A.class, B.class}) public class Bad {}\n"
+                + "@Command(name = \"add\") class A implements Runnable { public void run() {} }\n"
+                + "@Command(name = \"put\", aliases = \"add\") class B implements Runnable {\n"
+                + "  public void run() {} }", "only one of them can be reached");
+        assertRefused("abstract class Base { @Option(names = \"-v\") private boolean v; }\n"
+                + "@Command public class Bad extends Base implements Runnable {\n"
+                + "  public void run() {} }", "is private");
+    }
+
+    /// The fixes a red-team review asked for, each run through the generated code.
+    @Test
+    public void parsesTheEdgesLikePicocli() throws Exception {
+        String body = "abstract class Base { @Option(names = \"-l\") boolean loud; }\n"
+                + "class Conv implements CommandLine.ITypeConverter<Object> {\n"
+                + "  public Object convert(String s) { return s.startsWith(\"#\") ? s : (Object) Integer.valueOf(s); } }\n"
+                + "@Command(name = \"t\", mixinStandardHelpOptions = true)\n"
+                + "public class Edge extends Base implements java.util.concurrent.Callable<Integer> {\n"
+                + "  public static String last;\n"
+                + "  @Option(names = {\"-c\", \"--count\"}) int count;\n"
+                + "  @Option(names = \"--port\", converter = Conv.class) Integer port;\n"
+                + "  @Option(names = \"--x\", arity = \"1\") boolean x;\n"
+                + "  @Parameters(arity = \"0..1\", paramLabel = \"<name>\") String name;\n"
+                + "  public Integer call() { last = loud + \" \" + count + \" \" + port + \" \" + x;\n"
+                + "    return count == 9 ? -1 : 0; } }";
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Edge", IMPORTS + body + "\n");
+        File classes = compile(sources);
+        ProcessorContext ctx = process(classes, new CommandAnnotationProcessor());
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        ClassLoader loader = loader(classes);
+        // An inherited option, and = after a cluster.
+        assertEquals(0, CommandLine.run("t", commands(loader), new String[] {"-lc=2", "--port", "80"}));
+        assertEquals("true 2 80 false", loader.loadClass("com.example.Edge").getField("last").get(null));
+        assertEquals(0, CommandLine.run("t", commands(loader), new String[] {"--x", "true"}));
+        assertEquals("false 0 null true", loader.loadClass("com.example.Edge").getField("last").get(null));
+        // A negative exit code is the command's to give.
+        assertEquals(-1, CommandLine.run("t", commands(loader), new String[] {"-c", "9"}));
+        PrintStream oldErr = System.err;
+        PrintStream oldOut = System.out;
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(err, true));
+        System.setOut(new PrintStream(out, true));
+        int wrongType;
+        int bareX;
+        int badX;
+        try {
+            wrongType = CommandLine.run("t", commands(loader), new String[] {"--port", "#80"});
+            bareX = CommandLine.run("t", commands(loader), new String[] {"--x"});
+            badX = CommandLine.run("t", commands(loader), new String[] {"--x", "yes"});
+            CommandLine.run("t", commands(loader), new String[] {"--help"});
+        } finally {
+            System.setErr(oldErr);
+            System.setOut(oldOut);
+        }
+        // A converter answering the wrong type is an invalid value, never a cast.
+        assertEquals(err.toString(), 2, wrongType);
+        assertTrue(err.toString(), err.toString().contains("returned a java.lang.String, not a java.lang.Integer"));
+        assertEquals(err.toString(), 2, bareX);
+        assertEquals(err.toString(), 2, badX);
+        assertTrue(out.toString(), out.toString().contains("[<name>]"));
     }
 
     @Test

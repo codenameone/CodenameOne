@@ -37,6 +37,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -86,6 +87,10 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
 
     /// The command classes found, by internal name, in the order found.
     private final Map<String, AnnotatedClass> commands = new LinkedHashMap<String, AnnotatedClass>();
+    /// Classes that declare @Option or @Parameters fields but are not concrete
+    /// commands: a base class a command extends, as in picocli. One no command
+    /// extends is reported in [#finish].
+    private final Map<String, AnnotatedClass> holders = new LinkedHashMap<String, AnnotatedClass>();
 
     @Override
     public Set<String> getAnnotationDescriptors() {
@@ -99,6 +104,7 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         commands.clear();
+        holders.clear();
     }
 
     @Override
@@ -107,19 +113,19 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
             return;
         }
         boolean command = cls.getClassAnnotation(COMMAND) != null;
-        if (!command) {
+        if (!command || cls.isAbstract()) {
             for (FieldInfo f : cls.getFields()) {
                 if (f.getAnnotation(OPTION) != null || f.getAnnotation(PARAMETERS) != null) {
                     if (BuildHintAnnotationProcessor.hasBackingSource(cls,
                             ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
-                        ctx.error(cls, cls.getSourceName() + "." + f.getName() + " is an "
-                                + "@Option or @Parameters field, but " + cls.getSourceName()
-                                + " is not annotated @Command. Annotate the class.");
+                        holders.put(cls.getInternalName(), cls);
                     }
                     return;
                 }
             }
-            return;
+            if (!command) {
+                return;
+            }
         }
         // A deleted command whose .class is still in target/classes must not keep
         // shipping: the same orphan rule every generator here follows.
@@ -132,9 +138,22 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
-        if (commands.isEmpty()) {
+        if (commands.isEmpty() && holders.isEmpty()) {
             generatePythonEntryPoint(ctx);
             return;
+        }
+        Set<String> extended = new HashSet<String>();
+        for (AnnotatedClass cls : commands.values()) {
+            for (AnnotatedClass c : superclasses(cls, ctx)) {
+                extended.add(c.getInternalName());
+            }
+        }
+        for (AnnotatedClass h : holders.values()) {
+            if (!extended.contains(h.getInternalName())) {
+                ctx.error(h, h.getSourceName() + " has @Option or @Parameters fields, but it is "
+                        + "not a concrete @Command class and no @Command class extends it. "
+                        + "Annotate the class, or extend it with a command.");
+            }
         }
         Map<String, Model> models = new LinkedHashMap<String, Model>();
         for (AnnotatedClass cls : commands.values()) {
@@ -167,6 +186,21 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
             if (!referenced.contains(m.cls.getInternalName())) {
                 top.add(m);
             }
+        }
+        // A name or alias two siblings share reaches only the first of them.
+        for (Model m : models.values()) {
+            List<Model> subs = new ArrayList<Model>();
+            for (String sub : m.subcommands) {
+                if (models.containsKey(sub)) {
+                    subs.add(models.get(sub));
+                }
+            }
+            checkSiblingNames(ctx, subs, "subcommands of " + m.cls.getSourceName(), false);
+        }
+        if (top.size() > 1) {
+            // Several top-level commands become the subcommands of one generated
+            // group, beside the built-in serve in a backend.
+            checkSiblingNames(ctx, top, "top-level commands", isBackendModule(ctx));
         }
         if (top.isEmpty() && !ctx.hasErrors()) {
             ctx.error("The @Command classes only list each other as subcommands, so none of "
@@ -393,7 +427,19 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
         int nextIndex = 0;
         boolean openPositional = false;
         List<int[]> ranges = new ArrayList<int[]>();
-        for (FieldInfo f : cls.getFields()) {
+        // A superclass's fields first, as picocli orders them, so a base class's
+        // positionals come before the command's own.
+        List<FieldInfo> fields = new ArrayList<FieldInfo>();
+        Map<FieldInfo, AnnotatedClass> owners = new HashMap<FieldInfo, AnnotatedClass>();
+        List<AnnotatedClass> supers = superclasses(cls, ctx);
+        for (int i = supers.size() - 1; i >= 0; i--) {
+            for (FieldInfo f : supers.get(i).getFields()) {
+                fields.add(f);
+                owners.put(f, supers.get(i));
+            }
+        }
+        fields.addAll(cls.getFields());
+        for (FieldInfo f : fields) {
             AnnotationValues option = f.getAnnotation(OPTION);
             AnnotationValues params = f.getAnnotation(PARAMETERS);
             boolean parent = f.getAnnotation(PARENT) != null;
@@ -403,7 +449,18 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
             if (count == 0) {
                 continue;
             }
-            String fw = "field " + f.getName() + " of " + where;
+            AnnotatedClass owner = owners.get(f);
+            String fw = "field " + f.getName() + " of "
+                    + (owner == null ? where : owner.getSourceName());
+            if (owner != null && !f.isPublic()
+                    && (f.isPrivate() || !packageOf(owner).equals(packageOf(cls)))) {
+                ctx.error(cls, fw + ", which " + where + " inherits, is "
+                        + (f.isPrivate() ? "private" : "not public and in another package")
+                        + ", so the code generated beside " + where + " cannot set it. "
+                        + "Make it " + (f.isPrivate() ? "package-private or protected" : "public")
+                        + ".");
+                continue;
+            }
             if (count > 1) {
                 ctx.error(cls, fw + " has more than one of @Option, @Parameters, "
                         + "@ParentCommand and @Spec. Choose one.");
@@ -468,6 +525,11 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
                     } else if (!names.add(n)) {
                         ctx.error(cls, "The option name '" + n + "' is used twice in " + where
                                 + ".");
+                    } else if (m.standardHelp && ("-h".equals(n) || "--help".equals(n)
+                            || "-V".equals(n) || "--version".equals(n))) {
+                        ctx.error(cls, fw + " names the option '" + n + "', which "
+                                + "mixinStandardHelpOptions already gives " + where
+                                + ". Choose another name, or drop mixinStandardHelpOptions.");
                     }
                 }
                 a.flag = !a.multiple && (a.kind == Kind.BOOLEAN || a.kind == Kind.BOXED_BOOLEAN)
@@ -514,6 +576,11 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
                 nextIndex = to == Integer.MAX_VALUE ? nextIndex : to + 1;
                 a.index = index;
             }
+            if (a.values.getStringOrDefault("split", "").length() > 0 && !a.multiple) {
+                ctx.error(cls, fw + " has a split, which divides one value into several, but "
+                        + "holds one value. Make it an array or a list, or drop the split.");
+                continue;
+            }
             String arity = a.values.getStringOrDefault("arity", "").trim();
             if (arity.length() > 0 && !validArity(arity)) {
                 ctx.error(cls, fw + " has the arity '" + arity + "'. Write a count, such as 1, "
@@ -522,6 +589,53 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
             m.args.add(a);
         }
         return m;
+    }
+
+    private static void checkSiblingNames(ProcessorContext ctx, List<Model> siblings,
+                                          String what, boolean serveReserved) {
+        Map<String, Model> seen = new HashMap<String, Model>();
+        for (Model m : siblings) {
+            List<String> all = new ArrayList<String>();
+            all.add(m.name);
+            for (String alias : m.aliases) {
+                all.add(alias);
+            }
+            for (String n : all) {
+                if (serveReserved && "serve".equals(n)) {
+                    ctx.error(m.cls, m.cls.getSourceName() + " is named or aliased 'serve', "
+                            + "which the server's own command takes in a backend. Rename it.");
+                    continue;
+                }
+                Model other = seen.put(n, m);
+                if (other != null && other != m) {
+                    ctx.error(m.cls, "The name '" + n + "' belongs to both "
+                            + other.cls.getSourceName() + " and " + m.cls.getSourceName()
+                            + " among the " + what + ", so only one of them can be reached.");
+                }
+            }
+        }
+    }
+
+    /// The superclasses of `cls` the build can read, nearest first, up to but not
+    /// including java.lang.Object.
+    private static List<AnnotatedClass> superclasses(AnnotatedClass cls, ProcessorContext ctx) {
+        List<AnnotatedClass> out = new ArrayList<AnnotatedClass>();
+        String name = cls.getSuperInternalName();
+        while (name != null && !"java/lang/Object".equals(name)) {
+            AnnotatedClass c = ctx.lookupWithDependencies(name);
+            if (c == null) {
+                break;
+            }
+            out.add(c);
+            name = c.getSuperInternalName();
+        }
+        return out;
+    }
+
+    private static String packageOf(AnnotatedClass cls) {
+        String n = cls.getInternalName();
+        int slash = n.lastIndexOf('/');
+        return slash < 0 ? "" : n.substring(0, slash);
     }
 
     /// Works out the kind of `a`'s field. Answers false after reporting a type
@@ -884,11 +998,47 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
                         + "if (all[i].name().equals(text)) return all[i]; "
                         + "names.append(i == 0 ? \"\" : \", \").append(all[i].name()); } "
                         + "throw new IllegalArgumentException(\"expected one of \" + names); }";
-            case CUSTOM:
-                return "return new " + a.converter + "().convert(text);";
+            case CUSTOM: {
+                // A converter is generic, so nothing at compile time ties what
+                // it returns to the field. The cast that stores it is unchecked
+                // on ParparVM -- a wrong type would be read as the field's type
+                // and crash natively -- so the type is tested here, where a
+                // mismatch is reported as an invalid value like any other.
+                String checked = checkedType(target);
+                boolean primitive = !checked.equals(stripGenerics(target));
+                return "Object v = new " + a.converter + "().convert(text); "
+                        + "if (" + (primitive ? "!(v instanceof " + checked + ")"
+                            : "v != null && !(v instanceof " + checked + ")") + ") "
+                        + "throw new IllegalArgumentException(\"" + a.converter
+                        + " returned \" + (v == null ? \"null\" : \"a \" + v.getClass().getName())"
+                        + " + \", not a " + checked + "\"); return v;";
+            }
             default:
                 return "return text;";
         }
+    }
+
+    /// The class a converter's result must be an instance of to be stored in
+    /// a field of type `source`: the wrapper of a primitive, the erasure of a
+    /// generic type.
+    private static String checkedType(String source) {
+        String raw = stripGenerics(source);
+        switch (raw) {
+            case "boolean": return "Boolean";
+            case "int": return "Integer";
+            case "long": return "Long";
+            case "short": return "Short";
+            case "byte": return "Byte";
+            case "double": return "Double";
+            case "float": return "Float";
+            case "char": return "Character";
+            default: return raw;
+        }
+    }
+
+    private static String stripGenerics(String source) {
+        int lt = source.indexOf('<');
+        return lt < 0 ? source : source.substring(0, lt);
     }
 
     /// The statements storing `value` into `a`'s field.

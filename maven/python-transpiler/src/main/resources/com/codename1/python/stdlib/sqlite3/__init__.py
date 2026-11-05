@@ -653,6 +653,7 @@ class Connection:
         self._autocommit = autocommit
         self._decltypes = {}
         self._closed = False
+        name = _resolve(name)
         try:
             self._handle = _cn1sql.open(name)
         except OSError as e:
@@ -894,6 +895,17 @@ def _from_uri(uri):
         if part == "mode=memory":
             return ":memory:"
     return rest or ":memory:"
+
+
+def _resolve(name):
+    """A relative file name against the working directory, once os.chdir has
+    moved it away from where the process started, as CPython opens it."""
+    if name in ("", ":memory:") or name.startswith("/"):
+        return name
+    import io as _io
+    if _io._cwd is None or _io._cwd == _io._cn1fs.home():
+        return name
+    return _io._abspath(name)
 
 
 def connect(database, timeout=5.0, detect_types=0, isolation_level="", check_same_thread=True,

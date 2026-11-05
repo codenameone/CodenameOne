@@ -154,3 +154,21 @@ usage: wide [-h] [--option-number-0 V] [--option-number-1 V]
             [--option-number-11 V]
             source destination
 Namespace(a=1, b='x') True True
+usage: meta [-h] A B
+
+positional arguments:
+  A B
+
+options:
+  -h, --help  show this help message and exit
+
+error: the following arguments are required: A, B
+usage: subs [-h] CMD ...
+
+options:
+  -h, --help  show this help message and exit
+
+cmds:
+  CMD
+    run (r)   run it
+
