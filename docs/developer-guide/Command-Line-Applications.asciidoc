@@ -166,7 +166,7 @@ exists. `argparse` covers the module as programs use it: positional and
 optional arguments, every action and `nargs`, `type`, `choices`, defaults,
 subcommands with `add_subparsers`, argument groups, mutually exclusive groups,
 `fromfile_prefix_chars` and the help formatters. `parse_intermixed_args` and
-coloured help aren't supported.
+colored help aren't supported.
 
 === Commands in a backend
 
