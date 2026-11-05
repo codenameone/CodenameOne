@@ -62,11 +62,7 @@ public class PartyTest extends E2e {
             // A race only moves as the server stamps ticks, so a stalled one
             // would spin here until the suite's timeout killed the test with
             // no word of why; give it half a minute and say where it stood.
-            long give = System.currentTimeMillis() + 30000;
-            while (view.driver().run().tick() < 60 * 6 && System.currentTimeMillis() < give
-                    && !driveFor(view, 200)) {
-                // keep running
-            }
+            driveUntil(view, () -> view.driver().run().tick() >= 60 * 6, 30000);
             int tick = view.driver().run().tick();
             assertTrue(tick >= 60 * 6 || view.driver().run().over(),
                     "the race reached tick " + tick + " of " + 60 * 6 + " in 30 s");

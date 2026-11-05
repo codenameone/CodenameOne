@@ -217,6 +217,15 @@ public abstract class E2e extends AbstractTest {
     /// so a test waiting on the screen does not leave the runner to crash.
     /// Answers whether the run ended.
     protected boolean driveFor(final RunView view, int millis) {
+        return driveUntil(view, null, millis);
+    }
+
+    /// Steers with the bot until `done` holds, the run ends or `millis` of real
+    /// time pass, and answers whether the run ended. One bot steers the whole
+    /// stretch: calling `driveFor` in a loop instead took the bot off between
+    /// calls, the game kept ticking with nobody at the controls, and on a slow
+    /// CI runner a city run crashed in one of those gaps before its landmark.
+    protected boolean driveUntil(final RunView view, Check done, int millis) {
         // A race applies an input when the server has stamped it, at least
         // INPUT_DELAY ticks on, so the bot looks that much further ahead.
         final Bot bot = new Bot(7, 90, view.driver() instanceof RaceDriver ? GameProtocol.INPUT_DELAY + 4 : 0);
@@ -228,7 +237,7 @@ public abstract class E2e extends AbstractTest {
         }));
         try {
             long end = System.currentTimeMillis() + millis;
-            while (System.currentTimeMillis() < end) {
+            while (System.currentTimeMillis() < end && (done == null || !done.ok())) {
                 final boolean[] over = new boolean[1];
                 onEdt(() -> over[0] = view.driver().run().over());
                 if (over[0]) {
@@ -334,10 +343,7 @@ public abstract class E2e extends AbstractTest {
 
     /// Lets the bot run, for at most `millis`, until the track ahead is busy.
     protected void driveToBusy(RunView view, int items, int millis) {
-        long give = System.currentTimeMillis() + millis;
-        while (System.currentTimeMillis() < give && !busyAhead(view, items) && !driveFor(view, 100)) {
-            // the bot steers
-        }
+        driveUntil(view, () -> busyAhead(view, items), millis);
     }
 
     /// A shot of a run in progress: the bot keeps steering while the frame
