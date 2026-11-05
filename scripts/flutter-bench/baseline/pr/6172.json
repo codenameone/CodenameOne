@@ -32,6 +32,38 @@
      "value": 5447152
     }
    }
+  },
+  "linux": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 16754402
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled, and with a Dart runtime calling String.split, which the native translation lacks; this PR fixes both, so this is the first measurement of the Linux gallery under #6154's code generation. Code grows 16,754,402 -> 18,748,258 bytes and install 119,197,408 -> 121,747,040 by about the same amount, while the gallery's wire_bytes, gated at 2%, went 85,769,588 -> 86,583,233 (+0.95%) in the same run.",
+     "runs": 1,
+     "value": 18748258
+    },
+    "install_bytes": {
+     "from": {
+      "value": 119197408
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled, and with a Dart runtime calling String.split, which the native translation lacks; this PR fixes both, so this is the first measurement of the Linux gallery under #6154's code generation. Code grows 16,754,402 -> 18,748,258 bytes and install 119,197,408 -> 121,747,040 by about the same amount, while the gallery's wire_bytes, gated at 2%, went 85,769,588 -> 86,583,233 (+0.95%) in the same run.",
+     "runs": 1,
+     "value": 121747040
+    }
+   }
+  },
+  "windows": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 12399104
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled, and with a Dart runtime calling String.split, which the native translation lacks; this PR fixes both, so this is the first measurement of the Windows gallery under #6154's code generation. Code grows 12,399,104 -> 13,748,224 bytes while install (115,558,400, +1.66%) and wire_bytes (82,434,526, +0.69%) stay inside their 2% tolerance in the same run.",
+     "runs": 1,
+     "value": 13748224
+    }
+   }
   }
  }
 }
