@@ -48,6 +48,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /// `@Command` classes: the bindings the processor generates, compiled and run
@@ -236,6 +237,49 @@ public class CommandAnnotationProcessorTest {
         proc.finish(ctx);
         assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
         return (String) loader(classes).loadClass("com.example.CliApplication").getField("NAME").get(null);
+    }
+
+    @Test
+    public void pythonProgramBecomesTheEntryPoint() throws Exception {
+        // What the transpiler and the Python runtime provide, reduced to the two
+        // members the generated main calls.
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.codename1.python.runtime.Py", "package com.codename1.python.runtime;\n"
+                + "public class Py { public static String[] argv;\n"
+                + "  public static void setArgv(String p, String[] a) { argv = a; } }\n");
+        sources.put("com.codename1.generated.python.PythonModules", "package com.codename1.generated.python;\n"
+                + "public class PythonModules { public static int runMain() { return 0; } }\n");
+        File classes = compile(sources);
+        File project = tmp.newFolder("pytool");
+        List<String> cp = new ArrayList<String>();
+        for (File f : classpath()) {
+            cp.add(f.getPath());
+        }
+        // No Python sources in the project: a class left by an earlier build is not a program.
+        assertNull(pythonEntryPoint(classes, project, cp));
+        File python = new File(project, "src/main/python");
+        assertTrue(python.mkdirs());
+        java.nio.file.Files.write(new File(python, "main.py").toPath(), "print(1)\n".getBytes("UTF-8"));
+        // Not a backend module: an application runs its Python from its Lifecycle.
+        assertNull(pythonEntryPoint(classes, project, new ArrayList<String>()));
+        assertEquals("com.codename1.generated.python.PythonCliApplication",
+                pythonEntryPoint(classes, project, cp));
+        Class<?> app = loader(classes).loadClass("com.codename1.generated.python.PythonCliApplication");
+        assertEquals("pytool", app.getField("NAME").get(null));
+        String source = CommandAnnotationProcessor.generatePythonApplication("pytool");
+        assertTrue(source, source.contains("Py.setArgv(NAME, args)"));
+        assertTrue(source, source.contains("System.exit(code)"));
+    }
+
+    private String pythonEntryPoint(File classes, File project, List<String> cp) throws Exception {
+        ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), ClassScanner.scan(classes),
+                new SystemStreamLog(), project, null, null, null, "UTF-8", cp);
+        CommandAnnotationProcessor proc = new CommandAnnotationProcessor();
+        proc.start(ctx);
+        proc.finish(ctx);
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        byte[] marker = ctx.getEmittedResources().get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE);
+        return marker == null ? null : new String(marker, "UTF-8");
     }
 
     @Test

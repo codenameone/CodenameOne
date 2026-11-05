@@ -145,6 +145,39 @@ that the native runtime provides: collections, strings, `java.io` files and
 streams, `java.time`, and the backend's own networking, database and
 cryptography APIs. Packaging the tool reports any class outside that subset.
 
+=== Command-line tools in Python
+
+A tool written in Python uses `argparse`, as it would under CPython. Put the
+modules in `src/main/python` of a command-line project, in place of the Java
+command; `main.py` runs as `+__main__+`, with the command line in `sys.argv`:
+
+[source,python]
+----
+include::../demos/common/src/main/python/developer_guide/greet_cli.py[tag=cli-python,indent=0]
+----
+
+The build transpiles the program to Java and generates the entry point that
+runs it, so `runBackend`, `cn1:backend` and the native executable all work as
+they do for a Java tool. Usage, help and error messages read as CPython's do,
+with the project's name as the program name, or `cn1.cli.name` from
+`application.properties`. The process exits with the status CPython would
+give it:
+
+* 0 when the main module finishes;
+* the value passed to `sys.exit`;
+* 1 when an exception escapes, after its traceback is printed to standard
+  error;
+* 2 when `argparse` rejects the command line, after the usage and the error
+  are printed to standard error.
+
+The Python is transpiled to Java 17, so the build runs on JDK 17 or newer;
+the Maven project switches to that level by itself once `src/main/python`
+exists. `argparse` covers the module as programs use it: positional and
+optional arguments, every action and `nargs`, `type`, `choices`, defaults,
+subcommands with `add_subparsers`, argument groups, mutually exclusive groups,
+`fromfile_prefix_chars` and the help formatters. `parse_intermixed_args` and
+coloured help aren't supported.
+
 === Commands in a backend
 
 The annotations work in a server too, with no setting to turn them on. A backend

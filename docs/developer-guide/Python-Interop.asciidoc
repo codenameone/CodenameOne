@@ -177,7 +177,7 @@ The standard library modules applications use most are included: `json`, `re`,
 `datetime`, `decimal`, `fractions`, `collections`, `itertools`, `functools`,
 `dataclasses`, `enum`, `typing`, `inspect`, `asyncio`, `logging`, `pathlib`,
 `os.path`, `csv`, `struct`, `hashlib`, `base64`, `uuid`, `random`,
-`statistics`, `heapq`, `bisect`, `textwrap`, `string`, `tomllib`, `sqlite3`,
+`statistics`, `heapq`, `bisect`, `textwrap`, `string`, `argparse`, `tomllib`, `sqlite3`,
 `threading`, `queue`, `concurrent.futures`, `pickle`, `shelve`,
 `urllib.request`, `http.client`, `email.message`, `zlib`, `gzip`, `zipfile`,
 `zoneinfo`, `unittest` (with `unittest.mock`) and others. A small `pytest` is

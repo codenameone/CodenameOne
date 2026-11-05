@@ -75,6 +75,11 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
     private static final String GENERATED = "Lcom/codename1/backend/annotations/Generated;";
     private static final String GENERATED_ANNOTATION = "@com.codename1.backend.annotations.Generated";
 
+    /// What the Python transpiler generates for a module with Python sources.
+    static final String PYTHON_MODULES = "com/codename1/generated/python/PythonModules";
+    /// The entry point generated for a command-line tool written in Python.
+    static final String PYTHON_APPLICATION = "com/codename1/generated/python/PythonCliApplication";
+
     private static final String RUNNABLE = "java/lang/Runnable";
     private static final String CALLABLE = "java/util/concurrent/Callable";
     private static final String EXIT_CODE = "com/codename1/cli/CommandLine$IExitCodeGenerator";
@@ -128,6 +133,7 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
         if (commands.isEmpty()) {
+            generatePythonEntryPoint(ctx);
             return;
         }
         Map<String, Model> models = new LinkedHashMap<String, Model>();
@@ -223,7 +229,7 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
     /// have, and the native packager hands this pass none at all. The file is the
     /// one both the JVM run and the packaged binary read, so the two agree.
     private static String appName(ProcessorContext ctx, List<Model> top) {
-        File dir = ctx.getProjectDir();
+        File dir = moduleDir(ctx);
         File settings = dir == null ? null : new File(dir, "application.properties");
         if (settings != null && settings.isFile()) {
             java.util.Properties p = new java.util.Properties();
@@ -940,6 +946,124 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
             return "t." + BackendWeaver.injectSetter(field.getName()) + "(" + expr + ");";
         }
         return "t." + field.getName() + " = " + expr + ";";
+    }
+
+    /// The entry point of a command-line tool written in Python: a module with
+    /// Python sources, built against the backend runtime, and no `@Command`.
+    ///
+    /// Its `main` hands the arguments to `sys.argv` and exits with the status
+    /// the program leaves, so `argparse`, `sys.exit` and an uncaught exception
+    /// behave as they do under CPython. `sys.argv[0]` is the application name,
+    /// which is what `argparse` prints as the program in its usage. A module
+    /// that also serves HTTP from Java controllers keeps that processor's entry
+    /// point, which replaces this marker; a Flask or FastAPI server written in
+    /// Python is started by its own main module, so it takes this one.
+    private void generatePythonEntryPoint(ProcessorContext ctx) throws ProcessingException {
+        File modules = new File(ctx.getOutputClassDir(),
+                PYTHON_MODULES.replace('/', File.separatorChar) + ".class");
+        File projectDir = moduleDir(ctx);
+        // Both: the transpiled program compiled into this tree, and the Python
+        // sources it came from still in the project, so a class left in an
+        // output directory by an earlier build is not mistaken for a program.
+        if (!modules.isFile() || projectDir == null
+                || !com.codename1.maven.PythonProjectBuilder.isPythonProject(
+                        new File(projectDir, "src/main/python"))
+                || !isBackendModule(ctx)) {
+            return;
+        }
+        String application = PYTHON_APPLICATION.replace('/', '.');
+        if (isNotOurOwnOutput(ctx, application)) {
+            ctx.error(application + " already exists, and the entry point generated for the "
+                    + "Python program would replace it. Rename that class.");
+            return;
+        }
+        String appName = appName(ctx, new ArrayList<Model>());
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put(application, generatePythonApplication(appName));
+        try {
+            List<File> cp = new ArrayList<File>();
+            cp.add(ctx.getOutputClassDir());
+            for (String element : ctx.getCompileClasspath()) {
+                cp.add(new File(element));
+            }
+            JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
+        } catch (IOException ioe) {
+            throw new ProcessingException("Could not compile the generated Python entry point: "
+                    + ioe.getMessage(), ioe);
+        }
+        ctx.emitResource(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE, utf8(application));
+        ctx.getLog().info("cn1: generated " + application + ", which runs the Python main module");
+    }
+
+    /// The module's own directory. The context's project directory is the one
+    /// holding `codenameone_settings.properties`, which a Maven backend or tool
+    /// does not have, so there it is null: the module is then found from the
+    /// output directory, the first ancestor with a build file.
+    static File moduleDir(ProcessorContext ctx) {
+        if (ctx.getProjectDir() != null) {
+            return ctx.getProjectDir();
+        }
+        File dir = ctx.getOutputClassDir();
+        for (int i = 0; dir != null && i < 4; i++) {
+            dir = dir.getParentFile();
+            if (dir != null && (new File(dir, "pom.xml").isFile() || new File(dir, "build.gradle.kts").isFile()
+                    || new File(dir, "build.gradle").isFile())) {
+                return dir;
+            }
+        }
+        return null;
+    }
+
+    static String generatePythonApplication(String appName) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("package com.codename1.generated.python;\n\n");
+        sb.append("// Generated for the Python program in this module. Do not edit.\n");
+        sb.append(GENERATED_ANNOTATION).append('\n');
+        sb.append("public final class PythonCliApplication {\n\n");
+        sb.append("    private PythonCliApplication() {\n    }\n\n");
+        sb.append("    /** The application's name, sys.argv[0] for the program. */\n");
+        sb.append("    public static final String NAME = ").append(quote(appName)).append(";\n\n");
+        sb.append("    public static void main(String[] args) {\n");
+        sb.append("        com.codename1.python.runtime.Py.setArgv(NAME, args);\n");
+        sb.append("        int code = PythonModules.runMain();\n");
+        sb.append("        System.out.flush();\n");
+        sb.append("        System.err.flush();\n");
+        sb.append("        System.exit(code);\n");
+        sb.append("    }\n");
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    /// Whether the module builds against the backend runtime: on its compile
+    /// classpath, or, in the native packager, compiled into the very tree being
+    /// translated. An application has neither, and runs its Python from its
+    /// Lifecycle instead.
+    private static boolean isBackendModule(ProcessorContext ctx) {
+        String entry = "com/codename1/cli/CommandLine.class";
+        return new File(ctx.getOutputClassDir(), entry.replace('/', File.separatorChar)).isFile()
+                || onCompileClasspath(ctx, entry);
+    }
+
+    /// Whether a class file is on the compile classpath, as a directory entry or
+    /// a jar entry, without loading anything.
+    private static boolean onCompileClasspath(ProcessorContext ctx, String entryName) {
+        for (String element : ctx.getCompileClasspath()) {
+            File file = new File(element);
+            if (file.isDirectory()) {
+                if (new File(file, entryName.replace('/', File.separatorChar)).isFile()) {
+                    return true;
+                }
+            } else if (file.isFile()) {
+                try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(file)) {
+                    if (zip.getEntry(entryName) != null) {
+                        return true;
+                    }
+                } catch (IOException err) {
+                    ctx.getLog().warn("cn1: could not read " + file + ": " + err.getMessage());
+                }
+            }
+        }
+        return false;
     }
 
     String generateApplication(String packageName, String appName, List<Model> top) {

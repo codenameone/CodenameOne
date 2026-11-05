@@ -43,7 +43,8 @@ public abstract class PySql {
         return current;
     }
 
-    static boolean installed() {
+    /// Whether one is installed.
+    public static boolean installed() {
         return current != null;
     }
 

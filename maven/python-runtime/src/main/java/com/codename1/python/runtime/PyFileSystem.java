@@ -30,15 +30,25 @@ import java.io.OutputStream;
 /// The file system `open()`, `os` and `os.path` see.
 ///
 /// Paths are POSIX-style absolute paths (`/a/b`); the caller has already
-/// joined a relative path with the working directory. An application runs
-/// on Codename One's `FileSystemStorage` unless something else is
-/// installed, and the working directory starts at the application's home.
+/// joined a relative path with the working directory. The generated
+/// registry installs one: Codename One's `FileSystemStorage` in an
+/// application ([Cn1FileSystem#installDefault()]), `java.io` in a backend
+/// build, whose class library has no `FileSystemStorage`. Nothing here names
+/// either, so a backend binary never links the client's storage.
 public abstract class PyFileSystem {
-    private static PyFileSystem current = new Cn1FileSystem();
+    private static PyFileSystem current;
 
     /// The file system in use.
     public static PyFileSystem get() {
+        if (current == null) {
+            throw Py.error(Py.OS_ERROR, "no file system is installed");
+        }
         return current;
+    }
+
+    /// Whether a file system is installed.
+    public static boolean installed() {
+        return current != null;
     }
 
     /// Replaces the file system, for a host that is not a Codename One
