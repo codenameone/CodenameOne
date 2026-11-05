@@ -19,6 +19,9 @@
     <!-- The game itself: a deterministic simulation the app, the server and the
          replay viewer all run. Built first; it depends on nothing. -->
     <module>rules</module>
+    <!-- The REST contract between the app and the server. -->
+    <module>shared</module>
+    <module>common</module>
   </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
@@ -203,10 +206,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>javascript</module>
+      </modules>
     </profile>
     <profile>
       <id>ios</id>
@@ -220,10 +221,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>ios</module>
+      </modules>
     </profile>
     <profile>
       <id>win</id>
@@ -237,10 +236,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>win</module>
+      </modules>
     </profile>
     <profile>
       <id>linux</id>
@@ -254,10 +251,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>linux</module>
+      </modules>
     </profile>
     <profile>
       <!--
@@ -278,10 +273,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>backend</module>
+      </modules>
     </profile>
     <profile>
       <id>android</id>
@@ -295,10 +288,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>android</module>
+      </modules>
     </profile>
     <profile>
       <id>javase</id>
@@ -312,10 +303,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>javase</module>
+      </modules>
     </profile>
     <profile>
       <id>cn1libs</id>
@@ -325,10 +314,8 @@
         </file>
       </activation>
       <modules>
-    <!-- The game itself: a deterministic simulation the app, the server and the
-         replay viewer all run. Built first; it depends on nothing. -->
-    <module>rules</module>
-  </modules>
+        <module>cn1libs</module>
+      </modules>
     </profile>
   </profiles>
 </project>
