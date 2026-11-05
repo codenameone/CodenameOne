@@ -56,14 +56,17 @@ concurrency:
 jobs:
   gradle-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 80
     name: gradle-smoke (JDK ${{ matrix.gradle-jdk }}, Gradle ${{ matrix.gradle-version || 'wrapper' }})
     strategy:
       fail-fast: false
       matrix:
         include:
           # The Gradle the template's wrapper pins, on both supported JDKs.
+          # Translating the Python tool to a native binary takes ~12 minutes,
+          # so one leg does it; the others run the same tool on the JVM.
           - gradle-jdk: '17'
+            python-native: '1'
           - gradle-jdk: '21'
           # The oldest Gradle the plugin supports (CodenameOnePlugin.MINIMUM_GRADLE),
           # and the release before it, which must be refused with the fix.
@@ -143,6 +146,7 @@ jobs:
         env:
           # A skip reads like a pass; this runner has clang.
           CN1_BACKEND_PACKAGE_REQUIRED: '1'
+          CN1_PYTHON_NATIVE: ${{ matrix.python-native || '0' }}
         run: bash gradle-initializr-test.sh
       # The desktop tools are separate Maven projects under scripts/; Settings
       # stands in for all four, which start through the same launcher.

@@ -217,7 +217,10 @@ check_python_binary() {
   [ "$crash" = "1" ] || { cat "$WORKDIR/pycli-crash.log"; fail "an uncaught exception exited $crash, not 1"; }
   grep -q "RuntimeError: boom" "$WORKDIR/pycli-crash.log" || { cat "$WORKDIR/pycli-crash.log"; fail "no traceback"; }
 }
-if command -v clang > /dev/null 2>&1; then
+if [ "${CN1_PYTHON_NATIVE:-1}" = "0" ]; then
+  # The translation is the slowest step of this script; CI runs it on one leg.
+  echo "   native binary skipped (CN1_PYTHON_NATIVE=0)"
+elif command -v clang > /dev/null 2>&1; then
   run_gradle "$PYCLI" backendPackage > "$WORKDIR/pycli-package.log" 2>&1 \
     || { cat "$WORKDIR/pycli-package.log"; fail "backendPackage for the Python tool"; }
   [ -x "$PYCLI/build/launcherprobe" ] || { cat "$WORKDIR/pycli-package.log"; fail "no executable at $PYCLI/build/launcherprobe"; }
