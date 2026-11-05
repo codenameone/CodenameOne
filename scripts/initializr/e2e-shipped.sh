@@ -209,7 +209,10 @@ for template in "${TEMPLATES[@]}"; do
   if curl -fs -o /dev/null "http://localhost:$PORT/oauth2/jwks"; then
     fail "$template: something already answers on port $PORT; stop it or set E2E_PORT"
   fi
-  (cd "$dir" && CN1_PROFILE=test PORT="$PORT" exec ./run-server.sh) > "$server_log" 2>&1 &
+  # SLATE_DEMO_HISTORY seeds Slate's demo day, as scripts/slate/run-e2e.sh
+  # does: its board and schedule tests wait for those bookings. Every other
+  # template ignores it.
+  (cd "$dir" && CN1_PROFILE=test SLATE_DEMO_HISTORY=true PORT="$PORT" exec ./run-server.sh) > "$server_log" 2>&1 &
   SERVER_PID=$!
   ready=0
   for _ in $(seq 1 300); do
