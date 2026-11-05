@@ -11703,6 +11703,9 @@ public final class JavaEmitter {
         boolean simple = SIMPLE_RECEIVER.matcher(recv).matches();
         if (name.equals("new") || !name.matches("[\\w$]+")
                 || simple && STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null
+                // A library-private class (`_DialogDemoState::_route`) fails the capital-letter
+                // test above, and its name is no receiver: a static tear-off has none.
+                || simple && recv.startsWith("_") && ctx.lookup(recv) == null && programClass(recv, ctx) != null
                 || !simple && (e instanceof Ident || COMPLEX_TYPE_RECEIVER.matcher(recv).matches()
                 || recv.endsWith(".super") || recv.endsWith(".this"))) {
             return out;
@@ -17406,10 +17409,22 @@ public final class JavaEmitter {
     /// marking a required one), so the Type prints and compares as Dart's does.
     private String functionWitness(TypeRef t, boolean nullable, Ctx ctx) {
         String erased = erasedJavaType(t, ctx);
-        String test = functionTest("$twf", t, erased, ctx);
-        return test == null ? null : "dart.runtime.TypeWitness.function(" + erased + ".class, " + nullable
-                + ", ($twf) -> " + test + functionSigWitnesses(t, ctx) + ")";
+        // One name per nesting level: a function type whose parameter is a function type
+        // nests its witness's lambda in this one's, and Java refuses a lambda parameter
+        // that shadows an enclosing one ("variable $twf is already defined").
+        String fv = functionWitnessDepth == 0 ? "$twf" : "$twf" + functionWitnessDepth;
+        functionWitnessDepth++;
+        try {
+            String test = functionTest(fv, t, erased, ctx);
+            return test == null ? null : "dart.runtime.TypeWitness.function(" + erased + ".class, " + nullable
+                    + ", (" + fv + ") -> " + test + functionSigWitnesses(t, ctx) + ")";
+        } finally {
+            functionWitnessDepth--;
+        }
     }
+
+    /// How deeply functionWitness is nested in itself, for its lambda parameter's name.
+    private int functionWitnessDepth;
 
     private String functionSigWitnesses(TypeRef t, Ctx ctx) {
         StringBuilder sb = new StringBuilder(", new dart.runtime.TypeWitness[] {");
@@ -23620,6 +23635,10 @@ public final class JavaEmitter {
         return right.code;
     }
 
+    /// The operators whose result is a double when either operand is a double.
+    private static final java.util.Set<String> ARITH_DOUBLE_OPS = new HashSet<String>(
+            java.util.Arrays.asList("+", "-", "*", "/"));
+
     private Out emitBinary(Binary b, Ctx ctx) {
         if (b.left instanceof SuperExpr && (b.op.equals("==") || b.op.equals("!="))) {
             // `super == other` invokes the superclass's operator ==, which every class
@@ -23726,7 +23745,17 @@ public final class JavaEmitter {
         }
         Out l = emitExpr(b.left, genericCtorValueSlot(b.left, ctx), ctx);
         ctx.pushWriter(ctx.currentIndent());
-        Out r = emitExpr(b.right, genericCtorValueSlot(b.right, ctx), ctx);
+        // `w * h + (n > 0 ? gap : 0)`: a double plus an int-or-double conditional is a
+        // double whichever arm is taken, so the conditional is read as one -- its int arm
+        // promoted, as Java's ternary does. With no context it took the Number arms a num
+        // slot needs, and the sum fell to dynBinary, a Number no double parameter takes
+        // (the Flutter gallery's Shrine bottom sheet).
+        TypeRef rSlot = genericCtorValueSlot(b.right, ctx);
+        if (rSlot == null && stripParens(b.right) instanceof Conditional && ARITH_DOUBLE_OPS.contains(b.op)
+                && l.type != null && l.type.is("double") && !l.type.nullable) {
+            rSlot = TypeRef.DOUBLE;
+        }
+        Out r = emitExpr(b.right, rSlot, ctx);
         String rLifted = ctx.popWriter();
         if (NUMERIC_BOUND_OPS.contains(b.op)) {
             // `T extends num` operand: Dart types `n * 2` by T's bound, so it is a num
@@ -24642,6 +24671,22 @@ public final class JavaEmitter {
                     }
                 } else if (!(a instanceof Lambda)) {
                     unifyTypeVars(p.type, inferExprTypeQuiet(a, ctx), tps, m);
+                }
+            }
+            // Named arguments bind too, as the witnesses (methodWitnessCall) already read
+            // them: `ease<T>({required T begin, required T end})` called with
+            // `begin: radius, end: 0` is ease<double>, and its `0` is the double 0.0. Left
+            // unbound, T erased to dynamic and the literal was emitted as a long the
+            // double-typed call then rejected (the Flutter gallery's Shrine bottom sheet).
+            // After the positionals, so an argument written first still binds first.
+            for (NamedArg na : c.args.named) {
+                if (na.value instanceof Lambda || na.value instanceof ListLit) {
+                    continue;
+                }
+                for (Param p : params) {
+                    if (p.named && p.name.equals(na.name)) {
+                        unifyTypeVars(p.type, inferExprTypeQuiet(na.value, ctx), tps, m);
+                    }
                 }
             }
         }
@@ -27759,12 +27804,19 @@ public final class JavaEmitter {
                 if (c.typeArgs != null && !c.typeArgs.isEmpty() && c.typeArgs.size() == m.typeParams.size()) {
                     StringBuilder tb = new StringBuilder("<");
                     for (int i = 0; i < c.typeArgs.size(); i++) {
-                        if (i > 0) {
-                            tb.append(", ");
+                        String jt = javaType(c.typeArgs.get(i), true, ctx);
+                        if ("Number".equals(jt)) {
+                            // `_sort<num>((d) => d.calories)` with `Comparable<T> Function(D)`:
+                            // Dart's int is a Comparable<num>, Java's Long only a
+                            // Comparable<Long>, so `<Number>` cannot type the argument (the
+                            // Flutter gallery's data table). javac infers T instead; the
+                            // witness still says num.
+                            tb = null;
+                            break;
                         }
-                        tb.append(javaType(c.typeArgs.get(i), true, ctx));
+                        tb.append(i > 0 ? ", " : "").append(jt);
                     }
-                    targs = tb.append('>').toString();
+                    targs = tb == null ? "" : tb.append('>').toString();
                 }
                 List<Param> mps = m.params;
                 if (cc.method(n) == null && !m.isStatic) {
@@ -30490,7 +30542,17 @@ public final class JavaEmitter {
             return new Out(cls + witness + "filled(" + args + ")", listType);
         }
         // generate: the generator's index parameter is typed via the IndexedGenerator typedef
-        String gen = emitExpr(pos.get(1), new TypeRef("IndexedGenerator"), ctx).code;
+        // With a known element type the generator is an `E Function(int)`, as Dart types it:
+        // `List<double>.generate(n, (i) => i.isEven ? 0 : gap)` returns 0.0, not a num the
+        // primitive list's Func1<Long, Double> cannot take (the Flutter gallery's Shrine).
+        TypeRef genType = new TypeRef("IndexedGenerator");
+        if (elem != null && isConcreteType(elem) && !isDynamicType(elem) && typeVarsInScope(elem, ctx)) {
+            genType = new TypeRef("Function");
+            genType.funcParams = new ArrayList<TypeRef>();
+            genType.funcParams.add(TypeRef.INT);
+            genType.funcReturn = elem;
+        }
+        String gen = emitExpr(pos.get(1), genType, ctx).code;
         String args = len + ", " + gen + (growable != null ? ", " + growable : "");
         return new Out(cls + witness + "generate" + sfx + "(" + args + ")", listType);
     }
