@@ -64,6 +64,38 @@
      "value": 13748224
     }
    }
+  },
+  "ios": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 18307800
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that (and gives the build the heap it then needs on a macOS runner), so this is the first measurement of the iOS gallery under #6154's code generation. Code grows 18,307,800 -> 20,376,264 bytes while install (113,756,645 -> 115,825,110, +1.82%) and wire_bytes (83,914,831 -> 84,538,531, +0.74%) stay inside their 2% tolerance in the same run.",
+     "runs": 1,
+     "value": 20376264
+    }
+   }
+  },
+  "macos": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 35268200
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that (and gives the build the heap it then needs on a macOS runner), so this is the first measurement of the macOS gallery under #6154's code generation. Code grows 35,268,200 -> 39,385,912 bytes and install 130,793,677 -> 134,911,389 by the same 4,117,712, while the gallery's wire_bytes, gated at 2%, went 89,829,730 -> 91,095,323 (+1.41%) in the same run.",
+     "runs": 1,
+     "value": 39385912
+    },
+    "install_bytes": {
+     "from": {
+      "value": 130793677
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that (and gives the build the heap it then needs on a macOS runner), so this is the first measurement of the macOS gallery under #6154's code generation. Code grows 35,268,200 -> 39,385,912 bytes and install 130,793,677 -> 134,911,389 by the same 4,117,712, while the gallery's wire_bytes, gated at 2%, went 89,829,730 -> 91,095,323 (+1.41%) in the same run.",
+     "runs": 1,
+     "value": 134911389
+    }
+   }
   }
  }
 }
