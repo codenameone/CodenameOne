@@ -90,15 +90,6 @@
         -->
         <executions>
           <execution>
-            <!-- Python sources (src/main/python) as generated Java source; a
-                 no-op without that directory. See the python profile below. -->
-            <id>cn1-transpile-python</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>transpile-python</goal>
-            </goals>
-          </execution>
-          <execution>
             <id>cn1-process-annotations</id>
             <phase>process-classes</phase>
             <goals>
@@ -159,6 +150,26 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
       </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <!-- Declared here rather than in the main build so a project with no
+                 Python never names the goal. -->
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-maven-plugin</artifactId>
+            <version>${cn1.plugin.version}</version>
+            <executions>
+              <execution>
+                <id>cn1-transpile-python</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>transpile-python</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
       <dependencies>
         <dependency>
           <groupId>com.codenameone</groupId>
