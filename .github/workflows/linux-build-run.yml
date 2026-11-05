@@ -247,7 +247,19 @@ jobs:
         run: |
           df -h /
           free -m
-          sudo fallocate -l 12G /cn1-swapfile
+          # Size the swap to the disk this runner actually has: a fixed 12G on a
+          # runner image with little free space left the C build nothing, and the
+          # job died "No space left on device" two minutes into it. Keep at least
+          # 40G for the build and take at most 12G.
+          avail=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          swap=$(( avail - 40 ))
+          [ "$swap" -gt 12 ] && swap=12
+          if [ "$swap" -lt 2 ]; then
+            echo "Only ${avail}G free; not adding swap"
+            exit 0
+          fi
+          echo "Adding ${swap}G swap (${avail}G free)"
+          sudo fallocate -l ${swap}G /cn1-swapfile
           sudo chmod 600 /cn1-swapfile
           sudo mkswap /cn1-swapfile
           sudo swapon /cn1-swapfile

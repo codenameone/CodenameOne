@@ -1,0 +1,22 @@
+{
+ "pr": 6128,
+ "rebaseline": {
+  "windows-x64@intel64-family-6-model-106-genuineintel": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.536,
+      "time": 0.627,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.536,
+     "reason": "Windows x64 Intel model 106: the base row is one run (0.627x). This PR's VM changes measure identical to master on the translator workload: self-hosted -O3 translator built with this branch's and master's cn1_globals.m/.h, cn1_virtual_thread.c and nativeMethods.m, interleaved, 0.67x vs 0.67-0.68x against JDK 25 on macOS arm64; the only Windows-specific hunk keeps master's calloc path. CI measured 0.75x and 0.76x on two runs.",
+     "runs": 1,
+     "time": 0.756
+    }
+   }
+  }
+ }
+}

@@ -79,15 +79,54 @@ final class SqlLimits {
     /// Null is the default and stays it: both entry points document the
     /// absent mode as "prefer", and a URL without the parameter is the ordinary
     /// case rather than a mistake.
-    static void requireSslMode(String sslMode) throws IOException {
+    ///
+    /// Answers the canonical mode the drivers branch on: every spelling
+    /// `Database` accepts in a URL (verify-full, MySQL's REQUIRED and so on) is
+    /// accepted here too, so a driver can be handed the mode exactly as the user
+    /// wrote it and name it that way in its errors. verify-full folds into
+    /// require, which is only safe because require verifies the chain and the
+    /// host (`verifiesHost`). The table must match `Database.Url.canonicalSslMode`;
+    /// `SqlLimitsAndKindsTest` holds the two together.
+    static String canonicalSslMode(String sslMode) throws IOException {
         if (sslMode == null) {
-            return;
+            return null;
         }
-        if (!"require".equals(sslMode) && !"prefer".equals(sslMode)
-                && !"disable".equals(sslMode)) {
-            throw new IOException("sslmode=" + sslMode + " is not one this runtime "
-                    + "implements: use require, prefer or disable. It is refused "
-                    + "rather than read as prefer, which would accept plaintext");
+        String v = sslMode.trim();
+        if ("disable".equals(v) || "DISABLED".equals(v) || "false".equals(v)) {
+            return "disable";
+        }
+        if ("prefer".equals(v) || "PREFERRED".equals(v)) {
+            return "prefer";
+        }
+        if ("require".equals(v) || "REQUIRED".equals(v) || "true".equals(v)
+                || "verify-full".equals(v) || "VERIFY_IDENTITY".equals(v)) {
+            return "require";
+        }
+        if ("verify-ca".equals(v) || "VERIFY_CA".equals(v)) {
+            return "verify-ca";
+        }
+        throw new IOException("sslmode=" + sslMode + " is not one this runtime "
+                + "implements: use require, verify-full, verify-ca, prefer or disable. It is "
+                + "refused rather than read as prefer, which would accept plaintext");
+    }
+
+    /// Whether `sslMode` refuses a connection that cannot be encrypted.
+    static boolean demandsTls(String sslMode) {
+        return "require".equals(sslMode) || "verify-ca".equals(sslMode);
+    }
+
+    /// Whether the certificate's name must match the host: every mode but
+    /// `verify-ca`.
+    static boolean verifiesHost(String sslMode) {
+        return !"verify-ca".equals(sslMode);
+    }
+
+    /// Refuses `verify-ca` without its own trust root: skipping the name check
+    /// against the public roots would accept any certificate any CA issued.
+    static void requireRootForVerifyCa(String sslMode, String caFile) throws IOException {
+        if ("verify-ca".equals(sslMode) && caFile == null) {
+            throw new IOException("sslmode=verify-ca needs sslrootcert naming the "
+                    + "CA (or server certificate) to trust");
         }
     }
 }

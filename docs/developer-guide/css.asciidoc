@@ -719,6 +719,19 @@ include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-031,i
 
 NOTE: If a third-party font repository moves or changes licensing, vendor the font into your project and reference it locally so builds stay reproducible.
 
+===== Fonts loaded at runtime
+
+A font that isn't known at build time, such as one the app downloads or a user picks, can't go through `@font-face`. `Font.createTrueTypeFontFromData` creates a font from the bytes of a `.ttf` or `.otf` file, given either as an `InputStream` or as a `byte[]`. The result works like a bundled font: derive it to the size and weight you need and set it on a style.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/FontFromDataSnippets.java[tag=font-from-data,indent=0]
+----
+
+The name you pass identifies the font in the font cache, so a second call with the same name returns the first font without reading the data again. Give each distinct font its own name.
+
+`Font.isTrueTypeStreamSupported()` reports whether the platform can do this. The simulator, Android, iOS, macOS, the JavaScript port and the native Windows and Linux ports all can. Elsewhere `createTrueTypeFontFromData` returns `null`, so keep a fallback font as the example does.
+
 ==== `font-size`
 
 It's best practice to size your fonts using millimetres (`rem`) (or another "real-world" measurement unit such as inches (`in`), centimetres (`cm`), millimetres (`mm`). This will allow the font to be sized appropriate for all display densities. If you specify size in pixels (`px`), it will treat it the same as if you sized it in points (`pt`), where 1pt == 1/72 inches (one seventy-second of an inch).

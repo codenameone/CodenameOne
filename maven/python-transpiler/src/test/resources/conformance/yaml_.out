@@ -1,0 +1,252 @@
+null1 None
+null2 None
+null3 None
+null4 None
+t1 True
+t2 False
+t3 True
+t4 False
+t5 True
+t6 False
+i1 42
+i2 -17
+i3 5
+i4 31
+i5 5
+i6 '0o17'
+i7 15
+i8 1000000
+i9 90
+f1 3.14
+f2 '-.5e+3'
+f3 inf
+f4 -inf
+f5 685230.15
+f6 10.5
+s1 'hello world'
+s2 "single 'quoted' text"
+s3 'double "quoted"\t tab A \xe9 \n newline'
+s4 '1e3'
+s5 '12abc'
+s6 '123'
+s7 '~'
+d1 datetime.date(2001, 12, 14)
+d2 datetime.datetime(2001, 12, 14, 21, 59, 43, 100000, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=68400)))
+d3 datetime.datetime(2001, 12, 14, 21, 59, 43, 100000)
+d4 datetime.datetime(2002, 12, 14, 21, 59, 43, tzinfo=datetime.timezone.utc)
+True True
+seq ['a', ['b1', 'b2'], {'key': 'value', 'other': [1, 2, 3], 'nested': {'x': 1, 'y': ['a', 'b'], 'z': {'q': 'r'}}}, {'complex': 'value'}, '123', 42, 1.0, True, None, [], {}, ['a', 'b', 'c'], None, [1, [2, [3]]], {'a': 1, 'b': None}]
+lit 'line one\nline two\n\nafter blank\n'
+fold 'folded text continues here\nnew paragraph\n  indented more\nback\n'
+strip 'no trailing newline'
+keep 'keep trailing\n\n'
+clip 'stripped folded'
+ind '  two extra\nbase\n'
+last 'end'
+comments {'a': 1, 'b': 'x # not comment', 'c': 'x#y'}
+docs [{'a': 1}, [2, 3], 'plain', 'folded\n']
+empty None
+onlycomment None
+explicit 'foo'
+emptydocs [None, None]
+anchors {'base': {'name': 'x', 'size': 1}, 'derived': {'name': 'x', 'size': 2}, 'multi': {'extra': True, 'name': 'x', 'size': 1}, 'list': [1, 2], 'again': [1, 2], 'scalar': 'hello', 'copy': 'hello'}
+True
+True
+True 2
+binary b'\x01\x02\x03\x04\x05'
+set ['a', 'b', 'c']
+omap [('a', 1), ('b', 2)]
+pairs [('a', 1), ('a', 2)]
+str 'true'
+seqtag [1, 2]
+maptag {'a': 1}
+ts datetime.date(2020, 1, 2)
+tagdirective '42'
+verbatim 5
+multiline {'plain': 'this is a multi line plain scalar', 'quoted': 'folded double', 'single': 'folded\nsingle', 'esc': 'ab', 'flow': ['a', 'b', 'c']}
+urlish {'a': 'http://x.y/z?q=1', 'b': ['x:y', 'a: b'], 'c': 'a:b'}
+flowkeys {'a': 1, 'b c': 2, 'd': 3, 'e': None}
+unicode {'k': 'caf\xe9 \u4e2d\u6587'}
+bytesin {'a': 1, 'b': ['x']}
+custom {'p': (1, 2)}
+custom2 ['ABC', 'X Y']
+multi 'one:1'
+subclass 'Xy'
+full {'a': 1}
+plain Loader {'a': [1, 2]}
+unsafe {'a': 1}
+fullload [1, 2]
+tuple (1, 2)
+base {'a': '1', 'b': ['2']}
+e1 ScannerError
+mapping values are not allowed here
+  in "<unicode string>", line 1, column 5:
+    a: b: c
+        ^
+e2 ParserError
+while parsing a flow sequence
+  in "<unicode string>", line 1, column 4:
+    a: [1, 2
+       ^
+expected ',' or ']', but got '<stream end>'
+  in "<unicode string>", line 1, column 9:
+    a: [1, 2
+            ^
+e3 ScannerError
+while scanning a quoted scalar
+  in "<unicode string>", line 1, column 4:
+    a: 'unterminated
+       ^
+found unexpected end of stream
+  in "<unicode string>", line 1, column 17:
+    a: 'unterminated
+                    ^
+e4 ParserError
+while parsing a block collection
+  in "<unicode string>", line 1, column 1:
+    - a
+    ^
+expected <block end>, but found '?'
+  in "<unicode string>", line 2, column 1:
+    b: c
+    ^
+e5 ComposerError
+found undefined alias 'missing'
+  in "<unicode string>", line 1, column 4:
+    a: *missing
+       ^
+e6 ParserError
+while parsing a flow mapping
+  in "<unicode string>", line 1, column 1:
+    {a: 1, b: 2
+    ^
+expected ',' or '}', but got '<stream end>'
+  in "<unicode string>", line 1, column 12:
+    {a: 1, b: 2
+               ^
+e7 ParserError
+while parsing a block mapping
+  in "<unicode string>", line 1, column 1:
+    a:
+    ^
+expected <block end>, but found '<block mapping start>'
+  in "<unicode string>", line 3, column 2:
+     c: d
+     ^
+e8 ConstructorError
+could not determine a constructor for the tag '!foo'
+  in "<unicode string>", line 1, column 4:
+    a: !foo bar
+       ^
+e9 ComposerError
+expected a single document in the stream
+  in "<unicode string>", line 1, column 1:
+    a: 1
+    ^
+but found another document
+  in "<unicode string>", line 2, column 1:
+    ---
+    ^
+e10 ParserError
+expected '<document start>', but found ']'
+  in "<unicode string>", line 1, column 7:
+    [1, 2]]
+          ^
+e11 ScannerError
+while scanning a double-quoted scalar
+  in "<unicode string>", line 1, column 4:
+    a: "bad \q escape"
+       ^
+found unknown escape character 'q'
+  in "<unicode string>", line 1, column 10:
+    a: "bad \q escape"
+             ^
+e12 ScannerError
+while scanning for the next token
+found character '\t' that cannot start any token
+  in "<unicode string>", line 2, column 1:
+    	indented: x
+    ^
+e13 ParserError
+while parsing a block mapping
+  in "<unicode string>", line 1, column 1:
+    ? [1, 2]
+    ^
+expected <block end>, but found '-'
+  in "<unicode string>", line 3, column 1:
+    - y
+    ^
+e14 ComposerError
+found duplicate anchor 'x'; first occurrence
+  in "<unicode string>", line 1, column 4:
+    a: &x 1
+       ^
+second occurrence
+  in "<unicode string>", line 2, column 4:
+    b: &x 2
+       ^
+e15 ConstructorError
+while constructing a mapping
+  in "<unicode string>", line 1, column 1:
+    {[1]: 2}
+    ^
+found unhashable key
+  in "<unicode string>", line 1, column 2:
+    {[1]: 2}
+     ^
+e16 ScannerError
+mapping values are not allowed here
+  in "<unicode string>", line 2, column 4:
+      c: d
+       ^
+e18 ScannerError
+while scanning for the next token
+found character '@' that cannot start any token
+  in "<unicode string>", line 1, column 4:
+    x: @foo
+       ^
+e19 ParserError
+while parsing a block mapping
+  in "<unicode string>", line 1, column 1:
+    a: 'x'y
+    ^
+expected <block end>, but found '<scalar>'
+  in "<unicode string>", line 1, column 7:
+    a: 'x'y
+          ^
+e20 ParserError
+while parsing a block node
+expected the node content, but found ']'
+  in "<unicode string>", line 2, column 5:
+      - ]
+        ^
+e21 ConstructorError
+failed to decode base64 data: Invalid base64-encoded string: number of data characters (9) cannot be 1 more than a multiple of 4
+  in "<unicode string>", line 1, column 1:
+    !!binary 'not base64!'
+    ^
+e22 ParserError
+while parsing a block mapping
+  in "<unicode string>", line 1, column 1:
+    a: |
+    ^
+expected <block end>, but found '<scalar>'
+  in "<unicode string>", line 3, column 2:
+     y
+     ^
+e23 ParserError
+while parsing a flow node
+expected the node content, but found '}'
+  in "<unicode string>", line 1, column 12:
+    {a: 1, a: [}
+               ^
+e24 ParserError
+found incompatible YAML document (version 1.* is required)
+  in "<unicode string>", line 1, column 1:
+    %YAML 2.0
+    ^
+e25 no error
+lazy ParserError expected the node content, but found '<stream end>' 3 0
+ns ParserError while parsing a flow node expected the node content, but found '<stream end>'
+True True
+6.0.3

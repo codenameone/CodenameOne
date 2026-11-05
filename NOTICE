@@ -230,6 +230,45 @@ keeps OpenJDK's notice:
   Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
 
 ================================================================================
+FDLIBM erf and erfc
+================================================================================
+
+The class com.codename1.python.runtime.Erf, in maven/python-runtime, is a Java
+rewrite of s_erf.c from Sun Microsystems' FDLIBM, the C library the platform
+math libraries derive their erf and erfc from, so that Python's math.erf and
+math.erfc agree with CPython's. It retains FDLIBM's notice:
+
+  Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+
+  Developed at SunPro, a Sun Microsystems, Inc. business.
+  Permission to use, copy, modify, and distribute this
+  software is freely granted, provided that this notice
+  is preserved.
+
+The module PIL.ImageFont, in maven/python-transpiler
+(src/main/resources/com/codename1/python/site/PIL/ImageFont.py), is a
+rewrite of the bitmap font support of Pillow's ImageFont and embeds Pillow's
+built-in default font (courB08) unchanged, so that text drawn with
+ImageFont.load_default_imagefont() matches Pillow pixel for pixel. It retains
+Pillow's notice:
+
+  Copyright (c) 1997-2003 by Secret Labs AB
+  Copyright (c) 1996-2003 by Fredrik Lundh
+  Licensed under the MIT-CMU (HPND) license; the full text is in the file.
+
+================================================================================
+Aileron (font)
+================================================================================
+
+vm/backend/src/com/codename1/backend/image/DefaultFontData.java embeds Aileron
+Regular by Sora Sagano (https://dotcolon.net/fonts/aileron), the subset
+Pillow embeds for ImageFont.load_default(). It is the default font of
+com.codename1.backend.image.TrueTypeFont, the backend's image API, and
+of PIL.ImageFont in a Python server build.
+Aileron is dedicated to the public domain under CC0 1.0 Universal; the legal
+code is kept in maven/backend/third-party/aileron/LICENSE.txt.
+
+================================================================================
 libsecp256k1 and ed25519-donna (native crypto kernels)
 ================================================================================
 

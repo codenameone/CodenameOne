@@ -1,0 +1,12 @@
+['Base', 'Child'] base child {'flavor': 'mint'} {}
+Registry True True True
+hello from Child! class Child CHILD
+1 2 2 [0, 1] P3 <counted P> True False
+['B', 'alpha']
+_title Rec unset
+Dune Dune ok
+42 42 1 Lazy True
+Box[int] True
+5 dyn dyn Registry
+True Plugin
+TypeError Q.__init_subclass__() takes no keyword arguments

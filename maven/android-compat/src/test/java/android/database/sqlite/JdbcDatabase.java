@@ -302,6 +302,11 @@ class JdbcDatabase extends Database {
         }
 
         @Override
+        public int getColumnType(int index) {
+            return com.codename1.db.Database.COLUMN_UNKNOWN;
+        }
+
+        @Override
         public String getString(int index) throws IOException {
             try {
                 String s = rs.getString(index + 1);
