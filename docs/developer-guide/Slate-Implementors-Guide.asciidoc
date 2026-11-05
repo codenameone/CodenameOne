@@ -279,7 +279,7 @@ include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate
 
 === Deposits
 
-A deposit is a part of the price, authorized on the card a few days before the
+A deposit is a part of the price, authorized on the card about six days before the
 appointment (at once when booking is closer than that) and taken when a client
 cancels late or doesn't come. Payments go through the same `PaymentProvider` as
 the other samples:

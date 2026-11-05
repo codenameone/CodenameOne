@@ -312,8 +312,9 @@ public class Bookings {
         }
         Appointment before = ownRead(client, id);
         AppointmentDto moved;
+        String[] stale = new String[1];
         try {
-            moved = move(client, id, to);
+            moved = move(client, id, to, stale);
         } catch (ResponseStatusException answered) {
             throw answered;
         } catch (IOException failed) {
@@ -321,13 +322,15 @@ public class Bookings {
         } catch (RuntimeException failed) {
             throw taken(client, before.getServiceId(), before.getLocationId(), to.start(), failed);
         }
+        letGo(stale[0]);
         live.slotsChanged(before.getServiceId(), day(before));
         changed(moved, Notifier.CHANGED);
         return moved;
     }
 
     @Transactional(rollbackFor = IOException.class)
-    private AppointmentDto move(String client, String id, RescheduleDto to) throws IOException {
+    private AppointmentDto move(String client, String id, RescheduleDto to, String[] stale)
+            throws IOException {
         Appointment a = own(client, id);
         Business business = catalog.main();
         if (!States.CONFIRMED.equals(a.getState()) && !States.HELD.equals(a.getState())) {
@@ -347,6 +350,16 @@ public class Bookings {
         Service service = catalog.offered(a.getServiceId());
         Location location = catalog.openLocation(a.getLocationId());
         place(a, business, service, location, to.start(), who, now);
+        // A card hold lapses after about a week, so one placed for the old
+        // start cannot last to a start moved further out than that. Go back
+        // to pending; authorizeDue places a fresh hold when the new start is
+        // close, and reschedule releases the old one once this commits.
+        if (States.PAY_AUTHORIZED.equals(a.getPaymentState())
+                && a.getStartsAt().toEpochMilli() - now > AUTHORIZE_AHEAD) {
+            stale[0] = a.getPaymentRef();
+            a.setPaymentRef("");
+            a.setPaymentState(States.PAY_PENDING);
+        }
         a.setRemindedAt(Instant.EPOCH);
         a.setUpdatedAt(Instant.ofEpochMilli(now));
         appointments.save(a);
@@ -488,7 +501,8 @@ public class Bookings {
             String reference = "";
             String state = States.PAY_AUTHORIZED;
             try {
-                reference = payments.authorize("slate-" + a.getId(), a.getClient(),
+                reference = payments.authorize("slate-" + a.getId() + "-"
+                        + a.getStartsAt().toEpochMilli(), a.getClient(),
                         a.getMethodId(), holdAmount(a, business), a.getCurrency(),
                         "Deposit for " + serviceName(a.getServiceId()));
             } catch (IOException failed) {

@@ -217,6 +217,21 @@ class BookingFlowTest {
     }
 
     @Test
+    void aDepositHoldIsPlacedAgainWhenTheBookingMovesFarOut() throws Exception {
+        setUp(50);
+        String client = client();
+        card(client);
+        AppointmentDto held = bookings.hold(client, "Client", ask(People.daysAhead(3)));
+        assertEquals(States.PAY_AUTHORIZED,
+                bookings.confirm(client, held.id(), new ConfirmDto("", "", null)).paymentState());
+        // A hold placed for three days out would lapse before a start
+        // three weeks out, so the move puts the deposit back to pending.
+        AppointmentDto moved = bookings.reschedule(client, held.id(),
+                new RescheduleDto(People.daysAhead(21), Collections.singletonList(provider)));
+        assertEquals(States.PAY_PENDING, moved.paymentState());
+    }
+
+    @Test
     void aRescheduleFreesTheOldTimeAndTakesTheNew() throws Exception {
         setUp(0);
         String client = client();
