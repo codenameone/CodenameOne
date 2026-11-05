@@ -44,12 +44,12 @@ public class PromoteTest extends E2e {
         shot("desktop-admin-overview");
         reveal("chartGems");
         shot("desktop-admin-reports");
-        tab(6);
+        tab("Query");
         until(() -> has("queryRun"), 20000, "the query tool");
         click("queryRun");
         until(() -> has("queryCount"), 20000, "the players the query found");
         shot("desktop-admin-query");
-        tab(7);
+        tab("Pipelines");
         until(() -> has("pipeline-Win back"), 20000, "the pipelines");
         shot("desktop-admin-pipelines");
         click("pipelineEdit-Win back");
@@ -58,7 +58,7 @@ public class PromoteTest extends E2e {
         waitFor(1500);
         shot("desktop-admin-pipeline-edit");
         click("pipelineCancel");
-        tab(8);
+        tab("Promote");
         until(() -> has("promoteTitle"), 20000, "the Promote tab");
         shot("desktop-admin-promote");
         type("promoteTitle", "Season two is here");
@@ -89,8 +89,19 @@ public class PromoteTest extends E2e {
         return true;
     }
 
-    private void tab(final int index) {
-        onEdt(() -> ((Tabs) findByName("adminTabs")).setSelectedIndex(index));
+    /// Selects a tab by its title, so a tab added to the console cannot
+    /// silently shift which page each shot shows.
+    private void tab(final String title) {
+        onEdt(() -> {
+            Tabs t = (Tabs) findByName("adminTabs");
+            for (int i = 0; i < t.getTabCount(); i++) {
+                if (title.equals(t.getTabTitle(i))) {
+                    t.setSelectedIndex(i);
+                    return;
+                }
+            }
+            throw new IllegalStateException("no admin tab " + title);
+        });
         waitFor(600);
     }
 

@@ -236,13 +236,22 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
 
     @Override
     public void ended(int[] places, int[] scores, int trophies, int coins, String matchId) {
+        if (endShown) {
+            return;
+        }
         view.stop();
         endShown = true;
         int mine = driver.me() < places.length ? places[driver.me()] : 1;
         Friends.raceFinished(mine == 0);
         Telemetry.runEnded("online", ((OnlineDriver) driver).level(), mine, driver.me() < scores.length
                 ? scores[driver.me()] : 0, mine != 0);
-        String title = driver.match().winner() < 0 ? "DRAW" : mine == 0 ? "VICTORY" : "DEFEAT";
+        // The server's places, not this phone's prediction: a draw places
+        // everyone first.
+        boolean draw = places.length > 0;
+        for (int p : places) {
+            draw &= p == 0;
+        }
+        String title = draw ? "DRAW" : mine == 0 ? "VICTORY" : "DEFEAT";
         result(title, (trophies >= 0 ? "+" : "") + trophies + " RANK   +" + coins + " CP", matchId);
     }
 
@@ -257,8 +266,8 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
     }
 
     @Override
-    public void lost() {
-        Ui.toast("The ref removed you from the field.");
+    public void lost(String why) {
+        Ui.toast(why);
         close();
     }
 

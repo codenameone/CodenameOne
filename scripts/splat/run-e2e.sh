@@ -72,7 +72,9 @@ fi
 
 # Every test runs in one simulator, and the Forge's turntable previews and
 # 3D battles hold enough textures that 768m ran out in the test after them.
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx1536m -Dsplat.server.url=http://localhost:$PORT -Dsplat.shots.dir=$SHOTS $VIDEO"
+# Under xvfb, GL is Mesa's software renderer and every 3D view reads its frame
+# back into buffers on the Java heap, so 1536m ran out there in the tutorial.
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx2560m -Dsplat.server.url=http://localhost:$PORT -Dsplat.shots.dir=$SHOTS $VIDEO"
 
 set +e
 ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
@@ -103,7 +105,7 @@ if [ "$STATUS" -eq 0 ] && [ "$(uname -s)" = "Linux" ]; then
 </map>
 XML
   echo "[splat-e2e] the desktop pass"
-  export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dsplat.e2e.desktop=true -Djava.util.prefs.userRoot=$PREFS -Dcodename1.arg.desktop.titleBar=native"
+  export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dsplat.e2e.desktop=true -Djava.util.prefs.userRoot=$PREFS -Dcodename1.arg.desktop.titleBar=toolbar"
   set +e
   ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
   STATUS=$?

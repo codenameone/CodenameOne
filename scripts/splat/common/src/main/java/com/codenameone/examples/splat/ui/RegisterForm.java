@@ -38,6 +38,7 @@ public final class RegisterForm {
 
     public static void show() {
         Form f = Ui.form("New player", "register");
+        Ui.desktopColumn(f);
         Ui.back(f, SignInForm::show);
         final TextField name = new TextField("", "Your runner name", 16, TextField.ANY);
         name.setUIID("NameField");

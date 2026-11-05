@@ -68,7 +68,10 @@ public class PartyTest extends E2e {
             }
             int tick = view.driver().match().tick();
             assertTrue(tick >= 6 * Match.TICK_HZ || view.driver().match().over(),
-                    "the match reached tick " + tick + " in 30 s");
+                    "the match reached tick " + tick + " in 30 s; "
+                    + ((OnlineDriver) view.driver()).describe());
+            assertTrue(((OnlineDriver) view.driver()).reconnects() == 0, "the socket dropped mid-match: "
+                    + ((OnlineDriver) view.driver()).describe());
             guest.emote("bounce");
             guest.say("That one bounced, I swear");
             click("comms");

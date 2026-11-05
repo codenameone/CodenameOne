@@ -44,6 +44,7 @@ public final class FriendsForm {
 
     public static void show() {
         final Form f = Ui.form("Friends", "friends");
+        Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
         Telemetry.screen("friends");
         final Container col = Ui.column();

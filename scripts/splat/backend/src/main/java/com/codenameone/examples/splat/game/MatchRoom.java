@@ -55,7 +55,16 @@ final class MatchRoom {
     final Replay replay;
     final long startedAt;
     final List<WebSocketSession> spectators = new ArrayList<WebSocketSession>();
-    private final Input[] pending;
+    /// The inputs each seat has sent and the server has not used yet, oldest
+    /// first, one per tick. A client simulates one tick per input it sends,
+    /// so two that arrive within one server tick must both be played, or the
+    /// client's prediction runs a tick ahead and a trigger pull in the first
+    /// is never fired.
+    static final int QUEUE = 8;
+    private final Input[][] queued;
+    private final int[][] queuedSeq;
+    private final int[] queueHead;
+    private final int[] queueCount;
     /// Wipes each seat got away with, for the achievement nobody should be proud of.
     private final int[] wipes;
     /// Events since the last snapshot, already encoded.
@@ -76,7 +85,10 @@ final class MatchRoom {
         this.replay = new Replay(seed, arena, mode, slots);
         this.match = replay.newMatch();
         this.startedAt = startedAt;
-        this.pending = new Input[seats.length];
+        this.queued = new Input[seats.length][QUEUE];
+        this.queuedSeq = new int[seats.length][QUEUE];
+        this.queueHead = new int[seats.length];
+        this.queueCount = new int[seats.length];
         this.wipes = new int[seats.length];
     }
 
@@ -113,12 +125,22 @@ final class MatchRoom {
         }
         s.recent[s.recentCount % s.recent.length] = now;
         s.recentCount++;
-        Input previous = pending[seat] != null ? pending[seat] : match.player(seat).input();
+        Input previous = queueCount[seat] > 0
+                ? queued[seat][(queueHead[seat] + queueCount[seat] - 1) % QUEUE] : match.player(seat).input();
         if (Math.abs(Trig.delta(previous.yaw, in.yaw)) > SNAP_TURN) {
             s.snaps++;
         }
         s.lastSeq = seq;
-        pending[seat] = in;
+        if (queueCount[seat] == QUEUE) {
+            // A client this far ahead of the server is snapped back by the
+            // next snapshot anyway; its oldest guess goes.
+            queueHead[seat] = (queueHead[seat] + 1) % QUEUE;
+            queueCount[seat]--;
+        }
+        int at = (queueHead[seat] + queueCount[seat]) % QUEUE;
+        queued[seat][at] = in;
+        queuedSeq[seat][at] = seq;
+        queueCount[seat]++;
         return true;
     }
 
@@ -126,13 +148,17 @@ final class MatchRoom {
         int now = match.tick();
         Input[] frame = new Input[seats.length];
         for (int i = 0; i < seats.length; i++) {
-            frame[i] = pending[i];
-            if (pending[i] != null) {
-                seats[i].appliedSeq = seats[i].lastSeq;
+            if (queueCount[i] > 0) {
+                int h = queueHead[i];
+                frame[i] = queued[i][h];
+                // Only the input actually played is acknowledged.
+                seats[i].appliedSeq = queuedSeq[i][h];
+                queued[i][h] = null;
+                queueHead[i] = (h + 1) % QUEUE;
+                queueCount[i]--;
             } else if (seats[i].left) {
                 frame[i] = Input.IDLE;
             }
-            pending[i] = null;
         }
         replay.record(now, frame);
         match.step(frame);

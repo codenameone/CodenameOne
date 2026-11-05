@@ -40,6 +40,7 @@ public final class CrewsForm {
 
     public static void show() {
         final Form f = Ui.form("Crews", "crews");
+        Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
         final Container list = Ui.column();
         f.add(Ui.centeredColumn(list));

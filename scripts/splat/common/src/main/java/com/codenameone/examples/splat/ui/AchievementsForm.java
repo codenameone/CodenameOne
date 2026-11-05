@@ -34,6 +34,7 @@ public final class AchievementsForm {
 
     public static void show() {
         final Form f = Ui.form("Trophy room", "achievements");
+        Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
         final Container col = Ui.column();
         f.add(Ui.centeredColumn(col));

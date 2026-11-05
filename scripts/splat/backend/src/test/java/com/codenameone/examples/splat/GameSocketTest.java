@@ -32,6 +32,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// The game over a real socket: a ticket opens it, a party seats two
@@ -65,10 +66,17 @@ class GameSocketTest {
             writeText(b, "{\"type\":\"join\",\"code\":\"" + code + "\"}");
             Map party = until(b, "party");
             assertEquals(2, ((java.util.List) party.get("names")).size());
+            // Members are handles, never account names (emails).
+            java.util.List handles = (java.util.List) party.get("players");
+            String hostHandle = (String) handles.get(0);
+            String guestHandle = (String) party.get("you");
+            assertEquals(handles.get(1), guestHandle);
+            assertFalse(party.toString().contains(host));
+            assertFalse(party.toString().contains(guest));
             // Voice signaling reaches the other member, and only them.
-            writeText(b, "{\"type\":\"voice\",\"to\":\"" + host + "\",\"data\":\"offer\"}");
+            writeText(b, "{\"type\":\"voice\",\"to\":\"" + hostHandle + "\",\"data\":\"offer\"}");
             Map voice = until(a, "voice");
-            assertEquals(guest, voice.get("from"));
+            assertEquals(guestHandle, voice.get("from"));
             assertEquals("offer", voice.get("data"));
 
             writeText(a, "{\"type\":\"go\"}");
@@ -86,9 +94,14 @@ class GameSocketTest {
             assertEquals(5L, ackOf(a, 5));
 
             writeText(b, "{\"type\":\"leave\"}");
+            // Leaving detaches the socket from the match: the room it walked
+            // out of must not stream its snapshots or its end into it, so
+            // the server answers the next request with no trace of that match.
             writeText(a, "{\"type\":\"leave\"}");
-            Map end = until(a, "end");
-            assertEquals(startA.get("match"), end.get("match"));
+            writeText(a, "{\"type\":\"host\"}");
+            for (Map m = next(a); !"party".equals(m.get("type")) && !"error".equals(m.get("type")); m = next(a)) {
+                assertFalse("end".equals(m.get("type")), "the abandoned match ended into the socket");
+            }
         } finally {
             a.close();
             b.close();

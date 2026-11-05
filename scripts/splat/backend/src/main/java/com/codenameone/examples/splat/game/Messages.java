@@ -42,18 +42,13 @@ final class Messages {
     /// for a spectator. `slots` are the roster in [Slot#encode] form: with the
     /// seed, the field and the mode, everything a client needs to build the same
     /// [com.codenameone.examples.splat.rules.Match]; `snap` is where it stands now.
-    static String start(MatchRoom room, int you, long startIn) {
-        StringBuilder players = new StringBuilder();
+    static String start(MatchRoom room, int you, long startIn, List<String> handles) {
+        String players = array(handles);
         StringBuilder slots = new StringBuilder();
         for (int i = 0; i < room.seats.length; i++) {
             if (i > 0) {
-                players.append(',');
                 slots.append(',');
             }
-            // A bot has no account, so no username: an empty one, which a
-            // client knows not to call.
-            String u = room.seats[i].username;
-            players.append(Json.write(u == null ? "" : u));
             slots.append(Json.write(room.replay.slots().get(i).encode()));
         }
         return "{\"type\":\"" + GameProtocol.START + "\",\"match\":\"" + room.id + "\",\"level\":"
@@ -73,12 +68,13 @@ final class Messages {
         return join(v);
     }
 
-    /// `players` are the members' usernames, in the order of `names`: what a
-    /// client addresses voice signaling to.
-    static String party(String code, String url, String level, String host, List<String> names,
+    /// `players` are the members' handles, in the order of `names`: what a
+    /// client addresses voice signaling to; `you` is the receiver's own.
+    static String party(String code, String url, String level, String host, String you, List<String> names,
             List<String> players) {
         return "{\"type\":\"" + GameProtocol.PARTY + "\",\"code\":" + Json.write(code) + ",\"url\":"
                 + Json.write(url) + ",\"level\":" + Json.write(level) + ",\"host\":" + Json.write(host)
+                + ",\"you\":" + Json.write(you)
                 + ",\"names\":[" + array(names) + "],\"players\":[" + array(players) + "]}";
     }
 

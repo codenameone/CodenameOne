@@ -137,6 +137,24 @@ class OnlineMatchTest {
         rooms.fastForward(id);
     }
 
+    /// Walking out of a match is never a win, even when the team left behind
+    /// goes on to take it.
+    @Test
+    void aLeaverNeverWins() throws Exception {
+        String host = Api.player(accounts, "stayer");
+        String guest = Api.player(accounts, "quitter");
+        rooms.host(profile(host), null, Arenas.DEFAULT, null);
+        rooms.join(profile(guest), null, rooms.partyCode(host));
+        rooms.go(host, null);
+        String id = rooms.raceOf(host);
+        assertFalse(id.isEmpty());
+        int wins = profile(guest).getWins();
+        rooms.leave(guest);
+        assertEquals("", rooms.raceOf(guest));
+        rooms.fastForward(id);
+        assertEquals(wins, profile(guest).getWins());
+    }
+
     @Test
     void aQuickMatchFillsWithBotsAndNeverCostsTrophies() throws Exception {
         String who = Api.player(accounts, "lonely");
@@ -166,6 +184,21 @@ class OnlineMatchTest {
         assertTrue(accepted <= MatchRoom.FLOOD_LIMIT, "accepted " + accepted);
         assertFalse(room.input(0, 3, Input.IDLE), "a replayed sequence is dropped");
         assertFalse(room.input(-1, 200, Input.IDLE));
+    }
+
+    /// Two inputs that land within one server tick are played on two ticks,
+    /// and each tick acknowledges only the input it used: the client
+    /// simulated one tick per input, and a trigger pull in the first is fired.
+    @Test
+    void inputsArrivingTogetherArePlayedOneTickEach() {
+        MatchRoom room = new MatchRoom("r", Arenas.DEFAULT, "lot7", Arenas.mode(Arenas.DEFAULT), 7L,
+                new Seat[] {new Seat("a@x", "A", "semi", 0, 0, null), new Seat("", "Bot", "pump", 0, 1, null)}, 0L);
+        assertTrue(room.input(0, 1, new Input(0, 0, 0, 0, Input.FIRE, -1)));
+        assertTrue(room.input(0, 2, Input.IDLE));
+        room.step();
+        assertEquals(1, room.seats[0].appliedSeq);
+        room.step();
+        assertEquals(2, room.seats[0].appliedSeq);
     }
 
     @Test

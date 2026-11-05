@@ -77,6 +77,9 @@ public class Rooms {
     /// Parties by challenge code, and the code each member is in.
     private final Map<String, Party> parties = new HashMap<String, Party>();
     private final Map<String, String> partyOf = new HashMap<String, String>();
+    private final Map<String, String> handles = new HashMap<String, String>();
+    private final Map<String, String> owners = new HashMap<String, String>();
+    private long handleCount;
 
     static final class Waiting {
         final Profile profile;
@@ -128,7 +131,7 @@ public class Rooms {
             // Back from a drop: the new socket gets the whole log and catches up.
             int seat = room.seatOf(username);
             room.seats[seat].session = session;
-            send(session, Messages.start(room, seat, room.startedAt - Clock.now()));
+            send(session, startMessage(room, seat, room.startedAt - Clock.now()));
             return;
         }
         Party party = parties.get(partyOf.get(username));
@@ -138,7 +141,7 @@ public class Rooms {
                     w.session = session;
                 }
             }
-            send(session, partyMessage(party));
+            send(session, partyMessage(party, username));
         }
     }
 
@@ -148,6 +151,8 @@ public class Rooms {
         MatchRoom room = byPlayer.get(username);
         if (room != null) {
             int seat = room.seatOf(username);
+            System.err.println("[socket] seat " + seat + " of " + room.id + " dropped at tick " + room.match.tick()
+                    + (room.seats[seat].session == session ? "" : " (an older socket)"));
             if (room.seats[seat].session == session) {
                 room.seats[seat].session = null;
             }
@@ -169,20 +174,40 @@ public class Rooms {
 
     /// Closes everything `username` has open: used when an admin suspends or bans.
     public void kick(String username) {
-        WebSocketSession session = null;
+        // Every socket the account has: a queued or partied one is not seated
+        // yet, and a suspended player must not keep any of them.
+        List<WebSocketSession> sessions = new ArrayList<WebSocketSession>();
         synchronized (this) {
+            for (List<Waiting> q : queues.values()) {
+                collect(q, username, sessions);
+            }
+            Party party = parties.get(partyOf.get(username));
+            if (party != null) {
+                collect(party.members, username, sessions);
+            }
             removeQueued(username);
             leaveParty(username);
             MatchRoom room = byPlayer.get(username);
             if (room != null) {
                 Seat s = room.seats[room.seatOf(username)];
-                session = s.session;
+                if (s.session != null && !sessions.contains(s.session)) {
+                    sessions.add(s.session);
+                }
+                s.session = null;
                 s.left = true;
             }
         }
-        if (session != null) {
+        for (WebSocketSession session : sessions) {
             send(session, Messages.simple(GameProtocol.KICKED));
             session.close(4403, "suspended");
+        }
+    }
+
+    private static void collect(List<Waiting> from, String username, List<WebSocketSession> into) {
+        for (Waiting w : from) {
+            if (w.profile.getUsername().equals(username) && w.session != null && !into.contains(w.session)) {
+                into.add(w.session);
+            }
         }
     }
 
@@ -205,7 +230,7 @@ public class Rooms {
             party.members.add(new Waiting(player, session, Clock.now()));
             parties.put(party.code, party);
             partyOf.put(player.getUsername(), party.code);
-            broadcast(party, partyMessage(party));
+            sendParty(party);
         }
         if (crew != null) {
             crews.callToRace(player.getUsername(), player.getDisplayName(), crew, c.code());
@@ -220,7 +245,7 @@ public class Rooms {
         }
         abandonMatch(player.getUsername());
         if (code.equals(partyOf.get(player.getUsername()))) {
-            send(session, partyMessage(party));
+            send(session, partyMessage(party, player.getUsername()));
             return;
         }
         if (party.members.size() >= GameProtocol.MAX_PLAYERS) {
@@ -232,7 +257,7 @@ public class Rooms {
         party.members.add(new Waiting(player, session, Clock.now()));
         partyOf.put(player.getUsername(), code);
         challenges.joinedWhileAway(code, party.host, player.getDisplayName());
-        broadcast(party, partyMessage(party));
+        sendParty(party);
     }
 
     /// The host starts the race. A party of one gets bots, so hosting alone
@@ -277,19 +302,55 @@ public class Rooms {
                 send(w.session, Messages.error("The host closed the party"));
             }
         } else {
-            broadcast(party, partyMessage(party));
+            sendParty(party);
         }
         return party;
     }
 
-    private static String partyMessage(Party party) {
+    /// Each member gets the roster with their own handle as `you`.
+    private void sendParty(Party party) {
+        for (Waiting w : party.members) {
+            send(w.session, partyMessage(party, w.profile.getUsername()));
+        }
+    }
+
+    private String partyMessage(Party party, String forUsername) {
         List<String> names = new ArrayList<String>();
         List<String> players = new ArrayList<String>();
         for (Waiting w : party.members) {
             names.add(w.profile.getDisplayName());
-            players.add(w.profile.getUsername());
+            players.add(handle(w.profile.getUsername()));
         }
-        return Messages.party(party.code, party.url, party.level, party.host, names, players);
+        return Messages.party(party.code, party.url, party.level, handle(party.host), handle(forUsername), names,
+                players);
+    }
+
+    /// The name other clients know an account by. A username is an email
+    /// address, so it never goes to another runner: rosters, voice signaling
+    /// and mutes carry this opaque handle instead, and voice addressed to one
+    /// is resolved back here. Handles live as long as this process, so a
+    /// reconnecting runner keeps theirs.
+    String handle(String username) {
+        if (username == null) {
+            return "";
+        }
+        String h = handles.get(username);
+        if (h == null) {
+            h = "p" + Long.toString(++handleCount, 36);
+            handles.put(username, h);
+            owners.put(h, username);
+        }
+        return h;
+    }
+
+    private String startMessage(MatchRoom room, int you, long startIn) {
+        List<String> players = new ArrayList<String>();
+        for (Seat s : room.seats) {
+            // A bot has no account: an empty handle, which a client knows
+            // not to call.
+            players.add(handle(s.username));
+        }
+        return Messages.start(room, you, startIn, players);
     }
 
     // ------------------------------------------------------------ quick races
@@ -387,7 +448,7 @@ public class Rooms {
             }
         }
         for (int i = 0; i < n; i++) {
-            send(seats[i].session, Messages.start(room, i, GameProtocol.COUNTDOWN_MILLIS));
+            send(seats[i].session, startMessage(room, i, GameProtocol.COUNTDOWN_MILLIS));
         }
     }
 
@@ -437,19 +498,19 @@ public class Rooms {
             return;
         }
         for (WebSocketSession s : peers(username, to)) {
-            send(s, Messages.voice(username, data));
+            send(s, Messages.voice(handle(username), data));
         }
     }
 
     synchronized void mute(String username, boolean on) {
-        relay(username, Messages.mute(username, on), true);
+        relay(username, Messages.mute(handle(username), on), true);
     }
 
     private void relay(String username, String msg, boolean includeSelf) {
         MatchRoom room = byPlayer.get(username);
         if (room != null) {
             for (Seat s : room.seats) {
-                if (includeSelf || !s.username.equals(username)) {
+                if (includeSelf || !username.equals(s.username)) {
                     send(s.session, msg);
                 }
             }
@@ -465,8 +526,12 @@ public class Rooms {
         }
     }
 
-    private List<WebSocketSession> peers(String username, String to) {
+    private List<WebSocketSession> peers(String username, String toHandle) {
         List<WebSocketSession> out = new ArrayList<WebSocketSession>();
+        String to = owners.get(toHandle);
+        if (to == null) {
+            return out;
+        }
         MatchRoom room = byPlayer.get(username);
         if (room != null) {
             int seat = room.seatOf(to);
@@ -493,7 +558,11 @@ public class Rooms {
     private void abandonMatch(String username) {
         MatchRoom room = byPlayer.get(username);
         if (room != null) {
-            room.seats[room.seatOf(username)].left = true;
+            Seat s = room.seats[room.seatOf(username)];
+            s.left = true;
+            // The socket is about to carry another match or a party; the old
+            // room must stop streaming its snapshots and its end into it.
+            s.session = null;
             byPlayer.remove(username);
         }
     }
@@ -509,8 +578,10 @@ public class Rooms {
         if (room == null) {
             return false;
         }
-        room.spectators.add(session);
-        send(session, Messages.start(room, -1, room.startedAt - Clock.now()));
+        if (!room.spectators.contains(session)) {
+            room.spectators.add(session);
+        }
+        send(session, startMessage(room, -1, room.startedAt - Clock.now()));
         return true;
     }
 
@@ -557,6 +628,8 @@ public class Rooms {
     /// Advances every race to where the wall clock says it should be, then
     /// records the ones that ended. Tests call this with their own clock.
     public void tick(long now) {
+        long began = System.currentTimeMillis();
+        int stepped = 0;
         List<MatchRoom> ended = new ArrayList<MatchRoom>();
         synchronized (this) {
             match(now);
@@ -570,6 +643,7 @@ public class Rooms {
                     step(room);
                     steps++;
                 }
+                stepped += steps;
 
                 if (room.isOver()) {
                     ended.add(room);
@@ -582,7 +656,16 @@ public class Rooms {
         for (MatchRoom room : ended) {
             finish(room);
         }
+        long took = System.currentTimeMillis() - began;
+        if (took > SLOW_TICK_MILLIS) {
+            // A tick slower than its period puts every match behind the wall
+            // clock, and every client runs out of prediction and freezes.
+            System.err.println("[race] a tick took " + took + " ms for " + stepped + " steps over " + byId.size()
+                    + " matches");
+        }
     }
+
+    static final long SLOW_TICK_MILLIS = 200;
 
     private void step(MatchRoom room) {
         room.step();
@@ -689,8 +772,9 @@ public class Rooms {
             if (session != null && session.isOpen()) {
                 session.sendText(msg);
             }
-        } catch (IOException ignored) {
+        } catch (IOException failed) {
             // The socket is going away; its close callback cleans up.
+            System.err.println("[socket] a send failed: " + failed);
         }
     }
 }

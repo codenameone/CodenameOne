@@ -31,6 +31,7 @@ public final class HistoryForm {
 
     public static void show() {
         final Form f = Ui.form("Replays", "history");
+        Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
         Api.game().history(Net.to(list -> Ui.later(() -> {
             if (list.isEmpty()) {

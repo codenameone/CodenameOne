@@ -55,6 +55,9 @@ import java.util.Map;
 // tag::splat-lobby[]
 public final class MatchLobby implements GameLink.Listener, Voice.Listener {
     private final String hello;
+
+    /// Times a match carries on over a new socket before it gives up.
+    private static final int MAX_RECONNECTS = 3;
     private final boolean spectator;
     private GameLink link;
     private OnlineDriver driver;
@@ -243,7 +246,12 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
         }
         String type = GameLink.text(m, "type");
         if (GameProtocol.READY.equals(type)) {
-            link.send(hello);
+            // A socket that rejoins a match says nothing: the server already
+            // knows the seat and sends the match, and the hello would queue
+            // the player for another one.
+            if (driver == null) {
+                link.send(hello);
+            }
         } else if (GameProtocol.PARTY.equals(type)) {
             party(m);
         } else if (GameProtocol.START.equals(type) && driver == null) {
@@ -272,7 +280,9 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
             Voice.stop();
             link.close();
             if (driver != null) {
-                driver.dispose();
+                // The match screen is up: it stops its view and leaves.
+                driver.lost(why);
+                return;
             }
             Ui.toast(why);
             Nav.home();
@@ -280,6 +290,8 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
             driver.message(m);
         }
     }
+
+    private String self = "";
 
     private void party(Map<String, Object> m) {
         code.setText(GameLink.text(m, "code"));
@@ -290,8 +302,11 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
         }
         names = toStrings(m.get("names"));
         players = toStrings(m.get("players"));
-        if (Voice.available() && Voice.current() == null && Session.user() != null) {
-            Voice.start(link, Session.user().username()).setListener(this);
+        // The server names members by handle, never by account: an account
+        // name is an email address.
+        self = GameLink.text(m, "you");
+        if (Voice.available() && Voice.current() == null && self != null && self.length() > 0) {
+            Voice.start(link, self).setListener(this);
         }
         if (Voice.current() != null) {
             Voice.current().members(players);
@@ -312,7 +327,7 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
                 continue;
             }
             String u = i < players.length ? players[i] : "";
-            boolean me = Session.user() != null && Session.user().username().equals(u);
+            boolean me = u.equals(self);
             String state = me ? "" : contains(talking, u) ? (mutedPeers.contains(u) ? "  MUTED" : "  VOICE") : "";
             friends.add(slot(Ui.caps(names[i]) + state, "RosterFriendly", i == 0 ? "HOST" : null));
         }
@@ -343,6 +358,9 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
             Voice.current().members(toStrings(m.get("players")));
         }
         MatchForm.online(driver, () -> {
+            // The match screen is gone, so the socket closing after it is
+            // no news to anyone.
+            cancelled = true;
             Voice.stop();
             Nav.home();
         });
@@ -357,6 +375,17 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
         if (driver == null) {
             Ui.toast("Could not reach the game server.");
             Nav.home();
+        } else if (!driver.match().over()) {
+            if (!spectator && driver.reconnects() < MAX_RECONNECTS) {
+                // A blip -- a train tunnel, a wifi handover -- is not the end
+                // of a match: the seat is kept, so a new socket picks it up.
+                link = GameLink.open(this);
+                driver.relink(link);
+                return;
+            }
+            // Mid-match, nothing else will ever arrive: without this the
+            // match freezes once the phone is too far ahead of the server.
+            driver.lost("Lost the connection to the field.");
         }
     }
 

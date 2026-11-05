@@ -86,27 +86,37 @@ final class Deadlines {
     }
 
     /// Puts the channel in non-blocking mode, counting this caller in.
-    private static void enterNonBlocking(int fd, SocketChannel channel) throws IOException {
+    static void enterNonBlocking(int fd, SocketChannel channel) throws IOException {
         int[] count = NONBLOCKING.get(Integer.valueOf(fd));
         if (count == null) {
             // putIfAbsent is the map's own atomic check-then-insert; locking the
             // concurrent map to get the same thing bypassed its concurrency
             // rather than using it. Whoever loses the race adopts the winner's.
-            int[] fresh = new int[1];
+            int[] fresh = new int[2];
             int[] prior = NONBLOCKING.putIfAbsent(Integer.valueOf(fd), fresh);
             count = prior != null ? prior : fresh;
         }
         synchronized (count) {
             boolean first = count[0] == 0;
-            count[0]++;
             if (first) {
+                // The mode to restore is the one found by the FIRST thread in,
+                // read under this lock. Each caller used to capture
+                // channel.isBlocking() itself, before entering: a websocket
+                // writer arriving while the reader was inside saw the reader's
+                // non-blocking mode, left last, and "restored" non-blocking. The
+                // channel then stayed non-blocking for good, ServerSocket.read
+                // took its non-blocking branch and answered 0 for "no bytes
+                // yet", and WebSocketSession.fill read that as end of stream --
+                // a live connection closed with 1006 and no error, at random.
+                count[1] = channel.isBlocking() ? 1 : 0;
                 channel.configureBlocking(false);
             }
+            count[0]++;
         }
     }
 
     /// Restores blocking mode once the LAST caller has left.
-    private static void leaveNonBlocking(int fd, SocketChannel channel, boolean wasBlocking) {
+    static void leaveNonBlocking(int fd, SocketChannel channel) {
         int[] count = NONBLOCKING.get(Integer.valueOf(fd));
         if (count == null) {
             return;
@@ -115,7 +125,7 @@ final class Deadlines {
             count[0]--;
             if (count[0] <= 0) {
                 count[0] = 0;
-                if (wasBlocking && channel.isOpen()) {
+                if (count[1] == 1 && channel.isOpen()) {
                     try {
                         channel.configureBlocking(true);
                     } catch (IOException ignored) {
@@ -126,13 +136,33 @@ final class Deadlines {
         }
     }
 
+    /// Whether the descriptor's OWNER put it in blocking mode.
+    ///
+    /// channel.isBlocking() is not that answer while a reader or writer is
+    /// inside the non-blocking window above: it reports the transient mode,
+    /// and ServerSocket.read used it to pick its branch -- so a websocket read
+    /// racing a send took the non-blocking path and returned 0.
+    static boolean isLogicallyBlocking(int fd, SocketChannel channel) {
+        int[] count = NONBLOCKING.get(Integer.valueOf(fd));
+        if (count != null) {
+            synchronized (count) {
+                if (count[0] > 0) {
+                    return count[1] == 1;
+                }
+                return channel.isBlocking();
+            }
+        }
+        return channel.isBlocking();
+    }
+
     static int readWithDeadline(int fd, SocketChannel channel, ByteBuffer target)
             throws IOException {
         Integer timeout = receiveTimeout(fd);
-        if (timeout == null || timeout.intValue() <= 0) {
-            return channel.read(target);
-        }
-        boolean wasBlocking = channel.isBlocking();
+        // No deadline still goes through the selector: another thread (a
+        // websocket writer) may hold this channel non-blocking right now, and a
+        // bare channel.read would then answer 0, which every caller reads as end
+        // of stream. Selector.select(0) waits without a bound.
+        int millis = timeout == null || timeout.intValue() <= 0 ? 0 : timeout.intValue();
         Selector selector = null;
         try {
             enterNonBlocking(fd, channel);
@@ -142,15 +172,17 @@ final class Deadlines {
             }
             selector = Selector.open();
             channel.register(selector, SelectionKey.OP_READ);
-            if (selector.select(timeout.intValue()) == 0) {
-                throw new ServerSocket.TimeoutException("Read timed out on " + fd);
+            while (selector.select(millis) == 0) {
+                if (millis > 0) {
+                    throw new ServerSocket.TimeoutException("Read timed out on " + fd);
+                }
             }
             return channel.read(target);
         } finally {
             if (selector != null) {
                 selector.close();
             }
-            leaveNonBlocking(fd, channel, wasBlocking);
+            leaveNonBlocking(fd, channel);
         }
     }
 
@@ -172,7 +204,6 @@ final class Deadlines {
             }
             return;
         }
-        boolean wasBlocking = channel.isBlocking();
         Selector selector = null;
         try {
             enterNonBlocking(fd, channel);
@@ -199,7 +230,7 @@ final class Deadlines {
             if (selector != null) {
                 selector.close();
             }
-            leaveNonBlocking(fd, channel, wasBlocking);
+            leaveNonBlocking(fd, channel);
         }
     }
 }

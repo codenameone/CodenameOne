@@ -74,7 +74,7 @@ public class ArenaView extends GameView {
     /// Field of view from the hip and down the sights.
     static final float HIP_FOV = 70f;
     static final float ADS_FOV = 46f;
-    private static final int MAX_STEPS_PER_FRAME = 6;
+    private static final int MAX_STEPS_PER_FRAME = 12;
     private static final int MAX_BALLS = 120;
     private static final int MAX_DECALS = 260;
     private static final float MM = 0.001f;
@@ -130,6 +130,11 @@ public class ArenaView extends GameView {
     private int lastYaw;
     private int lastPitch;
     private double accumulator;
+    // The quality governor: seconds of frames slower than SLOW_FRAME, and how
+    // many steps down it has taken (0 everything, 1 no post, 2 no shadows).
+    private static final double SLOW_FRAME = 1.0 / 20;
+    private double slowFor;
+    private int qualityDrops;
     private float alpha;
     private float[] prevX = new float[0];
     private float[] prevY = new float[0];
@@ -482,7 +487,8 @@ public class ArenaView extends GameView {
     /// Takes the touch buttons off the screen for good, for the result card.
     public void hideControls() {
         controlsHidden = true;
-        if (buttons != null) {
+        // a desktop has a keyboard and mouse and no touch buttons at all
+        if (buttons.length > 0) {
             getControls().setVisible(false);
         }
     }
@@ -490,7 +496,8 @@ public class ArenaView extends GameView {
     /// The buttons show only while there is something to press: not during
     /// the briefing, and the ADS button reads WIPE while you are out.
     private void controlsFor(Match m) {
-        if (buttons == null) {
+        // a desktop has a keyboard and mouse and no touch buttons at all
+        if (buttons.length == 0) {
             return;
         }
         boolean show = !controlsHidden && driver.countdownTicks() == 0 && !m.over();
@@ -674,6 +681,7 @@ public class ArenaView extends GameView {
             return;
         }
         controlsFor(driver.match());
+        govern(dt);
         accumulator += dt * driver.speedPercent() / 100.0;
         int steps = 0;
         while (accumulator >= TICK && steps < MAX_STEPS_PER_FRAME) {
@@ -695,6 +703,27 @@ public class ArenaView extends GameView {
         tick((float) dt);
     }
     // end::splat-fixed-tick[]
+
+    /// Steps the look down when frames stay slow, so a weak GPU (or a software
+    /// renderer) still plays at speed: the post chain goes first, then the
+    /// shadow pass. It never steps back up within a match; a frame time that
+    /// recovers after a drop is usually the drop working.
+    private void govern(double dt) {
+        if (qualityDrops >= 2) {
+            return;
+        }
+        slowFor = dt > SLOW_FRAME ? slowFor + dt : Math.max(0, slowFor - dt);
+        if (slowFor < 2.0) {
+            return;
+        }
+        slowFor = 0;
+        qualityDrops++;
+        if (qualityDrops == 1) {
+            setPostProcess(null);
+        } else {
+            getLight().setShadows(false);
+        }
+    }
 
     private void remember() {
         Match m = driver.match();

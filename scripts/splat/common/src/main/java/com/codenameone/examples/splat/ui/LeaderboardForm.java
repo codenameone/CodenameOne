@@ -33,6 +33,7 @@ public final class LeaderboardForm {
 
     public static void show() {
         final Form f = Ui.form("Leaders", "leaders");
+        Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
         Api.game().leaderboard(50, Net.to(list -> Ui.later(() -> {
             for (LeaderDto l : list) {

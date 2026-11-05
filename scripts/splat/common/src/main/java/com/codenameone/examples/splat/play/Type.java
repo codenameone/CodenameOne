@@ -46,7 +46,7 @@ public final class Type {
         if (boldBase == null) {
             boldBase = load("Rajdhani-Bold");
         }
-        return boldBase.derive(CN.convertToPixels(mm), Font.STYLE_BOLD);
+        return boldBase.derive(pixels(mm), Font.STYLE_BOLD);
     }
 
     /// Rajdhani Medium at `mm` millimetres.
@@ -54,7 +54,19 @@ public final class Type {
         if (mediumBase == null) {
             mediumBase = load("Rajdhani-Medium");
         }
-        return mediumBase.derive(CN.convertToPixels(mm), Font.STYLE_PLAIN);
+        return mediumBase.derive(pixels(mm), Font.STYLE_PLAIN);
+    }
+
+    /// A monitor reports far fewer pixels to the millimetre than a phone and is
+    /// read from further away, so the HUD's small print -- the kill feed, the
+    /// marker name -- came out at eight pixels. On a desktop each size has a
+    /// floor that keeps it readable at arm's length.
+    private static int pixels(float mm) {
+        int px = CN.convertToPixels(mm);
+        if (CN.isDesktop()) {
+            px = Math.max(px, Math.round(mm * 5.5f));
+        }
+        return px;
     }
 
     private static Font load(String name) {

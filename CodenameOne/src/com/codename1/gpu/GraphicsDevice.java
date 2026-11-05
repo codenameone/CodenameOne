@@ -22,6 +22,7 @@ import com.codename1.ui.Image;
 /// platform shader, uploads any dirty buffers and issues the draw call.
 public abstract class GraphicsDevice {
     private Camera camera;
+    private boolean shadowMapCurrent;
     private Light light = new Light();
     private Environment environment = new Environment();
 
@@ -100,11 +101,28 @@ public abstract class GraphicsDevice {
     /// Sets the active camera supplying the view and projection matrices used by
     /// subsequent draws.
     ///
+    /// Setting the camera starts a new frame as far as shadows go: a shadow map
+    /// rendered before it is not used again, so set the camera first and then
+    /// run `beginShadowPass`.
+    ///
     /// #### Parameters
     ///
     /// - `camera`: the camera
     public void setCamera(Camera camera) {
         this.camera = camera;
+        shadowMapCurrent = false;
+    }
+
+    /// For a backend: true once a shadow pass has ended since the camera was
+    /// last set, so the map belongs to this frame. A frame that skipped the pass
+    /// must not sample the one before it.
+    protected final boolean isShadowMapCurrent() {
+        return shadowMapCurrent;
+    }
+
+    /// For a backend: records that a shadow pass of this frame has ended.
+    protected final void shadowMapRendered() {
+        shadowMapCurrent = true;
     }
 
     /// Returns the active camera, or null if none was set.

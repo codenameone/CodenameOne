@@ -36,6 +36,7 @@ public final class SignInForm {
 
     public static void show() {
         Form f = Ui.form("", "signin");
+        Ui.desktopColumn(f);
         f.setLayout(new com.codename1.ui.layouts.LayeredLayout());
         f.setScrollable(false);
         f.setUIID("MenuForm");

@@ -119,7 +119,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
-        boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
+        boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         if (shadowed != shadowSampling) {
             shadowSampling = shadowed;
@@ -294,7 +294,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         Light sl = getLight();
         uniforms[o++] = sl.getShadowBias();
         uniforms[o++] = sl.getShadowStrength();
-        uniforms[o++] = 1.0f / shadowSize;
+        uniforms[o++] = 1.0f / Math.max(1, shadowSize);
         uniforms[o++] = 0.0f;
     }
 
@@ -319,6 +319,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
         inShadowPass = false;
         shadowReady = true;
+        shadowMapRendered();
         WindowsNative.gl3dEndShadowPass(contextPeer);
     }
 

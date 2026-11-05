@@ -52,14 +52,17 @@ public final class OnlineDriver extends Driver {
 
         void ended(int[] places, int[] scores, int trophies, int coins, String matchId);
 
-        void lost();
+        /// The match is gone for this player: removed by the ref, or the
+        /// connection to the server dropped. `why` is said to the player.
+        void lost(String why);
     }
 
     /// The most inputs the phone runs ahead of the last snapshot. Past this the
     /// server has gone quiet, and guessing further only makes the snap back worse.
     static final int MAX_AHEAD = 20;
 
-    private final GameLink link;
+    private GameLink link;
+    private int reconnects;
     private final boolean spectator;
     private Listener listener;
     private String matchId;
@@ -118,9 +121,12 @@ public final class OnlineDriver extends Driver {
         startsAt = System.currentTimeMillis() + GameLink.number(m, "startIn");
     }
 
+    private long lastSnapAt;
+
     public void message(Map<String, Object> m) {
         String type = GameLink.text(m, "type");
         if (GameProtocol.SNAP.equals(type)) {
+            lastSnapAt = System.currentTimeMillis();
             snap(GameLink.number(m, "t"), GameLink.number(m, "ack"), GameLink.text(m, "s"), GameLink.text(m, "e"));
         } else if (GameProtocol.START.equals(type)) {
             restart(m);
@@ -131,10 +137,14 @@ public final class OnlineDriver extends Driver {
         } else if (GameProtocol.CHAT.equals(type)) {
             listener.chat(GameLink.text(m, "from"), GameLink.text(m, "text"));
         } else if (GameProtocol.END.equals(type)) {
+            if (matchId != null && !matchId.equals(GameLink.text(m, "match"))) {
+                // the end of a match this socket has already left
+                return;
+            }
             listener.ended(ints(GameLink.text(m, "places")), ints(GameLink.text(m, "scores")),
                     GameLink.number(m, "trophies"), GameLink.number(m, "coins"), GameLink.text(m, "match"));
         } else if (GameProtocol.KICKED.equals(type)) {
-            listener.lost();
+            listener.lost("The ref removed you from the field.");
         }
     }
 
@@ -162,6 +172,14 @@ public final class OnlineDriver extends Driver {
                 emit(new Event(f[0], f[1], f[2], f[3], f[4], f[5], f[6]));
             }
         }
+    }
+
+    /// Where the link stands, for a test that has to say why a match stalled.
+    public String describe() {
+        return "server tick " + serverTick + " (" + (lastSnapAt == 0 ? "no snapshot"
+                : (System.currentTimeMillis() - lastSnapAt) + " ms ago") + "), " + pending.size()
+                + " inputs unacknowledged, countdown " + countdownTicks() + ", " + reconnects + " reconnects, "
+                + link.describe();
     }
 
     @Override
@@ -222,8 +240,29 @@ public final class OnlineDriver extends Driver {
         link.send("{\"type\":\"" + GameProtocol.LEAVE + "\"}");
     }
 
+    /// Carries on over a new socket after the old one dropped. The server
+    /// seats it in the same place and answers with the whole match so far,
+    /// which arrives as a start and rebuilds the field from it.
+    public void relink(GameLink fresh) {
+        link = fresh;
+        reconnects++;
+    }
+
+    /// How many times the match had to carry on over a new socket.
+    public int reconnects() {
+        return reconnects;
+    }
+
     public GameLink link() {
         return link;
+    }
+
+    /// Tells the match screen the match is gone, when the lobby that owns the
+    /// socket learns it first.
+    public void lost(String why) {
+        if (listener != null) {
+            listener.lost(why);
+        }
     }
 
     @Override

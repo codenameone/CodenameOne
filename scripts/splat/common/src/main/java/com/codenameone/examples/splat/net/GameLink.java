@@ -26,6 +26,8 @@ import com.codename1.ui.CN;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Timer;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// The game socket, `/ws/game` on the server. One is open while the player is
 /// queued, playing, or (as an admin) watching.
@@ -74,9 +76,15 @@ public final class GameLink {
         String url = "ws" + base.substring(4) + "/ws/game?ticket=" + ticket;
         socket = WebSocket.build(url)
                 .onConnect(ws -> CN.callSerially(this::opened))
-                .onTextMessage((ws, text) -> CN.callSerially(() -> frame(text)))
+                .onTextMessage((ws, text) -> {
+                    arrived.incrementAndGet();
+                    CN.callSerially(() -> frame(text));
+                })
                 .onClose((ws, code, reason) -> CN.callSerially(() -> lost(code)))
-                .onError((ws, err) -> CN.callSerially(() -> lost(0)))
+                .onError((ws, err) -> {
+                    error.set(String.valueOf(err));
+                    CN.callSerially(() -> lost(0));
+                })
                 .connect(10000);
     }
 
@@ -84,7 +92,27 @@ public final class GameLink {
         pinger = CN.setInterval(PING_MILLIS, () -> send("{\"type\":\"ping\"}"));
     }
 
+    /// Frames the socket has delivered and frames the EDT has read, for a test
+    /// that has to tell a server that went quiet from a client that stopped
+    /// reading. The first is counted on the socket's own thread.
+    private final AtomicInteger arrived = new AtomicInteger();
+    private int read;
+    private String closedBy;
+    private int largest;
+    private long lastFrameAt;
+    /// The socket's last error, written on the socket's own thread.
+    private final AtomicReference<String> error = new AtomicReference<String>();
+
+    /// Where the socket stands, for diagnostics.
+    public String describe() {
+        return "frames arrived " + arrived.get() + ", read " + read + ", largest " + largest + " chars"
+                + (closed ? ", closed by " + closedBy : "");
+    }
+
     private void frame(String text) {
+        read++;
+        lastFrameAt = System.currentTimeMillis();
+        largest = Math.max(largest, text.length());
         if (closed) {
             return;
         }
@@ -99,6 +127,8 @@ public final class GameLink {
         if (closed) {
             return;
         }
+        closedBy = "socket, code " + code + (error.get() == null ? "" : " (" + error.get() + ")") + ", "
+                + (System.currentTimeMillis() - lastFrameAt) + " ms after the last frame";
         close();
         listener.closed(code);
     }
@@ -110,6 +140,9 @@ public final class GameLink {
     }
 
     public void close() {
+        if (closedBy == null) {
+            closedBy = "client";
+        }
         closed = true;
         if (pinger != null) {
             pinger.cancel();

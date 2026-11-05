@@ -20,15 +20,18 @@ package com.codenameone.examples.splat.ui;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.components.ToastBar;
+import com.codename1.io.Log;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -37,9 +40,14 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
 import com.codenameone.examples.splat.api.PlayerDto;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Session;
+import java.io.IOException;
+import java.util.Enumeration;
+import java.util.Hashtable;
 
 /// The few building blocks every screen is made of. None of them draws
 /// anything itself: each one only names a UIID, and `theme.css` decides what a
@@ -67,6 +75,74 @@ public final class Ui {
         return f;
     }
 
+    /// On a desktop, lifts every theme font to the floor `Type` keeps for the
+    /// HUD. The stylesheet sizes its small print in millimetres, and a monitor
+    /// reports so few pixels to the millimetre that a 2mm caption -- a menu
+    /// item's subtitle, a store row's tag -- came out at seven pixels. Call it
+    /// once, before the first form shows. Does nothing on a phone or tablet.
+    public static void desktopFonts() {
+        if (!CN.isDesktop()) {
+            return;
+        }
+        float perMm = CN.convertToPixels(100f) / 100f;
+        if (perMm <= 0 || perMm >= 5.5f) {
+            return;
+        }
+        float scale = 5.5f / perMm;
+        try {
+            Resources r = Resources.openLayered("/theme");
+            String[] names = r.getThemeResourceNames();
+            if (names == null || names.length == 0) {
+                return;
+            }
+            Hashtable theme = r.getTheme(names[0]);
+            Hashtable lifted = new Hashtable();
+            Enumeration keys = theme.keys();
+            while (keys.hasMoreElements()) {
+                Object k = keys.nextElement();
+                Object v = theme.get(k);
+                if (v instanceof Font && ((Font) v).isTTFNativeFont()) {
+                    Font f = (Font) v;
+                    v = f.derive(f.getPixelSize() * scale, f.getStyle());
+                }
+                lifted.put(k, v);
+            }
+            UIManager.getInstance().setThemeProps(lifted);
+        } catch (IOException e) {
+            Log.e(e);
+        }
+    }
+
+    /// The widest a list screen reads on a desktop, in pixels: a row with its
+    /// label at one edge of a monitor and its button at the other is two
+    /// things, not one.
+    static final int DESKTOP_PAGE_PX = 1000;
+
+    /// On a desktop, keeps a list screen to a column in the middle of the
+    /// window, however wide the window is. Does nothing on a phone or tablet.
+    public static void desktopColumn(final Form f) {
+        if (!CN.isDesktop()) {
+            return;
+        }
+        final Container c = f.getContentPane();
+        final Runnable fit = () -> {
+            int side = Math.max(0, (f.getWidth() - DESKTOP_PAGE_PX) / 2);
+            Style s = c.getUnselectedStyle();
+            s.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
+            s.setPaddingUnitRight(Style.UNIT_TYPE_PIXELS);
+            s.setPadding(Component.LEFT, side);
+            s.setPadding(Component.RIGHT, side);
+        };
+        f.addShowListener(e -> {
+            fit.run();
+            f.revalidate();
+        });
+        f.addSizeChangedListener(e -> {
+            fit.run();
+            f.revalidateLater();
+        });
+    }
+
     /// Adds a back command that leaves through `leave`.
     public static void back(Form f, final Runnable leave) {
         Command back = new Command("") {
@@ -75,7 +151,15 @@ public final class Ui {
                 leave.run();
             }
         };
-        f.getToolbar().setBackCommand(back);
+        // The toolbar draws its arrow in millimetres, which on a monitor came
+        // out as a speck beside the title: there it gets the same desktop
+        // floor as the fonts.
+        float mm = 3f;
+        float perMm = CN.convertToPixels(100f) / 100f;
+        if (CN.isDesktop() && perMm > 0 && perMm < 5.5f) {
+            mm = mm * 5.5f / perMm;
+        }
+        f.getToolbar().setBackCommand(back, Toolbar.BackCommandPolicy.AS_ARROW, mm);
     }
 
     public static Label label(String text, String uiid) {

@@ -122,7 +122,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
         Environment env = getEnvironment();
-        boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
+        boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
 
         long vboHandle = uploadVertexBuffer(vb);
@@ -344,6 +344,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         }
         inShadowPass = false;
         shadowReady = true;
+        shadowMapRendered();
         LinuxNative.gl3dEndShadowPass(contextPeer);
     }
 

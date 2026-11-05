@@ -211,7 +211,7 @@ class JavaSEGLDevice extends GraphicsDevice {
             return;
         }
         Environment env = getEnvironment();
-        boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
+        boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         Program program = getProgram(material, fmt, env, shadowed);
         if (program.handle == 0) {
@@ -682,6 +682,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
         inShadowPass = false;
         shadowReady = true;
+        shadowMapRendered();
         restoreTarget();
     }
 

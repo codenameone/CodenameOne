@@ -54,6 +54,7 @@ import com.codenameone.examples.splat.ui.Ui;
 public class Splat extends Lifecycle implements PurchaseCallback {
     @Override
     public void runApp() {
+        Ui.desktopFonts();
         SettingsForm.apply();
         Sfx.load();
         Telemetry.start();

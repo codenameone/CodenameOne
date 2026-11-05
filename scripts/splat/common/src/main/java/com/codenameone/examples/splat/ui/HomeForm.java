@@ -207,8 +207,10 @@ public final class HomeForm {
     private static Component item(String title, String sub, String name, boolean primed, final Runnable go) {
         Button b = Ui.button(title, primed ? "MenuItemTextPrimed" : "MenuItemText", name, e -> go.run());
         // a phone held upright has room for the whole list only without the
-        // second lines; the primed order keeps its own
-        boolean tall = CN.getDisplayHeight() > CN.getDisplayWidth() && !CN.isTablet() && !CN.isDesktop();
+        // second lines, and so does a desktop window under 1000 pixels once
+        // the fonts are at their desktop size; the primed order keeps its own
+        boolean tall = CN.isDesktop() ? CN.getDisplayHeight() < 1000
+                : CN.getDisplayHeight() > CN.getDisplayWidth() && !CN.isTablet();
         Container c = tall && !primed ? BoxLayout.encloseY(b)
                 : BoxLayout.encloseY(b, new Label(Ui.caps(sub), "MenuItemSub"));
         c.setUIID(primed ? "MenuItemPrimed" : "MenuItem");
@@ -293,8 +295,10 @@ public final class HomeForm {
         b.setMaterialIcon(FontImage.MATERIAL_CAMPAIGN, 4);
         // a span measures its first layout at its unwrapped width, so the
         // strip under the menu was sized for one line and cut the second;
-        // a news line is at most two, so ask for two from the start
-        b.getTextComponent().setRows(2);
+        // a news line is at most two, so ask for two from the start; a wide
+        // screen fits it on one, and two would leave an empty band
+        boolean wide = CN.getDisplayWidth() > CN.convertToPixels(150);
+        b.getTextComponent().setRows(wide ? 1 : 2);
         b.getTextComponent().setGrowByContent(true);
         b.addActionListener(e -> {
             Nav.screen(s.screen() == null ? "" : s.screen());

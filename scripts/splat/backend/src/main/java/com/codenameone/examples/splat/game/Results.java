@@ -116,21 +116,25 @@ public class Results {
             if (!s.isBot()) {
                 Profile p = profiles.findById(s.username);
                 if (p != null) {
-                    int t = trophies(places[i], draw, humans);
+                    // A runner who walked out never wins, however well their
+                    // team did without them: otherwise leaving while ahead is
+                    // a free win.
+                    int place = s.left ? Math.max(1, places[i]) : places[i];
+                    int t = trophies(place, draw, humans);
                     t = Math.max(t, -p.getTrophies());
                     int coins = s.left ? 0 : Math.min(MAX_MATCH_COINS, r.paints() * COINS_PER_PAINT);
                     p.setTrophies(p.getTrophies() + t);
                     p.setCoins(p.getCoins() + coins);
                     if (draw) {
                         p.setDraws(p.getDraws() + 1);
-                    } else if (places[i] == 0) {
+                    } else if (place == 0) {
                         p.setWins(p.getWins() + 1);
                     } else {
                         p.setLosses(p.getLosses() + 1);
                     }
                     p.setLeftStreak(s.left ? p.getLeftStreak() + 1 : 0);
                     p.setLastSeen(now);
-                    progression.afterMatch(p, !draw && places[i] == 0, i == room.leader(), r.paints(), wipes[i]);
+                    progression.afterMatch(p, !draw && place == 0, i == room.leader(), r.paints(), wipes[i]);
                     profiles.save(p);
                     out[i] = new Outcome(t, coins);
                     RaceEntry e = new RaceEntry();

@@ -92,6 +92,9 @@ struct CN1D3DContext {
     ID3D11Buffer* postCb;
     ID3D11Buffer* quad;
     D3D11_VIEWPORT savedVp;
+    // the application's viewport when the post pass began, kept for the
+    // scene target and restored after the composite, as the other backends do
+    D3D11_VIEWPORT postVp;
     int shadowOn;
 };
 
@@ -802,10 +805,22 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dBeginPost___long_boole
         }
     }
     cn1D3DUnbindPs(c);
+    UINT vpCount = 1;
+    c->ctx->RSGetViewports(&vpCount, &c->postVp);
+    if (vpCount == 0) {
+        c->postVp.TopLeftX = 0.0f;
+        c->postVp.TopLeftY = 0.0f;
+        c->postVp.Width = (FLOAT) w;
+        c->postVp.Height = (FLOAT) h;
+        c->postVp.MinDepth = 0.0f;
+        c->postVp.MaxDepth = 1.0f;
+    }
     c->activeRtv = c->scene.rtv;
     c->activeDsv = c->scene.dsv;
     c->ctx->OMSetRenderTargets(1, &c->activeRtv, c->activeDsv);
-    cn1D3DSetViewport(c, w, h);
+    // the scene target is frame sized, so the application's viewport is
+    // the same rectangle in it
+    c->ctx->RSSetViewports(1, &c->postVp);
     return JAVA_TRUE;
 }
 
@@ -907,7 +922,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_
         cn1D3DPostDraw(c, comp, c->rtv, c->width, c->height, c->scene.srv, bloomSrv, k);
     }
     c->ctx->OMSetRenderTargets(1, &c->rtv, c->dsv);
-    cn1D3DSetViewport(c, c->width, c->height);
+    c->ctx->RSSetViewports(1, &c->postVp);
 }
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_gl3dCaptureFrame___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {

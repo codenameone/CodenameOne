@@ -142,7 +142,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         if (vboHandle == 0) {
             return;
         }
-        boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
+        boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         long pipeline = getOrCreatePipeline(material, fmt, getEnvironment(), shadowed);
         if (pipeline == 0) {
@@ -310,7 +310,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
         uniforms[124] = light.getShadowBias();
         uniforms[125] = light.getShadowStrength();
-        uniforms[126] = 1.0f / shadowSize;
+        uniforms[126] = 1.0f / Math.max(1, shadowSize);
         uniforms[127] = 0.0f;
     }
 
@@ -334,6 +334,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
         inShadowPass = false;
         shadowReady = true;
+        shadowMapRendered();
         IOSImplementation.nativeInstance.gl3dEndShadowPass(contextPeer);
     }
 

@@ -50,6 +50,7 @@ public final class SettingsForm {
 
     public static void show() {
         Form f = Ui.form("Settings", "settings");
+        Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
         final TextField name = new TextField(Session.user().displayName(), "Runner name", 16, TextField.ANY);
         name.setUIID("NameField");

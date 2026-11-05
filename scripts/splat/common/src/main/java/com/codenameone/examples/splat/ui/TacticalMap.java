@@ -53,6 +53,11 @@ public final class TacticalMap extends Component {
     @Override
     protected Dimension calcPreferredSize() {
         int s = CN.convertToPixels(40);
+        // a monitor has few pixels to the millimetre; the briefing map is
+        // the point of the screen there, so it gets real size
+        if (CN.isDesktop()) {
+            s = Math.max(s, CN.getDisplayHeight() * 2 / 3);
+        }
         return new Dimension(s, s * 3 / 4);
     }
 
@@ -68,11 +73,13 @@ public final class TacticalMap extends Component {
         // The field is drawn lying on its side, the long axis across.
         int span = Math.max(arena.width, arena.depth);
         int pad = CN.convertToPixels(3);
-        float k = Math.min((w - pad * 2) / (float) arena.depth, (h - pad * 2) / (float) arena.width);
+        // the caption has a strip of its own under the field, never over it
+        int caption = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight() + 4;
+        float k = Math.min((w - pad * 2) / (float) arena.depth, (h - pad * 2 - caption) / (float) arena.width);
         int fw = (int) (arena.depth * k);
         int fh = (int) (arena.width * k);
         int ox = x0 + (w - fw) / 2;
-        int oy = y0 + (h - fh) / 2;
+        int oy = y0 + (h - caption - fh) / 2;
         g.setColor(0x1f262d);
         int cell = Math.max(4, (int) (5000 * k));
         for (int gx = ox; gx <= ox + fw; gx += cell) {

@@ -45,6 +45,7 @@ public final class ShopForm {
 
     public static void show() {
         final Form f = Ui.form("ARMORY", "shop");
+        Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
         Store.listen(wallet -> {
             Ui.toast("Purchase complete");

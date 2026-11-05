@@ -118,6 +118,11 @@ public class GameSocket implements WebSocket {
     }
 
     @Override
+    public void onError(WebSocketSession session, Exception error) {
+        System.err.println("[socket] error on " + session.getAttachment() + ": " + error);
+    }
+
+    @Override
     public void onClose(WebSocketSession session, int code, String reason) {
         Object who = session.getAttachment();
         if (who instanceof String) {

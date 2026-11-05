@@ -393,7 +393,7 @@ SpotlightIcon {
 SpotlightText {
     color: var(--volt);
     font-family: "Rajdhani Bold";
-    font-size: 2.4mm;
+    font-size: 3mm;
     text-align: left;
 }
 
@@ -662,9 +662,9 @@ CrateSlot, CrateSlotEmpty {
     border-radius: 0;
     color: var(--cyan);
     font-family: "Rajdhani Bold";
-    font-size: 2.2mm;
+    font-size: 2.6mm;
     text-align: center;
-    padding: 0.8mm 0.3mm;
+    padding: 1.2mm 2.5mm;
     margin: 0 1.2mm 1.5mm 1.2mm;
 }
 

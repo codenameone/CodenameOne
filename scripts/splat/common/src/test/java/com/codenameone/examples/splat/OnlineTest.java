@@ -40,7 +40,12 @@ public class OnlineTest extends E2e {
         while (view.driver().match().tick() < 100 && System.currentTimeMillis() < give) {
             driveFor(view, 200);
         }
-        assertTrue(view.driver().match().tick() >= 100, "server snapshots");
+        assertTrue(view.driver().match().tick() >= 100, "server snapshots: tick "
+                + view.driver().match().tick() + ", " + ((OnlineDriver) view.driver()).describe());
+        // The client carries a match over a dropped socket, which would hide
+        // a server that drops them: on a test machine none may drop at all.
+        assertTrue(((OnlineDriver) view.driver()).reconnects() == 0, "the socket dropped mid-match: "
+                + ((OnlineDriver) view.driver()).describe());
         click("comms");
         click("emote-gg");
         shot("match-online", view);
