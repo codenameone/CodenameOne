@@ -43,6 +43,12 @@ public class PracticeTest extends E2e {
         while (view.driver().match().tick() < 6 * Match.TICK_HZ && System.currentTimeMillis() < give) {
             driveFor(view, 200);
         }
+        // The shot is of the HUD in play, so not while painted: then the view
+        // looks at the floor and the HUD counts down to the respawn.
+        give = System.currentTimeMillis() + 20000;
+        while (!view.driver().match().player(view.driver().me()).alive() && System.currentTimeMillis() < give) {
+            driveFor(view, 200);
+        }
         shot("match-practice", view);
         finish(view, 10 * 60 * Match.TICK_HZ);
         assertTrue(view.driver().match().over(), "the match ended");

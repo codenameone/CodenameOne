@@ -93,6 +93,14 @@ talk over WebRTC voice and trade emotes during it ("It bounced!", "REF!").
 image::img/splat-party-chat.png["A party: the code, the members and the chat",scaledwidth=30%]
 image::img/splat-party-match.png["A party match with a friend's emote and chat on screen",scaledwidth=30%]
 
+On a desktop the same app is a window, not a phone. The menus keep to a readable column,
+small text is sized for a monitor instead of being scaled down from a phone, and the match
+drops the touch controls for the keyboard and mouse, with a wider view and a fuller HUD.
+
+image::img/splat-desktop-home.png["The main menu on a desktop",scaledwidth=60%]
+image::img/splat-desktop-match.png["A match on a desktop: keyboard and mouse, no touch controls",scaledwidth=60%]
+image::img/splat-desktop-shop.png["The store on a desktop, with its title bar and back arrow",scaledwidth=60%]
+
 [[splat-modules]]
 === The modules
 
