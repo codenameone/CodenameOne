@@ -1,0 +1,3 @@
+{4: kiwi, 3: fig, 6: banana}
+[fig, pear, kiwi, banana]
+[3, 2, 1]

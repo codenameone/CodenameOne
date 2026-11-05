@@ -42,6 +42,36 @@ import java.util.List;
  */
 public class Future<T> {
 
+    /// The type argument the construction named (`Future<int>.value(1)` is a
+    /// `Future<int>`), which `is Future<X>` and `as Future<X>` read; null when nothing
+    /// recorded it, which those tests take as unknown.
+    private dart.runtime.TypeWitness typeArg;
+
+    /// The recorded type argument, or null.
+    public final dart.runtime.TypeWitness typeArgWitness() {
+        return typeArg;
+    }
+
+    /// Records {@code w} as {@code f}'s type argument and answers {@code f}; the emitter
+    /// wraps a construction whose type argument it knows. A null witness records nothing.
+    /// Records {@code w} as {@code f}'s type argument unless one is recorded already, and
+    /// answers it. The emitter calls it on the result of a call whose static type is
+    /// Future<X>: a future a member or a function value made without recording X takes the
+    /// declared X, and one that recorded its own (narrower) X keeps it.
+    public static <F extends Future<?>> F reifyUnknown(F f, dart.runtime.TypeWitness w) {
+        if (f != null && w != null && ((Future<?>) f).typeArg == null) {
+            ((Future<?>) f).typeArg = w;
+        }
+        return f;
+    }
+
+    public static <F extends Future<?>> F reify(F f, dart.runtime.TypeWitness w) {
+        if (f != null && w != null) {
+            ((Future<?>) f).typeArg = w;
+        }
+        return f;
+    }
+
     private final Object lock = new Object();
     private boolean done;
     /// Set while this future waits on another it was completed WITH. It counts
@@ -51,8 +81,44 @@ public class Future<T> {
     private T value;
     private Throwable error;
     private List<Runnable> listeners;
+    /// The zone this future was created in: an error nothing listens for is its
+    /// uncaught error, as Dart reports it.
+    private final Zone zone = Zone.current;
+    /// Set once anything listened to, awaited or read this future's outcome.
+    private boolean errorHandled;
 
-    Future() {
+    /// Set once cn1Drive() has run, so a program subclass is driven at most once.
+    private boolean driven;
+    /// A future completed the way Dart's StreamIterator completes moveNext() (an
+    /// internal synchronous completion): an await on it resumes inside the completion
+    /// rather than a microtask later.
+    boolean resumeInline;
+
+    /// Also the constructor of a program class declared {@code implements Future<T>}:
+    /// it extends this class, and its inherited state is completed by {@link #cn1Drive}.
+    protected Future() {
+    }
+
+    /// Completes a program subclass's inherited state from its own then(); see
+    /// {@code JavaEmitter.implementsRuntimeFuture}. The runtime's futures complete
+    /// themselves, so the default does nothing.
+    protected void cn1Drive() {
+    }
+
+    /// Adopts {@code source}'s value or error, for {@link #cn1Drive} overrides.
+    protected final void cn1Adopt(Future<?> source) {
+        adopt(source);
+    }
+
+    /// Runs cn1Drive() the first time this future is listened to or awaited.
+    final void driveOnce() {
+        synchronized (lock) {
+            if (driven || done || adopting) {
+                return;
+            }
+            driven = true;
+        }
+        cn1Drive();
     }
 
     /**
@@ -97,14 +163,50 @@ public class Future<T> {
     /** The error of a future that has already failed, else null (Java side only). */
     public Throwable completedError() {
         synchronized (lock) {
+            errorHandled = true;
             return done ? error : null;
         }
+    }
+
+    /// Dart's {@code Future.any}: completes with the outcome of the first of
+    /// {@code futures} to complete, value or error; the later ones are ignored.
+    public static <T> Future<T> any(Iterable<? extends Future<? extends T>> futures) {
+        final Future<T> result = new Future<T>();
+        final boolean[] settled = new boolean[1];
+        for (Future<? extends T> f : futures) {
+            @SuppressWarnings("unchecked")
+            Future<T> ft = (Future<T>) f;
+            ft.then(new Funcs.Func1<T, Object>() {
+                public Object call(T v) {
+                    if (!settled[0]) {
+                        settled[0] = true;
+                        result.complete(v);
+                    }
+                    return null;
+                }
+            }).catchError(new Funcs.VoidFunc1<Object>() {
+                public void call(Object e) {
+                    if (!settled[0]) {
+                        settled[0] = true;
+                        result.completeError(e);
+                    }
+                }
+            });
+        }
+        return result;
     }
 
     /** An already-completed future. */
     public static <T> Future<T> value(T v) {
         Future<T> f = new Future<T>();
         f.complete(v);
+        return f;
+    }
+
+    /** Dart's {@code Future.error(error, stackTrace)}: the trace travels with the error. */
+    public static <T> Future<T> error(Object err, Object stackTrace) {
+        Future<T> f = new Future<T>();
+        f.completeError(dart.core.StackTrace.carry(err, stackTrace));
         return f;
     }
 
@@ -142,14 +244,15 @@ public class Future<T> {
         });
     }
 
-    public static Future<Object> delayed(dart.core.Duration duration, final Funcs.Func0<Object> computation) {
+    /**
+     * Dart's {@code Future.microtask(computation)}: the computation is put on the
+     * microtask queue at the call, so it runs before any timer and in order with
+     * {@code scheduleMicrotask} calls made around it. A result that is a future is
+     * followed, and a throw completes this future with that error.
+     */
+    public static Future<Object> microtask(final Funcs.Func0<Object> computation) {
         final Future<Object> f = new Future<Object>();
-        // Dart treats a negative delay as zero. Passed through, it reached
-        // Thread.sleep -- which throws -- on the headless path, so the worker died
-        // without completing and an await on the result hung forever; Timer
-        // rejects it the same way on the Display path.
-        long ms = duration == null ? 0 : Math.max(0L, duration.inMilliseconds());
-        final Runnable complete = new Runnable() {
+        Microtasks.schedule(Zone.capture(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -158,23 +261,56 @@ public class Future<T> {
                     f.completeError(t);
                 }
             }
-        };
-        if (com.codename1.ui.Display.isInitialized()) {
-            Timers.schedule(ms, complete);
-        } else {
-            final long sleepMs = ms;
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Thread.sleep(sleepMs);
-                    } catch (InterruptedException ignore) {
-                        // fall through and complete anyway
-                    }
-                    complete.run();
+        }));
+        return f;
+    }
+
+    /**
+     * Dart's unnamed {@code Future(computation)} constructor: the computation runs
+     * in a later timer event, as {@code Future.delayed(Duration.zero, computation)}
+     * does. A computation that returns a future makes this one follow it, and one
+     * that throws completes it with that error.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Future<T> create(final Funcs.Func0<? extends Object> computation) {
+        return (Future<T>) (Future<?>) delayed(dart.core.Duration.zero, new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                return computation.call();
+            }
+        });
+    }
+
+    /** {@link #create(Funcs.Func0)} for a computation with a statement body. */
+    public static <T> Future<T> create(final Funcs.VoidFunc0 computation) {
+        return create(new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                computation.call();
+                return null;
+            }
+        });
+    }
+
+    public static Future<Object> delayed(dart.core.Duration duration, final Funcs.Func0<Object> computation) {
+        final Future<Object> f = new Future<Object>();
+        // Dart treats a negative delay as zero. Passed through, it reached
+        // Thread.sleep -- which throws -- on the headless path, so the worker died
+        // without completing and an await on the result hung forever; Timer
+        // rejects it the same way on the Display path.
+        long ms = duration == null ? 0 : Math.max(0L, duration.inMilliseconds());
+        final Runnable complete = Zone.capture(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    f.complete(computation == null ? null : computation.call());
+                } catch (Throwable t) {
+                    f.completeError(t);
                 }
-            }, "dart-future-delayed").start();
-        }
+                // The loop that runs this timer drains its microtasks (see Microtasks).
+            }
+        });
+        Microtasks.scheduleTimer(ms, complete);
         return f;
     }
 
@@ -190,7 +326,22 @@ public class Future<T> {
      * {@code Future.wait(fs).catchError(...)} never got a future to install
      * its handler on.
      */
-    public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures) {
+    /**
+     * The result of {@link #wait} with its list reified at the element type Dart
+     * infers from the inputs ({@code Future.wait(<Future<int>>[..])} completes with a
+     * {@code List<int>}); the values themselves are unchanged.
+     */
+    public static Future<DartList<Object>> typedList(Future<DartList<Object>> f,
+            final dart.runtime.TypeWitness elem) {
+        return f.<DartList<Object>>then(new Funcs.Func1<DartList<Object>, Object>() {
+            @Override
+            public Object call(DartList<Object> l) {
+                return DartList.typed(l, elem);
+            }
+        });
+    }
+
+    public static Future<DartList<Object>> wait(Iterable<?> futures) {
         return wait(futures, false, null);
     }
 
@@ -202,14 +353,20 @@ public class Future<T> {
      * every non-null successful value: the ones already in and the ones that arrive
      * later, as Dart hands them over.
      */
-    public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures,
+    /// Takes any Iterable: a Dart {@code List<Future>} built from dynamic values is a
+    /// {@code DartList<Object>} in Java. An element that is not a future fails the result
+    /// with a TypeError, as Dart's cast does.
+    public static Future<DartList<Object>> wait(Iterable<?> futures,
                                                 final boolean eagerError,
                                                 final Funcs.VoidFunc1<Object> cleanUp) {
         final Future<DartList<Object>> result = new Future<DartList<Object>>();
         final List<Future<?>> inputs = new ArrayList<Future<?>>();
         try {
-            for (Future<?> f : futures) {
-                inputs.add(f);
+            for (Object f : futures) {
+                if (!(f instanceof Future)) {
+                    throw new dart.core.TypeError("Future.wait element " + f + " is not a Future");
+                }
+                inputs.add((Future<?>) f);
             }
         } catch (Throwable t) {
             // Dart returns a future failed with the traversal's error; letting it escape
@@ -219,7 +376,7 @@ public class Future<T> {
         }
         final int count = inputs.size();
         if (count == 0) {
-            result.complete(new DartList<Object>());
+            result.complete(new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC));
             return result;
         }
         final Object[] values = new Object[count];
@@ -282,7 +439,7 @@ public class Future<T> {
                         result.completeError(error);
                         return;
                     }
-                    DartList<Object> out = new DartList<Object>();
+                    DartList<Object> out = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
                     for (Object v : values) {
                         out.add(v);
                     }
@@ -294,7 +451,8 @@ public class Future<T> {
     }
 
     /** Registers a completion callback (fires immediately if already done). */
-    public Future<Object> then(final Funcs.Func1<T, Object> onValue) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.Func1<T, Object> onValue) {
         final Future<Object> next = new Future<Object>();
         onComplete(new Runnable() {
             @Override
@@ -310,7 +468,7 @@ public class Future<T> {
                 }
             }
         });
-        return next;
+        return (Future<S>) (Future) next;
     }
 
     /**
@@ -320,9 +478,10 @@ public class Future<T> {
      * a failure skipped the handler and the chain stayed failed. The handler may take
      * the error, or the error and a stack trace, and may return a value or nothing.
      */
-    public Future<Object> then(final Funcs.Func1<T, Object> onValue, final Object onError) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.Func1<T, Object> onValue, final Object onError) {
         if (onError == null) {
-            return then(onValue);
+            return (Future<S>) (Future) then(onValue);
         }
         final Future<Object> next = new Future<Object>();
         onComplete(new Runnable() {
@@ -343,18 +502,63 @@ public class Future<T> {
                 }
             }
         });
-        return next;
+        return (Future<S>) (Future) next;
     }
 
     /** {@link #then(Funcs.Func1, Object)} with a void onValue body. */
-    public Future<Object> then(final Funcs.VoidFunc1<T> onValue, final Object onError) {
-        return then(new Funcs.Func1<T, Object>() {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.VoidFunc1<T> onValue, final Object onError) {
+        return (Future<S>) (Future) then(new Funcs.Func1<T, Object>() {
             @Override
             public Object call(T v) {
                 onValue.call(v);
                 return null;
             }
         }, onError);
+    }
+
+    /**
+     * Dart's {@code onError<E>(handleError, {test})}: like {@code catchError}, but the
+     * handler takes {@code (error, stackTrace)}. E is erased, so every error matches the
+     * type filter; {@code test}, when it is a function, still decides.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Future<T> onError(final Object handleError, final Object test) {
+        final Future<T> next = new Future<T>();
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (error == null) {
+                    next.complete(value);
+                    return;
+                }
+                Object err = DartRuntime.caught(error);
+                try {
+                    if (test instanceof Funcs.Func1 && !Boolean.TRUE.equals(((Funcs.Func1) test).call(err))) {
+                        next.completeError(error);
+                        return;
+                    }
+                    next.complete((T) callErrorHandler(handleError, error));
+                } catch (Throwable t) {
+                    next.completeError(t);
+                }
+            }
+        });
+        return next;
+    }
+
+    /** {@code onError((error, stackTrace) => ...)}: the lambda form of the handler. */
+    public Future<T> onError(final Funcs.Func2<Object, Object, Object> handleError, final Object test) {
+        return onError((Object) handleError, test);
+    }
+
+    public Future<T> onError(final Funcs.Func2<Object, Object, Object> handleError) {
+        return onError((Object) handleError, null);
+    }
+
+    /** {@code onError(handleError)} with no test. */
+    public Future<T> onError(final Object handleError) {
+        return onError(handleError, null);
     }
 
     /** Invokes an error handler of any shape a Dart handler transpiles to. */
@@ -370,10 +574,10 @@ public class Future<T> {
             return null;
         }
         if (handler instanceof Funcs.Func2) {
-            return ((Funcs.Func2) handler).call(err, null);
+            return ((Funcs.Func2) handler).call(err, dart.core.StackTrace.forError(thrown));
         }
         if (handler instanceof Funcs.VoidFunc2) {
-            ((Funcs.VoidFunc2) handler).call(err, null);
+            ((Funcs.VoidFunc2) handler).call(err, dart.core.StackTrace.forError(thrown));
             return null;
         }
         throw new dart.core.ArgumentError("onError is not a function");
@@ -385,8 +589,9 @@ public class Future<T> {
      * {@link Funcs.VoidFunc1}. Mirrors {@link #then(Funcs.Func1)} but discards
      * the (absent) callback result.
      */
-    public Future<Object> then(final Funcs.VoidFunc1<T> onValue) {
-        return then(new Funcs.Func1<T, Object>() {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.VoidFunc1<T> onValue) {
+        return (Future<S>) (Future) then(new Funcs.Func1<T, Object>() {
             @Override
             public Object call(T v) {
                 onValue.call(v);
@@ -435,7 +640,7 @@ public class Future<T> {
             public void run() {
                 if (error != null) {
                     try {
-                        next.complete(onError.call(DartRuntime.caught(error)));
+                        next.complete(recoveryValue(onError.call(DartRuntime.caught(error))));
                     } catch (Throwable t) {
                         next.completeError(t);
                     }
@@ -477,6 +682,50 @@ public class Future<T> {
         return next;
     }
 
+    /// {@code catchError((e, st) => ...)}: a handler that also takes the trace -- the one
+    /// this future's error carries (the handler runs once it has failed).
+    public Future<Object> catchError(final Funcs.Func2<Object, ? super dart.core.StackTrace, ?> onError,
+            final Object test) {
+        return catchError(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return onError.call(e, dart.core.StackTrace.forError(completedError()));
+            }
+        }, test);
+    }
+
+    public Future<Object> catchError(final Funcs.Func2<Object, ? super dart.core.StackTrace, ?> onError) {
+        return catchError(onError, (Object) null);
+    }
+
+    /// {@code catchError((e, st) { ... })} with a void handler.
+    public Future<T> catchError(final Funcs.VoidFunc2<Object, ? super dart.core.StackTrace> onError,
+            final Object test) {
+        return catchError(new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                onError.call(e, dart.core.StackTrace.forError(completedError()));
+            }
+        }, test);
+    }
+
+    public Future<T> catchError(final Funcs.VoidFunc2<Object, ? super dart.core.StackTrace> onError) {
+        return catchError(onError, (Object) null);
+    }
+
+    /// A value-returning catchError handler's result, checked against this future's
+    /// recorded T: Dart's `Future<int>.error(e).catchError((e) => 'x')` fails with an
+    /// ArgumentError, since the recovered future must still complete with a T. A future
+    /// that recorded no T accepts any value, as before.
+    private Object recoveryValue(Object v) {
+        dart.runtime.TypeWitness w = typeArg;
+        if (w != null && !w.test(v)) {
+            throw dart.core.ArgumentError.value(v, "onError",
+                    "The error handler of Future.catchError must return a value of the future's type");
+        }
+        return v;
+    }
+
     /** {@code catchError(onError, test: ...)} -- value-handler form. */
     public Future<Object> catchError(final Funcs.Func1<Object, Object> onError, final Object test) {
         final Future<Object> next = new Future<Object>();
@@ -495,7 +744,7 @@ public class Future<T> {
                             next.completeError(error);
                             return;
                         }
-                        next.complete(onError.call(DartRuntime.caught(error)));
+                        next.complete(recoveryValue(onError.call(DartRuntime.caught(error))));
                     } catch (Throwable t) {
                         next.completeError(t);
                     }
@@ -594,37 +843,30 @@ public class Future<T> {
         }
     }
 
-    /**
-     * Runs {@code r} when this future settles -- AT ONCE, on the calling thread, when it
-     * already has. {@link #runAll} likewise runs the listeners inline on the completing
-     * thread.
-     *
-     * <p>This is a KNOWN, DELIBERATE divergence from Dart, which queues every
-     * then/catchError/whenComplete callback on the microtask queue: there,
-     * {@code Future.value(1).then((_) => events.add('future')); events.add('sync');}
-     * records sync first; here it records future first. The behavior case
-     * {@code dart_review_round24} pins the current order so a change to it is a
-     * decision, not an accident.</p>
-     *
-     * <p>Why not a microtask queue: it is only correct together with the await it would
-     * have to interleave with, and await is not a continuation here. This runtime is the
-     * blocking-await model (see the class comment and {@link Await}): an async body runs
-     * to completion inside the call, and {@code await} parks the frame in invokeAndBlock
-     * rather than returning to an event loop. Deferring callbacks alone would make them
-     * run AFTER await continuations that Dart runs after them, so ordering would merely be
-     * wrong differently; and every blocking await, plus the end of a headless main, would
-     * have to drain the queue re-entrantly from inside the parked frame, while a headless
-     * program (tests, plain JVM) has no event loop to drain it at all -- a then() at the
-     * end of main would never run. It would also move every completion in the Flutter
-     * frame pipeline (FutureBuilder, route results, image and localization loads) one
-     * serial call later on device, which nothing here can verify headlessly. Dart's
-     * ordering arrives with a continuation-passing lowering of await, which replaces
-     * this model rather than patching it.</p>
-     */
+    /// Registers a completion listener. As in Dart, a listener added to a future that has
+    /// already completed does not run inside the call: it is queued on the microtask queue,
+    /// so {@code Future.value(1).then(f); print('sync');} prints sync first. A listener
+    /// added before completion runs when the future settles.
     void onComplete(Runnable r) {
+        // A listener runs in the zone it was registered in, not the one that
+        // happens to complete the future.
+        final Runnable captured = Zone.capture(r);
+        r = new Runnable() {
+            @Override
+            public void run() {
+                listenerDepth++;
+                try {
+                    captured.run();
+                } finally {
+                    listenerDepth--;
+                }
+            }
+        };
+        driveOnce();
         boolean immediate;
         synchronized (lock) {
             immediate = done;
+            errorHandled = true;
             if (!done) {
                 if (listeners == null) {
                     listeners = new ArrayList<Runnable>();
@@ -633,8 +875,20 @@ public class Future<T> {
             }
         }
         if (immediate) {
-            r.run();
+            Microtasks.schedule(r);
         }
+    }
+
+    /// The future an {@code await v} waits on: v itself when it is a Future, else a
+    /// future already completed with v ({@code await 42}, {@code await null}).
+    @SuppressWarnings("unchecked")
+    public static Future<Object> awaitable(Object v) {
+        if (v instanceof Future) {
+            return (Future<Object>) v;
+        }
+        Future<Object> f = new Future<Object>();
+        f.settle(v);
+        return f;
     }
 
     /// Completes with {@code v}, or -- when {@code v} is itself a Future --
@@ -710,15 +964,26 @@ public class Future<T> {
     }
 
     void completeError(Object err) {
+        completeError(err, false);
+    }
+
+    /// reportNow: an async body that failed after it had suspended. Every listener its
+    /// caller was going to add is already in place, so Dart hands an unlistened error to
+    /// the zone right here, in the microtask where it was thrown, not a timer turn later.
+    void completeError(Object err, boolean reportNow) {
         synchronized (lock) {
             if (done || adopting) {
                 throw new dart.core.StateError("Future already completed");
             }
         }
-        settleError(err);
+        settleError(err, reportNow);
     }
 
     private void settleError(Object err) {
+        settleError(err, false);
+    }
+
+    private void settleError(Object err, boolean reportNow) {
         List<Runnable> toRun;
         synchronized (lock) {
             if (done) {
@@ -732,6 +997,59 @@ public class Future<T> {
             lock.notifyAll();
         }
         runAll(toRun);
+        if (toRun == null && zone != Zone.root) {
+            // A future a listener settles (the result of then/catchError) is Dart's
+            // _propagateToListeners running inside the microtask that settled its
+            // source: an error nobody listens for is reported right there.
+            reportIfUnhandled(reportNow || listenerDepth > 0);
+        }
+    }
+
+    /// Dart hands an error no one has listened for by the microtask that settles it to
+    /// the future's zone. Only a zone with its own handler is told: the root zone's
+    /// report would be a log line for every future this runtime's blocking await
+    /// model reads without listening.
+    private void reportIfUnhandled(boolean reportNow) {
+        final Zone z = zone;
+        final Funcs.VoidFunc0 report = new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                Throwable e;
+                synchronized (lock) {
+                    if (errorHandled) {
+                        return;
+                    }
+                    errorHandled = true;
+                    e = error;
+                }
+                z.handleUncaughtError(DartRuntime.caught(e), Zone.stackOf(e));
+            }
+        };
+        if (reportNow) {
+            report.call();
+        } else {
+            // Dart settles a failed future in a microtask and, finding no listener
+            // there, reports it to the zone at that point -- before the microtasks
+            // queued after it and long before any timer. A handler attached in the
+            // same synchronous turn is already listening; one attached later is late.
+            Microtasks.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    report.call();
+                }
+            });
+        }
+    }
+
+    /// How many listeners registered through onComplete are running. Every Dart
+    /// callback runs on the single isolate thread, so a plain counter is enough
+    /// and avoids a ThreadLocal lookup per listener on ParparVM.
+    private static int listenerDepth;
+
+    void markHandled() {
+        synchronized (lock) {
+            errorHandled = true;
+        }
     }
 
     private void runAll(List<Runnable> rs) {
@@ -788,5 +1106,100 @@ public class Future<T> {
             }
         });
         return f;
+    }
+
+    /// {@code future.timeout(limit)}: a TimeoutException when this has not completed in time.
+    public Future<T> timeout(dart.core.Duration limit) {
+        return timeout(limit, null);
+    }
+
+    /// {@code future.timeout(limit, onTimeout: f)}: f's value (or the future it returns)
+    /// when this has not completed in time.
+    @SuppressWarnings("unchecked")
+    public Future<T> timeout(final dart.core.Duration limit, final Funcs.Func0<Object> onTimeout) {
+        final Future<T> out = new Future<T>();
+        final boolean[] settled = new boolean[1];
+        final Timer timer = new Timer(limit, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (settled[0]) {
+                    return;
+                }
+                settled[0] = true;
+                if (onTimeout == null) {
+                    out.completeError(new TimeoutException("Future not completed", limit));
+                    return;
+                }
+                Object v;
+                try {
+                    v = onTimeout.call();
+                } catch (Throwable t) {
+                    out.completeError(t);
+                    return;
+                }
+                if (v instanceof Future) {
+                    final Future<T> f = (Future<T>) v;
+                    f.onComplete(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (f.completedError() != null) {
+                                out.completeError(f.completedError());
+                            } else {
+                                out.complete(f.completedValue());
+                            }
+                        }
+                    });
+                } else {
+                    out.complete((T) v);
+                }
+            }
+        });
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (settled[0]) {
+                    return;
+                }
+                settled[0] = true;
+                timer.cancel();
+                if (completedError() != null) {
+                    out.completeError(completedError());
+                } else {
+                    out.complete(completedValue());
+                }
+            }
+        });
+        return out;
+    }
+
+    /// {@code future.ignore()}: its error, if any, is dropped rather than reported.
+    public void ignore() {
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+            }
+        });
+    }
+
+    /// {@code future.asStream()}: a single-subscription stream of this one value (or error).
+    public Stream<T> asStream() {
+        final StreamController<T> c = new StreamController<T>();
+        c.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                onComplete(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (completedError() != null) {
+                            c.addError(completedError());
+                        } else {
+                            c.add(completedValue());
+                        }
+                        c.close();
+                    }
+                });
+            }
+        });
+        return c.stream();
     }
 }

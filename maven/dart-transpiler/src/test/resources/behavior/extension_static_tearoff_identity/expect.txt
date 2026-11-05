@@ -1,0 +1,23 @@
+E.make true true true 1
+Id.make true true true 1
+Local.twice true true true 1
+C.make true true true 1
+p.E.make true true true 1
+p.Id.make true true true 1
+E vs Local false false false 2
+e3
+2
+true
+ctx Id.gen true true true 1
+7
+E.gen<int> true true true 1
+p.E.gen<int> true true true 1
+E.gen<int> vs <String> false false false 2
+4
+z
+2
+Local.pick<int> true true true 1
+10
+local shadows
+10
+10

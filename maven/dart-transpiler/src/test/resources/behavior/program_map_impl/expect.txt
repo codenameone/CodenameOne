@@ -1,0 +1,9 @@
+[11, 2, 3]
+ONE,Two,three
+20
+4
+4
+38
+4
+{ONE: 11, two: 20, three: 3, Four: 4}
+{n: 1, s: x}

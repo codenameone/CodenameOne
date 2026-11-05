@@ -37,7 +37,7 @@ enum WrapCrossAlignment { start, end, center }
 // --- directional alignment -------------------------------------------
 
 @JavaName('com.codename1.flutter.AlignmentDirectional')
-abstract class AlignmentDirectional {
+abstract class AlignmentDirectional extends AlignmentGeometry {
   external static AlignmentDirectional get topStart;
   external static AlignmentDirectional get topCenter;
   external static AlignmentDirectional get topEnd;
@@ -56,7 +56,8 @@ abstract class Decoration {}
 
 @JavaName('com.codename1.flutter.BoxDecoration')
 class BoxDecoration extends Decoration {
-  external BoxDecoration({Color? color, Object? image, Object? border, Object? borderRadius, Object? boxShadow, Object? gradient, Object? backgroundBlendMode, BoxShape? shape});
+  external BoxDecoration({Color? color, Object? image, Object? border, BorderRadiusGeometry? borderRadius, Object? boxShadow, Object? gradient, Object? backgroundBlendMode, BoxShape? shape});
+  external BorderRadiusGeometry? get borderRadius;
 }
 
 @JavaName('com.codename1.flutter.ImageProvider')
@@ -111,7 +112,7 @@ class SafeArea extends Widget {
 
 @JavaName('com.codename1.flutter.material.Material')
 class Material extends Widget {
-  external Material({Key? key, Object? type, double? elevation, Color? color, Color? shadowColor, Color? surfaceTintColor, TextStyle? textStyle, Object? borderRadius, Object? shape, bool? borderOnForeground, Clip? clipBehavior, Widget? child});
+  external Material({Key? key, Object? type, double? elevation, Color? color, Color? shadowColor, Color? surfaceTintColor, TextStyle? textStyle, BorderRadiusGeometry? borderRadius, Object? shape, bool? borderOnForeground, Clip? clipBehavior, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.Flexible')
@@ -170,7 +171,7 @@ class MouseRegion extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.ClipRRect')
 class ClipRRect extends Widget {
-  external ClipRRect({Key? key, Object? borderRadius, Object? clipper, Clip? clipBehavior, Widget? child});
+  external ClipRRect({Key? key, BorderRadiusGeometry? borderRadius, Object? clipper, Clip? clipBehavior, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.ClipRect')
@@ -199,9 +200,22 @@ class Tooltip extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.SelectableText')
 class SelectableText extends Widget {
-  external SelectableText(String data, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, double? textScaleFactor, bool? showCursor, Object? cursorColor, Object? onTap, Object? focusNode, Object? scrollPhysics});
-  external static SelectableText rich(TextSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, TextDirection? textDirection});
+  external SelectableText(String data, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, double? textScaleFactor, bool? showCursor, Object? cursorColor, Object? onTap, Object? focusNode, Object? scrollPhysics, Object? onSelectionChanged, TextScaler? textScaler});
+  external TextSpan? get textSpan;
+  external static SelectableText rich(TextSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, TextDirection? textDirection, TextScaler? textScaler, SelectionChangedCallback? onSelectionChanged, VoidCallback? onTap, bool? showCursor});
 }
+
+// What made a text selection change; passed to onSelectionChanged.
+@JavaName('com.codename1.flutter.SelectionChangedCause')
+enum SelectionChangedCause { tap, doubleTap, longPress, forcePress, keyboard, toolbar, drag, scribble }
+
+// Signature of Image.errorBuilder; a variable of this type may be invoked.
+typedef ImageErrorWidgetBuilder = Widget Function(BuildContext context, Object error, StackTrace? stackTrace);
+
+// Builder that receives a value and an optional pre-built child.
+typedef ValueWidgetBuilder<T> = Widget Function(BuildContext context, T value, Widget? child);
+
+typedef SelectionChangedCallback = void Function(TextSelection selection, SelectionChangedCause? cause);
 
 // --- popup menus ------------------------------------------------------
 

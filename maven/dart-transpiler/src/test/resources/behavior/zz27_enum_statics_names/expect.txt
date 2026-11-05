@@ -1,0 +1,15 @@
+[Level.low, Level.mid, Level.high]
+low
+4
+Level.high
+Level.mid
+Color.green
+3
+true
+false
+true
+true
+Stack
+Level
+Color
+Stack

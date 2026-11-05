@@ -34,7 +34,7 @@ public final class Firebase {
     public static final String DEFAULT_APP_NAME = "[DEFAULT]";
 
     /** {@code Firebase.apps}. */
-    public static final DartList<FirebaseApp> apps = new DartList<FirebaseApp>();
+    public static final DartList<FirebaseApp> apps = new DartList<FirebaseApp>(dart.runtime.TypeWitness.of(FirebaseApp.class, false));
 
     private Firebase() {
     }

@@ -20,7 +20,7 @@ external Object? inspect(Object? object);
 external void postEvent(String eventKind, Map eventData, {String stream = 'Extension'});
 
 @JavaName('dart.developer.Developer.registerExtension')
-external void registerExtension(String method, Object handler);
+external void registerExtension(String method, Function handler);
 
 @JavaName('dart.developer.Timeline')
 abstract class Timeline {

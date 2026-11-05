@@ -20,23 +20,24 @@ import com.codename1.flutter.widgets.Row;
 import com.codename1.flutter.material.Scaffold;
 import com.codename1.flutter.widgets.SizedBox;
 import com.codename1.flutter.State;
+import dart.runtime.TearOff;
 import com.codename1.flutter.widgets.Text;
 import com.codename1.flutter.material.TextButton;
 import com.codename1.flutter.Widget;
 
-// Generated from main.dart — do not edit.
+// Generated from main.dart -- do not edit.
 public class _DemoPageState extends State<DemoPage> {
 
-    private final DartList<String> _items = DartList.<String>of("Alpha", "Beta", "Gamma");
-    DartList<String> get$_items() {
+    private final DartList<String> _items = dart.core.DartList.typed(DartList.<String>of("Alpha", "Beta", "Gamma"), dart.runtime.TypeWitness.of(String.class, false));
+    public DartList<String> get$_items() {
         return _items;
     }
 
     private long _taps = 0L;
-    long get$_taps() {
+    public long get$_taps() {
         return _taps;
     }
-    void set$_taps(long v) {
+    public void set$_taps(long v) {
         this._taps = v;
     }
 
@@ -53,10 +54,10 @@ public class _DemoPageState extends State<DemoPage> {
         var $t4 = new Row();
         $t4.mainAxisAlignment(MainAxisAlignment.spaceEvenly);
         var $t5 = new ElevatedButton();
-        $t5.onPressed(this::_addItem);
+        $t5.onPressed(TearOff.v0(this, "_addItem", this::_addItem));
         $t5.child(new Text("Add"));
         var $t6 = new OutlinedButton();
-        $t6.onPressed(this::_clear);
+        $t6.onPressed(TearOff.v0(this, "_clear", this::_clear));
         $t6.child(new Text("Clear"));
         var $t7 = new TextButton();
         $t7.onPressed(() -> {
@@ -67,7 +68,7 @@ public class _DemoPageState extends State<DemoPage> {
             });
         });
         $t7.child(new Text("Taps: " + DartRuntime.str(this._taps)));
-        $t4.children(DartList.<Widget>of($t5, $t6, $t7));
+        $t4.children(dart.core.DartList.typed(DartList.<Widget>of($t5, $t6, $t7), dart.runtime.TypeWitness.of(Widget.class, false)));
         $t3.child($t4);
         var $t8 = new Expanded();
         $t8.child(ListView.builder(null, this._items.length(), (context$0, index) -> {
@@ -80,12 +81,12 @@ public class _DemoPageState extends State<DemoPage> {
             $t12.width(8.0);
             var $t13 = new Expanded();
             $t13.child(new Text(this._items.idx(index)));
-            $t11.children(DartList.<Widget>of(new Icon(Icons.favorite()), $t12, $t13, new Text("#" + DartRuntime.str(index))));
+            $t11.children(dart.core.DartList.typed(DartList.<Widget>of(new Icon(Icons.favorite()), $t12, $t13, new Text("#" + DartRuntime.str(index))), dart.runtime.TypeWitness.of(Widget.class, false)));
             $t10.child($t11);
             $t9.child($t10);
             return $t9;
         }, null, null, null, null, null, null, null, null, null));
-        $t2.children(DartList.<Widget>of($t3, new Divider(), $t8));
+        $t2.children(dart.core.DartList.typed(DartList.<Widget>of($t3, new Divider(), $t8), dart.runtime.TypeWitness.of(Widget.class, false)));
         $t0.body($t2);
         return $t0;
     }
@@ -94,7 +95,7 @@ public class _DemoPageState extends State<DemoPage> {
         //@dart:91 main.dart
         this.setState(() -> {
             //@dart:92 main.dart
-            this._items.add("Item " + DartRuntime.str(this._items.length() + 1L));
+            this._items.addUnchecked("Item " + DartRuntime.str(this._items.length() + 1L));
         });
     }
 
@@ -108,5 +109,5 @@ public class _DemoPageState extends State<DemoPage> {
         });
     }
 
-    static final String $cn1DartLines = "main.dart\n46:36,64:55,66:56,75:69,95:91,97:92,103:97,105:98,107:99";
+    static final String $cn1DartLines = "main.dart\n47:36,65:55,67:56,76:69,96:91,98:92,104:97,106:98,108:99";
 }

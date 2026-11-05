@@ -38,6 +38,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// add/addError/close.
 public class StreamTest {
 
+    /// A plain (non-sync) controller delivers each event in a microtask of its own, as
+    /// Dart's does, never inside add(): the tests let those microtasks run -- what the
+    /// end of the current synchronous code is to Dart -- before they look.
+    private static void flush() {
+        Microtasks.drain();
+    }
+
     @Test
     public void listenRunsOnFirstListenerOnce() {
         final int[] calls = {0};
@@ -101,11 +108,14 @@ public class StreamTest {
         final int[] upstreamCancels = {0};
         final StreamController<String> c = new StreamController<String>();
         c.onListen((Funcs.VoidFunc0) () -> c.add("boom"));
+        flush();
         c.onCancel((Funcs.VoidFunc0) () -> upstreamCancels[0]++);
         Stream<String> mapped = c.stream().map(v -> {
             throw new IllegalStateException("transform failed");
         });
+        flush();
         mapped.listen(v -> { }, (Funcs.VoidFunc1<Object>) e -> { }, null, Boolean.TRUE);
+        flush();
         assertEquals(1, upstreamCancels[0], "the upstream source got its cancel hook");
     }
 
@@ -120,14 +130,18 @@ public class StreamTest {
                 seenA.add(v);
             }
         });
+        flush();
         c.stream().listen(new Funcs.VoidFunc1<String>() {
             @Override
             public void call(String v) {
                 seenB.add(v);
             }
         });
+        flush();
         c.add("one");
+        flush();
         c.add("two");
+        flush();
         assertEquals(java.util.Arrays.asList("one", "two"), seenA);
         assertEquals(java.util.Arrays.asList("one", "two"), seenB);
     }
@@ -176,7 +190,9 @@ public class StreamTest {
                 errors.add(e);
             }
         }, null, Boolean.TRUE);
+        flush();
         c.addError("boom");
+        flush();
         c.add("after error"); // cancelOnError: this subscription is gone by now
         assertEquals(1, errors.size());
         assertEquals("boom", errors.get(0));
@@ -256,7 +272,9 @@ public class StreamTest {
                 seen.add(v);
             }
         });
+        flush();
         c.add("x");
+        flush();
         assertEquals(java.util.Arrays.asList("x"), seen);
     }
 
@@ -269,6 +287,7 @@ public class StreamTest {
                 return "<" + v + ">";
             }
         });
+        flush();
         final List<String> seen = new ArrayList<String>();
         mapped.listen(new Funcs.VoidFunc1<String>() {
             @Override
@@ -276,8 +295,11 @@ public class StreamTest {
                 seen.add(v);
             }
         });
+        flush();
         c.add(1);
+        flush();
         c.add(2);
+        flush();
         assertEquals(java.util.Arrays.asList("<1>", "<2>"), seen);
     }
 
@@ -290,6 +312,7 @@ public class StreamTest {
                 return v % 2 == 0;
             }
         });
+        flush();
         final List<Integer> seen = new ArrayList<Integer>();
         evens.listen(new Funcs.VoidFunc1<Integer>() {
             @Override
@@ -297,10 +320,15 @@ public class StreamTest {
                 seen.add(v);
             }
         });
+        flush();
         c.add(1);
+        flush();
         c.add(2);
+        flush();
         c.add(3);
+        flush();
         c.add(4);
+        flush();
         assertEquals(java.util.Arrays.asList(2, 4), seen);
     }
 
@@ -341,15 +369,21 @@ public class StreamTest {
                 seen.add(v);
             }
         });
+        flush();
         c.add("one");
+        flush();
         sub.pause();
+        flush();
         assertTrue(sub.isPaused());
         c.add("queued while paused");
+        flush();
         assertEquals(java.util.Arrays.asList("one"), seen,
                 "a paused subscription must not receive data while paused");
         sub.resume();
+        flush();
         assertFalse(sub.isPaused());
         c.add("two");
+        flush();
         assertEquals(java.util.Arrays.asList("one", "queued while paused", "two"), seen,
                 "resume() must deliver what was buffered while paused, in order, before later events");
     }
@@ -368,10 +402,14 @@ public class StreamTest {
                 errors.add(e);
             }
         });
+        flush();
         sub.pause();
+        flush();
         c.addError("boom");
+        flush();
         assertTrue(errors.isEmpty(), "a paused subscription must not receive errors while paused");
         sub.resume();
+        flush();
         assertEquals(java.util.Arrays.asList((Object) "boom"), errors,
                 "resume() must deliver an error that was buffered while paused");
     }
@@ -429,13 +467,19 @@ public class StreamTest {
                 seen.add(v);
             }
         });
+        flush();
         sub.pause();
+        flush();
         sub.pause();
+        flush();
         c.add("queued while doubly paused");
+        flush();
         sub.resume();
+        flush();
         assertTrue(sub.isPaused(), "one resume() must not undo two pause() calls");
         assertTrue(seen.isEmpty(), "still paused after only one matching resume(): must not deliver yet");
         sub.resume();
+        flush();
         assertFalse(sub.isPaused(), "the second, matching resume() must lift the pause");
         assertEquals(java.util.Arrays.asList("queued while doubly paused"), seen,
                 "the second resume() must drain what was buffered while doubly paused");
@@ -454,11 +498,16 @@ public class StreamTest {
                 seen.add(v);
             }
         });
+        flush();
         sub.resume();
+        flush();
         assertFalse(sub.isPaused(), "resume() with no prior pause() must stay a no-op");
         sub.pause();
+        flush();
         c.add("queued");
+        flush();
         sub.resume();
+        flush();
         assertFalse(sub.isPaused());
         assertEquals(java.util.Arrays.asList("queued"), seen,
                 "a single pause() must still need only a single resume() after an earlier stray resume()");
@@ -595,14 +644,17 @@ public class StreamTest {
                 throw new RuntimeException("boom from listener A");
             }
         });
+        flush();
         c.stream().listen(new Funcs.VoidFunc1<String>() {
             @Override
             public void call(String v) {
                 seenB.add(v);
             }
         });
+        flush();
         c.add("one"); // must not throw out to the caller
         c.add("two");
+        flush();
         assertEquals(java.util.Arrays.asList("one", "two"), seenB,
                 "listener A throwing must not stop listener B from receiving every event");
     }
@@ -621,6 +673,7 @@ public class StreamTest {
                 throw new RuntimeException("boom from error handler A");
             }
         });
+        flush();
         c.stream().listen(new Funcs.VoidFunc1<String>() {
             @Override
             public void call(String v) {
@@ -631,7 +684,9 @@ public class StreamTest {
                 seenB.add(e);
             }
         });
+        flush();
         c.addError("boom"); // must not throw out to the caller
+        flush(); // nor out of its delivery
         assertEquals(1, seenB.size(),
                 "listener A's error handler throwing must not stop listener B from receiving the error");
     }
@@ -692,10 +747,15 @@ public class StreamTest {
                 throw new RuntimeException("boom from queued done handler");
             }
         });
+        flush();
         sub.pause();
+        flush();
         c.add("boom");
+        flush();
         c.addError("queued error");
+        flush();
         c.close();
+        flush();
         sub.resume(); // must not throw out to the caller, and must still drain the whole queue
         assertEquals(java.util.Arrays.asList("boom"), seen);
         assertTrue(done[0], "a throwing data/error callback earlier in the queue must not stop done from draining");
@@ -723,5 +783,30 @@ public class StreamTest {
             }
         }); // must not throw out to the caller
         assertFalse(sub.isPaused());
+    }
+
+    /// Two plain controllers fed back to back interleave, one event per microtask each
+    /// (Dart prints a1 b1 a2 b2); a sync controller delivers inside add().
+    @Test
+    public void asyncControllersInterleaveAndASyncOneDeliversInsideAdd() {
+        final List<String> seen = new ArrayList<String>();
+        StreamController<String> a = new StreamController<String>();
+        StreamController<String> b = new StreamController<String>();
+        a.stream().listen((Funcs.VoidFunc1<String>) seen::add);
+        b.stream().listen((Funcs.VoidFunc1<String>) seen::add);
+        a.add("a1");
+        a.add("a2");
+        b.add("b1");
+        b.add("b2");
+        assertTrue(seen.isEmpty(), "nothing is delivered inside add()");
+        flush();
+        assertEquals(java.util.Arrays.asList("a1", "b1", "a2", "b2"), seen);
+
+        seen.clear();
+        StreamController<String> s = new StreamController<String>();
+        s.sync(true);
+        s.stream().listen((Funcs.VoidFunc1<String>) seen::add);
+        s.add("now");
+        assertEquals(java.util.Arrays.asList("now"), seen);
     }
 }

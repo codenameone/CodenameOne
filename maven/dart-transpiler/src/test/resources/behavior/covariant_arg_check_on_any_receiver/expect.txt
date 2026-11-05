@@ -1,0 +1,9 @@
+F true
+G true
+C true
+N true
+T true
+T2 true
+L true
+base true
+E 7

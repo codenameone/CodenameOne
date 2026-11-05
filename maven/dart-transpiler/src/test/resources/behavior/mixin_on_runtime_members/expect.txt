@@ -1,0 +1,11 @@
+HELLO X!
+6
+dear y
+6
+a
+b
+[a, b]
+[a, b]
+2
+bag2
+set

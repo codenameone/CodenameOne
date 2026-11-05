@@ -65,7 +65,7 @@ public class CovariantOverrideBridgeTest {
                 + "}\n"
                 + "void main() {}\n");
         assertTrue(java.contains("public boolean updateShouldNotify(InheritedWidget $b0) { "
-                + "return updateShouldNotify(((PageStatus) $b0)); }"), java);
+                + "return updateShouldNotify(DartRuntime.as($b0, PageStatus.class, false, \"PageStatus\")); }"), java);
     }
 
     @Test
@@ -80,7 +80,7 @@ public class CovariantOverrideBridgeTest {
                 + "}\n"
                 + "void main() {}\n");
         assertTrue(java.contains("public boolean shouldReload(LocalizationsDelegate $b0) { "
-                + "return shouldReload(((AppDelegate) $b0)); }"), java);
+                + "return shouldReload(DartRuntime.as($b0, AppDelegate.class, false, \"AppDelegate\")); }"), java);
     }
 
     /**

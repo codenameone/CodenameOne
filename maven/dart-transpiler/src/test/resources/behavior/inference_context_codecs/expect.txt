@@ -1,0 +1,13 @@
+square,circle
+[0, 5, 0] 8
+294
+desserts
+regal
+reward
+[104, 105]
+[1, 2]
+[1, 2, 3]
+[4, 5]
+fired 1 false
+hello world
+4

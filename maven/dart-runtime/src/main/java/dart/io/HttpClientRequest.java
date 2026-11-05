@@ -38,8 +38,10 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 
-/** Dart's {@code HttpClientRequest}: headers and body collected until {@link #close}. */
-public class HttpClientRequest {
+/// Dart's {@code HttpClientRequest}: headers and body collected until {@link #close}. Dart's is
+/// an IOSink, so a byte stream can {@code pipe} into it; pipe's future is then close()'s, the
+/// response.
+public class HttpClientRequest implements dart.async.StreamConsumer<dart.core.DartLongList> {
 
     private final HttpClient client;
     private final String method;
@@ -134,7 +136,11 @@ public class HttpClientRequest {
     }
 
     /** Dart's {@code addStream}: every chunk is appended. */
-    public Future<Object> addStream(dart.async.Stream<Object> stream) {
+    /// Raw on purpose: it implements StreamConsumer's {@code addStream(Stream<List<int>>)}
+    /// and still takes the untyped streams that callers built before.
+    @Override
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public Future<Object> addStream(dart.async.Stream stream) {
         return stream.forEach(new dart.runtime.Funcs.VoidFunc1<Object>() {
             @Override
             public void call(Object chunk) {
@@ -176,6 +182,7 @@ public class HttpClientRequest {
     }
 
     /** Sends the request; the future completes with the response, or a SocketException. */
+    @Override
     public Future<HttpClientResponse> close() {
         if (done != null) {
             return done.future();

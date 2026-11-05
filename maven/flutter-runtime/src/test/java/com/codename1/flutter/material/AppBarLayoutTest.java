@@ -89,7 +89,7 @@ class AppBarLayoutTest {
             b.title(title);
         }
         if (actions != null && actions.length > 0) {
-            DartList<Widget> l = new DartList<Widget>();
+            DartList<Widget> l = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             for (Widget a : actions) {
                 l.add(a);
             }

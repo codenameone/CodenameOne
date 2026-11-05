@@ -259,7 +259,7 @@ public class MethodChannelTest {
                         done.countDown();
                     }
                 });
-        assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(awaitRunningLoop(done, 5000));
         assertEquals("got:42", replied[0]);
     }
 
@@ -298,9 +298,9 @@ public class MethodChannelTest {
         // The platform caller must not be answered until the Dart handler's
         // own future settles -- give the dispatch a moment, then confirm it
         // has NOT replied yet before completing the gate.
-        assertFalse(done.await(300, java.util.concurrent.TimeUnit.MILLISECONDS));
+        assertFalse(awaitRunningLoop(done, 300));
         gate.complete("async result");
-        assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(awaitRunningLoop(done, 5000));
         assertEquals("async result", replied[0]);
     }
 
@@ -338,7 +338,7 @@ public class MethodChannelTest {
                         done.countDown();
                     }
                 });
-        assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(awaitRunningLoop(done, 5000));
         assertEquals("E_THROWN", codeSeen[0]);
     }
 
@@ -366,7 +366,7 @@ public class MethodChannelTest {
                         done.countDown();
                     }
                 });
-        assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(awaitRunningLoop(done, 5000));
         assertTrue(notImplementedCalled[0]);
     }
 
@@ -383,5 +383,21 @@ public class MethodChannelTest {
         assertTrue(com.codename1.flutter.FlutterChannelRegistry.dartMethodCallHandler(channel) != null);
         new MethodChannel(channel).setMethodCallHandler(null);
         assertNull(com.codename1.flutter.FlutterChannelRegistry.dartMethodCallHandler(channel));
+    }
+
+    /// Waits for the latch while this thread runs the headless event loop. A platform
+    /// call reaches the Dart handler through a timer, and headless a fired timer runs on
+    /// the isolate's thread -- the one draining the loop -- never on the timer's own, so a
+    /// test that only waits would wait forever.
+    private static boolean awaitRunningLoop(java.util.concurrent.CountDownLatch latch, long ms)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + ms;
+        while (System.currentTimeMillis() < deadline) {
+            dart.async.Async.runMicrotasks();
+            if (latch.await(5, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                return true;
+            }
+        }
+        return latch.getCount() == 0;
     }
 }

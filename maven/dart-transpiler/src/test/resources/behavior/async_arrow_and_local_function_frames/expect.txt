@@ -1,0 +1,10 @@
+[20, 20]
+x:start,y:start,x:end,y:end,p:start,q:start,p:end,p:1,q:end,q:1
+closed before: 0
+closed after: 1
+closed twice: 3
+42
+[m#1 m#2 calls=2 fact=120, n#1 n#2 calls=2 fact=120]
+7
+two: Too many elements
+none: No element

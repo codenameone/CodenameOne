@@ -1,0 +1,22 @@
+2
+11
+ababab
+c
+missing true
+f 3 q
+f 1 z
+nsm true
+te true
+5
+42
+[3, 2, 1]
+te2 true
+te3 true
+te4 true
+te5 true
+aBc
+te6 true
+te7 true
+ok idx
+te11 true
+5.00

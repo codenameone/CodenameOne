@@ -160,7 +160,7 @@ public class Overlay extends Widget {
         @Override
         protected Widget build() {
             Overlay o = (Overlay) widget();
-            DartList<Widget> children = new DartList<Widget>();
+            DartList<Widget> children = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             if (o.getBase() != null) {
                 children.add(o.getBase());
             }

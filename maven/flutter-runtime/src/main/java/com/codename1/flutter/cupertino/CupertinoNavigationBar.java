@@ -138,7 +138,7 @@ public class CupertinoNavigationBar extends StatelessWidget {
             bar.leading(leading);
         }
         if (trailing != null) {
-            DartList<Widget> actions = new DartList<Widget>();
+            DartList<Widget> actions = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             actions.add(trailing);
             bar.actions(actions);
         }

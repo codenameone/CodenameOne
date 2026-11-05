@@ -1,0 +1,17 @@
+view 3 2 [99, 77, 4] 99
+sublistView [5, 55] 55
+byteData 44 2
+byteData2 11 2
+asUint8List [55, 66] 66
+sublist copies 9 0
+asFuture end
+decodeStream hi!
+byteSink [1, 2, 4, 5]
+utf8 ctors [111, 107] h�
+iterator [a, b]
+resolve http://a/b/c/g http://a/b/g http://a/g http://a/b/c/d;p?y http://a/b/c/g#s http://a/g
+scheme true true false false null
+filePath /tmp/a b.txt
+symbol Symbol("a") true false true
+named 2024 05 [year, month] null 3
+named missing ArgumentError

@@ -128,4 +128,36 @@ public class GridView extends Widget {
     public Element createElement() {
         return new GridViewRenderElement(this);
     }
+
+    private Object scrollDirection;
+
+    /// GridView.builder with its scroll direction; Axis.horizontal scrolls and lays
+    /// the grid out horizontally.
+    public static GridView builder(Key key, Long itemCount,
+                                   Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
+                                   Object gridDelegate, EdgeInsets padding, Boolean shrinkWrap,
+                                   Object physics, Object scrollDirection) {
+        GridView g = builder(key, itemCount, itemBuilder, gridDelegate, padding, shrinkWrap, physics);
+        g.scrollDirection = scrollDirection;
+        return g;
+    }
+
+    /// GridView.count with its scroll direction, recorded as for builder.
+    public static GridView count(Key key, String restorationId, Object physics, Boolean primary,
+                                 long crossAxisCount, Double childAspectRatio,
+                                 Double mainAxisSpacing, Double crossAxisSpacing,
+                                 EdgeInsets padding, DartList<Widget> children, Object scrollDirection) {
+        GridView g = count(key, restorationId, physics, primary, crossAxisCount, childAspectRatio,
+                mainAxisSpacing, crossAxisSpacing, padding, children);
+        g.scrollDirection = scrollDirection;
+        return g;
+    }
+
+    public void scrollDirection(Object v) {
+        this.scrollDirection = v;
+    }
+
+    public Object getScrollDirection() {
+        return scrollDirection;
+    }
 }

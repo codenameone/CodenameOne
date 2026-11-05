@@ -1,0 +1,32 @@
+List<(int, {int? n}) => int>
+true
+List<(int, {required String s}) => void>
+true
+false
+(int) => void
+true
+false
+true
+false
+(int, {String? label}) => void
+true
+false
+([int]) => void
+true
+false
+(int) => Null
+(int) => void
+(int, {String? label}) => Null
+false
+true
+(int) => void
+(int, {String? label}) => void
+List<(int) => void>
+List<List<(String) => void>>
+List<Map<String, () => void>>
+true
+List<(int) => void>
+true
+List<(int, {String? label}) => void>
+(int) => Null
+(int) => Null

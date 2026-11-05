@@ -1,0 +1,11 @@
+42
+true
+7 false
+Mode.native
+[native, public, plain]
+4
+true
+42
+m3
+10
+Mode.public public

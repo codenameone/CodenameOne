@@ -46,7 +46,7 @@ public class FilePickerResult {
     }
 
     public DartList<String> paths() {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         for (PlatformFile f : files) {
             out.add(f.path());
         }
@@ -54,7 +54,7 @@ public class FilePickerResult {
     }
 
     public DartList<String> names() {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         for (PlatformFile f : files) {
             out.add(f.name());
         }

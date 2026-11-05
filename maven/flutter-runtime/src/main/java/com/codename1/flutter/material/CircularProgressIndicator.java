@@ -90,4 +90,20 @@ public class CircularProgressIndicator extends Widget {
     public com.codename1.flutter.Element createElement() {
         return new CircularProgressIndicatorRenderElement(this);
     }
+
+    /** Flutter's {@code CircularProgressIndicator.adaptive}: the Material spinner here. */
+    public static CircularProgressIndicator adaptive(com.codename1.flutter.Key key, Double value,
+            Color backgroundColor, Color color, Object valueColor, Double strokeWidth, String semanticsLabel,
+            String semanticsValue) {
+        CircularProgressIndicator c = new CircularProgressIndicator();
+        c.key(key);
+        if (value != null) c.value(value.doubleValue());
+        if (backgroundColor != null) c.backgroundColor(backgroundColor);
+        if (color != null) c.color(color);
+        c.valueColor(valueColor);
+        if (strokeWidth != null) c.strokeWidth(strokeWidth.doubleValue());
+        c.semanticsLabel(semanticsLabel);
+        c.semanticsValue(semanticsValue);
+        return c;
+    }
 }

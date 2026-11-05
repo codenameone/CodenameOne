@@ -1,0 +1,57 @@
+init seq.first 1
+init seq.limit 2
+Seq body sees Seq first0=1 limit=12
+[1, 12]
+init deep.depth 3
+init deep.list 4
+init deep.superArg 5
+init seq.first 6
+init seq.limit 7
+Seq body sees DeepSeq depth=3 arg=4 first0=6 limit=12
+DeepSeq body depth=3
+DeepSeq depth=3 arg=4 first0=6 limit=12 [6, 12]
+init mixed.own 8
+init mixed.list 9
+init mixed.superArg 10
+init mixin.count 11
+init mixin.tag 12
+init root.field 13
+Root body seed=10 sees Mixed own=8 fromList=9 tag=12 count=11
+Mixed body own=8 tag=12 count=11
+Mixed own=8 fromList=9 tag=12 count=11
+init child.field 14
+init mixed.own 15
+init mixed.list 16
+init mixed.superArg 17
+init mixin.count 18
+init mixin.tag 19
+init root.field 20
+Root body seed=17 sees Mixed own=15 fromList=16 tag=19 count=18
+Mixed body own=15 tag=19 count=18
+MixedChild body child=14
+Mixed own=15 fromList=16 tag=19 count=18
+Shape factory
+init shape.redirectArg 21
+init shape.sides 22
+init root.field 23
+Root body seed=21 sees Shape sides=22
+Shape._ body sides=22
+Shape sides=22
+Shape factory
+init shape.directArg 24
+init shape.sides 25
+init root.field 26
+Root body seed=24 sees Shape sides=25
+Shape._ body sides=25
+Shape sides=25
+init square.edge 27
+init shape.sides 28
+init root.field 29
+Root body seed=4 sees Shape sides=28
+Shape._ body sides=28
+Square body edge=27
+Shape sides=28
+init made.value 30
+init root.field 31
+Root body seed=0 sees MadeImpl value=30
+made value=30

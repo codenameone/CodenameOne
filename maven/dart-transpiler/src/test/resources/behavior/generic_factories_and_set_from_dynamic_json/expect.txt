@@ -1,0 +1,14 @@
+true
+2
+[{"id":"a","price":1.0,"tags":[{"n":"x"}]},{"id":"b","price":2.5,"tags":[]}]
+bad true
+tot true
+tag true
+true
+true
+3
+direct true
+dl true
+a-b
+sf true
+ii true

@@ -1,0 +1,35 @@
+mk1
+arg
+order TypeError
+1
+order2 ok
+cascade TypeError
+z
+nullrecv ok
+mixin TypeError
+4
+mixinok ok
+iface TypeError
+took 2.5
+ifaceok ok
+dyn TypeError
+3
+dynok ok
+1
+closure TypeError
+true
+false
+fnfield ok
+[1]
+ascoll TypeError
+asnull TypeError
+1
+asnull2 ok
+true
+false
+q
+generic ok
+mapas TypeError
+1
+0
+postinc ok

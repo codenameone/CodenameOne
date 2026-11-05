@@ -83,7 +83,7 @@ public class DataTable extends StatelessWidget {
     }
 
     private static Row rowOf(DartList<Widget> cells) {
-        DartList<Widget> flexed = new DartList<Widget>();
+        DartList<Widget> flexed = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < cells.size(); i++) {
             Expanded e = new Expanded();
             e.child(cells.get(i));
@@ -96,9 +96,9 @@ public class DataTable extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        DartList<Widget> body = new DartList<Widget>();
+        DartList<Widget> body = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (columns != null) {
-            DartList<Widget> labels = new DartList<Widget>();
+            DartList<Widget> labels = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             for (int i = 0; i < columns.size(); i++) {
                 labels.add(columns.get(i).getLabel());
             }
@@ -107,7 +107,7 @@ public class DataTable extends StatelessWidget {
         if (rows != null) {
             for (int i = 0; i < rows.size(); i++) {
                 DataRow dr = rows.get(i);
-                DartList<Widget> cellWidgets = new DartList<Widget>();
+                DartList<Widget> cellWidgets = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
                 DartList<DataCell> cells = dr.getCells();
                 if (cells != null) {
                     for (int j = 0; j < cells.size(); j++) {

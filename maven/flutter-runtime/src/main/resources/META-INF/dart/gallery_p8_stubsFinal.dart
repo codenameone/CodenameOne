@@ -102,5 +102,5 @@ class ShapeBorderClipper {
 // `MasonryGridView`. crane/backdrop builds it via the `.count` constructor.
 @JavaName('com.codename1.flutter.widgets.MasonryGridView')
 class MasonryGridView extends Widget {
-  external static MasonryGridView count({Key? key, String? restorationId, int crossAxisCount, double? mainAxisSpacing, double? crossAxisSpacing, int? itemCount, Object itemBuilder, Object? scrollDirection, bool? shrinkWrap, Object? physics, Object? padding, Object? controller});
+  external static MasonryGridView count({Key? key, String? restorationId, int crossAxisCount, double? mainAxisSpacing, double? crossAxisSpacing, int? itemCount, IndexedWidgetBuilder itemBuilder, Object? scrollDirection, bool? shrinkWrap, Object? physics, Object? padding, Object? controller});
 }
