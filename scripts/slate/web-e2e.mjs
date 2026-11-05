@@ -233,11 +233,11 @@ try {
   say('declined usage statistics');
 
   // 3. The home screen.
-  // The member's home: the next class, read from the server, and the
-  // member's level. The eyebrow is set in capitals, so compare without case.
+  // The client's home: the booking button and the services, read from the
+  // server. Compare without case, as headings may be set in capitals.
   await waitFor('the home screen', stepSeconds, async () => {
     const text = (await screenText()).toLowerCase();
-    return text.includes('next class') && text.includes('level');
+    return text.includes('book an appointment') && text.includes('what you can book');
   });
   await waitFor('the home screen to ask for appointments', stepSeconds, async () =>
       requests.some(r => /^200 GET \/api\/(business\/services|appointments)/.test(r)));
