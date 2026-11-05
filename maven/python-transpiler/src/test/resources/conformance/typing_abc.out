@@ -1,0 +1,36 @@
+int | None int | str typing.List[int] typing.Dict[str, typing.List[int]] typing.Tuple[int, ...] typing.Callable[[int], str]
+True <class 'int'> <class 'list'> (<class 'str'>, <class 'int'>)
+typing.Literal['a', 'b'] typing.Annotated[int, 'meta'] (<class 'int'>, 'm') False
+~T True x
+2 Stack (typing.Generic[~T],)
+Employee(name='ann', id=3) ann#3 ('name', 'id') 9 True
+{'title': 'x', 'year': 1} True True
+True False
+5 UserId
+{'name': <class 'str'>, 'times': <class 'int'>, 'return': <class 'str'>} Says hi. <class 'int'>
+3
+Sq 9 frozenset({'area'}) True
+TypeError Can't instantiate abstract class Shape without an implementation for abstract method 'area'
+TypeError Can't instantiate abstract class Half without an implementation for abstract method 'area'
+True True False
+<p>
+body P
+</p>
+<q>
+</q>
+caught boom
+swallowed
+after
+suppressed
+<x>
+in stack
+</x>
+exit b
+exit a
+using
+closed
+5
+'hidden\n'
+<deco>
+inside
+</deco>

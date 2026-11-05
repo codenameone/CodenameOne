@@ -1,0 +1,24 @@
+12345678-1234-5678-1234-567812345678 UUID('12345678-1234-5678-1234-567812345678') 12345678123456781234567812345678 24197857161011715162171839636988778104 urn:uuid:12345678-1234-5678-1234-567812345678 None reserved for NCS compatibility
+(305419896, 4660, 22136, 18, 52, 95073701484152) 305419896 4660 4660 95073701484152 b'\x124Vx\x124Vx\x124Vx\x124Vx' b'xV4\x124\x12xV\x124Vx\x124Vx'
+True True True True True
+6fa459ea-ee8a-3ca4-894e-db77e160355e 886313e1-3b8a-5372-9b90-0c9aee199e5d
+53b14841-9895-312b-bb91-82c1f08c9edd 42d5e23b-3a02-5135-85c6-52d1102f1f00
+00000000-0001-8002-8000-000000000003 00000000-0000-0000-0000-000000000000 ffffffff-ffff-ffff-ffff-ffffffffffff None reserved for future definition
+uuid1 1 specified in RFC 4122 True 36 True
+uuid4 4 specified in RFC 4122 True 36 True
+uuid6 6 specified in RFC 4122 True 36 True
+uuid7 7 specified in RFC 4122 True 36 True
+uuid8 8 specified in RFC 4122 True 36 True
+True 2748 7
+00000000-0000-4000-8000-000000000005 True True
+1 True True
+ValueError badly formed hexadecimal UUID string
+ValueError bytes is not a 16-char string
+ValueError int is out of range (need a 128-bit value)
+ValueError fields is not a 6-tuple
+ValueError illegal version number
+TypeError one of the hex, bytes, bytes_le, fields, or int arguments must be given
+UUID objects are immutable
+'k' KeyError
+None (None, None, None)
+1-   'n'-8-3 [('a', 'b', 'c', None), ('{', None, None, None), ('d}', None, None, None)]

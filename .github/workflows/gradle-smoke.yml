@@ -168,6 +168,10 @@ jobs:
   # for its version) but never compiles anything, so it stays cheap. The same
   # script's upload-jar and android-source comparisons run again here for free.
   gradle-maven-parity-macos:
+    # The Xcode half of the parity check runs nightly only: hosted macOS runners
+    # are the scarce pool, and the Linux job above already holds every other
+    # target to Maven/Gradle parity on the pull request.
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 60
     env:

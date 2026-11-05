@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="173" viewBox="0 0 760 173" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Flask JSON API throughput (higher is better)</text>
+<rect x="150" y="36" width="12" height="12" fill="#9aa0a6"/>
+<text x="168" y="47" font-size="12" fill="#202124">CPython</text>
+<rect x="350" y="36" width="12" height="12" fill="#f9ab00"/>
+<text x="368" y="47" font-size="12" fill="#202124">PyPy</text>
+<rect x="550" y="36" width="12" height="12" fill="#a142f4"/>
+<text x="568" y="47" font-size="12" fill="#202124">GraalPy</text>
+<rect x="150" y="58" width="12" height="12" fill="#1a73e8"/>
+<text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
+<rect x="350" y="58" width="12" height="12" fill="#8ab4f8"/>
+<text x="368" y="69" font-size="12" fill="#202124">Codename One Python, 128 MB budget</text>
+<line x1="150.0" y1="80" x2="150.0" y2="143" stroke="#e8eaed"/>
+<text x="150.0" y="159" font-size="11" fill="#5f6368" text-anchor="middle">0 </text>
+<line x1="326.7" y1="80" x2="326.7" y2="143" stroke="#e8eaed"/>
+<text x="326.7" y="159" font-size="11" fill="#5f6368" text-anchor="middle">10k </text>
+<line x1="503.3" y1="80" x2="503.3" y2="143" stroke="#e8eaed"/>
+<text x="503.3" y="159" font-size="11" fill="#5f6368" text-anchor="middle">20k </text>
+<line x1="680.0" y1="80" x2="680.0" y2="143" stroke="#e8eaed"/>
+<text x="680.0" y="159" font-size="11" fill="#5f6368" text-anchor="middle">30k </text>
+<text x="142" y="110" font-size="12" fill="#202124" text-anchor="end">requests/s</text>
+<rect x="150" y="84" width="12.3" height="8" fill="#9aa0a6"/>
+<text x="166.3" y="91" font-size="9" fill="#5f6368">699</text>
+<rect x="150" y="93" width="12.2" height="8" fill="#f9ab00"/>
+<text x="166.2" y="100" font-size="9" fill="#5f6368">692</text>
+<rect x="150" y="102" width="9.9" height="8" fill="#a142f4"/>
+<text x="163.9" y="109" font-size="9" fill="#5f6368">559</text>
+<rect x="150" y="111" width="479.1" height="8" fill="#1a73e8"/>
+<text x="633.1" y="118" font-size="9" fill="#5f6368">27117</text>
+<rect x="150" y="120" width="452.6" height="8" fill="#8ab4f8"/>
+<text x="606.6" y="127" font-size="9" fill="#5f6368">25619</text>
+</svg>

@@ -114,4 +114,16 @@ public interface WebSocket {
     default String[] getSubprotocols() {
         return null;
     }
+
+    /// Extra headers for the 101 handshake response, or null for none.
+    ///
+    /// Asked once, after [#getSubprotocols] and before the 101 is written. Keys
+    /// are header names; a value is a String or a `List` of them, one header line
+    /// each. A name the handshake owns -- `Upgrade`, `Connection`,
+    /// `Sec-WebSocket-Accept`, `Sec-WebSocket-Protocol`,
+    /// `Sec-WebSocket-Extensions`, or one the server always writes -- and a value
+    /// carrying a CR or an LF are left out, never written.
+    default java.util.Map getHandshakeHeaders() {
+        return null;
+    }
 }

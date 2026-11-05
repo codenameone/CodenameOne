@@ -308,7 +308,7 @@ final class IntPipeline implements IntStream {
         Iterator<Integer> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                all.add(it.next());
+                addNext(all, it);
             }
             int[] out = new int[all.size()];
             for (int i = 0; i < out.length; i++) {
@@ -542,6 +542,12 @@ final class IntPipeline implements IntStream {
     // are Integers by construction, so the cast cannot fail anyway.
     private static int unboxNext(Iterator<Integer> it) {
         return it.next().intValue();
+    }
+
+    // Outside the caller's try: the element cast javac inserts must not sit
+    // under a catch, because a failed cast does not throw on ParparVM.
+    private static void addNext(List<Integer> all, Iterator<Integer> it) {
+        all.add(it.next());
     }
 
     private static int unboxAt(List<Integer> all, int i) {

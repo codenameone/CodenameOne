@@ -1,0 +1,94 @@
+Point(x=1, y=2) Point(x=3, y=0) Point(x=4, y=5)
+True True False
+True
+lt raised TypeError '<' not supported between instances of 'Point' and 'Point'
+missing raised TypeError Point.__init__() missing 1 required positional argument: 'x'
+extra raised TypeError Point.__init__() takes from 2 to 3 positional arguments but 4 were given
+badkw raised TypeError Point.__init__() got an unexpected keyword argument 'z'
+True False
+['x', 'y'] x 0
+{'x': 1, 'y': 2} (1, 2)
+Point(x=10, y=2)
+('x', 'y')
+True True [Ver(major=1, minor=0), Ver(major=1, minor=5), Ver(major=2, minor=0)]
+True False
+Frozen(name='a', tags=(1, 2)) True True
+frozen set raised FrozenInstanceError can't set attribute
+FrozenInstanceError caught True
+attr.exceptions caught
+Frozen(name='z', tags=(1, 2)) Frozen(name='a', tags=(1, 2))
+WithFactory(items=[1], d={}, n=3, twice=6) WithFactory(items=[], d={}, n=5, twice=10) []
+Factory(factory=<class 'list'>, takes_self=False)
+SelfFactory(a=1, b=2) SelfFactory(a=1, b=7)
+Validated(x=1, name='n', opt=None, kind='a', pos=1)
+v type raised TypeError 'x' must be <class 'int'> (got 's' that is a <class 'str'>).
+v name raised ValueError 'name' must match regex '^[a-z]+$' ('Bad1' doesn't)
+v opt ok -> Validated(x=1, name='n', opt=3, kind='a', pos=1)
+v opt bad raised TypeError 'opt' must be <class 'int'> (got 'x' that is a <class 'str'>).
+v in raised ValueError 'kind' must be in ['a', 'b'] (got 'c')
+v pos raised ValueError 'pos' must be >= 0: -1
+v pos2 raised ValueError 'pos' must be < 100: 100
+v dec raised ValueError unlucky x
+set invalid raised TypeError 'x' must be <class 'int'> (got 'q' that is a <class 'str'>).
+set invalid2 raised ValueError unlucky x
+4
+validate() raised TypeError 'x' must be <class 'int'> (got 'zz' that is a <class 'str'>).
+Lists(xs=[1, 2], m={}, s='ab', c=<built-in function len>)
+deep it raised TypeError 'xs' must be <class 'int'> (got 'a' that is a <class 'str'>).
+deep it2 raised TypeError 'xs' must be <class 'list'> (got (1, 2) that is a <class 'tuple'>).
+deep map raised TypeError 'm' must be <class 'int'> (got 'b' that is a <class 'str'>).
+min raised ValueError Length of 's' must be >= 1: 0
+max raised ValueError Length of 's' must be <= 3: 4
+callable raised NotCallableError 'c' must be callable (got 5 that is a <class 'int'>).
+Converted(n=5, s=None, z=7, b=True, p=3)
+Converted(n=1, s='2', z=7, b=False, p=9)
+8 int
+conv bad raised ValueError invalid literal for int() with base 10: 'x'
+to_bool bad raised ValueError Cannot convert value to bool: 'maybe'
+Kw(a=1, b=2, c=3)
+kw missing raised TypeError Kw.__init__() missing 1 required keyword-only argument: 'c'
+kw positional raised TypeError Kw.__init__() takes 2 positional arguments but 4 were given
+AllKw(a=1, b=5)
+allkw raised TypeError AllKw.__init__() takes 1 positional argument but 2 were given
+Post(a=4, b=40) 40
+Priv(_hidden=1, shown=2) Priv(_hidden=5, shown=2) hidden
+Opts(a=1, ignored=0, shout=X) True False
+Child(a=1, c=3, b=20) ['a', 'c', 'b'] [True, False, False]
+False True
+mandatory after default raised ValueError No mandatory attributes allowed after an attribute with a default value or factory.  Attribute in question: Attribute(name='b', default=NOTHING, validator=None, repr=True, eq=True, eq_key=None, order=True, order_key=None, hash=None, init=True, metadata=mappingproxy({}), type=<class 'int'>, converter=None, kw_only=False, inherited=False, on_setattr=None, alias='b')
+{'inner': {'v': 1}, 'items': [{'v': 2}, 3], 'mapping': {'k': {'v': 4}}, 'tup': ({'v': 5}, 6)}
+{'inner': Inner(v=1), 'items': [Inner(v=2), 3], 'mapping': {'k': Inner(v=4)}, 'tup': (Inner(v=5), 6)}
+{'inner': {'v': 1}, 'items': [{'v': 2}, 3], 'mapping': {'k': {'v': 4}}, 'tup': ({'v': 5}, 6)}
+((1,), [(2,), 3], {'k': (4,)}, ((5,), 6))
+{'inner': {'v': 1}, 'items': [{'v': 2}, 3], 'mapping': {'k': {'v': 4}}}
+{'inner': {'v': 1}, 'mapping': {'k': {'v': 4}}}
+{'v': 4}
+(1,) (Inner(v=5), 6)
+Priv(_hidden=9, shown=2)
+evolve bad raised TypeError Point.__init__() got an unexpected keyword argument 'q'
+fields bad raised NotAnAttrsClassError <class 'int'> is not an attrs-decorated class.
+fields inst -> (Attribute(name='x', default=NOTHING, validator=None, repr=True, eq=True, eq_key=None, order=True, order_key=None, hash=None, init=True, metadata=mappingproxy({}), type=<class 'int'>, converter=None, kw_only=False, inherited=False, on_setattr=None, alias='x'), Attribute(name='y', default=0, validator=None, repr=True, eq=True, eq_key=None, order=True, order_key=None, hash=None, init=True, metadata=mappingproxy({}), type=<class 'int'>, converter=None, kw_only=False, inherited=False, on_setattr=None, alias='y'))
+Old(x=1, y=5, z=[]) True True True
+['x', 'y', 'z', 'w'] 5
+old validator raised TypeError 'y' must be <class 'int'> (got 'no' that is a <class 'str'>).
+changes freely unhashable
+OldFrozen(a=1, b='b') True
+old frozen raised FrozenInstanceError can't set attribute
+OldFrozen(a=1, b='c')
+{'a': 1, 'b': 'b'}
+False True
+no order raised TypeError '<' not supported between instances of 'NoOrder' and 'NoOrder'
+OrderBy(b=1, a=2) ['b', 'a']
+Decorated(n=2, m=3)
+decorated raised ValueError neg
+Auto(a=1, b=[], c=3) True
+Dyn(a=1, b=2) True
+Dyn2(x=1, y=2) Dyn2(x=1, y=5)
+custom! True
+False
+_Nothing.NOTHING NOTHING False
+Validated(x='not an int', name='n', opt=None, kind='a', pos=1)
+False
+5 6
+<instance_of validator for type <class 'int'>>
+<optional validator for <instance_of validator for type <class 'int'>> or None>

@@ -1,0 +1,34 @@
+4 8 5 16 4 6
+b'\xfe\xff\xff\xff\xff\xff\xff\xff\x00(k\xee\xfb\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
+b'\xff\xfe\xff\xff\xff\xff\xff\xff\xeek(\x00' b'\x80\xff\x01z'
+(-2, 65535, -1, 4000000000, -5, 18446744073709551615)
+0.0 0000000000000000 0.0 00000000 0.0 0000
+-0.0 0000000000000080 -0.0 80000000 -0.0 0080
+1.0 000000000000f03f 1.0 3f800000 1.0 003c
+-2.5 00000000000004c0 -2.5 c0200000 -2.5 00c1
+0.1 9a9999999999b93f 0.1 3dcccccd 0.10000000149011612 662e
+1e+300 9c7500883ce4377e 1e+300 - - -
+5e-324 0100000000000000 5e-324 00000000 0.0 0000
+3.4028234663852886e+38 000000e0ffffef47 3.4028234663852886e+38 7f7fffff 3.4028234663852886e+38 -
+1.401298464324817e-45 000000000000a036 1.401298464324817e-45 00000001 1.401298464324817e-45 0000
+65504.0 0000000000fcef40 65504.0 477fe000 65504.0 ff7b
+6e-08 2b69a4292b1b703e 6e-08 3380d959 5.99999978589949e-08 0100
+inf 000000000000f07f inf - - 007c
+0.10000000149011612 0.0999755859375 (nan,)
+b'ab\x00\x00\x00' b'ab' b'\x03abc\x00' (b'abc',) (b'xyz',)
+b'\x01\x00\x02\x00\x03\x00\x00\x00' b'a\x00\x00\x00\x01\x00\x00\x00' b'\x00\x00\x00\x00\x00\x00\xf0?\x00'
+4 <2h b'\x01\x00\x02\x00' (1, 2) [(1, 2), (3, 4)] Struct('<2h')
+bytearray(b'\x00\x00\x04\x03\x02\x01\x00\x00') (16909060,) (258,)
+'b' format requires -128 <= number <= 127
+'B' format requires 0 <= number <= 255
+'h' format requires -32768 <= number <= 32767
+'I' format requires 0 <= number <= 4294967295
+required argument is not an integer
+pack expected 1 items for packing (got 0)
+char format requires a bytes object of length 1
+'q' format requires -9223372036854775808 <= number <= 9223372036854775807
+unpack requires a buffer of 4 bytes
+unpack requires a buffer of 2 bytes
+bad char in struct format
+float too large to pack with f format
+b'\x00' b'\x01' b'\x07\x00'

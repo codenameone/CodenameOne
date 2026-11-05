@@ -1,0 +1,24 @@
+10 ['The quick', 'brown fox', 'jumps over', 'the lazy', 'dog. A', 'well-known', 'pangram --', 'used by ty', 'pographers', '--', 'contains', 'every', 'letter of', 'the', 'alphabet.', 'Supercalif', 'ragilistic', 'expialidoc', 'ious is', 'long; so', 'is pseudo-', 'pseudo-hyp', 'oparathyro', 'idism.', 'Tabs', 'and', 'newlines', 'too.']
+25 ['The quick brown fox jumps', 'over the lazy dog. A', 'well-known pangram --', 'used by typographers --', 'contains every letter of', 'the alphabet.  Supercalif', 'ragilisticexpialidocious', 'is long; so is pseudo-', 'pseudo-', 'hypoparathyroidism.', 'Tabs    and newlines too.']
+40 ['The quick brown fox jumps over the lazy', 'dog. A well-known pangram -- used by', 'typographers -- contains every letter of', 'the alphabet.', 'Supercalifragilisticexpialidocious is', 'long; so is pseudo-pseudo-', 'hypoparathyroidism.        Tabs    and', 'newlines too.']
+79 ['The quick brown fox jumps over the lazy dog. A well-known pangram -- used by', 'typographers -- contains every letter of the alphabet.', 'Supercalifragilisticexpialidocious is long; so is pseudo-pseudo-', 'hypoparathyroidism.        Tabs    and newlines too.']
+* The quick brown fox jumps
+  over the lazy dog. A well-
+  known pangram -- used by
+  typographers -- contains
+  every letter of the
+  alphabet.  Supercalifragilis
+  ticexpialidocious is long;
+  so is pseudo-pseudo-
+  hypoparathyroidism.
+  Tabs    and newlines too.
+['The quick brown fox', 'jumps over the lazy', 'dog. A well-known', 'pangram -- used by', 'typographers --', 'contains every', 'letter of the', 'alphabet.', 'Supercalifragilisticexpialidocious', 'is long; so is', 'pseudo-pseudo-', 'hypoparathyroidism.', 'Tabs    and newlines', 'too.']
+['The quick brown fox', 'jumps over the lazy', 'dog. A well-known', 'pangram -- used by', 'typographers --', 'contains every', 'letter of the', 'alphabet.  Supercali', 'fragilisticexpialido', 'cious is long; so is', 'pseudo-pseudo-hypopa', 'rathyroidism.', 'Tabs    and newlines', 'too.']
+['The quick brown fox jumps over', 'the lazy dog.  A well-known', 'pangram -- used by', 'typographers -- contains every', 'letter of the alphabet.  Super', 'califragilisticexpialidocious', 'is long; so is pseudo-pseudo-', 'hypoparathyroidism.', 'Tabs    and newlines too.']
+['  leading', 'and', 'trailing'] ['  leading', '   ']
+['The quick brown fox jumps over', 'the lazy dog. A well-known', 'pangram -- used by [...]'] ['The quick brown fox jumps...']
+Hello world! Hello [...] Hello world
+[] ['a', 'b', 'c'] ['a-b-', 'c-d-', 'e-f']
+'\ndef f():\n    return 1\n  x\n' '  a\n\tb\n' '\na\nb'
+'> a\n\n> b\n' '+a\n+\n+b'
+invalid width 0 (must be > 0)

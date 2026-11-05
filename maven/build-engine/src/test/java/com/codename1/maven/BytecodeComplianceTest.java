@@ -49,6 +49,56 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceTest {
+    /// Two paths that join with a long on the stack, one pushed by LCONST_1
+    /// (ASM's own BasicValue.LONG_VALUE) and one loaded from a local (the
+    /// checker's value class), must still merge to a two-slot long: a DUP2
+    /// after the join was reported as illegal in generated Python code.
+    @Test
+    void longsFromBothValueClassesMergeAsLongs() throws Exception {
+        analyzeJoin(false);
+        analyzeJoin(true);
+    }
+
+    private static void analyzeJoin(boolean constantFirst) throws Exception {
+        org.objectweb.asm.tree.MethodNode m = new org.objectweb.asm.tree.MethodNode(
+                Opcodes.ACC_STATIC, "m", "(I)V", null, null);
+        org.objectweb.asm.Label a = new org.objectweb.asm.Label();
+        org.objectweb.asm.Label join = new org.objectweb.asm.Label();
+        m.visitVarInsn(Opcodes.ILOAD, 0);
+        m.visitInsn(Opcodes.I2L);
+        m.visitVarInsn(Opcodes.LSTORE, 1);
+        m.visitVarInsn(Opcodes.ILOAD, 0);
+        m.visitJumpInsn(Opcodes.IFEQ, a);
+        // The analyzer meets the join from either path first.
+        if (constantFirst) {
+            m.visitInsn(Opcodes.LCONST_1);
+        } else {
+            m.visitVarInsn(Opcodes.LLOAD, 1);
+        }
+        m.visitJumpInsn(Opcodes.GOTO, join);
+        m.visitLabel(a);
+        if (constantFirst) {
+            m.visitVarInsn(Opcodes.LLOAD, 1);
+        } else {
+            m.visitInsn(Opcodes.LCONST_1);
+        }
+        m.visitLabel(join);
+        m.visitInsn(Opcodes.DUP2);
+        m.visitInsn(Opcodes.POP2);
+        m.visitInsn(Opcodes.POP2);
+        m.visitInsn(Opcodes.RETURN);
+        m.maxStack = 4;
+        m.maxLocals = 3;
+        Class<?> type = Class.forName("com.codename1.maven.BytecodeCompliance$SimdAllocaInterpreter");
+        java.lang.reflect.Constructor<?> ctor = type.getDeclaredConstructor();
+        ctor.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        org.objectweb.asm.tree.analysis.Interpreter<org.objectweb.asm.tree.analysis.BasicValue> interpreter =
+                (org.objectweb.asm.tree.analysis.Interpreter<org.objectweb.asm.tree.analysis.BasicValue>) ctor.newInstance();
+        new org.objectweb.asm.tree.analysis.Analyzer<org.objectweb.asm.tree.analysis.BasicValue>(interpreter)
+                .analyze("app/Joins", m);
+    }
+
     /// A sibling module checked with the application is compiled by its own
     /// module, so its classes have to count when deciding whether the last
     /// check still holds; otherwise a change to it alone skips the check.

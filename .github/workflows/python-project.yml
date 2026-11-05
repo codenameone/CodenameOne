@@ -1,0 +1,120 @@
+name: Python projects
+
+# Python applications built as Codename One applications: the transpiler and
+# runtime (maven/python-transpiler, maven/python-runtime) and the build steps
+# that import and transpile a project (build-engine, the Maven and Gradle
+# plugins, the archetype's python profile).
+#
+#   unit tests               the importer, the incremental builder and the
+#                            pom updater
+#   python-project-test.sh   every sample under scripts/python-samples imported,
+#                            built by Maven and Gradle and staged for iOS,
+#                            Android, JavaScript and the desktop with identical
+#                            uploads from both tools
+#
+# The transpiler's own conformance tests run in python-bench.yml.
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'maven/python-transpiler/**'
+      - 'maven/python-runtime/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/python-project-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/python-samples/**'
+      - 'scripts/python-backend/**'
+      - 'vm/backend/src/**'
+      - '.github/workflows/python-project.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'maven/python-transpiler/**'
+      - 'maven/python-runtime/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/python-project-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/python-samples/**'
+      - 'scripts/python-backend/**'
+      - 'vm/backend/src/**'
+      - '.github/workflows/python-project.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python-project:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CN1_GRADLE_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v6
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: |
+          echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+          echo "JAVA17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      # xvfb for the reactor build's JavaSE port; the application builds below
+      # compile CSS headless and need no display.
+      - name: Install xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb
+      - name: Build Codename One Maven artifacts (includes archetypes and both plugins)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      # The runtime compiles at release 17, which the JDK 8 reactor skips.
+      - name: Build the Python runtime on JDK 17
+        working-directory: maven
+        run: JAVA_HOME="$JAVA17_HOME" mvn -B install -DskipTests -Dmaven.javadoc.skip=true -pl python-runtime
+      - name: Unit tests
+        working-directory: maven
+        run: JAVA_HOME="$JAVA17_HOME" mvn -B -pl build-engine,codenameone-maven-plugin test -Dtest='Python*' -Dsurefire.failIfNoSpecifiedTests=false
+      # The real server path: Flask and FastAPI samples served by the
+      # backend's HttpServer on a JVM and driven over sockets -- HTTP,
+      # middleware, websockets and streamed responses.
+      - name: Python backend end-to-end
+        run: |
+          (cd maven && mvn -B -q -f ../vm/pom.xml -pl JavaAPI -am install -DskipTests)
+          bash scripts/python-backend/e2e-test.sh "$HOME/.m2/repository"
+      - name: Refresh archetype catalog
+        run: |
+          cd maven
+          mvn archetype:update-local-catalog -Plocal-dev-javase
+          mvn archetype:crawl -Plocal-dev-javase
+      - name: Python samples, imported and built by Maven and Gradle
+        working-directory: maven/integration-tests
+        run: bash python-project-test.sh
+      - name: Upload the test projects' logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-project-logs
+          path: maven/integration-tests/build/python-project/**/*.log
+          if-no-files-found: ignore

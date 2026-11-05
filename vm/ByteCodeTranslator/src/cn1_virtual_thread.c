@@ -134,6 +134,8 @@ static pthread_mutex_t cn1VirtualThreadRegistryLock = PTHREAD_MUTEX_INITIALIZER;
 static int cn1VirtualThreadScanActive = 0;              /* guarded by the registry lock */
 static struct cn1VirtualThread* cn1VirtualThreadRetired = 0;  /* likewise */
 
+int cn1ProcessHasMemoryBudget(void);   /* cn1_globals.m */
+
 static void cn1VirtualThreadRelease(struct cn1VirtualThread* co) {
     size_t pageSize = (size_t)sysconf(_SC_PAGESIZE);
     munmap((unsigned char*)co->stackLow - pageSize, co->stackBytes + pageSize);
@@ -311,6 +313,24 @@ void cn1VirtualThreadFree(struct cn1VirtualThread* co) {
     }
     pthread_mutex_unlock(&cn1VirtualThreadRegistryLock);
     if(deferred) {
+        /* THE MAPPING WAITS FOR THE SCAN, THE MEMORY DOES NOT. A scan can last a long
+         * time -- under a memory budget the collector runs back to back, so one is in
+         * progress most of the time -- and a server retires a virtual thread per
+         * request. A Flask server under a 64MB budget held 340MB of retired stacks
+         * across one scan, and the parts they had touched were 16MB of footprint past
+         * its limit. The advice keeps the mapping, so a snapshot that still reads the
+         * stack gets zeros or stale words rather than a fault, and a finished thread
+         * has no roots left on it to lose. Only a process with a budget pays the
+         * system call; without one the stack waits for the drain as it always did. */
+        if(cn1ProcessHasMemoryBudget()) {
+#if defined(__APPLE__) && defined(MADV_FREE_REUSABLE)
+            if(madvise(co->stackLow, co->stackBytes, MADV_FREE_REUSABLE) != 0) {
+                (void)madvise(co->stackLow, co->stackBytes, MADV_FREE);
+            }
+#elif defined(MADV_DONTNEED)
+            (void)madvise(co->stackLow, co->stackBytes, MADV_DONTNEED);
+#endif
+        }
         return;
     }
     cn1VirtualThreadRelease(co);

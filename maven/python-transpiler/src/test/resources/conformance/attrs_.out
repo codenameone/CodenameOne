@@ -1,0 +1,15 @@
+[1, 2] ['m1', 'm2']
+3 m3 9
+shadowed m1
+m3
+replaced1 replaced3
+AttributeError 'P' object has no attribute 'x'
+5 {'y': 9, 'x': 5}
+q
+prop prop
+1
+base
+base2
+kid base2
+15
+1 ['a', 'b'] 1
