@@ -24,15 +24,14 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.Label;
-import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codenameone.examples.splat.api.ClaimDto;
 import com.codenameone.examples.splat.api.PlayerDto;
 import com.codenameone.examples.splat.api.ProgressDto;
@@ -40,15 +39,15 @@ import com.codenameone.examples.splat.api.QuestDto;
 import com.codenameone.examples.splat.api.SpotlightDto;
 import com.codenameone.examples.splat.engage.Ads;
 import com.codenameone.examples.splat.engage.Telemetry;
-import com.codenameone.examples.splat.forge.PackScreen;
 import com.codenameone.examples.splat.net.Api;
 import com.codenameone.examples.splat.net.Net;
 import com.codenameone.examples.splat.net.Session;
+import com.codenameone.examples.splat.play.OperatorStage;
 
-/// The menu between runs, built to pull the player into the next one: their
-/// runner and level up top, the run button where the thumb is, a race with
-/// friends one tap away, chests waiting to be opened and today's quests with
-/// a claim button the moment one is done.
+/// The main menu, laid out like the front end of every military shooter: your
+/// operator standing in the light on the right, a column of capitalised
+/// orders down the left, your rank and wallet in the corner, and the daily
+/// orders and supply drops along the bottom.
 // tag::splat-home[]
 public final class HomeForm {
     private HomeForm() {
@@ -64,7 +63,12 @@ public final class HomeForm {
         f.setLayout(new LayeredLayout());
         f.getToolbar().hideToolbar();
         f.setScrollable(false);
-        f.add(Kit.backdrop());
+        f.setUIID("MenuForm");
+        boolean wide = CN.getDisplayWidth() > CN.getDisplayHeight();
+        f.add(new OperatorStage(OperatorStage.operatorFor(p.username()), p.runner(), wide ? 0.9f : 0.55f));
+        Label shade = new Label();
+        shade.setUIID("MenuShade");
+        f.add(shade);
         final Container front = new Container(new BorderLayout());
         front.setSafeArea(true);
         f.add(front);
@@ -91,9 +95,8 @@ public final class HomeForm {
         });
     }
 
-    /// A new player is walked through the tutorial level before anything else.
-    /// Offered once per account on this device; "First steps", at the top of
-    /// the level list, brings it back.
+    /// A new player is walked through basic training before anything else.
+    /// Offered once per account on this device.
     private static void offerTutorial(ProgressDto now) {
         if (now == null || now.tutorialDone()) {
             return;
@@ -103,38 +106,57 @@ public final class HomeForm {
             return;
         }
         Preferences.set(key, true);
-        RunForm.tutorial();
+        MatchForm.practice("lot7:TEAM_PAINT", Nav::home);
     }
 
     private static void fill(Form f, Container front, PlayerDto p, ProgressDto g) {
         front.removeAll();
-        String runner = Portraits.of(p.runner());
 
-        // Top bar: the avatar ringed by level progress, the name and level
-        // over what the player holds, and the settings gear.
+        // Top: the game's mark on the left, your rank card on the right.
         Container top = new Container(new BorderLayout());
-        top.setUIID("TopBar");
-        int into = g == null ? 0 : g.xp() - g.levelStart();
-        int span = g == null ? 1 : g.levelEnd() - g.levelStart();
-        top.add(BorderLayout.WEST, Kit.xpRing(Portraits.face(runner, CN.convertToPixels(9)), into, span));
-        Container nameRow = new Container(BoxLayout.x());
-        nameRow.add(new Label(p.displayName(), "PlayerName"));
+        top.setUIID("MenuTop");
+        Container mark = BoxLayout.encloseY(new Label("SPLAT", "MenuLogo"),
+                new Label("MULTIPLAYER  //  PAINTBALL", "MenuLogoSub"));
+        top.add(BorderLayout.CENTER, mark);
+        Container card = new Container(BoxLayout.y());
+        card.setUIID("RankCard");
+        Container nameRow = new Container(new FlowLayout(Component.RIGHT));
+        nameRow.add(new Label(Ui.caps(p.displayName()), "PlayerName"));
         if (g != null) {
-            Label lvl = new Label("LV " + g.level(), "LevelBadge");
+            Label lvl = new Label(String.valueOf(g.level()), "LevelBadge");
             lvl.setName("level");
             nameRow.add(lvl);
         }
-        Container wallet = new Container(BoxLayout.x());
-        wallet.add(Kit.pill(FontImage.MATERIAL_MONETIZATION_ON, p.coins(), "Coins", "Coins", e -> ShopForm.show()));
-        wallet.add(Kit.pill(FontImage.MATERIAL_DIAMOND, p.gems(), "Gems", "Gems", e -> ShopForm.show()));
-        top.add(BorderLayout.CENTER, BoxLayout.encloseY(nameRow, wallet));
+        card.add(nameRow);
+        int into = g == null ? 0 : g.xp() - g.levelStart();
+        int span = g == null ? 1 : g.levelEnd() - g.levelStart();
+        card.add(Ui.bar(into, Math.max(1, span), 0xf2b632));
+        Label league = new Label(Ui.caps(leagueName(p.trophies())), "LeagueName");
+        Label trophies = new Label(String.valueOf(p.trophies()), "Trophies");
+        trophies.setName("Trophies");
+        Container wallet = new Container(new FlowLayout(Component.RIGHT));
+        Button coins = Ui.button("CP " + p.coins(), "Coins", "Coins", e -> ShopForm.show());
+        Button gems = Ui.button("GB " + p.gems(), "Gems", "Gems", e -> ShopForm.show());
         Button gear = Ui.button("", "IconButton", "settingsButton", e -> SettingsForm.show());
-        gear.setMaterialIcon(FontImage.MATERIAL_SETTINGS, 4.2f);
-        top.add(BorderLayout.EAST, FlowLayout.encloseMiddle(gear));
+        gear.setMaterialIcon(FontImage.MATERIAL_SETTINGS, 3.6f);
+        wallet.add(league).add(trophies).add(coins).add(gems).add(gear);
+        card.add(wallet);
+        top.add(BorderLayout.EAST, card);
         front.add(BorderLayout.NORTH, top);
 
-        // The middle: rails down both sides, the runner on its stage between.
-        Container mid = new Container(new BorderLayout());
+        // Left: the menu, one order per line, the first one primed.
+        Container menu = new Container(BoxLayout.y());
+        menu.setUIID("MenuColumn");
+        if (p.suspended()) {
+            menu.add(Ui.text("ACCOUNT SUSPENDED. MATCHES AND LEADERBOARDS ARE CLOSED UNTIL IT IS LIFTED.",
+                    "Warning"));
+        }
+        menu.add(item("FIND A MATCH", "Quick play, 4v4, any yard", "quickRaceButton", true,
+                () -> MatchLobby.quick(null)));
+        menu.add(item("OPERATIONS", "Modes, yards, practice vs bots", "runButton", false, PlayForm::show));
+        menu.add(item("PARTY UP", "Private lobby with your squad", "partyButton", false,
+                () -> MatchLobby.host(null)));
+        menu.add(item("OPERATOR", "Marker and kit", "loadoutButton", false, LoadoutForm::show));
         int ready = 0;
         if (g != null) {
             for (QuestDto q : g.quests()) {
@@ -144,55 +166,33 @@ public final class HomeForm {
             }
         }
         final ProgressDto prog = g;
-        mid.add(BorderLayout.WEST, Kit.rail(
-                Kit.tile("Missions", FontImage.MATERIAL_TASK_ALT, "missionsButton", ready,
-                        e -> missions(prog)),
-                Kit.tile("Daily", FontImage.MATERIAL_TODAY, "dailyButton", 0, e -> RunForm.daily()),
-                Kit.tile("Trophies", FontImage.MATERIAL_MILITARY_TECH, "achievementsButton", 0,
-                        e -> AchievementsForm.show()),
-                Kit.tile("Replays", FontImage.MATERIAL_REPLAY, "replaysButton", 0, e -> HistoryForm.show())));
-        mid.add(BorderLayout.EAST, Kit.rail(
-                Kit.tile("Runner", FontImage.MATERIAL_CHECKROOM, "runnerButton", 0, e -> RunnerForm.show()),
-                Kit.tile("Friends", FontImage.MATERIAL_GROUP_ADD, "friendsButton", 0, e -> FriendsForm.show()),
-                Kit.tile("Crews", FontImage.MATERIAL_GROUPS, "crewsButton", 0, e -> CrewsForm.show()),
-                Kit.tile("Leaders", FontImage.MATERIAL_LEADERBOARD, "leadersButton", 0,
-                        e -> LeaderboardForm.show())));
-        Container center = new Container(new BorderLayout());
-        Component spot = spotlightBanner();
-        if (p.suspended()) {
-            center.add(BorderLayout.NORTH, Ui.text("Your account is suspended. Races and leaderboards are "
-                    + "closed to you until it is lifted.", "Warning"));
+        menu.add(item("ORDERS" + (ready > 0 ? "  [" + ready + "]" : ""), "Daily challenges", "missionsButton", false,
+                () -> missions(prog)));
+        menu.add(item("BARRACKS", "Medals and service record", "achievementsButton", false,
+                AchievementsForm::show));
+        menu.add(item("REPLAYS", "Watch it back. It was a bounce.", "replaysButton", false, HistoryForm::show));
+        menu.add(item("LEADERBOARDS", "Who paints the most", "leadersButton", false, LeaderboardForm::show));
+        menu.add(item("SOCIAL", "Friends", "friendsButton", false, FriendsForm::show));
+        menu.add(item("CREWS", "Clans, but with juice boxes", "crewsButton", false, CrewsForm::show));
+        menu.add(item("STORE", "Camo that is clearly a hunting jacket", "shopButton", false, ShopForm::show));
+        if (p.admin()) {
+            menu.add(item("COMMAND", "Admin console", "adminButton", false, Nav::adminConsole));
         }
-        Component hero = Kit.stage(Portraits.figure(runner, CN.convertToPixels(26)));
-        hero.setName("hero");
-        center.add(BorderLayout.CENTER, hero);
-        Label league = new Label(leagueName(p.trophies()), "LeagueName");
-        league.setMaterialIcon(FontImage.MATERIAL_SHIELD, 3.4f);
-        Label trophies = new Label(String.valueOf(p.trophies()), "Trophies");
-        trophies.setName("Trophies");
-        trophies.setMaterialIcon(FontImage.MATERIAL_EMOJI_EVENTS, 3.4f);
-        center.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(league, trophies));
-        mid.add(BorderLayout.CENTER, center);
-        front.add(BorderLayout.CENTER, mid);
+        Container left = new Container(new BorderLayout());
+        left.add(BorderLayout.NORTH, menu);
+        left.setScrollableY(true);
+        front.add(BorderLayout.WEST, left);
 
-        // The bottom: crates, the big button, races, then the bar.
+        // Bottom: news, supply drops, the ad.
         Container bottom = new Container(BoxLayout.y());
-        bottom.setUIID("HomeBottom");
+        bottom.setUIID("MenuBottom");
+        Component spot = spotlightBanner();
         if (spot != null) {
             bottom.add(spot);
         }
-        if (g != null) {
-            bottom.add(chests(g));
+        if (g != null && g.chests() > 0) {
+            bottom.add(supplyDrops(g));
         }
-        Button run = Ui.button("PLAY", "GoButton", "runButton", e -> LevelsForm.show());
-        run.setMaterialIcon(FontImage.MATERIAL_PLAY_ARROW, 6f);
-        bottom.add(run);
-        Button quick = Ui.button("Quick race", "RaceChip", "quickRaceButton", e -> RaceLobby.quick(null));
-        quick.setMaterialIcon(FontImage.MATERIAL_BOLT, 3.6f);
-        Button party = Ui.button("Party", "RaceChip", "partyButton", e -> RaceLobby.host(null));
-        party.setMaterialIcon(FontImage.MATERIAL_HEADSET_MIC, 3.6f);
-        bottom.add(GridLayout.encloseIn(2, quick, party));
-        bottom.add(Kit.navBar("homeNav", p.admin()));
         Component banner = Ads.banner(Ui.adFree());
         if (banner != null) {
             bottom.add(banner);
@@ -200,48 +200,48 @@ public final class HomeForm {
         front.add(BorderLayout.SOUTH, bottom);
     }
 
+    /// One line of the menu: the order in capitals and, under it, what it
+    /// does. The primed one carries the amber bar.
+    private static Component item(String title, String sub, String name, boolean primed, final Runnable go) {
+        Button b = Ui.button(title, primed ? "MenuItemTextPrimed" : "MenuItemText", name, e -> go.run());
+        Container c = BoxLayout.encloseY(b, new Label(Ui.caps(sub), "MenuItemSub"));
+        c.setUIID(primed ? "MenuItemPrimed" : "MenuItem");
+        c.setLeadComponent(b);
+        return c;
+    }
+
+    /// Supply drops waiting: one button per drop.
+    private static Container supplyDrops(ProgressDto g) {
+        Container c = new Container(new FlowLayout());
+        c.setName("chests");
+        c.add(new Label("SUPPLY DROPS", "SectionTitle"));
+        for (int i = 0; i < g.chests(); i++) {
+            Button b = Ui.button("OPEN DROP " + (i + 1), "CrateSlot", "chest" + i, null);
+            b.addActionListener(e -> {
+                b.setEnabled(false);
+                Api.progress().openChest(Net.to(r -> Ui.later(() -> Rewards.show(r, HomeForm::show)),
+                        (s, m) -> Ui.later(() -> Ui.failed(s, m))));
+            });
+            c.add(b);
+        }
+        return c;
+    }
+
     /// Today's quests in a sheet over home, each claimable the moment it is done.
     private static void missions(ProgressDto g) {
-        Dialog d = new Dialog("Missions", BoxLayout.y());
+        Dialog d = new Dialog("DAILY ORDERS", BoxLayout.y());
         d.setName("missions");
         d.getContentPane().setScrollableY(true);
         if (g == null || g.quests().isEmpty()) {
-            d.add(new Label("No missions right now.", "Muted"));
+            d.add(new Label("No orders. Stand easy.", "Muted"));
         } else {
             for (QuestDto q : g.quests()) {
                 d.add(quest(q));
             }
         }
-        Button close = Ui.button("Close", "DialogAction", "closeMissions", e -> d.dispose());
+        Button close = Ui.button("DISMISSED", "DialogAction", "closeMissions", e -> d.dispose());
         d.add(close);
         d.showPacked(BorderLayout.CENTER, true);
-    }
-
-    /// The four chest slots. A full one opens on a tap; an empty one says how
-    /// to fill it.
-    private static Container chests(ProgressDto g) {
-        Container c = new Container(new GridLayout(1, 4));
-        c.setName("chests");
-        int size = CN.convertToPixels(5.5f);
-        for (int i = 0; i < 4; i++) {
-            if (i < g.chests()) {
-                Button b = new Button("Open", Portraits.crate(size, false), "CrateSlot");
-                b.setName("chest" + i);
-                b.setTextPosition(Component.BOTTOM);
-                b.addActionListener(e -> {
-                    b.setEnabled(false);
-                    Api.progress().openChest(Net.to(r -> Ui.later(() -> Rewards.show(r, HomeForm::show)),
-                            (s, m) -> Ui.later(() -> Ui.failed(s, m))));
-                });
-                c.add(b);
-            } else {
-                Label l = new Label("Win one", "CrateSlotEmpty");
-                l.setTextPosition(Component.BOTTOM);
-                l.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ADD_CIRCLE_OUTLINE, "CrateSlotEmpty", 3.6f));
-                c.add(l);
-            }
-        }
-        return c;
     }
 
     private static Container quest(final QuestDto q) {
@@ -288,11 +288,7 @@ public final class HomeForm {
         b.setName("spotlight");
         b.setMaterialIcon(FontImage.MATERIAL_CAMPAIGN, 4);
         b.addActionListener(e -> {
-            if (s.packId() != null && s.packId().length() > 0) {
-                PackScreen.show(s.packId());
-            } else {
-                Nav.screen(s.screen() == null ? "" : s.screen());
-            }
+            Nav.screen(s.screen() == null ? "" : s.screen());
         });
         return b;
     }
@@ -302,15 +298,15 @@ public final class HomeForm {
     /// fills with whoever is waiting, not by league.
     static String leagueName(int trophies) {
         if (trophies < 300) {
-            return "Rookie Lane";
+            return "Private, Weekend Division";
         }
         if (trophies < 800) {
-            return "Bronze Circuit";
+            return "Corporal of the Car Park";
         }
         if (trophies < 1500) {
-            return "Neon League";
+            return "Sergeant, Snack Bar Ops";
         }
-        return "Skyline Masters";
+        return "Commander of the Cul-de-Sac";
     }
 }
 // end::splat-home[]

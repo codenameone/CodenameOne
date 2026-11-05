@@ -30,7 +30,6 @@ import com.codenameone.examples.splat.api.CrewDto;
 import com.codenameone.examples.splat.net.Api;
 import com.codenameone.examples.splat.net.Net;
 import com.codenameone.examples.splat.net.Session;
-import com.codenameone.examples.splat.rules.Content;
 
 /// Crews: a standing group of friends with its own leaderboard on every
 /// level and a one-tap party. Joining takes the crew's code, which a member
@@ -95,9 +94,7 @@ public final class CrewsForm {
         share.setUIID("DialogButton");
         share.setTextToShare("Join my crew in Splat: code " + c.code());
         card.add(BorderLayout.SOUTH, Ui.row(
-                Ui.button("Party", "ClaimButton", "crewParty-" + c.code(), e -> RaceLobby.host(null, c.code())),
-                Ui.button("Board", "DialogButton", "crewBoard-" + c.code(),
-                        e -> ScoresForm.show(Content.CAUSEWAY, CrewsForm::show)),
+                Ui.button("Party", "ClaimButton", "crewParty-" + c.code(), e -> MatchLobby.host(null, c.code())),
                 share,
                 Ui.button("Leave", "DialogButton", "leaveCrew-" + c.code(),
                         e -> Api.game().leaveCrew(c.code(), Net.to(x -> Ui.later(CrewsForm::show), Ui::failed)))));

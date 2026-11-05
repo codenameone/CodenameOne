@@ -81,6 +81,16 @@ public enum Template {
             "The runner template is an app, a server and the modules they share; "
                     + "an Initializr Gradle project is a single project.",
             new String[0], "/dash-modules.zip", "/dash-settings.properties"),
+    // A first-person team paintball shooter: deterministic rules shared by the
+    // app and the server, server-authoritative matches with client prediction,
+    // parties, crews and replays. It is the project in scripts/splat; its
+    // resources come from `scripts/sync-initializr-template.py splat`. Like DASH,
+    // its look is painted art, so it has no colour scheme to choose.
+    SPLAT(false, "/splat-src.zip", "/splat-css.zip", "/splat-pom.xml",
+            "com.codenameone.examples.splat", "Splat", "/splat-preview.jpg",
+            "The paintball template is an app, a server and the modules they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/splat-modules.zip", "/splat-settings.properties"),
     // The same kind of template as WAYLINE: an end-to-end encrypted messaging app
     // (chats, groups, media, calls) and its server. It is the project in
     // scripts/parley, and its resources come from
@@ -170,7 +180,7 @@ public enum Template {
     /// Whether the developer can choose a colour scheme for the template: false for
     /// one whose look is art and not a palette its stylesheet declares.
     public boolean hasColorScheme() {
-        return this != SKIRMISH && this != DASH;
+        return this != SKIRMISH && this != DASH && this != SPLAT;
     }
 
     public boolean supportsGradle() {

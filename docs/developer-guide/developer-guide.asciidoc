@@ -160,6 +160,8 @@ include::Skirmish-Implementors-Guide.asciidoc[]
 
 include::Dash-Implementors-Guide.asciidoc[]
 
+include::Splat-Implementors-Guide.asciidoc[]
+
 include::Parley-Users-Guide.asciidoc[]
 
 include::Parley-Implementors-Guide.asciidoc[]

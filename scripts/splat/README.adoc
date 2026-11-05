@@ -1,22 +1,22 @@
 = Splat
 
-An endless runner and its server, in one Maven project and one language. A runner
-races down a track of lanes, jumping hurdles, sliding under barriers and changing
-lanes around traffic, while the camera can start side on, like a 2D platformer,
-and swing behind the runner into full 3D halfway through a level. Around the run
-is what a live game needs: accounts, levels with stars, leaderboards for every
-level (all time, this week, today, friends and crews), live races between friends
-on the same track with voice chat, ghosts and replays, a track editor with
-publishing and moderation, crews, a shop with in-app purchases and rewarded ads,
-push notifications, and a console for running the game.
+A first-person team paintball shooter and its server, in one Maven project and one
+language. Four against four in a self-storage yard or a suburban cul-de-sac, in Team
+Paint, Capture the Flag or Hold the Snack Bar, with a grim mission briefing before
+every match, a big red PAINTED stamp for every hit, and a referee who catches most
+of the players wiping paint off. Around the match is what a live game needs:
+accounts, quick matches with bots filling the empty slots, parties with voice chat,
+replays, crews, a shop with in-app purchases and rewarded ads, push notifications,
+and a console for running the game.
 
 The rules are one module, `rules`, that the app, the server and the tests all
-compile. It uses no floating point and no clock, so a run plays out identically
-on a phone, on the server and in a replay. That's what makes the leaderboards
-honest: the app sends its input log, and the server plays it again.
+compile. It uses no floating point and no clock, so a match plays out identically
+on a phone, on the server and in a replay. The server runs every online match as
+the authority and sends snapshots; the app predicts its own player with the same
+rules and reconciles when a snapshot arrives, so the marker fires with no wait.
 
 It's a sample of what Codename One does for games, and the project the
-Initializr generates when you start from the endless-runner template.
+Initializr generates when you start from the paintball template.
 
 == Start here
 
@@ -25,9 +25,8 @@ One chapter of the developer guide covers this project:
 * https://www.codenameone.com/developer-guide/#splat-implementors-guide[The Splat chapter]
   (link:../../docs/developer-guide/Splat-Implementors-Guide.asciidoc[source])
   tours what the game does, with the demo accounts, then explains how it's
-  built and what to change to make it yours: levels and their camera, new
-  obstacles and pickups, runners, the look, store products, ads, push and
-  moderation.
+  built and what to change to make it yours: fields, markers, the jokes,
+  the look, store products, ads, push and moderation.
 
 == The modules
 
@@ -35,13 +34,13 @@ One chapter of the developer guide covers this project:
 |===
 | Module | What it holds
 
-| `rules` | The deterministic simulation: tracks, runners, obstacles, pickups,
-  camera cues, the bot, replays and level packs.
+| `rules` | The deterministic simulation: fields, markers, paintballs, the three
+  modes, lag compensation, the bots and replays.
 | `shared` | The data transfer objects and `@RestClient` interfaces.
-| `common` | The app: the 3D track, the menus, the track editor, the race lobby and
-  voice, the store, the admin console.
-| `backend` | The server: accounts, re-simulated scores and leaderboards, the
-  lockstep race rooms, level packs and moderation, progression, receipts, push.
+| `common` | The app: the 3D field and HUD, prediction, the menus, the party lobby
+  and voice, the replay viewer, the store, the admin console.
+| `backend` | The server: accounts, matchmaking, the authoritative match rooms,
+  results and replays, moderation, progression, receipts, push.
 | `ios` | The iOS build, for generating the Xcode project.
 |===
 
@@ -84,11 +83,11 @@ mvn -pl rules,shared,backend -Dcodename1.platform=backend test   # <2>
 ./run-e2e.sh   # <3>
 ./check-template.sh   # <4>
 ----
-<1> Determinism: the same seed and inputs give the same run, the golden
-    replays still end the way they were recorded, and the bot can finish every
-    official level.
-<2> The server's tests: whole races over its rooms and sockets, re-simulated
-    scores, level packs, receipts, progression and moderation.
+<1> Determinism: the same seed and inputs give the same match, and the golden
+    replays still end the way they were recorded.
+<2> The server's tests: whole matches over its rooms and sockets, replays of
+    their results, input floods and aimbot flags, receipts, progression and
+    moderation.
 <3> Starts the server on the `test` profile and runs the app's tests against it
     in the simulator. The screenshots the developer guide shows land in
     `target/e2e-shots`.
@@ -110,5 +109,5 @@ Splat is released under MIT No Attribution (see `LICENSE`), not under the
 GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
 into your own application, under any licence, with no notice to keep.
 
-The game ships no art files. The runners, the track, the skyline and the
+The game ships no art files. The fields, the players, the markers and the
 portraits are all drawn in code, so there is nothing else to license.

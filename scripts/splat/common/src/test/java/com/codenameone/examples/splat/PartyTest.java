@@ -20,14 +20,15 @@ package com.codenameone.examples.splat;
 
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
-import com.codenameone.examples.splat.run.RaceDriver;
-import com.codenameone.examples.splat.run.RunView;
+import com.codenameone.examples.splat.play.OnlineDriver;
+import com.codenameone.examples.splat.play.ArenaView;
+import com.codenameone.examples.splat.rules.Match;
 import com.codenameone.examples.splat.ui.Nav;
 
 /// A party of two: the app hosts, a second player signs in from the test,
-/// joins by the party code and talks; then they race each other and trade
-/// emotes. The screenshots are the party chat and the race with the guest's
-/// emote and chat on screen.
+/// joins by the party code and talks; then they play on opposite teams and
+/// trade emotes. The screenshots are the party chat and the match with the
+/// guest's emote and chat on screen.
 public class PartyTest extends E2e {
     @Override
     protected boolean run() throws Exception {
@@ -46,38 +47,35 @@ public class PartyTest extends E2e {
             waitFor(600);
             onEdt(() -> {
                 TextField say = (TextField) findByName("chatField");
-                say.setText("Neon Causeway, best of three?");
+                say.setText("Cul-de-sac, loser mows the lawn?");
                 say.fireDoneEvent();
             });
             waitFor(600);
-            guest.say("You're on. Loser buys the next crate");
-            until(() -> guest.heard("best of three"), 10000, "the host's message at the guest");
+            guest.say("You're on. Bring goggles");
+            until(() -> guest.heard("mows the lawn"), 10000, "the host's message at the guest");
             waitFor(1200);
             shot("party-chat");
             click("goButton");
-            waitForForm("run");
-            final RunView view = track();
-            // The bot steers while the race warms up, so the shot is of the
-            // race and not of a runner who hit the first barrier.
-            // A race only moves as the server stamps ticks, so a stalled one
-            // would spin here until the suite's timeout killed the test with
-            // no word of why; give it half a minute and say where it stood.
+            waitForForm("match");
+            final ArenaView view = arena();
+            // A match only moves as the server's snapshots arrive, so a stalled
+            // one would spin here until the suite's timeout; give it half a
+            // minute and say where it stood.
             long give = System.currentTimeMillis() + 30000;
-            while (view.driver().run().tick() < 60 * 6 && System.currentTimeMillis() < give
+            while (view.driver().match().tick() < 6 * Match.TICK_HZ && System.currentTimeMillis() < give
                     && !driveFor(view, 200)) {
-                // keep running
+                // keep playing
             }
-            int tick = view.driver().run().tick();
-            assertTrue(tick >= 60 * 6 || view.driver().run().over(),
-                    "the race reached tick " + tick + " of " + 60 * 6 + " in 30 s");
-            guest.emote("wow");
-            guest.say("Catch me if you can!");
-            click("emote-wave");
-            driveToBusy(view, 5, 4000);
-            assertTrue(!view.driver().run().over(), "still racing for the shot");
-            shot("party-race", view);
+            int tick = view.driver().match().tick();
+            assertTrue(tick >= 6 * Match.TICK_HZ || view.driver().match().over(),
+                    "the match reached tick " + tick + " in 30 s");
+            guest.emote("bounce");
+            guest.say("That one bounced, I swear");
+            click("emote-ref");
+            driveFor(view, 1500);
+            shot("party-match", view);
             onEdt(() -> {
-                ((RaceDriver) view.driver()).leave();
+                ((OnlineDriver) view.driver()).leave();
                 view.stop();
                 view.driver().dispose();
                 Nav.home();

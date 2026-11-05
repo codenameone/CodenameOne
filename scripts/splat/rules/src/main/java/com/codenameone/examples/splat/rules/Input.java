@@ -31,6 +31,9 @@ public final class Input {
     public static final int THROW = 32;
     /// Wipe the paint off and pretend nothing happened. See [Match#WIPE_WINDOW].
     public static final int WIPE = 64;
+    /// Aim down the sights: a quarter of the spread, a little over half the speed,
+    /// and no sprinting.
+    public static final int AIM = 128;
 
     public static final Input IDLE = new Input(0, 0, 0, 0, 0, -1);
 

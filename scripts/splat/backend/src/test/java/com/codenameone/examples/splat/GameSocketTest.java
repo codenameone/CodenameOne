@@ -60,7 +60,7 @@ class GameSocketTest {
         try {
             assertEquals("ready", next(a).get("type"));
             assertEquals("ready", next(b).get("type"));
-            writeText(a, "{\"type\":\"host\",\"level\":\"weekend:TEAM_PAINT\"}");
+            writeText(a, "{\"type\":\"host\",\"level\":\"lot7:TEAM_PAINT\"}");
             String code = (String) until(a, "party").get("code");
             writeText(b, "{\"type\":\"join\",\"code\":\"" + code + "\"}");
             Map party = until(b, "party");

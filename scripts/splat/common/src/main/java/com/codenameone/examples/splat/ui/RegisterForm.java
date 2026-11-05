@@ -47,8 +47,7 @@ public final class RegisterForm {
         final TextField password = SignInForm.field("Password (8+ characters)", TextField.PASSWORD,
                 "password");
         Container col = Ui.column();
-        col.add(SignInForm.heroes());
-        col.add(Ui.label("Choose your runner name", "SectionTitle"));
+        col.add(Ui.label("CHOOSE YOUR CALLSIGN", "SectionTitle"));
         col.add(Ui.panel(name));
         col.add(Ui.panel(email, password, Ui.primary("Start running", "createButton", e -> {
             final String mail = email.getText().trim();

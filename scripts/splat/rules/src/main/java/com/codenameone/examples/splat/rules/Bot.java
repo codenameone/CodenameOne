@@ -88,6 +88,10 @@ public final class Bot {
             if (p.hasGrenade() && dist > 8 * Arena.UNIT && dist < 18 * Arena.UNIT && r.nextInt(3000) < skill) {
                 buttons |= Input.THROW;
             }
+            // Good bots aim down the sights at range; bad ones hip-fire everything.
+            if (dist > 12 * Arena.UNIT && skill > 40) {
+                buttons |= Input.AIM;
+            }
             if (p.marker.spread > 20 && dist > 10 * Arena.UNIT && m.mode() == Mode.TEAM_PAINT) {
                 buttons |= Input.CROUCH;
                 forward = 0;

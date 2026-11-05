@@ -376,8 +376,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
-        boolean game = template == Template.SKIRMISH || template == Template.DASH;
+        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT;
         boolean runner = template == Template.DASH;
+        boolean paintball = template == Template.SPLAT;
         boolean video = template == Template.REEL;
         boolean studio = template == Template.PULSE;
         String name = template.SOURCE_MAIN_CLASS;
@@ -394,7 +395,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
             assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",

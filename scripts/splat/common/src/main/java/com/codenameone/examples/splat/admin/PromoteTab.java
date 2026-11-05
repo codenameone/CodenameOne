@@ -29,7 +29,6 @@ import com.codenameone.examples.splat.api.InviterDto;
 import com.codenameone.examples.splat.api.PromoteDto;
 import com.codenameone.examples.splat.api.SpotlightDto;
 import com.codenameone.examples.splat.engage.Friends;
-import com.codenameone.examples.splat.forge.Fields;
 import com.codenameone.examples.splat.net.Api;
 import com.codenameone.examples.splat.net.Net;
 import com.codenameone.examples.splat.ui.Ui;
@@ -114,12 +113,12 @@ final class PromoteTab {
     private void broadcastComposer() {
         col.add(Desk.section("Broadcast a push"));
         Container form = Desk.panel();
-        form.add(Desk.field("To", Desk.choice("promoteSegment", SEGMENT_NAMES, Fields.indexOf(SEGMENTS, segment),
+        form.add(Desk.field("To", Desk.choice("promoteSegment", SEGMENT_NAMES, indexOf(SEGMENTS, segment),
                 i -> segment = SEGMENTS[i])));
         form.add(Desk.field("Days", Desk.number("promoteDays", days, v -> days = v)));
         form.add(Desk.field("Title", Desk.text("promoteTitle", title, "Season two is here", 60, v -> title = v)));
         form.add(Desk.field("Message", Desk.area("promoteBody", body, 200, v -> body = v)));
-        form.add(Desk.field("Opens", Desk.choice("promoteScreen", SCREEN_NAMES, Fields.indexOf(SCREENS, screen),
+        form.add(Desk.field("Opens", Desk.choice("promoteScreen", SCREEN_NAMES, indexOf(SCREENS, screen),
                 i -> screen = SCREENS[i])));
         form.add(Desk.field("Campaign", Desk.text("promoteCampaign", campaign, "season-two", 40,
                 v -> campaign = v)));
@@ -167,7 +166,7 @@ final class PromoteTab {
         Container form = Desk.panel();
         form.add(Desk.field("Banner", Desk.text("spotlightText", spotText, "", 140, v -> spotText = v)));
         form.add(Desk.field("Forge pack", Desk.text("spotlightPack", spotPack, "pack id", 40, v -> spotPack = v)));
-        form.add(Desk.field("Opens", Desk.choice("spotlightScreen", SCREEN_NAMES, Fields.indexOf(SCREENS, spotScreen),
+        form.add(Desk.field("Opens", Desk.choice("spotlightScreen", SCREEN_NAMES, indexOf(SCREENS, spotScreen),
                 i -> spotScreen = SCREENS[i])));
         form.add(Desk.help("Shown at the top of every player's home screen. A pack id wins over the "
                 + "screen. Save an empty banner to take it down."));
@@ -201,5 +200,13 @@ final class PromoteTab {
         })));
         col.add(form);
     }
+
+    private static int indexOf(String[] options, String value) {
+        for (int i = 0; i < options.length; i++) {
+            if (options[i].equals(value)) {
+                return i;
+            }
+        }
+        return 0;
+    }
 }
-// end::splat-promote-tab[]

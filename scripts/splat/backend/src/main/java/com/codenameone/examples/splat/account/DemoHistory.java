@@ -108,7 +108,7 @@ public class DemoHistory {
     }
 
     private static final String[] MATCHES = {
-        "weekend:TEAM_PAINT", "cul-de-sac:SNACK_BAR", "weekend:CAPTURE_THE_FLAG", "cul-de-sac:TEAM_PAINT",
+        "lot7:TEAM_PAINT", "cul-de-sac:SNACK_BAR", "lot7:CAPTURE_THE_FLAG", "cul-de-sac:TEAM_PAINT",
     };
 
     private void match(String[][] field, String ref, int[] who, long endedAt, long seed) throws IOException {

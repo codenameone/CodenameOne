@@ -116,8 +116,8 @@ class SocialTest {
 
         Map sent = Api.json(mvc, admin(Api.body(post("/api/admin/promote/broadcast"),
                 "{\"segment\":\"new\",\"days\":7,\"title\":\"Double coins\",\"body\":\"All weekend long\","
-                        + "\"screen\":\"shop\",\"campaign\":\"weekend\"}")));
-        assertEquals("weekend", sent.get("campaign"));
+                        + "\"screen\":\"shop\",\"campaign\":\"lot7\"}")));
+        assertEquals("lot7", sent.get("campaign"));
         Map promote = Api.json(mvc, admin(get("/api/admin/promote")));
         assertTrue(((List) promote.get("broadcasts")).size() >= 1);
 

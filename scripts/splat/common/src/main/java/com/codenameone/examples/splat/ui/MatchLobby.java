@@ -36,11 +36,10 @@ import com.codenameone.examples.splat.net.Api;
 import com.codenameone.examples.splat.net.GameLink;
 import com.codenameone.examples.splat.net.Net;
 import com.codenameone.examples.splat.net.Session;
-import com.codenameone.examples.splat.rules.Content;
 import com.codenameone.examples.splat.rules.Json;
-import com.codenameone.examples.splat.run.Levels;
-import com.codenameone.examples.splat.run.RaceDriver;
-import com.codenameone.examples.splat.run.Voice;
+import com.codenameone.examples.splat.play.OnlineDriver;
+import com.codenameone.examples.splat.play.Arenas;
+import com.codenameone.examples.splat.play.Voice;
 import java.util.Map;
 
 /// Getting into a live race.
@@ -54,11 +53,11 @@ import java.util.Map;
 /// Every runner in a race runs the same level on the same seed: the track is
 /// identical on every screen, and the race is decided by who runs it best.
 // tag::splat-lobby[]
-public final class RaceLobby implements GameLink.Listener, Voice.Listener {
+public final class MatchLobby implements GameLink.Listener, Voice.Listener {
     private final String hello;
     private final boolean spectator;
     private GameLink link;
-    private RaceDriver driver;
+    private OnlineDriver driver;
     private boolean cancelled;
     private Form form;
     private ShareButton share;
@@ -68,13 +67,13 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
     private final Label code = new Label("", "ChallengeCode");
     private final Label url = new Label("", "ChallengeUrl");
     private boolean host;
-    private String level = Content.CAUSEWAY;
+    private String level = Arenas.DEFAULT;
     private String[] names = new String[0];
     private String[] players = new String[0];
     private String[] talking = new String[0];
     private final java.util.Set<String> mutedPeers = new java.util.HashSet<String>();
 
-    private RaceLobby(String hello, boolean spectator) {
+    private MatchLobby(String hello, boolean spectator) {
         this.hello = hello;
         this.spectator = spectator;
     }
@@ -82,8 +81,8 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
     /// A quick race on `level` (an official id or `pack/level`), or on the
     /// game's featured race level when null.
     public static void quick(String level) {
-        String l = level == null ? Content.CAUSEWAY : level;
-        RaceLobby r = new RaceLobby("{\"type\":\"" + GameProtocol.QUICK + "\",\"level\":" + Json.write(l) + "}",
+        String l = level == null ? Arenas.DEFAULT : level;
+        MatchLobby r = new MatchLobby("{\"type\":\"" + GameProtocol.QUICK + "\",\"level\":" + Json.write(l) + "}",
                 false);
         r.level = l;
         r.waiting("Finding runners");
@@ -96,23 +95,23 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
 
     /// A party for a crew: the server pushes the invite to the other members.
     public static void host(String level, String crew) {
-        String l = level == null ? Content.CAUSEWAY : level;
-        RaceLobby r = new RaceLobby("{\"type\":\"" + GameProtocol.HOST + "\",\"level\":" + Json.write(l)
+        String l = level == null ? Arenas.DEFAULT : level;
+        MatchLobby r = new MatchLobby("{\"type\":\"" + GameProtocol.HOST + "\",\"level\":" + Json.write(l)
                 + (crew == null ? "" : ",\"crew\":" + Json.write(crew)) + "}", false);
         r.level = l;
         r.host = true;
-        r.party("Your party");
+        r.party("PRIVATE LOBBY");
     }
 
     /// Someone else's party, from its link or code.
     public static void join(String code) {
-        new RaceLobby("{\"type\":\"" + GameProtocol.JOIN + "\",\"code\":" + Json.write(code) + "}", false)
+        new MatchLobby("{\"type\":\"" + GameProtocol.JOIN + "\",\"code\":" + Json.write(code) + "}", false)
                 .party("Joining the party");
     }
 
     /// The admin console's spectator view of a live race.
     public static void spectate(String raceId) {
-        new RaceLobby("{\"type\":\"" + GameProtocol.SPECTATE + "\",\"race\":" + Json.write(raceId) + "}", true)
+        new MatchLobby("{\"type\":\"" + GameProtocol.SPECTATE + "\",\"race\":" + Json.write(raceId) + "}", true)
                 .waiting("Connecting");
     }
 
@@ -135,8 +134,13 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         form = Ui.form(title, "lobby");
         Ui.back(form, this::cancel);
         form.setLayout(BoxLayout.yCenter());
+        form.setUIID("OpsForm");
+        form.add(Ui.centered(new Label("SEARCHING FOR MATCH", "OpsTitle")));
+        form.add(Ui.centered(new Label(level == null ? "PLAYLIST: ANY YARD, ANY MODE" : "PLAYLIST: "
+                + Ui.caps(com.codenameone.examples.splat.play.Arenas.arenaName(level)), "OpsCaption")));
         form.add(Ui.centered(new InfiniteProgress()));
-        form.add(Ui.secondary("Cancel", "cancel", e -> cancel()));
+        form.add(Ui.centered(new Label("BOTS FILL EMPTY SLOTS AFTER 10 SECONDS", "MenuItemSub")));
+        form.add(Ui.secondary("CANCEL", "cancel", e -> cancel()));
         form.show();
         link = GameLink.open(this);
     }
@@ -146,19 +150,19 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         form.setLayout(new BorderLayout());
         Ui.back(form, this::cancel);
         Container top = Ui.column();
-        top.add(Ui.label("Party code", "SectionTitle"));
+        top.add(Ui.label("PRIVATE LOBBY  //  CODE", "SectionTitle"));
         code.setName("partyCode");
         top.add(Ui.centered(code));
         top.add(url);
         share = new ShareButton();
-        share.setText("Invite friends");
+        share.setText("INVITE SQUAD");
         share.setUIID("PrimaryButton");
         share.setName("shareParty");
         share.addActionListener(e -> Telemetry.challengeShared());
         // A material icon takes the button's own colour; the stock share
         // image is a picture and sits on a light square on a dark button.
         share.setMaterialIcon(FontImage.MATERIAL_SHARE);
-        Button copy = Ui.secondary("Copy the link", "copyParty", e -> {
+        Button copy = Ui.secondary("COPY LINK", "copyParty", e -> {
             Display.getInstance().copyToClipboard(url.getText());
             Ui.toast("Copied");
         });
@@ -168,7 +172,7 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         // under them, so the conversation is never squeezed into what the
         // code card leaves and scrolling to a new line never hides the code.
         Container below = Ui.column();
-        below.add(Ui.label("Runners", "SectionTitle"));
+        
         members.setName("members");
         below.add(members);
         chat.setName("chat");
@@ -178,7 +182,7 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         form.add(BorderLayout.NORTH, Ui.centeredColumn(top));
         form.add(BorderLayout.CENTER, page);
 
-        final TextField say = new TextField("", "Say something", 40, TextField.ANY);
+        final TextField say = new TextField("", "Comms", 40, TextField.ANY);
         say.setName("chatField");
         say.setDoneListener(e -> {
             String t = say.getText().trim();
@@ -203,11 +207,11 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         sayRow.setUIID("LobbySay");
         sayRow.add(BorderLayout.CENTER, say);
         sayRow.add(BorderLayout.EAST, mic);
-        Button leave = Ui.secondary("Leave", "cancel", e -> cancel());
+        Button leave = Ui.secondary("LEAVE", "cancel", e -> cancel());
         // Both buttons in one row from the start: a grid built for one
         // child grows a second row for the next, not a second column.
         Container actions = host
-                ? Ui.row(leave, Ui.primary("Start", "goButton", e -> link.send("{\"type\":\""
+                ? Ui.row(leave, Ui.primary("DEPLOY", "goButton", e -> link.send("{\"type\":\""
                         + GameProtocol.GO + "\",\"level\":" + Json.write(level) + "}")))
                 : Ui.row(leave);
         Container bottom = Ui.centeredColumn(Ui.column(sayRow, actions));
@@ -278,7 +282,7 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         url.setText(GameLink.text(m, "url"));
         level = GameLink.text(m, "level");
         if (share != null) {
-            share.setTextToShare("Race me in Splat: " + url.getText());
+            share.setTextToShare("Come get PAINTED in Splat: " + url.getText());
         }
         names = toStrings(m.get("names"));
         players = toStrings(m.get("players"));
@@ -291,57 +295,50 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         drawMembers();
     }
 
+    /// The pre-game lobby: your squad in blue down the left, the other side
+    /// in red down the right. A party is one team; matchmaking or bots fill
+    /// the other, so its slots read as open until the match starts.
     private void drawMembers() {
         members.removeAll();
-        for (int i = 0; i < names.length; i++) {
+        Container friends = new Container(BoxLayout.y());
+        friends.add(new Label("YOUR SQUAD  " + names.length + "/4", "RosterHeadFriendly"));
+        for (int i = 0; i < 4; i++) {
+            if (i >= names.length) {
+                friends.add(slot("OPEN SLOT", "RosterOpen", null));
+                continue;
+            }
             String u = i < players.length ? players[i] : "";
             boolean me = Session.user() != null && Session.user().username().equals(u);
-            String state = me ? "" : contains(talking, u) ? (mutedPeers.contains(u) ? "  (muted)" : "  (voice)") : "";
-            Label l = new Label(names[i] + state, "LobbyMemberName");
-            l.setMaterialIcon(FontImage.MATERIAL_DIRECTIONS_RUN);
-            Container row = BorderLayout.center(l);
-            row.setUIID("LobbyMember");
-            if (i == 0) {
-                row.add(BorderLayout.EAST, new Label("HOST", "LobbyHostTag"));
-            }
-            members.add(row);
+            String state = me ? "" : contains(talking, u) ? (mutedPeers.contains(u) ? "  MUTED" : "  VOICE") : "";
+            friends.add(slot(Ui.caps(names[i]) + state, "RosterFriendly", i == 0 ? "HOST" : null));
         }
+        Container hostiles = new Container(BoxLayout.y());
+        hostiles.add(new Label("OPPOSITION  0/4", "RosterHeadHostile"));
+        for (int i = 0; i < 4; i++) {
+            hostiles.add(slot("SEARCHING...", "RosterHostile", null));
+        }
+        members.add(com.codename1.ui.layouts.GridLayout.encloseIn(2, friends, hostiles));
         form.revalidateLater();
     }
 
-    /// The race is on: its level must be on this device first, so a
-    /// community level's pack is fetched before the run begins.
-    private void start(final Map<String, Object> m) {
-        final String ref = GameLink.text(m, "level");
-        Levels.Playable p = Levels.resolve(ref);
-        if (p != null) {
-            begin(p, m);
-            return;
+    private static Container slot(String text, String uiid, String tag) {
+        Label l = new Label(text, "LobbyMemberName");
+        Container row = BorderLayout.center(l);
+        row.setUIID(uiid);
+        if (tag != null) {
+            row.add(BorderLayout.EAST, new Label(tag, "LobbyHostTag"));
         }
-        String pack = Levels.packOf(ref);
-        if (pack == null) {
-            Ui.toast("This race's level is not in this version of the game.");
-            cancel();
-            return;
-        }
-        Api.forge().pack(pack, Net.to(dto -> Ui.later(() -> {
-            Levels.remember(dto.content());
-            Levels.Playable found = Levels.resolve(ref);
-            if (found == null) {
-                Ui.toast("The race's level changed while it started.");
-                cancel();
-            } else {
-                begin(found, m);
-            }
-        }), (s, msg) -> Ui.later(this::cancel)));
+        return row;
     }
 
-    private void begin(Levels.Playable p, Map<String, Object> m) {
-        driver = new RaceDriver(link, p, m, spectator);
+    /// The match is on: the field and the mode ship with the app, so it starts
+    /// at once.
+    private void start(final Map<String, Object> m) {
+        driver = new OnlineDriver(link, m, spectator);
         if (Voice.current() != null) {
             Voice.current().members(toStrings(m.get("players")));
         }
-        RunForm.race(driver, toStrings(m.get("runners")), () -> {
+        MatchForm.online(driver, () -> {
             Voice.stop();
             Nav.home();
         });

@@ -37,23 +37,18 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.splat.api.AdminActionDto;
-import com.codenameone.examples.splat.api.AssetDto;
 import com.codenameone.examples.splat.api.ConditionDto;
 import com.codenameone.examples.splat.api.AuditDto;
 import com.codenameone.examples.splat.api.FlagDto;
-import com.codenameone.examples.splat.api.ForgeActionDto;
 import com.codenameone.examples.splat.api.LiveRaceDto;
 import com.codenameone.examples.splat.api.RaceSummaryDto;
-import com.codenameone.examples.splat.api.PackSummaryDto;
 import com.codenameone.examples.splat.api.PlayerDetailDto;
 import com.codenameone.examples.splat.api.PlayerDto;
 import com.codenameone.examples.splat.engage.Telemetry;
-import com.codenameone.examples.splat.forge.PackScreen;
 import com.codenameone.examples.splat.net.Api;
 import com.codenameone.examples.splat.net.Net;
-import com.codenameone.examples.splat.rules.forge.AssetRef;
 import com.codenameone.examples.splat.ui.HistoryForm;
-import com.codenameone.examples.splat.ui.RaceLobby;
+import com.codenameone.examples.splat.ui.MatchLobby;
 import com.codenameone.examples.splat.ui.Nav;
 import com.codenameone.examples.splat.ui.ReplayForm;
 import com.codenameone.examples.splat.ui.Ui;
@@ -85,13 +80,13 @@ public final class AdminConsole {
     private static final int POLL_MILLIS = 15000;
     private static int knownFlags = -1;
 
-    private static final String[] TABS = {"Overview", "Flags", "Players", "Live", "Audit", "Forge", "Query",
+    private static final String[] TABS = {"Overview", "Flags", "Players", "Live", "Audit", "Query",
         "Pipelines", "Promote"};
     // Not MATERIAL_DASHBOARD: the Initializr renames every "Splat" in this
     // template to the new app's name, and the constant would be renamed too.
     private static final char[] ICONS = {FontImage.MATERIAL_ANALYTICS, FontImage.MATERIAL_FLAG,
         FontImage.MATERIAL_PEOPLE, FontImage.MATERIAL_SPORTS_ESPORTS, FontImage.MATERIAL_HISTORY,
-        FontImage.MATERIAL_BUILD, FontImage.MATERIAL_SEARCH, FontImage.MATERIAL_ALT_ROUTE,
+        FontImage.MATERIAL_SEARCH, FontImage.MATERIAL_ALT_ROUTE,
         FontImage.MATERIAL_CAMPAIGN};
 
     private final Form form = new Form("Splat console", new BorderLayout());
@@ -100,7 +95,6 @@ public final class AdminConsole {
     private final Container players = Desk.page();
     private final Container live = Desk.page();
     private final Container audit = Desk.page();
-    private final Container forge = Desk.page();
     private final QueryTab query = new QueryTab(this);
     private final PipelinesTab pipelines = new PipelinesTab();
     private final PromoteTab promote = new PromoteTab();
@@ -129,7 +123,7 @@ public final class AdminConsole {
         tabs.setTabUIID("DeskTab");
         tabs.getTabsContainer().setUIID("DeskSide");
         tabs.setName("adminTabs");
-        Component[] pages = {overview.page(), flags, playersTab(), live, audit, forge, query.page(),
+        Component[] pages = {overview.page(), flags, playersTab(), live, audit, query.page(),
             pipelines.page(), promote.column()};
         for (int i = 0; i < TABS.length; i++) {
             tabs.addTab(TABS[i], FontImage.createMaterial(ICONS[i], "DeskTab", 3.2f), pages[i]);
@@ -175,11 +169,8 @@ public final class AdminConsole {
         } else if (tab == 4) {
             Api.admin().audit(Net.to(list -> Ui.later(() -> showAudit(list)), Ui::failed));
         } else if (tab == 5) {
-            Api.admin().forgeQueue(Net.to(packs -> Api.admin().forgeAssets(Net.to(
-                    files -> Ui.later(() -> showForge(packs, files)), Ui::failed)), Ui::failed));
-        } else if (tab == 6) {
             query.refresh();
-        } else if (tab == 7) {
+        } else if (tab == 6) {
             pipelines.refresh();
         } else {
             promote.refresh();
@@ -199,86 +190,6 @@ public final class AdminConsole {
     void openPlayer(String username) {
         player(username, null);
     }
-
-    /// Player content waiting for a moderator: packs players reported or a
-    /// moderator hid, and uploaded models and images nobody has seen yet. A
-    /// file stays usable by its owner and anyone they share it with, and is
-    /// public once approved; promoting a pack to official is how the game's
-    /// own designers ship a campaign made with the same editor.
-    private void showForge(List<PackSummaryDto> packs, List<AssetDto> files) {
-        forge.removeAll();
-        forge.add(Desk.section("Packs (" + packs.size() + ")"));
-        if (packs.isEmpty()) {
-            forge.add(Desk.empty("No packs waiting."));
-        }
-        for (final PackSummaryDto p : packs) {
-            Container row = Desk.panel();
-            row.add(new Label(p.name() + " by " + p.author(), "DeskPanelTitle"));
-            row.add(new Label(p.status() + (p.official() ? ", official" : "") + ", " + p.plays() + " plays",
-                    "DeskHelp"));
-            row.add(Desk.actions(
-                    Desk.button("Open", "forge-open-" + p.id(), e -> PackScreen.show(p.id())),
-                    Desk.button("hidden".equals(p.status()) ? "Restore" : "Hide", "forge-hide-" + p.id(),
-                            e -> packAction(p, "hidden".equals(p.status()) ? "restore" : "hide")),
-                    Desk.button(p.official() ? "Unofficial" : "Official", "forge-official-" + p.id(),
-                            e -> packAction(p, p.official() ? "unofficial" : "official"))));
-            forge.add(row);
-        }
-        forge.add(Desk.section("Uploaded files (" + files.size() + ")"));
-        if (files.isEmpty()) {
-            forge.add(Desk.empty("No files waiting."));
-        }
-        for (final AssetDto a : files) {
-            Container row = Desk.panel();
-            row.add(new Label(a.name() + " (" + a.kind() + ", " + a.bytes() / 1024 + " KB)", "DeskPanelTitle"));
-            if (a.animations() != null && !a.animations().isEmpty()) {
-                StringBuilder names = new StringBuilder("Animations:");
-                for (String n : a.animations()) {
-                    names.append(' ').append(n);
-                }
-                row.add(new Label(names.toString(), "DeskHelp"));
-            }
-            row.add(Desk.actions(
-                    Desk.button("Look", "asset-look-" + a.sha256(), e -> look(a)),
-                    Desk.danger("Reject", "asset-reject-" + a.sha256(), e -> assetAction(a, "reject")),
-                    Desk.primary("Approve", "asset-approve-" + a.sha256(), e -> assetAction(a, "approve"))));
-            forge.add(row);
-        }
-        forge.revalidate();
-    }
-
-    private void packAction(PackSummaryDto p, String action) {
-        Api.admin().forgePackAction(new ForgeActionDto(p.id(), action, ""),
-                Net.to(x -> Ui.later(() -> refresh(5)), Ui::failed));
-    }
-
-    private void assetAction(AssetDto a, String action) {
-        Api.admin().forgeAssetAction(new ForgeActionDto(a.sha256(), action, ""),
-                Net.to(x -> Ui.later(() -> refresh(5)), Ui::failed));
-    }
-
-    /// An image as it is, or what a model holds, before deciding. The file
-    /// comes from the server as base64, the way an editor uploaded it.
-    private void look(final AssetDto a) {
-        Api.forge().asset(a.sha256(), Net.to(full -> Ui.later(() -> {
-            Form f = Ui.form(a.name(), "assetLook");
-            f.setLayout(new BorderLayout());
-            Ui.back(f, () -> form.showBack());
-            if (AssetRef.MODEL.equals(a.kind())) {
-                f.add(BorderLayout.CENTER, Ui.text("A model of " + a.bytes() / 1024 + " KB with "
-                        + a.animations().size() + " animations: " + a.animations(), "DeskValue"));
-            } else {
-                try {
-                    f.add(BorderLayout.CENTER, new Label(com.codename1.ui.EncodedImage.create(
-                            com.codename1.util.Base64.decode(full.data().getBytes("UTF-8"))), "Container"));
-                } catch (java.io.UnsupportedEncodingException | RuntimeException err) {
-                    f.add(BorderLayout.CENTER, Ui.label("This file is not an image", "ForgeProblem"));
-                }
-            }
-            f.show();
-        }), Ui::failed));
-    }
-
     private void pollFlags() {
         Api.admin().stats(Net.to(s -> Ui.later(() -> {
             if (knownFlags >= 0 && s.openFlags() > knownFlags) {
@@ -350,7 +261,7 @@ public final class AdminConsole {
             MultiButton b = Desk.row(m.level() + ": " + joined(m.names()), "leading: " + m.leader()
                     + "   " + (m.tick() / 60) + "s" + (m.bots() > 0 ? "   (" + m.bots() + " bots)" : ""), null);
             b.setName("live-" + m.id());
-            b.addActionListener(e -> RaceLobby.spectate(m.id()));
+            b.addActionListener(e -> MatchLobby.spectate(m.id()));
             live.add(b);
         }
         form.revalidate();

@@ -45,6 +45,8 @@ public final class Match {
     public static final int WALK = 150;
     public static final int SPRINT = 215;
     public static final int CROUCH_WALK = 70;
+    /// Speed while aiming down the sights, in percent.
+    public static final int ADS_SPEED = 55;
     public static final int PITCH_LIMIT = 900;
     public static final int BALL_GRAVITY = 6;
     public static final int BALL_LIFE = 90;
@@ -231,8 +233,14 @@ public final class Match {
         p.yaw = in.yaw;
         p.pitch = in.pitch;
         p.crouched = in.has(Input.CROUCH);
-        int speed = p.crouched ? CROUCH_WALK : (in.has(Input.SPRINT) && in.forward > 0 ? SPRINT : WALK);
+        boolean aiming = in.has(Input.AIM);
+        // A sprint ends the moment you aim or pull the trigger.
+        boolean sprint = in.has(Input.SPRINT) && in.forward > 0 && !aiming && !in.has(Input.FIRE);
+        int speed = p.crouched ? CROUCH_WALK : (sprint ? SPRINT : WALK);
         speed = speed * p.marker.mobility / 100;
+        if (aiming) {
+            speed = speed * ADS_SPEED / 100;
+        }
         if (p.carrying >= 0) {
             speed = speed * FLAG_CARRY_SPEED / 100;
         }
@@ -291,7 +299,7 @@ public final class Match {
 
     private void fire(Player p, Input in, int t) {
         MarkerDef m = p.marker;
-        int s = m.spread;
+        int s = in.has(Input.AIM) ? m.spread / 4 : m.spread;
         int yaw = p.yaw;
         int pitch = p.pitch;
         if (s > 0) {
@@ -302,6 +310,10 @@ public final class Match {
         p.ammo--;
         p.cooldownUntil = t + m.cooldown;
         events.add(new Event(Event.SHOT, t, p.index, 0, b.x, b.y, b.z));
+        // tag::splat-lag-comp[]
+        // The shooter aimed at the world as it was `viewTick`; the ball is flown
+        // forward the ticks it lost on the way here, at most MAX_LAG_TICKS, so a
+        // shot on a phone with a slow connection still lands where it was aimed.
         int lag = in.viewTick < 0 ? 0 : FixedMath.clamp(t - in.viewTick, 0, MAX_LAG_TICKS);
         boolean alive = true;
         for (int i = 0; i < lag && alive; i++) {
@@ -310,6 +322,7 @@ public final class Match {
         if (alive) {
             balls.add(b);
         }
+        // end::splat-lag-comp[]
         if (p.ammo == 0) {
             startReload(p, t);
         }

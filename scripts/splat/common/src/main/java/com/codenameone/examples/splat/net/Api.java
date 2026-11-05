@@ -21,7 +21,6 @@ package com.codenameone.examples.splat.net;
 import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.splat.api.AccountApi;
 import com.codenameone.examples.splat.api.AdminApi;
-import com.codenameone.examples.splat.api.ForgeApi;
 import com.codenameone.examples.splat.api.GameApi;
 import com.codenameone.examples.splat.api.ProgressApi;
 import com.codenameone.examples.splat.api.ShopApi;
@@ -35,7 +34,6 @@ public final class Api {
     private static ShopApi shop;
     private static AdminApi admin;
     private static ProgressApi progress;
-    private static ForgeApi forge;
     private static SocialApi social;
 
     private Api() {
@@ -47,7 +45,6 @@ public final class Api {
         shop = RestClients.create(ShopApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
         progress = RestClients.create(ProgressApi.class, baseUrl);
-        forge = RestClients.create(ForgeApi.class, baseUrl);
         social = RestClients.create(SocialApi.class, baseUrl);
     }
 
@@ -71,9 +68,6 @@ public final class Api {
         return progress;
     }
 
-    public static ForgeApi forge() {
-        return forge;
-    }
 
     public static SocialApi social() {
         return social;

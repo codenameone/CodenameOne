@@ -98,11 +98,11 @@ class MatchTest {
 
     @Test
     void sameSeedSameMatch() {
-        Match a = run(7, "weekend", Mode.TEAM_PAINT, 4, 60);
-        Match b = run(7, "weekend", Mode.TEAM_PAINT, 4, 60);
+        Match a = run(7, "lot7", Mode.TEAM_PAINT, 4, 60);
+        Match b = run(7, "lot7", Mode.TEAM_PAINT, 4, 60);
         assertEquals(a.stateHash(), b.stateHash());
         assertEquals(a.tick(), b.tick());
-        Match c = run(8, "weekend", Mode.TEAM_PAINT, 4, 60);
+        Match c = run(8, "lot7", Mode.TEAM_PAINT, 4, 60);
         assertNotEquals(a.stateHash(), c.stateHash());
     }
 
@@ -131,7 +131,7 @@ class MatchTest {
             for (int i = 0; i < 8; i++) {
                 s.add(new Slot("B" + i, i % 2, "semi", i % 2 == 0 ? 95 : 15));
             }
-            Match m = new Match(seed, Catalog.arena("weekend"), Mode.TEAM_PAINT, s);
+            Match m = new Match(seed, Catalog.arena("lot7"), Mode.TEAM_PAINT, s);
             while (!m.over()) {
                 m.step(null);
             }
@@ -147,7 +147,7 @@ class MatchTest {
         List<Slot> s = new ArrayList<Slot>();
         s.add(new Slot("Gary", 0, "pump", 0));
         s.add(new Slot("Kevin", 1, "pump", 0));
-        Match m = new Match(3, Catalog.arena("weekend"), Mode.TEAM_PAINT, s);
+        Match m = new Match(3, Catalog.arena("lot7"), Mode.TEAM_PAINT, s);
         // let the respawn shield run out, then put them face to face on open ground
         Input[] idle = new Input[2];
         for (int i = 0; i <= Match.SHIELD; i++) {
@@ -204,8 +204,8 @@ class MatchTest {
         List<Slot> s = new ArrayList<Slot>();
         s.add(new Slot("Gary", 0, "pump", 0));
         s.add(new Slot("Kevin", 1, "pump", 0));
-        Match now = new Match(5, Catalog.arena("weekend"), Mode.TEAM_PAINT, s);
-        Match lagged = new Match(5, Catalog.arena("weekend"), Mode.TEAM_PAINT, s);
+        Match now = new Match(5, Catalog.arena("lot7"), Mode.TEAM_PAINT, s);
+        Match lagged = new Match(5, Catalog.arena("lot7"), Mode.TEAM_PAINT, s);
         for (int i = 0; i < 10; i++) {
             now.step(null);
             lagged.step(null);

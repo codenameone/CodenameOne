@@ -60,9 +60,8 @@ public final class FriendsForm {
     }
 
     private static void fillInvite(Container col, final InviteDto mine) {
-        // The crew they could race, in front: who an invite brings in.
-        col.add(SignInForm.heroes());
-        col.add(Ui.label("Invite a friend", "SectionTitle"));
+
+        col.add(Ui.label("RECRUIT A FRIEND", "SectionTitle"));
         col.add(Ui.text("Your friend starts with " + mine.friendCoins() + " coins. When they have played "
                 + "their first race, you get " + mine.inviterCoins() + " coins, for up to "
                 + mine.maxRewarded() + " friends.", "ForgeHelpText"));

@@ -37,14 +37,14 @@ import com.codenameone.examples.splat.net.Session;
 import java.util.List;
 
 /// The shop. Gems and the Royal Pass are real-money purchases through the
-/// platform store ([Store]); runners, trails and emotes cost coins or gems and are
+/// platform store ([Store]); markers, paint and comms packs cost coins or gems and are
 /// bought from the game's own server. Either way the server holds the wallet.
 public final class ShopForm {
     private ShopForm() {
     }
 
     public static void show() {
-        final Form f = Ui.form("Shop", "shop");
+        final Form f = Ui.form("ARMORY", "shop");
         Ui.back(f, Nav::home);
         Store.listen(wallet -> {
             Ui.toast("Purchase complete");
@@ -69,27 +69,26 @@ public final class ShopForm {
             boolean owned = wallet.owned() != null && wallet.owned().contains(item.id());
             Container row = new Container(new BorderLayout());
             row.setUIID("ShopItem");
-            row.add(BorderLayout.WEST, new Label(Kit.shopArt(item.id(), CN.convertToPixels(13)), "ShopArt"));
             Container text = new Container(BoxLayout.y());
             text.add(Ui.text(item.name(), "ShopItemName"));
             text.add(new Label(kindOf(item), "ShopItemKind"));
             row.add(BorderLayout.CENTER, text);
             if (item.sku() != null && item.sku().length() > 0) {
                 if (owned) {
-                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(new Label("Owned", "Owned")));
+                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(new Label("OWNED", "Owned")));
                 } else {
                     String price = Store.price(item.sku());
-                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button(price == null ? "Buy" : price,
+                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button(price == null ? "BUY" : price,
                             "GemButton", "buy-" + item.id(),
                             e -> Store.buy(item.sku()))));
                 }
             } else if (owned) {
                 boolean on = item.id().equals(wallet.outfit());
-                row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(item.id().startsWith("trail-") && !on
-                        ? Ui.button("Use", "GhostButton", "equip-" + item.id(), e -> equip(item.id()))
-                        : new Label(on ? "In use" : "Owned", "Owned")));
+                row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(item.id().startsWith("paint-") && !on
+                        ? Ui.button("EQUIP", "GhostButton", "equip-" + item.id(), e -> equip(item.id()))
+                        : new Label(on ? "EQUIPPED" : "OWNED", "Owned")));
             } else {
-                String price = item.priceGems() > 0 ? item.priceGems() + " gems" : item.priceCoins() + " coins";
+                String price = item.priceGems() > 0 ? item.priceGems() + " GEMS" : item.priceCoins() + " COINS";
                 row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button(price, "PriceButton", "buy-" + item.id(),
                         e -> buy(item))));
             }
@@ -98,20 +97,24 @@ public final class ShopForm {
     }
 
     private static String kindOf(ShopItemDto item) {
-        if (item.id().startsWith("runner-")) {
-            return "RUNNER";
-        }
-        if (item.id().startsWith("trail-")) {
-            return "TRAIL";
-        }
         if ("gems-500".equals(item.id())) {
             // The biggest pack is the one that is cheapest per gem.
             return "BEST VALUE";
         }
-        if (item.id().startsWith("gems-")) {
+        String kind = item.kind() == null ? "" : item.kind();
+        if ("runner".equals(kind)) {
+            return "MARKER";
+        }
+        if ("outfit".equals(kind)) {
+            return "PAINT";
+        }
+        if ("emotes".equals(kind)) {
+            return "COMMS PACK";
+        }
+        if ("gems".equals(kind)) {
             return "GEM PACK";
         }
-        return item.sku() != null && item.sku().length() > 0 ? "SEASON PASS" : "ITEM";
+        return "pass".equals(kind) ? "SEASON PASS" : "ITEM";
     }
 
     private static void buy(ShopItemDto item) {

@@ -22,6 +22,7 @@ package com.codenameone.examples.splat.rules;
 /// game on the phone, the server and the replay viewer at once; bump
 /// [RulesVersion#ID] when you do, because old replays will no longer agree.
 public final class Catalog {
+    // tag::splat-markers[]
     public static final MarkerDef[] MARKERS = {
         new MarkerDef("pump", "The Purist",
                 "One shot, one paint. Owned exclusively by men who say 'back in my day'.",
@@ -33,37 +34,46 @@ public final class Catalog {
                 "Fully automatic, fully unnecessary. Banned at three fields and one barbecue.",
                 3, 1500, 44, 90, 105, 90),
     };
+    // end::splat-markers[]
 
     public static final Arena[] ARENAS = {
-        new Arena.Builder("weekend", "Weekend Warrior Paintball Park", 40, 60)
+        // tag::splat-arena[]
+        // Every box is the footprint of the prop the app draws there (see
+        // tools/pack-art.py): centre and size in decimetres, height last.
+        new Arena.Builder("lot7", "Lot 7 Self Storage", 40, 60)
                 .base(200, 110).hill(45)
                 .spawn(140, 25).spawn(200, 20).spawn(260, 25).spawn(170, 45).spawn(230, 45)
                 .spawn(200, 55)
-                .mirror("bunker", 120, 120, 30, 12, 13)
-                .mirror("bunker", 280, 120, 30, 12, 13)
-                .mirror("haybale", 200, 140, 24, 10, 8)
-                .mirror("dorito", 80, 200, 14, 14, 15)
-                .mirror("dorito", 320, 200, 14, 14, 15)
-                .mirror("minivan", 200, 230, 45, 20, 17)
-                .mirror("crate", 60, 260, 10, 10, 5)
-                .mirror("crate", 340, 265, 10, 10, 5)
-                .mirror("haybale", 140, 280, 20, 9, 8)
-                .mirror("haybale", 260, 280, 20, 9, 8)
-                .mirror("snackbar", 200, 300, 30, 12, 24)
+                .mirror("sandbags", 130, 150, 34, 9, 13)
+                .mirror("sandbags", 270, 150, 34, 9, 13)
+                .mirror("sandbags-small", 95, 120, 25, 9, 10)
+                .mirror("sandbags-small", 305, 120, 25, 9, 10)
+                .mirror("container", 90, 175, 44, 21, 21)
+                .mirror("container", 310, 195, 44, 21, 21)
+                .mirror("barrier", 145, 235, 38, 7, 32)
+                .mirror("car", 260, 245, 26, 55, 18)
+                .mirror("tank", 335, 280, 24, 25, 21)
+                .mirror("boxes", 55, 260, 13, 12, 22)
+                .mirror("tires", 120, 295, 18, 11, 11)
+                .mirror("barrier-single", 250, 175, 19, 7, 6)
+                .mirror("snackbar", 200, 300, 22, 21, 21)
                 .build(),
+        // end::splat-arena[]
         new Arena.Builder("cul-de-sac", "Cul-de-Sac Siege (HOA Approved)", 36, 52)
                 .base(180, 95).hill(40)
                 .spawn(120, 20).spawn(180, 18).spawn(240, 20).spawn(150, 40).spawn(210, 40)
                 .spawn(180, 50)
-                .mirror("hedge", 90, 110, 60, 8, 12)
-                .mirror("hedge", 270, 110, 60, 8, 12)
-                .mirror("bbq", 180, 120, 12, 8, 11)
-                .mirror("trampoline", 70, 190, 30, 30, 6)
-                .mirror("shed", 300, 190, 30, 26, 25)
-                .mirror("recycling", 170, 200, 8, 8, 11)
-                .mirror("minivan", 120, 240, 20, 45, 17)
-                .mirror("mailbox", 260, 240, 4, 4, 13)
-                .mirror("fountain", 180, 260, 26, 26, 9)
+                .mirror("sofa", 180, 140, 34, 15, 13)
+                .mirror("car", 85, 195, 26, 55, 18)
+                .mirror("car", 285, 170, 55, 26, 18)
+                .mirror("dumpster", 150, 230, 24, 13, 20)
+                .mirror("tires", 250, 225, 18, 11, 11)
+                .mirror("barrel", 235, 130, 8, 8, 10)
+                .mirror("tree", 55, 250, 6, 6, 50)
+                .mirror("watertower", 320, 255, 16, 24, 35)
+                .mirror("crate", 120, 165, 8, 8, 8)
+                .mirror("boxes", 245, 290, 13, 12, 22)
+                .mirror("snackbar", 180, 260, 22, 21, 21)
                 .build(),
     };
 

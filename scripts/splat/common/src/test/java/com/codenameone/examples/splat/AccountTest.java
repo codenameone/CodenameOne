@@ -19,10 +19,10 @@
 package com.codenameone.examples.splat;
 
 import com.codenameone.examples.splat.net.Session;
-import com.codenameone.examples.splat.run.RunView;
+import com.codenameone.examples.splat.play.ArenaView;
 import com.codenameone.examples.splat.ui.Nav;
 
-/// Registering with a runner name, the first level, choosing a runner, the
+/// Registering with a call sign, the first practice match, choosing a marker, the
 /// settings and signing out.
 public class AccountTest extends E2e {
     @Override
@@ -38,8 +38,8 @@ public class AccountTest extends E2e {
         click("createButton");
         waitForForm("home");
         // A new player is taken straight into the first level.
-        waitForForm("run");
-        final RunView view = track();
+        waitForForm("match");
+        final ArenaView view = arena();
         shot("tutorial-first-visit");
         onEdt(() -> {
             view.stop();
@@ -48,16 +48,17 @@ public class AccountTest extends E2e {
         });
         waitForForm("home");
         assertEqual("Ironclad", Session.user().displayName());
-        assertEqual("runner-splat", Session.user().runner() == null ? "runner-splat" : Session.user().runner(), "a new player runs as Splat");
+        assertEqual("semi", Session.user().runner() == null ? "semi" : Session.user().runner(), "a new player carries the semi");
         shot("home");
 
-        // Picking another runner saves it on the account.
-        click("runnerButton");
-        waitForForm("runner");
-        shot("runner");
-        if (has("choose-runner-kite")) {
-            click("choose-runner-kite");
-            until(() -> "runner-kite".equals(Session.user().runner()), 10000, "the runner to be saved");
+        // Picking another marker saves it on the account.
+        click("loadoutButton");
+        waitForForm("loadout");
+        shot("loadout");
+        click("pump");
+        if (has("choose-pump")) {
+            click("choose-pump");
+            until(() -> "pump".equals(Session.user().runner()), 10000, "the marker to be saved");
         }
 
         onEdt(() -> com.codenameone.examples.splat.ui.SettingsForm.show());

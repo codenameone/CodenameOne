@@ -36,9 +36,9 @@ public class ShopTest extends E2e {
         click("buy-gems-80");
         until(() -> Session.user().gems() == gems + 80, 20000, "the gems to arrive");
         waitForForm("shop");
-        until(() -> has("buy-trail-comet"), 20000, "the shop items");
-        click("buy-trail-comet");
-        until(() -> Session.user().owned().contains("trail-comet"), 20000, "the trail to be owned");
+        until(() -> has("buy-paint-glitter"), 20000, "the shop items");
+        click("buy-paint-glitter");
+        until(() -> Session.user().owned().contains("paint-glitter"), 20000, "the paint to be owned");
         return true;
     }
 }

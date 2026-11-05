@@ -20,15 +20,25 @@
  * The whole look of Splat.
  *
  * Every screen is built from ordinary Codename One widgets -- Button,
- * TextField, Label, Tabs, Switch -- and this file is what makes them look like
- * a game instead of a form: a night-blue backdrop, glass panels with a hairline
- * edge, bright pill-shaped calls to action and a volt-green GO. Change the
- * palette below to re-skin the game; change a rule to re-shape one widget
- * everywhere it appears.
+ * TextField, Label, Tabs, Switch -- and this file makes them read like the
+ * menus of a military shooter: near-black and gunmetal, square edges with a
+ * hairline, Rajdhani in capitals and one amber accent for whatever you should
+ * press next. Friendly is blue and hostile red everywhere. Change the palette
+ * below to re-skin the game; change a rule to re-shape one widget everywhere
+ * it appears.
  *
- * The track itself is not styled here: run/RunView.java draws it with
- * com.codename1.gaming, in the colours of run/Theme.java.
+ * The field itself is not styled here: play/ArenaView.java draws it with
+ * com.codename1.gaming, and play/Hud.java paints the HUD over it in the
+ * colours of play/Type.java.
  */
+@font-face {
+    font-family: "Rajdhani Bold";
+    src: url("fonts/Rajdhani-Bold.ttf");
+}
+@font-face {
+    font-family: "Rajdhani Medium";
+    src: url("fonts/Rajdhani-Medium.ttf");
+}
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
@@ -40,8 +50,8 @@
     dialogTransitionOut: "fade";
     dlgCommandGridBool: false;
     dlgButtonCommandUIID: "DialogAction";
-    /* Modals dim the game to a deep navy, not the default grey. */
-    tintColor: "d0060818";
+    /* Modals dim the game to near-black, not the default grey. */
+    tintColor: "d8050607";
     /* Lists scroll by touch; the bar is noise on a phone. */
     scrollVisibleBool: false;
     /* The admin console's tabs are the desk's own flat cells (DeskTab). The
@@ -50,29 +60,29 @@
     tabsSelectionCapsuleBool: false;
     tabsAnimatedIndicatorBool: false;
     /* tag::splat-palette[] */
-    --bg: #0b0e1d;
-    --surface: #151a33;
-    --surface-light: #1f2647;
-    --edge: #2c3563;
-    --edge-light: #4a5594;
-    --coral: #ff4d5e;
-    --coral-light: #ff8a4c;
-    --coral-dark: #c22745;
-    --volt: #d4ff3a;
-    --volt-dark: #8fb800;
-    --cyan: #2ee6ff;
-    --violet: #8a5cff;
-    --violet-glow: #c3b0ff;
-    --ice: #eaf6ff;
-    --ink: #0b0e1d;
-    --text: #ffffff;
-    --text-muted: #93a0c8;
-    --danger: #ff3b5c;
+    --bg: #0b0d10;
+    --surface: #161a1f;
+    --surface-light: #20262d;
+    --edge: #2e353d;
+    --edge-light: #4f5862;
+    --coral: #f2b632;
+    --coral-light: #ffd166;
+    --coral-dark: #a8770f;
+    --volt: #f2b632;
+    --volt-dark: #a8770f;
+    --cyan: #4aa8ff;
+    --violet: #5c6670;
+    --violet-glow: #aab3bd;
+    --ice: #e8ecef;
+    --ink: #0b0d10;
+    --text: #f2f4f5;
+    --text-muted: #8a949e;
+    --danger: #f0443a;
     /* end::splat-palette[] */
 }
 
 Form, GameForm, RunScreen {
-    background: linear-gradient(to bottom, #1a1f45, var(--bg));
+    background: linear-gradient(to bottom, #171b20, var(--bg));
     color: var(--text);
 }
 
@@ -88,7 +98,7 @@ GameToolbar {
 
 GameTitle {
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 4mm;
     text-align: center;
 }
@@ -99,13 +109,13 @@ Container {
 
 Label {
     color: var(--text);
-    font-family: "native:MainRegular";
+    font-family: "Rajdhani Medium";
     font-size: 3mm;
 }
 
 Logo {
     color: var(--volt);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 9mm;
     text-align: center;
     margin: 4mm 0 0 0;
@@ -115,17 +125,17 @@ Logo {
 Tagline {
     background-color: rgba(11, 14, 29, 0.78);
     color: var(--ice);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.8mm;
     text-align: center;
-    border-radius: 3mm;
+    border-radius: 0;
     padding: 0.8mm 3mm;
     margin: 0 0 4mm 0;
 }
 
 SectionTitle {
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.8mm;
     margin: 3.5mm 2mm 1mm 2.5mm;
 }
@@ -136,9 +146,9 @@ SectionTitle {
 PrimaryButton {
     background: linear-gradient(to bottom, var(--coral-light), var(--coral));
     border: 0.3mm solid var(--coral-dark);
-    border-radius: 5mm;
+    border-radius: 0;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.8mm;
     text-align: center;
     padding: 2.6mm;
@@ -160,9 +170,9 @@ PrimaryButton.disabled {
 GhostButton, PriceButton, GemButton, ReplayButton {
     background-color: var(--surface);
     border: 0.35mm solid var(--edge-light);
-    border-radius: 5mm;
+    border-radius: 0;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: center;
     padding: 1.9mm;
@@ -173,18 +183,18 @@ GhostButton.pressed, PriceButton.pressed, GemButton.pressed, ReplayButton.presse
     background-color: var(--edge);
 }
 
-GemButton {
-    background: linear-gradient(to bottom, #7cf2ff, #12b4d6);
-    border: 0.3mm solid #0b7c96;
-    color: var(--ink);
+GemButton, GemButton.selected, GemButton.disabled {
+    background-color: #f2b632;
+    border: 0.35mm solid #f2b632;
+    color: #0c0e10;
 }
 
 DangerButton {
     background-color: transparent;
     border: 0.35mm solid var(--danger);
-    border-radius: 5mm;
+    border-radius: 0;
     color: var(--danger);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     text-align: center;
     padding: 1.8mm;
     margin: 1mm 2mm;
@@ -193,9 +203,9 @@ DangerButton {
 AdminButton {
     background-color: var(--surface);
     border: 0.4mm solid var(--volt);
-    border-radius: 1.5mm;
+    border-radius: 0;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     text-align: center;
     padding: 1.8mm;
     margin: 2mm;
@@ -213,7 +223,7 @@ LinkButton {
 Panel {
     background-color: var(--surface);
     border: 0.25mm solid var(--edge);
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 2.5mm;
     margin: 1.5mm 2mm;
 }
@@ -221,7 +231,7 @@ Panel {
 GameField {
     background-color: var(--bg);
     border: 0.3mm solid var(--edge-light);
-    border-radius: 3mm;
+    border-radius: 0;
     color: var(--text);
     font-size: 3.2mm;
     padding: 2.2mm;
@@ -236,11 +246,11 @@ TextHint {
 /* The runner-name entry is a volt-green plate: the name is the one thing a
    player types that everyone else sees. */
 NameField {
-    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    background: linear-gradient(to bottom, #ffd166, var(--volt));
     border: 0.4mm solid var(--volt-dark);
-    border-radius: 4mm;
+    border-radius: 0;
     color: var(--ink);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 5mm;
     /* Left, like every other field: a centred native editor put the caret
        at one edge and the text at the other while typing. */
@@ -257,7 +267,7 @@ WalletBar {
 }
 
 Trophies, Coins, Gems {
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.2mm;
     text-align: center;
 }
@@ -278,9 +288,9 @@ Gems {
 CardSlot, CardSlotSelected {
     background-color: var(--surface);
     border: 0.3mm solid var(--edge);
-    border-radius: 4mm;
+    border-radius: 0;
     color: var(--violet-glow);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.6mm;
     text-align: center;
     padding: 1.2mm;
@@ -313,7 +323,7 @@ PlayerName {
 
 RunClock {
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 4mm;
     text-align: center;
 }
@@ -326,9 +336,9 @@ RunClock {
 EmoteButton {
     background-color: rgba(21, 26, 51, 0.85);
     border: 0.3mm solid var(--cyan);
-    border-radius: 3mm;
+    border-radius: 0;
     color: var(--ice);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.4mm;
     text-align: center;
     padding: 0.9mm 0.5mm;
@@ -337,9 +347,9 @@ EmoteButton {
 
 ChallengeCode {
     background-color: var(--ice);
-    border-radius: 2mm;
+    border-radius: 0;
     color: var(--ink);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 7mm;
     padding: 2mm 4mm;
 }
@@ -355,9 +365,9 @@ ChallengeUrl, Empty {
 Spotlight {
     background-color: var(--surface);
     border: 0.4mm solid var(--volt);
-    border-radius: 3mm;
+    border-radius: 0;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.4mm;
     text-align: left;
     padding: 1mm 2mm;
@@ -375,14 +385,14 @@ SpotlightIcon {
 
 SpotlightText {
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.4mm;
     text-align: left;
 }
 
 InviteCode {
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 5mm;
     text-align: center;
     margin: 2mm;
@@ -396,7 +406,7 @@ Warning {
 
 ShopItem, LeaderRow, LeaderTop, SettingRow {
     background-color: var(--surface);
-    border-radius: 2mm;
+    border-radius: 0;
     padding: 2mm;
     margin: 1mm 2mm;
 }
@@ -412,18 +422,18 @@ ShopItemName, LeaderName, SettingLabel {
 
 LeaderRank {
     color: var(--text-muted);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     padding: 0 2mm 0 0;
 }
 
 Owned {
     color: #7be38a;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 HistoryRow, AdminRow, FlagReport, FlagAuto {
     background-color: var(--surface);
-    border-radius: 2mm;
+    border-radius: 0;
     padding: 1.5mm;
     margin: 0.8mm 2mm;
 }
@@ -438,22 +448,22 @@ FlagAuto {
 
 HistoryWin {
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 HistoryLoss {
     color: #ff9a92;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 HistoryDraw {
     color: var(--text-muted);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 MultiLine1 {
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
 }
 
@@ -465,9 +475,9 @@ MultiLine2, MultiLine3 {
 AdminStat {
     background-color: var(--surface);
     border: 0.4mm solid var(--edge);
-    border-radius: 2mm;
+    border-radius: 0;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.2mm;
     padding: 2.5mm;
     margin: 1mm;
@@ -497,7 +507,7 @@ Tab.selected {
 Dialog {
     background-color: var(--surface);
     border: 0.5mm solid var(--coral);
-    border-radius: 3mm;
+    border-radius: 0;
     padding: 2mm;
 }
 
@@ -507,7 +517,7 @@ DialogBody, DialogTitle {
 
 DialogTitle {
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 AdDialog {
@@ -517,13 +527,13 @@ AdDialog {
 
 Slider {
     background-color: var(--edge);
-    border-radius: 1mm;
+    border-radius: 0;
     padding: 0.8mm;
 }
 
 SliderFull {
     background-color: var(--volt);
-    border-radius: 1mm;
+    border-radius: 0;
 }
 
 /* Text sits on the panel or backdrop under it: the native theme gives a
@@ -573,7 +583,7 @@ HomeHeader {
 PlayerNameBig {
     background-color: transparent;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.6mm;
     padding: 0 1.5mm;
 }
@@ -581,9 +591,9 @@ PlayerNameBig {
 LevelBadge, LevelBadgeBig {
     background-color: var(--violet);
     border: 0.3mm solid var(--violet-glow);
-    border-radius: 3mm;
+    border-radius: 0;
     color: #ffffff;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.6mm;
     text-align: center;
     padding: 0.4mm 1.8mm;
@@ -591,7 +601,7 @@ LevelBadge, LevelBadgeBig {
 }
 
 LevelBadgeBig {
-    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    background: linear-gradient(to bottom, #ffd166, var(--volt));
     color: var(--ink);
     border: 0.4mm solid var(--volt-dark);
 }
@@ -616,18 +626,18 @@ HeroStage {
 LeagueName {
     background-color: transparent;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.4mm;
     margin: 1.6mm 0 0 0;
     text-align: center;
 }
 
 GoButton {
-    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    background: linear-gradient(to bottom, #ffd166, var(--volt));
     border: 0.4mm solid var(--volt-dark);
-    border-radius: 7mm;
+    border-radius: 0;
     color: var(--ink);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 7mm;
     text-align: center;
     padding: 3.5mm;
@@ -642,9 +652,9 @@ GoButton.pressed {
 CrateSlot, CrateSlotEmpty {
     background-color: var(--surface);
     border: 0.35mm solid var(--cyan);
-    border-radius: 3.5mm;
+    border-radius: 0;
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.2mm;
     text-align: center;
     padding: 0.8mm 0.3mm;
@@ -664,7 +674,7 @@ CrateSlotEmpty {
 QuestCard {
     background-color: var(--surface);
     border: 0.4mm solid var(--edge);
-    border-radius: 2mm;
+    border-radius: 0;
     padding: 1.5mm 2mm;
     margin: 0.8mm 0;
 }
@@ -672,7 +682,7 @@ QuestCard {
 QuestTitle {
     background-color: transparent;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
 }
 
@@ -681,11 +691,11 @@ QuestReward {
 }
 
 ClaimButton {
-    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    background: linear-gradient(to bottom, #ffd166, var(--volt));
     border: 0.3mm solid var(--volt-dark);
-    border-radius: 4mm;
+    border-radius: 0;
     color: var(--ink);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.8mm;
     text-align: center;
     padding: 1.2mm 2.8mm;
@@ -705,9 +715,9 @@ Claimed {
 RunnerChip {
     background-color: rgba(212, 255, 58, 0.12);
     border: 0.3mm solid var(--volt);
-    border-radius: 3mm;
+    border-radius: 0;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.5mm;
     text-align: center;
     padding: 1.4mm 0.5mm;
@@ -717,7 +727,7 @@ RunnerChip {
 RunnerStageName {
     background-color: transparent;
     color: var(--text);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 5mm;
     text-align: center;
     padding: 0 0 3mm 0;
@@ -727,9 +737,9 @@ RunnerStageName {
 NavTile {
     background: linear-gradient(to bottom, var(--edge-light), var(--edge));
     border: 0.4mm solid var(--edge);
-    border-radius: 2mm;
+    border-radius: 0;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.6mm;
     text-align: center;
     padding: 1.5mm 0.5mm;
@@ -741,16 +751,16 @@ NavTile.pressed {
 }
 
 RewardDialog {
-    background: linear-gradient(to bottom, #222a5a, var(--bg));
+    background: linear-gradient(to bottom, #20262d, var(--bg));
     border: 0.8mm solid var(--volt);
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 2mm 3mm;
 }
 
 RewardCard {
-    background: linear-gradient(to bottom, #222a5a, var(--bg));
+    background: linear-gradient(to bottom, #20262d, var(--bg));
     border: 0.8mm solid var(--volt);
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 2mm 3mm;
     margin: 2mm;
 }
@@ -763,7 +773,7 @@ RewardBody {
 RewardTitle, LevelUpTitle {
     background-color: transparent;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 4mm;
     text-align: center;
 }
@@ -782,8 +792,8 @@ RewardHero {
 
 RewardCoins, RewardGems, RewardXp, RewardChest {
     background-color: #0e1224;
-    border-radius: 2mm;
-    font-family: "native:MainBold";
+    border-radius: 0;
+    font-family: "Rajdhani Bold";
     font-size: 2.8mm;
     padding: 0.8mm 1.6mm;
     margin: 0.6mm;
@@ -797,14 +807,14 @@ RewardChest { color: var(--volt); }
 RewardAchievement {
     background-color: transparent;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
 }
 
 AchievementRow, AchievementLocked {
     background-color: var(--surface);
     border: 0.4mm solid var(--volt);
-    border-radius: 2mm;
+    border-radius: 0;
     padding: 1.5mm;
     margin: 0.8mm 0;
 }
@@ -816,7 +826,7 @@ AchievementLocked {
 CoachBubble {
     background-color: var(--surface-light);
     border: 0.35mm solid var(--cyan);
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 2mm;
     margin: 2mm;
 }
@@ -824,7 +834,7 @@ CoachBubble {
 CoachName {
     background-color: transparent;
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.6mm;
 }
 
@@ -877,9 +887,9 @@ DialogCommandArea {
 DialogAction {
     background: linear-gradient(to bottom, var(--coral-light), var(--coral));
     border: 0.5mm solid var(--coral-dark);
-    border-radius: 1.5mm;
+    border-radius: 0;
     color: var(--ink);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: center;
     padding: 1.5mm 4mm;
@@ -896,14 +906,14 @@ DialogAction.pressed {
    buttons so the editor feels like part of the game. */
 ForgeRow {
     background-color: var(--edge);
-    border-radius: 1.5mm;
+    border-radius: 0;
     padding: 1.5mm 2mm;
     margin: 0.8mm 2mm;
 }
 
 ForgeLabel {
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: left;
     padding: 0.5mm 2mm 0.5mm 0.5mm;
@@ -912,7 +922,7 @@ ForgeLabel {
 
 ForgeValue {
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: center;
     padding: 0.5mm 1.5mm;
@@ -922,7 +932,7 @@ ForgeValue {
 ForgeField {
     background-color: var(--bg);
     border: 0.3mm solid var(--edge-light);
-    border-radius: 2.5mm;
+    border-radius: 0;
     color: var(--text);
     font-size: 3mm;
     text-align: left;
@@ -949,9 +959,9 @@ ForgeChoiceArrow {
 ForgeStep {
     background-color: rgba(46, 230, 255, 0.12);
     border: 0.35mm solid var(--cyan);
-    border-radius: 3mm;
+    border-radius: 0;
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: center;
     padding: 1mm 2mm;
@@ -990,7 +1000,7 @@ ForgeProblem {
 ForgeOfficial {
     background-color: transparent;
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.4mm;
     padding: 0.3mm 0;
     margin: 0;
@@ -998,9 +1008,9 @@ ForgeOfficial {
 
 ForgeTab, ForgeTabOn {
     background-color: var(--edge);
-    border-radius: 1.5mm;
+    border-radius: 0;
     color: var(--edge-light);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: center;
     padding: 1.5mm;
@@ -1016,9 +1026,9 @@ ForgeTabOn {
    five of them share a phone's width without "To...". */
 ForgeTool, ForgeToolOn {
     background-color: var(--edge);
-    border-radius: 1.5mm;
+    border-radius: 0;
     color: var(--edge-light);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.4mm;
     text-align: center;
     padding: 1mm 0.5mm;
@@ -1053,7 +1063,7 @@ DeskToolbar {
 DeskTitle {
     background-color: transparent;
     color: #ffffff;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.2mm;
     text-align: left;
 }
@@ -1067,11 +1077,11 @@ DeskSide {
 DeskTab, DeskTab.selected, DeskTab.pressed {
     background-color: transparent;
     color: #3c4454;
-    font-family: "native:MainRegular";
+    font-family: "Rajdhani Medium";
     font-size: 2.7mm;
     text-align: left;
     border: none;
-    border-radius: 1mm;
+    border-radius: 0;
     padding: 1.4mm 2.5mm;
     margin: 0.3mm 1mm;
 }
@@ -1079,13 +1089,13 @@ DeskTab, DeskTab.selected, DeskTab.pressed {
 DeskTab.selected {
     background-color: #ffffff;
     color: #1d4ed8;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 DeskSection {
     background-color: transparent;
-    color: #1d2330;
-    font-family: "native:MainBold";
+    color: #1a1f25;
+    font-family: "Rajdhani Bold";
     font-size: 3.2mm;
     padding: 0;
     margin: 3mm 0 1.2mm 0;
@@ -1094,15 +1104,15 @@ DeskSection {
 DeskPanel, DeskCard, DeskChartBox {
     background-color: #ffffff;
     border: 0.2mm solid #d9dde3;
-    border-radius: 1.2mm;
+    border-radius: 0;
     padding: 2mm 2.5mm;
     margin: 0.8mm;
 }
 
 DeskPanelTitle {
     background-color: transparent;
-    color: #1d2330;
-    font-family: "native:MainBold";
+    color: #1a1f25;
+    font-family: "Rajdhani Bold";
     font-size: 2.9mm;
     padding: 0 0 0.6mm 0;
     margin: 0;
@@ -1110,8 +1120,8 @@ DeskPanelTitle {
 
 DeskCardValue {
     background-color: transparent;
-    color: #1d2330;
-    font-family: "native:MainBold";
+    color: #1a1f25;
+    font-family: "Rajdhani Bold";
     font-size: 5mm;
     padding: 0;
     margin: 0;
@@ -1156,7 +1166,7 @@ DeskLabel {
 
 DeskValue, DeskValueAlert {
     background-color: transparent;
-    color: #1d2330;
+    color: #1a1f25;
     font-size: 2.7mm;
     padding: 1.2mm 0;
     margin: 0;
@@ -1169,8 +1179,8 @@ DeskValueAlert {
 DeskInput {
     background-color: #ffffff;
     border: 0.2mm solid #c4c9d2;
-    border-radius: 0.8mm;
-    color: #1d2330;
+    border-radius: 0;
+    color: #1a1f25;
     font-size: 2.7mm;
     text-align: left;
     padding: 1mm 1.4mm;
@@ -1192,9 +1202,9 @@ DeskActions {
 DeskButton, DeskPrimary, DeskDanger {
     background-color: #ffffff;
     border: 0.2mm solid #c4c9d2;
-    border-radius: 0.8mm;
-    color: #1d2330;
-    font-family: "native:MainRegular";
+    border-radius: 0;
+    color: #1a1f25;
+    font-family: "Rajdhani Medium";
     font-size: 2.7mm;
     text-align: center;
     padding: 1mm 2.5mm;
@@ -1209,7 +1219,7 @@ DeskPrimary {
     background-color: #2563eb;
     border: 0.2mm solid #1d4ed8;
     color: #ffffff;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 DeskPrimary.pressed {
@@ -1237,7 +1247,7 @@ DeskLink {
 DeskRow, DeskRowWarn, DeskRowAlert {
     background-color: #ffffff;
     border: 0.2mm solid #d9dde3;
-    border-radius: 1mm;
+    border-radius: 0;
     padding: 1.4mm 2mm;
     margin: 0.5mm 0;
 }
@@ -1252,8 +1262,8 @@ DeskRowAlert {
 
 DeskRowTitle {
     background-color: transparent;
-    color: #1d2330;
-    font-family: "native:MainBold";
+    color: #1a1f25;
+    font-family: "Rajdhani Bold";
     font-size: 2.8mm;
 }
 
@@ -1276,7 +1286,7 @@ DeskTableHeader {
 
 DeskTableHead, DeskCell {
     background-color: transparent;
-    color: #1d2330;
+    color: #1a1f25;
     font-size: 2.6mm;
     text-align: left;
     padding: 1mm;
@@ -1285,7 +1295,7 @@ DeskTableHead, DeskCell {
 
 DeskTableHead {
     color: #4a5263;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
 }
 
 DeskEmpty {
@@ -1297,9 +1307,9 @@ DeskEmpty {
 
 DeskBadge, DeskBadgeOn {
     background-color: #e5e7eb;
-    border-radius: 1mm;
+    border-radius: 0;
     color: #4a5263;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.3mm;
     padding: 0.4mm 1.5mm;
     margin: 0;
@@ -1350,20 +1360,20 @@ HudBar {
 HudDistance, HudScore, HudCoins, HudPlace, HudPower {
     background-color: transparent;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3.2mm;
     padding: 0.3mm 1.5mm;
     margin: 0;
 }
 HudDistance {
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 8mm;
     text-align: center;
 }
 HudScore {
     background-color: rgba(10, 14, 32, 0.72);
-    border: 0.25mm solid #3a4380;
-    border-radius: 3mm;
+    border: 0.25mm solid #3a424b;
+    border-radius: 0;
     color: var(--ice);
     text-align: center;
     padding: 0.4mm 2.2mm;
@@ -1371,9 +1381,9 @@ HudScore {
 HudStreet {
     background-color: #0f6b45;
     border: 0.25mm solid #ffffff;
-    border-radius: 1.2mm;
+    border-radius: 0;
     color: #ffffff;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.6mm;
     text-align: center;
     padding: 0.4mm 1.8mm;
@@ -1382,7 +1392,7 @@ HudStreet {
 HudCoins {
     background-color: rgba(10, 14, 32, 0.8);
     border: 0.3mm solid #ffc93a;
-    border-radius: 3.5mm;
+    border-radius: 0;
     color: #ffc93a;
     font-size: 3.6mm;
     padding: 0.8mm 2.2mm;
@@ -1394,14 +1404,14 @@ HudPower {
 }
 HudPlace {
     color: var(--cyan);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 4.6mm;
     text-align: right;
 }
 HudCountdown {
     background-color: transparent;
     color: var(--volt);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 24mm;
     text-align: center;
 }
@@ -1410,7 +1420,7 @@ HudButton {
     border: 0.3mm solid var(--edge-light);
     color: var(--text);
     font-size: 3mm;
-    border-radius: 5mm;
+    border-radius: 0;
     padding: 1.6mm;
     margin: 1mm;
 }
@@ -1433,7 +1443,7 @@ ChatLine {
 ChatFrom {
     background-color: transparent;
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.2mm;
     padding: 0;
     margin: 0;
@@ -1441,14 +1451,14 @@ ChatFrom {
 
 LobbyMember {
     background-color: rgba(255, 255, 255, 0.04);
-    border-radius: 2mm;
+    border-radius: 0;
     padding: 1mm 2mm;
     margin: 0.6mm 2mm;
 }
 
 LobbyMemberName {
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     padding: 0;
     margin: 0;
@@ -1456,7 +1466,7 @@ LobbyMemberName {
 
 LobbyHostTag {
     color: var(--volt);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.2mm;
     padding: 0.3mm 1mm;
     margin: 0;
@@ -1470,7 +1480,7 @@ LobbySay {
 ChatBubble {
     background-color: #1e2350;
     border: 1px solid #3a4290;
-    border-radius: 2mm;
+    border-radius: 0;
     padding: 1mm 2mm;
     margin: 0.6mm 2mm;
 }
@@ -1486,10 +1496,10 @@ DialogButton {
     background: linear-gradient(to bottom, var(--coral-light), var(--coral));
     border: 0.3mm solid var(--coral-dark);
     color: #ffffff;
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.6mm;
     text-align: center;
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 1.5mm 1mm;
     margin: 1mm;
 }
@@ -1497,7 +1507,7 @@ BoardTab {
     background-color: var(--surface);
     color: var(--edge-light);
     font-size: 2.9mm;
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 1.2mm 2.2mm;
     margin: 0.6mm;
 }
@@ -1521,7 +1531,7 @@ TopBar {
 CurrencyPill {
     background-color: rgba(10, 14, 32, 0.78);
     border: 0.3mm solid var(--edge-light);
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 0.4mm 0.6mm 0.4mm 1.4mm;
     margin: 0 0.8mm;
 }
@@ -1535,7 +1545,7 @@ Trophies, Coins, Gems {
 
 PillPlus {
     background-color: var(--volt);
-    border-radius: 2.5mm;
+    border-radius: 0;
     color: var(--ink);
     padding: 0.2mm;
     margin: 0 0.2mm 0 0.6mm;
@@ -1544,7 +1554,7 @@ PillPlus {
 IconButton {
     background-color: rgba(10, 14, 32, 0.78);
     border: 0.3mm solid var(--edge-light);
-    border-radius: 4mm;
+    border-radius: 0;
     color: var(--text);
     padding: 1mm;
     margin: 0 0 0 0.8mm;
@@ -1558,9 +1568,9 @@ Rail {
 RailTile {
     background: linear-gradient(to bottom, rgba(46, 54, 104, 0.9), rgba(16, 20, 44, 0.9));
     border: 0.35mm solid var(--edge-light);
-    border-radius: 3.5mm;
+    border-radius: 0;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 1.8mm;
     text-align: center;
     padding: 0.8mm 1.1mm 0.6mm 1.1mm;
@@ -1580,9 +1590,9 @@ HomeBottom {
 RaceChip {
     background-color: rgba(18, 22, 50, 0.9);
     border: 0.35mm solid var(--cyan);
-    border-radius: 5mm;
+    border-radius: 0;
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: center;
     padding: 2mm;
@@ -1603,7 +1613,7 @@ NavBar {
 NavItem, NavItemOn {
     background-color: transparent;
     color: var(--text-muted);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.2mm;
     text-align: center;
     padding: 1mm 0.5mm;
@@ -1625,16 +1635,16 @@ RunDim {
 }
 
 ResultCard {
-    background: linear-gradient(to bottom, #1d2350, #0b0e1d);
+    background: linear-gradient(to bottom, #1c2127, #0b0d10);
     border: 0.4mm solid var(--violet-glow);
-    border-radius: 5mm;
+    border-radius: 0;
     padding: 4mm 3mm 3mm 3mm;
     margin: 2mm;
 }
 
 ResultTitle {
     color: var(--volt);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 5.5mm;
     text-align: center;
     background-color: transparent;
@@ -1642,7 +1652,7 @@ ResultTitle {
 
 ResultScore {
     color: #ffffff;
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 9mm;
     text-align: center;
     background-color: transparent;
@@ -1651,7 +1661,7 @@ ResultScore {
 
 ResultCaption {
     color: var(--text-muted);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.4mm;
     text-align: center;
     background-color: transparent;
@@ -1660,9 +1670,9 @@ ResultCaption {
 StatChip {
     background-color: rgba(46, 230, 255, 0.12);
     border: 0.3mm solid var(--cyan);
-    border-radius: 3.5mm;
+    border-radius: 0;
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.2mm;
     padding: 0.8mm 1.6mm;
     margin: 1.5mm 0.8mm;
@@ -1671,9 +1681,9 @@ StatChip {
 /* ---- Level cards ---- */
 
 LevelCard {
-    background: linear-gradient(to bottom, #1d2350, #121633);
+    background: linear-gradient(to bottom, #1c2127, #121633);
     border: 0.3mm solid var(--edge-light);
-    border-radius: 4mm;
+    border-radius: 0;
     padding: 2mm;
     margin: 1.5mm 3mm;
 }
@@ -1686,7 +1696,7 @@ LevelThumb {
 
 CityIcon {
     background-color: #1f2a5e;
-    border-radius: 3mm;
+    border-radius: 0;
     color: var(--volt);
     text-align: center;
     padding: 2mm;
@@ -1694,9 +1704,9 @@ CityIcon {
 }
 
 CityCard {
-    background: linear-gradient(to bottom, #1d2350, #0b0e1d);
+    background: linear-gradient(to bottom, #1c2127, #0b0d10);
     border: 0.4mm solid var(--violet-glow);
-    border-radius: 5mm;
+    border-radius: 0;
     padding: 3mm;
     margin: 2mm;
 }
@@ -1704,7 +1714,7 @@ CityCard {
 CityStatus {
     background-color: transparent;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     text-align: center;
     padding: 0 0 2mm 0;
@@ -1714,7 +1724,7 @@ CityStatus {
 MapCredit {
     background-color: rgba(255, 255, 255, 0.8);
     color: #333333;
-    font-family: "native:MainRegular";
+    font-family: "Rajdhani Medium";
     font-size: 1.7mm;
     padding: 0.3mm 1mm;
     margin: 0;
@@ -1722,8 +1732,8 @@ MapCredit {
 
 CityMinimap {
     background-color: rgba(10, 14, 32, 0.72);
-    border: 0.25mm solid #3a4380;
-    border-radius: 3mm;
+    border: 0.25mm solid #3a424b;
+    border-radius: 0;
     padding: 0;
     margin: 1mm 0 0 0;
 }
@@ -1731,7 +1741,7 @@ CityMinimap {
 LevelLength {
     background-color: transparent;
     color: var(--text-muted);
-    font-family: "native:MainRegular";
+    font-family: "Rajdhani Medium";
     font-size: 2.4mm;
     padding: 0.4mm 0 0 0.6mm;
     margin: 0;
@@ -1740,7 +1750,7 @@ LevelLength {
 LevelName {
     background-color: transparent;
     color: var(--text);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 3.2mm;
     padding: 0.5mm 0;
 }
@@ -1748,18 +1758,18 @@ LevelName {
 TagChip {
     background-color: rgba(181, 108, 255, 0.2);
     border: 0.3mm solid var(--violet-glow);
-    border-radius: 2.5mm;
+    border-radius: 0;
     color: var(--violet-glow);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.2mm;
     padding: 0.4mm 1.6mm;
     margin: 0.5mm 1mm 0.5mm 0;
 }
 
 PlayRound {
-    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    background: linear-gradient(to bottom, #ffd166, var(--volt));
     border: 0.4mm solid var(--volt-dark);
-    border-radius: 7mm;
+    border-radius: 0;
     color: var(--ink);
     padding: 2.4mm;
     margin: 0 0 0 1mm;
@@ -1772,9 +1782,9 @@ PlayRound.pressed {
 CardAction {
     background-color: rgba(46, 230, 255, 0.08);
     border: 0.3mm solid var(--edge-light);
-    border-radius: 3mm;
+    border-radius: 0;
     color: var(--cyan);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2.5mm;
     text-align: center;
     padding: 1.4mm 0.5mm;
@@ -1786,11 +1796,11 @@ CardAction.pressed {
 }
 
 CardGo {
-    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    background: linear-gradient(to bottom, #ffd166, var(--volt));
     border: 0.4mm solid var(--volt-dark);
-    border-radius: 6mm;
+    border-radius: 0;
     color: var(--ink);
-    font-family: "native:MainBlack";
+    font-family: "Rajdhani Bold";
     font-size: 4.6mm;
     text-align: center;
     padding: 2.6mm;
@@ -1816,8 +1826,8 @@ ShopArt {
 
 ShopItemKind {
     background-color: transparent;
-    color: var(--violet-glow);
-    font-family: "native:MainBold";
+    color: #f2b632;
+    font-family: "Rajdhani Bold";
     font-size: 2.1mm;
     padding: 0.3mm 0;
 }
@@ -1826,7 +1836,7 @@ ShopItemKind {
 PlayerName {
     background-color: transparent;
     color: var(--text);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 3mm;
     padding: 0.4mm 1mm 0.4mm 1.5mm;
 }
@@ -1842,7 +1852,7 @@ LevelBadge {
 InviteCard {
     background: linear-gradient(to bottom, var(--surface-light), var(--surface));
     border: 0.3mm solid var(--edge-light);
-    border-radius: 3mm;
+    border-radius: 0;
     padding: 2mm;
     margin: 1.5mm 0;
 }
@@ -1850,7 +1860,7 @@ InviteCard {
 InviteCaption {
     background-color: transparent;
     color: var(--text-muted);
-    font-family: "native:MainBold";
+    font-family: "Rajdhani Bold";
     font-size: 2mm;
     padding: 0;
     margin: 0;
@@ -1861,4 +1871,447 @@ Emblem {
     background-color: transparent;
     padding: 0 0 0 1mm;
     margin: 0;
+}
+
+/* ---------------------------------------------------------------- Splat match */
+
+MatchScreen {
+    background-color: #000000;
+    padding: 0;
+    margin: 0;
+}
+
+MissionCard {
+    background: linear-gradient(to bottom, #1c2127, #0b0d10);
+    border: 0.3mm solid var(--edge);
+    border-radius: 0;
+    padding: 3mm;
+    margin: 1.5mm 2mm 1.5mm 2mm;
+}
+
+MissionTitle {
+    color: var(--coral);
+    font-family: "Rajdhani Bold";
+    font-size: 3.4mm;
+    background-color: transparent;
+}
+
+MissionCaption {
+    color: var(--text-muted);
+    font-family: "Rajdhani Bold";
+    font-size: 2.4mm;
+    background-color: transparent;
+}
+
+MissionBriefing {
+    color: var(--text);
+    font-family: "Rajdhani Medium";
+    font-size: 2.6mm;
+    background-color: transparent;
+    padding: 1mm 0 2mm 0;
+}
+
+ScoreRowTangerine {
+    color: #ff7a1f;
+    font-family: "Rajdhani Bold";
+    font-size: 2.6mm;
+    background-color: transparent;
+    padding: 0.6mm 1mm 0.6mm 1mm;
+}
+
+ScoreRowTeal {
+    color: #1fc6ff;
+    font-family: "Rajdhani Bold";
+    font-size: 2.6mm;
+    background-color: transparent;
+    padding: 0.6mm 1mm 0.6mm 1mm;
+}
+
+/* ---------------------------------------------------------------- main menu
+   The front end of a military shooter: the operator stage (a 3D view) under
+   everything, a shade darkening the left third so the menu reads, and square
+   capitalised orders with an amber bar on the one that is primed. */
+MenuForm {
+    background-color: #0d1014;
+    padding: 0;
+}
+
+MenuShade {
+    background: linear-gradient(to right, rgba(5, 6, 8, 0.92), rgba(5, 6, 8, 0.0));
+    padding: 0;
+    margin: 0;
+}
+
+MenuTop {
+    padding: 3mm 4mm 1mm 4mm;
+    background-color: transparent;
+}
+
+MenuLogo {
+    font-family: "Rajdhani Bold";
+    font-size: 7mm;
+    color: var(--coral);
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+MenuLogoSub {
+    font-family: "Rajdhani Medium";
+    font-size: 2.2mm;
+    color: var(--text-muted);
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+RankCard {
+    background-color: rgba(11, 13, 16, 0.75);
+    border: 1px solid #2e353d;
+    padding: 1.5mm 2mm;
+    margin: 0;
+}
+
+MenuColumn {
+    padding: 2mm 0 2mm 4mm;
+    background-color: transparent;
+}
+
+MenuItem, MenuItemPrimed {
+    background-color: transparent;
+    border: none;
+    border-left: 0.8mm solid transparent;
+    padding: 1.4mm 6mm 1.4mm 2.5mm;
+    margin: 0.4mm 0;
+}
+
+MenuItem.pressed {
+    background-color: rgba(242, 182, 50, 0.16);
+    border-left: 0.8mm solid #f2b632;
+}
+
+MenuItemPrimed {
+    background: linear-gradient(to right, rgba(242, 182, 50, 0.30), rgba(242, 182, 50, 0.0));
+    border-left: 0.8mm solid #f2b632;
+}
+
+MenuItemText, MenuItemTextPrimed {
+    font-family: "Rajdhani Bold";
+    font-size: 4.2mm;
+    color: #f2f4f5;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+MenuItemTextPrimed {
+    color: #ffd166;
+}
+
+MenuBottom {
+    padding: 1mm 4mm 3mm 4mm;
+    background-color: transparent;
+}
+
+MenuItemSub {
+    font-family: "Rajdhani Medium";
+    font-size: 2.1mm;
+    color: var(--text-muted);
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ---------------------------------------------------------------- operations */
+OpsForm {
+    background: linear-gradient(to bottom, #15191e, #0b0d10);
+}
+
+OpsList {
+    padding: 2mm 0 2mm 3mm;
+    background-color: transparent;
+}
+
+OpsRow, OpsRowOn {
+    font-family: "Rajdhani Bold";
+    font-size: 3mm;
+    color: #c4cbd2;
+    background-color: rgba(22, 26, 31, 0.85);
+    border: none;
+    border-left: 0.8mm solid #2e353d;
+    padding: 1.6mm 2.5mm;
+    margin: 0.5mm 2mm 0.5mm 0;
+    text-align: left;
+}
+
+OpsRowOn {
+    color: #ffd166;
+    background: linear-gradient(to right, rgba(242, 182, 50, 0.28), rgba(22, 26, 31, 0.85));
+    border-left: 0.8mm solid #f2b632;
+}
+
+OpsDetail {
+    padding: 2mm 3mm 3mm 3mm;
+    background-color: transparent;
+}
+
+OpsKicker {
+    background-color: transparent;
+    border: none;
+    font-family: "Rajdhani Bold";
+    font-size: 2.2mm;
+    color: #f0443a;
+    padding: 0;
+    margin: 0;
+}
+
+OpsTitle {
+    background-color: transparent;
+    border: none;
+    font-family: "Rajdhani Bold";
+    font-size: 5mm;
+    color: #f2b632;
+    padding: 0;
+    margin: 0;
+}
+
+OpsCaption {
+    background-color: transparent;
+    border: none;
+    font-family: "Rajdhani Medium";
+    font-size: 2.4mm;
+    color: #8a949e;
+    padding: 0 0 1.5mm 0;
+    margin: 0;
+}
+
+OpsBriefing {
+    background-color: transparent;
+    border: none;
+    font-family: "Rajdhani Medium";
+    font-size: 3mm;
+    color: #e8ecef;
+    padding: 2mm 0;
+    margin: 0;
+}
+
+DeployButton {
+    font-family: "Rajdhani Bold";
+    font-size: 4.6mm;
+    color: #0b0d10;
+    background-color: #f2b632;
+    border: none;
+    padding: 2.2mm;
+    margin: 1mm 0;
+    text-align: center;
+}
+
+DeployButton.pressed {
+    background-color: #ffd166;
+}
+
+OpsAction {
+    font-family: "Rajdhani Bold";
+    font-size: 3mm;
+    color: #f2f4f5;
+    background-color: rgba(28, 33, 39, 0.9);
+    border: 1px solid #4f5862;
+    padding: 1.8mm;
+    margin: 0.5mm;
+    text-align: center;
+}
+
+OpsAction.pressed {
+    border: 1px solid #f2b632;
+    color: #ffd166;
+}
+
+OpsRowTitle {
+    font-family: "Rajdhani Bold";
+    font-size: 3.2mm;
+    color: #f2f4f5;
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+}
+
+OpsRowSub {
+    font-family: "Rajdhani Medium";
+    font-size: 2.1mm;
+    color: #8a949e;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- operator */
+BackLink {
+    font-family: "Rajdhani Bold";
+    font-size: 2.6mm;
+    color: #8a949e;
+    background-color: transparent;
+    border: none;
+    padding: 0 0 1mm 0;
+    margin: 0;
+}
+
+LoadoutEquipped {
+    font-family: "Rajdhani Bold";
+    font-size: 2.1mm;
+    color: #f2b632;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+LoadoutBlurb {
+    font-family: "Rajdhani Medium";
+    font-size: 2.6mm;
+    color: #c4cbd2;
+    padding: 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+LoadoutStat {
+    padding: 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+LoadoutStatName {
+    font-family: "Rajdhani Bold";
+    font-size: 2.2mm;
+    color: #8a949e;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ---------------------------------------------------------------- lobby */
+RosterHeadFriendly, RosterHeadHostile {
+    font-family: "Rajdhani Bold";
+    font-size: 2.6mm;
+    color: #4aa8ff;
+    padding: 1mm 1.5mm;
+    margin: 0 1mm;
+    background-color: transparent;
+}
+
+RosterHeadHostile {
+    color: #f0443a;
+}
+
+RosterFriendly, RosterHostile, RosterOpen {
+    background-color: rgba(22, 26, 31, 0.9);
+    border: none;
+    border-left: 0.8mm solid #4aa8ff;
+    padding: 1.4mm 2mm;
+    margin: 0.4mm 1mm;
+}
+
+RosterHostile {
+    border-left: 0.8mm solid #f0443a;
+}
+
+RosterOpen {
+    border-left: 0.8mm solid #2e353d;
+}
+
+/* ---------------------------------------------------------------- match */
+CommsColumn {
+    padding: 34mm 0 0 2.5mm;
+    background-color: transparent;
+}
+
+EmoteBar {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+EmoteButton {
+    font-family: "Rajdhani Bold";
+    font-size: 2.3mm;
+    color: #e8ecef;
+    background-color: rgba(11, 13, 16, 0.6);
+    border: none;
+    border-left: 0.6mm solid #4aa8ff;
+    padding: 0.8mm 2mm;
+    margin: 0.3mm 0;
+    text-align: left;
+}
+
+EmoteButton.pressed {
+    background-color: rgba(74, 168, 255, 0.35);
+}
+
+ResultTitleLoss {
+    font-family: "Rajdhani Bold";
+    font-size: 9mm;
+    color: #f0443a;
+    padding: 0;
+    margin: 0;
+    text-align: center;
+    background-color: transparent;
+}
+
+ResultScore {
+    font-family: "Rajdhani Bold";
+    font-size: 3.4mm;
+    color: #f2f4f5;
+    padding: 1mm 0 2mm 0;
+    margin: 0;
+    text-align: center;
+    background-color: transparent;
+}
+
+ScoreHead, ScoreRowFriendly, ScoreRowHostile, ScoreRowMe {
+    padding: 0.8mm 1.5mm;
+    margin: 0.2mm 0;
+    background-color: rgba(22, 26, 31, 0.9);
+    border: none;
+}
+
+ScoreHead {
+    background-color: transparent;
+}
+
+ScoreRowFriendly {
+    border-left: 0.8mm solid #4aa8ff;
+    background-color: rgba(74, 168, 255, 0.12);
+}
+
+ScoreRowHostile {
+    border-left: 0.8mm solid #f0443a;
+    background-color: rgba(240, 68, 58, 0.12);
+}
+
+ScoreRowMe {
+    border-left: 0.8mm solid #f2b632;
+    background-color: rgba(242, 182, 50, 0.22);
+}
+
+ScoreCellName, ScoreCell {
+    font-family: "Rajdhani Bold";
+    font-size: 2.6mm;
+    color: #f2f4f5;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+ScoreCell {
+    text-align: right;
+}
+
+RewardKicker {
+    font-family: "Rajdhani Bold";
+    font-size: 4mm;
+    color: #f2b632;
+    padding: 1mm;
+    margin: 0;
+    background-color: transparent;
 }

@@ -126,13 +126,11 @@ public final class Rewards {
         SpanLabel title = Ui.text(r.title(), r.levelUp() ? "LevelUpTitle" : "RewardTitle");
         title.setTextBlockAlign(Component.CENTER);
         d.add(title);
-        String hero = Portraits.mine();
-        Image art = Portraits.figure(hero, CN.convertToPixels(r.levelUp() ? 17 : 16));
-        // The prize turns in a burst of light, the way a win should feel.
-        Image prize = r.chests() > 0 && !r.levelUp() ? Portraits.crate(CN.convertToPixels(16), true) : art;
-        d.add(Kit.burst(prize, r.levelUp() ? 0xd4ff3a : 0xffd23a));
+        // A rank-up is the one moment the whole card turns amber.
+        d.add(FlowLayout.encloseCenter(new Label(r.levelUp() ? "PROMOTED" : r.chests() > 0 && !r.levelUp()
+                ? "SUPPLY DROP" : "AFTER ACTION REPORT", "RewardKicker")));
         if (r.levelUp()) {
-            d.add(FlowLayout.encloseCenter(new Label("Level " + r.level(), "LevelBadgeBig")));
+            d.add(FlowLayout.encloseCenter(new Label("RANK " + r.level(), "LevelBadgeBig")));
         }
         Container items = new Container(new FlowLayout(Component.CENTER));
         if (r.coins() > 0) {
@@ -152,7 +150,7 @@ public final class Rewards {
             items.add(chip(FontImage.MATERIAL_STAR, "+" + r.xp() + " XP", "RewardXp"));
         }
         if (r.chests() > 0) {
-            items.add(chip(FontImage.MATERIAL_INVENTORY_2, "+" + r.chests() + " chest", "RewardChest"));
+            items.add(chip(FontImage.MATERIAL_INVENTORY_2, "+" + r.chests() + " SUPPLY DROP", "RewardChest"));
         }
         d.add(items);
         if (r.unlocked() != null) {

@@ -1,0 +1,134 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.splat.play;
+
+import com.codename1.gaming.AnimatedModel;
+import com.codename1.gaming.GameView;
+import com.codename1.gaming.Model;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Primitives;
+
+/// An operator standing in a pool of light in a dark storage yard, marker in
+/// hand, shifting their weight: the backdrop of the main menu and the loadout.
+/// The menu is laid over the left of it, so the operator stands right of
+/// centre.
+// tag::splat-operator-stage[]
+public class OperatorStage extends GameView {
+    private final String operator;
+    private String marker;
+    private AnimatedModel op;
+    private AnimatedModel gun;
+    private float scale;
+    private final float[] hand = new float[16];
+    private GraphicsDevice device;
+    private float time;
+    private final float offset;
+
+    /// `operator` is a model name from [Models]; `marker` a marker id, or null
+    /// for empty hands.
+    public OperatorStage(String operator, String marker, float offset) {
+        this.operator = operator;
+        this.marker = marker;
+        this.offset = offset;
+        setName("operatorStage");
+    }
+
+    /// The operator the menu shows for a player's chosen look: the same
+    /// player always gets the same one.
+    public static String operatorFor(String look) {
+        int h = look == null ? 0 : look.hashCode();
+        return Models.operator(0, (h & 0x7fffffff) % Models.OPERATORS[0].length);
+    }
+
+    /// Swaps the marker in the operator's hand.
+    public void setMarker(String id) {
+        marker = id;
+        if (device != null && gun != null) {
+            gun.removeFrom(this);
+            gun = null;
+        }
+        if (device != null && id != null) {
+            gun = Models.create(device, Models.marker(id));
+            float[] b = Models.bounds(gun);
+            gun.setScale(0.34f / Math.max(0.01f, Math.max(b[3] - b[0], Math.max(b[4] - b[1], b[5] - b[2]))));
+            gun.addTo(this);
+        }
+    }
+
+    @Override
+    protected void onSetup(GraphicsDevice d) {
+        device = d;
+        setClearColor(0xff0d1014);
+        getLight().setDirection(0.55f, -0.8f, -0.45f).setColor(0xffffe6c4).setAmbientColor(0xff4a525c);
+        getCamera().setPerspective(34f, 0.1f, 120f);
+        getCamera().setPosition(0f, 1.35f, 5.2f);
+        getCamera().setTarget(offset * 0.55f, 1.0f, 0f);
+        Model floor = new Model(Primitives.quad(d, 1f), new Material(Material.Type.LAMBERT).setColor(0xff24282d));
+        floor.setRotation(-90f, 0f, 0f);
+        floor.setScale(40f, 40f, 1f);
+        addModel(floor);
+        prop("container", 2.13f, -1.2f, -3.4f, 8f);
+        prop("container-small", 2.13f, 3.4f, -3.0f, -14f);
+        prop("sandbags", 1.0f, -2.6f, -0.6f, 25f);
+        prop("barrel", 1.0f, 2.2f, -1.2f, 0f);
+        prop("streetlight", 7f, 3.8f, -4.5f, 200f);
+        op = Models.create(d, operator);
+        op.hideNode(Models.PISTOL);
+        float[] b = Models.bounds(op);
+        scale = 1.8f / Math.max(0.01f, b[4] - b[1]);
+        op.setScale(scale);
+        op.setPosition(offset, 0f, 0f);
+        op.setRotation(0f, -18f, 0f);
+        op.play(Models.IDLE, true);
+        op.addTo(this);
+        setMarker(marker);
+    }
+
+    private void prop(String name, float height, float x, float z, float deg) {
+        AnimatedModel m = Models.create(device, name);
+        float[] b = Models.bounds(m);
+        float s = height / Math.max(0.01f, b[4] - b[1]);
+        m.setScale(s);
+        m.setRotation(0f, deg, 0f);
+        m.setPosition(x, -b[1] * s, z);
+        m.addTo(this);
+    }
+
+    @Override
+    protected void update(double dt) {
+        if (op == null) {
+            return;
+        }
+        time += (float) dt;
+        op.update((float) dt);
+        // A slow drift of the camera, so the stage never looks like a still.
+        getCamera().setPosition((float) Math.sin(time * 0.25f) * 0.25f, 1.35f, 5.2f);
+        if (gun != null && op.getNodeMatrix(Models.HAND, hand)) {
+            double r = Math.toRadians(op.getRotationY());
+            float c = (float) Math.cos(r);
+            float sn = (float) Math.sin(r);
+            float hx = hand[12] * scale;
+            float hz = hand[14] * scale;
+            gun.setPosition(op.getX() + hx * c + hz * sn, hand[13] * scale, op.getZ() - hx * sn + hz * c);
+            gun.setRotation(0f, op.getRotationY() + 180f, 0f);
+        }
+    }
+}
+// end::splat-operator-stage[]

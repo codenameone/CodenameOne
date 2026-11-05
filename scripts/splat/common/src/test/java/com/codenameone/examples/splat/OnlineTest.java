@@ -18,30 +18,33 @@
  */
 package com.codenameone.examples.splat;
 
-import com.codenameone.examples.splat.run.RaceDriver;
-import com.codenameone.examples.splat.run.RunView;
+import com.codenameone.examples.splat.play.ArenaView;
+import com.codenameone.examples.splat.play.OnlineDriver;
 import com.codenameone.examples.splat.ui.Nav;
 
-/// A quick race, in lockstep with the server. The test server fills a lone
-/// player's race with bots at once, so this needs no second player.
+/// A quick match against the server. The test server fills a lone player's
+/// match with bots at once, so this needs no second player.
 public class OnlineTest extends E2e {
     @Override
     protected boolean run() throws Exception {
         signIn(RIVAL);
         waitForForm("home");
         click("quickRaceButton");
-        waitForForm("run");
-        final RunView view = track();
-        assertTrue(view.driver() instanceof RaceDriver, "a live race");
-        assertTrue(view.driver().run().runnerCount() > 1, "other runners on the track");
-        // The clock only moves when the server says it may: reaching tick 100
-        // means the ticks are arriving.
-        until(() -> view.driver().run().tick() > 100, 30000, "server ticks");
+        waitForForm("match");
+        final ArenaView view = arena();
+        assertTrue(view.driver() instanceof OnlineDriver, "a live match");
+        assertTrue(view.driver().match().playerCount() > 1, "other players on the field");
+        // The match only moves past the briefing when the server's snapshots
+        // arrive: reaching tick 100 means they are.
+        long give = System.currentTimeMillis() + 30000;
+        while (view.driver().match().tick() < 100 && System.currentTimeMillis() < give) {
+            driveFor(view, 200);
+        }
+        assertTrue(view.driver().match().tick() >= 100, "server snapshots");
         click("emote-gg");
-        waitFor(1500);
-        shot("race");
+        shot("match-online", view);
         onEdt(() -> {
-            ((RaceDriver) view.driver()).leave();
+            ((OnlineDriver) view.driver()).leave();
             view.stop();
             view.driver().dispose();
             Nav.home();

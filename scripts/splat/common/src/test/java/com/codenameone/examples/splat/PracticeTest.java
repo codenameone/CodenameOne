@@ -18,47 +18,38 @@
  */
 package com.codenameone.examples.splat;
 
-import com.codenameone.examples.splat.rules.Content;
-import com.codenameone.examples.splat.rules.ViewMode;
-import com.codenameone.examples.splat.run.RunView;
-import com.codenameone.examples.splat.run.SoloDriver;
-import com.codenameone.examples.splat.ui.ScoresForm;
+import com.codenameone.examples.splat.play.ArenaView;
+import com.codenameone.examples.splat.play.PracticeDriver;
+import com.codenameone.examples.splat.rules.Match;
 
-/// A solo run of the causeway from the level list: it starts side on, the
-/// camera swings behind the runner at 300 m, and the server's re-simulation
-/// of the input log is what puts the score on the board.
+/// Practice against bots from the operations list: the briefing, the match in
+/// progress, and the scoreboard at the end.
 public class PracticeTest extends E2e {
     @Override
     protected boolean run() throws Exception {
         signIn(PLAYER);
         waitForForm("home");
         click("runButton");
-        waitForForm("levels");
-        shot("levels");
-        click("play-" + Content.CAUSEWAY);
-        waitForForm("run");
-        final RunView view = track();
-        assertTrue(view.driver() instanceof SoloDriver, "a solo run");
-        assertEqual(ViewMode.SIDE_2D, view.driver().run().level().startView(), "the causeway starts side on");
-        until(() -> view.driver().run().tick() > 240, 20000, "the run");
-        shot("run-side");
-        new Thread(() -> drive(view, 60000)).start();
-        until(() -> view.driver().run().runner(view.driver().me()).z / 1000 > 340
-                && busyAhead(view, 8) || view.driver().run().over(), 60000, "the swing to the chase view");
-        shot("run-chase");
-        finish(view, 60 * 600);
-        awaitResult("the result");
-        shot("run-result");
-        click("scores");
-        waitForForm("scores");
-        // The board for the guide is the day's endless run: a track with no
-        // finish line, where every run ends somewhere different. A finite
-        // level's all-time board is a row of finishers at its length.
-        onEdt(() -> ScoresForm.show(Content.ENDLESS, null));
-        until(() -> has("board-day"), 20000, "the endless board");
-        touch("board-day");
-        until(() -> has("score-3"), 20000, "the day's board");
-        shot("scores");
+        waitForForm("play");
+        click("mission-cul-de-sac:CAPTURE_THE_FLAG");
+        shot("operations");
+        click("practice-cul-de-sac:CAPTURE_THE_FLAG");
+        waitForForm("match");
+        final ArenaView view = arena();
+        assertTrue(view.driver() instanceof PracticeDriver, "a practice match");
+        shot("briefing");
+        until(() -> view.driver().countdownTicks() == 0, 20000, "the briefing to end");
+        long give = System.currentTimeMillis() + 20000;
+        while (view.driver().match().tick() < 6 * Match.TICK_HZ && System.currentTimeMillis() < give) {
+            driveFor(view, 200);
+        }
+        shot("match-practice", view);
+        finish(view, 10 * 60 * Match.TICK_HZ);
+        assertTrue(view.driver().match().over(), "the match ended");
+        awaitResult("the scoreboard");
+        shot("scoreboard");
+        click("done");
+        waitForForm("play");
         return true;
     }
 }

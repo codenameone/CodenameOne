@@ -22,31 +22,25 @@ import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.record.RecordingOptions;
 import com.codename1.impl.javase.record.SimulatorRecorder;
 import com.codename1.impl.javase.record.TouchOverlay;
-import com.codename1.maps.routing.RouteService;
-import com.codename1.maps.routing.Routing;
-import com.codename1.ui.Button;
-import com.codename1.ui.Component;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
-import com.codenameone.examples.splat.rules.Content;
-import com.codenameone.examples.splat.run.Landmarks;
-import com.codenameone.examples.splat.run.RaceDriver;
-import com.codenameone.examples.splat.run.RunView;
+import com.codenameone.examples.splat.play.ArenaView;
+import com.codenameone.examples.splat.play.OnlineDriver;
+import com.codenameone.examples.splat.rules.Match;
 import com.codenameone.examples.splat.ui.Nav;
-import com.codenameone.examples.splat.forge.PackEditor;
 import java.io.File;
 
 /// The promotional videos: the simulator's own recorder films a tour of the
-/// game with captions -- a run, a city route, a live race with chat, the
-/// level editor and the boards -- and, when `splat.e2e.clip` names a second
-/// file, a short gameplay clip inside the phone's skin first. It is not a
-/// test of anything the others do not cover, so it runs only when asked for
-/// (`run-e2e.sh --video`, which names the files in `splat.e2e.video` and
-/// `splat.e2e.clip`).
+/// game with captions -- a mission briefing, a practice match to the
+/// scoreboard, and a live party match with chat and emotes -- and, when
+/// `splat.e2e.clip` names a second file, a short gameplay clip inside the
+/// phone's skin first. It is not a test of anything the others do not cover,
+/// so it runs only when asked for (`run-e2e.sh --video`, which names the files
+/// in `splat.e2e.video` and `splat.e2e.clip`).
 public class PromoVideoTest extends E2e {
     private SimulatorRecorder recorder;
 
-    /// The clip and the whole tour play in real time, about five minutes.
+    /// The clip and the whole tour play in real time, a few minutes.
     @Override
     public int getTimeoutMillis() {
         return 600000;
@@ -59,9 +53,6 @@ public class PromoVideoTest extends E2e {
             log("The promo video is recorded only when splat.e2e.video names the file; skipped");
             return true;
         }
-        RouteService realRoutes = Routing.getService();
-        Routing.setService(new CityRunTest.Canned());
-        Landmarks.setSource(new CityRunTest.CannedPlaces());
         Guest guest = null;
         try {
             signIn(PLAYER);
@@ -72,53 +63,26 @@ public class PromoVideoTest extends E2e {
                 clip(clip);
             }
             record(out, RecordingOptions.Frame.SCREEN, 240);
-            caption("Splat -- a runner you can make your own", 2600);
+            caption("Splat -- team paintball you can make your own", 2600);
             waitFor(2800);
 
             click("runButton");
-            waitForForm("levels");
-            waitFor(1200);
-            click("play-" + Content.CAUSEWAY);
-            waitForForm("run");
-            RunView view = track();
-            caption("Starts side on...", 2600);
-            driveTo(view, 280);
-            caption("...and swings into 3D mid-run", 3000);
-            driveTo(view, 400);
-            caption("Coins, power-ups and traps every few metres", 2800);
-            driveFor(view, 4000);
-            finish(view, 60 * 600);
-            caption("Rewards, chests and level ups", 2400);
-            collectAll();
-            waitFor(1200);
-            home();
-
-            click("runButton");
-            waitForForm("levels");
-            touch("cityButton");
-            waitForForm("city");
-            until(() -> findByName("cityMap") != null && findByName("cityMap").getWidth() > 0, 20000, "the map");
-            caption("Pick two points on a real map", 2600);
+            waitForForm("play");
+            caption("Every mission gets the briefing it does not deserve", 2800);
+            click("mission-cul-de-sac:CAPTURE_THE_FLAG");
             waitFor(3000);
-            Component map = findByName("cityMap");
-            int x = map.getAbsoluteX();
-            int y = map.getAbsoluteY();
-            touch(x + map.getWidth() / 4, y + map.getHeight() * 2 / 3);
-            waitFor(700);
-            touch(x + map.getWidth() * 3 / 4, y + map.getHeight() / 4);
-            until(() -> ((Button) findByName("runCity")).isEnabled(), 20000, "the route");
-            caption("The route becomes a level: its streets, turns and landmarks", 3000);
+            click("practice-cul-de-sac:CAPTURE_THE_FLAG");
+            waitForForm("match");
+            ArenaView view = arena();
             waitFor(3200);
-            click("runCity");
-            waitForForm("run");
-            view = track();
-            caption("Street names overhead, landmarks along the way", 3200);
-            driveTo(view, 280);
-            caption("Every turn on the map is a corner on the track", 3000);
-            driveTo(view, 560);
-            finish(view, 60 * 900);
+            caption("First person, 3D, four on four", 2800);
+            driveFor(view, 6000);
+            caption("Get hit and the whole field knows", 2800);
+            driveFor(view, 8000);
+            finish(view, 10 * 60 * Match.TICK_HZ);
+            caption("Scoreboards, trophies and excuses", 2600);
             collectAll();
-            waitFor(1000);
+            waitFor(1200);
             home();
 
             click("partyButton");
@@ -127,71 +91,36 @@ public class PromoVideoTest extends E2e {
             String code = ((Label) findByName("partyCode")).getText().trim();
             guest = Guest.signIn(RIVAL, PASSWORD);
             final Guest g = guest;
-            caption("Race friends live: a party code, chat and voice", 3000);
+            caption("Play friends live: a party code, chat and voice", 3000);
             g.join(code);
             until(() -> g.heard("\"party\""), 20000, "the guest in the party");
             waitFor(900);
-            g.say("Hey! Ready when you are");
+            g.say("Bring goggles");
             waitFor(1100);
             onEdt(() -> {
                 TextField say = (TextField) findByName("chatField");
-                say.setText("Neon Causeway, best of three?");
+                say.setText("Loser mows the lawn");
                 say.fireDoneEvent();
             });
-            waitFor(1000);
-            g.say("You're on.");
             waitFor(1500);
             click("goButton");
-            waitForForm("run");
-            view = track();
-            final RunView racing = view;
-            until(() -> racing.driver().run().tick() > 30, 20000, "the countdown");
-            caption("Same seed, side by side, scored by the server", 3000);
-            driveFor(view, 4000);
-            g.emote("wow");
-            g.say("Catch me if you can!");
-            click("emote-wave");
+            waitForForm("match");
+            view = arena();
+            caption("The server is the referee; the phone predicts", 3000);
+            driveFor(view, 8000);
+            g.emote("bounce");
+            g.say("That one bounced");
+            click("emote-ref");
             driveFor(view, 6000);
-            // A race steps in lockstep with the guest, who sends no inputs
-            // from here; leave it the way the pause menu does.
-            final RunView race = view;
+            final ArenaView live = view;
             onEdt(() -> {
-                ((RaceDriver) race.driver()).leave();
-                race.stop();
-                race.driver().dispose();
+                ((OnlineDriver) live.driver()).leave();
+                live.stop();
+                live.driver().dispose();
             });
             g.leave();
             guest = null;
             home();
-
-            click("forgeButton");
-            waitForForm("forge");
-            caption("Build levels in the app, playtest, publish", 3000);
-            waitFor(1800);
-            onEdt(() -> PackEditor.create("Frost Pass"));
-            waitForForm("packEditor");
-            waitFor(1200);
-            click("addLevel");
-            waitForForm("levelEditor");
-            waitFor(1200);
-            click("tool-" + Content.HURDLE);
-            Component t = findByName("timeline");
-            onEdt(() -> t.getComponentForm().scrollComponentToVisible(t));
-            waitFor(500);
-            for (int i = 0; i < 3; i++) {
-                touch(t.getAbsoluteX() + t.getWidth() * (2 + 2 * i) / 10 - t.getScrollX(),
-                        t.getAbsoluteY() + t.getHeight() * (2 + i % 3) / 5 + t.getHeight() / 10);
-                waitFor(600);
-            }
-            waitFor(1200);
-            click("playtest");
-            waitForForm("run");
-            view = track();
-            driveFor(view, 4000);
-            finish(view, 60 * 600);
-            collectAll();
-            click("done");
-            waitForForm("levelEditor");
 
             caption("Splat -- a Codename One sample. Rename it, reskin it, ship it.", 3200);
             waitFor(3400);
@@ -208,29 +137,24 @@ public class PromoVideoTest extends E2e {
             if (guest != null) {
                 guest.leave();
             }
-            Routing.setService(realRoutes);
-            Landmarks.setSource(new Landmarks.Overpass("https://overpass-api.de/api/interpreter"));
         }
     }
 
-    /// About forty seconds of play in the phone's skin: one run of the
-    /// causeway from its side-on start through the swing into 3D.
+    /// About thirty seconds of play in the phone's skin: one practice match.
     private void clip(String out) throws Exception {
         record(out, RecordingOptions.Frame.SKIN, 90);
         caption("Splat", 1800);
         click("runButton");
-        waitForForm("levels");
+        waitForForm("play");
         waitFor(900);
-        click("play-" + Content.CAUSEWAY);
-        waitForForm("run");
-        RunView view = track();
-        driveTo(view, 280);
-        caption("2D to 3D, mid-run", 2600);
-        driveTo(view, 420);
-        driveFor(view, 6000);
+        click("practice-lot7:TEAM_PAINT");
+        waitForForm("match");
+        ArenaView view = arena();
+        waitFor(3200);
+        driveFor(view, 10000);
         caption("Built with Codename One", 2600);
-        driveFor(view, 2800);
-        finish(view, 60 * 600);
+        driveFor(view, 8000);
+        finish(view, 10 * 60 * Match.TICK_HZ);
         collectAll();
         SimulatorRecorder.Result r = recorder.stop();
         recorder = null;
@@ -255,15 +179,6 @@ public class PromoVideoTest extends E2e {
 
     private void caption(String text, long ms) {
         recorder.caption(text, ms);
-    }
-
-    /// Lets the bot run until the runner is `metres` down the track.
-    private void driveTo(RunView view, int metres) {
-        long give = System.currentTimeMillis() + 90000;
-        while (view.driver().run().runner(view.driver().me()).z / 1000 < metres
-                && System.currentTimeMillis() < give && !driveFor(view, 100)) {
-            // the bot steers
-        }
     }
 
     /// Back to the home screen, the way the tab bar takes a player there.

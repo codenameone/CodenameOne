@@ -18,155 +18,63 @@
  */
 package com.codenameone.examples.splat.ui;
 
-import com.codename1.ui.Button;
-import com.codename1.ui.Container;
-import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
-import com.codename1.ui.Label;
-import com.codename1.ui.Slider;
-import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.splat.api.ReplayDto;
 import com.codenameone.examples.splat.net.Api;
 import com.codenameone.examples.splat.net.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.rules.Replay;
-import com.codenameone.examples.splat.rules.Run;
-import com.codenameone.examples.splat.run.Levels;
-import com.codenameone.examples.splat.run.ReplayDriver;
-import com.codenameone.examples.splat.run.RunView;
+import com.codenameone.examples.splat.rules.RulesVersion;
+import java.util.List;
 
-/// A replay. Nothing was recorded but the level, the seed and the inputs each
-/// runner gave: the [Run] is simply run again under the same rules, which is
-/// why a replay is a few hundred bytes and why scrubbing is "run from the
-/// start up to here". A tap on a runner's name follows that runner.
+/// A finished match, simulated again on the phone from its seed and the human
+/// inputs. The server sends no video and no positions: the file is a few
+/// kilobytes, and the bots replay their own decisions because they think inside
+/// the rules.
 // tag::splat-replay-form[]
-public final class ReplayForm implements RunView.Hud {
-    private final ReplayDriver driver;
-    private final Slider scrub = new Slider();
-    private final Label clock = new Label("0:00", "RunClock");
-    private final Runnable back;
-    private boolean dragging;
-
-    private ReplayForm(ReplayDriver driver, Runnable back) {
-        this.driver = driver;
-        this.back = back;
+public final class ReplayForm {
+    private ReplayForm() {
     }
 
-    /// A race (by id) or a leaderboard run (`level|player` ids) from the server.
+    /// Fetches match `id` and plays it, following the signed-in player.
+    public static void show(String id, final Runnable back) {
+        Api.game().replay(id, Net.to(r -> Ui.later(() -> open(r, back)), Ui::failed));
+    }
+
     public static void load(String id) {
-        Api.game().replay(id, Net.to(r -> Ui.later(() -> open(r, null)), Ui::failed));
-    }
-
-    /// Opens `r`, fetching the community pack its level lives in first when
-    /// this device has not seen it.
-    public static void open(final ReplayDto r, final Runnable back) {
-        final Replay replay = Replay.decode(r.replay());
-        Levels.Playable level = Levels.resolve(replay.levelId());
-        if (level != null) {
-            show(level, replay, r.names() == null ? null : r.names().toArray(new String[0]), back);
-            return;
-        }
-        String pack = Levels.packOf(replay.levelId());
-        if (pack == null) {
-            Ui.toast("This replay's level is not in this version of the game.");
-            return;
-        }
-        Api.forge().pack(pack, Net.to(p -> Ui.later(() -> {
-            Levels.remember(p.content());
-            Levels.Playable found = Levels.resolve(replay.levelId());
-            if (found == null) {
-                Ui.toast("The level was changed after this run, so it cannot be replayed.");
-            } else {
-                show(found, replay, r.names() == null ? null : r.names().toArray(new String[0]), back);
-            }
-        }), Ui::failed));
-    }
-
-    public static void show(Levels.Playable level, Replay replay, String[] names, Runnable back) {
-        int me = 0;
-        if (names != null && Session.user() != null) {
-            for (int i = 0; i < names.length; i++) {
-                if (Session.user().displayName().equals(names[i])) {
-                    me = i;
-                }
-            }
-        }
-        new ReplayForm(new ReplayDriver(level, replay, names, me), back).build();
-    }
-
-    private void build() {
-        final RunView view = new RunView(driver);
-        view.setName("track");
-        view.setHud(this);
-        Form f = new Form(driver.run().level().name, new BorderLayout());
-        f.setName("replay");
-        f.setUIID("RunScreen");
-        Ui.back(f, () -> {
-            view.stop();
-            if (back != null) {
-                back.run();
-            } else if (Session.user() == null) {
+        show(id, () -> {
+            if (Session.user() == null) {
                 SignInForm.show();
             } else {
                 HistoryForm.show();
             }
         });
-        f.add(BorderLayout.CENTER, view);
-        scrub.setName("scrub");
-        scrub.setEditable(true);
-        scrub.setMinValue(0);
-        scrub.setMaxValue(Math.max(1, driver.length()));
-        scrub.addPointerPressedListener(e -> dragging = true);
-        scrub.addPointerReleasedListener(e -> dragging = false);
-        scrub.addDataChangedListener((type, index) -> {
-            if (dragging) {
-                driver.seek(scrub.getProgress());
+    }
+
+    public static void open(ReplayDto r, Runnable back) {
+        Replay replay;
+        try {
+            replay = Replay.decode(r.replay());
+        } catch (RuntimeException bad) {
+            Ui.toast("This replay could not be read.");
+            return;
+        }
+        if (replay.rulesVersion() != RulesVersion.ID) {
+            Ui.toast("This match was played on older rules and can no longer be replayed.");
+            return;
+        }
+        MatchForm.replay(replay, follow(r.names()), back == null ? HistoryForm::show : back);
+    }
+
+    private static int follow(List<String> names) {
+        if (names == null || Session.user() == null) {
+            return 0;
+        }
+        for (int i = 0; i < names.size(); i++) {
+            if (Session.user().displayName().equals(names.get(i))) {
+                return i;
             }
-        });
-        final Button pause = Ui.button("", "ReplayButton", "pause", null);
-        pause.setMaterialIcon(FontImage.MATERIAL_PAUSE);
-        pause.addActionListener(e -> {
-            driver.setPaused(!driver.isPaused());
-            pause.setMaterialIcon(driver.isPaused() ? FontImage.MATERIAL_PLAY_ARROW : FontImage.MATERIAL_PAUSE);
-        });
-        final Button speed = Ui.button("1x", "ReplayButton", "speed", null);
-        speed.addActionListener(e -> {
-            int next = driver.speedPercent() >= 400 ? 100 : driver.speedPercent() * 2;
-            driver.setSpeedPercent(next);
-            speed.setText((next / 100) + "x");
-        });
-        Container controls = new Container(new BorderLayout());
-        controls.setUIID("ReplayBar");
-        controls.setSafeArea(true);
-        controls.add(BorderLayout.WEST, BoxLayout.encloseX(pause, speed));
-        controls.add(BorderLayout.CENTER, scrub);
-        controls.add(BorderLayout.EAST, clock);
-        if (driver.run().runnerCount() > 1) {
-            final Button follow = Ui.button(driver.name(driver.me()), "ReplayButton", "follow", null);
-            follow.addActionListener(e -> {
-                driver.follow((driver.me() + 1) % driver.run().runnerCount());
-                follow.setText(driver.name(driver.me()));
-            });
-            controls.add(BorderLayout.NORTH, follow);
         }
-        f.add(BorderLayout.SOUTH, controls);
-        f.show();
-        view.start();
-    }
-    // end::splat-replay-form[]
-
-    @Override
-    public void ticked(Run r) {
-        if (!dragging) {
-            scrub.setProgress(r.tick());
-        }
-        int s = r.tick() / Run.TICKS_PER_SECOND;
-        clock.setText((s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60));
-    }
-
-    @Override
-    public void ended(Run r) {
-        driver.setPaused(true);
+        return 0;
     }
 }
+// end::splat-replay-form[]

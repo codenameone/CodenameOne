@@ -61,6 +61,7 @@ public final class Ui {
         f.setUIID("GameForm");
         f.getToolbar().setUIID("GameToolbar");
         f.getToolbar().getTitleComponent().setUIID("GameTitle");
+        f.setTitle(caps(title));
         f.setScrollableY(true);
         Telemetry.screen(name);
         return f;
@@ -166,25 +167,22 @@ public final class Ui {
         return new Component() {
             @Override
             public void paint(Graphics g) {
+                // Segmented and square, the way a shooter shows a stat.
                 int h = getHeight();
                 int w = getWidth();
-                g.setAntiAliased(true);
-                g.setColor(0x0e1224);
-                g.fillRoundRect(getX(), getY(), w, h, h, h);
-                int fill = max <= 0 ? 0 : (int) ((long) Math.max(0, Math.min(value, max)) * (w - 2) / max);
-                if (fill > 0) {
-                    g.setColor(color);
-                    g.fillRoundRect(getX() + 1, getY() + 1, Math.max(h - 2, fill), h - 2, h - 2, h - 2);
-                    g.setColor(0xffffff);
-                    g.setAlpha(70);
-                    g.fillRoundRect(getX() + 2, getY() + 1, Math.max(h - 4, fill - 2), (h - 2) / 2, h / 2, h / 2);
-                    g.setAlpha(255);
+                int segs = 10;
+                int gap = Math.max(1, CN.convertToPixels(0.3f));
+                int sw = Math.max(1, (w - gap * (segs - 1)) / segs);
+                int lit = max <= 0 ? 0 : (int) ((long) Math.max(0, Math.min(value, max)) * segs * 2 / max + 1) / 2;
+                for (int i = 0; i < segs; i++) {
+                    g.setColor(i < lit ? color : 0x2a3038);
+                    g.fillRect(getX() + i * (sw + gap), getY(), sw, h);
                 }
             }
 
             @Override
             protected Dimension calcPreferredSize() {
-                return new Dimension(CN.convertToPixels(20), CN.convertToPixels(2.2f));
+                return new Dimension(CN.convertToPixels(26), CN.convertToPixels(1.4f));
             }
         };
     }
@@ -213,6 +211,11 @@ public final class Ui {
         l.setName(uiid);
         l.setMaterialIcon(icon);
         return l;
+    }
+
+    /// `s` in capitals, the way every menu label in the game is set.
+    public static String caps(String s) {
+        return com.codenameone.examples.splat.play.Type.caps(s == null ? "" : s);
     }
 
     public static void toast(String text) {

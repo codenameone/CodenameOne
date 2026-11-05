@@ -25,8 +25,6 @@ import com.codenameone.examples.splat.engage.Friends;
 import com.codenameone.examples.splat.engage.Notifications;
 import com.codenameone.examples.splat.engage.Store;
 import com.codenameone.examples.splat.engage.Telemetry;
-import com.codenameone.examples.splat.forge.ForgeHome;
-import com.codenameone.examples.splat.forge.PackScreen;
 import com.codenameone.examples.splat.net.Session;
 
 /// Where the app goes. Every screen change that is not a plain "back" comes
@@ -34,7 +32,6 @@ import com.codenameone.examples.splat.net.Session;
 /// land on the same screen the same way.
 public final class Nav {
     private static String pendingChallenge;
-    private static String pendingPack;
 
     private Nav() {
     }
@@ -42,7 +39,6 @@ public final class Nav {
     /// The first screen: the stored session decides between home and sign-in.
     public static void launch() {
         pendingChallenge = AppConfig.challengeCode();
-        pendingPack = AppConfig.packId();
         Session.onSignedOut(() -> CN.callSerially(SignInForm::show));
         Session.restore(() -> CN.callSerially(Nav::enter),
                 () -> CN.callSerially(SignInForm::show),
@@ -61,12 +57,6 @@ public final class Nav {
             String code = pendingChallenge;
             pendingChallenge = null;
             challenge(code);
-            return;
-        }
-        if (pendingPack != null) {
-            String id = pendingPack;
-            pendingPack = null;
-            PackScreen.show(id);
             return;
         }
         if (Session.user() != null && Session.user().admin()
@@ -89,7 +79,7 @@ public final class Nav {
     }
 
     public static void challenge(String code) {
-        RaceLobby.join(code);
+        MatchLobby.join(code);
     }
 
     public static void adminConsole() {
@@ -104,19 +94,12 @@ public final class Nav {
             shop();
         } else if ("friends".equals(name)) {
             FriendsForm.show();
-        } else if ("forge".equals(name)) {
-            ForgeHome.show();
-        } else if ("runner".equals(name)) {
-            RunnerForm.show();
-        } else if ("race".equals(name)) {
-            RaceLobby.quick(null);
-        } else if ("daily".equals(name)) {
-            RunForm.daily();
+        } else if ("loadout".equals(name)) {
+            LoadoutForm.show();
+        } else if ("play".equals(name)) {
+            PlayForm.show();
         } else if ("crews".equals(name)) {
             CrewsForm.show();
-        } else if (name != null && name.startsWith("level:")) {
-            // "A friend beat your score": that level's board, to see by how much.
-            ScoresForm.show(name.substring(6), null);
         } else {
             home();
         }

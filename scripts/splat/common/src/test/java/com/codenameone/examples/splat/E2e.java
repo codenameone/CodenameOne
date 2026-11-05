@@ -33,13 +33,11 @@ import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.rules.Bot;
-import com.codenameone.examples.splat.api.GameProtocol;
-import com.codenameone.examples.splat.run.RaceDriver;
-import com.codenameone.examples.splat.rules.Run;
-import com.codenameone.examples.splat.rules.Track;
-import com.codenameone.examples.splat.run.Driver;
-import com.codenameone.examples.splat.run.RunView;
-import com.codenameone.examples.splat.run.Sfx;
+import com.codenameone.examples.splat.rules.Match;
+import com.codenameone.examples.splat.rules.Rng;
+import com.codenameone.examples.splat.play.Driver;
+import com.codenameone.examples.splat.play.ArenaView;
+import com.codenameone.examples.splat.play.Sfx;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.ui.Nav;
 import java.io.OutputStream;
@@ -199,62 +197,43 @@ public abstract class E2e extends AbstractTest {
         until(() -> Session.user() != null, 30000, "the sign-in");
     }
 
-    protected RunView track() {
-        until(() -> findByName("track") instanceof RunView, 20000, "the track");
-        return (RunView) findByName("track");
+    protected ArenaView arena() {
+        until(() -> findByName("arena") instanceof ArenaView, 20000, "the arena");
+        return (ArenaView) findByName("arena");
     }
 
-    /// Runs the level with the bot's thumbs: before every tick, whatever the
-    /// bot would press goes through the same `input` a swipe reaches. A test
-    /// still asserts that the run ended, never that it was won.
-    protected void drive(final RunView view, int timeoutMillis) {
-        if (!driveFor(view, timeoutMillis)) {
-            assertTrue(false, "the run did not end in " + timeoutMillis + " ms");
-        }
-    }
-
-    /// Steers with the bot for `millis` of real time, or until the run ends,
-    /// so a test waiting on the screen does not leave the runner to crash.
-    /// Answers whether the run ended.
-    protected boolean driveFor(final RunView view, int millis) {
-        // A race applies an input when the server has stamped it, at least
-        // INPUT_DELAY ticks on, so the bot looks that much further ahead.
-        final Bot bot = new Bot(7, 90, view.driver() instanceof RaceDriver ? GameProtocol.INPUT_DELAY + 4 : 0);
-        onEdt(() -> view.setBeforeTick(() -> {
-            Run run = view.driver().run();
-            if (!run.over()) {
-                view.driver().input(bot.decide(run, view.driver().me()));
-            }
-        }));
+    /// Plays with the rules' bot on the player's thumbs for `millis` of real
+    /// time, or until the match ends. Answers whether it ended. A test asserts
+    /// that a match ended, never that it was won.
+    protected boolean driveFor(final ArenaView view, int millis) {
+        onEdt(() -> view.setAutopilot(new Rng(7)));
         try {
             long end = System.currentTimeMillis() + millis;
             while (System.currentTimeMillis() < end) {
                 final boolean[] over = new boolean[1];
-                onEdt(() -> over[0] = view.driver().run().over());
+                onEdt(() -> over[0] = view.driver().match().over());
                 if (over[0]) {
                     return true;
                 }
                 waitFor(16);
             }
         } finally {
-            onEdt(() -> view.setBeforeTick(null));
+            onEdt(() -> view.setAutopilot(null));
         }
         return false;
     }
 
-    /// Plays the rest of the run at once, the bot choosing every tick, so a
-    /// long level costs a test a moment instead of minutes of real time. The
-    /// view then sees a finished run on its next frame, the way it would at
-    /// the end of a real one. `maxTicks` stops an endless level.
-    protected void finish(final RunView view, final int maxTicks) {
+    /// Plays the rest of an offline match at once, the bot choosing every
+    /// tick, so a five minute match costs a test a moment. The view then sees
+    /// a finished match on its next frame, as it would at the end of a real one.
+    protected void finish(final ArenaView view, final int maxTicks) {
         onEdt(() -> {
-            Bot bot = new Bot(7, 90);
+            Rng rng = new Rng(7);
             Driver d = view.driver();
-            Run run = d.run();
-            int limit = run.tick() + maxTicks;
-            while (!run.over() && d.canStep() && run.tick() < limit) {
-                d.input(bot.decide(run, d.me()));
-                d.step();
+            Match m = d.match();
+            int limit = m.tick() + maxTicks;
+            while (!m.over() && d.canStep() && m.tick() < limit) {
+                d.step(Bot.think(m, m.player(d.me()), rng));
             }
         });
     }
@@ -315,34 +294,9 @@ public abstract class E2e extends AbstractTest {
         capture(dir, name);
     }
 
-    /// Whether the stretch the camera shows next -- 10 to 70 m ahead --
-    /// holds at least `items` coins, power-ups and obstacles, so a shot of
-    /// the track has something on it.
-    protected static boolean busyAhead(RunView view, int items) {
-        Run run = view.driver().run();
-        int z = run.runner(view.driver().me()).z;
-        Track t = run.track();
-        int n = 0;
-        for (int i = 0; i < t.size(); i++) {
-            Track.Entry e = t.get(i);
-            if (e.z > z + 10 * Track.UNIT && e.z < z + 70 * Track.UNIT) {
-                n++;
-            }
-        }
-        return n >= items;
-    }
-
-    /// Lets the bot run, for at most `millis`, until the track ahead is busy.
-    protected void driveToBusy(RunView view, int items, int millis) {
-        long give = System.currentTimeMillis() + millis;
-        while (System.currentTimeMillis() < give && !busyAhead(view, items) && !driveFor(view, 100)) {
-            // the bot steers
-        }
-    }
-
     /// A shot of a run in progress: the bot keeps steering while the frame
     /// settles, or the runner would be on the floor by the time it is taken.
-    protected void shot(String name, RunView view) {
+    protected void shot(String name, ArenaView view) {
         String dir = System.getProperty("splat.shots.dir");
         if (dir == null || dir.length() == 0) {
             return;

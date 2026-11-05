@@ -102,7 +102,7 @@ class GoldenReplayTest {
 
     @Test
     void decodedReplayMatchesTheRecordedRun() {
-        Replay r = scripted(9, "weekend", Mode.SNACK_BAR);
+        Replay r = scripted(9, "lot7", Mode.SNACK_BAR);
         Match direct = r.play();
         Match decoded = Replay.decode(r.encode()).play();
         assertEquals(direct.stateHash(), decoded.stateHash());

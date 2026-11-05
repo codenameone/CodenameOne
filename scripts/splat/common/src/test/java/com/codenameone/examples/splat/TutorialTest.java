@@ -20,35 +20,36 @@ package com.codenameone.examples.splat;
 
 import com.codename1.ui.CN;
 import com.codenameone.examples.splat.api.RewardDto;
-import com.codenameone.examples.splat.run.RunView;
+import com.codenameone.examples.splat.play.ArenaView;
 import com.codenameone.examples.splat.ui.Nav;
 import com.codenameone.examples.splat.ui.Rewards;
-import com.codenameone.examples.splat.ui.RunForm;
+import com.codenameone.examples.splat.play.Arenas;
+import com.codenameone.examples.splat.rules.Match;
+import com.codenameone.examples.splat.ui.MatchForm;
 import java.util.Arrays;
 
-/// The home screen with progress on it, then the first level the way a new
-/// player meets it: the countdown, the coach's lines as the hazards arrive,
-/// and the result.
+/// The home screen with progress on it, then the first practice match the way
+/// a new player meets it: the briefing, the match, the scoreboard and the
+/// reward.
 public class TutorialTest extends E2e {
     @Override
     protected boolean run() throws Exception {
         signIn(PLAYER);
         waitForForm("home");
-        until(() -> has("chests") || has("spotlight"), 20000, "the progress on the home screen");
+        until(() -> has("level"), 20000, "the progress on the home screen");
         shot("home");
-        onEdt(RunForm::tutorial);
-        waitForForm("run");
-        final RunView view = track();
-        until(() -> view.driver().run().tick() > 120, 20000, "the run to start");
-        until(() -> has("coach"), 20000, "the coach");
-        shot("tutorial-coach");
-        finish(view, 60 * 600);
+        onEdt(() -> MatchForm.practice(Arenas.DEFAULT, Nav::home));
+        waitForForm("match");
+        final ArenaView view = arena();
+        shot("tutorial-briefing");
+        until(() -> view.driver().countdownTicks() == 0, 20000, "the briefing to end");
+        finish(view, 10 * 60 * Match.TICK_HZ);
         awaitResult("the result");
         shot("tutorial-result");
         click("done");
         // Not through onEdt: the popup is modal and would hold it forever.
         CN.callSerially(() -> Rewards.show(new RewardDto("Training complete", 100, 15, 150, 2, 2, true,
-                Arrays.asList("Sprinter")), Nav::home));
+                Arrays.asList("Weekend Warrior")), Nav::home));
         until(() -> has("collectReward"), 10000, "the reward");
         shot("reward-levelup");
         click("collectReward");

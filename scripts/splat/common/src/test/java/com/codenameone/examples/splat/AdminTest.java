@@ -32,7 +32,7 @@ public class AdminTest extends E2e {
         waitForForm("admin");
         until(() -> has("stat-Open flags"), 20000, "the numbers");
         shot("admin-overview");
-        onEdt(() -> ((com.codename1.ui.Tabs) findByName("adminTabs")).setSelectedIndex(8));
+        onEdt(() -> ((com.codename1.ui.Tabs) findByName("adminTabs")).setSelectedIndex(7));
         until(() -> has("promoteTitle"), 20000, "the Promote tab");
         shot("admin-promote");
         onEdt(() -> ((com.codename1.ui.Tabs) findByName("adminTabs")).setSelectedIndex(1));

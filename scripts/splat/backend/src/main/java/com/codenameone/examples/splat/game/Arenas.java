@@ -21,10 +21,10 @@ package com.codenameone.examples.splat.game;
 import com.codenameone.examples.splat.rules.Catalog;
 import com.codenameone.examples.splat.rules.Mode;
 
-/// A playlist reference: `arena:MODE`, such as `weekend:CAPTURE_THE_FLAG`. It is
+/// A playlist reference: `arena:MODE`, such as `lot7:CAPTURE_THE_FLAG`. It is
 /// what a client asks to play and what a match record stores as its level.
 public final class Arenas {
-    public static final String DEFAULT = "weekend:TEAM_PAINT";
+    public static final String DEFAULT = "lot7:TEAM_PAINT";
 
     private Arenas() {
     }

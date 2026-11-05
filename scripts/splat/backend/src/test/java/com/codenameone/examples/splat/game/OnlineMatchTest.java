@@ -139,7 +139,7 @@ class OnlineMatchTest {
 
     @Test
     void anInputFloodIsCutAndOldSequencesAreDropped() {
-        MatchRoom room = new MatchRoom("r", Arenas.DEFAULT, "weekend", Arenas.mode(Arenas.DEFAULT), 7L,
+        MatchRoom room = new MatchRoom("r", Arenas.DEFAULT, "lot7", Arenas.mode(Arenas.DEFAULT), 7L,
                 new Seat[] {new Seat("a@x", "A", "semi", 0, 0, null), new Seat("", "Bot", "pump", 0, 1, null)}, 0L);
         int accepted = 0;
         for (int i = 1; i <= 100; i++) {
@@ -154,7 +154,7 @@ class OnlineMatchTest {
 
     @Test
     void anAimbotFlickIsCounted() {
-        MatchRoom room = new MatchRoom("r", Arenas.DEFAULT, "weekend", Arenas.mode(Arenas.DEFAULT), 7L,
+        MatchRoom room = new MatchRoom("r", Arenas.DEFAULT, "lot7", Arenas.mode(Arenas.DEFAULT), 7L,
                 new Seat[] {new Seat("a@x", "A", "semi", 0, 0, null), new Seat("", "Bot", "pump", 0, 1, null)}, 0L);
         room.input(0, 1, new Input(0, 0, 0, 0, 0, -1));
         room.step();

@@ -38,26 +38,29 @@ public final class SignInForm {
         Form f = Ui.form("", "signin");
         f.setLayout(new com.codename1.ui.layouts.LayeredLayout());
         f.setScrollable(false);
-        f.add(Kit.backdrop());
+        f.setUIID("MenuForm");
+        f.add(new com.codenameone.examples.splat.play.OperatorStage("op-swat", "semi",
+                CN.getDisplayWidth() > CN.getDisplayHeight() ? 0.9f : 0.55f));
+        Label shade = new Label();
+        shade.setUIID("MenuShade");
+        f.add(shade);
         f.getToolbar().hideToolbar();
         Container col = Ui.column();
-        col.add(heroes());
         col.add(Ui.label("SPLAT", "Logo"));
-        col.add(FlowLayout.encloseCenter(Ui.label("Run. Race. Build.", "Tagline")));
+        col.add(Ui.label("TEAM PAINTBALL. TACTICAL. ALLEGEDLY.", "Tagline"));
         final TextField email = field("Email", TextField.EMAILADDR, "email");
         final TextField password = field("Password", TextField.PASSWORD, "password");
         // Fields and both buttons share one panel, so they share one width.
         // The guest run and the server switch sit inside the panel too, so
         // nothing reads over the backdrop's track.
-        Button guest = Ui.button("Try a level without an account", "LinkButton", "practiceButton",
-                e -> RunForm.solo(com.codenameone.examples.splat.run.Levels.official(
-                        com.codenameone.examples.splat.rules.Content.CAUSEWAY), 1L, "guest", null, SignInForm::show));
+        Button guest = Ui.button("PRACTICE VS BOTS -- NO ACCOUNT NEEDED", "LinkButton", "practiceButton",
+                e -> MatchForm.practice("lot7:TEAM_PAINT", SignInForm::show));
         Container panel = Ui.panel(email, password,
-                Ui.primary("Sign in", "signInButton", e -> {
+                Ui.primary("SIGN IN", "signInButton", e -> {
                     Session.signIn(email.getText().trim(), password.getText(),
                             () -> Ui.later(Nav::signedIn), Ui::failed);
                 }),
-                Ui.secondary("Create an account", "registerButton", e -> RegisterForm.show()), guest);
+                Ui.secondary("ENLIST", "registerButton", e -> RegisterForm.show()), guest);
         // Which server the app talks to is a setting, not something every
         // player meets before signing in: it is under Settings, signed in.
         col.add(panel);
@@ -68,19 +71,6 @@ public final class SignInForm {
         front.add(safe);
         f.add(front);
         f.show();
-    }
-
-    /// Three runners mid-stride, the middle one in front: the first thing a
-    /// new player sees is who they will race.
-    static Container heroes() {
-        int h = CN.convertToPixels(26);
-        Label left = new Label(Portraits.figure("runner-nova", h * 4 / 5), "SignInHero");
-        Label mid = new Label(Portraits.figure("runner-splat", h), "SignInHero");
-        Label right = new Label(Portraits.figure("runner-kite", h * 4 / 5), "SignInHero");
-        Container c = new Container(new FlowLayout(Component.CENTER, Component.BOTTOM));
-        c.add(left).add(mid).add(right);
-        c.setName("heroes");
-        return c;
     }
 
     static TextField field(String hint, int constraint, String name) {

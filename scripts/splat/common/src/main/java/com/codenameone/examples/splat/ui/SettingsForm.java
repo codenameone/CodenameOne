@@ -28,8 +28,8 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.splat.AppConfig;
 import com.codenameone.examples.splat.api.ProfileDto;
-import com.codenameone.examples.splat.run.RunView;
-import com.codenameone.examples.splat.run.Sfx;
+import com.codenameone.examples.splat.play.ArenaView;
+import com.codenameone.examples.splat.play.Sfx;
 import com.codenameone.examples.splat.engage.Notifications;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
@@ -66,8 +66,8 @@ public final class SettingsForm {
                     Preferences.set(SOUND_KEY, on);
                     Sfx.setMuted(!on);
                 }),
-                toggle("On-screen buttons", "touchButtons", Preferences.get(RunView.BUTTONS_KEY, true),
-                        on -> Preferences.set(RunView.BUTTONS_KEY, on)),
+                toggle("Invert look", "invertLook", Preferences.get(ArenaView.INVERT_KEY, false),
+                        on -> Preferences.set(ArenaView.INVERT_KEY, on)),
                 toggle("Share anonymous usage", "analytics", Telemetry.allowed(), Telemetry::allow),
                 toggle("Notifications", "push", Notifications.enabled(), Notifications::setEnabled)));
         if (AppConfig.serverSwitchable()) {

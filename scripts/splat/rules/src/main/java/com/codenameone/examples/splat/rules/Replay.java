@@ -89,6 +89,40 @@ public final class Replay {
         return m;
     }
 
+    /// A match played forward one tick at a time from this replay, for a viewer
+    /// that draws every tick instead of jumping to the end.
+    public Cursor cursor() {
+        return new Cursor();
+    }
+
+    /// One pass through a replay. [#runTo] in pieces: the same inputs on the same
+    /// ticks, so it ends exactly where [#play] does.
+    public final class Cursor {
+        private final Match match = newMatch();
+        private final Input[] frame = new Input[slots.size()];
+        private int next;
+
+        public Match match() {
+            return match;
+        }
+
+        /// Steps one tick; false once the match is over.
+        public boolean step() {
+            if (match.over()) {
+                return false;
+            }
+            for (int i = 0; i < frame.length; i++) {
+                frame[i] = null;
+            }
+            while (next < entries.size() && entries.get(next).tick == match.tick()) {
+                Entry en = entries.get(next++);
+                frame[en.slot] = en.input;
+            }
+            match.step(frame);
+            return true;
+        }
+    }
+
     public Match play() {
         return runTo(Integer.MAX_VALUE);
     }
