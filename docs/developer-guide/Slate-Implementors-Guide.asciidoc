@@ -185,7 +185,11 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/HoursForm.java[tag=slate-hours-form,indent=0]
 ----
 
-The provider's day, week and agenda are one schedule read over a range:
+The provider's day, week and agenda are one schedule read over a range, drawn as
+a timeline: a lane per day, the working hours as a band, bookings as blocks as long
+as they last, calendar busy time shaded and a line at the current time. The owner's
+day board is the same component with a lane per provider, so a gap reads the same
+on both:
 
 [source,java,role=cn1-no-try]
 ----
@@ -195,6 +199,11 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 [source,java,role=cn1-no-try]
 ----
 include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/ProviderForm.java[tag=slate-provider-timeline,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/ui/Timeline.java[tag=slate-timeline,indent=0]
 ----
 
 === Calendars, both ways
@@ -317,6 +326,10 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 * *Your vertical.* A row in `Verticals` and, for the demo, a set of services.
 * *Your brand.* Colors and shapes are in `common/src/main/css/theme.css`, text in
   `common/src/main/l10n`.
+* *What it leaves out.* Slate books single appointments. Packages and memberships,
+  gift cards, reviews, recurring appointments, intake forms beyond the one question
+  a service can ask, tips and staff commission aren't included; each is a table
+  and a screen on top of the booking rules, which stay as they are.
 * *Your rules.* Every gap rule is a column of the business that the owner edits
   and previews; the engine is where a new rule goes, with a reason to report.
 

@@ -21,6 +21,7 @@ package com.codenameone.examples.slate.ui;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
@@ -73,6 +74,12 @@ public final class Chart extends Component {
                 CN.convertToPixels(HEIGHT_MM) + style.getVerticalPadding());
     }
 
+    // Whole numbers as they are, anything else to one decimal.
+    private static String number(double value) {
+        long whole = Math.round(value);
+        return Math.abs(value - whole) < 0.05 ? String.valueOf(whole) : Ui.tenths(value);
+    }
+
     @Override
     public void paint(Graphics g) {
         Style style = getStyle();
@@ -84,16 +91,7 @@ public final class Chart extends Component {
             return;
         }
         UIManager styles = getUIManager();
-        g.setColor(styles.getComponentStyle("SvChartGrid").getFgColor());
-        // Three lines to read the heights against: the foot, half, the top.
-        for (int line = 0; line <= 2; line++) {
-            int y = top + (height - 1) * line / 2;
-            g.drawLine(left, y, left + width, y);
-        }
         int count = values.length;
-        if (count == 0) {
-            return;
-        }
         double most = 0;
         int peak = -1;
         for (int iter = 0; iter < count; iter++) {
@@ -102,8 +100,41 @@ public final class Chart extends Component {
                 peak = iter;
             }
         }
-        if (most <= 0) {
+        // The scale: the top line's value and half of it, in a gutter of their
+        // own, so a bar's height is a number and not just taller or shorter.
+        if (most > 0) {
+            Style axis = styles.getComponentStyle("SvChartAxis");
+            Font font = axis.getFont();
+            String high = number(most);
+            String half = number(most / 2);
+            int pad = CN.convertToPixels(1f);
+            int gutter = font.stringWidth(high) + pad;
+            g.setFont(font);
+            g.setColor(axis.getFgColor());
+            int x = isRTL() ? left + width - gutter + pad : left;
+            g.drawString(high, x, top);
+            g.drawString(half, x, top + (height - 1) / 2 - font.getHeight() / 2);
+            width -= gutter;
+            if (!isRTL()) {
+                left += gutter;
+            }
+        }
+        g.setColor(styles.getComponentStyle("SvChartGrid").getFgColor());
+        // Three lines to read the heights against: the foot, half, the top.
+        for (int line = 0; line <= 2; line++) {
+            int y = top + (height - 1) * line / 2;
+            g.drawLine(left, y, left + width, y);
+        }
+        if (count == 0 || most <= 0) {
             return;
+        }
+        // The peak is picked out only when it is one day; four days tied at the
+        // top would make the one colored look chosen at random.
+        for (int iter = 0; iter < count; iter++) {
+            if (iter != peak && values[iter] == most) {
+                peak = -1;
+                break;
+            }
         }
         // The space is shared out in whole pixels, so every bar is as wide as
         // every other and what is left over goes to the two ends.

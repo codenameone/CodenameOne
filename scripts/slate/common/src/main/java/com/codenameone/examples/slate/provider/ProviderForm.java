@@ -37,6 +37,7 @@ import com.codenameone.examples.slate.net.Api;
 import com.codenameone.examples.slate.net.Net;
 import com.codenameone.examples.slate.net.Session;
 import com.codenameone.examples.slate.ui.Lang;
+import com.codenameone.examples.slate.ui.Timeline;
 import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Menu;
 import com.codenameone.examples.slate.ui.Nav;
@@ -93,6 +94,7 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
         top.add(Ui.choice("view", new String[] {"Day", "Week", "Agenda"},
                 new String[] {DAY, WEEK, AGENDA}, view, chosen -> {
                     view = chosen;
+                    from = WEEK.equals(view) ? Times.weekStart(from) : from;
                     load();
                 }));
         heading.add(BorderLayout.WEST, Ui.flat(FontImage.MATERIAL_CHEVRON_LEFT, "Earlier",
@@ -147,6 +149,13 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
         }
         timeline.removeAll();
         boolean agenda = AGENDA.equals(view);
+        if (!agenda) {
+            timeline.add(grid(s));
+            timeline.add(Timeline.legend());
+            Layouts.broaden(timeline);
+            Ui.relayout(timeline);
+            return;
+        }
         int shown = 0;
         for (int d = 0; d < days(); d++) {
             long dayFrom = Times.addDays(from, d);
@@ -172,6 +181,42 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
         }
         Layouts.broaden(timeline);
         Ui.relayout(timeline);
+    }
+
+    /// The day or the week as a timeline: a lane per day, the shifts as bands,
+    /// bookings as blocks a tap opens, calendar busy time hatched.
+    private Timeline grid(ScheduleDto s) {
+        List<Timeline.Lane> lanes = new ArrayList<Timeline.Lane>();
+        for (int d = 0; d < days(); d++) {
+            long dayFrom = Times.addDays(from, d);
+            Timeline.Lane lane = new Timeline.Lane(Times.shortDay(dayFrom), dayFrom);
+            List<Object> items = items(s, dayFrom, Times.addDays(from, d + 1), false);
+            for (int iter = 0; iter < items.size(); iter++) {
+                lane.add(block(items.get(iter)));
+            }
+            lanes.add(lane);
+        }
+        Timeline t = new Timeline(lanes, days() > 1);
+        t.setName("timeline-grid");
+        return t;
+    }
+
+    private Timeline.Block block(Object o) {
+        if (o instanceof ShiftDto) {
+            ShiftDto shift = (ShiftDto) o;
+            return new Timeline.Block(Timeline.SHIFT, shift.start(), shift.end(), "", "", null);
+        }
+        if (o instanceof BusyDto) {
+            BusyDto b = (BusyDto) o;
+            String what = "TIME_OFF".equals(b.kind()) ? Lang.tr("Time off")
+                    : b.label() == null || b.label().length() == 0 ? Lang.tr("Busy in a calendar")
+                    : b.label();
+            return new Timeline.Block(Timeline.BUSY, b.start(), b.end(), what, "", null);
+        }
+        final AppointmentDto a = (AppointmentDto) o;
+        return new Timeline.Block(Timeline.kindOf(a.state()), a.start(), a.end(),
+                a.serviceName(), Times.clock(a.start()) + Ui.DOT
+                        + (a.clientName() == null ? "" : a.clientName()), () -> booking(a));
     }
 
     /// Shifts, busy blocks and appointments that start in a day, in time order.

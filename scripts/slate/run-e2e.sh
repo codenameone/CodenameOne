@@ -43,7 +43,7 @@ if [ "$BUILD" = 1 ]; then
 fi
 
 echo "[slate-e2e] starting the server on port $PORT"
-CN1_PROFILE=test "$HERE/backend/server.sh" run "$MODE" --prebuilt --port "$PORT" >"$LOG" 2>&1 &
+CN1_PROFILE=test SLATE_DEMO_HISTORY=true "$HERE/backend/server.sh" run "$MODE" --prebuilt --port "$PORT" >"$LOG" 2>&1 &
 SERVER_PID=$!
 cleanup() {
   kill "$SERVER_PID" >/dev/null 2>&1 || true

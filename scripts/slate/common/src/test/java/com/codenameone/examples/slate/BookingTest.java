@@ -43,10 +43,18 @@ public class BookingTest extends E2e {
         signIn(CLIENT, "Client");
         click("service-" + serviceId);
         waitForForm("Book");
-        // Two days out: far enough that no notice rule refuses it.
-        String day = Times.iso(Times.addDays(System.currentTimeMillis(), 2));
-        click("day-" + day);
-        until(() -> firstNamed("slot-").length() > 0, 20000, "a free start");
+        // The first day from tomorrow that has a free start: far enough that no
+        // notice rule refuses it, and whichever weekday the run falls on.
+        boolean found = false;
+        for (int d = 1; d <= 7 && !found; d++) {
+            click("day-" + Times.iso(Times.addDays(System.currentTimeMillis(), d)));
+            long deadline = System.currentTimeMillis() + 8000;
+            while (!found && System.currentTimeMillis() < deadline) {
+                found = firstNamed("slot-").length() > 0;
+                waitFor(100);
+            }
+        }
+        assertTrue(found, "a day in the coming week has a free start");
         shot("book-slots");
         click(firstNamed("slot-"));
         waitForForm("Confirm");

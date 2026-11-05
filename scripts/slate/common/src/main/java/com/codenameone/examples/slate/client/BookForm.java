@@ -73,6 +73,9 @@ public final class BookForm extends LiveChannel.Adapter {
     private final AppointmentDto moving;
     private final Container choices = new Container(BoxLayout.y());
     private final Container slots = new Container(BoxLayout.y());
+    // Below the times, not above them: the times are what the screen is for,
+    // and the switch is set once and left alone.
+    private final Container myCalendar = new Container(BoxLayout.y());
     private final List<ServiceDto> services = new ArrayList<ServiceDto>();
     private final List<ProviderDto> providers = new ArrayList<ProviderDto>();
     private ServiceDto service;
@@ -91,7 +94,7 @@ public final class BookForm extends LiveChannel.Adapter {
         Container page = Ui.page();
         choices.setName("choices");
         slots.setName("slots");
-        page.add(choices).add(slots);
+        page.add(choices).add(slots).add(myCalendar);
         Layouts.broaden(page);
         form.add(BorderLayout.CENTER, page);
         form.addShowListener(e -> LiveChannel.listen(this));
@@ -167,6 +170,15 @@ public final class BookForm extends LiveChannel.Adapter {
             }));
         }
         choices.add(Ui.text(service.description() == null ? "" : service.description(), "SvText"));
+        // What it takes and costs, before a time is picked: every booking app
+        // answers this first.
+        String terms = Times.length(service.minutes()) + Ui.DOT
+                + Ui.money(service.priceCents(), service.currency());
+        if (service.depositPercent() > 0) {
+            terms += Ui.DOT + Lang.tr("Deposit {0}", Ui.money(service.priceCents()
+                    * service.depositPercent() / 100, service.currency()));
+        }
+        choices.add(Ui.text(terms, "SvCaption"));
         if (places.size() > 1 && moving == null && !service.online()) {
             String[] labels = new String[places.size()];
             String[] values = new String[places.size()];
@@ -202,8 +214,9 @@ public final class BookForm extends LiveChannel.Adapter {
                     loadSlots();
                 }));
         choices.add(when);
+        myCalendar.removeAll();
         if (DeviceCalendar.canReadBusy()) {
-            choices.add(Ui.row(FontImage.MATERIAL_EVENT_NOTE, "Check my calendar",
+            myCalendar.add(Ui.row(FontImage.MATERIAL_EVENT_NOTE, "Check my calendar",
                     "Marks times that clash with this phone's calendar",
                     Ui.toggle("checkCalendar", Preferences.get(CHECK_CALENDAR, false), on -> {
                         Preferences.set(CHECK_CALENDAR, on);

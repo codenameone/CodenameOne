@@ -21,6 +21,7 @@ package com.codenameone.examples.slate.owner;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.slate.api.DashboardDto;
@@ -107,7 +108,9 @@ public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
         page.add(top);
         StatRow second = Ui.stats(3);
         second.stat(d.utilisation() + "%", "Hours filled", "stat-utilisation");
-        second.stat(String.valueOf(d.noShows()), "No-shows", "stat-no-shows");
+        int shown = d.completed() + d.noShows();
+        second.stat(shown == 0 ? "0%" : (d.noShows() * 100 / shown) + "%", "No-show rate",
+                "stat-no-shows");
         second.stat(String.valueOf(d.cancelled()), "Cancelled", "stat-cancelled");
         page.add(second);
         Ui.section(page, "Bookings a day");
@@ -117,6 +120,12 @@ public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
         }
         page.add(Chart.of("chart-booked", days, Lang.tr("{0} days ago",
                 String.valueOf(days.length - 1)), Lang.tr("Today")));
+        String trend = trend(days);
+        if (trend != null) {
+            Label change = Ui.label(trend, "SvCaption");
+            change.setName("booked-trend");
+            page.add(change);
+        }
         counts(page, "Most booked", d.topServices(), FontImage.MATERIAL_SPA);
         counts(page, "Busiest providers", d.providerLoad(), FontImage.MATERIAL_PERSON);
         page.add(Ui.primary("Open the day board", "open-board", e -> BoardForm.show(form)));
@@ -124,15 +133,43 @@ public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
         Ui.relayout(page);
     }
 
+    /// The second half of the period against the first: is the business
+    /// growing. Null while the first half has nothing to compare with.
+    static String trend(double[] days) {
+        int half = days.length / 2;
+        double before = 0;
+        double after = 0;
+        for (int iter = 0; iter < half * 2; iter++) {
+            if (iter < half) {
+                before += days[days.length - half * 2 + iter];
+            } else {
+                after += days[days.length - half * 2 + iter];
+            }
+        }
+        if (before <= 0) {
+            return null;
+        }
+        long change = Math.round((after - before) * 100 / before);
+        return Lang.tr("{0}% against the {1} days before", (change > 0 ? "+" : "") + change,
+                String.valueOf(half));
+    }
+
+    /// Each row with a bar as long as its share of the busiest, so the
+    /// ranking reads at a glance.
     private static void counts(Container page, String title, List<NameCountDto> rows, char icon) {
         if (rows.isEmpty()) {
             return;
         }
         Ui.section(page, title);
         Container list = new Container(BoxLayout.y());
+        int most = 1;
+        for (int iter = 0; iter < rows.size(); iter++) {
+            most = Math.max(most, rows.get(iter).count());
+        }
         for (int iter = 0; iter < rows.size(); iter++) {
             NameCountDto r = rows.get(iter);
             list.add(Ui.row(icon, r.name(), "", Ui.label(String.valueOf(r.count()), "SvValue")));
+            list.add(new Chart.Meter(r.count() / (double) most));
         }
         page.add(list);
     }

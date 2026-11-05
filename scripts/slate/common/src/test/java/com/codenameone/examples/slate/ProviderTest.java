@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.slate;
 
+import com.codenameone.examples.slate.ui.Timeline;
+
 /// A provider opens their schedule and moves between the day, the week and
 /// the agenda; their calendars screen offers every kind of connection.
 public class ProviderTest extends E2e {
@@ -25,9 +27,13 @@ public class ProviderTest extends E2e {
     protected boolean run() throws Exception {
         onEdt(() -> AppConfig.setMode(""));
         signIn(PROVIDER, "Provider");
-        until(() -> findByName("range") != null, 20000, "the schedule's range");
+        until(() -> findByName("timeline-grid") instanceof Timeline
+                && OwnerTest.booked((Timeline) findByName("timeline-grid")), 20000,
+                "today's bookings");
         shot("provider-day");
         click("view-week");
+        until(() -> findByName("timeline-grid") instanceof Timeline
+                && ((Timeline) findByName("timeline-grid")).lanes().size() == 7, 20000, "the week");
         shot("provider-week");
         click("view-agenda");
         click("later");

@@ -800,7 +800,26 @@ public final class Ui {
         if (currency == null || currency.length() == 0 || "USD".equals(currency)) {
             return sign + "$" + amount;
         }
-        return sign + amount + " " + currency;
+        String symbol = symbol(currency);
+        return symbol == null ? sign + amount + " " + currency : sign + symbol + amount;
+    }
+
+    // The common currencies by their sign, so "\u00a33,339" fits a stat tile where
+    // "3,339 GBP" was cut off. Anything else keeps its code, which is never wrong.
+    private static String symbol(String currency) {
+        if ("GBP".equals(currency)) {
+            return "\u00a3";
+        }
+        if ("EUR".equals(currency)) {
+            return "\u20ac";
+        }
+        if ("ILS".equals(currency)) {
+            return "\u20aa";
+        }
+        if ("JPY".equals(currency)) {
+            return "\u00a5";
+        }
+        return null;
     }
 
     // Thousands grouped with commas, "1,187": a dashboard's figures are read
@@ -818,8 +837,19 @@ public final class Ui {
     }
 
     /// An amount for a stat tile: whole units when there are no cents, so
-    /// "$25" fits where "$25.00" was cut off.
+    /// "$25" fits where "$25.00" was cut off, and thousands as "$3.4k", which
+    /// is what a tile a third of a phone wide has room for.
     public static String moneyShort(long cents, String currency) {
+        long whole = Math.abs(cents) / 100;
+        if (whole >= 1000) {
+            String sign = cents < 0 ? "-" : "";
+            String unit = whole >= 1000000 ? "m" : "k";
+            String amount = tenths(whole / (whole >= 1000000 ? 1000000d : 1000d));
+            if (amount.endsWith(".0")) {
+                amount = amount.substring(0, amount.length() - 2);
+            }
+            return sign + money(100, currency).replace("1.00", amount + unit);
+        }
         String full = money(cents, currency);
         return cents % 100 == 0 ? full.replace(".00", "") : full;
     }

@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.slate;
 
+import com.codenameone.examples.slate.ui.Timeline;
+
 /// The owner opens the dashboard, the day board and the booking rules, and
 /// previews what tomorrow looks like under them without saving anything.
 public class OwnerTest extends E2e {
@@ -29,7 +31,9 @@ public class OwnerTest extends E2e {
         shot("owner-dashboard");
         click("open-board");
         waitForForm("Board");
-        until(() -> firstNamed("column-").length() > 0, 20000, "a provider's column");
+        until(() -> findByName("board-grid") instanceof Timeline
+                && ((Timeline) findByName("board-grid")).lanes().size() >= 2
+                && booked((Timeline) findByName("board-grid")), 20000, "the day's bookings on the board");
         shot("owner-board");
         back();
         click("menu-open");
@@ -41,5 +45,16 @@ public class OwnerTest extends E2e {
         until(() -> firstNamed("preview-").length() > 0, 20000, "the preview");
         shot("owner-preview");
         return true;
+    }
+
+    // The demo books every provider today, so a board with no booking on it is
+    // still loading, or broken.
+    static boolean booked(Timeline t) {
+        for (int iter = 0; iter < t.lanes().size(); iter++) {
+            if (t.lanes().get(iter).bookings() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }

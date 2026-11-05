@@ -245,14 +245,23 @@ public class Schedules {
 
     // tag::slate-schedule[]
     /// One provider's schedule for `days` days from `from`, the start of a day
-    /// at their default location.
+    /// on the device that asks.
+    ///
+    /// The device's day is not the location's: midnight in Paris is 23:00 the
+    /// day before in London, and reading `from` as a London date answered a
+    /// Paris phone's "today" with yesterday. So the answer covers every day of
+    /// the location that the device's range touches, and the device keeps what
+    /// falls inside its own days.
     @Transactional(readOnly = true)
     public ScheduleDto schedule(String username, long from, int days) {
         Provider p = provider(username);
         int span = Math.max(1, Math.min(MAX_DAYS, days));
         ZoneId zone = zoneOf(p.getDefaultLocation());
         LocalDate first = Instant.ofEpochMilli(from).atZone(zone).toLocalDate();
-        return schedule(p, first, span, zone);
+        LocalDate last = Instant.ofEpochMilli(from + span * 86400000L - 1).atZone(zone)
+                .toLocalDate();
+        int touched = (int) (last.toEpochDay() - first.toEpochDay()) + 1;
+        return schedule(p, first, Math.min(MAX_DAYS + 1, touched), zone);
     }
     // end::slate-schedule[]
 

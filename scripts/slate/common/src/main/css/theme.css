@@ -1383,6 +1383,13 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvChartGrid { color: var(--line-dark); }
     SvChartAxis { color: var(--text-muted-dark); }
     SvChartValue { color: var(--text-dark); }
+    SvTimeline { color: var(--line-dark); background-color: var(--surface-alt-dark); }
+    SvTimelineShift { background-color: var(--surface-dark); }
+    SvTimelineBooking { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvTimelineDone { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
+    SvTimelineBusy { color: var(--text-muted-dark); background-color: var(--line-dark); }
+    SvTimelineNoShow { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvTimelineNow { color: var(--danger-dark); }
     SvMeter { color: var(--brand-dark); }
     SvAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
     SvAlert.pressed { background-color: var(--surface-press-dark); }
@@ -1483,6 +1490,14 @@ SvSlotClash { color: var(--warning); background-color: var(--warning-tint); font
 SvSlotClash.pressed { background-color: var(--warning); color: var(--surface); }
 SvSlotRefused { color: var(--text-muted); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2mm; text-align: center; padding: 1mm 0.3mm 1mm 0.3mm; margin: 0.4mm; border-radius: var(--radius-small); }
 SvBusyRow { background-color: var(--surface-alt); border-bottom: 1px solid var(--line); padding: 2.6mm 0 2.6mm 0; margin: 0; }
-SvBoardColumn { background-color: var(--surface); border-right: 1px solid var(--line); padding: 1.5mm; margin: 0; }
-SvBoardBooking { background-color: var(--brand-tint); border-radius: var(--radius-small); padding: 1.5mm; margin: 0 0 1mm 0; }
-SvBoardBusy { color: var(--text-muted); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.1mm; border-radius: var(--radius-small); padding: 1mm; margin: 0 0 1mm 0; }
+/* The timeline: closed hours are the grid's background and its lines its colour;
+   a shift is a lighter band over it, a booking a tinted block with a bar of brand
+   colour down its edge, busy time from a calendar a grey wash, now a brand line. */
+SvTimeline { color: var(--line); background-color: var(--surface-alt); padding: 0; margin: 0 0 2mm 0; }
+SvTimelineShift { background-color: var(--surface); }
+SvTimelineBooking { color: var(--brand); background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.2mm; }
+SvTimelineDone { color: var(--text-muted); background-color: var(--surface-press); font-family: "native:MainBold"; font-size: 2.2mm; }
+SvTimelineBusy { color: var(--text-muted); background-color: var(--line); }
+SvTimelineNoShow { color: var(--warning); background-color: var(--warning-tint); font-family: "native:MainBold"; font-size: 2.2mm; }
+SvLegend { padding: 1mm 0 1mm 0; margin: 0; }
+SvTimelineNow { color: var(--danger); }

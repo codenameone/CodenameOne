@@ -94,6 +94,7 @@ public class DemoBusiness {
     private final Catalog catalog;
     private final String vertical;
     private final String zone;
+    private final boolean history;
 
     public DemoBusiness(Config config, DemoAccounts accounts, Bookings bookings,
             Availability availability, BusinessRepository businesses,
@@ -102,7 +103,9 @@ public class DemoBusiness {
             WorkingHoursRepository hours, AppointmentRepository appointments,
             AppointmentPartyRepository parties, Catalog catalog,
             @Value("${slate.demo.vertical:SALON}") String vertical,
-            @Value("${slate.timezone:Europe/London}") String zone) {
+            @Value("${slate.timezone:Europe/London}") String zone,
+            @Value("${slate.demo.history:false}") String history) {
+        this.history = "true".equals(history == null ? "" : history.trim());
         this.config = config;
         this.accounts = accounts;
         this.bookings = bookings;
@@ -130,7 +133,10 @@ public class DemoBusiness {
             return;
         }
         write();
-        if (!"test".equals(config.getProfile())) {
+        // The test profile starts empty so the server tests count exactly what
+        // they made; the simulator tests turn the history back on, because
+        // their screenshots are the guide's pictures of a business in use.
+        if (!"test".equals(config.getProfile()) || history) {
             history();
             upcoming();
         }
@@ -287,20 +293,54 @@ public class DemoBusiness {
         LocalDate today = LocalDate.now(z);
         String[] clients = {DemoAccounts.CLIENT, DemoAccounts.FLAGGED_CLIENT};
         String[] names = {"Riley Park", "Rae Okafor"};
-        String[] who = {DemoAccounts.PROVIDER, DemoAccounts.SECOND_PROVIDER};
+        String[] who = {DemoAccounts.PROVIDER, DemoAccounts.SECOND_PROVIDER,
+            DemoAccounts.THIRD_PROVIDER};
+        // Three bookings a provider a day at most, two and a half hours apart:
+        // past the longest service and its buffers, so no lane overlaps itself.
+        int[] starts = {10 * 60, 12 * 60 + 30, 15 * 60};
         int n = 0;
         for (int back = 27; back >= 1; back--) {
             LocalDate day = today.minusDays(back);
-            if (day.getDayOfWeek().getValue() > 5) {
+            int weekday = day.getDayOfWeek().getValue();
+            if (weekday > 5) {
                 continue;
             }
-            for (int slot = 0; slot < 3; slot++) {
-                n++;
-                Service s = services.findById("svc-" + (1 + n % 3));
-                String state = n % 11 == 0 ? States.NO_SHOW : n % 7 == 0 ? States.CANCELLED
+            for (int p = 0; p < who.length; p++) {
+                for (int slot = 0; slot < starts.length; slot++) {
+                    // A salon's week: a quiet Monday and Tuesday, a full Friday, and
+                    // gaps that move from week to week.
+                    int quiet = weekday <= 2 ? 6 : weekday == 5 ? 0 : 4;
+                    if ((back * 7 + p * 3 + slot * 5) % 10 < quiet) {
+                        continue;
+                    }
+                    n++;
+                    Service s = services.findById("svc-" + (1 + (n + p) % 3));
+                    String state = n % 13 == 0 ? States.NO_SHOW : n % 9 == 0 ? States.CANCELLED
+                            : States.COMPLETED;
+                    past(s, clients[n % 2], names[n % 2], who[p], day, starts[slot], state);
+                }
+            }
+        }
+        // Today too: every day view opens on today, and a demo that opens on an empty
+        // day shows nothing of the timeline. What has ended is finished, the rest is
+        // still to come. They belong to the second demo client: the end-to-end tests
+        // cancel whatever the first one holds between tests.
+        String[] walkIns = {"Rae Okafor", "Sam Whitfield", "Ana Costa", "Jordan Lee",
+            "Mira Haddad", "Noor Saleh", "Ben Carter", "Lena Vogel"};
+        long now = System.currentTimeMillis();
+        int k = 0;
+        for (int p = 0; p < who.length; p++) {
+            for (int slot = 0; slot < starts.length; slot++) {
+                if ((p + slot) % 4 == 3) {
+                    continue;
+                }
+                Service s = services.findById("svc-" + (1 + (k + p) % 3));
+                long end = Availability.at(today, starts[slot], z) + s.getMinutes() * 60000L;
+                String state = end > now ? States.CONFIRMED : k == 1 ? States.NO_SHOW
                         : States.COMPLETED;
-                past(s, clients[n % 2], names[n % 2], who[(n / 2) % 2], day,
-                        10 * 60 + slot * 120, state);
+                past(s, DemoAccounts.FLAGGED_CLIENT, walkIns[k % walkIns.length], who[p], today,
+                        starts[slot], state);
+                k++;
             }
         }
     }

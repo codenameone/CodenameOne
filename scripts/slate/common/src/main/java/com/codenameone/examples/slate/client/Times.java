@@ -64,6 +64,15 @@ public final class Times {
         return c.getTime().getTime();
     }
 
+    /// The Monday starting the week `millis` is in: a week view starts where a
+    /// calendar's week does, not on whatever day it was opened.
+    public static long weekStart(long millis) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTime(new Date(dayStart(millis)));
+        int back = (c.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7;
+        return addDays(millis, -back);
+    }
+
     /// The day `days` after the one `millis` is in. Noon of the target day
     /// is found first, so an hour gained or lost to the clocks changing on
     /// the way still lands inside the right day.
