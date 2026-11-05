@@ -20,6 +20,18 @@
      "value": 113166156
     }
    }
+  },
+  "android": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 4965216
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that, so this is the first measurement of the gallery's dex under #6154's code generation. Executable code grows 4,965,216 -> 5,447,152 bytes while the APK itself, gated at 2%, went 82,093,372 -> 82,262,888 (+0.21%) in the same run.",
+     "runs": 1,
+     "value": 5447152
+    }
+   }
   }
  }
 }
