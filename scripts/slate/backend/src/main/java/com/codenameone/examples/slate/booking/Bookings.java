@@ -501,8 +501,11 @@ public class Bookings {
             String reference = "";
             String state = States.PAY_AUTHORIZED;
             try {
+                // Keyed by the last change, not the start: a booking moved out
+                // and back to the same start must not get its released hold back
+                // from an idempotent processor.
                 reference = payments.authorize("slate-" + a.getId() + "-"
-                        + a.getStartsAt().toEpochMilli(), a.getClient(),
+                        + a.getUpdatedAt().toEpochMilli(), a.getClient(),
                         a.getMethodId(), holdAmount(a, business), a.getCurrency(),
                         "Deposit for " + serviceName(a.getServiceId()));
             } catch (IOException failed) {
@@ -510,7 +513,7 @@ public class Bookings {
                         + failed.getMessage());
                 state = States.PAY_FAILED;
             }
-            if (!recordPayment(a.getId(), States.PAY_PENDING, state, reference)) {
+            if (!recordPayment(a.getId(), States.PAY_PENDING, state, reference, a.getStartsAt())) {
                 letGo(reference);
             } else if (States.PAY_FAILED.equals(state)) {
                 notifier.tell(a.getClient(), Notifier.PAYMENT, a.getId(),
@@ -719,13 +722,20 @@ public class Bookings {
                     + failed.getMessage());
             state = States.PAY_FAILED;
         }
-        recordPayment(settle.id, settle.was, state, null);
+        recordPayment(settle.id, settle.was, state, null, null);
     }
 
     @Transactional(rollbackFor = IOException.class)
-    private boolean recordPayment(String id, String from, String to, String reference) {
+    private boolean recordPayment(String id, String from, String to, String reference,
+            Instant placedFor) {
         Appointment a = appointments.findById(id);
         if (a == null || !from.equals(a.getPaymentState())) {
+            return false;
+        }
+        if (placedFor != null && !placedFor.equals(a.getStartsAt())) {
+            // Moved while the hold was being placed: a hold for the old start
+            // may lapse before the new one. The caller releases it, and the
+            // booking stays pending for the next round.
             return false;
         }
         if (States.PAY_PENDING.equals(from) && !States.CONFIRMED.equals(a.getState())) {
