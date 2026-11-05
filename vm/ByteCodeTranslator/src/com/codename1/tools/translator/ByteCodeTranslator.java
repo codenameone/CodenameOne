@@ -1048,6 +1048,7 @@ public class ByteCodeTranslator {
         // share. An app that wants CgBI can put its images in an asset catalog.
         File projectPbx = new File(xcproj, "project.pbxproj");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));
+        writeLldbSharedScheme(root, xcproj, appName);
 
         // File.list(FilenameFilter) is not in JavaAPI; filter the plain listing.
         String[] allNames = srcRoot.list();
@@ -2056,6 +2057,73 @@ public class ByteCodeTranslator {
             }
             copy(in, new FileOutputStream(new File(srcRoot, name)));
             sourceManifest.recordRuntime(name, "/" + name);
+        }
+    }
+
+    /// The collector stops a thread it cannot park with SIGUSR2, and lldb stops on every
+    /// signal by default, so a debug session halts on each such GC stop. Every project
+    /// therefore carries `cn1.lldbinit` beside the `.xcodeproj` and a shared scheme whose
+    /// Run and Test actions load it. This used to be written only by the builder's
+    /// xcodeproj-gem hook, which runs only when a project needs pods or an extension, so a
+    /// plain application never got it (issue #5362). The target identifier is the app
+    /// target of both Apple templates; the builder's hook, when it runs, sets the same
+    /// attribute on this scheme again.
+    private static void writeLldbSharedScheme(File root, File xcproj, String appName) throws IOException {
+        writeUtf8(new File(root, "cn1.lldbinit"),
+                "# Codename One LLDB settings: let the GC's stop signal through without stopping\n"
+                + "process handle -s false -n false -p true SIGUSR2\n");
+        File schemes = new File(xcproj, "xcshareddata/xcschemes");
+        schemes.mkdirs();
+        String ref = buildableReference("         ", appName);
+        String lldb = "      customLLDBInitFile = \"$(SRCROOT)/cn1.lldbinit\"\n";
+        writeUtf8(new File(schemes, appName + ".xcscheme"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<Scheme\n   LastUpgradeVersion = \"1500\"\n   version = \"1.7\">\n"
+                + "   <BuildAction\n      parallelizeBuildables = \"YES\"\n      buildImplicitDependencies = \"YES\">\n"
+                + "      <BuildActionEntries>\n"
+                + "         <BuildActionEntry\n            buildForTesting = \"YES\"\n            buildForRunning = \"YES\"\n"
+                + "            buildForProfiling = \"YES\"\n            buildForArchiving = \"YES\"\n            buildForAnalyzing = \"YES\">\n"
+                + buildableReference("            ", appName)
+                + "         </BuildActionEntry>\n      </BuildActionEntries>\n   </BuildAction>\n"
+                + "   <TestAction\n      buildConfiguration = \"Debug\"\n"
+                + "      selectedDebuggerIdentifier = \"Xcode.DebuggerFoundation.Debugger.LLDB\"\n"
+                + "      selectedLauncherIdentifier = \"Xcode.DebuggerFoundation.Launcher.LLDB\"\n"
+                + lldb
+                + "      shouldUseLaunchSchemeArgsEnv = \"YES\">\n   </TestAction>\n"
+                + "   <LaunchAction\n      buildConfiguration = \"Debug\"\n"
+                + "      selectedDebuggerIdentifier = \"Xcode.DebuggerFoundation.Debugger.LLDB\"\n"
+                + "      selectedLauncherIdentifier = \"Xcode.DebuggerFoundation.Launcher.LLDB\"\n"
+                + lldb
+                + "      launchStyle = \"0\"\n      useCustomWorkingDirectory = \"NO\"\n"
+                + "      ignoresPersistentStateOnLaunch = \"NO\"\n      debugDocumentVersioning = \"YES\"\n"
+                + "      allowLocationSimulation = \"YES\">\n"
+                + "      <BuildableProductRunnable\n         runnableDebuggingMode = \"0\">\n"
+                + ref + "      </BuildableProductRunnable>\n   </LaunchAction>\n"
+                + "   <ProfileAction\n      buildConfiguration = \"Release\"\n      shouldUseLaunchSchemeArgsEnv = \"YES\"\n"
+                + "      savedToolIdentifier = \"\"\n      useCustomWorkingDirectory = \"NO\"\n      debugDocumentVersioning = \"YES\">\n"
+                + "      <BuildableProductRunnable\n         runnableDebuggingMode = \"0\">\n"
+                + ref + "      </BuildableProductRunnable>\n   </ProfileAction>\n"
+                + "   <AnalyzeAction\n      buildConfiguration = \"Debug\">\n   </AnalyzeAction>\n"
+                + "   <ArchiveAction\n      buildConfiguration = \"Release\"\n      revealArchiveInOrganizer = \"YES\">\n   </ArchiveAction>\n"
+                + "</Scheme>\n");
+    }
+
+    private static String buildableReference(String indent, String appName) {
+        return indent + "<BuildableReference\n"
+                + indent + "   BuildableIdentifier = \"primary\"\n"
+                + indent + "   BlueprintIdentifier = \"0F634E7418E9ABBC002F3D1D\"\n"
+                + indent + "   BuildableName = \"" + appName + ".app\"\n"
+                + indent + "   BlueprintName = \"" + appName + "\"\n"
+                + indent + "   ReferencedContainer = \"container:" + appName + ".xcodeproj\">\n"
+                + indent + "</BuildableReference>\n";
+    }
+
+    private static void writeUtf8(File f, String s) throws IOException {
+        OutputStream o = new FileOutputStream(f);
+        try {
+            o.write(s.getBytes(StandardCharsets.UTF_8));
+        } finally {
+            o.close();
         }
     }
 
