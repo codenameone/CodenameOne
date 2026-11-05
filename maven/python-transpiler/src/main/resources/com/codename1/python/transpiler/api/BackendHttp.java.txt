@@ -65,8 +65,16 @@ final class BackendHttp extends PyHttp {
                     body = null;
                     sent = without(sent, "Content-Length", "Content-Type", "Transfer-Encoding");
                 }
-                // Credentials stay with the host they were meant for.
-                if (!host(next).equalsIgnoreCase(host(url))) {
+                // Credentials stay with the origin they were meant for: another
+                // host, or the same host over plain http, loses them, as in
+                // requests' should_strip_auth (which allows only http to https
+                // on default ports).
+                String from = origin(url);
+                String to = origin(next);
+                boolean upgrade = from.regionMatches(true, 0, "http://", 0, 7)
+                        && to.regionMatches(true, 0, "https://", 0, 8)
+                        && from.substring(7).equalsIgnoreCase(to.substring(8));
+                if (!from.equalsIgnoreCase(to) && !upgrade) {
                     sent = without(sent, "Authorization", "Cookie", null);
                 }
                 url = next;
@@ -143,33 +151,124 @@ final class BackendHttp extends PyHttp {
         return (String[]) kept.toArray(new String[kept.size()]);
     }
 
-    /// `location` against `base`: absolute, scheme-relative, rooted or relative.
+    /// `location` against `base`, as RFC 3986 section 5.2 resolves a reference.
     static String resolve(String base, String location) {
-        if (location.indexOf("://") > 0) {
+        int colon = location.indexOf(':');
+        int slash = location.indexOf('/');
+        if (colon > 0 && (slash < 0 || colon < slash) && isScheme(location.substring(0, colon))) {
             return location;
         }
-        int scheme = base.indexOf("://");
-        String prefix = base.substring(0, scheme + 1);
+        String[] b = split(base);
         if (location.startsWith("//")) {
-            return prefix + location;
+            return b[0] + ":" + location;
         }
-        int pathStart = base.indexOf('/', scheme + 3);
-        String origin = pathStart < 0 ? base : base.substring(0, pathStart);
-        if (location.startsWith("/")) {
-            return origin + location;
+        String authority = b[0] + "://" + b[1];
+        if (location.length() == 0) {
+            return authority + b[2] + b[3];
         }
-        String path = pathStart < 0 ? "/" : base.substring(pathStart);
-        int cut = path.indexOf('?');
+        if (location.charAt(0) == '?') {
+            return authority + b[2] + location;
+        }
+        if (location.charAt(0) == '#') {
+            return authority + b[2] + b[3] + location;
+        }
+        String tail = "";
+        int cut = firstOf(location, "?#");
         if (cut >= 0) {
-            path = path.substring(0, cut);
+            tail = location.substring(cut);
+            location = location.substring(0, cut);
         }
-        return origin + path.substring(0, path.lastIndexOf('/') + 1) + location;
+        String path;
+        if (location.startsWith("/")) {
+            path = location;
+        } else {
+            String dir = b[2].length() == 0 ? "/" : b[2].substring(0, b[2].lastIndexOf('/') + 1);
+            path = dir + location;
+        }
+        return authority + removeDots(path) + tail;
     }
 
-    private static String host(String url) {
+    /// scheme, authority, path and query ("" or starting with '?') of an
+    /// absolute URL; its fragment is dropped.
+    private static String[] split(String url) {
+        int hash = url.indexOf('#');
+        if (hash >= 0) {
+            url = url.substring(0, hash);
+        }
         int scheme = url.indexOf("://");
-        int end = url.indexOf('/', scheme + 3);
-        return (end < 0 ? url.substring(scheme + 3) : url.substring(scheme + 3, end));
+        String rest = url.substring(scheme + 3);
+        int end = firstOf(rest, "/?");
+        String authority = end < 0 ? rest : rest.substring(0, end);
+        String after = end < 0 ? "" : rest.substring(end);
+        int q = after.indexOf('?');
+        String path = q < 0 ? after : after.substring(0, q);
+        String query = q < 0 ? "" : after.substring(q);
+        return new String[] {url.substring(0, scheme), authority, path, query};
+    }
+
+    private static int firstOf(String s, String chars) {
+        for (int i = 0; i < s.length(); i++) {
+            if (chars.indexOf(s.charAt(i)) >= 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isScheme(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean letter = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
+            if (!letter && (i == 0 || !(c >= '0' && c <= '9' || c == '+' || c == '-' || c == '.'))) {
+                return false;
+            }
+        }
+        return s.length() > 0;
+    }
+
+    /// RFC 3986 section 5.2.4: "." and ".." segments taken out of a path.
+    private static String removeDots(String path) {
+        List out = new ArrayList();
+        String[] parts = path.split("/", -1);
+        for (int i = 1; i < parts.length; i++) {
+            String seg = parts[i];
+            boolean last = i == parts.length - 1;
+            if (".".equals(seg)) {
+                if (last) {
+                    out.add("");
+                }
+            } else if ("..".equals(seg)) {
+                if (!out.isEmpty()) {
+                    out.remove(out.size() - 1);
+                }
+                if (last) {
+                    out.add("");
+                }
+            } else {
+                out.add(seg);
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < out.size(); i++) {
+            sb.append('/').append(out.get(i));
+        }
+        return sb.length() == 0 ? "/" : sb.toString();
+    }
+
+    /// The scheme and host of a URL, without user information or a default
+    /// port, as requests compares them before keeping credentials.
+    static String origin(String url) {
+        String[] parts = split(url);
+        String host = parts[1];
+        int at = host.lastIndexOf('@');
+        if (at >= 0) {
+            host = host.substring(at + 1);
+        }
+        boolean https = "https".equalsIgnoreCase(parts[0]);
+        if (https && host.endsWith(":443") || !https && host.endsWith(":80")) {
+            host = host.substring(0, host.lastIndexOf(':'));
+        }
+        return parts[0] + "://" + host;
     }
 
     /// The standard reason phrase; libcurl does not hand back the server's.

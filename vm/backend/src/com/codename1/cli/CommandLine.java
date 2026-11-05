@@ -607,12 +607,14 @@ public final class CommandLine {
             }
             // The rest of the cluster is the value of the first option that takes one.
             // `-c=2` and `-lc=2` give the value 2, as `--count=2` does.
+            // `-c=` is an empty value, as `--count=` is; a bare `-c` takes the next.
             String rest = arg.substring(c + 1);
-            if (rest.startsWith("=")) {
+            boolean equals = rest.startsWith("=");
+            if (equals) {
                 rest = rest.substring(1);
             }
             return occurrence(cmd, binding, s, options, values, args,
-                    rest.length() == 0 ? null : rest, next, result);
+                    rest.length() == 0 && !equals ? null : rest, next, result);
         }
         throw new ParameterException(cmd, "Unknown option: '" + name + "'");
     }

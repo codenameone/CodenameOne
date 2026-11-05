@@ -22,15 +22,28 @@
  */
 package com.codename1.cli;
 
-/// Java SE twin of TerminalImpl. The JVM can only say whether the process as
-/// a whole has a console, which is true exactly when neither standard input
-/// nor standard output is redirected -- the closest answer it has for either
-/// stream.
+/// Java SE twin of TerminalImpl. The JVM has no isatty(), only
+/// System.console(), which answers for the process rather than for one
+/// stream. Up to JDK 21 it is null when standard input or output is
+/// redirected; from JDK 22 it is never null and Console.isTerminal() says
+/// what the earlier null did, so that is asked when it exists.
 final class TerminalImpl {
     private TerminalImpl() {
     }
 
     static boolean isTerminal(int fd) {
-        return System.console() != null;
+        java.io.Console console = System.console();
+        if (console == null) {
+            return false;
+        }
+        try {
+            Object answer = java.io.Console.class.getMethod("isTerminal").invoke(console);
+            return !(answer instanceof Boolean) || ((Boolean) answer).booleanValue();
+        } catch (NoSuchMethodException older) {
+            // JDK 21 or earlier: a console at all means a terminal.
+            return true;
+        } catch (ReflectiveOperationException e) {
+            return false;
+        }
     }
 }
