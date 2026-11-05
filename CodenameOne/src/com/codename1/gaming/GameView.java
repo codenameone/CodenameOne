@@ -22,8 +22,10 @@
  */
 package com.codename1.gaming;
 
+import com.codename1.gpu.Environment;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
+import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.RenderView;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
@@ -137,6 +139,19 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     /// The directional light shading lit 3D `Model`s in perspective mode.
     public Light getLight() {
         return ((SpriteRenderer) getRenderer()).getLight();
+    }
+
+    /// The fog, hemisphere ambient and tone mapping the 3D scene is shaded in.
+    /// The default changes nothing.
+    public Environment getEnvironment() {
+        return ((SpriteRenderer) getRenderer()).getEnvironment();
+    }
+
+    /// Sets the full screen effects (bloom, colour grade, vignette, grain)
+    /// applied to a perspective scene, or null for none. The touch controls
+    /// are drawn after them and are never affected.
+    public void setPostProcess(PostProcess postProcess) {
+        ((SpriteRenderer) getRenderer()).setPostProcess(postProcess);
     }
 
     /// Adds a 3D `Model` to be drawn in the perspective camera alongside the sprites.

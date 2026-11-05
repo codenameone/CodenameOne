@@ -23,6 +23,7 @@ import com.codename1.ui.Image;
 public abstract class GraphicsDevice {
     private Camera camera;
     private Light light = new Light();
+    private Environment environment = new Environment();
 
     /// Returns the capabilities and limits of the underlying GPU.
     public abstract GpuCapabilities getCapabilities();
@@ -123,6 +124,76 @@ public abstract class GraphicsDevice {
     /// Returns the active light.
     public Light getLight() {
         return light;
+    }
+
+    /// Sets the environment (fog, hemisphere ambient, tone mapping) used by
+    /// subsequent draws.
+    ///
+    /// #### Parameters
+    ///
+    /// - `environment`: the environment; null restores the default, which
+    ///   changes nothing
+    public void setEnvironment(Environment environment) {
+        this.environment = environment == null ? new Environment() : environment;
+    }
+
+    /// Returns the active environment.
+    public Environment getEnvironment() {
+        return environment;
+    }
+
+    /// Starts rendering the light's shadow map. Until `endShadowPass`, `draw`
+    /// writes only depth as seen from the light, and skips materials that do
+    /// not cast shadows. Draws after `endShadowPass` that receive shadows
+    /// sample the map.
+    ///
+    /// The default implementation supports no shadows and returns false; the
+    /// caller then skips the pass and draws as usual.
+    ///
+    /// #### Parameters
+    ///
+    /// - `light`: the light whose shadows to render; it must have shadows on
+    ///
+    /// #### Returns
+    ///
+    /// true if the pass started and the shadow casters should be drawn now
+    public boolean beginShadowPass(Light light) {
+        return false;
+    }
+
+    /// Ends the shadow pass started by `beginShadowPass`, and restores the
+    /// viewport and target that were active before it.
+    public void endShadowPass() {
+    }
+
+    /// Redirects drawing into an offscreen image so `endPostProcess` can apply
+    /// `effects` to it on its way to the screen.
+    ///
+    /// The default implementation supports no post processing and returns
+    /// false; the caller then draws straight to the screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the effects to apply
+    ///
+    /// - `width`: the width of the frame in pixels
+    ///
+    /// - `height`: the height of the frame in pixels
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes offscreen
+    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+        return false;
+    }
+
+    /// Applies the effects passed to `beginPostProcess` and draws the result
+    /// to the screen. Drawing goes to the screen again afterwards.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeSeconds`: a running clock, which animates the film grain
+    public void endPostProcess(float timeSeconds) {
     }
 
     /// Draws a mesh with the supplied material and model matrix. The device

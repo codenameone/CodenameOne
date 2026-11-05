@@ -19,14 +19,17 @@
 package com.codenameone.examples.splat.play;
 
 import com.codename1.gaming.AnimatedModel;
+import com.codename1.gaming.GameCamera;
 import com.codename1.gaming.GameView;
 import com.codename1.gaming.Model;
+import com.codename1.gaming.ParticleEmitter;
 import com.codename1.gaming.TouchControls;
 import com.codename1.gaming.VirtualButton;
 import com.codename1.gaming.VirtualJoystick;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.Primitives;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -64,6 +67,9 @@ public class ArenaView extends GameView {
     public static final String INVERT_KEY = "splat.invertLook";
     /// Paint colours: what a team's balls leave on the field.
     public static final int[] TEAM_COLORS = {0xffff7a1f, 0xff1fc6ff};
+    private static final int HAZE = 0xffb9c6cf;
+    private static final float SHADOW_AHEAD = 12f;
+
     public static final String[] TEAM_NAMES = {"Task Force Tangerine", "Teal Directorate"};
     /// Field of view from the hip and down the sights.
     static final float HIP_FOV = 70f;
@@ -89,6 +95,8 @@ public class ArenaView extends GameView {
     private Hud hud;
     private GraphicsDevice device;
     private Mesh sphere;
+    private Model sky;
+    private boolean controlsHidden;
     private Mesh quad;
     private Material[] teamPaint;
     private AnimatedModel[] operators = new AnimatedModel[0];
@@ -99,11 +107,22 @@ public class ArenaView extends GameView {
     private final Model[] balls = new Model[MAX_BALLS];
     private final Model[] decals = new Model[MAX_DECALS];
     private int nextDecal;
+    // Effects. Every one is a pool of soft billboards drawn in one call.
+    private final ParticleEmitter[] spray = new ParticleEmitter[2];
+    private final ParticleEmitter[] mist = new ParticleEmitter[2];
+    private ParticleEmitter dust;
+    private ParticleEmitter flash;
+    private ParticleEmitter motes;
+    private float moteClock;
+    private int moteSeed = 0x2545f491;
     private final AnimatedModel[] flags = new AnimatedModel[2];
     private AnimatedModel viewModel;
     private float viewScale;
     private final float[] hand = new float[16];
     private float recoil;
+    private float viewMuzzleX;
+    private float viewMuzzleY;
+    private float viewMuzzleZ;
     private float ads;
     private float bob;
     private float swayX;
@@ -154,21 +173,37 @@ public class ArenaView extends GameView {
         Match match = driver.match();
         Arena arena = match.arena();
         // An overcast, hazy afternoon: the colour of every serious shooter.
-        setClearColor(0xffa9b3ba);
-        getLight().setDirection(-0.45f, -1f, -0.25f).setColor(0xffffffff).setAmbientColor(0xffb4bcc6);
+        setClearColor(HAZE);
+        // A low, warm sun through haze: long shadows, a cool sky fill and fog
+        // that swallows the far side of the yard.
+        getLight().setDirection(-0.55f, -0.62f, -0.3f).setColor(0xfffff0dc).setAmbientColor(0xff8a929c)
+                .setShadows(true).setShadowMap(2048, 24f).setShadowStyle(0.72f, 0.0012f);
+        getEnvironment().setFog(HAZE, 0.0075f, 0.05f).setHemisphere(0xffa9bdd2, 0xff4f5a3c)
+                .setToneMapping(true).setExposure(1.3f)
+                .setSky(0xff4f7fb8, HAZE, 0xfffff0d0, 0.45f);
+        setPostProcess(new PostProcess().setBloom(0.78f, 0.55f)
+                .setGrade(1.12f, 0.86f, 0xff0b1720, 0xfffff2dc).setVignette(0.42f).setGrain(0.035f));
         getCamera().setPerspective(HIP_FOV, 0.03f, 400f);
         sphere = Primitives.sphere(d, 0.5f, 10, 14, false);
+        // the sky is a shader on the inside of a sphere that follows the eye
+        sky = new Model(Primitives.sphere(d, 300f, 16, 24, true), new Material(Material.Type.SKYBOX));
+        sky.getMaterial().getRenderState().setDepthWrite(false);
+        addModel(sky);
         quad = Primitives.quad(d, 1f);
         teamPaint = new Material[2];
         for (int t = 0; t < 2; t++) {
-            teamPaint[t] = new Material(Material.Type.PHONG).setColor(TEAM_COLORS[t]).setShininess(90f);
+            // wet paint: smooth, and lit a little from within so it blooms
+            teamPaint[t] = new Material(Material.Type.PBR).setColor(TEAM_COLORS[t]).setRoughness(0.22f)
+                    .setEmissive(dim(TEAM_COLORS[t], 0.18f));
         }
         float w = arena.width * MM;
         float dpt = arena.depth * MM;
-        addModel(flat(new Material(Material.Type.LAMBERT).setColor(0xff4a4d50), -w / 2f, 0f, dpt / 2f, w, dpt));
-        addModel(flat(new Material(Material.Type.LAMBERT).setColor(0xff6b6656), -w / 2f, -0.02f, dpt / 2f,
+        addModel(flat(new Material(Material.Type.PBR).setColor(0xff4a4d50).setRoughness(0.92f), -w / 2f, 0f, dpt / 2f,
+                w, dpt));
+        addModel(flat(new Material(Material.Type.PBR).setColor(0xff55683a).setRoughness(1f), -w / 2f, -0.02f, dpt / 2f,
                 400f, 400f));
         perimeter(w, dpt);
+        greenery(w, dpt);
         List<Box> boxes = arena.boxes();
         for (int i = 0; i < boxes.size(); i++) {
             cover(boxes.get(i), arena);
@@ -224,6 +259,7 @@ public class ArenaView extends GameView {
             decals[i].setVisible(false);
             addModel(decals[i]);
         }
+        effects(d);
         if (driver.interactive()) {
             // The marker in your hands, added last so it draws over the field.
             Player me = match.player(Math.min(driver.me(), n - 1));
@@ -341,6 +377,72 @@ public class ArenaView extends GameView {
         }
     }
 
+    /// Fields and woods around the yard, and weeds where the asphalt meets
+    /// the fence. All of it is scenery: nothing here blocks a player or a ball.
+    private void greenery(float w, float d) {
+        int seed = 0x5eed;
+        String[] trees = {"oak", "pine", "oak-2", "birch", "pine-2", "oak"};
+        float[] treeHeight = {7.5f, 11f, 8.5f, 9f, 12f, 6.5f};
+        for (int i = 0; i < 26; i++) {
+            seed = seed * 1103515245 + 12345;
+            float t = ((seed >>> 8) & 1023) / 1023f;
+            seed = seed * 1103515245 + 12345;
+            float out = 9f + ((seed >>> 8) & 1023) / 1023f * 26f;
+            float[] p = around(w, d, i % 4, t, out);
+            int k = (seed >>> 4) % trees.length;
+            scenery(trees[k], treeHeight[k] * (0.8f + 0.4f * t), i * 53f, p[0], p[1], true);
+        }
+        String[] low = {"bush", "bush-2", "bush-berries", "grass", "grass-2", "plant", "rock-moss", "log", "stump"};
+        float[] lowHeight = {1.1f, 1.3f, 1f, 0.5f, 0.6f, 0.8f, 0.7f, 0.45f, 0.6f};
+        for (int i = 0; i < 34; i++) {
+            seed = seed * 1103515245 + 12345;
+            float t = ((seed >>> 8) & 1023) / 1023f;
+            seed = seed * 1103515245 + 12345;
+            float out = 1.2f + ((seed >>> 8) & 1023) / 1023f * 9f;
+            float[] p = around(w, d, i % 4, t, out);
+            int k = (seed >>> 4) % low.length;
+            scenery(low[k], lowHeight[k], i * 71f, p[0], p[1], false);
+        }
+        // weeds through the cracks along the inside of the wire
+        String[] weeds = {"grass-short", "grass", "flowers", "grass-2"};
+        for (int i = 0; i < 24; i++) {
+            seed = seed * 1103515245 + 12345;
+            float t = ((seed >>> 8) & 1023) / 1023f;
+            float[] p = around(w, d, i % 4, t, -0.5f - ((seed >>> 3) & 7) * 0.08f);
+            scenery(weeds[(seed >>> 5) & 3], 0.35f + 0.1f * t, i * 97f, p[0], p[1], false);
+        }
+    }
+
+    /// A point `out` metres outside side `side` of the yard (negative is
+    /// inside), `t` of the way along it.
+    private static float[] around(float w, float d, int side, float t, float out) {
+        switch (side) {
+            case 0:
+                return new float[] {-w * t, -out};
+            case 1:
+                return new float[] {-w * t, d + out};
+            case 2:
+                return new float[] {out, d * t};
+            default:
+                return new float[] {-w - out, d * t};
+        }
+    }
+
+    /// One piece of scenery; only the big pieces are worth a place in the
+    /// shadow pass.
+    private void scenery(String name, float height, float deg, float x, float z, boolean shadow) {
+        AnimatedModel m = Models.create(device, name);
+        if (!shadow) {
+            Model[] parts = m.getParts();
+            for (int i = 0; i < parts.length; i++) {
+                parts[i].getMaterial().setCastShadows(false);
+            }
+        }
+        float[] b = Models.bounds(m);
+        place(m, height / Math.max(0.01f, b[4] - b[1]), deg % 360f, x, z, b);
+        m.addTo(this);
+    }
+
     private void fenceRow(float[] b, float s, float panel, float x0, float z0, float x1, float z1, float deg) {
         float len = (float) Math.sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0));
         int count = Math.max(1, (int) Math.ceil(len / panel));
@@ -368,17 +470,46 @@ public class ArenaView extends GameView {
         float small = CN.convertToPixels(5.5f);
         buttons = new VirtualButton[] {
             button(c, KEY_FIRE, "FIRE", big, gap),
-            button(c, KEY_AIM, "ADS", small, gap + big * 2.1f + small * 6.9f),
             button(c, KEY_JUMP, "JUMP", small, gap + big * 2.1f),
             button(c, KEY_THROW, "NADE", small, gap + big * 2.1f + small * 2.3f),
-            button(c, KEY_WIPE, "WIPE", small, gap + big * 2.1f + small * 4.6f),
+            // aiming while you are in, wiping the paint off while you are out
+            button(c, KEY_AIM, "ADS", small, gap + big * 2.1f + small * 4.6f),
         };
+    }
+
+    /// Takes the touch buttons off the screen for good, for the result card.
+    public void hideControls() {
+        controlsHidden = true;
+        if (buttons != null) {
+            getControls().setVisible(false);
+        }
+    }
+
+    /// The buttons show only while there is something to press: not during
+    /// the briefing, and the ADS button reads WIPE while you are out.
+    private void controlsFor(Match m) {
+        if (buttons == null) {
+            return;
+        }
+        boolean show = !controlsHidden && driver.countdownTicks() == 0 && !m.over();
+        if (show != getControls().isVisible()) {
+            getControls().setVisible(show);
+        }
+        buttons[3].setLabel(isOut(m) ? "WIPE" : "ADS");
+    }
+
+    /// True while your own player is painted and waiting to come back.
+    private boolean isOut(Match m) {
+        int me = driver.me();
+        return me >= 0 && me < m.playerCount() && !m.player(me).alive();
     }
 
     private static VirtualButton button(TouchControls c, int key, String label, float r, float margin) {
         VirtualButton b = c.addButton(key, r, TouchControls.RIGHT, TouchControls.BOTTOM, margin);
         b.setLabel(label);
-        b.setColor(0x66101418);
+        // dark glass with a light label: readable over sky and asphalt alike
+        b.setColor(key == KEY_FIRE ? 0xb0b8861e : 0x8c0c0e10);
+        b.setLabelColor(0xf2eef1f4);
         return b;
     }
 
@@ -514,10 +645,11 @@ public class ArenaView extends GameView {
         if (key(KEY_THROW)) {
             b |= Input.THROW;
         }
-        if (key(KEY_WIPE)) {
+        boolean out = isOut(driver.match());
+        if (key(KEY_WIPE) || (out && key(KEY_AIM))) {
             b |= Input.WIPE;
         }
-        if (key(KEY_AIM)) {
+        if (!out && key(KEY_AIM)) {
             b |= Input.AIM;
         }
         return new Input(clamp(strafe), clamp(forward), lookYaw, lookPitch, b, -1);
@@ -539,6 +671,7 @@ public class ArenaView extends GameView {
         if (device == null || getWidth() <= 0 || getHeight() <= 0) {
             return;
         }
+        controlsFor(driver.match());
         accumulator += dt * driver.speedPercent() / 100.0;
         int steps = 0;
         while (accumulator >= TICK && steps < MAX_STEPS_PER_FRAME) {
@@ -557,6 +690,7 @@ public class ArenaView extends GameView {
         alpha = (float) Math.min(1, accumulator / TICK);
         events();
         draw((float) dt);
+        tick((float) dt);
     }
     // end::splat-fixed-tick[]
 
@@ -577,19 +711,27 @@ public class ArenaView extends GameView {
             Event e = happened.get(i);
             if (e.kind == Event.SPLAT || e.kind == Event.GRENADE) {
                 decal(e.b & 1, e.x, e.y, e.z, e.kind == Event.GRENADE ? 2.6f : 0.55f);
+                burstImpact(e.b & 1, e.x, e.y, e.z, e.kind == Event.GRENADE);
                 if (near(e.x, e.z)) {
                     Sfx.splat();
                 }
             } else if (e.kind == Event.PAINTED) {
                 Player shooter = driver.match().player(e.a);
                 decal(shooter.team(), e.x, e.y, e.z, 0.7f);
+                burstImpact(shooter.team() & 1, e.x, e.y, e.z, false);
                 Sfx.whistle();
                 if (e.a == driver.me()) {
                     Sfx.hit();
                 }
-            } else if (e.kind == Event.SHOT && e.a == driver.me()) {
-                recoil = 1f;
-                Sfx.pop();
+            } else if (e.kind == Event.SHOT) {
+                if (e.a == driver.me() && driver.interactive()) {
+                    recoil = 1f;
+                    Sfx.pop();
+                    // your own flash sits at the marker you hold, not the ball
+                    flash.burst(viewMuzzleX, viewMuzzleY, viewMuzzleZ, 3);
+                } else if (near(e.x, e.z)) {
+                    flash.burst(-e.x * MM, e.y * MM, e.z * MM, 3);
+                }
             } else if (e.kind == Event.WIPE_CAUGHT) {
                 Sfx.whistle();
             } else if (e.kind == Event.RESPAWN && e.a == driver.me()) {
@@ -599,6 +741,70 @@ public class ArenaView extends GameView {
                 hud.event(e);
             }
         }
+    }
+
+    private void effects(GraphicsDevice d) {
+        for (int t = 0; t < 2; t++) {
+            // the droplets a ball throws off when it bursts
+            spray[t] = new ParticleEmitter(d, 220).setColor(TEAM_COLORS[t]).setSpeed(2.5f, 6.5f)
+                    .setLifetime(0.2f, 0.45f).setSize(0.035f, 0.01f).setGravity(9.8f).setDrag(1.5f)
+                    .setDirection(0f, 1f, 0f, 75f);
+            spray[t].addTo(this);
+            // and the cloud of it that hangs in the air a moment
+            mist[t] = new ParticleEmitter(d, 160).setColor(0x40000000 | (TEAM_COLORS[t] & 0xffffff))
+                    .setSpeed(0.3f, 1.0f).setLifetime(0.3f, 0.7f).setSize(0.12f, 0.45f).setGravity(-0.15f)
+                    .setDrag(2.5f);
+            mist[t].addTo(this);
+        }
+        dust = new ParticleEmitter(d, 200).setColor(0x509a8f80).setSpeed(0.4f, 1.6f).setLifetime(0.9f, 1.8f)
+                .setSize(0.2f, 1.0f).setGravity(-0.25f).setDrag(2f).setDirection(0f, 1f, 0f, 70f);
+        dust.addTo(this);
+        flash = new ParticleEmitter(d, 48).setColor(0xffffc778).setAdditive(true).setSpeed(0f, 0.6f)
+                .setLifetime(0.04f, 0.08f).setSize(0.22f, 0.05f);
+        flash.addTo(this);
+        // dust caught in the sun: a few faint specks drifting around the eye
+        motes = new ParticleEmitter(d, 90).setColor(0x55fff1d6).setAdditive(true).setSpeed(0.02f, 0.12f)
+                .setLifetime(3f, 6f).setSize(0.012f, 0.02f).setGravity(-0.01f);
+        motes.addTo(this);
+    }
+
+    private void burstImpact(int team, int x, int y, int z, boolean grenade) {
+        float px = -x * MM;
+        float py = Math.max(0.03f, y * MM);
+        float pz = z * MM;
+        spray[team].burst(px, py, pz, grenade ? 90 : 14);
+        mist[team].burst(px, py, pz, grenade ? 40 : 4);
+        if (y < 200) {
+            dust.burst(px, 0.05f, pz, grenade ? 24 : 3);
+        }
+    }
+
+    private void drift(float dt) {
+        moteClock += dt;
+        if (moteClock < 0.12f) {
+            return;
+        }
+        moteClock = 0f;
+        GameCamera c = getCamera();
+        moteSeed = moteSeed * 1103515245 + 12345;
+        float ox = ((moteSeed >>> 8) & 1023) / 1023f * 8f - 4f;
+        moteSeed = moteSeed * 1103515245 + 12345;
+        float oz = ((moteSeed >>> 8) & 1023) / 1023f * 8f - 4f;
+        moteSeed = moteSeed * 1103515245 + 12345;
+        float oy = ((moteSeed >>> 8) & 1023) / 1023f * 2.2f - 0.6f;
+        motes.burst(c.getEyeX() + ox, c.getEyeY() + oy, c.getEyeZ() + oz, 1);
+    }
+
+    private void tick(float dt) {
+        GameCamera c = getCamera();
+        for (int t = 0; t < 2; t++) {
+            spray[t].update(dt, c);
+            mist[t].update(dt, c);
+        }
+        dust.update(dt, c);
+        flash.update(dt, c);
+        drift(dt);
+        motes.update(dt, c);
     }
 
     /// Close enough to the camera to be worth a sound: 12 m.
@@ -761,7 +967,10 @@ public class ArenaView extends GameView {
         ads += ((aiming ? 1f : 0f) - ads) * Math.min(1f, dt * 14f);
         getCamera().setPerspective(HIP_FOV + (ADS_FOV - HIP_FOV) * ads, 0.03f, 400f);
         getCamera().setPosition(x, eye, z);
+        sky.setPosition(x, eye, z);
         getCamera().setTarget(x + dx, eye + dy, z + dz);
+        // the shadow map covers what is in front of the eye, not behind it
+        getLight().setShadowCenter(x + dx * SHADOW_AHEAD, 0f, z + dz * SHADOW_AHEAD);
         if (viewModel == null) {
             return;
         }
@@ -791,6 +1000,10 @@ public class ArenaView extends GameView {
         float ahead = 0.42f - 0.06f * ads - 0.07f * recoil;
         viewModel.setPosition(x + dx * ahead + rx * right + ux * up, eye + dy * ahead + uy * up,
                 z + dz * ahead + rz * right + uz * up);
+        // the barrel's end, where the flash goes
+        viewMuzzleX = x + dx * (ahead + MARKER_LENGTH) + rx * right + ux * up;
+        viewMuzzleY = eye + dy * (ahead + MARKER_LENGTH) + uy * up;
+        viewMuzzleZ = z + dz * (ahead + MARKER_LENGTH) + rz * right + uz * up;
         float yawDeg = -yaw * 360f / Trig.FULL;
         float pitchDeg = -pitch * 360f / Trig.FULL - recoil * 6f;
         viewModel.setRotation(pitchDeg, yawDeg + 180f, 0f);
@@ -805,5 +1018,11 @@ public class ArenaView extends GameView {
         }
         return a + (b - a) * alpha;
     }
+
+    private static int dim(int rgb, float k) {
+        int r = (int) (((rgb >> 16) & 0xff) * k);
+        int g = (int) (((rgb >> 8) & 0xff) * k);
+        int b = (int) ((rgb & 0xff) * k);
+        return 0xff000000 | (r << 16) | (g << 8) | b;
+    }
 }
-// end::splat-arena-view[]

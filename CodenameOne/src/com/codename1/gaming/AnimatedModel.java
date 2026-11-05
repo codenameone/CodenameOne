@@ -169,6 +169,8 @@ public class AnimatedModel {
             if (p.getMaterial() >= 0 && p.getMaterial() < scene.getMaterialCount()) {
                 GltfScene.MaterialInfo info = scene.getMaterial(p.getMaterial());
                 material.setColor(info.getBaseColor());
+                material.setMetallic(info.getMetallic()).setRoughness(info.getRoughness())
+                        .setEmissive(info.getEmissive());
                 Texture t = scene.getTexture(device, info.getImage());
                 if (t != null) {
                     material.setTexture(t);
@@ -184,6 +186,20 @@ public class AnimatedModel {
             parts[i] = new Model(new Mesh(vb, ib, PrimitiveType.TRIANGLES), material);
         }
         pose();
+    }
+
+    /// Switches every part of the model to a lighting model, keeping its
+    /// colour, texture and the metallic, roughness and emissive factors the
+    /// glTF file gave it. Parts start as `Material.Type.LAMBERT`;
+    /// `Material.Type.PBR` shades them the way the asset was authored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the lighting model
+    public void setMaterialType(Material.Type type) {
+        for (int i = 0; i < parts.length; i++) {
+            parts[i].getMaterial().setType(type);
+        }
     }
 
     /// The scene this instance poses.

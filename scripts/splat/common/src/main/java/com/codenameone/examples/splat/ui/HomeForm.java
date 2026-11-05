@@ -178,6 +178,11 @@ public final class HomeForm {
         if (p.admin()) {
             menu.add(item("COMMAND", "Admin console", "adminButton", false, Nav::adminConsole));
         }
+        if (g != null && g.chests() > 0) {
+            // in the list, not under it: the bottom strip is the news and the
+            // ad, and a third row there was cut off on a phone
+            menu.add(supplyDrops(g));
+        }
         Container left = new Container(new BorderLayout());
         left.add(BorderLayout.NORTH, menu);
         left.setScrollableY(true);
@@ -190,9 +195,6 @@ public final class HomeForm {
         if (spot != null) {
             bottom.add(spot);
         }
-        if (g != null && g.chests() > 0) {
-            bottom.add(supplyDrops(g));
-        }
         Component banner = Ads.banner(Ui.adFree());
         if (banner != null) {
             bottom.add(banner);
@@ -204,26 +206,28 @@ public final class HomeForm {
     /// does. The primed one carries the amber bar.
     private static Component item(String title, String sub, String name, boolean primed, final Runnable go) {
         Button b = Ui.button(title, primed ? "MenuItemTextPrimed" : "MenuItemText", name, e -> go.run());
-        Container c = BoxLayout.encloseY(b, new Label(Ui.caps(sub), "MenuItemSub"));
+        // a phone held upright has room for the whole list only without the
+        // second lines; the primed order keeps its own
+        boolean tall = CN.getDisplayHeight() > CN.getDisplayWidth() && !CN.isTablet() && !CN.isDesktop();
+        Container c = tall && !primed ? BoxLayout.encloseY(b)
+                : BoxLayout.encloseY(b, new Label(Ui.caps(sub), "MenuItemSub"));
         c.setUIID(primed ? "MenuItemPrimed" : "MenuItem");
         c.setLeadComponent(b);
         return c;
     }
 
-    /// Supply drops waiting: one button per drop.
+    /// Supply drops waiting: one button that opens the next, with the count.
     private static Container supplyDrops(ProgressDto g) {
         Container c = new Container(new FlowLayout());
         c.setName("chests");
-        c.add(new Label("SUPPLY DROPS", "SectionTitle"));
-        for (int i = 0; i < g.chests(); i++) {
-            Button b = Ui.button("OPEN DROP " + (i + 1), "CrateSlot", "chest" + i, null);
-            b.addActionListener(e -> {
-                b.setEnabled(false);
-                Api.progress().openChest(Net.to(r -> Ui.later(() -> Rewards.show(r, HomeForm::show)),
-                        (s, m) -> Ui.later(() -> Ui.failed(s, m))));
-            });
-            c.add(b);
-        }
+        final Button b = Ui.button("OPEN SUPPLY DROP" + (g.chests() > 1 ? "  x" + g.chests() : ""), "CrateSlot",
+                "chest0", null);
+        b.addActionListener(e -> {
+            b.setEnabled(false);
+            Api.progress().openChest(Net.to(r -> Ui.later(() -> Rewards.show(r, HomeForm::show)),
+                    (s, m) -> Ui.later(() -> Ui.failed(s, m))));
+        });
+        c.add(b);
         return c;
     }
 
@@ -287,6 +291,11 @@ public final class HomeForm {
         b.setIconUIID("SpotlightIcon");
         b.setName("spotlight");
         b.setMaterialIcon(FontImage.MATERIAL_CAMPAIGN, 4);
+        // a span measures its first layout at its unwrapped width, so the
+        // strip under the menu was sized for one line and cut the second;
+        // a news line is at most two, so ask for two from the start
+        b.getTextComponent().setRows(2);
+        b.getTextComponent().setGrowByContent(true);
         b.addActionListener(e -> {
             Nav.screen(s.screen() == null ? "" : s.screen());
         });

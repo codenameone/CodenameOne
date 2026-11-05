@@ -61,7 +61,7 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
     private final Hud hud;
     private final Form form;
     private final Container layers;
-    private final Container chatLog = new Container(BoxLayout.y());
+    private Container chrome;
     private boolean endShown;
 
     private MatchForm(Driver driver, String mode, Runnable back) {
@@ -78,32 +78,38 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
         form.setUIID("MatchScreen");
         form.getToolbar().hideToolbar();
 
-        Container chrome = new Container(new BorderLayout());
+        chrome = new Container(new BorderLayout());
         chrome.setSafeArea(true);
         Button quit = Ui.button("", "HudButton", "quit", e -> quit());
         quit.setMaterialIcon(FontImage.MATERIAL_PAUSE, 4.4f);
         Container top = new Container(new BorderLayout());
-        top.add(BorderLayout.EAST, FlowLayout.encloseIn(quit));
+        Container corner = new Container(BoxLayout.y());
+        if (driver instanceof OnlineDriver && driver.interactive()) {
+            // Comms stay folded behind one button: open, they cover the
+            // killfeed and nothing else, and they fold again once you speak.
+            final Container emotes = new Container(BoxLayout.y());
+            emotes.setUIID("EmoteBar");
+            emotes.setHidden(true);
+            Button comms = Ui.button("", "HudButton", "comms", null);
+            comms.setMaterialIcon(FontImage.MATERIAL_CHAT_BUBBLE, 4.4f);
+            comms.addActionListener(e -> showComms(emotes, emotes.isHidden()));
+            String[] ids = {"bounce", "cover", "ref", "gg"};
+            for (final String id : ids) {
+                emotes.add(Ui.button(emoteText(id), "EmoteButton", "emote-" + id, e -> {
+                    ((OnlineDriver) driver).emote(id);
+                    showComms(emotes, false);
+                }));
+            }
+            corner.add(FlowLayout.encloseRight(comms, quit));
+            corner.add(emotes);
+        } else {
+            corner.add(FlowLayout.encloseRight(quit));
+        }
+        top.add(BorderLayout.EAST, corner);
         if (driver instanceof ReplayDriver) {
             top.add(BorderLayout.WEST, replayControls((ReplayDriver) driver));
         }
         chrome.add(BorderLayout.NORTH, top);
-        if (driver instanceof OnlineDriver && driver.interactive()) {
-            // Comms, under the minimap: four callouts and the last lines said.
-            Container bottom = new Container(BoxLayout.y());
-            bottom.setUIID("CommsColumn");
-            chatLog.setUIID("ChatLog");
-            Container emotes = new Container(BoxLayout.y());
-            emotes.setUIID("EmoteBar");
-            String[] ids = {"bounce", "cover", "ref", "gg"};
-            for (final String id : ids) {
-                emotes.add(Ui.button(emoteText(id), "EmoteButton", "emote-" + id,
-                        e -> ((OnlineDriver) driver).emote(id)));
-            }
-            bottom.add(emotes);
-            bottom.add(chatLog);
-            chrome.add(BorderLayout.WEST, bottom);
-        }
         layers = new Container(new LayeredLayout());
         layers.add(view);
         layers.add(hud);
@@ -111,6 +117,12 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
         form.add(BorderLayout.CENTER, layers);
     }
     // end::splat-match-form[]
+
+    private void showComms(Container emotes, boolean open) {
+        emotes.setHidden(!open);
+        hud.setFeedHidden(open);
+        form.revalidateLater();
+    }
 
     /// The comms wheel, abridged: the four things every paintball player says.
     static String emoteText(String id) {
@@ -241,11 +253,7 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
 
     @Override
     public void chat(String from, String text) {
-        chatLog.add(new Label(from + ": " + text, "ChatLine"));
-        while (chatLog.getComponentCount() > 3) {
-            chatLog.removeComponent(chatLog.getComponentAt(0));
-        }
-        form.revalidateLater();
+        hud.chat(from, text);
     }
 
     @Override
@@ -269,6 +277,11 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
     /// should be proud of.
     private void result(String title, String note, final String matchId) {
         view.stop();
+        // the card owns the screen: no HUD, no touch buttons, no pause behind it
+        hud.setEnded(true);
+        view.hideControls();
+        chrome.setHidden(true);
+        chrome.setVisible(false);
         Match m = driver.match();
         int myTeam = driver.interactive() ? m.player(driver.me()).team() : 0;
         Container card = new Container(BoxLayout.y());
@@ -276,9 +289,11 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
         card.setName("result");
         card.add(new Label(title, "VICTORY".equals(title) ? "ResultTitle" : "ResultTitleLoss"));
         card.add(new Label(Ui.caps(m.mode().operation) + "  //  " + Ui.caps(m.arena().name), "ResultCaption"));
-        card.add(new Label(Ui.caps(ArenaView.TEAM_NAMES[myTeam]) + "  " + m.score(myTeam) + "   -   "
-                + m.score(1 - myTeam) + "  " + Ui.caps(ArenaView.TEAM_NAMES[1 - myTeam]), "ResultScore"));
-        card.add(scoreRow("PLAYER", "PAINTS", "OUTS", "CAPS", "ScoreHead"));
+        // the score big on a line of its own, the two sides named under it
+        card.add(new Label(m.score(myTeam) + "  -  " + m.score(1 - myTeam), "ResultScore"));
+        card.add(new Label(Ui.caps(ArenaView.TEAM_NAMES[myTeam]) + "  VS  "
+                + Ui.caps(ArenaView.TEAM_NAMES[1 - myTeam]), "ResultCaption"));
+        card.add(scoreRow("PLAYER", "HITS", "OUTS", "CAPS", "ScoreHead"));
         int mvp = -1;
         for (int i = 0; i < m.playerCount(); i++) {
             if (mvp < 0 || m.player(i).paints() > m.player(mvp).paints()) {

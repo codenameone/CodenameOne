@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.gpu.Camera;
+import com.codename1.gpu.Environment;
 import com.codename1.gpu.GpuCapabilities;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.IndexBuffer;
@@ -30,6 +31,7 @@ import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.PrimitiveType;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
@@ -89,7 +91,34 @@ class JavaSEGLDevice extends GraphicsDevice {
         int uAmbient;
         int uEye;
         int uShininess;
+        final Map<String, Integer> uniforms = new HashMap<String, Integer>();
     }
+
+    // an offscreen colour target (and optional depth) for the shadow map and
+    // the post processing chain
+    private static final class Target {
+        int fbo;
+        int tex;
+        int depth;
+        int width;
+        int height;
+    }
+
+    private Program shadowProgram;
+    private Program brightProgram;
+    private Program blurProgram;
+    private Program compositeProgram;
+    private Target shadowTarget;
+    private Target sceneTarget;
+    private Target bloomA;
+    private Target bloomB;
+    private int quadVbo;
+    private boolean inShadowPass;
+    private boolean shadowReady;
+    private final float[] shadowMatrix = new float[16];
+    private PostProcess activePost;
+    private final int[] savedFbo = new int[1];
+    private final int[] savedViewport = new int[4];
 
     private static final class TexHandle {
         final int id;
@@ -115,7 +144,7 @@ class JavaSEGLDevice extends GraphicsDevice {
             if (version != null) {
                 name = name + " / " + version;
             }
-            caps = new GpuCapabilities(maxTex, maxAttribs, false, false, false, name);
+            caps = new GpuCapabilities(maxTex, maxAttribs, false, false, false, name, true, true);
         }
         return caps;
     }
@@ -177,7 +206,14 @@ class JavaSEGLDevice extends GraphicsDevice {
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
 
-        Program program = getProgram(material, fmt);
+        if (inShadowPass) {
+            drawShadowCaster(mesh, material, modelMatrix);
+            return;
+        }
+        Environment env = getEnvironment();
+        boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
+                && material.isReceiveShadows();
+        Program program = getProgram(material, fmt, env, shadowed);
         if (program.handle == 0) {
             return;
         }
@@ -236,6 +272,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         if (program.uShininess >= 0) {
             gl.glUniform1f(program.uShininess, material.getShininess());
         }
+        applyEnvironment(program, material, env, shadowed);
 
         Texture tex = material.getTexture();
         if (tex != null && program.uTexture >= 0) {
@@ -435,15 +472,22 @@ class JavaSEGLDevice extends GraphicsDevice {
         return h.id;
     }
 
-    private Program getProgram(Material material, VertexFormat fmt) {
-        String key = material.getShaderKey() + "|" + System.identityHashCode(fmt);
+    private Program getProgram(Material material, VertexFormat fmt, Environment env, boolean shadowed) {
+        String key = material.getShaderKey() + "|" + GlslShaderGenerator.variantKey(env, shadowed)
+                + "|" + System.identityHashCode(fmt);
         Program p = programs.get(key);
         if (p != null) {
             return p;
         }
-        GlslShaderGenerator gen = new GlslShaderGenerator(material, fmt);
-        int handle = linkProgram(gen.getVertexSource(), gen.getFragmentSource());
-        p = new Program();
+        GlslShaderGenerator gen = new GlslShaderGenerator(material, fmt, env, shadowed);
+        p = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+        programs.put(key, p);
+        return p;
+    }
+
+    private Program buildProgram(String vertexSrc, String fragmentSrc) {
+        int handle = linkProgram(vertexSrc, fragmentSrc);
+        Program p = new Program();
         p.handle = handle;
         if (handle != 0) {
             p.aPosition = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_POSITION);
@@ -460,8 +504,324 @@ class JavaSEGLDevice extends GraphicsDevice {
             p.uEye = gl.glGetUniformLocation(handle, "u_eye");
             p.uShininess = gl.glGetUniformLocation(handle, "u_shininess");
         }
-        programs.put(key, p);
         return p;
+    }
+
+    private int loc(Program p, String name) {
+        Integer cached = p.uniforms.get(name);
+        if (cached == null) {
+            cached = Integer.valueOf(p.handle == 0 ? -1 : gl.glGetUniformLocation(p.handle, name));
+            p.uniforms.put(name, cached);
+        }
+        return cached.intValue();
+    }
+
+    private void uniformColor(Program p, String name, int argb) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            gl.glUniform3f(l, ((argb >> 16) & 0xff) / 255.0f, ((argb >> 8) & 0xff) / 255.0f,
+                    (argb & 0xff) / 255.0f);
+        }
+    }
+
+    private void uniform1(Program p, String name, float v) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            gl.glUniform1f(l, v);
+        }
+    }
+
+    private void uniform2(Program p, String name, float a, float b) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            gl.glUniform2f(l, a, b);
+        }
+    }
+
+    private void uniform3(Program p, String name, float a, float b, float c) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            gl.glUniform3f(l, a, b, c);
+        }
+    }
+
+    private void sampler(Program p, String name, int unit, int tex) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            gl.glActiveTexture(GL2ES2.GL_TEXTURE0 + unit);
+            gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, tex);
+            gl.glUniform1i(l, unit);
+            gl.glActiveTexture(GL2ES2.GL_TEXTURE0);
+        }
+    }
+
+    private void applyEnvironment(Program p, Material material, Environment env, boolean shadowed) {
+        uniformColor(p, "u_fogColor", env.getFogColor());
+        uniform3(p, "u_fog", env.getFogDensity(), env.getFogHeightFalloff(), env.getFogBaseHeight());
+        uniformColor(p, "u_sky", env.getSkyColor());
+        uniformColor(p, "u_ground", env.getGroundColor());
+        uniform1(p, "u_exposure", env.getExposure());
+        uniform2(p, "u_pbr", material.getMetallic(), material.getRoughness());
+        if (env.isSky()) {
+            uniformColor(p, "u_zenith", env.getZenithColor());
+            uniformColor(p, "u_horizon", env.getHorizonColor());
+            int sun = env.getSunColor();
+            int l = loc(p, "u_sun");
+            if (l >= 0) {
+                gl.glUniform4f(l, ((sun >> 16) & 0xff) / 255f, ((sun >> 8) & 0xff) / 255f, (sun & 0xff) / 255f,
+                        env.getCloudCover());
+            }
+        }
+        uniformColor(p, "u_emissive", material.getEmissive());
+        if (shadowed) {
+            int l = loc(p, "u_shadowMatrix");
+            if (l >= 0) {
+                gl.glUniformMatrix4fv(l, 1, false, shadowMatrix, 0);
+            }
+            Light light = getLight();
+            uniform3(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
+                    1f / shadowTarget.width);
+            sampler(p, "u_shadowMap", 1, shadowTarget.tex);
+        }
+    }
+
+    private Target target(Target t, int w, int h, boolean depth) {
+        return target(t, w, h, depth, GL2ES2.GL_LINEAR);
+    }
+
+    private Target target(Target t, int w, int h, boolean depth, int filter) {
+        if (t != null && t.width == w && t.height == h) {
+            return t;
+        }
+        if (t != null) {
+            releaseTarget(t);
+        }
+        Target n = new Target();
+        n.width = w;
+        n.height = h;
+        int[] ids = new int[1];
+        gl.glGenTextures(1, ids, 0);
+        n.tex = ids[0];
+        gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, n.tex);
+        gl.glTexImage2D(GL2ES2.GL_TEXTURE_2D, 0, GL2ES2.GL_RGBA, w, h, 0, GL2ES2.GL_RGBA,
+                GL2ES2.GL_UNSIGNED_BYTE, null);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, filter);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, filter);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, GL2ES2.GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, GL2ES2.GL_CLAMP_TO_EDGE);
+        gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, 0);
+        gl.glGenFramebuffers(1, ids, 0);
+        n.fbo = ids[0];
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, n.fbo);
+        gl.glFramebufferTexture2D(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_COLOR_ATTACHMENT0,
+                GL2ES2.GL_TEXTURE_2D, n.tex, 0);
+        if (depth) {
+            gl.glGenRenderbuffers(1, ids, 0);
+            n.depth = ids[0];
+            gl.glBindRenderbuffer(GL2ES2.GL_RENDERBUFFER, n.depth);
+            gl.glRenderbufferStorage(GL2ES2.GL_RENDERBUFFER, GL2ES2.GL_DEPTH_COMPONENT16, w, h);
+            gl.glFramebufferRenderbuffer(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_DEPTH_ATTACHMENT,
+                    GL2ES2.GL_RENDERBUFFER, n.depth);
+            gl.glBindRenderbuffer(GL2ES2.GL_RENDERBUFFER, 0);
+        }
+        return n;
+    }
+
+    private void releaseTarget(Target t) {
+        if (t == null || gl == null) {
+            return;
+        }
+        gl.glDeleteFramebuffers(1, new int[]{t.fbo}, 0);
+        gl.glDeleteTextures(1, new int[]{t.tex}, 0);
+        if (t.depth != 0) {
+            gl.glDeleteRenderbuffers(1, new int[]{t.depth}, 0);
+        }
+    }
+
+    // The panel renders into its own framebuffer, so "the screen" is whatever
+    // was bound when a pass began, never framebuffer 0.
+    private void saveTarget() {
+        gl.glGetIntegerv(GL2ES2.GL_FRAMEBUFFER_BINDING, savedFbo, 0);
+        gl.glGetIntegerv(GL2ES2.GL_VIEWPORT, savedViewport, 0);
+    }
+
+    private void restoreTarget() {
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, savedFbo[0]);
+        gl.glViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
+    }
+
+    public boolean beginShadowPass(Light light) {
+        if (gl == null) {
+            return false;
+        }
+        if (shadowProgram == null) {
+            shadowProgram = buildProgram(GlslShaderGenerator.shadowVertex(),
+                    GlslShaderGenerator.shadowFragment());
+        }
+        if (shadowProgram.handle == 0) {
+            return false;
+        }
+        saveTarget();
+        int size = light.getShadowMapSize();
+        // packed depth must not be interpolated between texels
+        shadowTarget = target(shadowTarget, size, size, true, GL2ES2.GL_NEAREST);
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, shadowTarget.fbo);
+        gl.glViewport(0, 0, size, size);
+        gl.glClearColor(1f, 1f, 1f, 1f);
+        gl.glClearDepthf(1f);
+        gl.glDepthMask(true);
+        gl.glClear(GL2ES2.GL_COLOR_BUFFER_BIT | GL2ES2.GL_DEPTH_BUFFER_BIT);
+        light.computeShadowMatrix(shadowMatrix);
+        inShadowPass = true;
+        return true;
+    }
+
+    public void endShadowPass() {
+        if (!inShadowPass) {
+            return;
+        }
+        inShadowPass = false;
+        shadowReady = true;
+        restoreTarget();
+    }
+
+    private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
+                || material.getType() == Material.Type.SKYBOX) {
+            return;
+        }
+        VertexBuffer vb = mesh.getVertices();
+        VertexFormat fmt = vb.getFormat();
+        gl.glUseProgram(shadowProgram.handle);
+        if (modelMatrix != null) {
+            Matrix4.copy(modelMatrix, model);
+        } else {
+            Matrix4.setIdentity(model);
+        }
+        Matrix4.multiply(shadowMatrix, model, mvp);
+        gl.glUniformMatrix4fv(shadowProgram.uMvp, 1, false, mvp, 0);
+        gl.glEnable(GL2ES2.GL_DEPTH_TEST);
+        gl.glDepthMask(true);
+        gl.glDisable(GL2ES2.GL_BLEND);
+        gl.glDisable(GL2ES2.GL_CULL_FACE);
+        int vbo = uploadVertexBuffer(vb);
+        gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, vbo);
+        bindAttribute(shadowProgram.aPosition, fmt, VertexAttribute.Usage.POSITION, fmt.getStrideBytes());
+        int glMode = toGlPrimitive(mesh.getPrimitiveType());
+        if (mesh.isIndexed()) {
+            IndexBuffer ib = mesh.getIndices();
+            int ibo = uploadIndexBuffer(ib);
+            gl.glBindBuffer(GL2ES2.GL_ELEMENT_ARRAY_BUFFER, ibo);
+            gl.glDrawElements(glMode, ib.getIndexCount(), GL2ES2.GL_UNSIGNED_SHORT, 0L);
+            gl.glBindBuffer(GL2ES2.GL_ELEMENT_ARRAY_BUFFER, 0);
+        } else {
+            gl.glDrawArrays(glMode, 0, vb.getVertexCount());
+        }
+        disableAttribute(shadowProgram.aPosition);
+        gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, 0);
+    }
+
+    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+        if (gl == null || effects == null) {
+            return false;
+        }
+        if (compositeProgram == null) {
+            String v = GlslShaderGenerator.postVertex();
+            brightProgram = buildProgram(v, GlslShaderGenerator.brightFragment());
+            blurProgram = buildProgram(v, GlslShaderGenerator.blurFragment());
+            compositeProgram = buildProgram(v, GlslShaderGenerator.compositeFragment());
+        }
+        if (compositeProgram.handle == 0 || brightProgram.handle == 0 || blurProgram.handle == 0) {
+            return false;
+        }
+        saveTarget();
+        int w = savedViewport[2];
+        int h = savedViewport[3];
+        if (w <= 0 || h <= 0) {
+            return false;
+        }
+        sceneTarget = target(sceneTarget, w, h, true);
+        if (effects.isBloom()) {
+            bloomA = target(bloomA, Math.max(1, w / 4), Math.max(1, h / 4), false);
+            bloomB = target(bloomB, bloomA.width, bloomA.height, false);
+        }
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, sceneTarget.fbo);
+        gl.glViewport(0, 0, w, h);
+        activePost = effects;
+        return true;
+    }
+
+    public void endPostProcess(float timeSeconds) {
+        PostProcess pp = activePost;
+        if (pp == null) {
+            return;
+        }
+        activePost = null;
+        gl.glDisable(GL2ES2.GL_DEPTH_TEST);
+        gl.glDepthMask(false);
+        gl.glDisable(GL2ES2.GL_BLEND);
+        gl.glDisable(GL2ES2.GL_CULL_FACE);
+        int bloomTex = sceneTarget.tex;
+        if (pp.isBloom()) {
+            passInto(bloomA);
+            gl.glUseProgram(brightProgram.handle);
+            sampler(brightProgram, "u_scene", 0, sceneTarget.tex);
+            uniform1(brightProgram, "u_threshold", pp.getBloomThreshold());
+            uniform2(brightProgram, "u_texel", 1f / sceneTarget.width, 1f / sceneTarget.height);
+            drawQuad(brightProgram);
+            for (int i = 0; i < 2; i++) {
+                float spread = 1f + i;
+                passInto(bloomB);
+                gl.glUseProgram(blurProgram.handle);
+                sampler(blurProgram, "u_scene", 0, bloomA.tex);
+                uniform2(blurProgram, "u_dir", spread / bloomA.width, 0f);
+                drawQuad(blurProgram);
+                passInto(bloomA);
+                sampler(blurProgram, "u_scene", 0, bloomB.tex);
+                uniform2(blurProgram, "u_dir", 0f, spread / bloomA.height);
+                drawQuad(blurProgram);
+            }
+            bloomTex = bloomA.tex;
+        }
+        restoreTarget();
+        Program c = compositeProgram;
+        gl.glUseProgram(c.handle);
+        sampler(c, "u_scene", 0, sceneTarget.tex);
+        sampler(c, "u_bloom", 1, bloomTex);
+        uniform1(c, "u_bloomIntensity", pp.isBloom() ? pp.getBloomIntensity() : 0f);
+        uniform2(c, "u_grade", pp.getContrast(), pp.getSaturation());
+        uniformColor(c, "u_lift", pp.getShadowTint());
+        uniformColor(c, "u_gain", pp.getHighlightTint());
+        uniform1(c, "u_vignette", pp.getVignette());
+        uniform1(c, "u_grain", pp.getGrain());
+        uniform1(c, "u_time", timeSeconds);
+        uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        drawQuad(c);
+        gl.glDepthMask(true);
+    }
+
+    private void passInto(Target t) {
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, t.fbo);
+        gl.glViewport(0, 0, t.width, t.height);
+    }
+
+    private void drawQuad(Program p) {
+        if (quadVbo == 0) {
+            int[] ids = new int[1];
+            gl.glGenBuffers(1, ids, 0);
+            quadVbo = ids[0];
+            FloatBuffer fb = ByteBuffer.allocateDirect(12 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+            fb.put(new float[]{-1f, -1f, 0f, 1f, -1f, 0f, -1f, 1f, 0f, 1f, 1f, 0f});
+            fb.position(0);
+            gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, quadVbo);
+            gl.glBufferData(GL2ES2.GL_ARRAY_BUFFER, 12L * 4, fb, GL2ES2.GL_STATIC_DRAW);
+        }
+        gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, quadVbo);
+        gl.glEnableVertexAttribArray(p.aPosition);
+        gl.glVertexAttribPointer(p.aPosition, 3, GL2ES2.GL_FLOAT, false, 12, 0L);
+        gl.glDrawArrays(GL2ES2.GL_TRIANGLE_STRIP, 0, 4);
+        gl.glDisableVertexAttribArray(p.aPosition);
+        gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, 0);
     }
 
     private int linkProgram(String vertexSrc, String fragmentSrc) {
@@ -576,5 +936,16 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
         programs.clear();
         caps = null;
+        shadowProgram = null;
+        brightProgram = null;
+        blurProgram = null;
+        compositeProgram = null;
+        // the context that owned these is gone with them
+        shadowTarget = null;
+        sceneTarget = null;
+        bloomA = null;
+        bloomB = null;
+        quadVbo = 0;
+        shadowReady = false;
     }
 }

@@ -71,6 +71,7 @@ public class PartyTest extends E2e {
                     "the match reached tick " + tick + " in 30 s");
             guest.emote("bounce");
             guest.say("That one bounced, I swear");
+            click("comms");
             click("emote-ref");
             driveFor(view, 1500);
             shot("party-match", view);

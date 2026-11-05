@@ -41,6 +41,7 @@ public class OnlineTest extends E2e {
             driveFor(view, 200);
         }
         assertTrue(view.driver().match().tick() >= 100, "server snapshots");
+        click("comms");
         click("emote-gg");
         shot("match-online", view);
         onEdt(() -> {

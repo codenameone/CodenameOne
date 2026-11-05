@@ -362,6 +362,16 @@ public final class GltfLoader {
             Object name = m.get("name");
             materials[i] = new GltfScene.MaterialInfo(name == null ? "" : name.toString(), argb, image,
                     isTrue(m.get("doubleSided")), "BLEND".equals(m.get("alphaMode")));
+            if (pbr != null && pbr.get("metallicFactor") instanceof Number) {
+                materials[i].metallic = clamp01(((Number) pbr.get("metallicFactor")).floatValue());
+            }
+            if (pbr != null && pbr.get("roughnessFactor") instanceof Number) {
+                materials[i].roughness = clamp01(((Number) pbr.get("roughnessFactor")).floatValue());
+            }
+            float[] em = floats(m.get("emissiveFactor"), new float[]{0f, 0f, 0f});
+            if (em.length >= 3) {
+                materials[i].emissive = 0xff000000 | (channel(em[0]) << 16) | (channel(em[1]) << 8) | channel(em[2]);
+            }
         }
 
         List skinList = list(root, "skins");
@@ -502,6 +512,10 @@ public final class GltfLoader {
     /// depending on its settings; accept both.
     private static boolean isTrue(Object o) {
         return Boolean.TRUE.equals(o) || "true".equals(o);
+    }
+
+    private static float clamp01(float f) {
+        return f < 0f ? 0f : f > 1f ? 1f : f;
     }
 
     private static int channel(float f) {

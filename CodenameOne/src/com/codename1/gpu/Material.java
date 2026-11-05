@@ -26,6 +26,11 @@ public final class Material {
         /// Diffuse and specular (Blinn-Phong) lighting using a single
         /// directional light and the `shininess` property.
         PHONG,
+        /// Physically based shading (metallic/roughness with a GGX specular
+        /// lobe, the model glTF describes) using the directional light, the
+        /// environment's hemisphere ambient and, when the light casts them,
+        /// shadows. See `setMetallic`, `setRoughness` and `setEmissive`.
+        PBR,
         /// Unlit shading intended for screen aligned sprites and billboards.
         SPRITE,
         /// Unlit shading sampling a background cube/sky texture, rendered behind
@@ -38,6 +43,11 @@ public final class Material {
     private Texture texture;
     private float shininess = 32.0f;
     private RenderState renderState = RenderState.opaque();
+    private float metallic;
+    private float roughness = 0.8f;
+    private int emissive = 0xff000000;
+    private boolean receiveShadows = true;
+    private boolean castShadows = true;
 
     /// Creates an unlit white material.
     public Material() {
@@ -147,6 +157,114 @@ public final class Material {
         return this;
     }
 
+    /// Returns how metallic a `Type.PBR` surface is, from 0 (a dielectric such
+    /// as paint, plastic or wood) to 1 (bare metal).
+    public float getMetallic() {
+        return metallic;
+    }
+
+    /// Sets how metallic a `Type.PBR` surface is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `metallic`: 0 for a dielectric, 1 for metal
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setMetallic(float metallic) {
+        this.metallic = Math.max(0f, Math.min(1f, metallic));
+        return this;
+    }
+
+    /// Returns how rough a `Type.PBR` surface is, from 0 (mirror) to 1 (chalk).
+    public float getRoughness() {
+        return roughness;
+    }
+
+    /// Sets how rough a `Type.PBR` surface is. Rough surfaces spread their
+    /// highlight wide and dim; smooth ones make it small and bright.
+    ///
+    /// #### Parameters
+    ///
+    /// - `roughness`: 0 for a mirror, 1 for fully diffuse
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setRoughness(float roughness) {
+        this.roughness = Math.max(0.04f, Math.min(1f, roughness));
+        return this;
+    }
+
+    /// Returns the light the surface gives off by itself, as RGB in an ARGB
+    /// int; black for none.
+    public int getEmissive() {
+        return emissive;
+    }
+
+    /// Sets the light the surface gives off by itself: a lamp, a screen, wet
+    /// paint catching the sun. Emissive colour is added after lighting and is
+    /// what a bloom post effect picks up. Used by `Type.PBR`, `Type.LAMBERT`
+    /// and `Type.PHONG`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the emitted colour; black for none
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setEmissive(int argb) {
+        this.emissive = argb | 0xff000000;
+        return this;
+    }
+
+    /// Returns true if the surface is darkened by shadows the light casts.
+    public boolean isReceiveShadows() {
+        return receiveShadows;
+    }
+
+    /// Sets whether the surface is darkened by the light's shadows. A ground
+    /// plane receives them; a particle or a muzzle flash should not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `receiveShadows`: true to receive shadows
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setReceiveShadows(boolean receiveShadows) {
+        this.receiveShadows = receiveShadows;
+        return this;
+    }
+
+    /// Returns true if geometry drawn with this material casts a shadow.
+    public boolean isCastShadows() {
+        return castShadows;
+    }
+
+    /// Sets whether geometry drawn with this material casts a shadow.
+    /// Transparent and unlit effects normally should not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `castShadows`: true to cast shadows
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setCastShadows(boolean castShadows) {
+        this.castShadows = castShadows;
+        return this;
+    }
+
+    /// Returns true if this material is lit by the directional light.
+    public boolean isLit() {
+        return type == Type.LAMBERT || type == Type.PHONG || type == Type.PBR;
+    }
+
     /// Returns a stable string identifying the shader variant required by this
     /// material. Backends use it together with the mesh `VertexFormat` to cache
     /// generated and compiled shader programs. The key intentionally depends
@@ -157,6 +275,7 @@ public final class Material {
     ///
     /// a shader variant cache key
     public String getShaderKey() {
-        return type.name() + (texture != null ? "|tex" : "|notex");
+        return type.name() + (texture != null ? "|tex" : "|notex")
+                + (receiveShadows ? "|rs" : "|nrs") + ((emissive & 0xffffff) != 0 ? "|em" : "");
     }
 }

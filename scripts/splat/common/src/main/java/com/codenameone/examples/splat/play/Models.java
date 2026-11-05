@@ -23,6 +23,7 @@ import com.codename1.gaming.Model;
 import com.codename1.gpu.GltfLoader;
 import com.codename1.gpu.GltfScene;
 import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Material;
 import com.codename1.io.Log;
 import com.codename1.ui.CN;
 import java.io.InputStream;
@@ -101,7 +102,9 @@ public final class Models {
 
     /// A new instance of `name`.
     static AnimatedModel create(GraphicsDevice d, String name) {
-        return new AnimatedModel(d, scene(name));
+        AnimatedModel m = new AnimatedModel(d, scene(name));
+        m.setMaterialType(Material.Type.PBR);
+        return m;
     }
 
     /// The bounds of the current pose, node transforms applied:

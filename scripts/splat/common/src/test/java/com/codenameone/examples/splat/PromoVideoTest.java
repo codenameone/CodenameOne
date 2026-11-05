@@ -110,6 +110,7 @@ public class PromoVideoTest extends E2e {
             driveFor(view, 8000);
             g.emote("bounce");
             g.say("That one bounced");
+            click("comms");
             click("emote-ref");
             driveFor(view, 6000);
             final ArenaView live = view;

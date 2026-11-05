@@ -198,9 +198,7 @@ public class Rooms {
         }
         ChallengeDto c = challenges.create(player.getUsername());
         synchronized (this) {
-            if (byPlayer.containsKey(player.getUsername())) {
-                return;
-            }
+            abandonMatch(player.getUsername());
             leaveParty(player.getUsername());
             removeQueued(player.getUsername());
             Party party = new Party(c.code(), c.url(), player.getUsername(), ref);
@@ -220,9 +218,7 @@ public class Rooms {
             send(session, Messages.error("That party has closed"));
             return;
         }
-        if (byPlayer.containsKey(player.getUsername())) {
-            return;
-        }
+        abandonMatch(player.getUsername());
         if (code.equals(partyOf.get(player.getUsername()))) {
             send(session, partyMessage(party));
             return;
@@ -304,9 +300,7 @@ public class Rooms {
             send(session, Messages.error("No such field or mode"));
             return;
         }
-        if (byPlayer.containsKey(player.getUsername())) {
-            return;
-        }
+        abandonMatch(player.getUsername());
         removeQueued(player.getUsername());
         leaveParty(player.getUsername());
         List<Waiting> q = queues.get(ref);
@@ -492,12 +486,20 @@ public class Rooms {
         return out;
     }
 
-    synchronized void leave(String username) {
+    /// A player still seated in a match who asks for a party or a new match
+    /// has walked away from the old one: reconnecting puts them back in their
+    /// seat, but an explicit request for something else must win, or it is
+    /// silently ignored until that match ends.
+    private void abandonMatch(String username) {
         MatchRoom room = byPlayer.get(username);
         if (room != null) {
             room.seats[room.seatOf(username)].left = true;
             byPlayer.remove(username);
         }
+    }
+
+    synchronized void leave(String username) {
+        abandonMatch(username);
         leaveParty(username);
         removeQueued(username);
     }

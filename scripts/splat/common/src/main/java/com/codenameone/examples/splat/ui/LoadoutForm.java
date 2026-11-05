@@ -103,6 +103,8 @@ public final class LoadoutForm {
             boolean owned = i == 0 || p != null && p.owned() != null && p.owned().contains(id);
             boolean open = id.equals(shown);
             Button pick = Ui.button(Ui.caps(m.name), open ? "MenuItemTextPrimed" : "MenuItemText", id, null);
+            // a long name shrinks to fit rather than ending in an ellipsis
+            pick.setAutoSizeMode(true);
             pick.addActionListener(e -> {
                 stage.setMarker(id);
                 fill(f, front, stage, id);
@@ -132,7 +134,7 @@ public final class LoadoutForm {
             }
             col.add(row);
         }
-        col.add(Ui.button("STORE: MORE MARKERS AND PAINT", "OpsAction", "runnerShop", e -> ShopForm.show()));
+        col.add(Ui.button("ARMORY", "OpsAction", "runnerShop", e -> ShopForm.show()));
         Container left = new Container(new BorderLayout());
         left.add(BorderLayout.NORTH, col);
         left.setScrollableY(true);

@@ -121,6 +121,22 @@ class OnlineMatchTest {
     }
     // end::splat-match-test[]
 
+    /// A player still seated in a match who joins a party has left that
+    /// match; the join used to be dropped without a word until it ended.
+    @Test
+    void joiningAPartyLeavesAMatchStillRunning() throws Exception {
+        String who = Api.player(accounts, "restless");
+        String host = Api.player(accounts, "partyhost");
+        rooms.quick(profile(who), null, Arenas.DEFAULT);
+        String id = rooms.raceOf(who);
+        assertFalse(id.isEmpty());
+        rooms.host(profile(host), null, Arenas.DEFAULT, null);
+        rooms.join(profile(who), null, rooms.partyCode(host));
+        assertEquals("", rooms.raceOf(who), "out of the old match");
+        assertEquals(rooms.partyCode(host), rooms.partyCode(who), "and in the party");
+        rooms.fastForward(id);
+    }
+
     @Test
     void aQuickMatchFillsWithBotsAndNeverCostsTrophies() throws Exception {
         String who = Api.player(accounts, "lonely");

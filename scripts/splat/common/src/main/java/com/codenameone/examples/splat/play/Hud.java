@@ -80,7 +80,15 @@ public final class Hud extends Component implements ArenaView.Hud {
     private Font medium;
     private Font small;
     private Font tiny;
+    private Font narrow;
     private Font stampFont;
+    /// A phone: less on screen, every element smaller. A desktop or a tablet
+    /// has room for the whole picture.
+    private boolean compact;
+    private boolean feedHidden;
+    private boolean ended;
+    private final List<String> chat = new ArrayList<String>();
+    private final List<Long> chatAt = new ArrayList<Long>();
 
     /// One line of the kill feed: who, with what, whom.
     static final class FeedLine {
@@ -208,6 +216,14 @@ public final class Hud extends Component implements ArenaView.Hud {
     }
 
     private void feed(String left, int lc, String verb, String right, int rc, long now) {
+        // two identical lines in a row (a grenade painting two teammates)
+        // read as a glitch; one is enough
+        for (int i = feed.size() - 1; i >= 0 && now - feed.get(i).at < 1500; i--) {
+            FeedLine f = feed.get(i);
+            if (f.left.equals(left) && f.verb.equals(verb) && f.right.equals(right)) {
+                return;
+            }
+        }
         feed.add(new FeedLine(left, lc, verb, right, rc, now));
         while (feed.size() > FEED_LINES) {
             feed.remove(0);
@@ -228,12 +244,13 @@ public final class Hud extends Component implements ArenaView.Hud {
         medium = Type.bold(3.4f);
         small = Type.bold(2.6f);
         tiny = Type.medium(2.2f);
+        narrow = Type.bold(2.1f);
         stampFont = Type.bold(15f);
     }
 
     @Override
     public void paint(Graphics g) {
-        if (match == null) {
+        if (match == null || ended) {
             return;
         }
         fonts();
@@ -247,19 +264,33 @@ public final class Hud extends Component implements ArenaView.Hud {
         g.setAntiAliased(true);
         g.setAntiAliasedText(true);
         Player p = match.player(me);
+        compact = !CN.isDesktop() && Math.min(w, h) < CN.convertToPixels(110);
+        int count = driver.countdownTicks();
+        if (count > 0) {
+            // the briefing is a screen of its own; the HUD comes after it
+            briefing(g, x0, y0, w, h, count);
+            return;
+        }
 
         splatter(g, now, x0, y0, w, h);
         if (driver.interactive()) {
             nameTags(g, x0, y0, w, h);
         }
-        int mapSize = Math.min(CN.convertToPixels(26), Math.min(w, h) / 3);
+        int mapSize = compact ? Math.min(CN.convertToPixels(17), w / 4)
+                : Math.min(CN.convertToPixels(26), Math.min(w, h) / 3);
         minimap(g, x0 + pad, top, mapSize);
+        chatLines(g, now, x0 + pad, top + mapSize + CN.convertToPixels(compact ? 1.5f : 5), w / 2);
         scoreBar(g, x0 + w / 2, top);
-        // Under the pause button, and under the score bar where both would
-        // not fit side by side.
-        boolean roomy = w > CN.convertToPixels(150);
-        killFeed(g, x0 + w - pad, top + (roomy ? CN.convertToPixels(10)
-                : big.getHeight() + tiny.getHeight() + CN.convertToPixels(3)));
+        if (compact) {
+            // Under the score bar, clear of the minimap and the pause button.
+            killFeed(g, x0 + w - pad, top + medium.getHeight() + CN.convertToPixels(9));
+        } else {
+            // Under the pause button, and under the score bar where both
+            // would not fit side by side.
+            boolean roomy = w > CN.convertToPixels(150);
+            killFeed(g, x0 + w - pad, top + (roomy ? CN.convertToPixels(10)
+                    : big.getHeight() + tiny.getHeight() + CN.convertToPixels(3)));
+        }
 
         if (driver.interactive()) {
             float ads = view == null ? 0f : view.aimAmount();
@@ -268,23 +299,26 @@ public final class Hud extends Component implements ArenaView.Hud {
             damageArc(g, now, x0 + w / 2, y0 + h / 2, Math.min(w, h) / 4);
             ammo(g, p, x0 + w - pad, y0 + h - pad - safeBottom()
                     - (CN.isDesktop() ? 0 : CN.convertToPixels(34)));
-            xpPop(g, now, x0 + w / 2 + CN.convertToPixels(8), y0 + h / 2 - CN.convertToPixels(6));
-            if (!p.alive()) {
+            // the stamp has the middle of the screen to itself while it lands
+            boolean stamping = now - stampAt < STAMP_MILLIS;
+            if (!stamping) {
+                xpPop(g, now, x0 + w / 2 + CN.convertToPixels(8), y0 + h / 2 - CN.convertToPixels(6));
+            }
+            if (!p.alive() && !stamping) {
                 int left = Math.max(0, p.respawnAt() - match.tick()) / Match.TICK_HZ + 1;
-                String back = p.canWipe(match.tick()) ? "HOLD [X] TO WIPE IT OFF -- IF THE REF ISN'T LOOKING"
-                        : "REDEPLOYING IN " + left;
-                plate(g, back, x0 + w / 2, y0 + h * 2 / 3, medium, Type.AMBER);
+                String wipe = compact ? "TAP WIPE -- IF THE REF ISN'T LOOKING"
+                        : "HOLD [X] TO WIPE IT OFF -- IF THE REF ISN'T LOOKING";
+                String back = p.canWipe(match.tick()) ? wipe : "REDEPLOYING IN " + left;
+                // where the crosshair was: nothing else is drawn there while
+                // you are out
+                plate(g, back, x0 + w / 2, y0 + h / 2 - small.getHeight() / 2, compact ? small : medium, Type.AMBER);
             }
         } else {
             plate(g, "SPECTATING  " + Type.caps(driver.name(me)), x0 + w / 2,
                     y0 + h - CN.convertToPixels(10) - safeBottom(), medium, Type.WHITE);
         }
-        if (now - bannerAt < 2200) {
-            plate(g, banner, x0 + w / 2, y0 + h / 2 + CN.convertToPixels(10), small, Type.WHITE);
-        }
-        int count = driver.countdownTicks();
-        if (count > 0) {
-            briefing(g, x0, y0, w, h, count);
+        if (now - bannerAt < 2200 && now - stampAt >= STAMP_MILLIS) {
+            plate(g, banner, x0 + w / 2, y0 + h * 58 / 100, small, Type.WHITE);
         }
         stamp(g, now, x0, y0, w, h);
     }
@@ -336,9 +370,11 @@ public final class Hud extends Component implements ArenaView.Hud {
                 g.fillArc(px - dot, pz - dot, dot * 2, dot * 2, 0, 360);
             }
         }
-        g.setFont(tiny);
-        g.setColor(Type.STEEL);
-        g.drawString(Type.caps(a.name), x, y + size + 2);
+        if (!compact) {
+            g.setFont(tiny);
+            g.setColor(Type.STEEL);
+            g.drawString(Type.caps(a.name), x, y + size + 2);
+        }
     }
 
     private static int mx(int mm, int size, int span) {
@@ -363,9 +399,11 @@ public final class Hud extends Component implements ArenaView.Hud {
         int mine = match.player(me).team();
         int secs = match.ticksLeft() / Match.TICK_HZ;
         String clock = (secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60);
-        int cell = CN.convertToPixels(13);
-        int ch = big.getHeight();
-        int clockW = medium.stringWidth("00:00") + CN.convertToPixels(4);
+        Font num = compact ? medium : big;
+        Font clockFont = compact ? small : medium;
+        int cell = CN.convertToPixels(compact ? 9 : 13);
+        int ch = num.getHeight();
+        int clockW = clockFont.stringWidth("00:00") + CN.convertToPixels(compact ? 2 : 4);
         int target = Math.max(1, match.mode().target);
         for (int k = 0; k < 2; k++) {
             int team = k == 0 ? mine : 1 - mine;
@@ -379,18 +417,21 @@ public final class Hud extends Component implements ArenaView.Hud {
             g.fillRect(bx, y, cell, 3);
             int fill = (int) ((long) Math.min(target, match.score(team)) * cell / target);
             g.fillRect(k == 0 ? bx + cell - fill : bx, y + ch - 4, fill, 4);
-            g.setFont(big);
+            g.setFont(num);
             String s = String.valueOf(match.score(team));
             g.setColor(Type.WHITE);
-            g.drawString(s, bx + (cell - big.stringWidth(s)) / 2, y + 1);
+            g.drawString(s, bx + (cell - num.stringWidth(s)) / 2, y + 1);
         }
         g.setColor(Type.GUNMETAL);
         g.setAlpha(215);
         g.fillRect(cx - clockW / 2, y, clockW, ch);
         g.setAlpha(255);
-        g.setFont(medium);
+        g.setFont(clockFont);
         g.setColor(secs <= 10 ? Type.HOSTILE : Type.WHITE);
-        g.drawString(clock, cx - medium.stringWidth(clock) / 2, y + (ch - medium.getHeight()) / 2);
+        g.drawString(clock, cx - clockFont.stringWidth(clock) / 2, y + (ch - clockFont.getHeight()) / 2);
+        if (compact) {
+            return;
+        }
         g.setFont(tiny);
         String goal = Type.caps(match.mode().title) + "  //  " + target;
         g.setColor(Type.AMBER);
@@ -400,10 +441,24 @@ public final class Hud extends Component implements ArenaView.Hud {
     /// Top right, newest at the bottom: who, what, whom, each name in the
     /// colour of their side.
     private void killFeed(Graphics g, int right, int y) {
+        if (feedHidden) {
+            return;
+        }
         long now = System.currentTimeMillis();
-        g.setFont(small);
-        int lh = small.getHeight() + 6;
-        for (int i = 0; i < feed.size(); i++) {
+        Font name = compact ? tiny : small;
+        g.setFont(name);
+        int lh = name.getHeight() + (compact ? 4 : 6);
+        // a phone shows the newest two, without the excuses
+        int lines = compact ? 2 : FEED_LINES;
+        int first = 0;
+        int live = 0;
+        for (int i = feed.size() - 1; i >= 0; i--) {
+            if (now - feed.get(i).at <= FEED_MILLIS && ++live == lines) {
+                first = i;
+                break;
+            }
+        }
+        for (int i = first; i < feed.size(); i++) {
             FeedLine f = feed.get(i);
             long age = now - f.at;
             if (age > FEED_MILLIS) {
@@ -411,25 +466,96 @@ public final class Hud extends Component implements ArenaView.Hud {
             }
             int alpha = age > FEED_MILLIS - 800 ? (int) (255 * (FEED_MILLIS - age) / 800) : 255;
             String verb = "  " + f.verb + "  ";
-            int lw = small.stringWidth(f.left);
+            String left = compact ? brief(f.left) : f.left;
+            String right2 = compact ? brief(f.right) : f.right;
+            int lw = name.stringWidth(left);
             int vw = tiny.stringWidth(verb);
-            int rw = small.stringWidth(f.right);
+            int rw = name.stringWidth(right2);
             int x = right - lw - vw - rw - 12;
             g.setColor(Type.INK);
             g.setAlpha(alpha * 150 / 255);
             g.fillRect(x - 6, y, lw + vw + rw + 18, lh - 2);
             g.setAlpha(alpha);
             g.setColor(f.leftColor);
-            g.drawString(f.left, x, y + 2);
+            g.drawString(left, x, y + 2);
             g.setFont(tiny);
             g.setColor(Type.AMBER);
-            g.drawString(verb, x + lw, y + 2 + (small.getHeight() - tiny.getHeight()) / 2);
-            g.setFont(small);
+            g.drawString(verb, x + lw, y + 2 + (name.getHeight() - tiny.getHeight()) / 2);
+            g.setFont(name);
             g.setColor(f.rightColor);
-            g.drawString(f.right, x + lw + vw, y + 2);
+            g.drawString(right2, x + lw + vw, y + 2);
             y += lh;
         }
         g.setAlpha(255);
+    }
+
+    /// Hides the killfeed while something else, the comms list, is drawn
+    /// where it goes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hidden`: true to hide it
+    public void setFeedHidden(boolean hidden) {
+        feedHidden = hidden;
+    }
+
+    /// Shows a line someone said, under the minimap, for a few seconds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `from`: who said it
+    ///
+    /// - `text`: what they said
+    public void chat(String from, String text) {
+        chat.add(from + ": " + text);
+        chatAt.add(Long.valueOf(System.currentTimeMillis()));
+        while (chat.size() > 2) {
+            chat.remove(0);
+            chatAt.remove(0);
+        }
+    }
+
+    private void chatLines(Graphics g, long now, int x, int y, int max) {
+        g.setFont(tiny);
+        for (int i = 0; i < chat.size(); i++) {
+            long age = now - chatAt.get(i).longValue();
+            if (age > FEED_MILLIS) {
+                continue;
+            }
+            String line = chat.get(i);
+            while (line.length() > 4 && tiny.stringWidth(line) > max) {
+                line = line.substring(0, line.length() - 4) + "...";
+            }
+            int alpha = age > FEED_MILLIS - 800 ? (int) (255 * (FEED_MILLIS - age) / 800) : 255;
+            g.setColor(Type.INK);
+            g.setAlpha(alpha * 150 / 255);
+            g.fillRect(x, y, tiny.stringWidth(line) + 8, tiny.getHeight() + 2);
+            g.setAlpha(alpha);
+            g.setColor(Type.WHITE);
+            g.drawString(line, x + 4, y + 1);
+            y += tiny.getHeight() + 4;
+        }
+        g.setAlpha(255);
+    }
+
+    /// Stops drawing once the result card is up, so nothing shows through it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ended`: true once the match is over and its card is shown
+    public void setEnded(boolean ended) {
+        this.ended = ended;
+        repaint();
+    }
+
+    /// A feed name without its parenthesised aside or trailing sentence, for
+    /// a phone: "Uncle Ray (disputes this)" is "Uncle Ray".
+    private static String brief(String s) {
+        int cut = s.indexOf(" (");
+        if (cut < 0) {
+            cut = s.indexOf(" wiping");
+        }
+        return cut > 0 ? s.substring(0, cut) : s;
     }
 
     /// Bottom right: the hopper count big, what is left in the pod after it,
@@ -439,6 +565,34 @@ public final class Hud extends Component implements ArenaView.Hud {
         int mag = p.marker.hopper;
         String count = reloading ? "--" : String.valueOf(p.ammo());
         String reserve = " / " + mag;
+        if (compact) {
+            // a small dark tab above the fire button, so the count reads over
+            // a bright sky and over the marker in your hands alike
+            int cw = big.stringWidth(count);
+            int rw = small.stringWidth(reserve);
+            int pad = CN.convertToPixels(1.2f);
+            int th = big.getHeight() + (p.hasGrenade() ? tiny.getHeight() : 0);
+            int x = right - cw - rw - pad;
+            int y = bottom - th - pad;
+            g.setColor(Type.INK);
+            g.setAlpha(165);
+            g.fillRect(x - pad, y - pad / 2, cw + rw + pad * 3, th + pad + pad / 2);
+            g.setAlpha(255);
+            g.setColor(Type.AMBER);
+            g.fillRect(x - pad, y - pad / 2, CN.convertToPixels(0.5f), th + pad + pad / 2);
+            g.setFont(big);
+            g.setColor(p.ammo() == 0 || reloading ? Type.HOSTILE : Type.WHITE);
+            g.drawString(count, x, y);
+            g.setFont(small);
+            g.setColor(Type.STEEL);
+            g.drawString(reserve, x + cw, y + big.getHeight() - small.getHeight() - 2);
+            if (p.hasGrenade()) {
+                g.setFont(tiny);
+                g.setColor(Type.AMBER);
+                g.drawString("NADE x1", x, y + big.getHeight());
+            }
+            return;
+        }
         g.setFont(huge);
         int cw = huge.stringWidth(count);
         int rw = medium.stringWidth(reserve);
@@ -592,10 +746,15 @@ public final class Hud extends Component implements ArenaView.Hud {
     }
 
     /// Text on a dark plate, centred on `cx`.
-    private static void plate(Graphics g, String s, int cx, int y, Font f, int color) {
+    private void plate(Graphics g, String s, int cx, int y, Font f, int color) {
         g.setFont(f);
         int tw = f.stringWidth(s);
         int pad = CN.convertToPixels(1.5f);
+        if (tw > getWidth() - pad * 6 && f != narrow) {
+            // too wide for a phone held upright: fall back to the narrowest size
+            plate(g, s, cx, y, narrow, color);
+            return;
+        }
         g.setColor(Type.INK);
         g.setAlpha(170);
         g.fillRect(cx - tw / 2 - pad, y - pad / 2, tw + pad * 2, f.getHeight() + pad);
@@ -608,8 +767,8 @@ public final class Hud extends Component implements ArenaView.Hud {
     /// stamped like a satellite feed, and the orders typed out a line at a
     /// time, read in the gravest voice available.
     private void briefing(Graphics g, int x0, int y0, int w, int h, int ticks) {
-        g.setColor(0x000000);
-        g.setAlpha(200);
+        g.setColor(0x07090b);
+        g.setAlpha(238);
         g.fillRect(x0, y0, w, h);
         g.setAlpha(255);
         int bar = h / 9;
@@ -617,23 +776,31 @@ public final class Hud extends Component implements ArenaView.Hud {
         g.fillRect(x0, y0 + h - bar, w, bar);
         Mode mode = match.mode();
         int elapsed = Math.max(0, 3 * Match.TICK_HZ - ticks);
-        int left = x0 + Math.max(CN.convertToPixels(6), w / 10);
+        int left = x0 + Math.max(CN.convertToPixels(compact ? 4 : 6), w / 12);
+        int room = x0 + w - left - Math.max(CN.convertToPixels(4), w / 12);
         int y = y0 + bar + CN.convertToPixels(4);
         g.setFont(tiny);
         g.setColor(Type.HOSTILE);
         g.drawString("// CLASSIFIED -- EYES ONLY -- DO NOT SHOW MUM", left, y);
         y += tiny.getHeight() + CN.convertToPixels(2);
+        String[] title = wrap(new String[] {Type.caps(mode.operation)}, room, big);
         g.setFont(big);
         g.setColor(Type.AMBER);
-        g.drawString(Type.caps(mode.operation), left, y);
-        y += big.getHeight();
+        for (int i = 0; i < title.length; i++) {
+            g.drawString(title[i], left, y);
+            y += big.getHeight();
+        }
         g.setFont(small);
         g.setColor(Type.STEEL);
         Arena a = match.arena();
         String grid = Type.caps(a.name) + "   GRID " + (a.width / 100) + "-" + (a.depth / 100) + "   0" + (match.seed() & 7)
                 + "00 HRS LOCAL";
-        g.drawString(grid, left, y);
-        y += small.getHeight() + CN.convertToPixels(3);
+        String[] gl = wrap(new String[] {grid}, room, small);
+        for (int i = 0; i < gl.length; i++) {
+            g.drawString(gl[i], left, y);
+            y += small.getHeight();
+        }
+        y += CN.convertToPixels(3);
         String[] lines = {
             "OBJECTIVE: " + Type.caps(mode.title) + ". FIRST TO " + mode.target + ".",
             "INTEL SUGGESTS THE ENEMY HAS BROUGHT [REDACTED] AND A COOLER.",
@@ -642,7 +809,7 @@ public final class Hud extends Component implements ArenaView.Hud {
                     : "ON THE SIDELINES") + ". GODSPEED.",
         };
         g.setFont(medium);
-        lines = wrap(lines, x0 + w - left - Math.max(CN.convertToPixels(14), w / 8), medium);
+        lines = wrap(lines, room, medium);
         int chars = elapsed * 3;
         for (int i = 0; i < lines.length && chars > 0; i++) {
             String line = lines[i].substring(0, Math.min(lines[i].length(), chars));
@@ -696,24 +863,37 @@ public final class Hud extends Component implements ArenaView.Hud {
         if (age > 3500 || match == null) {
             return;
         }
-        int alpha = fade(220 * (3500 - age) / 3500);
+        int alpha = fade(190 * (3500 - age) / 3500);
         int color = 0xff7a1f;
         Player p = match.player(me);
         if (p.paintedBy() >= 0 && p.paintedBy() < match.playerCount()) {
             color = ArenaView.TEAM_COLORS[match.player(p.paintedBy()).team()] & 0xffffff;
         }
         g.setColor(color);
-        g.setAlpha(alpha);
         int s = splatSeed * 2654435 + 7;
-        for (int i = 0; i < 9; i++) {
+        int unit = Math.min(w, h);
+        // A few splats hugging the edges of the visor, each a blob ringed by
+        // droplets with one thin run down from it: the middle stays clear.
+        for (int i = 0; i < 4; i++) {
             s = s * 1103515245 + 12345;
-            int bx = x0 + ((s >>> 8) & 0x7fff) % Math.max(1, w);
-            s = s * 1103515245 + 12345;
-            int by = y0 + ((s >>> 8) & 0x7fff) % Math.max(1, h);
-            int r = CN.convertToPixels(6 + i % 4 * 3);
+            int along = ((s >>> 8) & 0x7fff) % Math.max(1, unit);
+            int edge = (s >>> 3) & 3;
+            int bx = edge == 0 ? x0 + unit / 14 : edge == 1 ? x0 + w - unit / 14 : x0 + along * w / Math.max(1, unit);
+            int by = edge >= 2 ? (edge == 2 ? y0 + h / 7 : y0 + h - h / 7) : y0 + along * h / Math.max(1, unit);
+            int r = unit / 14 + (i % 3) * unit / 40;
+            g.setAlpha(alpha);
             g.fillArc(bx - r, by - r, r * 2, r * 2, 0, 360);
-            int drip = (int) (age / 12) % (h / 3 + 1);
-            g.fillRect(bx - r / 6, by, r / 3, r + drip);
+            for (int k = 0; k < 7; k++) {
+                s = s * 1103515245 + 12345;
+                double ang = ((s >>> 8) & 1023) / 1023.0 * Math.PI * 2;
+                int dist = r + ((s >>> 18) & 63) * r / 63;
+                int dr = Math.max(2, r / (3 + (k & 3)));
+                g.fillArc(bx + (int) (Math.cos(ang) * dist) - dr, by + (int) (Math.sin(ang) * dist) - dr,
+                        dr * 2, dr * 2, 0, 360);
+            }
+            int drip = (int) Math.min(r * 2, age * r / 900);
+            g.setAlpha(alpha * 3 / 4);
+            g.fillRect(bx - r / 10, by, Math.max(2, r / 5), r / 2 + drip);
         }
         g.setAlpha(255);
     }
@@ -730,7 +910,8 @@ public final class Hud extends Component implements ArenaView.Hud {
         int tw = stampFont.stringWidth(stampText);
         int th = stampFont.getHeight();
         int cx = x0 + w / 2;
-        int cy = y0 + h / 2 - th / 2;
+        // high, so the line under it clears the buttons on a phone
+        int cy = y0 + h * 36 / 100 - th / 2;
         boolean rotate = g.isAffineSupported();
         if (rotate) {
             g.rotateRadians(-0.18f, cx, cy);

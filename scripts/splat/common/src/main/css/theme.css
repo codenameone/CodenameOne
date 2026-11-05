@@ -183,10 +183,17 @@ GhostButton.pressed, PriceButton.pressed, GemButton.pressed, ReplayButton.presse
     background-color: var(--edge);
 }
 
-GemButton, GemButton.selected, GemButton.disabled {
+GemButton, GemButton.selected {
     background-color: #f2b632;
     border: 0.35mm solid #f2b632;
     color: #0c0e10;
+}
+
+/* the store is offline: say so in grey, never amber text on amber */
+GemButton.disabled {
+    background-color: #1c2127;
+    border: 0.35mm solid #4f5862;
+    color: #8a939c;
 }
 
 DangerButton {
@@ -2009,7 +2016,7 @@ MenuItemTextPrimed {
 }
 
 MenuBottom {
-    padding: 1mm 4mm 3mm 4mm;
+    padding: 1mm 4mm 5mm 4mm;
     background-color: transparent;
 }
 
@@ -2222,7 +2229,7 @@ RosterOpen {
 
 /* ---------------------------------------------------------------- match */
 CommsColumn {
-    padding: 34mm 0 0 2.5mm;
+    padding: 30mm 0 0 2.5mm;
     background-color: transparent;
 }
 
@@ -2260,7 +2267,7 @@ ResultTitleLoss {
 
 ResultScore {
     font-family: "Rajdhani Bold";
-    font-size: 3.4mm;
+    font-size: 9mm;
     color: #f2f4f5;
     padding: 1mm 0 2mm 0;
     margin: 0;
@@ -2314,4 +2321,13 @@ RewardKicker {
     padding: 1mm;
     margin: 0;
     background-color: transparent;
+}
+
+SectionRule {
+    background-color: transparent;
+    border: none;
+    border-bottom: 0.3mm solid #2e353d;
+    padding: 0;
+    margin: 1mm 4mm 0 4mm;
+    font-size: 0.5mm;
 }

@@ -168,6 +168,10 @@ public final class MatchLobby implements GameLink.Listener, Voice.Listener {
         });
         top.add(share);
         top.add(copy);
+        // a rule under the invite, so the roster scrolling under it reads as
+        // a list going under a header rather than rows cut off mid-button
+        Label rule = new Label(" ", "SectionRule");
+        top.add(rule);
         // The code and the invite stay put; the runners and the chat scroll
         // under them, so the conversation is never squeezed into what the
         // code card leaves and scrolling to a new line never hides the code.

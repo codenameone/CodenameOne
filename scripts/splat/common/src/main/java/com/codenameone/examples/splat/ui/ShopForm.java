@@ -79,7 +79,9 @@ public final class ShopForm {
                 } else {
                     String price = Store.price(item.sku());
                     row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button(price == null ? "BUY" : price,
-                            "GemButton", "buy-" + item.id(),
+                            // no price means the store has not answered; amber
+                            // is kept for an offer that can be bought now
+                            price == null ? "GhostButton" : "GemButton", "buy-" + item.id(),
                             e -> Store.buy(item.sku()))));
                 }
             } else if (owned) {

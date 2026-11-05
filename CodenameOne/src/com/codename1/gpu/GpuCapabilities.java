@@ -20,6 +20,8 @@ public final class GpuCapabilities {
     private final boolean depthTextureSupported;
     private final boolean intIndicesSupported;
     private final String rendererName;
+    private boolean shadowsSupported;
+    private boolean postProcessSupported;
 
     /// Constructs a capabilities descriptor. Intended to be called by platform
     /// backends only.
@@ -46,6 +48,47 @@ public final class GpuCapabilities {
         this.depthTextureSupported = depthTextureSupported;
         this.intIndicesSupported = intIndicesSupported;
         this.rendererName = rendererName;
+    }
+
+    /// Creates a capability descriptor that also says whether the device
+    /// renders shadow maps and full screen post processing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxTextureSize`: the maximum texture dimension in pixels
+    ///
+    /// - `maxVertexAttributes`: the maximum number of vertex attributes
+    ///
+    /// - `shaderLevel3`: true if GLSL ES 3 / Metal 2 class features exist
+    ///
+    /// - `depthTextureSupported`: true if depth textures may be sampled
+    ///
+    /// - `intIndicesSupported`: true if 32 bit element indices are supported
+    ///
+    /// - `rendererName`: a human readable backend/renderer description
+    ///
+    /// - `shadowsSupported`: true if `GraphicsDevice.beginShadowPass` works
+    ///
+    /// - `postProcessSupported`: true if `GraphicsDevice.beginPostProcess` works
+    public GpuCapabilities(int maxTextureSize, int maxVertexAttributes,
+                           boolean shaderLevel3, boolean depthTextureSupported,
+                           boolean intIndicesSupported, String rendererName,
+                           boolean shadowsSupported, boolean postProcessSupported) {
+        this(maxTextureSize, maxVertexAttributes, shaderLevel3, depthTextureSupported,
+                intIndicesSupported, rendererName);
+        this.shadowsSupported = shadowsSupported;
+        this.postProcessSupported = postProcessSupported;
+    }
+
+    /// Returns true if the device renders shadow maps for a light with
+    /// shadows on.
+    public boolean isShadowsSupported() {
+        return shadowsSupported;
+    }
+
+    /// Returns true if the device applies a `PostProcess` to the frame.
+    public boolean isPostProcessSupported() {
+        return postProcessSupported;
     }
 
     /// Returns the maximum supported texture edge length in pixels.

@@ -2,7 +2,7 @@
 """Packs the game's art into the app's resources.
 
 The models are CC0 packs (see ART.md): Quaternius's Ultimate Modular Men and
-Toon Shooter Game Kit, and Kenney's Blaster Kit and Survival Kit. Unzip them
+Toon Shooter Game Kit and Ultimate Nature, and Kenney's Blaster Kit and Survival Kit. Unzip them
 anywhere and run
 
     tools/pack-art.py <directory holding the unzipped packs>
@@ -38,6 +38,105 @@ PROPS = {
     'streetlight': 'StreetLight', 'sign': 'Sign', 'planks': 'WoodPlanks',
     'tent': 'tent-canvas', 'workbench': 'workbench', 'rock': 'rock-a', 'campfire': 'campfire-pit',
 }
+# Greenery from Ultimate Nature, which ships OBJ + MTL only (flat colours, no textures).
+NATURE = {
+    'grass': 'Grass', 'grass-2': 'Grass_2', 'grass-short': 'Grass_Short', 'flowers': 'Flowers',
+    'bush': 'Bush_1', 'bush-2': 'Bush_2', 'bush-berries': 'BushBerries_1', 'plant': 'Plant_2',
+    'oak': 'CommonTree_1', 'oak-2': 'CommonTree_3', 'pine': 'PineTree_2', 'pine-2': 'PineTree_4',
+    'birch': 'BirchTree_2', 'stump': 'TreeStump_Moss', 'log': 'WoodLog_Moss', 'rock-moss': 'Rock_Moss_2',
+}
+
+
+def find_obj(root, stem):
+    for d, _, files in os.walk(root):
+        if stem + '.obj' in files:
+            return os.path.join(d, stem + '.obj')
+    raise SystemExit('not found in the packs: ' + stem + '.obj')
+
+
+def obj_to_gltf(path):
+    """An OBJ and its MTL as one glTF mesh, a primitive per material. Blender wrote the
+    MTL colours linear; the game's materials take sRGB, so they are encoded here."""
+    base = os.path.dirname(path)
+    colors, order = {}, []
+    v, vn, prims, cur = [], [], {}, None
+    for line in open(path):
+        t = line.split()
+        if not t:
+            continue
+        if t[0] == 'mtllib':
+            name = None
+            for m in open(os.path.join(base, ' '.join(t[1:]))):
+                mt = m.split()
+                if mt and mt[0] == 'newmtl':
+                    name = ' '.join(mt[1:])
+                elif mt and mt[0] == 'Kd' and name is not None:
+                    colors[name] = [max(0.0, min(1.0, float(c))) ** (1 / 2.2) for c in mt[1:4]]
+        elif t[0] == 'v':
+            v.append([float(c) for c in t[1:4]])
+        elif t[0] == 'vn':
+            vn.append([float(c) for c in t[1:4]])
+        elif t[0] == 'usemtl':
+            cur = ' '.join(t[1:])
+            if cur not in prims:
+                prims[cur] = []
+                order.append(cur)
+        elif t[0] == 'f':
+            if cur is None:
+                cur = ''
+                prims[cur] = []
+                order.append(cur)
+            corners = []
+            for c in t[1:]:
+                parts = c.split('/')
+                corners.append((int(parts[0]) - 1, int(parts[2]) - 1 if len(parts) > 2 and parts[2] else -1))
+            for i in range(1, len(corners) - 1):
+                prims[cur] += [corners[0], corners[i], corners[i + 1]]
+    g = {'asset': {'version': '2.0'}, 'scene': 0, 'scenes': [{'nodes': [0]}],
+         'nodes': [{'mesh': 0, 'name': os.path.basename(path)[:-4]}], 'meshes': [{'primitives': []}],
+         'materials': [], 'accessors': [], 'bufferViews': []}
+    out = bytearray()
+
+    def view(data, target):
+        while len(out) % 4:
+            out.append(0)
+        g['bufferViews'].append({'buffer': 0, 'byteOffset': len(out), 'byteLength': len(data), 'target': target})
+        out.extend(data)
+        return len(g['bufferViews']) - 1
+
+    for name in order:
+        corners = prims[name]
+        if not corners:
+            continue
+        pos, nor, idx, seen = [], [], [], {}
+        for c in corners:
+            if c not in seen:
+                seen[c] = len(pos)
+                pos.append(v[c[0]])
+                nor.append(vn[c[1]] if c[1] >= 0 else [0.0, 1.0, 0.0])
+            idx.append(seen[c])
+        pb = b''.join(struct.pack('<3f', *p) for p in pos)
+        nb = b''.join(struct.pack('<3f', *n) for n in nor)
+        ib = struct.pack('<%dI' % len(idx), *idx)
+        mins = [min(p[k] for p in pos) for k in range(3)]
+        maxs = [max(p[k] for p in pos) for k in range(3)]
+        a = len(g['accessors'])
+        g['accessors'] += [
+            {'bufferView': view(pb, 34962), 'componentType': 5126, 'count': len(pos), 'type': 'VEC3', 'min': mins, 'max': maxs},
+            {'bufferView': view(nb, 34962), 'componentType': 5126, 'count': len(nor), 'type': 'VEC3'},
+            {'bufferView': view(ib, 34963), 'componentType': 5125, 'count': len(idx), 'type': 'SCALAR'}]
+        g['materials'].append({'name': name, 'pbrMetallicRoughness': {
+            'baseColorFactor': colors.get(name, [0.8, 0.8, 0.8]) + [1.0], 'metallicFactor': 0.0, 'roughnessFactor': 0.85}})
+        g['meshes'][0]['primitives'].append({'attributes': {'POSITION': a, 'NORMAL': a + 1}, 'indices': a + 2,
+                                              'material': len(g['materials']) - 1})
+    return g, bytes(out)
+
+
+def pack_obj(root, name, stem):
+    g, bin_ = obj_to_gltf(find_obj(root, stem))
+    path = os.path.join(OUT, 'model_' + name + '.glb')
+    write_glb(g, bin_, path)
+    return os.path.getsize(path)
 
 
 def find(root, stem):
@@ -188,7 +287,9 @@ def main():
     for table in (MARKERS, PROPS):
         for name, stem in table.items():
             total += pack(root, name, stem)
-    print('packed %d models, %d KB' % (len(OPERATORS) + len(MARKERS) + len(PROPS), total // 1024))
+    for name, stem in NATURE.items():
+        total += pack_obj(root, name, stem)
+    print('packed %d models, %d KB' % (len(OPERATORS) + len(MARKERS) + len(PROPS) + len(NATURE), total // 1024))
 
 
 if __name__ == '__main__':
