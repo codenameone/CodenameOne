@@ -226,9 +226,14 @@ public final class Ics {
 
     private static List<String> unfold(String text) {
         List<String> out = new ArrayList<String>();
-        String[] raw = (text == null ? "" : text).split("\r?\n");
-        for (int iter = 0; iter < raw.length; iter++) {
-            String line = raw[iter];
+        // No String.split: the compiled server's class library has no regex.
+        String all = text == null ? "" : text;
+        int from = 0;
+        while (from < all.length()) {
+            int nl = all.indexOf('\n', from);
+            int end = nl < 0 ? all.length() : nl;
+            String line = all.substring(from, end > from && all.charAt(end - 1) == '\r' ? end - 1 : end);
+            from = end + 1;
             if ((line.startsWith(" ") || line.startsWith("\t")) && !out.isEmpty()) {
                 out.set(out.size() - 1, out.get(out.size() - 1) + line.substring(1));
             } else if (line.length() > 0) {

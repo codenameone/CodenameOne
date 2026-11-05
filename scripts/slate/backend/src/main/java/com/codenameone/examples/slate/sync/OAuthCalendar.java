@@ -102,11 +102,16 @@ abstract class OAuthCalendar implements ExternalCalendar {
     static List<String> calendars(String csv) {
         List<String> out = new ArrayList<String>();
         if (csv != null) {
-            String[] parts = csv.split(",");
-            for (int iter = 0; iter < parts.length; iter++) {
-                if (parts[iter].trim().length() > 0) {
-                    out.add(parts[iter].trim());
+            // No String.split: the compiled server's class library has no regex.
+            int from = 0;
+            while (from <= csv.length()) {
+                int comma = csv.indexOf(',', from);
+                int end = comma < 0 ? csv.length() : comma;
+                String part = csv.substring(from, end).trim();
+                if (part.length() > 0) {
+                    out.add(part);
                 }
+                from = end + 1;
             }
         }
         if (out.isEmpty()) {
