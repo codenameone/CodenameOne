@@ -88,6 +88,19 @@ public final class Symbol {
         return null;
     }
 
+    /// Registers the pairs of {@link #spell} packed into one string, every name followed
+    /// by a newline (no Dart identifier contains one). One literal instead of an array
+    /// of them: built natively, each string constant costs code of its own.
+    public static void spellPacked(String pairs) {
+        int at = 0;
+        while (at < pairs.length()) {
+            int a = pairs.indexOf('\n', at);
+            int b = pairs.indexOf('\n', a + 1);
+            SPELLINGS.put(pairs.substring(at, a), pairs.substring(a + 1, b));
+            at = b + 1;
+        }
+    }
+
     /// The name as Dart spells it: the one given with it, or the one registered for a
     /// renamed private name. The renamed name stays in {@link #name} as the library
     /// identity, so {@code #_x} of one library is not equal to {@code #_x} of another.

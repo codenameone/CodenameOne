@@ -160,6 +160,70 @@ public final class JavaEmitter {
         return pruned;
     }
 
+    /// Every class given a `$constKey()`: its Java name to {the program superclass whose
+    /// key it extends or null, whether a runtime superclass implements ConstCanon.Keyed}.
+    private final Map<String, String[]> constKeyedClasses = new java.util.HashMap<String, String[]>();
+
+    /// A class's `$constKey()` is read only when one of its constants is canonicalized,
+    /// `ConstCanon.object(new X(..))`, or a subclass's is (its key starts with the
+    /// superclass's). Every other one is dead code that a native build still compiles --
+    /// the gallery had 278 of them for 64 classes ever constructed as constants, about
+    /// 160 KB of its Linux executable -- so those are dropped once every file is known.
+    private List<GeneratedFile> dropUnusedConstKeys(List<GeneratedFile> files) {
+        if (constKeyedClasses.isEmpty()) {
+            return files;
+        }
+        java.util.Set<String> needed = new java.util.HashSet<String>();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("ConstCanon\\.object\\(new ([A-Za-z0-9_$.]+)").matcher("");
+        for (GeneratedFile g : files) {
+            if (g == null || !g.relativePath.endsWith(".java")) {
+                continue;
+            }
+            m.reset(g.content);
+            while (m.find()) {
+                String cn = m.group(1).substring(m.group(1).lastIndexOf('.') + 1);
+                while (cn != null && constKeyedClasses.containsKey(cn) && needed.add(cn)) {
+                    cn = constKeyedClasses.get(cn)[0];
+                }
+            }
+        }
+        List<GeneratedFile> out = new ArrayList<GeneratedFile>(files.size());
+        for (GeneratedFile g : files) {
+            String cn = g == null ? null : g.relativePath.substring(g.relativePath.lastIndexOf('/') + 1);
+            cn = cn != null && cn.endsWith(".java") ? cn.substring(0, cn.length() - 5) : null;
+            String[] info = cn == null ? null : constKeyedClasses.get(cn);
+            if (info == null || needed.contains(cn)) {
+                out.add(g);
+                continue;
+            }
+            String c = g.content;
+            int at = c.indexOf("    public Object[] $constKey() {\n");
+            int end = at < 0 ? -1 : c.indexOf("\n    }\n\n", at);
+            if (end < 0) {
+                out.add(g);
+                continue;
+            }
+            c = c.substring(0, at) + c.substring(end + "\n    }\n\n".length());
+            if (!Boolean.parseBoolean(info[1])) {
+                // Unless a runtime superclass implements it, the interface goes too: a
+                // program superclass that is Keyed loses its $constKey() by this same rule
+                // whenever this class does (a needed class keeps its superclasses').
+                // Wherever it sits in the list: other interfaces are added after it.
+                String k = "dart.runtime.ConstCanon.Keyed";
+                if (c.contains("implements " + k + ", ")) {
+                    c = c.replaceFirst("implements " + java.util.regex.Pattern.quote(k) + ", ", "implements ");
+                } else if (c.contains(", " + k)) {
+                    c = c.replaceFirst(", " + java.util.regex.Pattern.quote(k), "");
+                } else {
+                    c = c.replaceFirst(" implements " + java.util.regex.Pattern.quote(k), "");
+                }
+            }
+            out.add(new GeneratedFile(g.relativePath, c));
+        }
+        return out;
+    }
+
     /// The Dart file each generated Java file was emitted from, by its relative path.
     private final Map<String, String> dartFileOf = new java.util.HashMap<String, String>();
 
@@ -168,7 +232,7 @@ public final class JavaEmitter {
         pinMemberTypesToOwnLibraries();
         computeBoxedReturnSets();
         checkStubInterfaceReturnConflicts();
-        List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
+        List<GeneratedFile> pruned = dropUnusedConstKeys(new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll())));
         if (!closureSignatures.isEmpty() || !signedSams.isEmpty() || !callbackTearOffs.isEmpty()) {
             pruned.add(closureSignatureFile(pruned));
         }
@@ -1491,8 +1555,30 @@ public final class JavaEmitter {
         sb.append("/** Generated entry-point registry for transpiled Flutter code. */\n");
         sb.append("public final class FlutterRegistry {\n");
         sb.append("    private FlutterRegistry() {\n    }\n\n");
+        // The Dart spelling of every renamed private name ({@code _x$p2}), which only a
+        // Symbol's toString reads, registered once before any Dart code runs. Each class
+        // of a renaming library used to register its library's whole table from a static
+        // initializer of its own: in a native build that was a kilobyte or more per
+        // class, repeated across every class of the library. Each library's table is one
+        // packed string literal (Symbol.spellPacked), which costs far less natively
+        // than an array of separate constants.
+        List<String> spellers = new ArrayList<String>();
+        for (Map.Entry<String, Map<String, String>> lib : new java.util.TreeMap<String, Map<String, String>>(
+                program.privateSpellings).entrySet()) {
+            if (lib.getValue() == null || lib.getValue().isEmpty()) {
+                continue;
+            }
+            StringBuilder a = new StringBuilder();
+            for (Map.Entry<String, String> e : lib.getValue().entrySet()) {
+                a.append(e.getKey()).append('\n').append(e.getValue()).append('\n');
+            }
+            spellers.add("dart.core.Symbol.spellPacked(" + quote(a.toString()) + ")");
+        }
         sb.append("    /** Invokes the Dart main() of the application's main library. */\n");
         sb.append("    public static void invokeMain() {\n");
+        for (String m : spellers) {
+            sb.append("        ").append(m).append(";\n");
+        }
         sb.append("        ").append(mainLib).append(".main$();\n");
         // The end of main() is the end of Dart's first synchronous turn: what it queued
         // (a controller's deliveries, scheduleMicrotask) runs now, on this thread.
@@ -1702,21 +1788,29 @@ public final class JavaEmitter {
         // Dart's `EnumType.values` is a `List<EnumType>`; expose it as a DartList field
         // (coexisting with Java's implicit values() method) so `.values.idx(i)` resolves.
         sb.append(";\n\n");
-        sb.append(privateSpellingInit("public enum ", e.file != null ? e.file : e.ownerLibrary != null ? e.ownerLibrary.fileName : null));
         sb.append("    public static final dart.core.DartList<").append(enumJava)
                 .append("> values = dart.core.DartList.<").append(enumJava).append(">of(")
                 .append(names).append(");\n\n");
         // The Dart names, which a value whose name is a Java keyword (`native`)
         // does not keep as its Java constant (JavaKeywordEscaper renames it).
+        // Only an enum with such a value carries the table: every string in it is
+        // built in the class's static initializer, which in a native build costs
+        // hundreds of bytes per value, and the gallery has dozens of enums.
         StringBuilder dartNames = new StringBuilder();
+        boolean renamed = false;
         for (String nm : names.toString().split(", ")) {
             if (dartNames.length() > 0) {
                 dartNames.append(", ");
             }
             dartNames.append('"').append(nm).append('"');
+            renamed |= JavaKeywordEscaper.renames(nm);
         }
-        sb.append("    private static final String[] $dartNames = {").append(dartNames).append("};\n\n");
-        sb.append("    public String name$() {\n        return $dartNames[ordinal()];\n    }\n\n");
+        if (renamed) {
+            sb.append("    private static final String[] $dartNames = {").append(dartNames).append("};\n\n");
+            sb.append("    public String name$() {\n        return $dartNames[ordinal()];\n    }\n\n");
+        } else {
+            sb.append("    public String name$() {\n        return name();\n    }\n\n");
+        }
         sb.append(body);
         // Dart's Enum.toString is "Mode.only" -- what print and string interpolation
         // show -- where Java's is the bare constant name; .name is still name().
@@ -2991,8 +3085,12 @@ public final class JavaEmitter {
                     kb.append(kb.length() > 0 ? ", " : "").append("this.").append(f.name);
                 }
             }
+            boolean keyedSuper = constKeyed(ksup) || ksup == null && stubConstKeyed(c.superclass);
+            constKeyedClasses.put(javaClassName(c), new String[] {
+                    constKeyed(ksup) ? javaClassName(ksup) : null,
+                    String.valueOf(ksup == null && stubConstKeyed(c.superclass))});
             body.append("    public Object[] $constKey() {\n");
-            if (constKeyed(ksup) || ksup == null && stubConstKeyed(c.superclass)) {
+            if (keyedSuper) {
                 body.append("        return dart.runtime.ConstCanon.join(super.$constKey(), new Object[] {")
                         .append(kb).append("});\n");
             } else {
@@ -5054,26 +5152,6 @@ public final class JavaEmitter {
         return subs;
     }
 
-    /// A class of a library whose private names were renamed ({@code _x$p2}) registers the
-    /// Dart spelling of each with the runtime when it is initialized; code of the library
-    /// runs only in its own classes, so the table is filled before any of its dynamic
-    /// accesses can make an Invocation. An interface cannot have a static block; a field
-    /// initializer is run when an implementing class is initialized, the interface having
-    /// default methods, or else when it runs none of the library's code at all.
-    private String privateSpellingInit(String decl, String dartFile) {
-        Map<String, String> sp = dartFile == null ? null : program.privateSpellings.get(dartFile);
-        if (sp == null || sp.isEmpty()) {
-            return "";
-        }
-        StringBuilder a = new StringBuilder();
-        for (Map.Entry<String, String> e : sp.entrySet()) {
-            a.append(a.length() == 0 ? "" : ", ").append(quote(e.getKey())).append(", ").append(quote(e.getValue()));
-        }
-        String call = "dart.core.Symbol.spell(" + a + ")";
-        return decl.contains(" interface ") ? "    Object $privateSpelling = " + call + ";\n\n"
-                : "    static {\n        " + call + ";\n    }\n\n";
-    }
-
     private GeneratedFile finishClassFile(String name, String decl, String ext, String impls,
                                           CharSequence body, Ctx ctx, String dartFile) {
         return finishClassFile(name, decl, ext, impls, null, body, ctx, dartFile);
@@ -5100,7 +5178,7 @@ public final class JavaEmitter {
         if (permits != null && !permits.isEmpty()) {
             sb.append(" permits ").append(permits);
         }
-        sb.append(" {\n\n").append(privateSpellingInit(decl, dartFile)).append(body).append("}\n");
+        sb.append(" {\n\n").append(body).append("}\n");
         return new GeneratedFile(name + ".java", sb.toString());
     }
 
@@ -29240,8 +29318,11 @@ public final class JavaEmitter {
     /// Dart's num.clamp on a boxed receiver: dispatched on the values, so the operand that
     /// wins comes back as it is, a Long or a Double.
     private Out numClamp(String boxedTarget, Out lo, Out hi, Ctx ctx) {
-        return new Out("((Number) dart.runtime.Dyn.call(" + boxedTarget + ", \"clamp\", new Object[] {"
-                + boxIfPrimitive(lo, ctx) + ", " + boxIfPrimitive(hi, ctx) + "}))", new TypeRef("num"));
+        // Straight to the helper, not through Dyn.call: dynamic dispatch on a builtin
+        // reaches every builtin's members, which a native build then has to carry.
+        return new Out("dart.runtime.Dyn.numClamp((Number) " + paren(boxedTarget) + ", (Number) "
+                + paren(boxIfPrimitive(lo, ctx)) + ", (Number) " + paren(boxIfPrimitive(hi, ctx)) + ")",
+                new TypeRef("num"));
     }
 
     private Out coreArg(Expr a, TypeRef param, Ctx ctx) {
@@ -29612,6 +29693,10 @@ public final class JavaEmitter {
                 || n.equals("clamp") && pos.size() == 2)) {
             // `(c ? 7 : 2.0).abs()`: a num is a boxed Long or Double, and these answer the
             // receiver's own kind (an int stays an int), so they dispatch on the value.
+            if (n.equals("clamp")) {
+                return numClamp(boxIfPrimitive(target, ctx), coreArg(pos.get(0), new TypeRef("num"), ctx),
+                        coreArg(pos.get(1), new TypeRef("num"), ctx), ctx);
+            }
             StringBuilder args = new StringBuilder();
             for (int i = 0; i < pos.size(); i++) {
                 Out ao = coreArg(pos.get(i), new TypeRef("num"), ctx);

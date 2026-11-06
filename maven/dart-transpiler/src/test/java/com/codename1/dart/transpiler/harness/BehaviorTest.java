@@ -147,8 +147,8 @@ public class BehaviorTest {
         File runner = new File(work, "src/Runner.java");
         TestSupport.write(runner, "public class Runner {\n"
                 + "    public static void main(String[] args) {\n"
-                + "        " + TestSupport.PKG + ".MainLib.main$();\n"
-                + "        dart.async.Async.runMicrotasks();\n"
+                // The app's own entry point, which registers what main() relies on.
+                + "        " + TestSupport.PKG + ".FlutterRegistry.invokeMain();\n"
                 + "    }\n"
                 + "}\n");
         javacArgs.add(runner.getAbsolutePath());
