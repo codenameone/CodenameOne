@@ -21,7 +21,7 @@ package com.codenameone.examples.slate.client;
 import com.codenameone.examples.slate.api.AppointmentDto;
 import com.codenameone.examples.slate.calendar.DeviceCalendar;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 
 import java.util.List;
 

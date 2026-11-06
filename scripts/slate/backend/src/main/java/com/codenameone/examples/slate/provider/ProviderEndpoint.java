@@ -20,7 +20,7 @@ package com.codenameone.examples.slate.provider;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
-import com.codenameone.examples.slate.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.slate.Roles;
 import com.codenameone.examples.slate.api.AppointmentDto;
 import com.codenameone.examples.slate.api.BusyUploadDto;

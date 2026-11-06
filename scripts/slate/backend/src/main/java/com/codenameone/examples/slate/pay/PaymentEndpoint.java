@@ -20,7 +20,7 @@ package com.codenameone.examples.slate.pay;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Value;
-import com.codenameone.examples.slate.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.slate.account.Accounts;
 import com.codenameone.examples.slate.api.CardDto;
 import com.codenameone.examples.slate.api.PaymentApiServer;

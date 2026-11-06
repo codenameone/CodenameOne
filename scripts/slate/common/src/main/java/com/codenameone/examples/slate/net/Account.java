@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.slate.net;
 
+import com.codename1.appkit.Net;
+
 import com.codename1.io.Preferences;
 import com.codename1.ui.CN;
 import com.codenameone.examples.slate.Prefs;

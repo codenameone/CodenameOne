@@ -35,7 +35,7 @@ import com.codenameone.examples.slate.api.AccountClosureDto;
 import com.codenameone.examples.slate.api.PasswordChangeDto;
 import com.codenameone.examples.slate.api.UserDto;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.net.Session;
 import com.codenameone.examples.slate.pay.WalletForm;
 

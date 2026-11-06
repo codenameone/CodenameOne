@@ -27,7 +27,7 @@ import com.codenameone.examples.slate.api.IntervalDto;
 import com.codenameone.examples.slate.calendar.DeviceCalendar;
 import com.codenameone.examples.slate.client.Times;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 
 import java.util.ArrayList;
 import java.util.List;

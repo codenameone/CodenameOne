@@ -28,7 +28,7 @@ import com.codename1.ui.spinner.Picker;
 import com.codenameone.examples.slate.api.WeekDto;
 import com.codenameone.examples.slate.api.WorkingHoursDto;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.ui.Lang;
 import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Ui;

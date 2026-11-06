@@ -19,7 +19,7 @@
 package com.codenameone.examples.slate.account;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.slate.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.slate.api.AccountApiServer;
 import com.codenameone.examples.slate.api.AccountClosureDto;
 import com.codenameone.examples.slate.api.PasswordChangeDto;

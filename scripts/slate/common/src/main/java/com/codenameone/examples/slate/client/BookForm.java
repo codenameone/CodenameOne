@@ -40,7 +40,7 @@ import com.codenameone.examples.slate.api.SlotDto;
 import com.codenameone.examples.slate.calendar.DeviceCalendar;
 import com.codenameone.examples.slate.live.LiveChannel;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.ui.Lang;
 import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Ui;
@@ -288,7 +288,7 @@ public final class BookForm extends LiveChannel.Adapter {
             return;
         }
         slots.removeAll();
-        slots.add(new com.codenameone.examples.slate.ui.Skeleton(3));
+        slots.add(new com.codename1.appkit.Skeleton(3, "SvSkeleton"));
         Ui.relayout(slots);
         if (WEEK.equals(view)) {
             List<String> who = provider.length() == 0 ? new ArrayList<String>()

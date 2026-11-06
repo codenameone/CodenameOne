@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.slate.account;
 
+import com.codename1.appkit.server.Grants;
+
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -29,7 +31,7 @@ import com.codename1.backend.security.core.userdetails.UsernameNotFoundException
 import com.codename1.backend.security.crypto.PasswordEncoder;
 import com.codenameone.examples.slate.Ids;
 import com.codenameone.examples.slate.Roles;
-import com.codenameone.examples.slate.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.slate.api.ProfileDto;
 import com.codenameone.examples.slate.api.RegisterDto;
 import com.codenameone.examples.slate.api.UserDto;

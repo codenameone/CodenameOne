@@ -28,8 +28,8 @@ import com.codenameone.examples.slate.api.DashboardDto;
 import com.codenameone.examples.slate.api.NameCountDto;
 import com.codenameone.examples.slate.live.LiveChannel;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
-import com.codenameone.examples.slate.ui.Chart;
+import com.codename1.appkit.Net;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.slate.ui.Lang;
 import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Menu;
@@ -118,7 +118,7 @@ public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
         for (int iter = 0; iter < days.length; iter++) {
             days[iter] = d.bookedByDay().get(iter).intValue();
         }
-        page.add(Chart.of("chart-booked", days, Lang.tr("{0} days ago",
+        page.add(Chart.of("Sv", "chart-booked", days, Lang.tr("{0} days ago",
                 String.valueOf(days.length - 1)), Lang.tr("Today")));
         String trend = trend(days);
         if (trend != null) {
@@ -169,7 +169,7 @@ public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
         for (int iter = 0; iter < rows.size(); iter++) {
             NameCountDto r = rows.get(iter);
             list.add(Ui.row(icon, r.name(), "", Ui.label(String.valueOf(r.count()), "SvValue")));
-            list.add(new Chart.Meter(r.count() / (double) most));
+            list.add(new Chart.Meter("Sv", r.count() / (double) most));
         }
         page.add(list);
     }

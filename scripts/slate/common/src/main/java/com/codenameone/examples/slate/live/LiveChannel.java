@@ -24,7 +24,7 @@ import com.codename1.io.WebSocket;
 import com.codename1.io.WebSocketState;
 import com.codename1.ui.CN;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.net.Session;
 import com.codenameone.examples.slate.ui.Nav;
 

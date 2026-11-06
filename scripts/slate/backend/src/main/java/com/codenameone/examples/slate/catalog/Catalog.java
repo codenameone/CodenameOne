@@ -22,7 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.slate.Ids;
-import com.codenameone.examples.slate.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.slate.api.BusinessDto;
 import com.codenameone.examples.slate.api.LocationDto;
 import com.codenameone.examples.slate.api.PolicyDto;

@@ -23,8 +23,8 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
+import com.codenameone.examples.slate.Clip;
 import com.codenameone.examples.slate.Ids;
-import com.codenameone.examples.slate.Text;
 import com.codenameone.examples.slate.api.BusyUploadDto;
 import com.codenameone.examples.slate.api.CalendarConfigDto;
 import com.codenameone.examples.slate.api.CalendarLinkDto;
@@ -164,8 +164,8 @@ public class CalendarLinks {
             for (int iter = 0; iter < mine.size(); iter++) {
                 CalendarLink old = mine.get(iter);
                 if (DEVICE.equals(old.getKind()) && old.getLabel().equals(label(ask, kind))) {
-                    old.setCalendars(Text.cut(ask.calendars(), 1000));
-                    old.setWriteCalendar(Text.cut(ask.writeCalendar(), 190));
+                    old.setCalendars(Clip.cut(ask.calendars(), 1000));
+                    old.setWriteCalendar(Clip.cut(ask.writeCalendar(), 190));
                     links.save(old);
                     return old;
                 }
@@ -176,8 +176,8 @@ public class CalendarLinks {
         link.setUsername(username);
         link.setKind(kind);
         link.setLabel(label(ask, kind));
-        link.setCalendars(Text.cut(ask.calendars(), 1000));
-        link.setWriteCalendar(Text.cut(ask.writeCalendar(), 190));
+        link.setCalendars(Clip.cut(ask.calendars(), 1000));
+        link.setWriteCalendar(Clip.cut(ask.writeCalendar(), 190));
         link.setCredential(credential);
         link.setLastSyncedAt(Instant.EPOCH);
         link.setCreatedAt(Instant.now());
@@ -273,7 +273,7 @@ public class CalendarLinks {
             spans = source.busy(link.getCredential(), link.getCalendars(), from, to);
         } catch (IOException failed) {
             return store(link.getUsername(), link.getId(), false, from, to, null,
-                    Text.cut(failed.getMessage(), 250));
+                    Clip.cut(failed.getMessage(), 250));
         }
         return store(link.getUsername(), link.getId(), false, from, to, spans, "");
     }
@@ -349,7 +349,7 @@ public class CalendarLinks {
     }
 
     private static String label(ConnectCalendarDto ask, String kind) {
-        String label = Text.cut(ask.label() == null ? "" : ask.label().trim(), 120);
+        String label = Clip.cut(ask.label() == null ? "" : ask.label().trim(), 120);
         return label.length() > 0 ? label : kind;
     }
 

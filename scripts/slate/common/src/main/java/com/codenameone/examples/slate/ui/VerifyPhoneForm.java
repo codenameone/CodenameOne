@@ -29,7 +29,7 @@ import com.codenameone.examples.slate.Telemetry;
 import com.codenameone.examples.slate.api.PhoneCodeDto;
 import com.codenameone.examples.slate.api.UserDto;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.net.Session;
 
 /// Proves the phone number is the user's, which the server asks for before the

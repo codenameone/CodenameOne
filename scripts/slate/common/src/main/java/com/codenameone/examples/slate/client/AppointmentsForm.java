@@ -26,7 +26,7 @@ import com.codenameone.examples.slate.api.AppointmentDto;
 import com.codenameone.examples.slate.calendar.DeviceCalendar;
 import com.codenameone.examples.slate.live.LiveChannel;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.ui.Ui;
 
 import java.util.List;

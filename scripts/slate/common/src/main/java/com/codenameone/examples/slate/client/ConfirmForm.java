@@ -33,7 +33,7 @@ import com.codenameone.examples.slate.api.PaymentMethodDto;
 import com.codenameone.examples.slate.api.PolicyDto;
 import com.codenameone.examples.slate.api.ServiceDto;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.pay.WalletForm;
 import com.codenameone.examples.slate.ui.Lang;
 import com.codenameone.examples.slate.ui.Layouts;

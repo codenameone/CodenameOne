@@ -20,7 +20,7 @@ package com.codenameone.examples.slate.booking;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
-import com.codenameone.examples.slate.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.slate.api.AppointmentApiServer;
 import com.codenameone.examples.slate.api.AppointmentDto;
 import com.codenameone.examples.slate.api.BusinessApiServer;

@@ -22,8 +22,8 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
+import com.codenameone.examples.slate.Clip;
 import com.codenameone.examples.slate.Ids;
-import com.codenameone.examples.slate.Text;
 import com.codenameone.examples.slate.api.AppointmentDto;
 import com.codenameone.examples.slate.api.CancelDto;
 import com.codenameone.examples.slate.api.ConfirmDto;
@@ -194,7 +194,7 @@ public class Bookings {
         a.setServiceId(service.getId());
         a.setLocationId(location.getId());
         a.setClient(client);
-        a.setClientName(Text.cut(clientName, 120));
+        a.setClientName(Clip.cut(clientName, 120));
         a.setState(States.HELD);
         a.setHoldExpiresAt(Instant.ofEpochMilli(now + business.getHoldMinutes() * 60000L));
         a.setPriceCents(service.getPriceCents());
@@ -286,14 +286,14 @@ public class Bookings {
             a.setDepositCents(0);
         }
         if (how != null && how.note() != null) {
-            a.setNote(Text.cut(how.note().trim(), 500));
+            a.setNote(Clip.cut(how.note().trim(), 500));
         }
         if (how != null && how.guests() != null) {
             for (int iter = 0; iter < how.guests().size() && iter < 8; iter++) {
                 String guest = how.guests().get(iter) == null ? "" : how.guests().get(iter).trim();
                 if (guest.length() > 0) {
-                    party(a.getId(), States.GUEST, Text.cut(guest, 190),
-                            Text.cut(guest, 120));
+                    party(a.getId(), States.GUEST, Clip.cut(guest, 190),
+                            Clip.cut(guest, 120));
                 }
             }
         }
@@ -409,7 +409,7 @@ public class Bookings {
         boolean late = byClient && now.toEpochMilli()
                 > a.getStartsAt().toEpochMilli() - business.getCancelHours() * HOUR;
         a.setState(States.CANCELLED);
-        a.setCancelReason(Text.cut(reason == null ? "" : reason.trim(), 200));
+        a.setCancelReason(Clip.cut(reason == null ? "" : reason.trim(), 200));
         a.setUpdatedAt(now);
         free(a);
         Settle settle = settlement(a, late ? a.getDepositCents() : 0);

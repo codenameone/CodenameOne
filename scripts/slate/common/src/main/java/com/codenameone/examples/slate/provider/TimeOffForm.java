@@ -28,7 +28,7 @@ import com.codename1.ui.spinner.Picker;
 import com.codenameone.examples.slate.api.TimeOffDto;
 import com.codenameone.examples.slate.client.Times;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Ui;
 

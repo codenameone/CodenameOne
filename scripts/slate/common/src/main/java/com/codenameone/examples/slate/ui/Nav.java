@@ -32,7 +32,7 @@ import com.codenameone.examples.slate.client.AppointmentsForm;
 import com.codenameone.examples.slate.client.Reminders;
 import com.codenameone.examples.slate.net.Account;
 import com.codenameone.examples.slate.net.Api;
-import com.codenameone.examples.slate.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.net.Session;
 import com.codenameone.examples.slate.notify.Notifications;
 import com.codenameone.examples.slate.owner.OwnerForm;

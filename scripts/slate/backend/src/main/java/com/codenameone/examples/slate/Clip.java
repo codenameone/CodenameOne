@@ -16,28 +16,23 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-package com.codenameone.examples.slate.push;
+package com.codenameone.examples.slate;
 
-import com.codename1.backend.push.PushNotification;
-import com.codename1.backend.push.PushTarget;
-
-import java.util.List;
-
-/// Prints each notification on the server's console instead of sending it.
+/// Shortening a value to fit its column.
 ///
-/// For development only: [com.codenameone.examples.slate.Services] hands it
-/// out on a development profile alone.
-public class ConsolePushSender implements PushSender {
-    @Override
-    public void send(List<PushTarget> targets, PushNotification message, Runnable delivered) {
-        if (targets == null || targets.isEmpty()) {
-            return;
+/// The app kit's `Text` refuses a value that is too long, which is right for
+/// what a person typed. This is for what a person did not type -- a calendar's
+/// error message, a name copied from an account -- where the row is still
+/// worth writing with the end cut off.
+public final class Clip {
+    private Clip() {
+    }
+
+    /// The value cut to `max` characters, or empty for null.
+    public static String cut(String value, int max) {
+        if (value == null) {
+            return "";
         }
-        System.out.println("[push] to " + targets.size() + " device(s): "
-                + message.toJson());
-        // Printed is as delivered as this sender gets.
-        if (delivered != null) {
-            delivered.run();
-        }
+        return value.length() > max ? value.substring(0, max) : value;
     }
 }
