@@ -3667,6 +3667,11 @@ public class BytecodeMethod implements SignatureSet {
         this.maxStack = maxStack;
     }
     
+    /** Appends a synthesized instruction (see {@link LambdaCarriers}). */
+    public void addRawInstruction(Instruction i) {
+        addInstruction(i);
+    }
+
     private void addInstruction(Instruction i) {
         instructions.add(i);
         i.setMethod(this);
