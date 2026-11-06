@@ -62,7 +62,7 @@ class CategoryHeaderShapeTest {
     private static final double WIDTH = 400;
 
     private static DartList<Widget> list(Widget... items) {
-        DartList<Widget> l = new DartList<Widget>();
+        DartList<Widget> l = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (Widget w : items) {
             l.add(w);
         }

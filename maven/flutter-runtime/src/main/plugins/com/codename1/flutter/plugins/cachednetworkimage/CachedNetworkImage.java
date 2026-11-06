@@ -163,7 +163,7 @@ public class CachedNetworkImage extends StatefulWidget {
         this.cacheKey = v;
     }
 
-    String key() {
+    String storeKey() {
         return cacheKey != null ? cacheKey : (imageUrl == null ? "" : imageUrl);
     }
 
@@ -175,7 +175,7 @@ public class CachedNetworkImage extends StatefulWidget {
     /// What can be answered without the network: the cached bytes (as byte[]), or the
     /// error a load that cannot start fails with; null when a download is needed.
     private Object immediate() {
-        byte[] cached = cacheGet(key());
+        byte[] cached = cacheGet(storeKey());
         if (cached != null) {
             return cached;
         }
@@ -233,7 +233,7 @@ public class CachedNetworkImage extends StatefulWidget {
 
     /// Stores bytes as a finished download of this widget's key.
     public void seedCache(dart.typed_data.Uint8List data) {
-        cachePut(key(), data.toBytes());
+        cachePut(storeKey(), data.toBytes());
     }
 
     private static final class Loader extends State<CachedNetworkImage> {
@@ -254,7 +254,7 @@ public class CachedNetworkImage extends StatefulWidget {
         public void didUpdateWidget(CachedNetworkImage old) {
             // A header change (a rotated auth token) reloads too, so a failure the old
             // headers caused is not kept.
-            if (!widget().key().equals(loadedKey) || !sameHeaders(old.httpHeaders, widget().httpHeaders)) {
+            if (!widget().storeKey().equals(loadedKey) || !sameHeaders(old.httpHeaders, widget().httpHeaders)) {
                 stop();
                 start();
             }
@@ -298,7 +298,7 @@ public class CachedNetworkImage extends StatefulWidget {
 
         private void start() {
             final CachedNetworkImage w = widget();
-            final String key = w.key();
+            final String key = w.storeKey();
             loadedKey = key;
             bytes = null;
             error = null;

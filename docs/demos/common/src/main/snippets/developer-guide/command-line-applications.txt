@@ -1,0 +1,11 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::command-line-applications-text-001[]
+Usage: greet [-hlV] [--count=<count>] <name>
+Prints a greeting.
+      <name>                  Who to greet.
+  -c, --count=<count>         How many times. Default: 1
+  -l, --loud                  Shout it.
+  -h, --help                  Show this help message and exit.
+  -V, --version               Print version information and exit.
+// end::command-line-applications-text-001[]

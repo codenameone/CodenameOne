@@ -51,6 +51,6 @@ public class SliverChildListDelegate extends SliverChildDelegate {
 
     @Override
     public DartList<Widget> buildChildren(BuildContext context) {
-        return children != null ? children : new DartList<Widget>();
+        return children != null ? children : new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
     }
 }

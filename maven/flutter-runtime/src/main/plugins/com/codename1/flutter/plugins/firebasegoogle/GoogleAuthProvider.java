@@ -52,7 +52,7 @@ public class GoogleAuthProvider implements FederatedSignIn {
     public static final String PROVIDER_ID = "google.com";
     public static final String GOOGLE_SIGN_IN_METHOD = "google.com";
 
-    private final DartList<String> scopes = new DartList<String>();
+    private final DartList<String> scopes = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
     private String clientId;
 
     /// The OAuth client to sign in with, ahead of the Display property and the app's

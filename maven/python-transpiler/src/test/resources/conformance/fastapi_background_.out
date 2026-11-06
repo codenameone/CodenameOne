@@ -1,0 +1,6 @@
+200 {'ok': True} ['handler', 'injected']
+200 {'own': True} ['own']
+ValueError task failed
+200 b'abc'
+ValueError stream failed ['stream finally']
+AttributeError 'int' object has no attribute 'encode'

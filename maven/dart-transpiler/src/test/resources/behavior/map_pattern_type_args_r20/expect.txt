@@ -1,0 +1,10 @@
+ints 1
+strings a
+nums 2.5
+dynamic 3
+none
+any true
+ints 4
+none
+not strings
+b 2

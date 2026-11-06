@@ -1,0 +1,27 @@
+1 0
+1 0
+true
+false
+[1, 2, 3]
+[1]
+true
+true
+true
+2
+true
+p3
+true
+5
+false
+false
+2
+false
+true
+false
+true
+true
+3.0
+P3
+7.0
+true
+4

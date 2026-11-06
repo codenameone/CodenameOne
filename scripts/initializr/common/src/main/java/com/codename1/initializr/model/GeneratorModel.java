@@ -45,7 +45,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.280";
+    private static final String CN1_PLUGIN_VERSION = "7.0.281";
     /// Whether the Codename One Gradle plugin is published at [CN1_PLUGIN_VERSION].
     /// A Gradle download resolves the plugin by that version, so until a release
     /// carrying the plugin is what the initializr generates against, a Gradle
@@ -328,7 +328,7 @@ public class GeneratorModel {
 
     /// A Maven backend-only project: the server alone, at the root.
     private boolean isMavenBackendOnly() {
-        return mavenLayoutsEnabled() && options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY;
+        return mavenLayoutsEnabled() && options.projectType.hasNoClient();
     }
 
     /// Whether the Maven app carries its platform modules (javase/, android/, ...).
@@ -672,14 +672,14 @@ public class GeneratorModel {
     /// -- as the panel; BuildCloud picks from a fixed set, never from text sent here.
     public String buildKind() {
         boolean gradle = options.isGradle();
-        boolean backendOnly = gradle ? options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY
+        boolean backendOnly = gradle ? options.projectType.hasNoClient()
                 : isMavenBackendOnly();
         return (gradle ? "gradle" : "maven") + (backendOnly ? "-backend" : "");
     }
 
     public NextSteps nextSteps() {
         boolean gradle = options.isGradle();
-        boolean backendOnly = gradle ? options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY
+        boolean backendOnly = gradle ? options.projectType.hasNoClient()
                 : isMavenBackendOnly();
         String extract = "Extract the whole " + toLowerCaseInvariant(appName) + ".zip into a folder.";
         String open = openInIdeStep(gradle);
@@ -794,12 +794,12 @@ public class GeneratorModel {
     private Map<String, byte[]> collectGradleProjectEntries() throws IOException {
         Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
         Map<String, byte[]> scaffold = readZipResource(GRADLE_TEMPLATE_ZIP);
-        boolean backendOnly = options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY;
+        boolean backendOnly = options.projectType.hasNoClient();
 
         addGradleIdeEntries(entries);
         putGradleText(entries, "settings.gradle.kts", gradleTemplate(scaffold, "settings.gradle.kts.txt", ""));
         String gradleProperties = gradleTemplate(scaffold, "gradle.properties.txt", "");
-        if (options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY) {
+        if (!options.projectType.hasNoClient()) {
             gradleProperties = withIdeBuildReportingGradle(gradleProperties);
         }
         putGradleText(entries, "gradle.properties", gradleProperties);
@@ -852,6 +852,18 @@ public class GeneratorModel {
         copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, entries, ZipEntryType.COMMON);
         copySingleTextEntryToMap("pom.xml", readResourceToString(BACKEND_ONLY_POM_RESOURCE), entries,
                 ZipEntryType.COMMON);
+        if (options.projectType == ProjectOptions.ProjectType.COMMAND_LINE) {
+            copySingleTextEntryToMap("application.properties",
+                    mavenBackendTemplate(scaffold, "cli/application.properties.txt"), entries, ZipEntryType.COMMON);
+            String cliSources = "src/main/java/" + packageName.replace('.', '/') + "/";
+            copySingleTextEntryToMap(cliSources + "Hello.java", mavenBackendTemplate(scaffold, "cli/Hello.java.txt"),
+                    entries, ZipEntryType.COMMON);
+            copySingleTextEntryToMap("src/test/java/" + packageName.replace('.', '/') + "/HelloTest.java",
+                    mavenBackendTemplate(scaffold, "cli/HelloTest.java.txt"), entries, ZipEntryType.COMMON);
+            copySingleTextEntryToMap("README.md", buildMavenBackendReadmeMarkdown(), entries, ZipEntryType.COMMON);
+            validateGeneratedPomCoordinates(entries);
+            return entries;
+        }
         copySingleTextEntryToMap("application.properties",
                 mavenBackendTemplate(scaffold, "backend/application.properties.txt"), entries, ZipEntryType.COMMON);
         copySingleTextEntryToMap("application-dev.properties",
@@ -882,12 +894,15 @@ public class GeneratorModel {
         }
         String text = StringUtil.newString(data);
         text = StringUtil.replaceAll(text, "./gradlew __BACKEND__runBackend", "./mvnw cn1:backend");
+        text = StringUtil.replaceAll(text, "-Pcn1.backend.args", "-Dcn1.backend.args");
         text = StringUtil.replaceAll(text, "./gradlew __BACKEND__backendPackage", "./mvnw cn1:backend-package");
         text = StringUtil.replaceAll(text, "./gradlew __BACKEND__backendTest",
                 "./mvnw test -Dcn1.backend.compiledTests=true");
         text = StringUtil.replaceAll(text, "./gradlew __BACKEND__test", "./mvnw test");
         text = StringUtil.replaceAll(text, "under `runBackend`", "under `cn1:backend`");
         text = StringUtil.replaceAll(text, "${package}", packageName);
+        // As the Gradle path names it (the artifact and the binary are named the same).
+        text = StringUtil.replaceAll(text, "__PROJECT_NAME__", toLowerCaseInvariant(appName));
         return text;
     }
 
@@ -895,6 +910,18 @@ public class GeneratorModel {
                                          String taskPrefix) throws IOException {
         putGradleText(entries, dir + "build.gradle.kts",
                 gradleTemplate(scaffold, "backend/build.gradle.kts.txt", taskPrefix));
+        if (options.projectType == ProjectOptions.ProjectType.COMMAND_LINE) {
+            // The same module, the same build script and the same packaging; only
+            // what it holds differs. The Gradle plugin tells a backend from an app
+            // by application.properties, so a tool keeps one too.
+            putGradleText(entries, dir + "application.properties",
+                    gradleTemplate(scaffold, "cli/application.properties.txt", taskPrefix));
+            putGradleText(entries, dir + "src/main/java/" + packageName.replace('.', '/') + "/Hello.java",
+                    gradleTemplate(scaffold, "cli/Hello.java.txt", taskPrefix));
+            putGradleText(entries, dir + "src/test/java/" + packageName.replace('.', '/') + "/HelloTest.java",
+                    gradleTemplate(scaffold, "cli/HelloTest.java.txt", taskPrefix));
+            return;
+        }
         putGradleText(entries, dir + "application.properties",
                 gradleTemplate(scaffold, "backend/application.properties.txt", taskPrefix));
         putGradleText(entries, dir + "application-dev.properties",
@@ -1028,7 +1055,7 @@ public class GeneratorModel {
         // A Gradle project is refused below, for the reason the template gives; a
         // backend-only project is no template's, so none of this is about it.
         if (template.isFullStack() && !options.isGradle()
-                && options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY) {
+                && !options.projectType.hasNoClient()) {
             if (!isVersionAtLeast(pluginVersion, FULL_STACK_SINCE)) {
                 throw new IOException("This template shares a contract module between the app and its server, "
                         + "which needs Codename One " + FULL_STACK_SINCE + " or newer.");
@@ -1049,12 +1076,12 @@ public class GeneratorModel {
                 throw new IOException("Gradle projects target Java 17. Choose Java 17, or the Maven build "
                         + "for a project that must target Java 8.");
             }
-            if (options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY && !template.supportsGradle()) {
+            if (!options.projectType.hasNoClient() && !template.supportsGradle()) {
                 throw new IOException(template.GRADLE_UNSUPPORTED_REASON + " Choose the Maven build for this template.");
             }
             return;
         }
-        if (options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY) {
+        if (options.projectType.hasNoClient()) {
             if (!mavenLayoutsEnabled()) {
                 throw new IOException("A backend-only Maven project needs Codename One " + MAVEN_LAYOUTS_SINCE
                         + " or newer; generate it for Gradle. Every Maven project already carries the backend "
@@ -2529,6 +2556,24 @@ public class GeneratorModel {
 
     private String buildMavenBackendReadmeMarkdown() {
         StringBuilder out = new StringBuilder();
+        if (options.projectType == ProjectOptions.ProjectType.COMMAND_LINE) {
+            return out.append("# Codename One Command-Line Tool\n\n")
+                    .append("This is a Maven project for a command-line tool written in Java, ")
+                    .append("run on the JVM while you develop and packaged as a single native binary ")
+                    .append("for the Linux or macOS machine that builds it.\n\n")
+                    .append("## Getting Started\n\n")
+                    .append("Use JDK 17 or newer, and set JAVA_HOME for terminal builds.\n\n")
+                    .append("```\n./mvnw cn1:backend -Dcn1.backend.args=\"--count 2 Ada\"\n```\n\n")
+                    .append("- `./mvnw test` runs the tests.\n")
+                    .append("- `./mvnw cn1:backend-package` builds the native binary.\n\n")
+                    .append("The command is `src/main/java/").append(packageName.replace('.', '/'))
+                    .append("/Hello.java`: its options and parameters are annotated fields, read by the ")
+                    .append("build, so `--help` and argument errors need no code.\n\n")
+                    .append("## Help and Support\n\n")
+                    .append("- Codename One website: https://www.codenameone.com\n")
+                    .append("- Codename One GitHub: https://github.com/codenameone/CodenameOne\n")
+                    .toString();
+        }
         out.append("# Codename One Backend\n\n")
                 .append("This is a Maven project for a Codename One backend: a server written in Java, ")
                 .append("run on the JVM while you develop and packaged as a single native binary.\n\n")
@@ -2569,7 +2614,7 @@ public class GeneratorModel {
 
     /// The tasks a Gradle project's IDE files offer, as {label, task path}.
     private String[][] gradleIdeTasks() {
-        if (options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY) {
+        if (options.projectType.hasNoClient()) {
             return new String[][] {
                     {"Run Backend", "runBackend"},
                     {"Package Backend", "backendPackage"},
@@ -2693,7 +2738,7 @@ public class GeneratorModel {
     }
 
     private String buildGradleReadmeMarkdown() {
-        boolean backendOnly = options.projectType == ProjectOptions.ProjectType.BACKEND_ONLY;
+        boolean backendOnly = options.projectType.hasNoClient();
         StringBuilder out = new StringBuilder();
         out.append("# Codename One Project\n\n");
         if (backendOnly) {

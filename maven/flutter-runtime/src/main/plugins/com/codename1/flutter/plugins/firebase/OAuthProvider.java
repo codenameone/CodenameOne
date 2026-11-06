@@ -36,7 +36,7 @@ import java.util.Map;
  */
 public class OAuthProvider {
     private final String providerId;
-    private final DartList<String> scopes = new DartList<String>();
+    private final DartList<String> scopes = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
 
     public OAuthProvider(String providerId) {
         this.providerId = providerId;

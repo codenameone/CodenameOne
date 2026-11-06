@@ -1004,6 +1004,7 @@ public class IOSNative {
     native short sqlCursorValueAtColumnShort(long statement, int col);
     native byte[] sqlCursorValueAtColumnText(long statement, int col);
     native boolean sqlCursorNullValueAtColumn(long statement, int col); //Warning. This function only works if no automatic type conversions have occurred for the value in question. So it must be called before any of the sqlCursorValueAtColumn* methods. After a type conversion, the result of calling this method is undefined, though harmless
+    native int sqlCursorColumnType(long statement, int col);
     
     native int sqlCursorGetColumnCount(long statementPeer);
     
@@ -1040,6 +1041,7 @@ public class IOSNative {
     /// lookup -- 33 files and 5.7MB in an application shipping a font family,
     /// measured at 25ms on the start-up path.
     native void registerBundledFont(String fileName);
+    native String registerFontData(byte[] data);
     native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
 
     native void log(String text);

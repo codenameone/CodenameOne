@@ -1,0 +1,14 @@
+outside root
+data 5 in A
+done in A
+microtask in A
+then 1 in A
+timer in A
+> hello
+> world
+captured 2
+guarded true root
+handled true
+bound R runs>0 true registered>0 true
+F
+end root

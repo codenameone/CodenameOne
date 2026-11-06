@@ -59,7 +59,7 @@ public class UserAccountsDrawerHeader extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        DartList<Widget> children = new DartList<Widget>();
+        DartList<Widget> children = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (currentAccountPicture != null) {
             children.add(currentAccountPicture);
         }

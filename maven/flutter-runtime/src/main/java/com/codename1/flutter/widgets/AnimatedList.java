@@ -86,7 +86,7 @@ public class AnimatedList extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        DartList<Widget> kids = new DartList<Widget>();
+        DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         Animation<Double> arrived = new AlwaysStoppedAnimation<Double>(1.0);
         if (itemBuilder != null) {
             for (long i = 0; i < initialItemCount; i++) {

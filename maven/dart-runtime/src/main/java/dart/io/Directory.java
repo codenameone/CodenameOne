@@ -107,7 +107,7 @@ public class Directory extends FileSystemEntity {
         if (!fs.isDirectory(path)) {
             throw new FileSystemException("Directory listing failed", path);
         }
-        DartList<FileSystemEntity> out = new DartList<FileSystemEntity>();
+        DartList<FileSystemEntity> out = new DartList<FileSystemEntity>(dart.runtime.TypeWitness.of(FileSystemEntity.class, false));
         for (String child : fs.list(path)) {
             if (fs.isDirectory(child)) {
                 Directory d = new Directory(child);

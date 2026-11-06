@@ -110,11 +110,11 @@ public class TextRenderElement extends RenderElement {
         // "the nearer style wins field by field".
         return ambient.copyWith(null, own.getColor(), null, own.getFontFamily(),
                 own.getFontSize(), own.getFontWeight(), null, own.getLetterSpacing(),
-                null, own.height(), null, null, null);
+                null, own.height(), null, null, null).withDecorationFrom(own);
     }
 
     private void applyStyle(Label l) {
-        TextStyle ts = effectiveStyle();
+        TextStyle ts = com.codename1.flutter.TextScaler.applyTo(text().textScaler(), effectiveStyle(), this);
         if (l instanceof WrappedLabel) {
             double sp = ts == null || ts.getLetterSpacing() == null
                     ? 0 : Dp.px(ts.getLetterSpacing().doubleValue());
@@ -189,11 +189,43 @@ public class TextRenderElement extends RenderElement {
             if (ts.getColor() != null) {
                 stylesToSet(l).setFgColor(ts.getColor().rgb());
             }
+            com.codename1.flutter.TextDecoration deco = ts.decoration();
+            boolean custom = deco != null && (deco.hasOverline() || ts.decorationColor() != null
+                    || ts.decorationThickness() != null
+                    || (ts.decorationStyle() != null
+                        && ts.decorationStyle() != com.codename1.flutter.TextDecorationStyle.solid));
+            if (l instanceof WrappedLabel) {
+                WrappedLabel wl = (WrappedLabel) l;
+                wl.shadows = shadowsOf(ts.shadows());
+                wl.decoFlags = 0;
+                if (custom) {
+                    // Codename One's own underline and strike-through are one pixel in the
+                    // text colour; anything else is drawn by WrappedLabel.paint.
+                    wl.decoFlags = (deco.hasUnderline() ? 1 : 0) | (deco.hasOverline() ? 2 : 0)
+                            | (deco.hasLineThrough() ? 4 : 0);
+                    wl.decoColor = ts.decorationColor() == null ? null
+                            : Integer.valueOf(ts.decorationColor().rgb());
+                    wl.decoAlpha = ts.decorationColor() == null ? 255
+                            : (int) ((ts.decorationColor().value() >>> 24) & 0xff);
+                    wl.decoThickness = ts.decorationThickness() == null ? 1
+                            : ts.decorationThickness().doubleValue();
+                    wl.decoStyle = ts.decorationStyle();
+                }
+            }
+            if (deco != null) {
+                stylesToSet(l).setUnderline(!custom && deco.hasUnderline());
+                stylesToSet(l).setStrikeThru(!custom && deco.hasLineThrough());
+            }
         }
         TextAlign a = text().getTextAlign();
         // Flutter's default is TextAlign.start, the right edge under right-to-left text.
         boolean rtl = isRtl();
-        if (a == null && rtl) {
+        // Justified text is laid out from the start edge; WrappedLabel.paint then
+        // stretches every line but a paragraph's last across the full width.
+        if (l instanceof WrappedLabel) {
+            ((WrappedLabel) l).justify = a == TextAlign.justify;
+        }
+        if ((a == null && rtl) || a == TextAlign.justify) {
             a = TextAlign.start;
         }
         if (a != null) {
@@ -217,6 +249,22 @@ public class TextRenderElement extends RenderElement {
             }
             stylesToSet(l).setAlignment(cn1Align);
         }
+    }
+
+    /** The first line's baseline: where {@link WrappedLabel#paint} draws its glyphs. */
+    @Override
+    public double distanceToBaseline() {
+        Component c = component();
+        if (!(c instanceof WrappedLabel)) {
+            return -1;
+        }
+        WrappedLabel l = (WrappedLabel) c;
+        Font f = font(l);
+        if (f == null) {
+            return -1;
+        }
+        int lh = (int) Math.round(l.lineHeight(f));
+        return Math.max(0, (lh - f.getHeight()) / 2) + f.getAscent();
     }
 
     @Override
@@ -247,6 +295,7 @@ public class TextRenderElement extends RenderElement {
         if (!isDryPass()) {
             // Only a real pass may hand the painter its lines; see isDryPass().
             l.lines = lines;
+            l.lineEnds = paragraphEndsAfter;
         }
         double w = 0;
         for (String line : lines) {
@@ -512,9 +561,95 @@ public class TextRenderElement extends RenderElement {
      * (falling back to standard single-line Label painting before the first
      * layout pass).
      */
+    /** TextStyle.shadows as {dx, dy, argb} in device pixels, or null when there are none. */
+    static java.util.List<int[]> shadowsOf(Object v) {
+        if (!(v instanceof Iterable)) {
+            return null;
+        }
+        java.util.List<int[]> out = new java.util.ArrayList<int[]>();
+        for (Object o : (Iterable<?>) v) {
+            if (o instanceof com.codename1.flutter.painting.Shadow) {
+                com.codename1.flutter.painting.Shadow sh = (com.codename1.flutter.painting.Shadow) o;
+                com.codename1.flutter.Offset off = sh.offset();
+                long argb = sh.color() == null ? 0xFF000000L : sh.color().value();
+                out.add(new int[] {
+                    off == null ? 0 : (int) Math.round(com.codename1.flutter.rendering.Dp.px(off.dx())),
+                    off == null ? 0 : (int) Math.round(com.codename1.flutter.rendering.Dp.px(off.dy())),
+                    (int) argb});
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
     static class WrappedLabel extends Label {
 
+        /** TextStyle.shadows; each run is drawn once per shadow, under the text. */
+        java.util.List<int[]> shadows;
+        /** 1 underline, 2 overline, 4 line-through: the decorations this label draws itself. */
+        int decoFlags;
+        /** The decoration colour (rgb), or null for the text colour. */
+        Integer decoColor;
+        int decoAlpha = 255;
+        /** decorationThickness: a multiple of the font's own one-pixel stroke. */
+        double decoThickness = 1;
+        com.codename1.flutter.TextDecorationStyle decoStyle;
+
+        /** Draws the decorations of one line whose text occupies [x, x + w) from top y. */
+        void paintDecorations(Graphics g, Font f, int x, int y, int w, int textColor) {
+            if (decoFlags == 0 || w <= 0) {
+                return;
+            }
+            int stroke = Math.max(1, (int) Math.round(decoThickness
+                    * Math.max(1, com.codename1.flutter.rendering.Dp.px(1))));
+            int color = decoColor != null ? decoColor.intValue() : textColor;
+            int prevAlpha = decoAlpha >= 255 ? -1 : g.concatenateAlpha(decoAlpha);
+            g.setColor(color);
+            int ascent = f.getAscent();
+            if ((decoFlags & 1) != 0) {
+                decorationLine(g, x, y + ascent + Math.max(1, Math.abs(f.getDescent()) / 2), w, stroke);
+            }
+            if ((decoFlags & 2) != 0) {
+                decorationLine(g, x, y, w, stroke);
+            }
+            if ((decoFlags & 4) != 0) {
+                decorationLine(g, x, y + ascent * 2 / 3, w, stroke);
+            }
+            if (prevAlpha >= 0) {
+                g.setAlpha(prevAlpha);
+            }
+        }
+
+        private void decorationLine(Graphics g, int x, int y, int w, int stroke) {
+            com.codename1.flutter.TextDecorationStyle st = decoStyle;
+            if (st == com.codename1.flutter.TextDecorationStyle.double_) {
+                g.fillRect(x, y, w, stroke);
+                g.fillRect(x, y + stroke * 2, w, stroke);
+            } else if (st == com.codename1.flutter.TextDecorationStyle.dotted
+                    || st == com.codename1.flutter.TextDecorationStyle.dashed) {
+                int on = st == com.codename1.flutter.TextDecorationStyle.dotted ? stroke : stroke * 4;
+                for (int i = 0; i < w; i += on * 2) {
+                    g.fillRect(x + i, y, Math.min(on, w - i), stroke);
+                }
+            } else if (st == com.codename1.flutter.TextDecorationStyle.wavy) {
+                int amp = stroke * 2;
+                int px = x;
+                int py = y;
+                for (int i = 1; i <= w; i++) {
+                    int ny = y + (int) Math.round(Math.sin(i * Math.PI / (amp * 2)) * amp);
+                    g.drawLine(px, py, x + i, ny);
+                    px = x + i;
+                    py = ny;
+                }
+            } else {
+                g.fillRect(x, y, w, stroke);
+            }
+        }
+
         List<String> lines;
+        /** Per line of {@link #lines}: whether a paragraph ends after it. */
+        List<Boolean> lineEnds;
+        /** {@code TextAlign.justify}: stretch the inter-word gaps of non-final lines. */
+        boolean justify;
         /** Flutter's TextStyle.letterSpacing, in device pixels. */
         double spacingPx;
         /// Flutter's {@code TextStyle.height} MULTIPLIED BY the font size, in device
@@ -566,7 +701,7 @@ public class TextRenderElement extends RenderElement {
             // through to Label.paint here drew the label's raw text instead, so
             // every one-line preview in the Reply study rendered its whole
             // message and got cut off mid-word with no ellipsis.
-            if (lines == null && spacingPx == 0 && fgAlpha >= 255) {
+            if (lines == null && spacingPx == 0 && fgAlpha >= 255 && shadows == null && decoFlags == 0) {
                 super.paint(g);
                 return;
             }
@@ -605,15 +740,55 @@ public class TextRenderElement extends RenderElement {
                 }
                 return;
             }
+            int lineIndex = -1;
             for (String line : toPaint) {
+                lineIndex++;
                 int lineW = (int) Math.ceil(spacedWidth(f, line, spacingPx));
+                // Flutter justifies every line except the last of each paragraph; the
+                // slack goes evenly into that line's spaces.
+                int spaces = 0;
+                if (justify && multiLine && lineIndex < toPaint.size() - 1
+                        && !(lineEnds != null && lineIndex < lineEnds.size()
+                                && Boolean.TRUE.equals(lineEnds.get(lineIndex)))) {
+                    for (int i = 0; i < line.length(); i++) {
+                        if (line.charAt(i) == ' ') {
+                            spaces++;
+                        }
+                    }
+                }
+                double gapExtra = spaces > 0 ? Math.max(0, getWidth() - lineW) / (double) spaces : 0;
                 int x = getX();
                 if (align == Component.CENTER) {
                     x += (getWidth() - lineW) / 2;
                 } else if (align == Component.RIGHT) {
                     x += getWidth() - lineW;
                 }
-                if (spacingPx == 0) {
+                if (shadows != null) {
+                    // Flutter paints every shadow beneath the glyphs, in the order given.
+                    // The blur radius has no equivalent and is drawn as a hard offset.
+                    for (int[] sh : shadows) {
+                        int prevShadowAlpha = g.concatenateAlpha((sh[2] >>> 24) & 0xff);
+                        g.setColor(sh[2] & 0xffffff);
+                        g.drawString(line, x + sh[0], y + glyphOffset + sh[1]);
+                        g.setAlpha(prevShadowAlpha);
+                    }
+                    g.setColor(s.getFgColor());
+                }
+                if (gapExtra <= 0) {
+                    paintDecorations(g, f, x, y + glyphOffset, lineW, s.getFgColor());
+                }
+                if (gapExtra > 0) {
+                    paintDecorations(g, f, x, y + glyphOffset, getWidth(), s.getFgColor());
+                    double scale = trackingScale(f, line);
+                    double cursor = x;
+                    for (int i = 0; i < line.length(); i++) {
+                        char ch = line.charAt(i);
+                        if (ch != ' ') {
+                            g.drawString(line.substring(i, i + 1), (int) Math.round(cursor), y + glyphOffset);
+                        }
+                        cursor += f.charWidth(ch) * scale + spacingPx + (ch == ' ' ? gapExtra : 0);
+                    }
+                } else if (spacingPx == 0) {
                     g.drawString(line, x, y + glyphOffset);
                 } else {
                     // One glyph at a time: the only way to add tracking, since Codename One

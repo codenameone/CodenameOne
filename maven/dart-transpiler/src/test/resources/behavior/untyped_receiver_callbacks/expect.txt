@@ -1,0 +1,4 @@
+error boom
+1:a,2:closed,3:b
+true
+0

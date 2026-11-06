@@ -1,0 +1,29 @@
+caught Oops(plain)
+outer Oops(plain)
+typed caught typed
+outer Oops(typed)
+no variable
+outer Oops(novar)
+1/2/0
+eval c 1
+eval a 2
+eval b 3
+2/3/1
+[1, 2] >ab red 2
+true
+true
+false
+Symbol("foo")
+true
+false
+2
+low 1
+low 2
+three
+other
+sized 42
+sized 4
+flag true
+none
+flag false
+none

@@ -24,7 +24,7 @@
 package dart.convert;
 
 /** {@code JsonDecoder}. */
-public final class JsonDecoder implements dart.async.StreamTransformer<String, Object> {
+public final class JsonDecoder extends Converter<String, Object> {
     private final Object reviver;
 
     public JsonDecoder() {
@@ -35,6 +35,8 @@ public final class JsonDecoder implements dart.async.StreamTransformer<String, O
         this.reviver = reviver;
     }
 
+
+    @Override
     public Object convert(String input) {
         return new JsonCodec().decode(input, reviver);
     }
@@ -42,10 +44,24 @@ public final class JsonDecoder implements dart.async.StreamTransformer<String, O
     /** {@code stream.transform(json.decoder)}: the whole text, decoded once it has all arrived. */
     @Override
     public dart.async.Stream<Object> bind(final dart.async.Stream<String> source) {
-        return dart.async.AsyncStar.asyncStar(new dart.runtime.Funcs.VoidFunc1<dart.async.AsyncStar.Sink<Object>>() {
+        // Errors in the text stream are forwarded; the whole text decodes at done.
+        return dart.async.Forward.bind(source, new dart.runtime.Funcs.Func0<dart.async.Forward<String, Object>>() {
             @Override
-            public void call(dart.async.AsyncStar.Sink<Object> sink) {
-                sink.yield$(convert(dart.async.Await.await$(source.join(""))));
+            public dart.async.Forward<String, Object> call() {
+                return new dart.async.Forward<String, Object>() {
+                    private final StringBuilder text = new StringBuilder();
+
+                    @Override
+                    protected void data(String chunk) {
+                        text.append(chunk);
+                    }
+
+                    @Override
+                    protected void done() {
+                        add(convert(text.toString()));
+                        close();
+                    }
+                };
             }
         });
     }

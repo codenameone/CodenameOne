@@ -8,5 +8,6 @@ public final class FlutterRegistry {
     /** Invokes the Dart main() of the application's main library. */
     public static void invokeMain() {
         MainLib.main$();
+        dart.async.Async.runMicrotasks();
     }
 }

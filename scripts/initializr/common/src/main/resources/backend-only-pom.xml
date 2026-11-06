@@ -25,8 +25,8 @@
     than a crash at start-up.
   -->
   <properties>
-    <cn1.plugin.version>7.0.280</cn1.plugin.version>
-    <cn1.version>7.0.280</cn1.version>
+    <cn1.plugin.version>7.0.281</cn1.plugin.version>
+    <cn1.version>7.0.281</cn1.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- The native build translates class files of this level. -->
     <maven.compiler.source>1.8</maven.compiler.source>
@@ -132,6 +132,53 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!--
+        A server or a command-line tool written in Python: put the modules in
+        src/main/python, and main.py runs as __main__ with the command line in
+        sys.argv. Needs JDK 17, because the Python is transpiled to Java 17 source.
+    -->
+    <profile>
+      <id>python</id>
+      <activation>
+        <file>
+          <exists>${basedir}/src/main/python</exists>
+        </file>
+      </activation>
+      <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <!-- Declared here rather than in the main build so a project with no
+                 Python never names the goal. -->
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-maven-plugin</artifactId>
+            <version>${cn1.plugin.version}</version>
+            <executions>
+              <execution>
+                <id>cn1-transpile-python</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>transpile-python</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+      <dependencies>
+        <dependency>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-python-runtime</artifactId>
+          <version>${cn1.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 
   <!--
       Codename One publishes its releases to the Codename One repository. Both lists

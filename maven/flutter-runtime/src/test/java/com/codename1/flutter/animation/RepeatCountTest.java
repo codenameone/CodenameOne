@@ -53,6 +53,8 @@ class RepeatCountTest {
                 completed[0] = true;
             }
         });
+        // A callback on a completed future runs from the microtask queue, as in Dart.
+        dart.async.Async.drainMicrotasks();
         return completed[0];
     }
 

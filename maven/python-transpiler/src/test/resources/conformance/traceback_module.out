@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+ValueError: bad value
+NoneType: None
+["KeyError: 'k'\n"]
+['ValueError: v\n']
+['RuntimeError\n']
+MyErr: custom
+MyErr: custom
+['Traceback (most recent call last):\n', 'ZeroDivisionError: division by zero\n', '\nThe above exception was the direct cause of the following exception:\n\n', 'Traceback (most recent call last):\n', "KeyError: 'x'\n"]
+['Traceback (most recent call last):\n', "ValueError: invalid literal for int() with base 10: 'q'\n", '\nDuring handling of the above exception, another exception occurred:\n\n', 'Traceback (most recent call last):\n', 'TypeError: t\n']
+z ['ValueError: z\n']
+ValueError
+True
+ValueError: to stdout

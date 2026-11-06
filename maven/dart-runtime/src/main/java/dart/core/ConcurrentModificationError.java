@@ -28,12 +28,32 @@ package dart.core;
  * being iterated.
  */
 public class ConcurrentModificationError extends RuntimeException {
+    private final Object modifiedObject;
+
+    public ConcurrentModificationError() {
+        this((Object) null);
+    }
+
     public ConcurrentModificationError(String message) {
-        super(message);
+        this((Object) message);
+    }
+
+    /// Dart's `ConcurrentModificationError([Object? modifiedObject])`: the
+    /// collection that was modified, kept for `modifiedObject`.
+    public ConcurrentModificationError(Object modifiedObject) {
+        super(modifiedObject == null ? null : String.valueOf(modifiedObject));
+        this.modifiedObject = modifiedObject;
+    }
+
+    public Object get$modifiedObject() {
+        return modifiedObject;
     }
 
     @Override
     public String toString() {
+        if (modifiedObject == null) {
+            return "Concurrent modification during iteration.";
+        }
         return "Concurrent modification during iteration: " + getMessage();
     }
 }

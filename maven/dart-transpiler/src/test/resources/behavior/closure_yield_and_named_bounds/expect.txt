@@ -1,0 +1,14 @@
+true
+false
+[7, 14, 0, 2, 4, 100, 200]
+List<int>
+true
+[2, 1, 1]
+true
+false
+true
+[x, y, z]
+List<(int, {String s}) => int>
+5
+List<({required int k}) => num>
+[3, 1.5]

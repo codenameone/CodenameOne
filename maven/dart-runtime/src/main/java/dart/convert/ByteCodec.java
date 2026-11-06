@@ -35,7 +35,8 @@ import java.util.List;
  * {@code base64} and {@code base64Url}. A byte input may be a {@link Uint8List} or any
  * {@code List<int>}; byte outputs are {@link Uint8List}, as in Dart.
  */
-public final class ByteCodec implements dart.async.StreamTransformer<Object, Object> {
+@SuppressWarnings("rawtypes")
+public class ByteCodec extends Converter<Object, Object> implements Codec {
 
     static final int UTF8 = 0;
     static final int ASCII = 1;
@@ -136,24 +137,24 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
      */
     @Override
     public dart.async.Stream<Object> bind(final dart.async.Stream<Object> source) {
-        // AsyncStar.over: subscribed inside listen() (a broadcast source's next event is
-        // not lost) and source errors forwarded without ending the stream, as Dart's do.
-        return dart.async.AsyncStar.over(source, new dart.runtime.Funcs.VoidFunc2<dart.async.StreamIterator<Object>,
-                dart.async.AsyncStar.Sink<Object>>() {
+        // Forward: subscribed inside listen() (a broadcast source's next event is not
+        // lost), source errors forwarded without ending the stream, as Dart's are.
+        return dart.async.Forward.bind(source, new dart.runtime.Funcs.Func0<dart.async.Forward<Object, Object>>() {
             @Override
-            public void call(dart.async.StreamIterator<Object> it, dart.async.AsyncStar.Sink<Object> sink) {
-                byte[] carry = new byte[0];
-                // Only the BOM at the very start of the stream is dropped; one opening a
-                // later chunk is a real U+FEFF in the middle of the text.
-                boolean atStart = true;
-                // Base64 works in whole groups -- three bytes encode to four characters --
-                // so a chunk's incomplete group is carried into the next one and finished
-                // only when the stream closes; per-chunk padding would corrupt the output.
-                boolean b64 = kind == BASE64 || kind == BASE64_URL;
-                StringBuilder textCarry = new StringBuilder();
-                try {
-                    while (it.next()) {
-                        Object chunk = it.current();
+            public dart.async.Forward<Object, Object> call() {
+                return new dart.async.Forward<Object, Object>() {
+                    private byte[] carry = new byte[0];
+                    // Only the BOM at the very start of the stream is dropped; one opening a
+                    // later chunk is a real U+FEFF in the middle of the text.
+                    private boolean atStart = true;
+                    // Base64 works in whole groups -- three bytes encode to four characters --
+                    // so a chunk's incomplete group is carried into the next one and finished
+                    // only when the stream closes; per-chunk padding would corrupt the output.
+                    private final boolean b64 = kind == BASE64 || kind == BASE64_URL;
+                    private final StringBuilder textCarry = new StringBuilder();
+
+                    @Override
+                    protected void data(Object chunk) {
                         if (b64 && chunk instanceof String) {
                             textCarry.append((String) chunk);
                             // Padding only ends the input, so text holding '=' waits for the end.
@@ -161,9 +162,9 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                             if (cut > 0) {
                                 String head = textCarry.substring(0, cut);
                                 textCarry.delete(0, cut);
-                                sink.yield$(convert(head));
+                                add(convert(head));
                             }
-                            continue;
+                            return;
                         }
                         if (b64) {
                             byte[] in = bytesOf(chunk);
@@ -176,13 +177,13 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                             if (cut > 0) {
                                 byte[] head = new byte[cut];
                                 System.arraycopy(all, 0, head, 0, cut);
-                                sink.yield$(base64(head, kind == BASE64_URL));
+                                add(base64(head, kind == BASE64_URL));
                             }
-                            continue;
+                            return;
                         }
                         if (kind != UTF8 || chunk instanceof String) {
-                            sink.yield$(convert(chunk));
-                            continue;
+                            add(convert(chunk));
+                            return;
                         }
                         byte[] in = bytesOf(chunk);
                         byte[] all = new byte[carry.length + in.length];
@@ -196,27 +197,31 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
                         if (cut > 0) {
                             // Strict as decode() is: Java's decoder would substitute U+FFFD.
                             checkUtf8(head, head.length);
-                            sink.yield$(text(head, atStart));
+                            add(text(head, atStart));
                             atStart = false;
                         }
                     }
-                    if (b64) {
-                        if (textCarry.length() > 0) {
-                            sink.yield$(convert(textCarry.toString()));
+
+                    @Override
+                    protected void done() {
+                        if (b64) {
+                            if (textCarry.length() > 0) {
+                                add(convert(textCarry.toString()));
+                            }
+                            if (carry.length > 0) {
+                                add(base64(carry, kind == BASE64_URL));
+                            }
+                            close();
+                            return;
                         }
                         if (carry.length > 0) {
-                            sink.yield$(base64(carry, kind == BASE64_URL));
+                            // An incomplete sequence left at the end of the stream is malformed.
+                            checkUtf8(carry, carry.length);
+                            add(text(carry, atStart));
                         }
-                        return;
+                        close();
                     }
-                    if (carry.length > 0) {
-                        // An incomplete sequence left at the end of the stream is malformed.
-                        checkUtf8(carry, carry.length);
-                        sink.yield$(text(carry, atStart));
-                    }
-                } finally {
-                    it.cancel();
-                }
+                };
             }
         });
     }
@@ -247,6 +252,7 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
     }
 
     /** {@code utf8.encoder.convert(s)} / {@code utf8.decoder.convert(b)}, by input type. */
+    @Override
     public Object convert(Object input) {
         boolean textIn = input instanceof String;
         if (kind == BASE64 || kind == BASE64_URL) {
@@ -424,7 +430,7 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
 
     /** {@code LineSplitter.split(s)} and {@code const LineSplitter().convert(s)}. */
     public static DartList<String> splitLines(String s) {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         int start = 0;
         int i = 0;
         while (i < s.length()) {
@@ -442,5 +448,55 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
             out.add(s.substring(start));
         }
         return out;
+    }
+
+    /// {@code Encoding.getByName(name)}: the codecs this runtime has, by their IANA
+    /// names and common aliases (case-insensitive, ASCII folded); null otherwise.
+    public static ByteCodec getByName(String name) {
+        if (name == null) {
+            return null;
+        }
+        if (name.equalsIgnoreCase("utf-8") || name.equalsIgnoreCase("utf8")) {
+            return Convert.utf8;
+        }
+        if (name.equalsIgnoreCase("us-ascii") || name.equalsIgnoreCase("ascii")
+                || name.equalsIgnoreCase("iso646-us")) {
+            return Convert.ascii;
+        }
+        if (name.equalsIgnoreCase("iso-8859-1") || name.equalsIgnoreCase("latin1")
+                || name.equalsIgnoreCase("l1") || name.equalsIgnoreCase("iso_8859-1")) {
+            return Convert.latin1;
+        }
+        return null;
+    }
+
+    /// {@code encoding.decodeStream(byteStream)}: every chunk joined, then decoded.
+    public dart.async.Future<String> decodeStream(Object byteStream) {
+        final java.io.ByteArrayOutputStream all = new java.io.ByteArrayOutputStream();
+        final dart.async.Completer<String> c = new dart.async.Completer<String>();
+        @SuppressWarnings("unchecked")
+        dart.async.Stream<Object> s = (dart.async.Stream<Object>) byteStream;
+        s.listen(new dart.runtime.Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object chunk) {
+                byte[] b = bytesOf(chunk);
+                all.write(b, 0, b.length);
+            }
+        }, new dart.runtime.Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                c.completeError(e);
+            }
+        }, new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                try {
+                    c.complete(String.valueOf(decode(dart.typed_data.Uint8List.fromBytes(all.toByteArray()))));
+                } catch (RuntimeException e) {
+                    c.completeError(e);
+                }
+            }
+        });
+        return c.future();
     }
 }

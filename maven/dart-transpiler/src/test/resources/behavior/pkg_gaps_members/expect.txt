@@ -1,0 +1,19 @@
+7
+{x: 8}
+{2: cc, 1: b}
+{fn-x: 0, fn-y: 2}
+110
+3
+[a, b]
+[1, 2, 3]
+3
+s1
+w7
+null
+50
+hey 3
+{a: 1}
+{x: 1, abc: 3}
+{k: [9]}
+hello from default
+42

@@ -1,0 +1,22 @@
+7
+true
+[x, x, x]
+Hi
+3.0
+{a: 1}
+[0, 1, 4]
+ab
+Str(AB!)
+HI!
+Str(typed)
+7
+int<7>
+2
+MyList[1, 2]
+cfg:k
+true
+2
+my object
+Obj
+boxed
+fut 9

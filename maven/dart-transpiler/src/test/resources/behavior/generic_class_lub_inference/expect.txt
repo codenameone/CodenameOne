@@ -1,0 +1,21 @@
+Box<int>
+true
+true
+true
+List<Object>
+List<Object>
+List<P>
+_Set<A>
+List<I>
+1
+int
+2
+0.5
+1
+5.0
+3.5
+List<num>
+1
+null
+[1, 3]
+List<Box<num>>

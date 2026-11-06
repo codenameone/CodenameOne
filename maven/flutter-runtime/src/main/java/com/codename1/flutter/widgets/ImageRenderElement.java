@@ -145,10 +145,18 @@ public class ImageRenderElement extends RenderElement {
         // happens -- a natural size that shrank would shrink the box, which
         // would shrink the picture again.
         applyLoaded(l);
+        // A source that is neither pending on the network nor decoded is a failure
+        // the errorBuilder must hear about, as a failed fetch does in onLoadFailed.
+        if (img == null && image().getUrl() == null) {
+            ImageBuildersElement.notifyFailed(image(), "could not load image " + source);
+        }
     }
 
     /** Takes the current {@code img} as the natural size and hands it to the component. */
     private void applyLoaded(Label l) {
+        if (img != null) {
+            ImageBuildersElement.notifyLoaded(image());
+        }
         naturalW = img == null ? 0 : img.getWidth();
         naturalH = img == null ? 0 : img.getHeight();
         if (l instanceof FittedImage) {
@@ -249,6 +257,7 @@ public class ImageRenderElement extends RenderElement {
      * the marker the new one is relying on.</p>
      */
     void onLoadFailed(String source) {
+        ImageBuildersElement.notifyFailed(image(), "could not load image " + source);
         if (source.equals(loadedSource)) {
             loadedSource = null;
         }

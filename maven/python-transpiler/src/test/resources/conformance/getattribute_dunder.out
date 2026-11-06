@@ -1,0 +1,15 @@
+get x
+1
+get __dict__
+['x']
+get __dict__
+True
+get __class__
+Spy
+3
+get __len__
+3
+faked doc
+42
+42
+True

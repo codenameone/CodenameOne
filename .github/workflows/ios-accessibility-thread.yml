@@ -1,19 +1,18 @@
 name: iOS accessibility thread contract
 
 on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  # IOSNative.m reaches it through the nightly: the check needs a hosted macOS
+  # runner, and a pull request touching the iOS port already queues many.
   workflow_dispatch:
   pull_request:
     branches: [master]
     paths:
-      - 'Ports/iOSPort/nativeSources/IOSNative.m'
       - 'scripts/ios/accessibility-thread-tests/**'
       - '.github/workflows/ios-accessibility-thread.yml'
-  push:
-    branches: [master]
-    paths:
-      - 'Ports/iOSPort/nativeSources/IOSNative.m'
-      - 'scripts/ios/accessibility-thread-tests/**'
-      - '.github/workflows/ios-accessibility-thread.yml'
+  schedule:
+    - cron: '11 0 * * *'
 
 permissions:
   contents: read

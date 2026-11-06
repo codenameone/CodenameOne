@@ -241,4 +241,16 @@ public class ListView extends Widget {
     public Element createElement() {
         return new ListViewRenderElement(this);
     }
+
+    /// ListView.separated with its scroll direction.
+    public static ListView separated(Key key, Boolean primary, Long itemCount,
+                                     Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
+                                     Funcs.Func2<BuildContext, Long, Widget> separatorBuilder,
+                                     EdgeInsets padding, Boolean shrinkWrap, com.codename1.flutter.Axis scrollDirection) {
+        ListView lv = separated(key, primary, itemCount, itemBuilder, separatorBuilder, padding, shrinkWrap);
+        if (scrollDirection != null) {
+            lv.scrollDirection(scrollDirection);
+        }
+        return lv;
+    }
 }

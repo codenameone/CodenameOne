@@ -92,7 +92,7 @@ public class ActionChip extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        DartList<Widget> kids = new DartList<Widget>();
+        DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (avatar != null) {
             kids.add(avatar);
         }

@@ -1,0 +1,6 @@
+2
+[b noted x]
+2
+[b noted x, b noted y]
+true
+3

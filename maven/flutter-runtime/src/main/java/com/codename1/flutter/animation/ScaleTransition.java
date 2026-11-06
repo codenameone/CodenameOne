@@ -24,6 +24,8 @@
 package com.codename1.flutter.animation;
 
 import com.codename1.flutter.Alignment;
+import com.codename1.flutter.AlignmentDirectional;
+import com.codename1.flutter.AlignmentGeometry;
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.widgets.Transform;
@@ -42,8 +44,11 @@ public class ScaleTransition extends AnimatedChildWidget {
         listenable(v);
     }
 
-    public void alignment(Alignment v) {
-        this.alignment = v;
+    public void alignment(AlignmentGeometry v) {
+        // Flutter types the slot AlignmentGeometry; a directional value is resolved
+        // left-to-right, the way the rest of the runtime lays it out.
+        this.alignment = v instanceof AlignmentDirectional ? ((AlignmentDirectional) v).resolve()
+                : v instanceof Alignment ? (Alignment) v : null;
     }
 
     public Animation<Double> getScale() {

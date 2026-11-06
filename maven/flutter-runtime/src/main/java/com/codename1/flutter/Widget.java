@@ -30,7 +30,7 @@ package com.codename1.flutter;
  * {@link Element}) is the retained structure; widgets are cheap descriptions
  * that are diffed against the previous configuration on every rebuild.
  */
-public abstract class Widget {
+public abstract class Widget implements dart.runtime.ConstCanon.Keyed {
     private Key key;
 
     /**
@@ -40,8 +40,26 @@ public abstract class Widget {
         this.key = v;
     }
 
+    /**
+     * The Dart {@code Widget.key} getter: the key this widget was built with, or null.
+     */
+    public Key key() {
+        return key;
+    }
+
     public Key getKey() {
         return key;
+    }
+
+    /**
+     * The widget's own const-relevant state, for {@code const} canonicalization: a
+     * transpiled subclass's key starts with it (super.$constKey()), so
+     * {@code identical(const W(), const W())} holds -- what lets an element skip
+     * rebuilding an unchanged const child -- while different keys stay distinct.
+     */
+    @Override
+    public Object[] $constKey() {
+        return new Object[] {key};
     }
 
     /**

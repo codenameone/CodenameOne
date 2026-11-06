@@ -102,7 +102,7 @@ public class MaterialBanner extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        DartList<Widget> top = new DartList<Widget>();
+        DartList<Widget> top = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (leading != null) {
             top.add(leading);
             // Material's gap between the leading icon and the message. Without
@@ -121,7 +121,7 @@ public class MaterialBanner extends StatelessWidget {
         topRow.crossAxisAlignment(CrossAxisAlignment.center);
         topRow.children(top);
 
-        DartList<Widget> rows = new DartList<Widget>();
+        DartList<Widget> rows = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         rows.add(topRow);
         if (actions != null && actions.size() > 0) {
             Row actionRow = new Row();
@@ -146,7 +146,7 @@ public class MaterialBanner extends StatelessWidget {
                 PAD_LP, PAD_LP, PAD_LP, 0));
         pad.child(col);
 
-        DartList<Widget> stackRows = new DartList<Widget>();
+        DartList<Widget> stackRows = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         stackRows.add(pad);
         stackRows.add(new Divider());
         Column outer = new Column();

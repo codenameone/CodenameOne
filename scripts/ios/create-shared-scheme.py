@@ -170,6 +170,7 @@ def render_scheme(
       selectedDebuggerIdentifier = \"Xcode.DebuggerFoundation.Debugger.LLDB\"
       selectedLauncherIdentifier = \"Xcode.DebuggerFoundation.Launcher.LLDB\"
       shouldUseLaunchSchemeArgsEnv = \"YES\"
+      customLLDBInitFile = \"$(SRCROOT)/cn1.lldbinit\"
       buildConfiguration = \"Debug\">
       <Testables>
 {testables_block}
@@ -187,6 +188,7 @@ def render_scheme(
    <LaunchAction
       selectedDebuggerIdentifier = \"Xcode.DebuggerFoundation.Debugger.LLDB\"
       selectedLauncherIdentifier = \"Xcode.DebuggerFoundation.Launcher.LLDB\"
+      customLLDBInitFile = \"$(SRCROOT)/cn1.lldbinit\"
       launchStyle = \"0\"
       useCustomWorkingDirectory = \"NO\"
       buildConfiguration = \"Debug\"

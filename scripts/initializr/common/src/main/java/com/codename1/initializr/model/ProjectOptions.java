@@ -112,12 +112,22 @@ public final class ProjectOptions {
     public enum ProjectType {
         APP("App"),
         APP_WITH_BACKEND("App + backend"),
-        BACKEND_ONLY("Backend only");
+        BACKEND_ONLY("Backend only"),
+        /// A command-line tool: the backend layout with a `@Command` class in
+        /// place of the controller, built to a native executable for Linux,
+        /// macOS and Windows.
+        COMMAND_LINE("Command-line tool");
 
         public final String label;
 
         ProjectType(String label) {
             this.label = label;
+        }
+
+        /// Whether the project is a server-side module with no client: a
+        /// backend on its own or a command-line tool, which share one layout.
+        public boolean hasNoClient() {
+            return this == BACKEND_ONLY || this == COMMAND_LINE;
         }
 
         @Override

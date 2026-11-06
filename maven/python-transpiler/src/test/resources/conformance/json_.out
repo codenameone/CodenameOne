@@ -1,0 +1,56 @@
+{"name": "caf\u00e9", "n": [1, 2.5, -3e-07, true, false, null], "nested": {"b": 1, "a": [{}]}, "big": 12345678901234567890, "esc": "tab\there \"q\" \\ \u0001 \ud83d\ude00"}
+{"name": "café", "n": [1, 2.5, -3e-07, true, false, null], "nested": {"b": 1, "a": [{}]}, "big": 12345678901234567890, "esc": "tab\there \"q\" \\ \u0001 😀"}
+{
+  "big": 12345678901234567890,
+  "esc": "tab\there \"q\" \\ \u0001 \ud83d\ude00",
+  "n": [
+    1,
+    2.5,
+    -3e-07,
+    true,
+    false,
+    null
+  ],
+  "name": "caf\u00e9",
+  "nested": {
+    "a": [
+      {}
+    ],
+    "b": 1
+  }
+}
+[1,[2,3]]
+{"1": "d", "2.5": "b", "null": "c"}
+NaN Infinity 1e+100 0.1
+[1, 2] [] {} ""
+[
+	1,
+	{}
+]
+True True
+{'a': [1, 2.0, 0, 1000.0, 'xé😀'], 'b': None}
+[nan, inf, -inf]
+{'a': 2}
+[('x', 1)]
+[('x', 1), ('y', 2)]
+F1.5 14
+[1]
+{"x": 1, "y": 2}
+{"s": [1, 2, 3]}
+JSONDecodeError True Expecting value: line 1 column 1 (char 0) 0 1 1
+JSONDecodeError True Illegal trailing comma before end of array: line 1 column 3 (char 2) 2 1 3
+JSONDecodeError True Expecting ':' delimiter: line 1 column 6 (char 5) 5 1 6
+JSONDecodeError True Illegal trailing comma before end of object: line 1 column 8 (char 7) 7 1 8
+JSONDecodeError True Expecting ',' delimiter: line 1 column 4 (char 3) 3 1 4
+JSONDecodeError True Unterminated string starting at: line 1 column 1 (char 0) 0 1 1
+JSONDecodeError True Expecting value: line 1 column 1 (char 0) 0 1 1
+JSONDecodeError True Expecting property name enclosed in double quotes: line 1 column 2 (char 1) 1 1 2
+JSONDecodeError True Extra data: line 1 column 5 (char 4) 4 1 5
+JSONDecodeError True Invalid \escape: line 1 column 2 (char 1) 1 1 2
+TypeError Object of type object is not JSON serializable
+ValueError Out of range float values are not JSON compliant: nan
+ValueError Circular reference detected
+TypeError keys must be str, int, float, bool or None, not tuple
+{"k": 4}
+[1, 2]
+Expecting value: line 2 column 3 (char 6)

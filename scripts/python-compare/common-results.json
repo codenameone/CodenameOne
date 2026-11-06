@@ -1,0 +1,253 @@
+{
+ "arms": [
+  "CPython",
+  "PyPy",
+  "GraalPy",
+  "Codename One Python",
+  "Codename One Java"
+ ],
+ "results": {
+  "intArithmetic": {
+   "CPython": {
+    "ms": 14452.1,
+    "rss_mb": 14.84375
+   },
+   "PyPy": {
+    "ms": 131.6,
+    "rss_mb": 32.0625
+   },
+   "GraalPy": {
+    "ms": 101.6,
+    "rss_mb": 365.046875
+   },
+   "Codename One Python": {
+    "ms": 65.7,
+    "rss_mb": 10.90625
+   },
+   "Codename One Java": {
+    "ms": 57.5,
+    "rss_mb": 11.28125
+   }
+  },
+  "longArithmetic": {
+   "CPython": {
+    "ms": 11708.8,
+    "rss_mb": 14.9375
+   },
+   "PyPy": {
+    "ms": 5300.7,
+    "rss_mb": 41.625
+   },
+   "GraalPy": {
+    "ms": 11133.7,
+    "rss_mb": 263.0625
+   },
+   "Codename One Python": {
+    "ms": 38.6,
+    "rss_mb": 10.921875
+   },
+   "Codename One Java": {
+    "ms": 38.4,
+    "rss_mb": 11.296875
+   }
+  },
+  "mathTranscendental": {
+   "CPython": {
+    "ms": 1009.9,
+    "rss_mb": 14.8125
+   },
+   "PyPy": {
+    "ms": 186.4,
+    "rss_mb": 31.84375
+   },
+   "GraalPy": {
+    "ms": 288.5,
+    "rss_mb": 354.125
+   },
+   "Codename One Python": {
+    "ms": 179.8,
+    "rss_mb": 11.34375
+   },
+   "Codename One Java": {
+    "ms": 167.2,
+    "rss_mb": 11.578125
+   }
+  },
+  "arraySequential": {
+   "CPython": {
+    "ms": 1745.4,
+    "rss_mb": 382.046875
+   },
+   "PyPy": {
+    "ms": 32.6,
+    "rss_mb": 154.171875
+   },
+   "GraalPy": {
+    "ms": 25.7,
+    "rss_mb": 337.640625
+   },
+   "Codename One Python": {
+    "ms": 31.5,
+    "rss_mb": 41.75
+   },
+   "Codename One Java": {
+    "ms": 9.3,
+    "rss_mb": 41.8125
+   }
+  },
+  "arrayRandom": {
+   "CPython": {
+    "ms": 4541.6,
+    "rss_mb": 198.5625
+   },
+   "PyPy": {
+    "ms": 275.4,
+    "rss_mb": 93.1875
+   },
+   "GraalPy": {
+    "ms": 233.5,
+    "rss_mb": 247.96875
+   },
+   "Codename One Python": {
+    "ms": 244.4,
+    "rss_mb": 26.265625
+   },
+   "Codename One Java": {
+    "ms": 219.7,
+    "rss_mb": 26.609375
+   }
+  },
+  "objectAllocation": {
+   "CPython": {
+    "ms": 521.6,
+    "rss_mb": 14.875
+   },
+   "PyPy": {
+    "ms": 18.1,
+    "rss_mb": 63.140625
+   },
+   "GraalPy": {
+    "ms": 58.1,
+    "rss_mb": 351.859375
+   },
+   "Codename One Python": {
+    "ms": 30.8,
+    "rss_mb": 163.84375
+   },
+   "Codename One Java": {
+    "ms": 14.2,
+    "rss_mb": 179.09375
+   }
+  },
+  "valueEscape": {
+   "CPython": {
+    "ms": 801.2,
+    "rss_mb": 14.921875
+   },
+   "PyPy": {
+    "ms": 6.1,
+    "rss_mb": 32.015625
+   },
+   "GraalPy": {
+    "ms": 55.5,
+    "rss_mb": 330.59375
+   },
+   "Codename One Python": {
+    "ms": 3.5,
+    "rss_mb": 10.921875
+   },
+   "Codename One Java": {
+    "ms": 4.5,
+    "rss_mb": 11.25
+   }
+  },
+  "hashMapChurn": {
+   "CPython": {
+    "ms": 158.4,
+    "rss_mb": 23.125
+   },
+   "PyPy": {
+    "ms": 41.1,
+    "rss_mb": 70.84375
+   },
+   "GraalPy": {
+    "ms": 86.7,
+    "rss_mb": 250.609375
+   },
+   "Codename One Python": {
+    "ms": 43.7,
+    "rss_mb": 26.890625
+   },
+   "Codename One Java": {
+    "ms": 20.4,
+    "rss_mb": 30.265625
+   }
+  },
+  "stringBuilding": {
+   "CPython": {
+    "ms": 629.5,
+    "rss_mb": 14.9375
+   },
+   "PyPy": {
+    "ms": 31.5,
+    "rss_mb": 40.078125
+   },
+   "GraalPy": {
+    "ms": 66.7,
+    "rss_mb": 262.984375
+   },
+   "Codename One Python": {
+    "ms": 28.9,
+    "rss_mb": 83.609375
+   },
+   "Codename One Java": {
+    "ms": 13.9,
+    "rss_mb": 86.0
+   }
+  },
+  "recursion": {
+   "CPython": {
+    "ms": 2151.7,
+    "rss_mb": 14.921875
+   },
+   "PyPy": {
+    "ms": 177.3,
+    "rss_mb": 57.015625
+   },
+   "GraalPy": {
+    "ms": 188.6,
+    "rss_mb": 282.609375
+   },
+   "Codename One Python": {
+    "ms": 85.7,
+    "rss_mb": 10.9375
+   },
+   "Codename One Java": {
+    "ms": 81.5,
+    "rss_mb": 11.328125
+   }
+  },
+  "quicksort": {
+   "CPython": {
+    "ms": 1519.2,
+    "rss_mb": 83.796875
+   },
+   "PyPy": {
+    "ms": 168.0,
+    "rss_mb": 57.859375
+   },
+   "GraalPy": {
+    "ms": 110.9,
+    "rss_mb": 247.046875
+   },
+   "Codename One Python": {
+    "ms": 117.7,
+    "rss_mb": 16.703125
+   },
+   "Codename One Java": {
+    "ms": 79.8,
+    "rss_mb": 17.03125
+   }
+  }
+ }
+}

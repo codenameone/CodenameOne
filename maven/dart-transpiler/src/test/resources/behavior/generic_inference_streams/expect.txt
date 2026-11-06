@@ -1,0 +1,5 @@
+collected [2, 4]
+[6, 8]
+hello
+[a, b, c]
+[1:x, raw 7/2, raw 8/1, y:3]

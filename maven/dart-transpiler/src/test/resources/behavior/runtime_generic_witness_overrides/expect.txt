@@ -1,0 +1,15 @@
+[1, 3]
+[1, 3]
+shelf whereType
+[a, b]
+shelf whereType
+[1, 2.5, null]
+shelf whereType
+1
+[1, 2]
+[40, 50]
+[one]
+9
+[]
+0
+[0, 3, 6]

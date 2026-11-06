@@ -1,0 +1,17 @@
+Point(x=3, y=4) 25 Point(x=1, y=0) Point(x=1, y=2) True True
+['x', 'y'] {'x': 3, 'y': 4} (3, 4) Point(x=3, y=9) True False
+TypeError Point.__init__() missing 1 required positional argument: 'x'
+TypeError Point.__init__() takes from 2 to 3 positional arguments but 4 were given
+TypeError unhashable type: 'Point'
+[Version(major=1, minor=5, label='x'), Version(major=2, minor=0, label=''), Version(major=2, minor=1, label='')] True True True
+FrozenInstanceError cannot assign to field 'major'
+Inventory(items=['apple', 'apple'], owner=None) Inventory(items=[], owner='bo') {'apple': 2} 2 ['items', 'counts', 'owner']
+Rect(w=2, h=3, area=6) 600
+Child(a=1, b='b', c=1.5, d=4) Child(a=1, b='x', c=2.5, d=7) ['a', 'b', 'c', 'd']
+Opts(verbose=False, level=3) Opts(verbose=True, level=1)
+False True True
+Node(val=1, children=[Node(val=2, children=[]), Node(val=3, children=[Node(val=4, children=[])])])
+{'val': 1, 'children': [{'val': 2, 'children': []}, {'val': 3, 'children': [{'val': 4, 'children': []}]}]}
+on y axis at 5
+Pair(left=1, right=0) True
+ValueError mutable default <class 'list'> for field xs is not allowed: use default_factory

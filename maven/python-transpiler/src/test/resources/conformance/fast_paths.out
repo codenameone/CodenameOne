@@ -1,0 +1,87 @@
+fused float float 4.038873605350878
+fused mixed float 14.75
+fused ints int 50
+int leaf float const float 13.0
+zero div ZeroDivisionError division by zero
+int zero div ZeroDivisionError division by zero
+pow overflow OverflowError (34, 'Result too large')
+neg float 1.125
+float overflow inf float inf
+big int add int 9223372036854775808
+big int mul int 18446744073709551616
+big int sub int -9223372036854775817
+floordiv neg int -4
+mod neg int 2
+mod neg divisor int -2
+mixed cmp tuple (True, True, True, False)
+shift tuple (4611686018427387904, 18446744073709551616, -4, 0)
+bits tuple (2, 7, 5, -6)
+true div ints tuple (3.5, -3.5, 3.843071682022823e+17)
+hash eq tuple ('a', 'b', True)
+bool arith tuple (2, 2.5, -1)
+slice list [2, 4, 6]
+slice neg list [8, 5]
+slice copy list [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+const index tuple (0, 9, 9)
+const index err IndexError list index out of range
+same len assign [2, 1, 0, 3, 4, 5]
+grow assign [2, 10, 11, 12, 0, 3, 4, 5]
+shrink assign [0, 3, 4, 5]
+extended assign [0, 3, 0, 5]
+extended err attempt to assign sequence of size 1 to extended slice of size 2
+self assign [1, 2, 3]
+self grow [1, 1, 2, 3]
+tuple const index tuple (4, 6)
+str slice str 'ell'
+2193406845013623645 9223372030926249001 9223372037000250000
+-9223372036854775807 9223372036854775808 9223372036854775808
+1109335178
+1 None 7 1
+None [3]
+['x', 'y', 'z'] ['a', 'b', '', 'c'] ABC abc
+p-q p-q r-s 
+3 2 0
+TypeError sequence item 1: expected str instance, int found
+[-10.069251117961866, 2.889287802318147]
+[-6.211102550927978, 2.8320502943378436]
+[-9.752906583803284, 2.813733471206735]
+skip
+TypeError 'tuple' object does not support item assignment
+(0, -2) (2, 1) (4, 4) (6, 7) (8, 10) (10, 13) (12, 16) (14, 19) (16, 22) (18, 25) (21.0, 29.5) (23.0, 32.5) 
+8.75 14.0 17.25
+3.0
+UnboundLocalError cannot access local variable 'q' where it is not associated with a value
+[-1.0, 2.5, 3.5, 4.5] 4 4.5 [2.5, 3.5] True 2 9.5
+[0.0, 2.25, 7] [0.0, 2.25, 7, 0.0, 2.25, 7] [0.0, 2.25, 7, -1.0, 2.5, 3.5, 4.5]
+[-1.0, 2.5, 3.5, 4.5, 's']
+[9.0, 1.5, 1.0, 0.5] 0.0 True [18.0, 3.0, 2.0, 1.0]
+0.25 0.75 [1.0, 2.0, 3.0] [2.0, 1.0]
+[5.0, 6.0, 3.0] 1 6.0 3.0
+([1.0, 3.0], [0.5, -0.5]) ([1.0, 3.0], [0.5, -0.5]) ([1, 4.0], [0, -2.0])
+[1, 2, 3, 11, 12]
+[2, 4]
+[1, 2] [9, 9, 9]
+empty else
+1109335178
+[55, 23, 2, 0, 2, 16, -23, 6, 0.009523809523809525, 16.0] [6, -19, -5, 0, -5, 30, 19, -6, 0.017857142857142856, -12.0] [10, -23, -5, 0, -3, -32, 23, -2, 0.016666666666666666, -16.0] [2417851639230357861040128, 1208925819614629174706179, 0, 0, 366503875924, 7696581394431, -1208925819614629174706179, 3, 2.7572687085092564e-25, 4398046511102.5]
+[42535295865117307937533511947398414336, 21267647932558653966460912964485513221, 0, 0, 922337203685477576, 32281802128991715327, -21267647932558653966460912964485513221, 5, 1.5673258010963833e-38, 2.7670116110564327e+19] [42535295865117307919086767873688862721, -9223372036854775809, 9223372036854775809, 0, 9223372036854775808, 9223372036854775815, 9223372036854775809, -9223372036854775801, 7.836629005481916e-39, 9.223372036854776e+18]
+9223372036854775809 5316911983139663491615228241121378303 4611686018427387904 4 0 -1 -9223372036854775809
+3002399751580331.0 2.0 10 -11 -3
+4 3-43-4 13 1.5 4
+ZeroDivisionError division by zero
+ZeroDivisionError division by zero
+ValueError negative shift count
+7.0 32.0 6.0
+0.0 (0.6361904761904762, 5.0625) (0.6361904761904762, 5.0625) (0, 1.0)
+0.05555555555555555 -0.3333333333333333 2.350988701644575e-38 5.5 5.5 2.0
+nan [1.0, 4.0]
+TypeError can't multiply sequence by non-int of type 'float'
+(6.0, 3.375)
+2.5
+(10.569346804511278, 4) (0.0, 'before') (6.378721804511279, 3)
+TypeError can't multiply sequence by non-int of type 'float'
+(6.917529027641082e+18, 4611686018427387906)
+(0.011427895039841603, 20)
+0.7416666666666667
+10.0 (6.0, 1)
+(104.66666666666667, 5, [1.0, 2.0, 3.0, 4.0]) (8.10008100042e+16, 3, [1.0, 2.0, 3.0, 4.0]) (2.1922524559963544e+48, 3, [1.0, 2.0, 3.0, 4.0]) (5.602277094844144e+28, 2, [1.0, 2.0, 3.0, 4.0])
