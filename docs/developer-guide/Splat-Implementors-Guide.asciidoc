@@ -113,6 +113,10 @@ image::img/splat-desktop-shop.png["The store on a desktop, with its title bar an
 * `common` is the app. `play/` is the match itself, `ui/` the screens around it,
   `engage/` ads, analytics, push and the store, and `admin/` the operations console.
 
+What every full-stack sample needs and none of them is about comes from the
+<<app-kit,`cn1-app-kit`>> library: `Net`, the app's error handling around a REST call, and on the
+server `Caller`, `Text` and the push senders.
+
 [[splat-rules]]
 === The rules are data
 
