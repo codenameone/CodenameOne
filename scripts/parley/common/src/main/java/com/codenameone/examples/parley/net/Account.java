@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.parley.net;
 
+import com.codename1.appkit.Net;
+
 import com.codename1.io.Preferences;
 import com.codename1.ui.CN;
 import com.codenameone.examples.parley.Prefs;

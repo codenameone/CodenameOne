@@ -23,7 +23,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.parley.Ids;
-import com.codenameone.examples.parley.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.parley.api.ContactDto;
 import com.codenameone.examples.parley.api.PhotoDto;
 import com.codenameone.examples.parley.api.ReportDto;

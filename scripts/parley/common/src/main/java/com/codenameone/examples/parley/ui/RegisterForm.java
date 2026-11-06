@@ -29,7 +29,7 @@ import com.codenameone.examples.parley.Telemetry;
 import com.codenameone.examples.parley.api.RegisterDto;
 import com.codenameone.examples.parley.AppConfig;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.net.Session;
 
 /// Creates an account, signs in with it and goes on to verify the phone.

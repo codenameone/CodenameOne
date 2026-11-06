@@ -33,7 +33,7 @@ import com.codename1.ui.spinner.Picker;
 import com.codenameone.examples.pulse.api.ShiftDto;
 import com.codenameone.examples.pulse.api.StaffDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.trainer.ShiftsForm;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Ui;

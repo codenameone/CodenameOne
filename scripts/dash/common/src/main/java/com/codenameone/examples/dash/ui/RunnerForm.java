@@ -31,7 +31,7 @@ import com.codenameone.examples.dash.api.PlayerDto;
 import com.codenameone.examples.dash.api.RunnerDto;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 
 /// The runner the player races as. One is free; the shop sells the others.

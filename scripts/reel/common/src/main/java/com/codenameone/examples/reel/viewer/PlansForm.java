@@ -31,7 +31,7 @@ import com.codenameone.examples.reel.api.PlanDto;
 import com.codenameone.examples.reel.api.SubscribeDto;
 import com.codenameone.examples.reel.api.SubscriptionDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.net.Session;
 import com.codenameone.examples.reel.pay.WalletForm;
 import com.codenameone.examples.reel.ui.Lang;

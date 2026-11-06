@@ -19,7 +19,7 @@
 package com.codenameone.examples.reel.billing;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.api.BillingApiServer;
 import com.codenameone.examples.reel.api.CouponCheckDto;
 import com.codenameone.examples.reel.api.InvoiceDto;

@@ -23,7 +23,7 @@ import com.codenameone.examples.skirmish.api.MissionResultDto;
 import com.codenameone.examples.skirmish.battle.ForgeFiles;
 import com.codenameone.examples.skirmish.battle.MissionDriver;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.CardDef;
 import com.codenameone.examples.skirmish.rules.CardSet;

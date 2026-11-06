@@ -30,7 +30,7 @@ import com.codenameone.examples.skirmish.api.ConditionDto;
 import com.codenameone.examples.skirmish.api.PipelineDto;
 import com.codenameone.examples.skirmish.api.QueryDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.ui.Ui;
 import java.util.Date;
 import java.util.List;

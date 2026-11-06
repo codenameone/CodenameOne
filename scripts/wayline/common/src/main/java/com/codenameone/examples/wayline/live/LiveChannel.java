@@ -24,7 +24,7 @@ import com.codename1.io.WebSocket;
 import com.codename1.io.WebSocketState;
 import com.codename1.ui.CN;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.net.Session;
 import com.codenameone.examples.wayline.ui.Nav;
 

@@ -29,7 +29,7 @@ import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.api.PhoneCodeDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.net.Session;
 
 /// Proves the phone number is the user's, which the server asks for before the

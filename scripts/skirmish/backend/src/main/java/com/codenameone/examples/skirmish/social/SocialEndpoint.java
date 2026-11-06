@@ -19,7 +19,7 @@
 package com.codenameone.examples.skirmish.social;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.skirmish.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.skirmish.api.FriendDto;
 import com.codenameone.examples.skirmish.api.InviteClaimDto;
 import com.codenameone.examples.skirmish.api.InviteDto;

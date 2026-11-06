@@ -38,7 +38,7 @@ import com.codenameone.examples.wayline.api.SuspendDto;
 import com.codenameone.examples.wayline.api.UserDetailDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.StatRow;
 import com.codenameone.examples.wayline.ui.Ui;

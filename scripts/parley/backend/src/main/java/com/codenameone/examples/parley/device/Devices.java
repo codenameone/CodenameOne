@@ -25,7 +25,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.crypto.Der;
 import com.codenameone.examples.parley.Ids;
-import com.codenameone.examples.parley.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.parley.api.DeviceDto;
 import com.codenameone.examples.parley.api.DeviceRegistrationDto;
 import com.codenameone.examples.parley.api.KeyCountDto;

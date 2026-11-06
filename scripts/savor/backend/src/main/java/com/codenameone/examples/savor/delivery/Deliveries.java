@@ -28,7 +28,7 @@ import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.session.Identifier;
 import com.codename1.orm.session.PersistenceException;
 import com.codenameone.examples.savor.Ids;
-import com.codenameone.examples.savor.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.savor.account.Moderation;
 import com.codenameone.examples.savor.api.DeliveryDto;
 import com.codenameone.examples.savor.api.DeliveryState;

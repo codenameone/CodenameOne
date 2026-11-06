@@ -24,7 +24,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.wayline.api.RideDto;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 
 import java.util.List;
 

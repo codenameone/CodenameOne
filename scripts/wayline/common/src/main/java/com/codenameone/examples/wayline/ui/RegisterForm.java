@@ -29,7 +29,7 @@ import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.api.RegisterDto;
 import com.codenameone.examples.wayline.AppConfig;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.net.Session;
 
 /// Creates an account, signs in with it and goes on to verify the phone.

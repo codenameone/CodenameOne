@@ -30,7 +30,7 @@ import com.codenameone.examples.reel.api.DeviceDto;
 import com.codenameone.examples.reel.api.ProfileDto;
 import com.codenameone.examples.reel.api.SessionDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.net.Session;
 import java.util.List;
 

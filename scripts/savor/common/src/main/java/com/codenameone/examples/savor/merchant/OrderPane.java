@@ -29,7 +29,7 @@ import com.codenameone.examples.savor.api.OrderLineDto;
 import com.codenameone.examples.savor.api.OrderState;
 import com.codenameone.examples.savor.api.ReasonDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Ui;
 

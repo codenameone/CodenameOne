@@ -27,7 +27,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.pulse.api.InvoiceDto;
 import com.codenameone.examples.pulse.api.ReasonDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;

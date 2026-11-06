@@ -27,7 +27,7 @@ import com.codenameone.examples.parley.api.CallDto;
 import com.codenameone.examples.parley.chat.Calls;
 import com.codenameone.examples.parley.chat.Messenger;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.store.Store;
 import java.util.List;
 

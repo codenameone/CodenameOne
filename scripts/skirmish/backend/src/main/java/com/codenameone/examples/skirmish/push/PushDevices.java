@@ -23,7 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.push.PushTarget;
 import com.codenameone.examples.skirmish.Ids;
-import com.codenameone.examples.skirmish.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.skirmish.api.PushDeviceDto;
 import com.codenameone.examples.skirmish.domain.PushDevice;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;

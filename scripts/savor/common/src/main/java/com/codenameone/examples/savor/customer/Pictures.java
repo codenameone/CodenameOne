@@ -23,7 +23,7 @@ import com.codename1.ui.Label;
 import com.codename1.util.Base64;
 import com.codenameone.examples.savor.api.PhotoDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;

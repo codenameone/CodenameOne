@@ -29,7 +29,7 @@ import com.codenameone.examples.pulse.Telemetry;
 import com.codenameone.examples.pulse.api.RegisterDto;
 import com.codenameone.examples.pulse.AppConfig;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.net.Session;
 
 /// Creates an account, signs in with it and goes on to verify the phone.

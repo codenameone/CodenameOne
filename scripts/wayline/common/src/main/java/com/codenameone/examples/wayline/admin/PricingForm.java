@@ -29,7 +29,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.api.PricingDto;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Ui;
 

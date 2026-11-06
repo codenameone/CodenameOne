@@ -29,7 +29,7 @@ import com.codenameone.examples.parley.api.ProfileDto;
 import com.codenameone.examples.parley.api.UserDto;
 import com.codenameone.examples.parley.net.Account;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.net.Session;
 import java.util.List;
 

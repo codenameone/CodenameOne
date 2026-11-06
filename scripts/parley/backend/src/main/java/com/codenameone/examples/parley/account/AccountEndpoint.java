@@ -19,7 +19,7 @@
 package com.codenameone.examples.parley.account;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.parley.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.parley.api.AccountApiServer;
 import com.codenameone.examples.parley.api.AccountClosureDto;
 import com.codenameone.examples.parley.api.PasswordChangeDto;

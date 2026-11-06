@@ -25,7 +25,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.skirmish.api.PackSummaryDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.ui.Nav;
 import com.codenameone.examples.skirmish.ui.Ui;
 

@@ -35,7 +35,7 @@ import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.pulse.api.MemberDto;
 import com.codenameone.examples.pulse.api.PassDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Ring;
 import com.codenameone.examples.pulse.ui.Ui;
@@ -84,7 +84,7 @@ public final class PassForm {
         qr.setName("pass-qr");
         digits.setName("pass-code");
         form.add(BorderLayout.CENTER, body);
-        body.add(new com.codenameone.examples.pulse.ui.Skeleton(3));
+        body.add(new com.codename1.appkit.Skeleton(3, "SvSkeleton"));
         form.show();
         if (memberId != null) {
             load(memberId);

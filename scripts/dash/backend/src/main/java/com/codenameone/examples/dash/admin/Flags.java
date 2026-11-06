@@ -25,7 +25,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.dash.Clock;
 import com.codenameone.examples.dash.Ids;
-import com.codenameone.examples.dash.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.dash.account.Lists;
 import com.codenameone.examples.dash.api.FlagDto;
 import com.codenameone.examples.dash.domain.Flag;

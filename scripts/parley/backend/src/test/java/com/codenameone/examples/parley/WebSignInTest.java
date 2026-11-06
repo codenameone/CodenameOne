@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.parley;
 
+import com.codename1.appkit.server.security.AccountSecurity;
+
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
@@ -43,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WebSignInTest {
     private static final String VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
     private static final String CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
-    private static final String HERE = "http://" + SignIn.HOST + SecurityConfig.WEB_REDIRECT_PATH;
+    private static final String HERE = "http://" + SignIn.HOST + AccountSecurity.WEB_REDIRECT_PATH;
 
     @Autowired
     private MockMvc mvc;
@@ -110,7 +112,7 @@ class WebSignInTest {
     void aCodeIsNeverSentToAnotherServer() throws Exception {
         String session = SignIn.session(mvc, DemoAccounts.ALICE, DemoAccounts.PASSWORD);
         // Same path, somebody else's server: the address has to be this one.
-        String elsewhere = authorize(session, "http://attacker.example" + SecurityConfig.WEB_REDIRECT_PATH);
+        String elsewhere = authorize(session, "http://attacker.example" + AccountSecurity.WEB_REDIRECT_PATH);
         assertTrue(elsewhere == null || elsewhere.indexOf("attacker.example") < 0, String.valueOf(elsewhere));
         String otherPath = authorize(session, "http://" + SignIn.HOST + "/somewhere/else");
         assertTrue(otherPath == null || otherPath.indexOf("code=") < 0, String.valueOf(otherPath));
@@ -123,7 +125,7 @@ class WebSignInTest {
 
     @Test
     void theCodePageSaysWhenThereIsNoCode() throws Exception {
-        mvc.perform(get(SecurityConfig.WEB_REDIRECT_PATH + "?error=access_denied&state=s-web")
+        mvc.perform(get(AccountSecurity.WEB_REDIRECT_PATH + "?error=access_denied&state=s-web")
                         .header("Host", SignIn.HOST))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("access_denied"));
@@ -173,16 +175,16 @@ class WebSignInTest {
 
     @Test
     void theOriginIsHeldToTheIssuerWhenOneIsConfigured() {
-        assertTrue(SecurityConfig.sameOrigin("https://parley.example", "https://parley.example"));
-        assertTrue(SecurityConfig.sameOrigin("https://PARLEY.example", "https://parley.example/auth"));
-        assertTrue(!SecurityConfig.sameOrigin("https://parley.example.attacker.example",
+        assertTrue(AccountSecurity.sameOrigin("https://parley.example", "https://parley.example"));
+        assertTrue(AccountSecurity.sameOrigin("https://PARLEY.example", "https://parley.example/auth"));
+        assertTrue(!AccountSecurity.sameOrigin("https://parley.example.attacker.example",
                 "https://parley.example"));
-        assertTrue(!SecurityConfig.sameOrigin("http://parley.example", "https://parley.example"));
-        assertTrue(!SecurityConfig.sameOrigin("https://parley.example:8443", "https://parley.example"));
+        assertTrue(!AccountSecurity.sameOrigin("http://parley.example", "https://parley.example"));
+        assertTrue(!AccountSecurity.sameOrigin("https://parley.example:8443", "https://parley.example"));
         // With an issuer the address a request arrived at is never consulted.
-        assertEquals("https://parley.example", SecurityConfig.here("https://parley.example"));
+        assertEquals("https://parley.example", AccountSecurity.here("https://parley.example"));
         // With none, and no request in hand, there is no address to accept.
-        assertNull(SecurityConfig.here(""));
+        assertNull(AccountSecurity.here(""));
     }
 
     @Test
@@ -237,7 +239,7 @@ class WebSignInTest {
 
     @Test
     void theCodePageIsDataAndNothingElse() throws Exception {
-        MockResponse page = mvc.perform(get(SecurityConfig.WEB_REDIRECT_PATH
+        MockResponse page = mvc.perform(get(AccountSecurity.WEB_REDIRECT_PATH
                         + "?code=%3Cscript%3Ealert(1)%3C/script%3E&state=s").header("Host", SignIn.HOST))
                 .andExpect(status().isOk()).andReturn().getResponse();
         assertTrue(String.valueOf(page.getContentType()).startsWith("application/json"),
@@ -255,13 +257,13 @@ class WebSignInTest {
                                 .ClientAuthenticationMethod.NONE)
                         .authorizationGrantType(com.codename1.backend.security.oauth2.core
                                 .AuthorizationGrantType.AUTHORIZATION_CODE)
-                        .redirectUri(SecurityConfig.LOOPBACK_REDIRECT).build();
-        java.util.Set<String> uris = SecurityConfig.withWebRedirect(app, "https://parley.example")
+                        .redirectUri(AccountSecurity.LOOPBACK_REDIRECT).build();
+        java.util.Set<String> uris = AccountSecurity.withWebRedirect(app, SecurityConfig.CLIENT_ID, "https://parley.example")
                 .getRedirectUris();
         assertTrue(uris.contains("https://parley.example/signin/code"), uris.toString());
-        assertTrue(uris.contains(SecurityConfig.LOOPBACK_REDIRECT), uris.toString());
+        assertTrue(uris.contains(AccountSecurity.LOOPBACK_REDIRECT), uris.toString());
         assertEquals(2, uris.size(), uris.toString());
         // With none configured and no request in hand, nothing is added.
-        assertEquals(1, SecurityConfig.withWebRedirect(app, "").getRedirectUris().size());
+        assertEquals(1, AccountSecurity.withWebRedirect(app, SecurityConfig.CLIENT_ID, "").getRedirectUris().size());
     }
 }

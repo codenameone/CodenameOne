@@ -33,12 +33,12 @@ import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.member.Classes;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.owner.OwnerForm;
 import com.codenameone.examples.pulse.owner.MembersForm;
 import com.codenameone.examples.pulse.ui.Badges;
 import com.codenameone.examples.pulse.ui.Beat;
-import com.codenameone.examples.pulse.ui.Chart;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Level;
@@ -218,7 +218,7 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
             values[iter] = value == null ? 0 : value.intValue();
         }
         list.add(Ui.label("Check-ins a week", "SvChartTitle"));
-        list.add(Chart.of("trainerAttendance", values, Lang.tr("7 weeks ago"),
+        list.add(Chart.of("Sv", "trainerAttendance", values, Lang.tr("7 weeks ago"),
                 Lang.tr("This week")));
         if (month.topClasses() != null && !month.topClasses().isEmpty()) {
             list.add(Ui.label("Top classes", "SvChartTitle"));

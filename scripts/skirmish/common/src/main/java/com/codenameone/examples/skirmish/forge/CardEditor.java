@@ -28,7 +28,7 @@ import com.codenameone.examples.skirmish.battle.ForgeFiles;
 import com.codenameone.examples.skirmish.battle.ModelPreview;
 import com.codenameone.examples.skirmish.battle.Models;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.rules.CardDef;
 import com.codenameone.examples.skirmish.rules.CardSet;
 import com.codenameone.examples.skirmish.rules.TargetKind;

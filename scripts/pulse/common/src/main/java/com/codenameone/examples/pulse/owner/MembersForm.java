@@ -30,10 +30,10 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.pulse.api.OwnerMemberDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Layouts;
-import com.codenameone.examples.pulse.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.pulse.ui.Split;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
@@ -85,7 +85,7 @@ public final class MembersForm {
         top.add(Ui.pills("filter", names, values, "ALL", value -> {
             filter = "ALL".equals(value) ? "" : value;
             list.removeAll();
-            list.add(new Skeleton(5));
+            list.add(new Skeleton(5, "SvSkeleton"));
             list.revalidate();
             load();
         }));

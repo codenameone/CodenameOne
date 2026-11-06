@@ -45,9 +45,9 @@ import com.codenameone.examples.wayline.api.ProfileDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.net.Account;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.net.Session;
-import com.codenameone.examples.wayline.ui.Chart;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Photos;
 import com.codenameone.examples.wayline.ui.Ui;
@@ -141,7 +141,7 @@ public final class ApplicationForm {
                 String.valueOf(STEPS.length)));
         stepTitle.setText(STEPS[step]);
         progress.removeAll();
-        progress.add(BorderLayout.CENTER, new Chart.Meter((step + 1) / (double) STEPS.length));
+        progress.add(BorderLayout.CENTER, new Chart.Meter("Wl", (step + 1) / (double) STEPS.length));
         body.removeAll();
         // A new step starts at its top, wherever the last one was left.
         body.scrollRectToVisible(0, 0, 1, 1, body);

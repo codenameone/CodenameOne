@@ -38,7 +38,7 @@ import com.codenameone.examples.parley.api.SuspendDto;
 import com.codenameone.examples.parley.api.UserDetailDto;
 import com.codenameone.examples.parley.api.UserDto;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.ui.Lang;
 import com.codenameone.examples.parley.ui.StatRow;
 import com.codenameone.examples.parley.ui.Ui;

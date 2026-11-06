@@ -31,7 +31,7 @@ import com.codenameone.examples.dash.api.AdminStatsDto;
 import com.codenameone.examples.dash.api.InsightsDto;
 import com.codenameone.examples.dash.api.NameCountDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.ui.Ui;
 import java.util.ArrayList;
 import java.util.Date;

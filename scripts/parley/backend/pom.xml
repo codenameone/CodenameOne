@@ -46,6 +46,12 @@
             <artifactId>codenameone-backend</artifactId>
             <version>${cn1.version}</version>
         </dependency>
+        <!-- The server half of the Codename One app kit. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-app-kit-backend</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
         <!--
              The contract shared with the app. Each @RestClient interface in it
              becomes an <Api>Server interface this module implements and a
