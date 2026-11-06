@@ -43,6 +43,15 @@ public final class ConstCanon {
         Object[] $constKey();
     }
 
+    /// A subclass's key: its superclass's, then its own fields. One shared method
+    /// rather than the concatenation inlined into every keyed class's `$constKey()`.
+    public static Object[] join(Object[] inherited, Object[] own) {
+        Object[] r = new Object[inherited.length + own.length];
+        System.arraycopy(inherited, 0, r, 0, inherited.length);
+        System.arraycopy(own, 0, r, inherited.length, own.length);
+        return r;
+    }
+
     public static <T> T object(T v) {
         if (!(v instanceof Keyed)) {
             return v;

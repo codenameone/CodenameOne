@@ -2993,10 +2993,8 @@ public final class JavaEmitter {
             }
             body.append("    public Object[] $constKey() {\n");
             if (constKeyed(ksup) || ksup == null && stubConstKeyed(c.superclass)) {
-                body.append("        Object[] s = super.$constKey();\n        Object[] o = new Object[] {")
-                        .append(kb).append("};\n        Object[] r = new Object[s.length + o.length];\n")
-                        .append("        System.arraycopy(s, 0, r, 0, s.length);\n")
-                        .append("        System.arraycopy(o, 0, r, s.length, o.length);\n        return r;\n");
+                body.append("        return dart.runtime.ConstCanon.join(super.$constKey(), new Object[] {")
+                        .append(kb).append("});\n");
             } else {
                 body.append("        return new Object[] {").append(kb).append("};\n");
             }
@@ -15038,6 +15036,28 @@ public final class JavaEmitter {
     }
 
     /// The holder of every signed SAM interface signClosure used.
+    /// The members a closure signature's `SIG` gives the interface that carries it.
+    private static void appendSignatureBody(StringBuilder sb, String[] m) {
+        sb.append("        dart.runtime.TypeWitness[] SIG = {").append(m[1])
+                .append("};\n\n        @Override\n        default dart.runtime.TypeWitness[] $sig() {\n")
+                .append("            return SIG;\n        }\n");
+        if (Boolean.parseBoolean(m[2])) {
+            sb.append("\n        @Override\n        default boolean $generic() {\n            return true;\n        }\n");
+        }
+        if (!"-1".equals(m[3])) {
+            sb.append("\n        @Override\n        default int $required() {\n            return ").append(m[3])
+                    .append(";\n        }\n");
+        }
+        if (m[4] != null) {
+            sb.append("\n        String[] NAMED = {").append(m[4]).append("};\n\n        @Override\n")
+                    .append("        default String[] $named() {\n            return NAMED;\n        }\n");
+        }
+        if (m.length > 5 && m[5] != null) {
+            sb.append("\n        String[] TYPE_VARS = {").append(m[5]).append("};\n\n        @Override\n")
+                    .append("        default String[] $typeVars() {\n            return TYPE_VARS;\n        }\n");
+        }
+    }
+
     private GeneratedFile closureSignatureFile(List<GeneratedFile> files) {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(pkg).append(";\n\n");
@@ -15045,29 +15065,52 @@ public final class JavaEmitter {
         sb.append("import dart.core.*;\nimport dart.runtime.Funcs;\n\n");
         sb.append("/** Closure SAMs carrying their reified Dart signatures (dart.runtime.Signed). */\n");
         sb.append("public final class DartFnSigs {\n    private DartFnSigs() {\n    }\n");
+        // Every member below is a class of its own, and the native executable carries
+        // each one's metadata and static initializer whether or not it is called; the
+        // gallery once got 105 bridges for 18 calls. Only what a generated file names is
+        // emitted (explicit type arguments, `DartFnSigs.<A, B>s9(..)`,
+        // included), and a signature that one SAM carries alone is written into that SAM
+        // rather than into an interface of its own.
+        java.util.Set<String> refs = new java.util.HashSet<String>();
+        java.util.regex.Matcher rm = java.util.regex.Pattern.compile("DartFnSigs\\.(?:<[^()]*?>\\s*)?([MSsbc][0-9]+)\\b").matcher("");
+        for (GeneratedFile g : files) {
+            if (g != null && g.relativePath.endsWith(".java")) {
+                rm.reset(g.content);
+                while (rm.find()) {
+                    refs.add(rm.group(1));
+                }
+            }
+        }
+        java.util.Map<String, String[]> sigByName = new java.util.HashMap<String, String[]>();
         for (String[] m : closureSignatures.values()) {
-            sb.append("\n    public interface ").append(m[0]).append(" extends dart.runtime.Signed {\n")
-                    .append("        dart.runtime.TypeWitness[] SIG = {").append(m[1])
-                    .append("};\n\n        @Override\n        default dart.runtime.TypeWitness[] $sig() {\n")
-                    .append("            return SIG;\n        }\n");
-            if (Boolean.parseBoolean(m[2])) {
-                sb.append("\n        @Override\n        default boolean $generic() {\n            return true;\n        }\n");
+            sigByName.put(m[0], m);
+        }
+        java.util.Map<String, Integer> samsPerSig = new java.util.HashMap<String, Integer>();
+        java.util.List<String[]> liveSams = new java.util.ArrayList<String[]>();
+        for (String[] e : signedSams.values()) {
+            String num = e[0].substring(1);
+            if (refs.contains(e[0]) || refs.contains("s" + num) || refs.contains("b" + num)) {
+                liveSams.add(e);
+                Integer k = samsPerSig.get(e[3]);
+                samsPerSig.put(e[3], k == null ? 1 : k + 1);
             }
-            if (!"-1".equals(m[3])) {
-                sb.append("\n        @Override\n        default int $required() {\n            return ").append(m[3])
-                        .append(";\n        }\n");
+        }
+        java.util.Set<String> folded = new java.util.HashSet<String>();
+        for (String[] m : closureSignatures.values()) {
+            Integer k = samsPerSig.get(m[0]);
+            boolean named = refs.contains(m[0]);
+            if (!named && k != null && k == 1 && sigByName.containsKey(m[0])) {
+                folded.add(m[0]);
+                continue;
             }
-            if (m[4] != null) {
-                sb.append("\n        String[] NAMED = {").append(m[4]).append("};\n\n        @Override\n")
-                        .append("        default String[] $named() {\n            return NAMED;\n        }\n");
+            if (!named && k == null) {
+                continue;
             }
-            if (m.length > 5 && m[5] != null) {
-                sb.append("\n        String[] TYPE_VARS = {").append(m[5]).append("};\n\n        @Override\n")
-                        .append("        default String[] $typeVars() {\n            return TYPE_VARS;\n        }\n");
-            }
+            sb.append("\n    public interface ").append(m[0]).append(" extends dart.runtime.Signed {\n");
+            appendSignatureBody(sb, m);
             sb.append("    }\n");
         }
-        for (String[] e : signedSams.values()) {
+        for (String[] e : liveSams) {
             int n = Integer.parseInt(e[2]);
             StringBuilder tp = new StringBuilder();
             for (int i = 0; i < n; i++) {
@@ -15076,17 +15119,24 @@ public final class JavaEmitter {
             if (n > 0) {
                 tp.append('>');
             }
+            String num = e[0].substring(1);
+            boolean fold = folded.contains(e[3]);
             sb.append("\n    public interface ").append(e[0]).append(tp).append(" extends ").append(e[1]).append(tp)
-                    .append(", ").append(e[3]).append(" {\n    }\n");
-            sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(e[0]).append(tp).append(" s")
-                    .append(e[0].substring(1)).append("(").append(e[0]).append(tp).append(" f) {\n")
-                    .append("        return f;\n    }\n");
+                    .append(", ").append(fold ? "dart.runtime.Signed" : e[3]).append(" {\n");
+            if (fold) {
+                appendSignatureBody(sb, sigByName.get(e[3]));
+            }
+            sb.append("    }\n");
+            if (refs.contains("s" + num)) {
+                sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(e[0]).append(tp).append(" s")
+                        .append(num).append("(").append(e[0]).append(tp).append(" f) {\n")
+                        .append("        return f;\n    }\n");
+            }
             java.util.regex.Matcher fm = FUNCS_SAM.matcher(e[1]);
-            if (fm.matches()) {
+            if (refs.contains("b" + num) && fm.matches()) {
                 // The value of an instance-method tear-off held as this SAM (valueTearOff).
                 boolean isVoid = fm.group(1) != null;
                 int arity = Integer.parseInt(fm.group(2));
-                String num = e[0].substring(1);
                 StringBuilder ps = new StringBuilder();
                 StringBuilder as = new StringBuilder();
                 for (int i = 0; i < arity; i++) {
@@ -15108,6 +15158,9 @@ public final class JavaEmitter {
             }
         }
         for (String[] w : callbackTearOffs.values()) {
+            if (!refs.contains("c" + w[1].substring(1))) {
+                continue;
+            }
             // The value of an instance-method tear-off held as a stub's callback interface.
             String[] pt = w[2].isEmpty() ? new String[0] : w[2].split(",");
             StringBuilder ps = new StringBuilder();
