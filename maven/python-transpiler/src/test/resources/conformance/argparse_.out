@@ -1,0 +1,174 @@
+ok Namespace(name='Ada', count=1, loud=False, color=True, mode='fast', verbose=0, tags=None)
+ok Namespace(name='Ada', count=2, loud=True, color=True, mode='fast', verbose=2, tags=None)
+ok Namespace(name='Ada', count=3, loud=False, color=False, mode='fast', verbose=0, tags=None)
+ok Namespace(name='Ada', count=4, loud=True, color=True, mode='slow', verbose=0, tags=['a', 'b'])
+ok Namespace(name='-Ada', count=5, loud=False, color=True, mode='fast', verbose=0, tags=None)
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+greet: error: the following arguments are required: name
+exit 2
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+greet: error: argument -c/--count: invalid int value: 'x'
+exit 2
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+greet: error: argument --mode: invalid choice: 'medium' (choose from 'fast', 'slow')
+exit 2
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+greet: error: unrecognized arguments: Bob
+exit 2
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+greet: error: unrecognized arguments: --unknown
+exit 2
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+greet: error: argument -c/--count: expected one argument
+exit 2
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+greet: error: ambiguous option: --c could match --count, --color
+exit 2
+greet 1.0
+exit 0
+usage: greet [-h] [-c COUNT] [-l] [--color | --no-color] [--mode {fast,slow}]
+             [-v] [--tag TAGS] [--version]
+             name
+
+Prints a greeting.
+
+positional arguments:
+  name                 who to greet
+
+options:
+  -h, --help           show this help message and exit
+  -c, --count COUNT    how many times (default: 1)
+  -l, --loud           shout it
+  --color, --no-color  colour output
+  --mode {fast,slow}
+  -v, --verbose
+  --tag TAGS
+  --version            show program's version number and exit
+
+See the guide.
+exit 0
+(Namespace(name='Ada', count=1, loud=False, color=True, mode='fast', verbose=0, tags=None), ['--extra', 'x'])
+ok Namespace(values=[1.0, -2.0, 3.5], scale=1, pair=None, rest=[])
+ok Namespace(values=[1.0], scale=2, pair=None, rest=[])
+ok Namespace(values=[1.0], scale=10, pair=None, rest=[])
+ok Namespace(values=[4.0], scale=1, pair=['x', 'y'], rest=[])
+usage: nums [-h] [--scale [SCALE]] [--pair A B] values [values ...] [rest ...]
+nums: error: argument --pair: expected 2 arguments
+exit 2
+usage: nums [-h] [--scale [SCALE]] [--pair A B] values [values ...] [rest ...]
+nums: error: the following arguments are required: values
+exit 2
+usage: nums [-h] [--scale [SCALE]] [--pair A B] values [values ...] [rest ...]
+
+positional arguments:
+  values
+  rest
+
+options:
+  -h, --help       show this help message and exit
+  --scale [SCALE]
+  --pair A B
+ok Namespace(a=True, b=False, out=None)
+usage: grp [-h] (-a | -b) [-o FILE]
+grp: error: argument -b: not allowed with argument -a
+exit 2
+usage: grp [-h] (-a | -b) [-o FILE]
+grp: error: one of the arguments -a -b is required
+exit 2
+usage: grp [-h] (-a | -b) [-o FILE]
+
+options:
+  -h, --help      show this help message and exit
+  -a
+  -b
+
+output:
+  Where the result goes.
+
+  -o, --out FILE  write here
+ok Namespace(file='notes.txt', command='add', text=['buy', 'milk'], tag='home', handler='adder')
+ok Namespace(file='w.txt', command='ls', limit=3)
+usage: notes [-h] [-f FILE] {add,show,ls} ...
+notes: error: argument command: invalid choice: 'rm' (choose from 'add', 'show', 'ls')
+exit 2
+usage: notes [-h] [-f FILE] {add,show,ls} ...
+notes: error: the following arguments are required: command
+exit 2
+usage: notes add [-h] [--tag TAG] text [text ...]
+notes add: error: the following arguments are required: text
+exit 2
+usage: notes add [-h] [--tag TAG] text [text ...]
+
+positional arguments:
+  text
+
+options:
+  -h, --help  show this help message and exit
+  --tag TAG
+exit 0
+usage: notes [-h] [-f FILE] {add,show,ls} ...
+
+positional arguments:
+  {add,show,ls}    what to do
+    add            add a note
+    show (ls)      list the notes
+
+options:
+  -h, --help       show this help message and exit
+  -f, --file FILE
+usage: defaults [-h] [--size SIZE] [--name NAME]
+                [--really-long-option-name-here SOME_LONG_VALUE]
+                [files ...]
+
+positional arguments:
+  files                 input files (default: None)
+
+options:
+  -h, --help            show this help message and exit
+  --size SIZE           the size (default: 3)
+  --name NAME           the name (default: x)
+  --really-long-option-name-here SOME_LONG_VALUE
+                        a long option whose help needs to wrap onto more than
+                        one line of the help output (default: None)
+Namespace(size=4, name='x', really_long_option_name_here=None, files=['a', 'b'])
+error: argument --n: '-3' is not positive
+Namespace(n=7)
+usage: wide [-h] [--option-number-0 V] [--option-number-1 V]
+            [--option-number-2 V] [--option-number-3 V] [--option-number-4 V]
+            [--option-number-5 V] [--option-number-6 V] [--option-number-7 V]
+            [--option-number-8 V] [--option-number-9 V] [--option-number-10 V]
+            [--option-number-11 V]
+            source destination
+Namespace(a=1, b='x') True True
+usage: meta [-h] A B
+
+positional arguments:
+  A B
+
+options:
+  -h, --help  show this help message and exit
+
+error: the following arguments are required: A, B
+usage: subs [-h] CMD ...
+
+options:
+  -h, --help  show this help message and exit
+
+cmds:
+  CMD
+    run (r)   run it
+
