@@ -290,6 +290,7 @@ class SubmissionTest(unittest.TestCase):
             with patch('syndicate_foojay_posts.discover_posts', return_value=[post()]), \
                  patch.dict('os.environ', {'GITHUB_ACTIONS': 'false'}), \
                  patch('syndicate_foojay_posts.build_bundle', return_value={}), \
+                 patch('syndicate_foojay_posts.canonical_is_live', return_value=True), \
                  patch('syndicate_foojay_posts.submit_bundle', side_effect=RuntimeError('API failure')):
                 self.assertEqual(2, main(['--submit', '--today', str(TODAY), '--state-file', str(state_path)]))
             self.assertEqual(before, state_path.read_bytes())
@@ -301,12 +302,24 @@ class SubmissionTest(unittest.TestCase):
             with patch('syndicate_foojay_posts.discover_posts', return_value=[post()]), \
                  patch.dict('os.environ', {'GITHUB_ACTIONS': 'false'}), \
                  patch('syndicate_foojay_posts.build_bundle', return_value={}), \
+                 patch('syndicate_foojay_posts.canonical_is_live', return_value=True), \
                  patch('syndicate_foojay_posts.submit_bundle', return_value=pr_result(pr())):
                 self.assertEqual(0, main(['--submit', '--today', str(TODAY), '--state-file', str(state_path)]))
             saved = State.load(state_path).raw['posts']['friday']
             self.assertEqual('https://dev.to/example', saved['devto']['url'])
             self.assertEqual('submitted', saved['foojay']['status'])
             self.assertFalse(saved['foojay']['published'])
+
+    def test_dead_canonical_page_is_never_submitted(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch('syndicate_foojay_posts.discover_posts', return_value=[post()]), \
+             patch.dict('os.environ', {'GITHUB_ACTIONS': 'false'}), \
+             patch('syndicate_foojay_posts.build_bundle', return_value={}), \
+             patch('syndicate_foojay_posts.canonical_is_live', return_value=False), \
+             patch('syndicate_foojay_posts.submit_bundle') as submit:
+            self.assertEqual(2, main(['--submit', '--today', str(TODAY),
+                                      '--state-file', str(Path(directory) / 'state.json')]))
+            submit.assert_not_called()
 
     def test_ci_missing_token_fails_before_preparing_or_submitting(self):
         with tempfile.TemporaryDirectory() as directory, \
