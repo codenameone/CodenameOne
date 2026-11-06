@@ -25,6 +25,18 @@ sys.modules[spec.name] = syndicate
 spec.loader.exec_module(syndicate)
 
 
+class DraftDiscoveryTest(unittest.TestCase):
+    def test_draft_sharing_a_date_never_displaces_the_published_post(self):
+        with tempfile.TemporaryDirectory() as directory:
+            blog = Path(directory)
+            (blog / "a-draft.md").write_text(
+                "---\ntitle: Draft\ndate: '2026-10-30'\ndraft: true\n---\nbody\n", encoding="utf-8")
+            (blog / "b-live.md").write_text(
+                "---\ntitle: Live\ndate: '2026-10-30'\n---\nbody\n", encoding="utf-8")
+            posts = syndicate.discover_posts(blog)
+            self.assertEqual(["b-live"], [p.slug for p in posts])
+
+
 class SyndicatedMediaTest(unittest.TestCase):
     def test_tab_bar_article_keeps_both_playable_videos(self):
         posts = syndicate.discover_posts(syndicate.BLOG_DIR)

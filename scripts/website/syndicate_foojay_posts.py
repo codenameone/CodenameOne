@@ -25,7 +25,7 @@ from typing import Any
 
 from syndicate_blog_posts import (
     BLOG_DIR, ELIGIBILITY_FLOOR, MIN_AGE_DAYS, REPO_ROOT,
-    STATE_FILE, USER_AGENT, Post, State, _MERMAID_BLOCK_RE,
+    STATE_FILE, USER_AGENT, Post, State, _MERMAID_BLOCK_RE, canonical_is_live,
     discover_posts, render_syndicated_body, select_candidate,
 )
 
@@ -359,6 +359,8 @@ def main(argv: list[str]) -> int:
         if args.submit and os.environ.get("GITHUB_ACTIONS") == "true" and not os.environ.get("FOOJAY_GITHUB_TOKEN"):
             raise RuntimeError("Set FOOJAY_GITHUB_TOKEN: the workflow GITHUB_TOKEN cannot write to Foojay or a fork")
         files = build_bundle(post, posts, args.today, args.static_dir)
+        if args.submit and not canonical_is_live(post):
+            raise RuntimeError(f"Canonical page is not live: {post.canonical_url}")
         if args.output_dir:
             for relative, data in files.items():
                 target = args.output_dir / relative
