@@ -96,7 +96,7 @@ public class ImagePicker {
         one.then(new dart.runtime.Funcs.VoidFunc1<XFile>() {
             @Override
             public void call(XFile f) {
-                DartList<XFile> out = new DartList<XFile>();
+                DartList<XFile> out = new DartList<XFile>(dart.runtime.TypeWitness.of(XFile.class, false));
                 if (f != null) {
                     out.add(f);
                 }
@@ -126,7 +126,7 @@ public class ImagePicker {
         }
         final long max = limit == null ? Long.MAX_VALUE : limit.longValue();
         if (!Display.isInitialized()) {
-            return Future.value(new DartList<XFile>());
+            return Future.value(new DartList<XFile>(dart.runtime.TypeWitness.of(XFile.class, false)));
         }
         if (!Display.getInstance().isGalleryTypeSupported(multiType)) {
             return asList(pick(ImageSource.gallery, singleType, shrink, 0));
@@ -135,7 +135,7 @@ public class ImagePicker {
         Display.getInstance().openGallery(new ActionListener<ActionEvent>() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                DartList<XFile> out = new DartList<XFile>();
+                DartList<XFile> out = new DartList<XFile>(dart.runtime.TypeWitness.of(XFile.class, false));
                 Object src = evt == null ? null : evt.getSource();
                 if (src instanceof String[]) {
                     for (String path : (String[]) src) {

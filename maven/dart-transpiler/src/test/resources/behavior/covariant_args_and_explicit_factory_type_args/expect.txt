@@ -1,0 +1,10 @@
+swapped sink: [n1, n2, n3]
+reversed: [2, 3]
+keyed left: {3: 3}
+prefixed left: {z: 3}
+factory mapped: [100, 200] sent []
+static mapped: [300]
+arrow reassigned capture: 22 10
+arrow string capture: AB-x
+never body: failed: expected digit
+if-case async: url /a 200 / plain 404

@@ -1,0 +1,7 @@
+saved ann
+block 3
+10
+setcb ok
+entity 4
+User(5,eve)
+call ok

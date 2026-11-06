@@ -1,0 +1,15 @@
+front#1 back#2
+1
+40
+dot
+other
+true
+true
+false
+bigger of Square(3) and Dot is square3 (9)
+bigger of Square(1) and Square(2) is square2 (4)
+square3
+wow!
+hi ann, hi bo
+5
+x:7

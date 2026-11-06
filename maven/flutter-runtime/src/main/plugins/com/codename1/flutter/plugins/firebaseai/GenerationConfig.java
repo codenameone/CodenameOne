@@ -47,7 +47,7 @@ public class GenerationConfig {
     public void stopSequences(Iterable<?> v) {
         DartList<String> stops = null;
         if (v != null) {
-            stops = new DartList<String>();
+            stops = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
             for (Object o : v) {
                 stops.add(String.valueOf(o));
             }

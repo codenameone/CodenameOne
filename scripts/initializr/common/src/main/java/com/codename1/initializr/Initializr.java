@@ -697,10 +697,10 @@ public class Initializr extends Lifecycle {
         final Container modulesSection = BoxLayout.encloseY(allModules);
         final Runnable updateModules = () -> {
             boolean show = mavenLayouts && buildTool[0] == ProjectOptions.BuildTool.MAVEN
-                    && projectType[0] != ProjectOptions.ProjectType.BACKEND_ONLY;
+                    && !projectType[0].hasNoClient();
             modulesSection.setHidden(!show);
             modulesSection.setVisible(show);
-            if (!show && allPlatformModules[0] && projectType[0] == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            if (!show && allPlatformModules[0] && projectType[0].hasNoClient()) {
                 // A backend-only project has no platform modules to include.
                 allPlatformModules[0] = false;
                 allModules.setSelected(false);
@@ -767,7 +767,7 @@ public class Initializr extends Lifecycle {
                 if (javaButtons[1] != null) {
                     javaButtons[1].setEnabled(!gradle);
                 }
-                if (!gradle && !mavenLayouts && projectType[0] == ProjectOptions.ProjectType.BACKEND_ONLY) {
+                if (!gradle && !mavenLayouts && projectType[0].hasNoClient()) {
                     // Maven has no backend-only project, and the type is hidden
                     // now, so a stale choice would fail generation with no way to
                     // correct it. Every Maven project carries the backend anyway.
@@ -1184,7 +1184,7 @@ public class Initializr extends Lifecycle {
     static String browserIdeUrl(String appName, String packageName, Template template,
                                 ProjectOptions.ProjectType type, ProjectOptions.BuildTool build) {
         String kind = template.isFullStack() || type == ProjectOptions.ProjectType.APP_WITH_BACKEND ? "fullstack"
-                : type == ProjectOptions.ProjectType.BACKEND_ONLY ? "backend" : "app";
+                : type.hasNoClient() ? "backend" : "app";
         return "https://cloud.codenameone.com/ide/?new=" + kind
                 + "&name=" + com.codename1.io.Util.encodeUrl(appName)
                 + "&package=" + com.codename1.io.Util.encodeUrl(packageName)
@@ -1223,7 +1223,7 @@ public class Initializr extends Lifecycle {
                 + (options.isGradle() || GeneratorModel.isMavenLayoutChoiceOffered()
                         ? " (" + options.projectType.label
                                 + (!options.isGradle() && options.allPlatformModules
-                                        && options.projectType != ProjectOptions.ProjectType.BACKEND_ONLY
+                                        && !options.projectType.hasNoClient()
                                         ? ", all modules" : "") + ")"
                         : "") + "\n"
                 + "Java     " + options.javaVersion.label + "\n"

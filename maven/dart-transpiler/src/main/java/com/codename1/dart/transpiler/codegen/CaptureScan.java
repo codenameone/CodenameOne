@@ -43,6 +43,8 @@ final class CaptureScan {
 
     private final Set<String> assigned = new HashSet<String>();
     private final Set<String> referencedInLambda = new HashSet<String>();
+    /** Names assigned (=, op=, ++, --) from inside a closure. */
+    private final Set<String> assignedInLambda = new HashSet<String>();
     private final Set<String> allReferenced = new HashSet<String>();
     /** Names called as {@code name(..)} where the result is used (not an expression statement). */
     private final Set<String> valueCalls = new HashSet<String>();
@@ -50,6 +52,13 @@ final class CaptureScan {
     private int lambdaDepth;
 
     private CaptureScan() {
+    }
+
+    /// The names closures within {@code s} reference.
+    static Set<String> lambdaRefs(Stmt s) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkStmt(s);
+        return scan.referencedInLambda;
     }
 
     static Set<String> boxedLocals(Block body) {
@@ -78,6 +87,49 @@ final class CaptureScan {
      * update clause, so a closure that captures it needs a per-iteration
      * effectively-final copy (Dart binds the loop variable fresh each pass).
      */
+    static boolean readInLambda(Expr body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkExpr(body);
+        return scan.referencedInLambda.contains(name);
+    }
+
+    /**
+     * True when a closure within {@code body} assigns {@code name}. A C-style loop
+     * variable written that way cannot be a final per-iteration copy: each pass gets
+     * its own mutable cell, whose value the update clause then continues from.
+     */
+    static boolean assignedInLambda(Expr body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkExpr(body);
+        return scan.assignedInLambda.contains(name);
+    }
+
+    static boolean assignedInLambda(Stmt body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkStmt(body);
+        return scan.assignedInLambda.contains(name);
+    }
+
+    /**
+     * True when a closure within {@code body} captures {@code name} and something in
+     * {@code body} -- the closure or the loop body itself -- writes it. A C-style loop
+     * variable like that cannot be read through a final per-iteration copy: the body
+     * and the closures share this pass's variable, so the pass gets a mutable cell.
+     */
+    static boolean capturedAndAssigned(Stmt body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkStmt(body);
+        return scan.referencedInLambda.contains(name)
+                && (scan.assigned.contains(name) || scan.assignedInLambda.contains(name));
+    }
+
+    static boolean capturedAndAssigned(Expr body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkExpr(body);
+        return scan.referencedInLambda.contains(name)
+                && (scan.assigned.contains(name) || scan.assignedInLambda.contains(name));
+    }
+
     static boolean readInLambda(Stmt body, String name) {
         CaptureScan scan = new CaptureScan();
         scan.walkStmt(body);
@@ -99,6 +151,18 @@ final class CaptureScan {
             scan.walkExpr(exprBody);
         }
         return scan.valueCalls;
+    }
+
+    /** True when {@code name} is referenced anywhere in a function's block or arrow body. */
+    static boolean mentions(Block body, Expr exprBody, String name) {
+        CaptureScan scan = new CaptureScan();
+        if (body != null) {
+            scan.walkBlock(body);
+        }
+        if (exprBody != null) {
+            scan.walkExpr(exprBody);
+        }
+        return scan.allReferenced.contains(name);
     }
 
     /** Every identifier name referenced anywhere in an expression. */
@@ -226,6 +290,9 @@ final class CaptureScan {
             Assign a = (Assign) e;
             if (a.lhs instanceof Ident) {
                 assigned.add(((Ident) a.lhs).name);
+                if (lambdaDepth > 0) {
+                    assignedInLambda.add(((Ident) a.lhs).name);
+                }
             }
             walkExpr(a.lhs);
             walkExpr(a.rhs);
@@ -233,6 +300,9 @@ final class CaptureScan {
             IncDec i = (IncDec) e;
             if (i.operand instanceof Ident) {
                 assigned.add(((Ident) i.operand).name);
+                if (lambdaDepth > 0) {
+                    assignedInLambda.add(((Ident) i.operand).name);
+                }
             }
             walkExpr(i.operand);
         } else if (e instanceof Lambda) {
@@ -307,6 +377,41 @@ final class CaptureScan {
             walkExpr(((ThrowExpr) e).value);
         } else if (e instanceof SetLit) {
             walkExprs(((SetLit) e).elements);
+        } else if (e instanceof Cascade) {
+            // `_buffer..write(text)` in a closure reads `text`: each section is walked,
+            // or a reassigned parameter read only through a cascade is never boxed.
+            walkExpr(((Cascade) e).target);
+            walkExprs(((Cascade) e).sections);
+        } else if (e instanceof SpreadElement) {
+            walkExpr(((SpreadElement) e).expr);
+        } else if (e instanceof MapEntry) {
+            walkExpr(((MapEntry) e).key);
+            walkExpr(((MapEntry) e).value);
+        } else if (e instanceof IfElement) {
+            IfElement ie = (IfElement) e;
+            walkExpr(ie.condition);
+            walkExpr(ie.thenElement);
+            walkExpr(ie.elseElement);
+        } else if (e instanceof ForElement) {
+            ForElement fe = (ForElement) e;
+            if (fe.init != null) {
+                walkStmt(fe.init);
+            }
+            walkExpr(fe.iterable);
+            walkExpr(fe.condition);
+            walkExprs(fe.updates);
+            walkExpr(fe.body);
+        } else if (e instanceof SwitchExpr) {
+            SwitchExpr se = (SwitchExpr) e;
+            walkExpr(se.subject);
+            for (SwitchExprCase c : se.cases) {
+                walkExpr(c.guard);
+                walkExpr(c.value);
+            }
+        } else if (e instanceof RecordLit) {
+            for (RecordField f : ((RecordLit) e).fields) {
+                walkExpr(f.value);
+            }
         }
     }
 }

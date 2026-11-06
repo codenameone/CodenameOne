@@ -147,6 +147,8 @@ include::Backend-MCP.asciidoc[]
 
 include::Backend-Operations.asciidoc[]
 
+include::Command-Line-Applications.asciidoc[]
+
 include::Wayline-Users-Guide.asciidoc[]
 
 include::Wayline-Implementors-Guide.asciidoc[]
@@ -291,6 +293,8 @@ include::Working-With-Javascript.asciidoc[]
 include::Android-Interop.asciidoc[]
 
 include::Unity-Interop.asciidoc[]
+
+include::Python-Interop.asciidoc[]
 
 include::Desktop-Interop.asciidoc[]
 

@@ -1,0 +1,16 @@
+false 7
+2
+3
+-1
+http://h/a%20b?q=1&r=%C3%A9#f
+a b/c
+{a: 1, b: x y, c: }
+file
+5-13 alpha 42 groups=2 in "item alpha 42 rest"
+alpha
+13
+[alpha, 42]
+true
+1 banana
+0
+2

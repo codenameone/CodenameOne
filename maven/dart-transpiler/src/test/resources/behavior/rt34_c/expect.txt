@@ -1,0 +1,16 @@
+xlib 2 1 true
+xlib call Shape(lib:a) true
+xlib generic true
+str true true
+pick 3 s
+plain 5
+hold true true
+set 2
+tools2 2 true 8
+tools 8 Inner[tq] mainInner true
+base 1 true Shape(lib:w)
+gen true true 1 true
+infer P<String>(x) P<int>(2!)
+apply nsm
+named ctor P<int>(3?) P<num>(4#)
+local local(1) Shape(lib:z)

@@ -70,7 +70,7 @@ public class GridTileBar extends StatelessWidget {
     @Override
     public Widget build(BuildContext context) {
         Column texts = new Column();
-        dart.core.DartList<Widget> lines = new dart.core.DartList<Widget>();
+        dart.core.DartList<Widget> lines = new dart.core.DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (title != null) {
             lines.add(title);
         }
@@ -80,7 +80,7 @@ public class GridTileBar extends StatelessWidget {
         texts.children(lines);
 
         Row row = new Row();
-        dart.core.DartList<Widget> kids = new dart.core.DartList<Widget>();
+        dart.core.DartList<Widget> kids = new dart.core.DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (leading != null) {
             kids.add(leading);
         }

@@ -1,0 +1,8 @@
+point 1,2 doubled sum 6
+point 3,4 doubled sum 14
+hello ann (30)
+hello bo (4)
+first 1 others [2, 3]
+x -> 2
+y -> 6
+stream total 6

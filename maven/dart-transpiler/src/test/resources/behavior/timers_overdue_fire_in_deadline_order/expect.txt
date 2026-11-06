@@ -1,0 +1,2 @@
+sync end m zero run runm first self false b bm a0 a1 a2 fd mz bz b200
+true

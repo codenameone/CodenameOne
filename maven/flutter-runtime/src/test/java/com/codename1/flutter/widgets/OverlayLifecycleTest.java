@@ -108,7 +108,7 @@ class OverlayLifecycleTest {
 
         OverlayEntry a = new OverlayEntry();
         OverlayEntry b = new OverlayEntry();
-        DartList<OverlayEntry> group = new DartList<OverlayEntry>();
+        DartList<OverlayEntry> group = new DartList<OverlayEntry>(dart.runtime.TypeWitness.of(OverlayEntry.class, false));
         group.add(a);
         group.add(b);
 
@@ -130,7 +130,7 @@ class OverlayLifecycleTest {
 
         OverlayEntry a = new OverlayEntry();
         OverlayEntry b = new OverlayEntry();
-        DartList<OverlayEntry> group = new DartList<OverlayEntry>();
+        DartList<OverlayEntry> group = new DartList<OverlayEntry>(dart.runtime.TypeWitness.of(OverlayEntry.class, false));
         group.add(a);
         group.add(b);
 

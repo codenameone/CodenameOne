@@ -1,0 +1,11 @@
+lines: [alpha, beéta, gam]
+json: {a: [1, 2], b: true}
+micro take:10 take:30 take:50 take:done
+controller has listener after take: false
+d:2 src:pause paused:true d:3 src:resume src:cancel
+asyncMap: [1, -1, 4, -4, 9]
+errors: [v1, e:boom, v2]
+take0: []
+ext: [3, 2, 1, 0]
+mixin: [clk#0, clk#1, clk#2]
+mixin take: [clk#0, clk#1]

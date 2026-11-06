@@ -30,3 +30,11 @@ slint warm 103 51 4 23330 22852 24164 4395 6
 qt warm 138 62 6 23202 22628 24132 75146 51
 javafx warm 1278 59 58 124878 124288 125840 104419 44
 chromium warm 421 59 65+ 410891 230124 964436 387377 149
+# flutter: flutter/Containerfile, sudo podman run --privileged --device /dev/dri, kernel vkms display,
+# Mesa llvmpipe through kms_swrast (no GPU), release (AOT) bundle, same host, 10 s x 3 runs
+flutter cold 2582 56 142 124466 123740 125532 238734 68
+flutter warm 528 59 146 115784 115056 116848 238734 68
+flutter cold 767 57 135 111718 111004 112768 238734 68
+flutter warm 541 60 138 111320 110592 112384 238734 68
+flutter cold 742 59 137 112012 111292 113072 238734 68
+flutter warm 555 60 134 111282 110556 112348 238734 68

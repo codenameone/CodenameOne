@@ -1,0 +1,23 @@
+main
+_State
+_Mode.on
+3
+8
+a1
+b:b
+_State
+_State
+false
+true
+false
+true
+_State
+2
+alpha,beta _Mode.beta
+1 _Mode.gamma
+f105
+50
+part:a1 _PartState
+implA
+mixA true
+mixB true List<_State>

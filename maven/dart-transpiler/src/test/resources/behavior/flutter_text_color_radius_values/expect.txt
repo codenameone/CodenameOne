@@ -1,0 +1,12 @@
+combine has underline: true
+combine has lineThrough: true
+combine has overline: false
+none contains none: true
+r g b a: 0.200 0.400 0.600 1.000
+withValues alpha: 0.500 red kept: 0.200
+linear(2).scale(10): 20.0
+noScaling.scale(14): 14.0
+clamped: 20.0
+copyWith: 2.0 8.0 8.0
+square: 5.0 5.0
+kDebugMode is bool: true

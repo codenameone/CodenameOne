@@ -1,0 +1,5 @@
+dup 1 1 2 has true
+rm 0 0 1
+mixin 0 0 1
+super 0 0 1
+loop ok

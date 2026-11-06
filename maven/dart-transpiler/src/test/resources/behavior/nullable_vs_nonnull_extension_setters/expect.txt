@@ -1,0 +1,12 @@
+snullable 4
+gnullable
+snonnull 5
+gnonnull
+snullable 6
+gnullable
+snonnull 1
+gnonnull
+snonnull 2
+gnonnull
+snonnull 3
+gnonnull

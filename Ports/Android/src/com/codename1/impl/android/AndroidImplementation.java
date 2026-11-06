@@ -2924,6 +2924,77 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
     }
 
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // Typeface.createFromFile is the only loader every supported API level has;
+        // the memory based Typeface.Builder needs API 26. The file is named by a
+        // hash of the content, so the same font is written once however many
+        // times it is loaded, and two fonts can never overwrite each other.
+        // The contract for data that is not a font is null, but createFromFile
+        // answers the default typeface for a file it cannot parse rather than
+        // failing, so bytes without an SFNT header are rejected up front and a
+        // DEFAULT answer for bytes with one is treated as a failure too.
+        if (!isSfntHeader(data)) {
+            return null;
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
+            StringBuilder name = new StringBuilder("font_");
+            for (int i = 0; i < 16; i++) {
+                int b = digest[i] & 0xff;
+                name.append(Character.forDigit(b >> 4, 16)).append(Character.forDigit(b & 0xf, 16));
+            }
+            name.append(".ttf");
+            File dir = new File(getContext().getCacheDir(), "cn1_fonts");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                return null;
+            }
+            File file = new File(dir, name.toString());
+            if (file.length() != data.length) {
+                File tmp = new File(dir, name + ".tmp");
+                FileOutputStream out = new FileOutputStream(tmp);
+                try {
+                    out.write(data);
+                } finally {
+                    out.close();
+                }
+                if (!tmp.renameTo(file)) {
+                    return null;
+                }
+            }
+            Typeface t = Typeface.createFromFile(file);
+            if (t == null || t == Typeface.DEFAULT) {
+                return null;
+            }
+            CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
+            newPaint.setAntiAlias(true);
+            newPaint.setSubpixelText(true);
+            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM,
+                    com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint,
+                    "data:" + fontName, 0, 0);
+        } catch (Exception err) {
+            com.codename1.io.Log.e(err);
+            return null;
+        }
+    }
+
+    /// True when data starts with a TrueType (0x00010000 or 'true'), OpenType
+    /// CFF ('OTTO') or collection ('ttcf') tag.
+    private static boolean isSfntHeader(byte[] data) {
+        if (data == null || data.length < 12) {
+            return false;
+        }
+        int tag = ((data[0] & 0xff) << 24) | ((data[1] & 0xff) << 16)
+                | ((data[2] & 0xff) << 8) | (data[3] & 0xff);
+        return tag == 0x00010000 || tag == 0x74727565 || tag == 0x4f54544f
+                || tag == 0x74746366;
+    }
+
     public static class NativeFont {
         int face;
         int style;

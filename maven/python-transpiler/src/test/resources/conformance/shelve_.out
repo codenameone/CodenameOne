@@ -1,0 +1,12 @@
+['a', 'item', 'list'] 3 True False
+[1, 2, {'k': (3, 4)}] Item(7) dflt
+[1, 2, {'k': (3, 4)}]
+x x None
+True
+['a', 'item', 'list'] 1 [1, 2, {'k': (3, 4)}] Item(7)
+[('b', 2), ('c', 3), ('item', Item(7)), ('list', [1, 2, {'k': (3, 4)}])]
+closed: invalid operation on closed shelf
+['b', 'c', 'item', 'list']
+read only
+[1, 2, 3]
+0

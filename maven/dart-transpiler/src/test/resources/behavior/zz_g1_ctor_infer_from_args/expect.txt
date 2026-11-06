@@ -1,0 +1,32 @@
+Box<int>
+false
+true
+false
+Box<String>
+2
+Box<double>
+2
+Pair<int, String>
+2
+X
+Pair<Box<bool>, List<int>>
+true
+Holder<int>
+true
+List<String>
+1
+true
+true
+List<int>
+List<dynamic>
+true
+Pair<int, double>
+Box<num>
+Box<Object>
+Pair<num, Object>
+Box<Box<int>>
+true
+Box<int?>
+Box<Null>
+true
+true

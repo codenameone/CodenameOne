@@ -65,6 +65,17 @@ public class SingleChildScrollView extends Widget {
         this.padding = v;
     }
 
+    private ScrollController controller;
+
+    /** The controller that reads and drives this view's scroll offset. */
+    public void controller(ScrollController v) {
+        this.controller = v;
+    }
+
+    public ScrollController controller() {
+        return controller;
+    }
+
     public void child(Widget v) {
         this.child = v;
     }

@@ -57,6 +57,8 @@ class RunFutureTest {
                 completed[0] = true;
             }
         });
+        // A callback on a completed future runs from the microtask queue, as in Dart.
+        dart.async.Async.drainMicrotasks();
         assertTrue(completed[0], "the run's future must be complete once the run has ended");
     }
 }

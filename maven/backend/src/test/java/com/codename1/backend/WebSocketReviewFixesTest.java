@@ -104,6 +104,76 @@ class WebSocketReviewFixesTest {
     }
 
     @Test
+    @DisplayName("a router refuses with its own status, and an endpoint adds 101 headers")
+    void refusalStatusAndHandshakeHeaders() throws Exception {
+        Backend backend = Backend.builder().port(0).quiet()
+                .webSockets(new Backend.WebSocketEndpoints() {
+                    public void register(HttpServer.WebSocketRegistry registry,
+                                         DataSource dataSource,
+                                         com.codename1.backend.orm.EntityManager entities) {
+                        registry.fallback(new HttpServer.WebSocketHandler() {
+                            public WebSocket open(HttpServer.Request request) {
+                                if (request.getTarget().startsWith("/bad")) {
+                                    return HttpServer.refuseUpgrade(200, "not a refusal");
+                                }
+                                if (!request.getTarget().startsWith("/ok")) {
+                                    return HttpServer.refuseUpgrade(403, "go away");
+                                }
+                                return new WebSocket() {
+                                    public void onOpen(WebSocketSession s) {
+                                    }
+
+                                    public void onText(WebSocketSession s, String m) {
+                                    }
+
+                                    public void onBinary(WebSocketSession s, byte[] m,
+                                                         int o, int l) {
+                                    }
+
+                                    public java.util.Map getHandshakeHeaders() {
+                                        java.util.Map h = new java.util.LinkedHashMap();
+                                        h.put("X-Room", "lobby");
+                                        h.put("Sec-WebSocket-Accept", "forged");
+                                        return h;
+                                    }
+                                };
+                            }
+                        });
+                    }
+                })
+                .start();
+        try {
+            int port = backend.getServer().getPort();
+            RawWebSocketClient refused = new RawWebSocketClient(port, "/no", null);
+            try {
+                assertTrue(refused.getStatusLine().startsWith("HTTP/1.1 403"),
+                        refused.getStatusLine());
+                assertEquals("go away", refused.readRefusal());
+            } finally {
+                refused.close();
+            }
+            RawWebSocketClient bad = new RawWebSocketClient(port, "/bad", null);
+            try {
+                assertTrue(bad.getStatusLine().startsWith("HTTP/1.1 500"),
+                        bad.getStatusLine());
+            } finally {
+                bad.close();
+            }
+            // The constructor checks Sec-WebSocket-Accept, so a forged one written
+            // by the endpoint would fail it.
+            RawWebSocketClient ok = new RawWebSocketClient(port, "/ok", null);
+            try {
+                assertTrue(ok.getStatusLine().startsWith("HTTP/1.1 101"), ok.getStatusLine());
+                assertEquals("lobby", ok.getResponseHeader("x-room"));
+            } finally {
+                ok.close();
+            }
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("a fallback router authenticates a handshake by its session")
     void aFallbackRouterSeesTheSession() throws Exception {
         final String[] seen = new String[1];

@@ -1,0 +1,7 @@
+true
+false
+true
+true
+2
+{a: 1, b: 2}
+true

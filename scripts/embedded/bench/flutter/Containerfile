@@ -1,0 +1,35 @@
+# flutter-pi and the gauge, on the same Debian bookworm base as the other
+# workloads. Build from scripts/embedded/bench after flutter/build-bundle.sh:
+#
+#   podman build -f flutter/Containerfile -t cn1-bench-flutter .
+#
+# flutter-pi draws only to a DRM/KMS display, so unlike the others it cannot draw
+# into memory. On a host without a GPU, load the kernel's virtual display first
+# (`sudo modprobe vkms`) and pass it in; Mesa then renders OpenGL ES on the CPU
+# (llvmpipe through kms_swrast) with no configuration:
+#
+#   sudo podman run --rm --privileged --device /dev/dri cn1-bench-flutter \
+#       /bench/run.sh /opt/no-cn1 10 3 flutter
+#
+# A rootless container is refused the device even when privileged; run it as root.
+FROM debian:bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cmake build-essential git ca-certificates curl pkg-config procps \
+        libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdrm-dev libgbm-dev libgl1-mesa-dri \
+        libsystemd-dev libinput-dev libudev-dev libxkbcommon-dev fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+# flutter-pi 8b86c52 (2026-09-17), the commit measured.
+RUN git clone --recursive https://github.com/ardera/flutter-pi /src/flutter-pi \
+    && cd /src/flutter-pi && git checkout -q 8b86c52a004ec2ca7f98a65e5079219679002c61 && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_VULKAN=OFF \
+        -DENABLE_GSTREAMER_VIDEO_PLAYER=OFF -DENABLE_GSTREAMER_AUDIO_PLAYER=OFF \
+    && make -j"$(nproc)" && make install
+# The release engine for Flutter 3.35.4, matching flutter/build-bundle.sh.
+RUN git clone -q https://github.com/ardera/flutter-engine-binaries-for-arm /eb \
+    && cd /eb && git checkout -q 72209d4 \
+    && cp arm64/libflutter_engine.so.release arm64/icudtl.dat /usr/lib/ \
+    && ldconfig && rm -rf /eb
+COPY flutter/bundle /bench/flutter/bundle
+COPY run.sh /bench/run.sh
+# run.sh copies a Codename One binary first; this image measures flutter-pi only.
+RUN mkdir -p /opt/no-cn1 && touch /opt/no-cn1/EmbeddedDemo

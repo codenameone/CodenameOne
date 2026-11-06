@@ -1,0 +1,12 @@
+[a]
+[a, null, null]
+[1, 2]
+[1.5]
+4
+[1, two, null, null]
+1
+[1, null, null]
+fixed refused
+unmodifiable refused
+negative refused
+3

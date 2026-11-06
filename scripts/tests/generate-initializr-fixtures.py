@@ -19,7 +19,7 @@ def check_gradle_fixture(archive, z, maven_settings):
     """A Gradle download: one project at the root, the shared template's build files,
     nothing of Maven's, and an extractable, executable wrapper."""
     names = set(z.namelist())
-    backend_only = '-BACKEND_ONLY-' in archive.name
+    backend_only = '-BACKEND_ONLY-' in archive.name or '-COMMAND_LINE-' in archive.name
     for name in names:
         assert not name.startswith('common/') and not name.endswith('pom.xml'), (archive.name, name)
         assert not name.startswith(('mvnw', '.mvn/')) and name not in ('build.sh', 'run.sh', 'build.bat', 'run.bat'), \
@@ -53,18 +53,29 @@ def check_maven_layout_fixture(archive, z):
     names = set(z.namelist())
     layout = archive.name.split('-')[1]
     root_pom = z.read('pom.xml').decode()
-    if layout == 'BACKEND_ONLY':
+    if layout in ('BACKEND_ONLY', 'COMMAND_LINE'):
         for name in names:
             assert not name.startswith(('common/', 'backend/') + PLATFORM_DIRS), (archive.name, name)
             assert name not in ('build.sh', 'run.sh', 'build.bat', 'run.bat', 'AGENTS.md'), (archive.name, name)
             assert not (name.endswith('/pom.xml')), (archive.name, name)
             if name.endswith(('.java', '.properties', '.md', '.xml', '.json')):
-                assert 'gradle' not in z.read(name).decode().lower(), (archive.name, name)
+                text = z.read(name).decode()
+                assert 'gradle' not in text.lower(), (archive.name, name)
+                # The Gradle downloads refuse a leftover template token in the generator;
+                # these are held to the same here.
+                assert '__PROJECT_NAME__' not in text and '__BACKEND__' not in text, (archive.name, name)
         assert '<parent>' not in root_pom and '<artifactId>codenameone-backend</artifactId>' in root_pom, archive.name
-        for name in ['mvnw', 'mvnw.cmd', 'application.properties', 'application-dev.properties',
-                     'src/main/java/com/example/probe/Api.java', 'README.md']:
+        main = 'src/main/java/com/example/probe/' + ('Api.java' if layout == 'BACKEND_ONLY' else 'Hello.java')
+        for name in ['mvnw', 'mvnw.cmd', 'application.properties', main, 'README.md']:
             assert name in names, (archive.name, name)
-        assert './mvnw cn1:backend' in z.read('src/main/java/com/example/probe/Api.java').decode(), archive.name
+        assert './mvnw cn1:backend' in z.read(main).decode(), archive.name
+        if layout == 'COMMAND_LINE':
+            # A tool, not a server: a command and its test, nothing that serves.
+            assert '-Dcn1.backend.args' in z.read(main).decode(), archive.name
+            assert 'src/test/java/com/example/probe/HelloTest.java' in names, archive.name
+            assert not any(n.endswith(('Api.java', 'ApiTest.java')) for n in names), archive.name
+        else:
+            assert 'application-dev.properties' in names, archive.name
         return False
     full = layout == 'FULL'
     for name in names:

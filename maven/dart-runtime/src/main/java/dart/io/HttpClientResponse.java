@@ -31,7 +31,7 @@ import dart.typed_data.Uint8List;
  * Dart's {@code HttpClientResponse}: a stream of byte chunks -- here the whole body as
  * one chunk, delivered once someone listens -- plus the status line and headers.
  */
-public class HttpClientResponse extends Stream<Object> {
+public class HttpClientResponse extends Stream<dart.core.DartLongList> {
 
     private final long statusCode;
     private final String reasonPhrase;
@@ -112,15 +112,23 @@ public class HttpClientResponse extends Stream<Object> {
     }
 
     public DartList<Object> redirects() {
-        return new DartList<Object>();
+        return new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
     }
 
     public DartList<Object> cookies() {
-        return new DartList<Object>();
+        return new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
     }
 
     /** Dart's {@code compressionState}; the platform has already decompressed the body. */
     public String compressionState() {
         return "decompressed";
+    }
+
+    /// Dart's {@code detachSocket()}. The body arrives through the port's connection
+    /// layer, which owns the connection, so there is no socket to detach; the future
+    /// fails with UnsupportedError.
+    public dart.async.Future<Socket> detachSocket() {
+        return dart.async.Future.error(new dart.core.UnsupportedError(
+                "detachSocket: the platform's connection layer does not expose its socket"));
     }
 }

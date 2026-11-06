@@ -1,0 +1,19 @@
+50
+1957
+b
+false
+[Color.red, Color.blue]
+2
+true
+2
+true
+false
+3
+3
+2
+0
+6
+2
+true
+false
+5

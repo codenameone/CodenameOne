@@ -1,0 +1,4 @@
+List<(int) => int>
+List<((int) => int)?>
+true
+true

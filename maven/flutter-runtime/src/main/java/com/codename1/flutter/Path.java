@@ -204,6 +204,60 @@ public final class Path {
      * segment's shape parameters (an arc's angles and radii, a conic's
      * weight, the boolean flags) are invariant under translation.
      */
+    /// Path.getBounds(): the box around every point and control point, as dart:ui
+    /// answers it (control points, not the tight curve extent). An arc counts its
+    /// whole oval; arcToPoint, whose oval is implied, counts its end point.
+    public Rect getBounds() {
+        double l = Double.MAX_VALUE;
+        double t = Double.MAX_VALUE;
+        double r = -Double.MAX_VALUE;
+        double b = -Double.MAX_VALUE;
+        for (Segment sg : segments) {
+            double[] c = sg.coords;
+            int n;
+            if ("close".equals(sg.verb)) {
+                n = 0;
+            } else if ("conicTo".equals(sg.verb) || "arcTo".equals(sg.verb) || sg.verb.startsWith("add")) {
+                n = 4;
+            } else if ("arcToPoint".equals(sg.verb)) {
+                n = 2;
+            } else {
+                n = c.length & ~1;
+            }
+            for (int i = 0; i + 1 < n && i + 1 < c.length; i += 2) {
+                l = Math.min(l, c[i]);
+                r = Math.max(r, c[i]);
+                t = Math.min(t, c[i + 1]);
+                b = Math.max(b, c[i + 1]);
+            }
+        }
+        if (l > r) {
+            return Rect.fromLTRB(0, 0, 0, 0);
+        }
+        return Rect.fromLTRB(l, t, r, b);
+    }
+
+    /// Path.transform(matrix4): a copy of this path with every point mapped through
+    /// the column-major 4x4 matrix's 2D affine part, as addPath(..., matrix4:) does.
+    public Path transform(Object matrix4) {
+        double[] m;
+        if (matrix4 instanceof double[]) {
+            m = (double[]) matrix4;
+        } else if (matrix4 instanceof java.util.List) {
+            java.util.List<?> l = (java.util.List<?>) matrix4;
+            m = new double[l.size()];
+            for (int i = 0; i < m.length; i++) {
+                Object v = l.get(i);
+                m[i] = v instanceof Number ? ((Number) v).doubleValue() : 0;
+            }
+        } else {
+            throw new IllegalArgumentException("matrix4 must be a Float64List");
+        }
+        Path p = new Path();
+        p.addPath(this, Offset.zero, m);
+        return p;
+    }
+
     public Path shift(Offset offset) {
         Path p = new Path();
         double dx = offset.dx();

@@ -1,0 +1,26 @@
+true
+true
+false
+4
+null
+true
+true
+true
+true
+[int, double, String]
+true
+_Map<String, dynamic>
+List<dynamic>
+List<Object?>
+dynamic
+Object
+Type
+Pattern
+List<Type>
+[int, String]
+{int: 1, dynamic: 2}
+true
+true
+List<Pattern>
+List<Pattern>
+{"a":1,"b":[1,2.5,"x"],"c":{"d":null}}

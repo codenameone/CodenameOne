@@ -101,7 +101,12 @@ public final class Postgres {
             int socketTimeoutMillis) throws IOException {
         // BEFORE THE SOCKET: a mode this code does not implement is a typo, and
         // reading it as prefer is how "require" spelled wrong accepts plaintext.
-        SqlLimits.requireSslMode(sslMode);
+        // The mode as written is kept for the errors: "sslmode=require" in a
+        // message about a URL that said verify-full would send the reader
+        // looking for a setting they never wrote.
+        final String sslModeAsWritten = sslMode;
+        sslMode = SqlLimits.canonicalSslMode(sslMode);
+        SqlLimits.requireRootForVerifyCa(sslMode, caFile);
         Tcp connection = Tcp.connect(host, port <= 0 ? 5432 : port, timeoutMillis);
         // AFTER THE CONNECT, and before anything is said on it: the deadline
         // governs the conversation, which is where a peer can stall a worker.
@@ -116,14 +121,14 @@ public final class Postgres {
             boolean secured = false;
             if (!plaintextByChoice) {
                 boolean offered = requestTls(wire);
-                boolean required = "require".equals(sslMode);
+                boolean required = SqlLimits.demandsTls(sslMode);
                 if (!offered && required) {
                     throw new IOException("The server at " + host
-                            + " refused TLS and sslmode=require");
+                            + " refused TLS and sslmode=" + sslModeAsWritten);
                 }
                 if (offered) {
                     try {
-                        connection.startTls(host, caFile);
+                        connection.startTls(host, caFile, SqlLimits.verifiesHost(sslMode));
                         secured = true;
                     } catch (IOException err) {
                         if (required) {
@@ -619,6 +624,11 @@ public final class Postgres {
                         types[iter] = intAt(message.body, at + 6);
                         at += 18; // + type size (2), modifier (4), format (2)
                     }
+                    String[] kinds = new String[columns];
+                    for (int iter = 0 ; iter < columns ; iter++) {
+                        kinds[iter] = kind(types[iter]);
+                    }
+                    result.rows.setColumnTypes(kinds);
                     break;
                 }
                 case DATA_ROW: {
@@ -728,6 +738,27 @@ public final class Postgres {
             return Wire.utf8(((Boolean) value).booleanValue() ? "t" : "f");
         }
         return Wire.utf8(String.valueOf(value));
+    }
+
+    /// The portable column kind (`Database.columnTypes(List)`) of a type OID:
+    /// only the kinds whose values arrive as text a caller must parse.
+    static String kind(int typeOid) {
+        switch (typeOid) {
+            case 1700:
+                return "decimal";
+            case 1082:
+                return "date";
+            case 1114:
+                return "datetime";
+            case 1184:
+                return "datetimetz";
+            case 1083:
+                return "time";
+            case 1266:
+                return "timetz";
+            default:
+                return null;
+        }
     }
 
     /// Maps a text-format value to the same Java types the SQLite path returns.

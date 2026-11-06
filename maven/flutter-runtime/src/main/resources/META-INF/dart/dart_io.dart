@@ -27,7 +27,50 @@ class FileSystemException extends IOException {
 
 @JavaName('dart.io.SocketException')
 class SocketException extends IOException {
-  external SocketException(String message);
+  external SocketException(String message,
+      {OSError? osError, InternetAddress? address, int? port});
+  external static SocketException closed();
+  external String get message;
+  external OSError? get osError;
+  external InternetAddress? get address;
+  external int? get port;
+}
+
+@JavaName('dart.io.OSError')
+class OSError {
+  external static int get noErrorCode;
+  external OSError([String message, int errorCode]);
+  external String get message;
+  external int get errorCode;
+}
+
+@JavaName('dart.io.InternetAddress')
+class InternetAddress {
+  external InternetAddress(String address);
+  external String get address;
+  external String get host;
+}
+
+// A type only: nothing hands one out (see dart.io.Socket).
+@JavaName('dart.io.Socket')
+abstract class Socket extends Stream<List<int>> {
+}
+
+@JavaName('dart.io.TlsException')
+class TlsException extends IOException {
+  external TlsException([String message]);
+  external String get message;
+}
+
+@JavaName('dart.io.HandshakeException')
+class HandshakeException extends TlsException {
+  external HandshakeException([String message]);
+}
+
+@JavaName('dart.io.WebSocketException')
+class WebSocketException extends IOException {
+  external WebSocketException([String message = ""]);
+  external String get message;
 }
 
 @JavaName('dart.io.HttpException')
@@ -242,7 +285,7 @@ abstract class HttpHeaders {
   external void remove(String name, Object value);
   external void removeAll(String name);
   external void clear();
-  external void forEach(Object action);
+  external void forEach(void Function(String name, List<String> values) action);
   external ContentType? get contentType;
   external set contentType(ContentType? type);
   external int get contentLength;
@@ -279,7 +322,7 @@ class HttpClient {
 }
 
 @JavaName('dart.io.HttpClientRequest')
-abstract class HttpClientRequest {
+abstract class HttpClientRequest implements StreamConsumer<List<int>> {
   external String get method;
   external Uri get uri;
   external HttpHeaders get headers;
@@ -314,6 +357,7 @@ abstract class HttpClientResponse extends Stream<List<int>> {
   external List get redirects;
   external List get cookies;
   external String get compressionState;
+  external Future<Socket> detachSocket();
 }
 
 @JavaName('dart.io.WebSocket')
@@ -323,7 +367,8 @@ abstract class WebSocket extends Stream<dynamic> {
   external static int get closing;
   external static int get closed;
   external static Future<WebSocket> connect(String url,
-      {Iterable<String>? protocols, Map<String, dynamic>? headers, Object? compression});
+      {Iterable<String>? protocols, Map<String, dynamic>? headers, Object? compression,
+      HttpClient? customClient});
   external void add(Object? data);
   external void addUtf8Text(List<int> bytes);
   external Future addStream(Stream stream);

@@ -165,4 +165,11 @@ public final class Colors {
     public static final Color black38 = new Color(0x61000000);
     public static final Color black26 = new Color(0x42000000);
     public static final Color black12 = new Color(0x1F000000);
+
+    /**
+     * Flutter's {@code Colors.primaries}: the primary swatches in the order Flutter
+     * lists them (grey is not one of them).
+     */
+    public static final dart.core.DartList<MaterialColor> primaries = dart.core.DartList.of(
+            red, pink, purple, deepPurple, indigo, blue, lightBlue, cyan, teal, green, lightGreen, lime, yellow, amber, orange, deepOrange, brown, blueGrey);
 }

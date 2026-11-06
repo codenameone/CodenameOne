@@ -34,6 +34,7 @@ GUI_NAMES = [
     ("qt", "Qt Widgets"),
     ("javafx", "JavaFX"),
     ("chromium", "Chromium kiosk"),
+    ("flutter", "flutter-pi, CPU GL"),
 ]
 
 SERVER_NAMES = [

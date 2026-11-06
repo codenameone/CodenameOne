@@ -141,7 +141,7 @@ public final class FlutterChannelRegistry {
             return Double.valueOf(((Float) value).doubleValue());
         }
         if (value instanceof List && !(value instanceof DartList)) {
-            DartList<Object> out = new DartList<Object>();
+            DartList<Object> out = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
             for (Object e : (List<?>) value) {
                 out.add(toDart(e));
             }

@@ -1,0 +1,12 @@
+CatFeeder cat
+inherited covariant TypeError true
+IntScale 8
+inherited covariant num TypeError true
+B.m 2
+override TypeError true
+B.m 11
+A.m 2.5
+IntSink 7
+interface TypeError true
+holder cat
+covariant field TypeError true

@@ -1,0 +1,9 @@
+[[a], [a, b]]
+b
+null
+[3]
+true
+[1, 2]
+5
+se x
+fn true

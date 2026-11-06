@@ -95,6 +95,10 @@ class Post:
         return f"{SITE_BASE_URL}/blog/{self.slug}/"
 
     @property
+    def is_draft(self) -> bool:
+        return str(self.front_matter.get("draft", "")).strip().lower() == "true"
+
+    @property
     def cover_image(self) -> str | None:
         match = re.search(r"!\[[^\]]*\]\((/blog/[^)\s]+)\)", self.body)
         if match:
@@ -216,10 +220,25 @@ def discover_posts(blog_dir: Path) -> list[Post]:
         if path.name.startswith("_"):
             continue
         post = parse_post(path)
-        if post is not None:
+        # Hugo does not publish a draft, so its canonical URL is a 404. A draft
+        # sharing a date with the real post once sorted first by file name and
+        # was syndicated in its place on every platform.
+        if post is not None and not post.is_draft:
             posts.append(post)
     posts.sort(key=lambda p: p.date)
     return posts
+
+
+def canonical_is_live(post: Post, timeout: float = 20.0) -> bool:
+    """True when the post's canonical page answers 200: the last check before
+    anything is published elsewhere pointing at it."""
+    request = urllib.request.Request(post.canonical_url, method="HEAD",
+                                     headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
 
 
 def select_candidate(

@@ -1,0 +1,14 @@
+add one
+error boom trace=false
+error bang trace=true
+close
+forward oops
+forward plain
+a
+listened oops
+listened plain
+completer got late failure
+value 7
+doubled 15
+ints 70
+waited [x, y]

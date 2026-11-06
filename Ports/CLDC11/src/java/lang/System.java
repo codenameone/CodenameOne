@@ -25,6 +25,11 @@ package java.lang;
 /// The System class contains several useful class fields and methods. It cannot be instantiated.
 /// Since: JDK1.0, CLDC 1.0
 public final class System{
+
+    // Not instantiable, as in the JDK: without this the class had an
+    // implicit public constructor that code compiled against the JDK cannot call.
+    private System() {
+    }
     /// The "standard" error output stream. This stream is already open and ready to accept output data.
     /// Typically this stream corresponds to display output or another output destination specified by the host environment or user. By convention, this output stream is used to display error messages or other information that should come to the immediate attention of a user even if the principal output stream, the value of the variable out, has been redirected to a file or other destination that is typically not continuously monitored.
     public static final java.io.PrintStream err=null;

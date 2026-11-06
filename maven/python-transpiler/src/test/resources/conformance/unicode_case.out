@@ -1,0 +1,21 @@
+'m\xfcnchen' 'M\xdcNCHEN' 'm\xfcnchen' 'M\xfcnchen' 'm\xfcnchen' 'M\xfcnchen'
+True False True False True
+'stra\xdfe' 'STRASSE' 'strasse' 'Stra\xdfe' 'STRASSE' 'Stra\xdfe'
+False True True False True
+'\u03b1\u03b2\u03b3 \u03b1\u03b2\u03b3' '\u0391\u0392\u0393 \u0391\u0392\u0393' '\u03b1\u03b2\u03b3 \u03b1\u03b2\u03b3' '\u0391\u03b2\u03b3 \u0391\u03b2\u03b3' '\u03b1\u03b2\u03b3 \u0391\u0392\u0393' '\u0391\u03b2\u03b3 \u03b1\u03b2\u03b3'
+False False False False False
+'\u043f\u0440\u0438\u0432\u0435\u0442' '\u041f\u0420\u0418\u0412\u0415\u0422' '\u043f\u0440\u0438\u0432\u0435\u0442' '\u041f\u0440\u0438\u0432\u0435\u0442' '\u043f\u0420\u0418\u0412\u0415\u0422' '\u041f\u0440\u0438\u0432\u0435\u0442'
+False False True True True
+'\u01c6ungla' '\u01c4UNGLA' '\u01c6ungla' '\u01c5ungla' '\u01c5UNGLA' '\u01c5ungla'
+False False True True True
+'i\u0307stanbul' '\u0130STANBUL' 'i\u0307stanbul' '\u0130stanbul' 'i\u0307STANBUL' '\u0130stanbul'
+False False True True True
+'\uff41\uff42\uff43' '\uff21\uff22\uff23' '\uff41\uff42\uff43' '\uff21\uff42\uff43' '\uff41\uff22\uff23' '\uff21\uff42\uff43'
+False False True True True
+'\u0663\u0664' True True True False True
+'\xb2' True False True False True
+'\u2167' False False True False True
+'\xbd' False False True False True
+'\u3000\u2003' False False False True False
+'\xa0' False False False True False
+'abc\u0661' False False False False True

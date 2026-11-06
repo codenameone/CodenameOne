@@ -86,6 +86,7 @@ from syndicate_blog_posts import (  # noqa: E402  (intentional path injection)
     Post,
     STATE_FILE,
     State,
+    canonical_is_live,
     discover_posts,
     render_syndicated_body,
     select_candidate,
@@ -1108,6 +1109,10 @@ def main(argv: list[str]) -> int:
         print(f"validate-only: using newest post {candidate.slug} for selector verification.")
 
     print(f"Selected post: {candidate.slug} (date={candidate.date.isoformat()})")
+    if not args.validate_only and not canonical_is_live(candidate):
+        print(f"Canonical page is not live, refusing to publish: {candidate.canonical_url}",
+              file=sys.stderr)
+        return 1
     body_markdown = render_syndicated_body(candidate, posts, today)
 
     any_change = False

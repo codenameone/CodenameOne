@@ -161,6 +161,18 @@ final class InfCodes {
                     while (k < (j)) {
                         if (n != 0) {
                             r = Z_OK;
+                        } else if (tree[(tree_index + (b & inflate_mask[j])) * 3 + 1] <= k) {
+                            // The input is exhausted but the bits held already
+                            // complete a code: every entry of the table is
+                            // replicated over the bits past its own length, so
+                            // the zero bits above k select the right one. A
+                            // stream's last code is usually shorter than the
+                            // table's index width; waiting for bytes that never
+                            // come made a complete raw stream answer
+                            // Z_BUF_ERROR under Z_FINISH ("incomplete or
+                            // truncated stream"), depending on how its final
+                            // bits fell. Modern zlib decodes the same way.
+                            break;
                         } else {
 
                             s.bitb = b;
@@ -251,6 +263,18 @@ final class InfCodes {
                     while (k < (j)) {
                         if (n != 0) {
                             r = Z_OK;
+                        } else if (tree[(tree_index + (b & inflate_mask[j])) * 3 + 1] <= k) {
+                            // The input is exhausted but the bits held already
+                            // complete a code: every entry of the table is
+                            // replicated over the bits past its own length, so
+                            // the zero bits above k select the right one. A
+                            // stream's last code is usually shorter than the
+                            // table's index width; waiting for bytes that never
+                            // come made a complete raw stream answer
+                            // Z_BUF_ERROR under Z_FINISH ("incomplete or
+                            // truncated stream"), depending on how its final
+                            // bits fell. Modern zlib decodes the same way.
+                            break;
                         } else {
 
                             s.bitb = b;

@@ -157,7 +157,7 @@ public class IconRenderElement extends RenderElement {
      * points the other way.
      */
     private char glyph() {
-        char c = icon().getIcon().codePoint();
+        char c = icon().getIcon().codePointChar();
         if (!isRtl()) {
             return c;
         }
@@ -178,14 +178,14 @@ public class IconRenderElement extends RenderElement {
     private static char[][] mirroredGlyphs() {
         if (mirrored == null) {
             mirrored = new char[][] {
-                {com.codename1.flutter.Icons.arrow_back().codePoint(),
-                        com.codename1.flutter.Icons.arrow_forward().codePoint()},
-                {com.codename1.flutter.Icons.arrow_back_ios().codePoint(),
-                        com.codename1.flutter.Icons.arrow_forward_ios().codePoint()},
-                {com.codename1.flutter.Icons.chevron_left().codePoint(),
-                        com.codename1.flutter.Icons.chevron_right().codePoint()},
-                {com.codename1.flutter.Icons.keyboard_arrow_left().codePoint(),
-                        com.codename1.flutter.Icons.keyboard_arrow_right().codePoint()},
+                {com.codename1.flutter.Icons.arrow_back().codePointChar(),
+                        com.codename1.flutter.Icons.arrow_forward().codePointChar()},
+                {com.codename1.flutter.Icons.arrow_back_ios().codePointChar(),
+                        com.codename1.flutter.Icons.arrow_forward_ios().codePointChar()},
+                {com.codename1.flutter.Icons.chevron_left().codePointChar(),
+                        com.codename1.flutter.Icons.chevron_right().codePointChar()},
+                {com.codename1.flutter.Icons.keyboard_arrow_left().codePointChar(),
+                        com.codename1.flutter.Icons.keyboard_arrow_right().codePointChar()},
             };
         }
         return mirrored;

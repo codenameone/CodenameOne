@@ -1,0 +1,19 @@
+empty String is List<String>: true
+empty String is List<bool>: false
+Object[a,b] is List<String>: false
+Object[a,b] is List<Object>: true
+String[a] is List<Object>: true
+String[a] is List<String?>: true
+String?[a] is List<String>: false
+double? list is List<num>: false
+inferred is List<String>: true
+map().toList() is List<String>: true 2
+List<Object>.from is List<String>: false
+List<String>.from is List<String>: true
+filled is List<bool>: true
+filled Object is List<bool>: false
+generate is List<String>: true
+toList copy keeps type: true
+as on Object list: TypeError
+as on String list: ok 1
+as on empty String list: ok 0

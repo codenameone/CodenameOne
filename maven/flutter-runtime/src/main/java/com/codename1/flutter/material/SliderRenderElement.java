@@ -181,6 +181,34 @@ public class SliderRenderElement extends RenderElement {
             int accent = cs.primary().rgb();
             int track = cs.surfaceVariant() != null
                     ? cs.surfaceVariant().rgb() : cs.surface().rgb();
+            // A SliderTheme above the slider wins over ThemeData.sliderTheme,
+            // which wins over the colour scheme -- Flutter's resolution order.
+            SliderThemeData st = SliderTheme.findIn(this);
+            if (st == null) {
+                st = Theme.of(this).sliderTheme();
+            }
+            int active = accent;
+            int thumb = accent;
+            if (st != null) {
+                if (st.activeTrackColor() != null) {
+                    active = st.activeTrackColor().rgb();
+                }
+                if (st.inactiveTrackColor() != null) {
+                    track = st.inactiveTrackColor().rgb();
+                }
+                thumb = st.thumbColor() != null ? st.thumbColor().rgb() : active;
+                if (st.thumbShape() instanceof RoundSliderThumbShape) {
+                    double r = ((RoundSliderThumbShape) st.thumbShape()).enabledThumbRadius();
+                    int d = Math.max(2, (int) Math.round(com.codename1.flutter.rendering.Dp.px(r * 2)));
+                    com.codename1.ui.Image img = com.codename1.ui.Image.createImage(d, d, 0);
+                    com.codename1.ui.Graphics g = img.getGraphics();
+                    g.setAntiAliased(true);
+                    g.setColor(thumb);
+                    g.fillArc(0, 0, d, d, 0, 360);
+                    s.setThumbImage(img);
+                }
+            }
+            accent = thumb;
             // Inactive track and thumb.
             s.getSliderEmptyUnselectedStyle().setBgColor(track);
             s.getSliderEmptyUnselectedStyle().setBgTransparency(255);
@@ -189,9 +217,9 @@ public class SliderRenderElement extends RenderElement {
             s.getSliderEmptySelectedStyle().setBgTransparency(255);
             s.getSliderEmptySelectedStyle().setFgColor(accent);
             // Active track.
-            s.getSliderFullSelectedStyle().setBgColor(accent);
+            s.getSliderFullSelectedStyle().setBgColor(active);
             s.getSliderFullSelectedStyle().setBgTransparency(255);
-            s.getSliderFullUnselectedStyle().setBgColor(accent);
+            s.getSliderFullUnselectedStyle().setBgColor(active);
             s.getSliderFullUnselectedStyle().setBgTransparency(255);
         } catch (Throwable noTheme) {
             // an unthemed slider keeps the base look

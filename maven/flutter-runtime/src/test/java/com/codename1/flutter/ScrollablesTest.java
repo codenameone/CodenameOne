@@ -147,7 +147,7 @@ class ScrollablesTest {
 
     @Test
     void gridViewCountLaysOutRowsOfTightCells() {
-        DartList<Widget> cells = new DartList<Widget>();
+        DartList<Widget> cells = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < 6; i++) {
             cells.add(new ProbeBox(1, 1));
         }
@@ -174,7 +174,7 @@ class ScrollablesTest {
 
     @Test
     void gridViewAspectRatioShrinksTheCellHeight() {
-        DartList<Widget> cells = new DartList<Widget>();
+        DartList<Widget> cells = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         cells.add(new ProbeBox(1, 1));
         cells.add(new ProbeBox(1, 1));
         GridView gv = GridView.count(null, null, null, null, 2L, 2.0, null, null, null, cells);

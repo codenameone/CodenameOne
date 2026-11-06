@@ -1,0 +1,7 @@
+noop x -
+noop - -
+noop 1 2
+got y
+report z null null
+report 7 null null
+report null null null

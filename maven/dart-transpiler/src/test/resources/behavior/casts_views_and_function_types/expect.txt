@@ -1,0 +1,38 @@
+true
+false
+2
+true
+read checked
+true
+[1, 1]
+true
+false
+true
+false
+1
+true
+true
+false
+false
+(int) => String
+(int) => String
+(int) => String
+true
+(int, {required int k}) => int
+(int, [String]) => int
+true
+false
+true
+true
+<Y0>(Y0) => Y0
+4
+<Y0, Y1>(Y1, Y0?) => Y0?
+<Y0>(Y0, Y0) => Y0
+<Y0>(int, Y0) => Y0
+<Y0>(Y0) => List<Y0>
+<Y0, Y1>(Map<Y0, Y1>) => int
+<Y0, Y1>((Y1) => Y0, Y1) => Y0
+n7
+<Y0>(Y0) => Y0
+5
+<Y0>(List<Y0>, ((Y0) => Y0)?) => int
