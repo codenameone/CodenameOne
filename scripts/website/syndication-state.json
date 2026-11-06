@@ -3230,6 +3230,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-06T16:01:12+00:00"
+      },
+      "devto": {
+        "id": 4989336,
+        "url": "https://dev.to/codenameone/flutter-better-in-java-1e48",
+        "syndicated_at": "2026-11-06T16:03:34+00:00"
       }
     }
   }
