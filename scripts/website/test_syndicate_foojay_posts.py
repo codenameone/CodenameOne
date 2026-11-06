@@ -248,6 +248,23 @@ class SubmissionTest(unittest.TestCase):
         self.assertEqual('writer:cn1-syndication/friday', writes[-1][1]['head'])
         self.assertIn(post().canonical_url, writes[-1][1]['body'])
 
+    def test_diverged_fork_is_force_reset_to_upstream(self):
+        github = self.fake()
+        submit_api = github.api.side_effect
+        resets = []
+
+        def api(endpoint, payload=None, **kwargs):
+            if endpoint.endswith('/merge-upstream'):
+                raise RuntimeError('gh: There are merge conflicts (HTTP 409)')
+            if endpoint == 'repos/writer/website/git/refs/heads/main':
+                resets.append((payload, kwargs.get('method')))
+                return {}
+            return submit_api(endpoint, payload, **kwargs)
+        github.api.side_effect = api
+        result = submit_bundle(post(), {'draft/friday/index.md': b'article'}, 'writer/website', github)
+        self.assertEqual('submitted', result['status'])
+        self.assertEqual([({'sha': 'base', 'force': True}, 'PATCH')], resets)
+
     def test_duplicate_migrated_article_prevents_writes(self):
         github = self.fake(duplicate=True)
         with self.assertRaisesRegex(RuntimeError, 'already contains'):
