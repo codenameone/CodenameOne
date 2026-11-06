@@ -46,7 +46,7 @@ import com.codenameone.examples.splat.api.PlayerDetailDto;
 import com.codenameone.examples.splat.api.PlayerDto;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.ui.HistoryForm;
 import com.codenameone.examples.splat.ui.MatchLobby;
 import com.codenameone.examples.splat.ui.Nav;

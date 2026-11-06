@@ -19,7 +19,7 @@
 package com.codenameone.examples.splat.account;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.splat.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.splat.api.AccountApiServer;
 import com.codenameone.examples.splat.api.PlayerDto;
 import com.codenameone.examples.splat.api.ProfileDto;

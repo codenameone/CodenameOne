@@ -34,7 +34,7 @@ import com.codenameone.examples.splat.api.GameProtocol;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
 import com.codenameone.examples.splat.net.GameLink;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.rules.Json;
 import com.codenameone.examples.splat.play.OnlineDriver;

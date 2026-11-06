@@ -30,7 +30,7 @@ import com.codenameone.examples.splat.api.PlayerDto;
 import com.codenameone.examples.splat.api.RunnerDto;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.play.OperatorStage;
 import com.codenameone.examples.splat.rules.Catalog;

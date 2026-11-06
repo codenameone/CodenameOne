@@ -25,6 +25,13 @@
             <artifactId>myappname-rules</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The client plumbing every full-stack sample shares; see cn1-app-kit. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-app-kit-lib</artifactId>
+            <version>${cn1.version}</version>
+            <type>pom</type>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>

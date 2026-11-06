@@ -26,7 +26,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.splat.api.ReceiptDto;
 import com.codenameone.examples.splat.api.WalletDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import java.util.List;
 
 /// In-app purchases, through `com.codename1.payment`.

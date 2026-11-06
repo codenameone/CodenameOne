@@ -33,7 +33,7 @@ import com.codenameone.examples.splat.play.Sfx;
 import com.codenameone.examples.splat.engage.Notifications;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 
 /// Settings: the runner name, sound, analytics consent, push, the server.

@@ -24,7 +24,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.splat.api.LeaderDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 
 /// The top players by trophies.
 public final class LeaderboardForm {

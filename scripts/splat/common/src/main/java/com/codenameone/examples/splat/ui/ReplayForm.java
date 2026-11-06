@@ -20,7 +20,7 @@ package com.codenameone.examples.splat.ui;
 
 import com.codenameone.examples.splat.api.ReplayDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.rules.Replay;
 import com.codenameone.examples.splat.rules.RulesVersion;

@@ -35,7 +35,7 @@ import com.codenameone.examples.splat.engage.Ads;
 import com.codenameone.examples.splat.engage.Friends;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.play.ArenaView;
 import com.codenameone.examples.splat.play.Driver;

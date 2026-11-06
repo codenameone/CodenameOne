@@ -147,13 +147,24 @@ RULES_DEPENDENCY = """        <!-- The rules both the app and the server run; se
 """
 
 
+APP_KIT_DEPENDENCY = """        <!-- The client plumbing every full-stack sample shares; see cn1-app-kit. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-app-kit-lib</artifactId>
+            <version>${cn1.version}</version>
+            <type>pom</type>
+        </dependency>
+"""
+
+
 def common_pom():
     """The common module's pom for the template.
 
     Not the sample's own: that one belongs to the reactor the sample has, built
     from the archetype in this tree, while a generated project gets the reactor in
     common.zip, and a module pom is only right for the reactor it was written for.
-    The one thing the application adds to a plain project's pom is `shared`.
+    What the application adds to a plain project's pom is `shared`, and `rules`
+    and the cn1-app-kit library when it uses them.
     """
     if '<artifactId>' + name + '-shared</artifactId>' not in (sample / 'common/pom.xml').read_text('utf-8'):
         raise SystemExit('scripts/' + name + '/common/pom.xml no longer depends on ' + name + '-shared; '
@@ -167,6 +178,10 @@ def common_pom():
         if '<artifactId>' + name + '-rules</artifactId>' not in (sample / 'common/pom.xml').read_text('utf-8'):
             raise SystemExit('scripts/' + name + '/common/pom.xml no longer depends on ' + name + '-rules.')
         added += RULES_DEPENDENCY
+    # The kit is released with the framework, so the generated project takes it
+    # at the framework version its reactor pins.
+    if '<artifactId>cn1-app-kit-lib</artifactId>' in (sample / 'common/pom.xml').read_text('utf-8'):
+        added += APP_KIT_DEPENDENCY
     return pom.replace(marker, marker + added, 1).encode('utf-8')
 
 

@@ -18,6 +18,14 @@
             <artifactId>codenameone-core</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- The client plumbing every full-stack sample shares (Net), from the
+             cn1-app-kit cn1lib released with the framework. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-app-kit-lib</artifactId>
+            <version>${cn1.version}</version>
+            <type>pom</type>
+        </dependency>
         <!-- The contract shared with the server; see shared/pom.xml. -->
         <dependency>
             <groupId>${project.groupId}</groupId>

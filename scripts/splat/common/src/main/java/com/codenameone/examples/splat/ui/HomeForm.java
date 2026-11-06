@@ -40,7 +40,7 @@ import com.codenameone.examples.splat.api.SpotlightDto;
 import com.codenameone.examples.splat.engage.Ads;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.play.OperatorStage;
 

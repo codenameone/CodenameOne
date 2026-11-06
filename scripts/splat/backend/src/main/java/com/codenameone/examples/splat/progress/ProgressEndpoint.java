@@ -19,7 +19,7 @@
 package com.codenameone.examples.splat.progress;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.splat.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.splat.api.ClaimDto;
 import com.codenameone.examples.splat.api.ProgressApiServer;
 import com.codenameone.examples.splat.api.ProgressDto;

@@ -31,7 +31,7 @@ import com.codenameone.examples.splat.api.AdminStatsDto;
 import com.codenameone.examples.splat.api.InsightsDto;
 import com.codenameone.examples.splat.api.NameCountDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.ui.Ui;
 import java.util.ArrayList;
 import java.util.Date;

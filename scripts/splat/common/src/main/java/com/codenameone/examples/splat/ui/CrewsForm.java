@@ -28,7 +28,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.splat.api.CrewCreateDto;
 import com.codenameone.examples.splat.api.CrewDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 
 /// Crews: a standing group of friends with its own leaderboard on every

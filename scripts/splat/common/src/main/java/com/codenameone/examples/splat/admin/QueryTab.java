@@ -27,7 +27,7 @@ import com.codenameone.examples.splat.api.PlayerDto;
 import com.codenameone.examples.splat.api.QueryDto;
 import com.codenameone.examples.splat.api.QueryResultDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.ui.Ui;
 import java.util.Arrays;
 

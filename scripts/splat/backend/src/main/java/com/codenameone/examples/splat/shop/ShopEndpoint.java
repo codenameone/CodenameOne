@@ -19,7 +19,7 @@
 package com.codenameone.examples.splat.shop;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.splat.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.splat.api.AdRewardDto;
 import com.codenameone.examples.splat.api.BuyDto;
 import com.codenameone.examples.splat.api.EquipDto;

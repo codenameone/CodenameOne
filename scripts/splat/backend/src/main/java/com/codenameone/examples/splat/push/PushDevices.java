@@ -23,7 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.push.PushTarget;
 import com.codenameone.examples.splat.Ids;
-import com.codenameone.examples.splat.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.splat.api.PushDeviceDto;
 import com.codenameone.examples.splat.domain.PushDevice;
 import com.codenameone.examples.splat.repository.ProfileRepository;

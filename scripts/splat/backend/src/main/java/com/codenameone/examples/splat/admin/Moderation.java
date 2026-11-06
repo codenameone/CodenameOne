@@ -25,7 +25,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.splat.Clock;
 import com.codenameone.examples.splat.Ids;
-import com.codenameone.examples.splat.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.splat.account.Accounts;
 import com.codenameone.examples.splat.api.AdminActionDto;
 import com.codenameone.examples.splat.api.AuditDto;

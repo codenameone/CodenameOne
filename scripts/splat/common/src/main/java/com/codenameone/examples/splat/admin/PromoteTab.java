@@ -30,7 +30,7 @@ import com.codenameone.examples.splat.api.PromoteDto;
 import com.codenameone.examples.splat.api.SpotlightDto;
 import com.codenameone.examples.splat.engage.Friends;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.ui.Ui;
 import java.util.Date;
 

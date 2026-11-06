@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.splat.push;
 
+import com.codename1.appkit.server.push.PushSender;
+
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;

@@ -19,7 +19,7 @@
 package com.codenameone.examples.splat.social;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.splat.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.splat.api.FriendDto;
 import com.codenameone.examples.splat.api.InviteClaimDto;
 import com.codenameone.examples.splat.api.InviteDto;

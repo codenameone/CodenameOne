@@ -36,7 +36,7 @@ import com.codenameone.examples.splat.api.ProgressDto;
 import com.codenameone.examples.splat.api.RewardDto;
 import com.codenameone.examples.splat.engage.Telemetry;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import java.util.ArrayList;
 import java.util.List;

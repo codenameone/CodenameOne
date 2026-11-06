@@ -29,7 +29,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.splat.AppConfig;
 import com.codenameone.examples.splat.api.PushDeviceDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.ui.Nav;
 

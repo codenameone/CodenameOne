@@ -28,7 +28,7 @@ import com.codename1.io.Preferences;
 import com.codenameone.examples.splat.api.InviteClaimDto;
 import com.codenameone.examples.splat.api.InviteDto;
 import com.codenameone.examples.splat.net.Api;
-import com.codenameone.examples.splat.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.ui.Rewards;
 import com.codenameone.examples.splat.ui.Ui;

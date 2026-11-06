@@ -22,7 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.repository.PageRequest;
-import com.codenameone.examples.splat.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.splat.account.Lists;
 import com.codenameone.examples.splat.admin.Flags;
 import com.codenameone.examples.splat.api.ChallengeDto;
