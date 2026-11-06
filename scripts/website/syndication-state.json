@@ -3211,6 +3211,16 @@
         "canonical_set": true,
         "syndicated_at": "2026-11-06T01:00:57+00:00"
       }
+    },
+    "flutter-better-in-java": {
+      "foojay": {
+        "id": 192,
+        "url": "https://github.com/foojayio/website/pull/192",
+        "pull_request_url": "https://github.com/foojayio/website/pull/192",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-06T04:24:28+00:00"
+      }
     }
   }
 }
