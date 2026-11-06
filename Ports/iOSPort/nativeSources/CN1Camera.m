@@ -166,6 +166,7 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
         dev = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
     }
     if (!dev) return NO;
+    AVCaptureDevice *requested = dev;
 #if !TARGET_OS_OSX && !TARGET_OS_TV
     dev = [CN1Camera closeFocusingDeviceFor:dev];
 #endif
@@ -189,6 +190,19 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
         self.session.sessionPreset = AVCaptureSessionPresetMedium;
     }
 
+    if (![self.session canAddInput:vin] && dev != requested) {
+        // A virtual device offers fewer formats than its physical lenses; if
+        // it cannot run this preset, open the lens that was asked for, as
+        // before the substitution.
+        dev = requested;
+        self.device = dev;
+        vin = [AVCaptureDeviceInput deviceInputWithDevice:dev error:&err];
+        if (!vin) {
+            [self.session commitConfiguration];
+            return NO;
+        }
+        self.input = vin;
+    }
     if ([self.session canAddInput:vin]) {
         [self.session addInput:vin];
     } else {
@@ -228,10 +242,12 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
     }
 
     [self.session commitConfiguration];
+    [self.session startRunning];
 #if !TARGET_OS_OSX && !TARGET_OS_TV
+    // After startRunning: the session may settle activeFormat as it starts,
+    // and a format change resets videoZoomFactor to 1.0 (the ultra-wide lens).
     [self applyVirtualDeviceDefaults];
 #endif
-    [self.session startRunning];
     return YES;
 }
 
