@@ -1,0 +1,8 @@
+A.Box(1) A.Shelf of 2 5
+B.Box("q") B.Shelf keys [x, y] 2 <b:w> -3
+14 A.Shelf of 1
+2 B.Shelf keys [3]
+A.Box(9) B.Box("z")
+[a:m] 102
+-4 101 true false
+1 <b:c> A.Box(2) 2

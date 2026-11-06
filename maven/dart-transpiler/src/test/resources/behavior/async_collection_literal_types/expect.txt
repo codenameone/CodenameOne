@@ -1,0 +1,11 @@
+[1, 10, 20, 5] List<int>
+{a, c} _Set<String>
+{k: 1, j: 2.5} _Map<String, num>
+{z: 3, 1: 1} _Map<String, num>
+[[1], {x: [2]}] List<Object> List<int> _Map<String, List<int>>
+{a: 1} _Map<String, int>
+int String
+[1] q List<int>
+List<int> List<String>
+1 2.5
+1 [2, 3] List<int>

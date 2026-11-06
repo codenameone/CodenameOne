@@ -33,8 +33,9 @@ import dart.core.DartList;
 /**
  * An app bar that integrates into a {@link CustomScrollView} and can expand,
  * float, pin or snap as the user scrolls — Flutter's {@code SliverAppBar}. This
- * milestone renders the {@code title} (with {@code flexibleSpace} preferred when
- * present); the scroll-driven collapse/expand behavior is deferred.
+ * {@link CustomScrollView} collapses it from expandedHeight to the toolbar height
+ * as the content scrolls, pinning or floating it as asked; outside one it renders
+ * the {@code flexibleSpace}, or the {@code title}.
  */
 public class SliverAppBar extends StatelessWidget {
 
@@ -64,16 +65,69 @@ public class SliverAppBar extends StatelessWidget {
         this.backgroundColor = v;
     }
 
+    private boolean pinned;
+    private boolean floating;
+    private Double expandedHeight;
+
     public void pinned(boolean v) {
+        this.pinned = v;
     }
 
     public void floating(boolean v) {
+        this.floating = v;
+    }
+
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public boolean isFloating() {
+        return floating;
+    }
+
+    /// Flutter's default toolbar height, the collapsed extent of the bar.
+    static final double TOOLBAR_HEIGHT = 56.0;
+
+    /// The bar as a persistent header, which {@link CustomScrollView} drives: it is
+    /// expandedHeight tall (the toolbar height without one) and collapses to the
+    /// toolbar height. While it has room beyond the toolbar the flexibleSpace is shown,
+    /// and the title once it is collapsed (or always, without a flexibleSpace).
+    SliverPersistentHeaderDelegate headerDelegate() {
+        final double max = Math.max(TOOLBAR_HEIGHT, expandedHeight != null ? expandedHeight.doubleValue() : TOOLBAR_HEIGHT);
+        return new SliverPersistentHeaderDelegate() {
+            @Override
+            public Widget build(BuildContext context, double shrinkOffset, boolean overlapsContent) {
+                if (flexibleSpace != null && shrinkOffset < max - TOOLBAR_HEIGHT) {
+                    return flexibleSpace;
+                }
+                if (title != null) {
+                    return title;
+                }
+                return flexibleSpace != null ? flexibleSpace : new SizedBox();
+            }
+
+            @Override
+            public double minExtent() {
+                return TOOLBAR_HEIGHT;
+            }
+
+            @Override
+            public double maxExtent() {
+                return max;
+            }
+
+            @Override
+            public boolean shouldRebuild(SliverPersistentHeaderDelegate oldDelegate) {
+                return true;
+            }
+        };
     }
 
     public void snap(boolean v) {
     }
 
     public void expandedHeight(double v) {
+        this.expandedHeight = v;
     }
 
     public void automaticallyImplyLeading(boolean v) {

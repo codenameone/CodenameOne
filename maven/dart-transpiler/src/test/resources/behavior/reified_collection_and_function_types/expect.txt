@@ -1,0 +1,40 @@
+Box<List<int>>
+List<int>
+true
+true
+false
+false
+true
+false
+true
+false
+true
+List<int>
+List<double>
+List<String>
+List<List<int>>
+_Map<String, int>
+_Set<int>
+TypeError true
+TypeError true
+TypeError true
+[1, 2.5]
+true
+false
+true
+true
+false
+true
+false
+true
+false
+true
+cast fail
+true
+true
+false
+true
+false
+true
+true
+false

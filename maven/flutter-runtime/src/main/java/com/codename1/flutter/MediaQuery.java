@@ -149,6 +149,46 @@ public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
         return of(context).size();
     }
 
+    /** {@code MediaQuery.viewPaddingOf}: the padding system UI covers, keyboard aside. */
+    public static EdgeInsets viewPaddingOf(BuildContext context) {
+        return of(context).viewPadding();
+    }
+
+    /** {@code MediaQuery.textScalerOf}: the ambient text scaling. */
+    public static TextScaler textScalerOf(BuildContext context) {
+        return TextScaler.linear(of(context).textScaleFactor());
+    }
+
+    /**
+     * {@code MediaQuery.withClampedTextScaling}: a subtree that sees the ambient text
+     * scale factor clamped to the given bounds.
+     */
+    public static Widget withClampedTextScaling(com.codename1.flutter.Key key, final Double minScaleFactor,
+                                                final Double maxScaleFactor, final Widget child) {
+        return new ClampedTextScaling(minScaleFactor, maxScaleFactor, child);
+    }
+
+    /** The subtree {@link #withClampedTextScaling} returns. */
+    static final class ClampedTextScaling extends StatelessWidget {
+        private final Double minScaleFactor;
+        private final Double maxScaleFactor;
+        private final Widget child;
+
+        ClampedTextScaling(Double minScaleFactor, Double maxScaleFactor, Widget child) {
+            this.minScaleFactor = minScaleFactor;
+            this.maxScaleFactor = maxScaleFactor;
+            this.child = child;
+        }
+
+        @Override
+        public Widget build(BuildContext context) {
+            MediaQueryData d = of(context);
+            double f = TextScaler.linear(d.textScaleFactor()).clamp(minScaleFactor, maxScaleFactor)
+                    .textScaleFactor();
+            return scope(d.copyWith(null, null, Double.valueOf(f), null, null), child);
+        }
+    }
+
     /** {@code MediaQuery.paddingOf}: the ambient safe-area padding. */
     public static EdgeInsets paddingOf(BuildContext context) {
         return of(context).padding();

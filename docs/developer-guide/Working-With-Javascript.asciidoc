@@ -300,6 +300,18 @@ The choice is kept in the browser's local storage and applies only in `auto` mod
 
 For anything the hints don't cover, the markup is the `cn1-splash` `div` in the generated `index.html`; edit it there if you host the bundle yourself.
 
+=== Blocking code and performance
+
+The browser has one thread per page, so Codename One runs your threads as green threads inside a web worker. A Java method that can wait -- `Object.wait()`, `Thread.sleep()`, `invokeAndBlock()`, a modal `Dialog`, or a call that waits for the browser to answer -- is compiled to a JavaScript generator, which can pause and resume. Every method that can reach such a method is compiled to a generator too, through any direct call, and through any interface or virtual call whose target could be one. Code you never meant to block pays the cost: a call to a generator is several times slower than a call to a plain function.
+
+The build writes `*-js-suspension-report.txt` beside the bundle. It lists every method compiled as a generator, with the reason, and the called methods that make the most of them.
+
+The `@JavaScriptDetached` annotation in `com.codename1.annotations` stops that spread at a method boundary. Every other platform ignores it.
+
+Put it on a `void` method whose callers don't wait for the work it starts. On the web the method runs as a plain function until it would block; the rest of it then continues on its own green thread, and the caller returns. `Display.callSerially` carries it, so a component that schedules work on the EDT is no longer a generator because of it.
+
+It changes nothing a caller observes on any other platform. On the web, use it only where the method's contract already says the caller doesn't wait for the result.
+
 [id="debugging", reftext="Debugging in Chrome"]
 === Debugging
 

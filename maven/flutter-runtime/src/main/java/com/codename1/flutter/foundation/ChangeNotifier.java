@@ -68,7 +68,7 @@ public interface ChangeNotifier extends Listenable {
     default void removeListener(Funcs.VoidFunc0 listener) {
         List<Funcs.VoidFunc0> own = changeNotifierListeners$();
         if (own != null) {
-            own.remove(listener);
+            dart.runtime.DartRuntime.removeEq(own, listener);
             return;
         }
         LISTENERS.remove(this, listener);

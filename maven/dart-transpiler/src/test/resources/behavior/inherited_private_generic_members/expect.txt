@@ -1,0 +1,6 @@
+true
+[5, 6]
+2
+[false, true, false, true]
+3
+[false, true, false]

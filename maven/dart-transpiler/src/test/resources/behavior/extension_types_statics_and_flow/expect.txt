@@ -1,0 +1,32 @@
+0
+2
+16
+1000
+id
+before lazy
+lazy init
+7
+14
+id#3
+6
+8
+2
+1
+stats
+id#4
+id#1005
+square
+tri
+14
+30
+62
+122
+id#6
+id#3
+true
+id#3
+id#4
+id#9
+id#3
+id#12
+[id#3, id#4]

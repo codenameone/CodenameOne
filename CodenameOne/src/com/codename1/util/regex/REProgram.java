@@ -25,6 +25,7 @@ package com.codename1.util.regex;
 /// - RE
 ///
 /// - RECompiler
+@com.codename1.impl.SharedWithBackend
 public class REProgram {
     static final int OPT_HASBACKREFS = 1;
     static final int OPT_HASBOL = 2;

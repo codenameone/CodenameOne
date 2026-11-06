@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /// Encapsulates java.io.InputStream as CharacterIterator.
+@com.codename1.impl.SharedWithBackend
 public final class StreamCharacterIterator implements CharacterIterator {
     /// Underlying is
     private final InputStream is;

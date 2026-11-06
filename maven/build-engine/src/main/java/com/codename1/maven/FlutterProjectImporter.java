@@ -62,7 +62,7 @@ public final class FlutterProjectImporter {
 
     static {
         COVERED.put("flutter", "Material and Cupertino widget stubs (codenameone-flutter-runtime)");
-        COVERED.put("flutter_localizations", "localization delegate scaffolding only; strings are not translated");
+        COVERED.put("flutter_localizations", "Material and Cupertino strings for en, es and he (RTL); any other locale falls back to English");
         COVERED.put("cupertino_icons", "CupertinoIcons constants (flutter-runtime stub); "
                 + "the font file itself still needs its own pubspec.yaml fonts: entry to be copied");
         // The rest are verified against the actual stub sources (maven/flutter-runtime's
@@ -76,7 +76,7 @@ public final class FlutterProjectImporter {
         COVERED.put("url_launcher", "launchUrl/launchUrlString/canLaunchUrl; LaunchMode.inAppWebView and "
                 + "inAppBrowserView open an in-app BrowserComponent, the others the system handler");
         COVERED.put("scoped_model", "ScopedModel/ScopedModelDescendant stubs");
-        COVERED.put("vector_math", "Matrix4/Vector3 stubs");
+        COVERED.put("vector_math", "Matrix4, Vector2 and Vector3 stubs, radians/degrees");
         COVERED.put("flutter_localized_locales", "LocaleNames/LocaleNamesLocalizationsDelegate stubs");
         COVERED.put("adaptive_breakpoints", "AdaptiveBreakpoints.getWindowType only; "
                 + "isDisplayDesktop/isDisplaySmallDesktop/isDisplayMobile are not stubbed");
@@ -1277,13 +1277,21 @@ public final class FlutterProjectImporter {
             b.append("\n        implements ").append(implementsList);
         }
         b.append(" {\n");
+        // WidgetsBindingObserver.didChangeAppLifecycleState is fed from here: resumed after
+        // every start (the first one runs main() inside super.start()), paused before stop.
+        b.append("    @Override\n")
+                .append("    public void start() {\n");
         if (links) {
-            b.append("    @Override\n")
-                    .append("    public void start() {\n")
-                    .append("        com.codename1.flutter.plugins.applinks.AppLinks.appStarted();\n")
-                    .append("        super.start();\n")
-                    .append("    }\n\n");
+            b.append("        com.codename1.flutter.plugins.applinks.AppLinks.appStarted();\n");
         }
+        b.append("        super.start();\n")
+                .append("        com.codename1.flutter.widgets.WidgetsBinding.instance.appStarted();\n")
+                .append("    }\n\n")
+                .append("    @Override\n")
+                .append("    public void stop() {\n")
+                .append("        com.codename1.flutter.widgets.WidgetsBinding.instance.appStopped();\n")
+                .append("        super.stop();\n")
+                .append("    }\n\n");
         b.append("    @Override\n")
                 .append("    public void runApp() {\n");
         if (push) {

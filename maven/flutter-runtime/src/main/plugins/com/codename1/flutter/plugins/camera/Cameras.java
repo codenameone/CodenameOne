@@ -37,7 +37,7 @@ public final class Cameras {
     }
 
     public static Future<DartList<CameraDescription>> availableCameras() {
-        DartList<CameraDescription> out = new DartList<CameraDescription>();
+        DartList<CameraDescription> out = new DartList<CameraDescription>(dart.runtime.TypeWitness.of(CameraDescription.class, false));
         if (Display.isInitialized() && Camera.isSupported()) {
             CameraInfo[] all = Camera.getCameras();
             for (int i = 0; all != null && i < all.length; i++) {

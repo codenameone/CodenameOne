@@ -104,6 +104,7 @@ public abstract class TextInputControl extends Control {
     private Paint textFill;
     private Paint promptTextFill;
     private boolean fillShown;
+    private boolean ownBox;
     private int themeFill;
     private int themeOpacity;
     private boolean syncing;
@@ -113,6 +114,28 @@ public abstract class TextInputControl extends Control {
     /// Creates a text input control.
     protected TextInputControl() {
         getStyleClass().add("text-input");
+        javafx.beans.InvalidationListener chrome = new javafx.beans.InvalidationListener() {
+            @Override
+            public void invalidated(javafx.beans.Observable observable) {
+                cn1Invalidated(Dirty.NATIVE);
+            }
+        };
+        backgroundProperty().addListener(chrome);
+        borderProperty().addListener(chrome);
+    }
+
+    /// Whether the style sheet gives this control a background or a
+    /// border of its own. That is its whole box in JavaFX, so the native
+    /// field then draws only its text: with the theme's box as well, a
+    /// field styled to sit borderless inside a rounded search bar showed
+    /// a second box of its own.
+    private boolean drawsOwnBox() {
+        javafx.scene.layout.Background b = getBackground();
+        if (b != null && !b.getFills().isEmpty()) {
+            return true;
+        }
+        javafx.scene.layout.Border border = getBorder();
+        return border != null && !border.getStrokes().isEmpty();
     }
 
     /// Returns the listener a subclass adds to its native text component:
@@ -143,6 +166,14 @@ public abstract class TextInputControl extends Control {
             return;
         }
         com.codename1.ui.TextArea area = (com.codename1.ui.TextArea) c;
+        boolean own = drawsOwnBox();
+        if (ownBox && !own) {
+            // Setting the UIID again brings the theme's box back, and the
+            // theme's text colour with it.
+            area.setUIID(area.getUIID());
+            fillShown = false;
+        }
+        ownBox = own;
         syncing = true;
         try {
             String t = getText();
@@ -163,6 +194,13 @@ public abstract class TextInputControl extends Control {
                 area.setEditable(isEditable());
             }
             Style style = com.codename1.fxcompat.runtime.PeerPaint.allStyles(area);
+            if (own) {
+                style.setBgTransparency(0);
+                style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
+                // The control's own padding insets the field.
+                style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                style.setPadding(0, 0, 0, 0);
+            }
             if (textFill instanceof Color) {
                 if (!fillShown) {
                     // Remembered so that withdrawing the fill shows the

@@ -92,8 +92,51 @@ import java.util.List;
  */
 public class Stream<T> {
 
+    /// The type argument the construction named (`StreamController<Event>().stream` is a
+    /// `Stream<Event>`), which `is Stream<X>` and `as Stream<X>` read; null when nothing
+    /// recorded it, which those tests take as unknown.
+    private dart.runtime.TypeWitness typeArg;
+
+    /// The recorded type argument, or null.
+    public final dart.runtime.TypeWitness typeArgWitness() {
+        return typeArg;
+    }
+
+    /// Records {@code w} as {@code s}'s type argument and answers {@code s}; the emitter
+    /// wraps a construction whose type argument it knows. A null witness records nothing.
+    /// Records {@code w} as {@code s}'s type argument unless one is recorded already, and
+    /// answers it. The emitter calls it on the result of a call whose static type is
+    /// Stream<X>: a stream a member or a function value made without recording X takes the
+    /// declared X, and one that recorded its own (narrower) X keeps it.
+    public static <S extends Stream<?>> S reifyUnknown(S s, dart.runtime.TypeWitness w) {
+        if (s != null && w != null && ((Stream<?>) s).typeArg == null) {
+            ((Stream<?>) s).typeArg = w;
+        }
+        return s;
+    }
+
+    public static <S extends Stream<?>> S reify(S s, dart.runtime.TypeWitness w) {
+        if (s != null && w != null) {
+            ((Stream<?>) s).typeArg = w;
+        }
+        return s;
+    }
+
+    /// Headless, an async* body runs on a thread of its own (see AsyncStar), so a
+    /// listen() or cancel() from that thread races the isolate thread delivering
+    /// events. Unguarded, the snapshot copy in emit() read a half-grown ArrayList
+    /// (a null Sub, or the new listener lost) and a periodic stream piped through
+    /// take(3) delivered two elements. Every read and write of subs and closed
+    /// holds subsLock; no listener callback runs under it.
+    private final Object subsLock = new Object();
     private final List<Sub> subs = new ArrayList<Sub>();
     private boolean closed;
+
+    private List<Sub> snapshotSubs() {
+        synchronized (subsLock) {
+            return new ArrayList<Sub>(subs);
+        }
+    }
 
     /** One event buffered by a paused subscription, delivered in order on resume(). */
     private static final class QueuedEvent {
@@ -182,6 +225,24 @@ public class Stream<T> {
      * event channel overrides this to call the platform
      * {@code StreamHandler.onCancel}.
      */
+    /** Hook: a subscription went from running to paused (StreamController's onPause). */
+    protected void onPaused() {
+    }
+
+    /** Hook: a paused subscription is running again (StreamController's onResume). */
+    protected void onResumed() {
+    }
+
+    /// {@code stream.pipe(consumer)}: hands this stream to the consumer, then closes it.
+    public final Future<Object> pipe(final StreamConsumer<T> consumer) {
+        return consumer.addStream(this).then(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object ignored) {
+                return consumer.close();
+            }
+        });
+    }
+
     protected void onNoListeners() {
     }
 
@@ -216,19 +277,60 @@ public class Stream<T> {
      * own arity needs before it ever reaches here (see
      * {@code JavaEmitter}'s {@code onError} handling for {@code Stream.listen},
      * mirroring {@code Future.then}'s).</p>
+     *
+     * <p>Not final: a Dart class that {@code extends Stream<T>} and overrides
+     * {@code listen} (the documented way to implement a stream) is emitted as
+     * an override of exactly this overload. Every operator here subscribes to
+     * its source through it, so the override is what they reach.</p>
      */
-    public final StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Funcs.VoidFunc0 onDone,
+    public StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Funcs.VoidFunc0 onDone,
             Boolean cancelOnError) {
         Stream<T> target = perListener();
         if (target != this) {
             return target.listen(onData, onError, onDone, cancelOnError);
         }
         Sub sub = new Sub();
-        sub.onData = onData;
-        sub.onError = onError;
-        sub.onDone = onDone;
+        // Listener callbacks run in the zone listen() was called in.
+        // What onData throws is an uncaught error of that zone too (Dart's
+        // runUnaryGuarded), so it is caught inside the binding, while the listen
+        // zone is still current -- not by deliverData after the zone was restored,
+        // where a broadcast pump running in the root zone would lose it.
+        final Funcs.VoidFunc1<T> data = onData;
+        sub.onData = (Funcs.VoidFunc1<T>) Zone.bindAny(data == null ? null : new Funcs.VoidFunc1<T>() {
+            @Override
+            public void call(T value) {
+                try {
+                    data.call(value);
+                } catch (Throwable t) {
+                    reportUncaught(t);
+                }
+            }
+        });
+        // With no onError the error goes to the zone of listen(), not to whichever
+        // zone happens to be current at delivery: bind the reporter there too.
+        sub.onError = Zone.bindAny(onError != null ? onError : new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object err) {
+                if (Zone.current != Zone.root) {
+                    Zone.current.handleUncaughtError(err, dart.core.StackTrace.forError(err));
+                } else {
+                    reportUncaught(err instanceof Throwable ? (Throwable) err
+                            : new RuntimeException(String.valueOf(err)));
+                }
+            }
+        });
+        sub.onDone = (Funcs.VoidFunc0) Zone.bindAny(onDone);
         sub.cancelOnError = cancelOnError != null && cancelOnError.booleanValue();
-        if (closed) {
+        boolean wasClosed;
+        boolean first;
+        synchronized (subsLock) {
+            wasClosed = closed;
+            first = !wasClosed && subs.isEmpty();
+            if (!wasClosed) {
+                subs.add(sub);
+            }
+        }
+        if (wasClosed) {
             // The stream already finished (emitDone() already ran, from
             // StreamController#close or an EventSink's endOfStream). subs
             // is empty by now (emitDone() clears it), so treating this
@@ -245,8 +347,6 @@ public class Stream<T> {
             deliverVoid(sub.onDone);
             return new Handle(sub);
         }
-        boolean first = subs.isEmpty();
-        subs.add(sub);
         if (first) {
             onFirstListener();
         }
@@ -255,7 +355,9 @@ public class Stream<T> {
 
     /** True while at least one live (not cancelled) subscription exists. */
     protected final boolean hasListeners() {
-        return !subs.isEmpty();
+        synchronized (subsLock) {
+            return !subs.isEmpty();
+        }
     }
 
     /**
@@ -264,7 +366,7 @@ public class Stream<T> {
      */
     @SuppressWarnings("unchecked")
     protected final void emit(T value) {
-        for (Sub s : new ArrayList<Sub>(subs)) {
+        for (Sub s : snapshotSubs()) {
             if (s.cancelled) {
                 continue;
             }
@@ -283,7 +385,7 @@ public class Stream<T> {
      * cancels it once {@link #drain} actually delivers that error on resume().
      */
     protected final void emitError(Object error) {
-        for (Sub s : new ArrayList<Sub>(subs)) {
+        for (Sub s : snapshotSubs()) {
             if (s.cancelled) {
                 continue;
             }
@@ -313,9 +415,12 @@ public class Stream<T> {
      * matching the old {@code Future.value(null)}.</p>
      */
     protected final Future<Object> emitDone() {
-        closed = true;
-        List<Sub> snapshot = new ArrayList<Sub>(subs);
-        subs.clear();
+        List<Sub> snapshot;
+        synchronized (subsLock) {
+            closed = true;
+            snapshot = new ArrayList<Sub>(subs);
+            subs.clear();
+        }
         PendingClose pendingClose = new PendingClose();
         boolean hadListeners = false;
         for (Sub s : snapshot) {
@@ -363,8 +468,11 @@ public class Stream<T> {
             s.pendingClose.resolve();
             s.pendingClose = null;
         }
-        subs.remove(s);
-        if (subs.isEmpty() && !closed) {
+        boolean none;
+        synchronized (subsLock) {
+            none = subs.remove(s) && subs.isEmpty() && !closed;
+        }
+        if (none) {
             onNoListeners();
         }
     }
@@ -480,6 +588,107 @@ public class Stream<T> {
      * <p>Concretely typed, like {@link #map} -- see the class comment.</p>
      */
     public final Stream<T> where(final Funcs.Func1<T, Boolean> test) {
+        // A filtered stream has the source's element type, and records it.
+        return reify(filtered(test), typeArg);
+    }
+
+    /// Dart's {@code timeout(timeLimit)}: a TimeoutException error each time
+    /// {@code timeLimit} passes with no event.
+    public final Stream<T> timeout(dart.core.Duration timeLimit) {
+        return timeout(timeLimit, null);
+    }
+
+    /// Dart's {@code timeout(timeLimit, onTimeout: (sink) {...})}: each time
+    /// {@code timeLimit} passes between events (counted from the listen), the output's
+    /// sink is handed to {@code onTimeout} -- or, with none, a TimeoutException is added
+    /// to it. Every event of this stream restarts the count; closing the sink ends the
+    /// output and cancels this stream.
+    public final Stream<T> timeout(final dart.core.Duration timeLimit,
+            final Funcs.VoidFunc1<? super StreamSink<T>> onTimeout) {
+        final Stream<T> upstream = this;
+        final StreamController<T> out = new StreamController<T>();
+        final Timer[] timer = new Timer[1];
+        final StreamSubscription<?>[] sub = new StreamSubscription<?>[1];
+        final Funcs.VoidFunc0[] arm = new Funcs.VoidFunc0[1];
+        final Funcs.VoidFunc0 stop = new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (timer[0] != null) {
+                    timer[0].cancel();
+                    timer[0] = null;
+                }
+            }
+        };
+        arm[0] = new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                stop.call();
+                timer[0] = new Timer(timeLimit, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        timer[0] = null;
+                        if (onTimeout == null) {
+                            out.addError(new TimeoutException("No stream event", timeLimit));
+                        } else {
+                            onTimeout.call(out);
+                        }
+                        if (out.isClosed()) {
+                            if (sub[0] != null) {
+                                sub[0].cancel();
+                                sub[0] = null;
+                            }
+                        } else {
+                            arm[0].call();
+                        }
+                    }
+                });
+            }
+        };
+        out.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                arm[0].call();
+                sub[0] = upstream.listen(new Funcs.VoidFunc1<T>() {
+                    @Override
+                    public void call(T v) {
+                        if (!out.isClosed()) {
+                            arm[0].call();
+                            out.add(v);
+                        }
+                    }
+                }, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        if (!out.isClosed()) {
+                            arm[0].call();
+                            out.addError(e);
+                        }
+                    }
+                }, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        stop.call();
+                        if (!out.isClosed()) {
+                            out.close();
+                        }
+                    }
+                });
+            }
+        });
+        out.onCancel(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                stop.call();
+                if (sub[0] != null) {
+                    sub[0].cancel();
+                    sub[0] = null;
+                }
+            }
+        });
+        return reify(out.stream(), typeArg);
+    }
+
+    private Stream<T> filtered(final Funcs.Func1<T, Boolean> test) {
         final Stream<T> upstream = this;
         return new Stream<T>() {
             private StreamSubscription<T> upstreamSub;
@@ -575,9 +784,9 @@ public class Stream<T> {
             } else if (onError instanceof Funcs.Func1) {
                 ((Funcs.Func1<Object, Object>) onError).call(err);
             } else if (onError instanceof Funcs.VoidFunc2) {
-                ((Funcs.VoidFunc2<Object, Object>) onError).call(err, null);
+                ((Funcs.VoidFunc2<Object, Object>) onError).call(err, dart.core.StackTrace.forError(error));
             } else if (onError instanceof Funcs.Func2) {
-                ((Funcs.Func2<Object, Object, Object>) onError).call(err, null);
+                ((Funcs.Func2<Object, Object, Object>) onError).call(err, dart.core.StackTrace.forError(error));
             } else if (onError == null) {
                 // No handler installed: Dart's default behaviour is to forward the
                 // error to the subscription's zone, which for a headless runtime
@@ -616,7 +825,20 @@ public class Stream<T> {
      * installs, and reporting an error must never itself throw a new one --
      * that would be exactly the failure this method exists to prevent.</p>
      */
+    /// What the source's cancel hook answered for the cancel just made (a controller's
+    /// onCancel returning a Future, an async* body still running its finally blocks):
+    /// {@code subscription.cancel()} completes with it, as in Dart. Null: nothing.
+    Future<Object> takeCancelResult() {
+        return null;
+    }
+
     static void reportUncaught(Throwable t) {
+        if (Zone.current != Zone.root) {
+            // A listener runs in its own zone, whose handler (runZonedGuarded's
+            // onError, a ZoneSpecification's handleUncaughtError) gets it.
+            Zone.current.handleUncaughtError(dart.runtime.DartRuntime.caught(t), Zone.stackOf(t));
+            return;
+        }
         try {
             com.codename1.io.Log.e(t);
         } catch (Throwable loggingFailed) {
@@ -635,7 +857,8 @@ public class Stream<T> {
         @Override
         public Future<Object> cancel() {
             cancelSub(sub);
-            return Future.value(null);
+            Future<Object> r = takeCancelResult();
+            return r != null ? r : Future.value(null);
         }
 
         @Override
@@ -656,6 +879,33 @@ public class Stream<T> {
         @Override
         public void pause() {
             sub.pauseCount++;
+            if (sub.pauseCount == 1) {
+                onPaused();
+            }
+        }
+
+        @Override
+        public Future<Object> asFuture() {
+            return asFuture(null);
+        }
+
+        @Override
+        public Future<Object> asFuture(final Object futureValue) {
+            final Future<Object> f = new Future<Object>();
+            sub.onDone = new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    f.complete(futureValue);
+                }
+            };
+            sub.onError = new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object e) {
+                    cancelSub(sub);
+                    f.completeError(e);
+                }
+            };
+            return f;
         }
 
         @Override
@@ -672,7 +922,13 @@ public class Stream<T> {
             }
             sub.pauseCount--;
             if (sub.pauseCount == 0) {
+                // What the pause buffered is delivered before the source hears of the
+                // resume, as Dart's subscription calls onResume only once its pending
+                // events are out.
                 drain(sub);
+                if (sub.pauseCount == 0) {
+                    onResumed();
+                }
             }
         }
 
@@ -685,30 +941,152 @@ public class Stream<T> {
     // ------------------------------------------------------------------
     // Factories, terminal operations and derived streams.
     //
-    // Derived streams are async* generators over a StreamIterator, so they
-    // inherit its cancellation and start from a timer, as Dart's do. Terminal
+    // Derived streams listen to their source through a Forward, which passes
+    // pause, resume and cancel on to it, as Dart's forwarding streams do. Terminal
     // operations listen and complete a future; none of them blocks.
     // ------------------------------------------------------------------
 
     /** Dart's {@code Stream.fromIterable}: each element in turn, then done. */
     public static <T> Stream<T> fromIterable(final Iterable<? extends T> elements) {
         // Dart lets this stream be listened to more than once, each listener getting
-        // its own iteration; one async* run would hand a second listener only done.
+        // its own iteration; one run would hand a second listener only done.
         return new Stream<T>() {
             @Override
             Stream<T> perListener() {
-                return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+                return new IterableStream<T>(elements);
+            }
+        };
+    }
+
+    /// One listener's run of {@link #fromIterable}, timed as Dart's: the iterator is
+    /// taken at listen, then each step is a microtask that moves it once and delivers
+    /// that element -- or done, one step after the last element. It used to be an
+    /// async* body, whose frame added hops of its own, so its events interleaved with
+    /// other microtasks differently from Dart.
+    private static final class IterableStream<T> extends Stream<T> {
+        private final Iterable<? extends T> elements;
+        private java.util.Iterator<? extends T> iterator;
+        private boolean scheduled;
+        private boolean paused;
+        private boolean finished;
+        private final Runnable step = new Runnable() {
+            @Override
+            public void run() {
+                step();
+            }
+        };
+
+        IterableStream(Iterable<? extends T> elements) {
+            this.elements = elements;
+        }
+
+        @Override
+        protected void onFirstListener() {
+            try {
+                iterator = elements == null
+                        ? java.util.Collections.<T>emptyList().iterator() : elements.iterator();
+            } catch (Throwable t) {
+                fail(t);
+                return;
+            }
+            schedule();
+        }
+
+        @Override
+        protected void onPaused() {
+            paused = true;
+        }
+
+        @Override
+        protected void onResumed() {
+            paused = false;
+            schedule();
+        }
+
+        @Override
+        protected void onNoListeners() {
+            finished = true;
+        }
+
+        private void schedule() {
+            if (scheduled || finished || paused) {
+                return;
+            }
+            scheduled = true;
+            Microtasks.schedule(step);
+        }
+
+        private void step() {
+            scheduled = false;
+            if (finished || paused) {
+                return;
+            }
+            T value;
+            try {
+                if (!iterator.hasNext()) {
+                    finished = true;
+                    emitDone();
+                    return;
+                }
+                value = iterator.next();
+            } catch (Throwable t) {
+                fail(t);
+                return;
+            }
+            emit(value);
+            schedule();
+        }
+
+        /// Dart: an iterator that throws ends the stream with that error, then done,
+        /// in the same step.
+        private void fail(Throwable t) {
+            finished = true;
+            emitError(dart.runtime.DartRuntime.caught(t));
+            emitDone();
+        }
+    }
+
+    /// {@code Stream.eventTransformed(source, mapSink)}: every event of {@code source}
+    /// goes to the sink {@code mapSink} builds over the output stream's sink.
+    ///
+    /// The sink is {@code ? super StreamSink<T>}, not {@code Object}: a typed
+    /// {@code (EventSink<T>) -> EventSink<S>} closure and a static method over raw sinks
+    /// ({@code static EventSink make(EventSink sink)}) must both bind, as they do in Dart.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static <T> Stream<T> eventTransformed(final Stream<?> source,
+            final Funcs.Func1<? super StreamSink<T>, ?> typedMapSink) {
+        final Funcs.Func1 mapSink = typedMapSink;
+        final StreamController<T> out = new StreamController<T>();
+        out.onListen(new Funcs.VoidFunc0() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public void call() {
+                Object made = mapSink.call(out);
+                if (!(made instanceof StreamSink)) {
+                    out.addError(new dart.core.ArgumentError("eventTransformed: mapSink must return an EventSink"));
+                    out.close();
+                    return;
+                }
+                final StreamSink<Object> in = (StreamSink<Object>) made;
+                ((Stream<Object>) source).listen(new Funcs.VoidFunc1<Object>() {
                     @Override
-                    public void call(AsyncStar.Sink<T> s) {
-                        if (elements != null) {
-                            for (T e : elements) {
-                                s.yield$(e);
-                            }
-                        }
+                    public void call(Object v) {
+                        in.add(v);
+                    }
+                }, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        in.addError(e);
+                    }
+                }, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        in.close();
                     }
                 });
             }
-        };
+        });
+        return out.stream();
     }
 
     /** Dart's {@code Stream.value}. */
@@ -721,24 +1099,39 @@ public class Stream<T> {
         return fromIterable(java.util.Collections.<T>emptyList());
     }
 
-    /** Dart's {@code Stream.error}. */
+    /// Dart's {@code Stream.error}: as in Dart, an async controller with the error
+    /// added and closed before anyone listens, so the error is the first microtask
+    /// after listen and done the next -- not an async* body throwing, whose frame
+    /// added hops of its own.
     public static <T> Stream<T> error(final Object error) {
-        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
-            @Override
-            public void call(AsyncStar.Sink<T> s) {
-                throw dart.runtime.DartRuntime.asError(error);
-            }
-        });
+        StreamController<T> c = new StreamController<T>();
+        c.addError(error);
+        c.close();
+        return c.stream();
     }
 
     /** Dart's {@code Stream.fromFuture}: the future's value as one event. */
     public static <T> Stream<T> fromFuture(final Future<T> future) {
-        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
+        final StreamController<T> c = new StreamController<T>();
+        c.onListen(new Funcs.VoidFunc0() {
             @Override
-            public void call(AsyncStar.Sink<T> s) {
-                s.yield$(Await.await$(future));
+            public void call() {
+                future.then(new Funcs.VoidFunc1<T>() {
+                    @Override
+                    public void call(T v) {
+                        c.add(v);
+                        c.close();
+                    }
+                }, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        c.addError(e);
+                        c.close();
+                    }
+                });
             }
         });
+        return c.stream();
     }
 
     /**
@@ -787,46 +1180,122 @@ public class Stream<T> {
 
     /** Dart's {@code Stream.periodic}; a null computation yields nulls. */
     public static <T> Stream<T> periodic(final dart.core.Duration period, final Funcs.Func1<Long, T> computation) {
-        return AsyncStar.asyncStar(new Funcs.VoidFunc1<AsyncStar.Sink<T>>() {
-            @Override
-            public void call(AsyncStar.Sink<T> s) {
-                for (long i = 0;; i++) {
-                    Await.await$(Future.delayed(period));
-                    s.yield$(computation == null ? null : computation.call(Long.valueOf(i)));
-                }
-            }
-        });
+        return new Periodic<T>(period, computation).out.stream();
     }
 
-    /** A derived stream: {@code body} reads this stream through an iterator and yields. */
-    private <R> Stream<R> derive(final Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<R>> body) {
-        return AsyncStar.over(this, body);
+    /// {@code Stream.periodic}'s state: one timer per tick, so a pause stops the clock
+    /// and a resume waits only what was left of the period, as Dart's does.
+    private static final class Periodic<T> {
+        final StreamController<T> out = new StreamController<T>();
+        final dart.core.Duration period;
+        final Funcs.Func1<Long, T> computation;
+        Timer timer;
+        long tick;
+        long dueAt;
+        long remaining = -1;
+
+        Periodic(dart.core.Duration period, Funcs.Func1<Long, T> computation) {
+            this.period = period;
+            this.computation = computation;
+            out.onListen(new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    schedule(periodMicros());
+                }
+            });
+            out.onPause(new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    if (timer != null) {
+                        timer.cancel();
+                        timer = null;
+                        remaining = Math.max(0, dueAt - System.currentTimeMillis() * 1000L);
+                    }
+                }
+            });
+            out.onResume(new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    if (timer == null && remaining >= 0) {
+                        long r = remaining;
+                        remaining = -1;
+                        schedule(r);
+                    }
+                }
+            });
+            out.onCancel(new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    if (timer != null) {
+                        timer.cancel();
+                        timer = null;
+                    }
+                    remaining = -1;
+                }
+            });
+        }
+
+        long periodMicros() {
+            return period == null ? 0 : Math.max(0, period.inMicroseconds());
+        }
+
+        void schedule(long micros) {
+            dueAt = System.currentTimeMillis() * 1000L + micros;
+            timer = new Timer(dart.core.Duration.ofMicroseconds(micros), new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    timer = null;
+                    T v;
+                    try {
+                        v = computation == null ? null : computation.call(Long.valueOf(tick++));
+                    } catch (Throwable t) {
+                        out.addError(t);
+                        schedule(periodMicros());
+                        return;
+                    }
+                    out.add(v);
+                    if (!out.isPaused()) {
+                        schedule(periodMicros());
+                    } else {
+                        remaining = periodMicros();
+                    }
+                }
+            });
+        }
+    }
+
+    /** A derived stream: one {@link Forward} per listen sees this stream's events. */
+    private <R> Stream<R> derive(final Funcs.Func0<Forward<T, R>> factory) {
+        return Forward.bind(this, factory);
     }
 
     /** Dart's {@code expand}. */
     public final <R> Stream<R> expand(final Funcs.Func1<T, ? extends Iterable<? extends R>> convert) {
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<R>>() {
+        return derive(new Funcs.Func0<Forward<T, R>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<R> s) {
-                while (it.next()) {
-                    // A failure converting or iterating one element is one error event
-                    // and the stream goes on, as Dart's expand does.
-                    List<R> out = new ArrayList<R>();
-                    try {
-                        Iterable<? extends R> items = convert.call(it.current());
-                        if (items != null) {
-                            for (R r : items) {
-                                out.add(r);
+            public Forward<T, R> call() {
+                return new Forward<T, R>() {
+                    @Override
+                    protected void data(T v) {
+                        // A failure converting or iterating one element is one error event
+                        // and the stream goes on, as Dart's expand does.
+                        List<R> out = new ArrayList<R>();
+                        try {
+                            Iterable<? extends R> items = convert.call(v);
+                            if (items != null) {
+                                for (R r : items) {
+                                    out.add(r);
+                                }
                             }
+                        } catch (Throwable t) {
+                            addError(t);
+                            return;
                         }
-                    } catch (Throwable t) {
-                        s.addError(t);
-                        continue;
+                        for (R r : out) {
+                            add(r);
+                        }
                     }
-                    for (R r : out) {
-                        s.yield$(r);
-                    }
-                }
+                };
             }
         });
     }
@@ -834,21 +1303,42 @@ public class Stream<T> {
     /** Dart's {@code asyncMap}: a callback returning a Future is awaited before the next event. */
     @SuppressWarnings("unchecked")
     public final <R> Stream<R> asyncMap(final Funcs.Func1<T, Object> convert) {
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<R>>() {
+        return derive(new Funcs.Func0<Forward<T, R>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<R> s) {
-                while (it.next()) {
-                    // A failed conversion is one error event and the stream goes on, as
-                    // Dart's asyncMap does; letting it escape would close the stream.
-                    Object r;
-                    try {
-                        r = Await.awaitAny(convert.call(it.current()));
-                    } catch (Throwable t) {
-                        s.addError(t);
-                        continue;
+            public Forward<T, R> call() {
+                return new Forward<T, R>() {
+                    @Override
+                    protected void data(T v) {
+                        // A failed conversion is one error event and the stream goes on, as
+                        // Dart's asyncMap does; letting it escape would close the stream.
+                        Object r;
+                        try {
+                            r = convert.call(v);
+                        } catch (Throwable t) {
+                            addError(t);
+                            return;
+                        }
+                        if (!(r instanceof Future)) {
+                            add((R) r);
+                            return;
+                        }
+                        // The source is held while the future is pending, as Dart's is.
+                        pauseSource();
+                        ((Future<Object>) r).then(new Funcs.VoidFunc1<Object>() {
+                            @Override
+                            public void call(Object value) {
+                                add((R) value);
+                                resumeSource();
+                            }
+                        }, new Funcs.VoidFunc1<Object>() {
+                            @Override
+                            public void call(Object e) {
+                                addError(e);
+                                resumeSource();
+                            }
+                        });
                     }
-                    s.yield$((R) r);
-                }
+                };
             }
         });
     }
@@ -856,12 +1346,27 @@ public class Stream<T> {
     /** Dart's {@code take}. */
     public final Stream<T> take(final long count) {
         // A negative count is an empty stream, not an error (measured on the Dart VM).
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+        return derive(new Funcs.Func0<Forward<T, T>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
-                for (long i = 0; i < count && it.next(); i++) {
-                    s.yield$(it.current());
-                }
+            public Forward<T, T> call() {
+                return new Forward<T, T>() {
+                    private long left = count;
+
+                    @Override
+                    protected void started() {
+                        if (left <= 0) {
+                            finish();
+                        }
+                    }
+
+                    @Override
+                    protected void data(T v) {
+                        add(v);
+                        if (--left <= 0) {
+                            finish();
+                        }
+                    }
+                };
             }
         });
     }
@@ -871,63 +1376,81 @@ public class Stream<T> {
         // Dart rejects a negative argument up front; elementAt(-1) otherwise drained
         // the whole source (forever, for an endless one) before failing.
         dart.core.RangeError.checkNotNegative(count, "count");
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+        return derive(new Funcs.Func0<Forward<T, T>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
-                long i = 0;
-                while (it.next()) {
-                    if (i++ >= count) {
-                        s.yield$(it.current());
+            public Forward<T, T> call() {
+                return new Forward<T, T>() {
+                    private long i;
+
+                    @Override
+                    protected void data(T v) {
+                        if (i++ >= count) {
+                            add(v);
+                        }
                     }
-                }
+                };
             }
         });
     }
 
     /** Dart's {@code takeWhile}. */
     public final Stream<T> takeWhile(final Funcs.Func1<T, Boolean> test) {
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+        return derive(new Funcs.Func0<Forward<T, T>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
-                while (it.next() && test.call(it.current()).booleanValue()) {
-                    s.yield$(it.current());
-                }
+            public Forward<T, T> call() {
+                return new Forward<T, T>() {
+                    @Override
+                    protected void data(T v) {
+                        if (test.call(v).booleanValue()) {
+                            add(v);
+                        } else {
+                            finish();
+                        }
+                    }
+                };
             }
         });
     }
 
     /** Dart's {@code skipWhile}. */
     public final Stream<T> skipWhile(final Funcs.Func1<T, Boolean> test) {
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+        return derive(new Funcs.Func0<Forward<T, T>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
-                boolean skipping = true;
-                while (it.next()) {
-                    if (skipping && test.call(it.current()).booleanValue()) {
-                        continue;
+            public Forward<T, T> call() {
+                return new Forward<T, T>() {
+                    private boolean skipping = true;
+
+                    @Override
+                    protected void data(T v) {
+                        if (skipping && test.call(v).booleanValue()) {
+                            return;
+                        }
+                        skipping = false;
+                        add(v);
                     }
-                    skipping = false;
-                    s.yield$(it.current());
-                }
+                };
             }
         });
     }
 
     /** Dart's {@code distinct()}: drops an event equal to the one before it. */
     public final Stream<T> distinct() {
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+        return derive(new Funcs.Func0<Forward<T, T>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
-                boolean first = true;
-                T last = null;
-                while (it.next()) {
-                    T v = it.current();
-                    if (first || !dart.runtime.DartRuntime.eq(v, last)) {
-                        s.yield$(v);
+            public Forward<T, T> call() {
+                return new Forward<T, T>() {
+                    private boolean first = true;
+                    private T last;
+
+                    @Override
+                    protected void data(T v) {
+                        if (first || !dart.runtime.DartRuntime.eq(v, last)) {
+                            add(v);
+                        }
+                        first = false;
+                        last = v;
                     }
-                    first = false;
-                    last = v;
-                }
+                };
             }
         });
     }
@@ -937,33 +1460,34 @@ public class Stream<T> {
         if (equals == null) {
             return distinct();
         }
-        return derive(new Funcs.VoidFunc2<StreamIterator<T>, AsyncStar.Sink<T>>() {
+        return derive(new Funcs.Func0<Forward<T, T>>() {
             @Override
-            public void call(StreamIterator<T> it, AsyncStar.Sink<T> s) {
-                boolean first = true;
-                T last = null;
-                while (it.next()) {
-                    T v = it.current();
-                    if (!first) {
-                        boolean same;
-                        try {
-                            same = equals.call(last, v).booleanValue();
-                        } catch (AsyncStar.Cancelled c) {
-                            throw c;
-                        } catch (RuntimeException e) {
-                            // Dart turns this one event into an error and goes on,
-                            // keeping the previous value for the next comparison.
-                            s.addError(e);
-                            continue;
+            public Forward<T, T> call() {
+                return new Forward<T, T>() {
+                    private boolean first = true;
+                    private T last;
+
+                    @Override
+                    protected void data(T v) {
+                        if (!first) {
+                            boolean same;
+                            try {
+                                same = equals.call(last, v).booleanValue();
+                            } catch (RuntimeException e) {
+                                // Dart turns this one event into an error and goes on,
+                                // keeping the previous value for the next comparison.
+                                addError(e);
+                                return;
+                            }
+                            if (same) {
+                                return;
+                            }
                         }
-                        if (same) {
-                            continue;
-                        }
+                        add(v);
+                        first = false;
+                        last = v;
                     }
-                    s.yield$(v);
-                    first = false;
-                    last = v;
-                }
+                };
             }
         });
     }
@@ -1014,6 +1538,15 @@ public class Stream<T> {
             }
         });
         return out.stream();
+    }
+
+    /// Dart's {@code transform} with a transformer whose static type is known: Java infers
+    /// the element type from it, so {@code transform(t).listen(sink::add)} keeps T rather
+    /// than erasing it to Object. Dart's own check (a {@code StreamTransformer<S, T>} on a
+    /// {@code Stream<S>}) happened before translation, hence the wildcard and the cast.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public final <R> Stream<R> transform(StreamTransformer<?, R> transformer) {
+        return ((StreamTransformer) transformer).bind(this);
     }
 
     /** Dart's {@code transform}: a converter such as {@code utf8.decoder} or {@code LineSplitter()}. */
@@ -1141,9 +1674,15 @@ public class Stream<T> {
         return c.future();
     }
 
-    /** Dart's {@code toList}. */
+    /** Dart's {@code toList}, unrecorded: for a stream whose X is an unwitnessed type variable. */
     public final Future<dart.core.DartList<T>> toList() {
-        final dart.core.DartList<T> out = new dart.core.DartList<T>();
+        return toList((dart.runtime.TypeWitness) null);
+    }
+
+    /// Dart's {@code toList} on a Stream<X>: the list records {@code elem}, X's witness,
+    /// which the call site names from the stream's static type.
+    public final Future<dart.core.DartList<T>> toList(dart.runtime.TypeWitness elem) {
+        final dart.core.DartList<T> out = new dart.core.DartList<T>(elem);
         return collect(new Funcs.Func1<T, Boolean>() {
             @Override
             public Boolean call(T v) {
@@ -1263,6 +1802,29 @@ public class Stream<T> {
             public T call() {
                 if (seen.isEmpty()) {
                     throw new dart.core.StateError("No element");
+                }
+                return seen.get(0);
+            }
+        });
+    }
+
+    /** Dart's {@code single}: a StateError when the stream is empty or has a second element. */
+    public final Future<T> single() {
+        final java.util.List<T> seen = new java.util.ArrayList<T>(2);
+        return collect(new Funcs.Func1<T, Boolean>() {
+            @Override
+            public Boolean call(T v) {
+                seen.add(v);
+                return Boolean.valueOf(seen.size() < 2);
+            }
+        }, new Funcs.Func0<T>() {
+            @Override
+            public T call() {
+                if (seen.isEmpty()) {
+                    throw new dart.core.StateError("No element");
+                }
+                if (seen.size() > 1) {
+                    throw new dart.core.StateError("Too many elements");
                 }
                 return seen.get(0);
             }

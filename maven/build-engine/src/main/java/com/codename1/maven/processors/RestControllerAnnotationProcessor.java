@@ -78,6 +78,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String MVC = "com.codename1.backend.mvc.";
     private static final String CONTROLLER = PKG + "RestController;";
     private static final String REQUEST_MAPPING = PKG + "RequestMapping;";
+    private static final String CROSS_ORIGIN = PKG + "CrossOrigin;";
     private static final String PATH_VARIABLE = PKG + "PathVariable;";
     private static final String REQUEST_PARAM = PKG + "RequestParam;";
     private static final String REQUEST_HEADER = PKG + "RequestHeader;";
@@ -91,6 +92,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
     private static final String WEBSOCKET_INTERFACE = "com/codename1/backend/WebSocket";
     static final String OPEN_TELEMETRY = PKG + "OpenTelemetry;";
+    static final String VIRTUAL_THREAD_STACK = PKG + "VirtualThreadStack;";
 
     /// The application.properties key that enables tracing without touching the
     /// source, read at build time from the module directory -- where Config reads
@@ -209,6 +211,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// Whether the generated entry point registers server-side daos. Settled
     /// when the entry point is written; see [#hasGeneratedDaos].
     private boolean daos;
+    /// The generated `CliApplication` of this module's `@Command` classes, or
+    /// null; set by [CommandAnnotationProcessor], which runs first.
+    private String cliApplication;
+    /// The name the command-line help prints, or null.
+    private String cliName;
 
     /// The beans this build resolved, once [#finish] has asked for them.
     BackendBeans beans;
@@ -231,6 +238,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// The settings annotations, and whether the build asked for the management
     /// and MCP endpoints. Settled in [#finish] beside [#telemetry].
     BackendSettings settings;
+
+    /// The C stack `@VirtualThreadStack` asks for, in bytes, or 0 when no class
+    /// asks. Settled in [#finish] beside [#telemetry].
+    int virtualThreadStack;
 
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
@@ -277,6 +288,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String codecWrite;
         /** Whether any parameter is checked before the call. */
         boolean validates;
+        /** The media types the route consumes, comma separated, or null for any. */
+        String consumes;
+        /** The media types the route produces, comma separated, or null for any. */
+        String produces;
+        /** The expression building the route's @CrossOrigin policy, or null. */
+        String cors;
     }
 
     private static final class Param {
@@ -408,6 +425,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             String httpMethod = null;
             List<String> paths = null;
+            AnnotationValues used = null;
             for (Map.Entry<String, String> e : MAPPINGS.entrySet()) {
                 AnnotationValues values = m.getAnnotation(e.getKey());
                 if (values != null) {
@@ -418,6 +436,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     }
                     httpMethod = e.getValue();
                     paths = pathsOf(values);
+                    used = values;
                 }
             }
             AnnotationValues mapping = m.getAnnotation(REQUEST_MAPPING);
@@ -429,6 +448,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 }
                 httpMethod = mapping.getStringOrDefault("method", "GET");
                 paths = pathsOf(mapping);
+                used = mapping;
             }
             if (httpMethod == null) {
                 continue;
@@ -456,6 +476,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     if (route == null) {
                         return;
                     }
+                    // A method's own consumes/produces win; the class's apply to
+                    // a method that names none, as in Spring.
+                    AnnotationValues classMapping = cls.getClassAnnotation(REQUEST_MAPPING);
+                    route.consumes = mediaTypes(used, classMapping, "consumes");
+                    route.produces = mediaTypes(used, classMapping, "produces");
+                    AnnotationValues crossOrigin = m.getAnnotation(CROSS_ORIGIN);
+                    route.cors = crossOriginPolicy(crossOrigin != null ? crossOrigin
+                            : cls.getClassAnnotation(CROSS_ORIGIN));
                     controller.routes.add(route);
                 }
             }
@@ -1424,6 +1452,72 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return joined.length() == 0 ? "/" : joined;
     }
 
+    /// The comma separated media types `name` lists on the method's mapping, or
+    /// on the class's when the method names none; null when neither does.
+    private static String mediaTypes(AnnotationValues method, AnnotationValues cls, String name) {
+        String own = joined(method, name);
+        return own != null ? own : joined(cls, name);
+    }
+
+    private static String joined(AnnotationValues values, String name) {
+        List<String> items = stringsOf(values, name);
+        if (items.isEmpty()) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (String item : items) {
+            if (out.length() > 0) {
+                out.append(',');
+            }
+            out.append(item.trim());
+        }
+        return out.toString();
+    }
+
+    /// The expression that builds a `@CrossOrigin` policy, or null for none.
+    /// `value` is Spring's alias of `origins`, so it wins when given.
+    private static String crossOriginPolicy(AnnotationValues values) {
+        if (values == null) {
+            return null;
+        }
+        List<String> origins = stringsOf(values, "value");
+        if (origins.isEmpty()) {
+            origins = values.get("origins") == null ? Collections.singletonList("*") : stringsOf(values, "origins");
+        }
+        List<String> headers = values.get("allowedHeaders") == null ? Collections.singletonList("*")
+                : stringsOf(values, "allowedHeaders");
+        return "com.codename1.backend.Cors.policy(" + stringArray(origins) + ", "
+                + stringArray(stringsOf(values, "methods")) + ", " + stringArray(headers) + ", "
+                + stringArray(stringsOf(values, "exposedHeaders")) + ", "
+                + values.getBoolOrDefault("allowCredentials", false) + ", "
+                + values.getIntOrDefault("maxAge", 1800) + ")";
+    }
+
+    private static String stringArray(List<String> items) {
+        StringBuilder out = new StringBuilder("new String[] {");
+        for (int i = 0; i < items.size(); i++) {
+            out.append(i > 0 ? ", " : "").append(quote(items.get(i)));
+        }
+        return out.append('}').toString();
+    }
+
+    private static List<String> stringsOf(AnnotationValues values, String name) {
+        List<String> out = new ArrayList<String>();
+        Object value = values == null ? null : values.get(name);
+        if (value instanceof List) {
+            for (Object item : (List<?>) value) {
+                out.add(String.valueOf(item));
+            }
+        } else if (value instanceof Object[]) {
+            for (Object item : (Object[]) value) {
+                out.add(String.valueOf(item));
+            }
+        } else if (value != null) {
+            out.add(String.valueOf(value));
+        }
+        return out;
+    }
+
     private static List<String> pathsOf(AnnotationValues values) {
         List<String> out = new ArrayList<String>();
         if (values == null) {
@@ -1536,6 +1630,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return;
         }
         resolveTelemetry(ctx);
+        resolveVirtualThreadStack(ctx);
         if (ctx.hasErrors()) {
             return;
         }
@@ -1581,6 +1676,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "would replace it. Rename that class.");
             return;
         }
+        // Json.read(body, Release.class) in the application's own code: each class
+        // it names gets a codec, as a route's body does.
+        JsonCallSites.scan(ctx, codecs(ctx));
+        if (ctx.hasErrors()) {
+            return;
+        }
         // The shared set, not only this processor's: the bean processor's tools
         // may have added classes, and the dispatcher compiled last must know them.
         if (codecs != null || ctx.getAttribute("cn1.backend.jsonCodecs") != null) {
@@ -1624,6 +1725,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             catch (IllegalArgumentException error) { ctx.error(error.getMessage()); return; }
         }
         daos = hasGeneratedDaos(ctx);
+        Object cli = ctx.getAttribute(CommandAnnotationProcessor.CLI_APPLICATION_ATTRIBUTE);
+        cliApplication = cli instanceof String ? (String) cli : null;
+        Object name = ctx.getAttribute(CommandAnnotationProcessor.CLI_NAME_ATTRIBUTE);
+        cliName = name instanceof String ? (String) name : null;
         sources.put(wiring, generateWiring(entryPackage));
         sources.put(bootstrap, generateBootstrap(entryPackage));
         try {
@@ -1673,10 +1778,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
           .append(". Do not edit.\n");
         sb.append("@com.codename1.backend.annotations.Generated\n");
         boolean local = !c.handlers.isEmpty();
+        boolean crossOrigin = false;
+        for (Route route : c.routes) {
+            crossOrigin |= route.cors != null;
+        }
         sb.append("public final class ").append(c.routerSimpleName)
           .append(" implements com.codename1.backend.HttpServer.Handler,\n")
           .append("        com.codename1.backend.web.ControllerHooks.Invocation")
-          .append(local ? ", com.codename1.backend.web.ExceptionResolver" : "").append(" {\n\n");
+          .append(local ? ", com.codename1.backend.web.ExceptionResolver" : "")
+          .append(crossOrigin ? ", com.codename1.backend.web.CorsRoutes" : "").append(" {\n\n");
 
         List<Route> ordered = new ArrayList<Route>(c.routes);
         Collections.sort(ordered, new java.util.Comparator<Route>() {
@@ -1714,6 +1824,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append("    private static final String[] A").append(i).append(" = ")
                   .append(stringArrayLiteral(route.after)).append(";\n");
             }
+            if (route.cors != null) {
+                sb.append("    private static final com.codename1.backend.Cors C").append(i).append(" = ")
+                  .append(route.cors).append(";\n");
+            }
             sb.append("    private static final com.codename1.backend.web.HandlerMethod H").append(i)
               .append(" = new com.codename1.backend.web.HandlerMethod(").append(quote(c.binaryName))
               .append(", ").append(quote(route.javaMethod)).append(", ")
@@ -1737,6 +1851,31 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // throws Exception because Handler does: a controller method that reads a
         // database throws IOException, and a router that could not pass it on would
         // force every handler to swallow its own errors.
+        if (crossOrigin) {
+            // The route a request is for -- for a preflight, the one its
+            // Access-Control-Request-Method asks about -- matched the way handle()
+            // matches it, so the server can apply that route's policy.
+            sb.append("    public com.codename1.backend.Cors corsPolicy(com.codename1.backend.HttpServer.Request request) {\n");
+            sb.append("        String httpMethod = request.getMethod();\n");
+            sb.append("        String asked = request.getHeader(\"Access-Control-Request-Method\");\n");
+            sb.append("        if (\"OPTIONS\".equals(httpMethod) && asked != null) httpMethod = asked.trim();\n");
+            for (int i = 0; i < ordered.size(); i++) {
+                Route route = ordered.get(i);
+                if (route.cors == null) {
+                    continue;
+                }
+                sb.append("        if ((\"").append(route.httpMethod).append("\".equals(httpMethod)")
+                  .append("GET".equals(route.httpMethod) ? " || \"HEAD\".equals(httpMethod)" : "").append(") && ");
+                if (route.after.isEmpty()) {
+                    sb.append("request.pathIs(P").append(i).append(")");
+                } else {
+                    sb.append("request.pathStartsWith(P").append(i).append(") && bindPath(request.pathFrom(P")
+                      .append(i).append(".length), A").append(i).append(") != null");
+                }
+                sb.append(") return C").append(i).append(";\n");
+            }
+            sb.append("        return null;\n    }\n\n");
+        }
         sb.append("    public com.codename1.backend.HttpServer.Response handle(\n")
           .append("            com.codename1.backend.HttpServer.Request request) throws Exception {\n");
         sb.append("        String httpMethod = request.getMethod();\n");
@@ -1863,6 +2002,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append(pad).append("com.codename1.backend.Tracing.route(")
           .append(quote(route.pattern)).append(");\n");
 
+        if (route.consumes != null) {
+            sb.append(pad).append("if (!com.codename1.backend.web.MediaTypes.consumable(request.getHeader(\"Content-Type\"), ")
+              .append(quote(route.consumes)).append(")) return com.codename1.backend.HttpServer.Response.text(415, \"Unsupported Media Type\");\n");
+        }
+        if (route.produces != null) {
+            sb.append(pad).append("if (!com.codename1.backend.web.MediaTypes.acceptable(request.getHeader(\"Accept\"), ")
+              .append(quote(route.produces)).append(")) return com.codename1.backend.HttpServer.Response.text(406, \"Not Acceptable\");\n");
+        }
         emitPartGuards(sb, route, pad);
         emitRequiredGuards(sb, route, pad);
         emitScalarGuards(sb, route, pad);
@@ -3193,7 +3340,30 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("@com.codename1.backend.annotations.Generated\n");
         sb.append("public final class BackendApplication {\n\n");
         sb.append("    private BackendApplication() {\n    }\n\n");
+        // The command line first. With no arguments -- how every backend has
+        // always been started -- it is the server, untouched. With arguments
+        // it goes to the module's @Command classes, the server being their
+        // "serve" sibling; a module with no commands still answers --help and
+        // otherwise starts the server whatever it was passed, as it always did.
+        String appName = cliName != null ? cliName : "server";
         sb.append("    public static void main(String[] args) throws Exception {\n");
+        sb.append("        int code = com.codename1.cli.CommandLine.serve(")
+          .append(quote(appName)).append(", ")
+          .append(cliApplication != null ? cliApplication + ".commands()" : "null")
+          .append(", new Cn1Server(), args);\n");
+        sb.append("        if (code != com.codename1.cli.CommandLine.SERVED) {\n");
+        sb.append("            System.out.flush();\n");
+        sb.append("            System.err.flush();\n");
+        sb.append("            System.exit(code);\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static final class Cn1Server implements "
+                + "com.codename1.cli.CommandLine.Server {\n");
+        sb.append("        public void serve() throws Exception {\n");
+        sb.append("            cn1Serve();\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static void cn1Serve() throws Exception {\n");
         if (daos) {
             // The generated daos are reachable from here and from nowhere else.
             // The translator drops a class nothing references, so this line is
@@ -3211,6 +3381,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // runtime's internal access, so none of them is public API.
         sb.append("        com.codename1.impl.backend.BackendAccess cn1Access =\n")
           .append("                com.codename1.impl.backend.BackendAccess.get();\n");
+        if (virtualThreadStack > 0) {
+            // Before the builder exists, so before any server can start: the
+            // runtime reads the size when it creates a connection's thread.
+            sb.append("        com.codename1.backend.HttpServer.requireVirtualThreadStack(")
+              .append(virtualThreadStack).append(");\n");
+        }
         sb.append("        com.codename1.backend.Backend.Builder cn1Builder = "
                 + "com.codename1.backend.Backend.builder()");
         if (telemetry) {
@@ -3276,6 +3452,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append("        cn1Access.serviceName(cn1Builder, ")
                   .append(quote(telemetryServiceName)).append(");\n");
             }
+        }
+        if (codecs != null && codecs.hasRegistry()) {
+            // The ONLY reference to the registry: Json.read(body, Release.class)
+            // reaches the application's codecs through it, and nothing else does.
+            sb.append("        com.codename1.impl.backend.JsonCodec.install(new ")
+              .append(BackendJsonCodecs.REGISTRY).append("());\n");
         }
         sb.append("        cn1Access.application(cn1Builder, new ")
           .append(qualify(packageName, BackendWiringWriter.CLASS_NAME)).append("());\n");
@@ -3375,6 +3557,44 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (!telemetry && propertyEnablesTelemetry(ctx)) {
             telemetry = true;
         }
+    }
+
+    /// The C stack `@VirtualThreadStack` asks for, across the whole class index
+    /// the way [#resolveTelemetry] looks for `@OpenTelemetry`.
+    ///
+    /// Several classes may carry it and the LARGEST size wins rather than the
+    /// build failing: the runtime call only ever raises the size, so a module
+    /// that combines two libraries each asking for its own floor gets what both
+    /// need. A value that is not a size is a build error naming the class.
+    void resolveVirtualThreadStack(ProcessorContext ctx) {
+        virtualThreadStack = 0;
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            AnnotationValues vts = cls.getClassAnnotation(VIRTUAL_THREAD_STACK);
+            if (vts == null) {
+                continue;
+            }
+            if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                    ctx.getSourceEncoding())) {
+                continue;
+            }
+            String raw = vts.getStringOrDefault("value", "");
+            int bytes = parseStackSize(raw);
+            if (bytes <= 0) {
+                ctx.error(cls, "@VirtualThreadStack(\"" + raw + "\") on " + cls.getBinaryName()
+                        + " is not a stack size. Write a positive number of bytes, or a number "
+                        + "followed by KB or MB, such as \"512KB\" or \"1MB\".");
+                return;
+            }
+            if (bytes > virtualThreadStack) {
+                virtualThreadStack = bytes;
+            }
+        }
+    }
+
+    /// Parses a size the way the Python build hint does, so the annotation and
+    /// the hint accept exactly the same spellings.
+    static int parseStackSize(String raw) {
+        return com.codename1.python.transpiler.api.PythonTranspiler.parseStackSize(raw);
     }
 
     /// `cn1.otel.enabled` from the module's application properties, the files

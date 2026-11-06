@@ -107,12 +107,12 @@ public class File extends FileSystemEntity {
         }
     }
 
-    /** Dart's {@code openRead()}: the content as one chunk. */
-    public dart.async.Stream<Object> openRead() {
+    /** Dart's {@code openRead()}: the content as one chunk, a {@code Stream<List<int>>}. */
+    public dart.async.Stream<dart.core.DartLongList> openRead() {
         return openRead(null, null);
     }
 
-    public dart.async.Stream<Object> openRead(Long start, Long end) {
+    public dart.async.Stream<dart.core.DartLongList> openRead(Long start, Long end) {
         try {
             // Dart rejects a negative bound or an end before the start; clamping them
             // made a bad range look like an empty file.
@@ -127,9 +127,9 @@ public class File extends FileSystemEntity {
             int e = end == null ? all.length : (int) Math.min(all.length, end.longValue());
             byte[] part = new byte[Math.max(0, e - s)];
             System.arraycopy(all, s, part, 0, part.length);
-            return dart.async.Stream.<Object>value(Uint8List.fromBytes(part));
+            return dart.async.Stream.<dart.core.DartLongList>value(Uint8List.fromBytes(part));
         } catch (RuntimeException ex) {
-            return dart.async.Stream.<Object>error(ex);
+            return dart.async.Stream.<dart.core.DartLongList>error(ex);
         }
     }
 

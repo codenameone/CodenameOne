@@ -18,6 +18,7 @@ package com.codename1.util.regex;
 
 import java.io.Reader;
 
+@com.codename1.impl.SharedWithBackend
 public class StringReader extends Reader {
 
     private static final char NEW_LINE = '\n';

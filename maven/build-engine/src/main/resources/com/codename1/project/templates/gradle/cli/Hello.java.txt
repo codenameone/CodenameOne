@@ -1,0 +1,48 @@
+package ${package};
+
+import com.codename1.cli.CommandLine.Command;
+import com.codename1.cli.CommandLine.Option;
+import com.codename1.cli.CommandLine.Parameters;
+
+import java.util.concurrent.Callable;
+
+/**
+ * A command-line tool. The annotations follow picocli: each @Option and
+ * @Parameters field receives an argument, and call() is the body.
+ *
+ * The build reads them and writes the parser and the main method -- there is no
+ * reflection -- so a mistake in a declaration is a build error, and the same
+ * tool runs on the JVM and as a native executable for Linux and macOS.
+ * Run it with the arguments in the cn1.backend.args property:
+ *
+ *     ./gradlew __BACKEND__runBackend -Pcn1.backend.args="--count 2 Ada"
+ *
+ * List more @Command classes in subcommands = {...} for a tool with several
+ * verbs, as in `git commit`. See the Command-Line Applications chapter of the
+ * developer guide.
+ */
+@Command(name = "__PROJECT_NAME__", mixinStandardHelpOptions = true,
+        version = "__PROJECT_NAME__ 1.0",
+        description = "Greets someone.")
+public class Hello implements Callable<Integer> {
+    @Option(names = {"-c", "--count"}, description = "How many times.", defaultValue = "1")
+    private int count;
+
+    @Option(names = {"-l", "--loud"}, description = "Shout the greeting.")
+    private boolean loud;
+
+    @Parameters(paramLabel = "<name>", description = "Who to greet.")
+    private String name;
+
+    @Override
+    public Integer call() {
+        String greeting = "Hello, " + name;
+        if (loud) {
+            greeting = greeting.toUpperCase() + "!";
+        }
+        for (int i = 0; i < count; i++) {
+            System.out.println(greeting);
+        }
+        return 0;
+    }
+}

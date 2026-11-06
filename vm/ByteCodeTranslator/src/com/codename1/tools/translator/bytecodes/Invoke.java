@@ -55,6 +55,26 @@ public class Invoke extends Instruction {
      * null -- so for those sites the test can never fire. A factory call or a field
      * read proves a type without proving non-nullness, and those keep it. */
     private boolean exactReceiverNonNull;
+    // JavascriptTypeFlow: where the receiver can come from (captured at parse time),
+    // and the bodies the solved receiver types reach (null = keep the cone answer).
+    private String[] flowReceiverSources;
+    private java.util.List<com.codename1.tools.translator.BytecodeMethod> flowImpls;
+
+    public String[] getFlowReceiverSources() {
+        return flowReceiverSources;
+    }
+
+    public void setFlowReceiverSources(String[] sources) {
+        this.flowReceiverSources = sources;
+    }
+
+    public java.util.List<com.codename1.tools.translator.BytecodeMethod> getFlowImpls() {
+        return flowImpls;
+    }
+
+    public void setFlowImpls(java.util.List<com.codename1.tools.translator.BytecodeMethod> impls) {
+        this.flowImpls = impls;
+    }
 
     public void setExactReceiverNonNull(boolean value) {
         exactReceiverNonNull = value;

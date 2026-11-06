@@ -1,0 +1,19 @@
+HEY!
+4
+8
+5
+6
+4
+30
+qq
+8
+false
+String
+int
+(String) => String
+(int) => int
+(String) => String
+List<String>
+List<int>
+true
+true

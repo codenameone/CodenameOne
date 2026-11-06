@@ -1,0 +1,9 @@
+2
+9
+3
+APPLE=2
+Pear=3
+PLUM=9
+[APPLE, Pear]
+APPLE:2,Pear:3
+2

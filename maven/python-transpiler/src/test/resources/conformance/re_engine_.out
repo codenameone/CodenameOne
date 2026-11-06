@@ -1,0 +1,35 @@
+(\w+)\s(\w+) 'hello world' ('hello world', ('hello', 'world'), (0, 11), 2)
+x(.)y 'a😀x😁yz' ('x😁y', ('😁',), (2, 5), 1)
+[\U0001F600-\U0001F64F]+ 'ab😀😂c' ('😀😂', (), (2, 4), None)
+\U0001F600. '😀😀!' ('😀😀', (), (0, 2), None)
+[a-z]+ 'ABCdef' ('ABCdef', (), (0, 6), None)
+[^A-Z]+ 'ABCdef' ('def', (), (3, 6), None)
+(ab)\1 'xxABab' ('ABab', ('AB',), (2, 6), 1)
+(?i)(straSSe)\1 'strasseSTRASSE' ('strasseSTRASSE', ('strasse',), (0, 14), 1)
+a.*?b 'aXbYb' ('aXb', (), (0, 3), None)
+a{2,3}? 'aaaa' ('aa', (), (0, 2), None)
+(?<=ab)c 'xabc' ('c', (), (3, 4), None)
+(?<!ab)c 'abcxc' ('c', (), (4, 5), None)
+(?=(\d+))\1x '123x' ('123x', ('123',), (0, 4), 1)
+(?>a+)b 'aaab' ('aaab', (), (0, 4), None)
+(?>a+)ab 'aaab' None
+a++b 'aaab' ('aaab', (), (0, 4), None)
+(a)?(?(1)b|c) 'c' ('c', (None,), (0, 1), None)
+(a*)*b 'aaab' ('aaab', ('',), (0, 4), 1)
+(a|)+b 'b' ('b', ('',), (0, 1), 1)
+^\w+$ 'café' ('café', (), (0, 4), None)
+^\w+$ 'café' None
+\bfoo\b 'a foo.' ('foo', (), (2, 5), None)
+\Bo 'foo' ('o', (), (1, 2), None)
+^b 'a\nb' ('b', (), (2, 3), None)
+a$ 'a\n' ('a', (), (0, 1), None)
+\d+ '١٢x' ('١٢', (), (0, 2), None)
+\d+ '١٢x' None
+abc 'xxabcabc' ('abc', (), (2, 5), None)
+(2, 3)
+None
+['a', '😀', '😀']
+elloh igb orldw
+['a', 'b', 'c', 'd']
+[(0, 0), (1, 1), (2, 2)]
+<re.Match object; span=(0, 5), match='abcab'> None

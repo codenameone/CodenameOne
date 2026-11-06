@@ -57,6 +57,13 @@ public class SliderTheme extends InheritedWidget {
         return new SliderThemeData();
     }
 
+    /** The nearest enclosing slider theme's data, or null when there is none. */
+    static SliderThemeData findIn(BuildContext context) {
+        SliderTheme t = context == null ? null
+                : context.dependOnInheritedWidgetOfExactType(SliderTheme.class);
+        return t != null ? t.data : null;
+    }
+
     @Override
     public boolean updateShouldNotify(InheritedWidget oldWidget) {
         return !(oldWidget instanceof SliderTheme) || ((SliderTheme) oldWidget).data != data;

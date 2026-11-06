@@ -1,0 +1,15 @@
+true
+false
+true
+true
+https://example.com/a%20b?q=1
+file:///tmp/x%20y
+a/b
+
+http://h/p
+http://h:8080?k=v+w&z=1#f
+/s/websocket
+2
+true
+Concurrent modification during iteration.
+[one]

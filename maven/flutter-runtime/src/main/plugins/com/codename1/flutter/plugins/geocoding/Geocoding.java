@@ -69,7 +69,7 @@ public final class Geocoding {
         query("latlng=" + latitude + "," + longitude, new Answer() {
             @Override
             void results(List<?> results) {
-                DartList<Placemark> out = new DartList<Placemark>();
+                DartList<Placemark> out = new DartList<Placemark>(dart.runtime.TypeWitness.of(Placemark.class, false));
                 for (Object r : results) {
                     if (r instanceof Map) {
                         out.add(placemark((Map<?, ?>) r));
@@ -91,7 +91,7 @@ public final class Geocoding {
         query("address=" + Util.encodeUrl(address == null ? "" : address), new Answer() {
             @Override
             void results(List<?> results) {
-                DartList<Location> out = new DartList<Location>();
+                DartList<Location> out = new DartList<Location>(dart.runtime.TypeWitness.of(Location.class, false));
                 for (Object r : results) {
                     Object geo = r instanceof Map ? ((Map<?, ?>) r).get("geometry") : null;
                     Object loc = geo instanceof Map ? ((Map<?, ?>) geo).get("location") : null;

@@ -1,0 +1,11 @@
+y0 g0 y1 g1 y2 g2 genfin afterbreak
+0,1,2,3,4,5
+e1
+caught bad
+y0 L0 y1 L1 y2 L2 y3 L3 y4 L4 genfin paused resumed cancelled
+sync m1 fv m2 t1 f1 f1then m3
+it 1
+it 2
+c2 7
+onCancel
+done

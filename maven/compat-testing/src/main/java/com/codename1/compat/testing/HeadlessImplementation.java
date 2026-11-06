@@ -136,6 +136,22 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    /// Accepts anything that starts like an SFNT file (TrueType, OpenType or
+    /// Apple 'true') and answers the box font every other load answers.
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        if (data == null || data.length < 4) {
+            return null;
+        }
+        int tag = (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | data[3] & 0xff;
+        return tag == 0x00010000 || tag == 0x4f54544f || tag == 0x74727565 ? FONT : null;
+    }
+
+    @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         return FONT;
     }
@@ -1428,6 +1444,14 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// Storage held in memory for the life of the test JVM, so code that
     /// persists through com.codename1.io.Storage (the AndroidKeyStore) can be
     /// read back by a fresh instance.
+    /// The size of a stored entry, read off the map. The inherited answer
+    /// counts with skip(), which never ends on these in-memory streams.
+    @Override
+    public int getStorageEntrySize(java.lang.String a0) {
+        byte[] b = STORAGE.get(a0);
+        return b == null ? -1 : b.length;
+    }
+
     public static final java.util.Map<String, byte[]> STORAGE =
             java.util.Collections.synchronizedMap(new java.util.TreeMap<String, byte[]>());
 

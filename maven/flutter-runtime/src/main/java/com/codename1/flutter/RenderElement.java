@@ -819,6 +819,25 @@ public abstract class RenderElement extends Element {
         child.relY = dy;
     }
 
+    /**
+     * Flutter's {@code getDistanceToBaseline}: the distance from this element's top to
+     * its first text baseline, in the same units as {@link #size()}, or a negative value
+     * when it has none. By default the first child with a baseline answers, offset by
+     * where it sits; text overrides it with its first line's.
+     */
+    public double distanceToBaseline() {
+        for (RenderElement c : renderChildren()) {
+            if (c.size() == null) {
+                continue;
+            }
+            double b = c.distanceToBaseline();
+            if (b >= 0) {
+                return c.relY() + b;
+            }
+        }
+        return -1;
+    }
+
     public double relX() {
         return relX;
     }

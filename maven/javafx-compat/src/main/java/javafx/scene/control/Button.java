@@ -95,7 +95,14 @@ public class Button extends ButtonBase {
 
     @Override
     protected Component cn1CreateNative() {
-        com.codename1.ui.Button b = new com.codename1.ui.Button();
+        com.codename1.ui.Button b = new com.codename1.ui.Button() {
+            @Override
+            public void repaint() {
+                if (!repaintThroughNode()) {
+                    super.repaint();
+                }
+            }
+        };
         b.addActionListener(cn1ActionBridge());
         return b;
     }

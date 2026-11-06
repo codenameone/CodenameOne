@@ -34,10 +34,13 @@ import com.codename1.camera.PhotoCaptureOptions;
 import com.codename1.impl.CameraImpl;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -182,7 +185,8 @@ public class IOSCameraImpl extends CameraImpl {
         this.frameFormat = format == null ? FrameFormat.JPEG : format;
         if (sessionPeer != 0) {
             IOSImplementation.nativeInstance.cn1CameraSetFrameDelivery(
-                    sessionPeer, listener != null, Math.max(1, maxFps));
+                    sessionPeer, listener != null, Math.max(1, maxFps),
+                    this.frameFormat != FrameFormat.JPEG);
         }
     }
 
@@ -265,6 +269,53 @@ public class IOSCameraImpl extends CameraImpl {
             Log.e(t);
         } finally {
             self.listenerBusy.set(false);
+        }
+    }
+
+    /// Called from native code with a single video frame as RGBA8888, when the
+    /// listener asked for a raw format. iOS captures BGRA and has no NV21, so an
+    /// NV21 request is answered with RGBA8888 and the frame says so in
+    /// `getFormat()`. The JPEG is encoded only if somebody asks for it.
+    public static void onRawFrameDelivered(final byte[] rgba, final int width,
+                                           final int height, int rotationDegrees,
+                                           long timestampNanos) {
+        IOSCameraImpl self = ACTIVE;
+        if (self == null) return;
+        FrameListener l = self.frameListener;
+        if (l == null) return;
+        if (!self.listenerBusy.compareAndSet(false, true)) {
+            return; // drop frame; previous still in flight
+        }
+        try {
+            CameraFrame f = new CameraFrame(null, rgba, width, height,
+                    rotationDegrees, timestampNanos, FrameFormat.RGBA8888,
+                    new CameraFrame.JpegEncoder() {
+                        public byte[] encode() {
+                            return encodeRgbaAsJpeg(rgba, width, height);
+                        }
+                    });
+            l.onFrame(f);
+        } catch (Throwable t) {
+            Log.e(t);
+        } finally {
+            self.listenerBusy.set(false);
+        }
+    }
+
+    private static byte[] encodeRgbaAsJpeg(byte[] rgba, int width, int height) {
+        int[] argb = new int[width * height];
+        for (int i = 0, p = 0; i < argb.length; i++, p += 4) {
+            argb[i] = 0xff000000 | ((rgba[p] & 0xff) << 16)
+                    | ((rgba[p + 1] & 0xff) << 8) | (rgba[p + 2] & 0xff);
+        }
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.getImageIO().save(Image.createImage(argb, width, height),
+                    out, ImageIO.FORMAT_JPEG, 0.8f);
+            return out.toByteArray();
+        } catch (IOException e) {
+            Log.e(e);
+            return null;
         }
     }
 

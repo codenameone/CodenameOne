@@ -51,6 +51,11 @@ public final class Await {
         if (f == null) {
             throw new dart.core.TypeError("await on null Future");
         }
+        f.markHandled();
+        // An await ends Dart's synchronous turn: what a controller queued for delivery
+        // runs now, before the frame blocks (see Microtasks).
+        Microtasks.drain();
+        f.driveOnce();
         if (f.isDone()) {
             return f.valueOrThrow();
         }
@@ -69,14 +74,24 @@ public final class Await {
     }
 
     private static void parkUntilDone(Future<?> f) {
-        synchronized (f.monitor()) {
+        if (com.codename1.ui.Display.isInitialized()) {
+            // Off the EDT of a live Display (or inside invokeAndBlock) the EDT runs the
+            // loop; this frame only waits for the result.
             while (!f.isDone()) {
-                try {
-                    f.monitor().wait(500);
-                } catch (InterruptedException ignore) {
-                    // spurious wakeup handling via the loop condition
+                synchronized (f.monitor()) {
+                    if (!f.isDone()) {
+                        try {
+                            f.monitor().wait(20);
+                        } catch (InterruptedException ignore) {
+                            // spurious wakeup handling via the loop condition
+                        }
+                    }
                 }
             }
+            return;
         }
+        // Headless, a parked frame is where Dart's event loop runs: microtasks and fired
+        // timers run here (see Microtasks).
+        Microtasks.parkUntil(f);
     }
 }

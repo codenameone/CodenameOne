@@ -1,0 +1,15 @@
+number: TextInputType(name: TextInputType.number, signed: false, decimal: false)
+options: TextInputType(name: TextInputType.number, signed: false, decimal: true)
+text: TextInputType(name: TextInputType.text, signed: null, decimal: null)
+signed false decimal true index 2
+same number: true
+options differ: false
+email index: 5
+status colour: true
+icons kept: true
+base untouched: true
+changed differs: true
+diagonal: 2.0 3.0 4.0 5.0
+bounds: 10.0 10.0 20.0 20.0
+disposed
+kDefaultFontSize: 14.0

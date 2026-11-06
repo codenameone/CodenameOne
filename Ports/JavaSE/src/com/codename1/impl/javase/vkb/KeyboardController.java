@@ -61,6 +61,10 @@ public final class KeyboardController {
 
         boolean isTablet();
 
+        /// Screen pixels at the bottom of the screen that the skin reserves for
+        /// the system navigation bar (the bottom safe-area inset), 0 for none.
+        int navigationBarHeight();
+
         /// Reduces the height the application sees by this many pixels (Android
         /// resize mode) and delivers the resulting size change; 0 restores it.
         void setResizeInset(int pixels);
@@ -106,6 +110,7 @@ public final class KeyboardController {
 
     private boolean showing;
     private int height;
+    private int bottomInset;
     private Component editing;
     private boolean resizeMode;
     private int panOffset;
@@ -178,6 +183,15 @@ public final class KeyboardController {
     /// The keyboard height in screen pixels while it is showing, else 0.
     public int getHeight() {
         return showing ? height : 0;
+    }
+
+    /// How far above the bottom of the screen the keyboard sits. An Android
+    /// keyboard opens above the navigation bar, which stays on screen with its
+    /// back/home buttons; an iOS keyboard covers the home indicator area.
+    /// Measured when the keyboard opens and kept until it closes, so the resize
+    /// inset, the drawing and the hit test all agree on one value.
+    public int getBottomInset() {
+        return bottomInset;
     }
 
     public boolean isResizeMode() {
@@ -258,6 +272,8 @@ public final class KeyboardController {
             animatingIn = true;
         }
         height = newHeight;
+        bottomInset = platform() == SimulatedKeyboard.Platform.ANDROID
+                ? Math.max(0, host.navigationBarHeight()) : 0;
         showing = true;
         applyGeometry(cmp);
         if (!wasShowing) {
@@ -331,10 +347,10 @@ public final class KeyboardController {
         }
         resizeMode = decideResize(cmp);
         if (resizeMode) {
-            host.setResizeInset(height);
+            host.setResizeInset(height + getBottomInset());
             scrollIntoView(cmp);
         } else {
-            int visibleBottom = host.fullScreenHeight() - height;
+            int visibleBottom = host.fullScreenHeight() - height - getBottomInset();
             int fieldBottom = cmp == null ? 0 : cmp.getAbsoluteY() + cmp.getScrollY() + cmp.getHeight();
             panOffset = Math.max(0, fieldBottom + PAN_MARGIN - visibleBottom);
             host.setPanOffset(panOffset);

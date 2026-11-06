@@ -49,6 +49,14 @@ public class ResponseStatusException extends RuntimeException {
     private final int status;
     private final String reason;
 
+    /// Answers with the status alone and an empty body, as Spring's
+    /// `new ResponseStatusException(HttpStatus.NOT_FOUND)` does.
+    ///
+    /// @param status the status to answer with, 400 to 599
+    public ResponseStatusException(int status) {
+        this(status, null, null);
+    }
+
     /// @param status the status to answer with, 400 to 599
     /// @param reason what to tell the caller; sent as the body
     public ResponseStatusException(int status, String reason) {
@@ -59,7 +67,7 @@ public class ResponseStatusException extends RuntimeException {
     /// @param reason what to tell the caller; sent as the body
     /// @param cause what led to it, for the log; never sent
     public ResponseStatusException(int status, String reason, Throwable cause) {
-        super(status + " " + reason, cause);
+        super(reason == null ? String.valueOf(status) : status + " " + reason, cause);
         if (status < 400 || status > 599) {
             throw new IllegalArgumentException("not an error status: " + status);
         }

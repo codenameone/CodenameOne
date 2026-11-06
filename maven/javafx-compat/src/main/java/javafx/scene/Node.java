@@ -427,7 +427,10 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     @Override
     public void cn1Invalidated(int what) {
         // Whatever changed, the picture an effect above keeps of it is old.
-        Effects.invalidate(this);
+        // A change that moved and resized nothing leaves the outline of an
+        // opaque shadowed ancestor as it was; see Effects.invalidate.
+        Effects.invalidate(this, (what & (Dirty.LAYOUT | Dirty.BOUNDS | Dirty.GEOMETRY | Dirty.NATIVE
+                | VISIBILITY)) == 0);
         if ((what & VISIBILITY) != 0 && peer != null) {
             peer.setVisible(isVisible());
         }
@@ -1273,6 +1276,14 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         if (by == null) {
             return null;
         }
+        if (by instanceof javafx.scene.shape.Shape) {
+            // A shape clips to its outline, not to its box: a circle over
+            // a photo is how an avatar is made round.
+            FxPath outline = ((javafx.scene.shape.Shape) by).cn1Outline();
+            if (!outline.isEmpty()) {
+                return outline.transformed(by.localToParentMatrix());
+            }
+        }
         Bounds b = by.getBoundsInParent();
         FxPath path = new FxPath();
         path.addRect(b.getMinX(), b.getMinY(), Math.max(0, b.getWidth()), Math.max(0, b.getHeight()));
@@ -1763,6 +1774,13 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     }
 
     // ------------------------------------------------------------ events
+
+    /// Returns whether a handler on this node sees a press,
+    /// release or click, so that its peer offers an accessibility action
+    /// that taps it.
+    public final boolean cn1HandlesClicks() {
+        return events != null && events.handlesClicks();
+    }
 
     /// Returns the filters and handlers of this node.
     protected final EventHandlerManager cn1Events() {

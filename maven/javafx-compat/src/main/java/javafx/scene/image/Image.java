@@ -49,16 +49,20 @@ import javafx.scene.paint.Color;
 ///   `getResource(...).toExternalForm()` all work. The whole path is
 ///   tried first and then the file name alone, because a Codename One
 ///   application keeps its resources in one flat directory on a device.
-/// - `http:` and `https:` URLs are **not loaded**; the image reports an
-///   error.
+/// - `http:` and `https:` URLs are downloaded in the background through
+///   Codename One's network manager and cached in `Storage`, as
+///   `URLImage` caches, so a later run reads the picture from the device.
 ///
-/// #### Loading is synchronous
+/// #### When the picture is there
 ///
-/// The constructor returns with the image decoded or failed, also when
-/// `backgroundLoading` is asked for; the flag is recorded and
-/// `getProgress()` is 1 for a loaded image from the start. A failure
-/// never throws: `isError()` answers `true`, `getException()` says why
-/// and the size is zero.
+/// A local image is decoded before the constructor returns, also when
+/// `backgroundLoading` is asked for; `getProgress()` is 1 for it from the
+/// start. A remote image always loads in the background, whatever the
+/// flag says, because a device cannot block its UI thread on the
+/// network: it starts with progress 0 and size zero, and on the EDT its
+/// size, progress and the view showing it change when the picture
+/// arrives. A failure never throws: `isError()` answers `true`,
+/// `getException()` says why and the size is zero.
 ///
 /// The size is in pixels of the picture, and one of them is drawn as one
 /// logical pixel. A requested size scales the decoded picture once, here.
@@ -119,6 +123,15 @@ public class Image {
         this.preserveRatio = preserveRatio;
         this.smooth = smooth;
         this.backgroundLoading = backgroundLoading;
+        if (startsWith(url, "http:") || startsWith(url, "https:")) {
+            try {
+                download(url);
+            } catch (RuntimeException failed) {
+                // As for a local URL: the image is in error, never the caller.
+                fail(failed);
+            }
+            return;
+        }
         InputStream in = null;
         try {
             in = open(url);
@@ -193,13 +206,105 @@ public class Image {
         return argb;
     }
 
-    /// Has a view told when the pixels change; an image that was decoded
-    /// never changes.
+    /// Has a view told when the pixels change: a decoded image never
+    /// changes, a remote one changes once, when it arrives.
     void addPixelListener(Runnable listener) {
+        // Only a remote load still under way changes; holding a view's
+        // listener for any other image would keep that view reachable for
+        // as long as the image is.
+        if (!pending) {
+            return;
+        }
+        if (listeners == null) {
+            listeners = new java.util.ArrayList<Runnable>();
+        }
+        listeners.add(listener);
     }
 
     /// Stops telling a view.
     void removePixelListener(Runnable listener) {
+        if (listeners != null) {
+            listeners.remove(listener);
+        }
+    }
+
+    private java.util.ArrayList<Runnable> listeners;
+
+    /// Whether a remote picture is still on its way.
+    private boolean pending;
+
+    private void firePixelsChanged() {
+        pending = false;
+        if (listeners == null) {
+            return;
+        }
+        Runnable[] all = listeners.toArray(new Runnable[listeners.size()]);
+        listeners = null;
+        for (Runnable r : all) {
+            r.run();
+        }
+    }
+
+    /// Fetches a remote picture into `Storage`, or reads it from there when
+    /// an earlier run fetched it, and applies it on the EDT.
+    private void download(final String remote) {
+        pending = true;
+        final String key = storageKey(remote);
+        com.codename1.io.ConnectionRequest req = new com.codename1.io.ConnectionRequest(remote, false);
+        // A missing picture is the image's error, never the application's
+        // global network error dialog.
+        req.setFailSilently(true);
+        req.setReadResponseForErrors(false);
+        req.downloadImageToStorage(key, new com.codename1.util.SuccessCallback<com.codename1.ui.Image>() {
+            @Override
+            public void onSucess(com.codename1.ui.Image value) {
+                try {
+                    if (value == null) {
+                        throw new IOException("Not an image: " + remote);
+                    }
+                    apply(value);
+                } catch (IOException failed) {
+                    forget(key);
+                    fail(failed);
+                } catch (RuntimeException failed) {
+                    forget(key);
+                    fail(failed);
+                }
+                firePixelsChanged();
+            }
+        }, new com.codename1.util.FailureCallback<com.codename1.ui.Image>() {
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                forget(key);
+                fail(new IOException("Could not load " + remote + " (" + errorCode + "): "
+                        + (err != null ? err.toString() : errorMessage)));
+                firePixelsChanged();
+            }
+        }, true);
+    }
+
+    /// Drops a cached entry that did not decode or was cut short, so the
+    /// next request downloads the picture again instead of failing on the
+    /// same bytes for good.
+    private static void forget(String key) {
+        try {
+            com.codename1.io.Storage.getInstance().deleteStorageFile(key);
+        } catch (RuntimeException ignored) {
+            // Nothing cached to drop.
+        }
+    }
+
+    /// A `Storage` name for a URL: storage names are flat and short, so the
+    /// URL's hash and length, then its last characters made safe.
+    static String storageKey(String remote) {
+        StringBuilder tail = new StringBuilder();
+        int from = Math.max(0, remote.length() - 40);
+        for (int i = from; i < remote.length(); i++) {
+            char c = remote.charAt(i);
+            boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.';
+            tail.append(safe ? c : '_');
+        }
+        return "fximg-" + Integer.toHexString(remote.hashCode()) + "-" + remote.length() + "-" + tail;
     }
 
     /// Returns what reads the pixels of the image, or `null` for an
@@ -304,6 +409,7 @@ public class Image {
 
     private void fail(Exception why) {
         nativeImage = null;
+        argb = null;
         width.set(0);
         height.set(0);
         exception.set(why);
@@ -317,6 +423,11 @@ public class Image {
         } catch (RuntimeException undecodable) {
             throw new IOException("Not an image: " + undecodable);
         }
+        apply(decoded);
+    }
+
+    /// Takes a decoded picture, scaled to the requested size.
+    private void apply(com.codename1.ui.Image decoded) throws IOException {
         if (decoded == null || decoded.getWidth() <= 0 || decoded.getHeight() <= 0) {
             throw new IOException("Not an image");
         }
@@ -345,6 +456,7 @@ public class Image {
             decoded = decoded.scaled(pw, ph);
         }
         nativeImage = decoded;
+        argb = null;
         width.set(pw);
         height.set(ph);
         progress.set(1);

@@ -38,6 +38,16 @@ public final class Border extends BoxBorder {
     }
 
     /** {@code Border.all(color: ..., width: ..., style: ...)}. */
+    /** Flutter's {@code Border.fromBorderSide}: the same side on all four edges. */
+    public static Border fromBorderSide(BorderSide side) {
+        Border b = new Border();
+        b.top = side;
+        b.right = side;
+        b.bottom = side;
+        b.left = side;
+        return b;
+    }
+
     public static Border all(Color color, double width, BorderStyle style,
             Double strokeAlign) {
         BorderSide side = new BorderSide();

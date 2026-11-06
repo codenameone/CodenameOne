@@ -143,7 +143,7 @@ public final class Renderer {
         g.pushClip();
         clipDepth++;
         if (exact && !path.isEmpty()) {
-            clipToShape(path.toDevice(m));
+            clipToShape(path.toDevice(m, true));
         } else {
             int x1 = (int) Math.floor(b[0]);
             int y1 = (int) Math.floor(b[1]);
@@ -166,7 +166,39 @@ public final class Renderer {
         int[] old = g.getClip();
         g.setClip(shape);
         if (!PeerPaint.screenClipUnderMatrix(g)) {
-            g.clipRect(old[0], old[1], old[2], old[3]);
+            narrow(g, shape, old[0], old[1], old[2], old[3]);
+        }
+    }
+
+    /// Narrows a clip that may be a shape by a rectangle. A shape inside
+    /// the rectangle is left as it is: narrowing it changes nothing, and
+    /// Codename One's intersection of a curved path with a rectangle throws
+    /// ("Unexpected shape segmentation") when a curve ends a fraction of a
+    /// pixel from an edge -- the rounded corner of a card scrolled to the
+    /// edge of the screen, which took the whole app down on iOS. Where it
+    /// still throws, the clip falls back to the rectangle shared by the
+    /// shape's bounds and the one asked for.
+    static void narrow(com.codename1.ui.Graphics g, com.codename1.ui.geom.Shape shape, int x, int y, int w,
+            int h) {
+        if (shape != null) {
+            com.codename1.ui.geom.Rectangle sb = shape.getBounds();
+            if (sb.getX() >= x && sb.getY() >= y && sb.getX() + sb.getWidth() <= x + w
+                    && sb.getY() + sb.getHeight() <= y + h) {
+                return;
+            }
+        }
+        try {
+            g.clipRect(x, y, w, h);
+        } catch (RuntimeException e) {
+            if (shape == null) {
+                throw e;
+            }
+            com.codename1.ui.geom.Rectangle sb = shape.getBounds();
+            int x1 = Math.max(x, sb.getX());
+            int y1 = Math.max(y, sb.getY());
+            int x2 = Math.min(x + w, sb.getX() + sb.getWidth());
+            int y2 = Math.min(y + h, sb.getY() + sb.getHeight());
+            g.setClip(x1, y1, Math.max(0, x2 - x1), Math.max(0, y2 - y1));
         }
     }
 
@@ -435,7 +467,7 @@ public final class Renderer {
         // one before.
         fill(path, outer, bx, by, bw, bh);
         g.pushClip();
-        clipToShape(path.toDevice(m));
+        clipToShape(path.toDevice(m, true));
         int rings = (int) Math.max(8, Math.min(64, Math.max(rx, ry) * uniformScale() / 2));
         for (int i = rings; i >= 1; i--) {
             double t = (double) i / rings;

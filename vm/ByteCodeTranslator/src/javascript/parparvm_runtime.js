@@ -807,37 +807,46 @@ function threadDebugLabel(threadObject) {
 // teaching each other: int[] stays SMI or DOUBLE, char/byte/short SMI, floating
 // DOUBLE. boolean and long get their own too, since what the translator stores in
 // them (JS booleans, long records) is not a plain number.
+// Grown with push, never ``new Array(n)``: a presized array is HOLEY to V8 for
+// good -- filling every slot does not make it packed again -- and every load
+// from a holey array checks for the hole. quicksort measured 5.6% and
+// arraySequential 6.6% faster packed.
 function cn1IntElements(n) {
-  const a = new Array(n);
-  for (let i = 0; i < n; i++) a[i] = 0;
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(0);
   return a;
 }
 function cn1SmallIntElements(n) {
-  const a = new Array(n);
-  for (let i = 0; i < n; i++) a[i] = 0;
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(0);
   return a;
 }
 function cn1BooleanElements(n) {
-  const a = new Array(n);
-  for (let i = 0; i < n; i++) a[i] = 0;
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(0);
   return a;
 }
 function cn1FloatingElements(n) {
-  const a = new Array(n);
-  for (let i = 0; i < n; i++) a[i] = 0;
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(0);
   return a;
 }
 function cn1LongElements(n) {
-  const a = new Array(n);
-  for (let i = 0; i < n; i++) a[i] = 0;
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(0);
   return a;
 }
 function cn1ReferenceElements(n) {
-  const a = new Array(n);
-  for (let i = 0; i < n; i++) a[i] = null;
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(null);
   return a;
 }
-// The identity counter every allocation increments. It lives on its own
+// The identity counter. An object is allocated with no __id and takes its
+// number from here only when something asks for it (identityHash: hashCode,
+// System.identityHashCode, Object.toString). Numbering every allocation was a
+// load and store of shared state on each ``new`` that almost no object needs;
+// lazily, the field is still in the literal, so the object's shape does not
+// change when it is numbered. The counter lives on its own
 // one-field object rather than on jvm: jvm carries hundreds of properties, so
 // V8 keeps it in dictionary mode and ``jvm.nextIdentity++`` was a hashed load
 // and store on every allocation -- which also kept V8 from removing an
@@ -1369,7 +1378,7 @@ const jvm = {
     // descriptor, and a breadth-first ancestor search to decide whether the class
     // is a Throwable (whose NEGATIVE answer was never cached, so every ordinary
     // object paid for the search) -- is computed once per class by
-    // instanceLayout() below. The monitor is left null: every monitor user
+    // instanceLayout() below. The monitor is left unset: every monitor user
     // attaches one on first use (see the per-monitor state notes above), and a
     // monitor plus its two arrays was three extra allocations on every object.
     // Measured on the flutter-bench compute workloads under node: allocation-heavy
@@ -1379,7 +1388,8 @@ const jvm = {
       this.ensureClassInitialized(className);
       classDef = this.classes[className];
     }
-    const obj = { __class: className, __classDef: classDef, __id: cn1Ids.n++, __monitor: null };
+    // __id and __monitor are added on first use; readers treat a missing one as 0/null.
+    const obj = { __class: className, __classDef: classDef };
     let layout = classDef.__layout;
     if (layout === undefined || layout.epoch !== this.__layoutEpoch) {
       layout = this.instanceLayout(classDef, className);
@@ -1530,7 +1540,7 @@ const jvm = {
     }
     // Primitive leaf arrays use Java's zero defaults. Reference arrays and
     // unallocated outer dimensions remain null. Each family is built at its own
-    // ``new Array`` site: see cn1IntElements.
+    // allocation site: see cn1IntElements.
     let array;
     if (dimensions === 1) {
       switch (componentClass) {
@@ -1568,10 +1578,8 @@ const jvm = {
     const cls = this.arrayClassFor(componentClass, dimensions);
     array.__class = cls.name;
     array.__classDef = cls;
-    array.__id = cn1Ids.n++;
     array.__dimensions = dimensions;
     array.__array = true;
-    array.__monitor = null;
     return array;
   },
   arrayClassFor(componentClass, dimensions) {
@@ -2403,16 +2411,38 @@ const jvm = {
   // kept every string the program ever built alive for good, and two
   // separately built equal strings were the same object, which Java forbids
   // (new String(s) != s; String.intern() has its own pool in the Java code).
+  //
+  // The characters stay in the native string: value is left null, which is the
+  // C VM's inline storage, and String.java reads such a string through
+  // cn1InlineCharAt / cn1InlineLatin1 (below), both answered from __nativeString.
+  // Copying every character into a char[] that almost nothing reads was a third
+  // of StringBuilder.toString's cost (flutter-bench stringBuilding).
   newJavaString(value) {
-    const chars = this.newArray(value.length, "JAVA_CHAR", 1);
-    for (let i = 0; i < value.length; i++) {
-      chars[i] = value.charCodeAt(i);
+    // One literal, in the property order newObject would produce, so these
+    // strings share the hidden class of every other String. Taken only while
+    // String's field defaults are exactly value and count, as JavaAPI declares
+    // them; anything else goes through newObject.
+    const classDef = this.classes.java_lang_String;
+    const layout = classDef !== undefined ? classDef.__layout : undefined;
+    if (layout !== undefined && layout.epoch === this.__layoutEpoch && layout.stringLiteralShape === true
+        && classDef.initialized) {
+      return { __class: "java_lang_String", __classDef: classDef,
+        cn1_java_lang_String_value: null, cn1_java_lang_String_count: value.length,
+        cn1_java_lang_String_hashCode: 0, __nativeString: value, __latin1: undefined };
     }
     const str = this.newObject("java_lang_String");
-    str[CN1_STRING_VALUE] = chars;
+    const built = this.classes.java_lang_String.__layout;
+    if (built !== undefined && built.stringLiteralShape === undefined) {
+      const inits = built.inits;
+      built.stringLiteralShape = inits.length === 4 && !built.throwable
+          && inits[0] === CN1_STRING_VALUE && inits[1] === null
+          && inits[2] === CN1_STRING_COUNT && inits[3] === 0;
+    }
+    str[CN1_STRING_VALUE] = null;
     str[CN1_STRING_COUNT] = value.length;
     str[CN1_STRING_HASH] = 0;
     str.__nativeString = value;
+    str.__latin1 = undefined;
     return str;
   },
   toNativeString(value) {
@@ -3191,7 +3221,7 @@ const jvm = {
                 source: "main-thread"
               });
             }
-            if (thread.object) {
+            if (thread.object && !thread.detached) {
               thread.object[CN1_THREAD_ALIVE] = 0;
               this.notifyAll(thread.object);
             }
@@ -3218,7 +3248,7 @@ const jvm = {
           thread.done = true;
           thread.resumeError = null;
           thread.resumeValue = undefined;
-          if (thread.object) {
+          if (thread.object && !thread.detached) {
             thread.object[CN1_THREAD_ALIVE] = 0;
             this.notifyAll(thread.object);
           }
@@ -4467,7 +4497,7 @@ function _LushrC(a, n) {
 }
 function _LushrO(a, n) { return _Lc(_LushrC(a, n)); }
 function _LdivO(a, b) {
-  if (_LisZero(b)) { throw new Error("/ by zero"); }
+  if (_LisZero(b)) { cn1_divByZero(); }
   if (_LisZero(a)) return _LO0;
   if (_Leq(a, _LMIN)) {
     if (_Leq(b, _LO1) || _Leq(b, _LOM1)) return _LMIN;
@@ -4536,7 +4566,7 @@ function _Lcmp(a, b) {
 }
 function _Ldiv(a, b) {
   if (typeof a === "number" && typeof b === "number") {
-    if (b === 0) { throw new Error("/ by zero"); }
+    if (b === 0) { cn1_divByZero(); }
     // % is exact on doubles, so a - r is an exact multiple of b and the
     // division is exact: truncating division without trusting a rounded a / b.
     const r = a % b;
@@ -4546,7 +4576,7 @@ function _Ldiv(a, b) {
 }
 function _Lrem(a, b) {
   if (typeof a === "number" && typeof b === "number") {
-    if (b === 0) { throw new Error("/ by zero"); }
+    if (b === 0) { cn1_divByZero(); }
     return a % b + 0; // the sign follows the dividend, as in Java
   }
   a = _Lc(a); b = _Lc(b);
@@ -4697,6 +4727,39 @@ global._me = function*(m) {
   }
 };
 global._mx = (m) => jvm.monitorExit(jvm.currentThread, m);
+// A @JavaScriptDetached method (see JavascriptMethodGenerator
+// .appendDetachedMethod): runs its body synchronously until the body really
+// waits, then leaves the rest on a new green thread and returns to the caller,
+// whose contract never waited for it. Cooperative slice yields are stepped
+// through, so a body that never waits behaves exactly like a sync call. The
+// thread answers Thread.currentThread() with its caller's thread, as the body
+// did before it detached, but finishing it does not end that thread.
+function cn1_detach(gen) {
+  if (!gen || typeof gen.next !== "function") {
+    return;
+  }
+  // The body runs as its own thread from its first step, not only once it
+  // waits: a monitor it enters before the split must be owned by the thread
+  // that later exits it, or that exit throws IllegalMonitorStateException.
+  const parent = jvm.currentThread;
+  const thread = { id: jvm.nextThreadId++, object: parent ? parent.object : null, generator: gen,
+                   waiting: null, interrupted: false, done: false, detached: true };
+  jvm.currentThread = thread;
+  try {
+    let step = gen.next();
+    while (!step.done && step.value === _Yv) {
+      step = gen.next();
+    }
+    if (step.done) {
+      return;
+    }
+    jvm.threads.push(thread);
+    jvm.handleYield(thread, step.value);
+  } finally {
+    jvm.currentThread = parent;
+  }
+}
+global.cn1_detach = cn1_detach;
 // Hook into ``defineClass`` to populate ``_S`` alongside the normal
 // ``jvm.classes`` registration. Done via a wrapping re-assignment so
 // we don't have to edit every call site inside the jvm object above.
@@ -5078,6 +5141,31 @@ function cn1_ivsDrive(r, mid) {
   }
   return r;
 }
+// Integer division and remainder by zero throw java.lang.ArithmeticException.
+// A JS division never throws -- 10 / 0 is Infinity, and | 0 makes it 0 -- so a
+// bare "/" printed a result where Java throws, and a plain Error thrown here
+// was not catchable as ArithmeticException.
+function cn1_divByZero() {
+  const ex = jvm.createException("java_lang_ArithmeticException");
+  if (typeof ex.ctor === "function") {
+    const cr = ex.ctor(ex.object);
+    if (cr && typeof cr.next === "function") {
+      const s = cr.next();
+      if (!s.done) { throw new Error("cn1: ArithmeticException constructor yielded"); }
+    }
+  }
+  throw ex.object;
+}
+function _Id(a, b) {
+  if ((b | 0) === 0) { cn1_divByZero(); }
+  return ((a | 0) / (b | 0)) | 0;
+}
+function _Ir(a, b) {
+  if ((b | 0) === 0) { cn1_divByZero(); }
+  return ((a | 0) % (b | 0)) | 0;
+}
+global._Id = _Id;
+global._Ir = _Ir;
 function cn1_ivsNpe() {
   const ex = jvm.createException("java_lang_NullPointerException");
   if (typeof ex.ctor === "function") {
@@ -5473,9 +5561,84 @@ function sbEnsureCapacity(sb, size, wide) {
   const capacity = data && data.length >= size ? data.length : Math.max(size, data ? data.length * 2 + 2 : 16);
   return sbResize(sb, capacity, needsWide);
 }
+// The builder's characters as one flat native string. Appending one
+// fromCharCode per character built a rope of count nodes that the first
+// hashCode or compare then had to flatten; fromCharCode over a chunk of codes
+// builds the flat string at once. Latin-1 data is signed bytes, so it is masked
+// into a scratch array first. Chunks stay well under the engines' argument limit.
+const SB_CHUNK = 4096;
+const sbScratch = [];
+function sbNativeString(data, count) {
+  if (!data || count <= 0) return "";
+  const latin1 = sbIsLatin1(data);
+  let out = "";
+  for (let start = 0; start < count; start += SB_CHUNK) {
+    const n = Math.min(SB_CHUNK, count - start);
+    sbScratch.length = n;
+    if (latin1) {
+      for (let i = 0; i < n; i++) sbScratch[i] = data[start + i] & 255;
+    } else {
+      for (let i = 0; i < n; i++) sbScratch[i] = data[start + i] & 65535;
+    }
+    out += String.fromCharCode.apply(null, sbScratch);
+  }
+  return out;
+}
+// String mode. A builder starts with its characters in a JS string, __sbs,
+// and value unset: appending is a concatenation, toString hands the string
+// over, and no char[] is ever allocated for the common build-and-convert use.
+// count stays the truth -- setLength and delete change it in Java without a
+// native -- so the content is the first count characters of __sbs. The first
+// native that edits characters in place (put, move, zero) materializes the
+// array, works out wide from the characters then, and the builder stays in
+// array mode from there on.
+function sbContent(sb) {
+  let s = sb.__sbs;
+  const count = sb[CN1_SB_COUNT] | 0;
+  if (s != null) {
+    if (s.length !== count) {
+      s = s.substring(0, count);
+      sb.__sbs = s;
+    }
+    return s;
+  }
+  return sbNativeString(sb[CN1_SB_VALUE], count);
+}
+function sbMaterialize(sb) {
+  const s = sb.__sbs;
+  if (s == null) return sb[CN1_SB_VALUE];
+  sb.__sbs = null;
+  const count = sb[CN1_SB_COUNT] | 0;
+  let wide = !!sb[CN1_SB_WIDE];
+  for (let i = 0; !wide && i < count; i++) if (s.charCodeAt(i) > 255) wide = true;
+  const capacity = Math.max(sb[CN1_SB_CAPACITY] | 0, count);
+  const data = jvm.newArray(capacity, wide ? "JAVA_CHAR" : "JAVA_BYTE", 1);
+  if (wide) {
+    for (let i = 0; i < count; i++) data[i] = s.charCodeAt(i);
+  } else {
+    for (let i = 0; i < count; i++) data[i] = (s.charCodeAt(i) << 24) >> 24;
+  }
+  sb[CN1_SB_VALUE] = data;
+  sb[CN1_SB_CAPACITY] = capacity;
+  sb[CN1_SB_WIDE] = wide;
+  return data;
+}
 function sbAppendNativeString(sb, value) {
   value = value == null ? "null" : String(value);
   const count = sb[CN1_SB_COUNT] | 0;
+  let s = sb.__sbs;
+  if (s != null) {
+    if (s.length !== count) s = s.substring(0, count);
+    sb.__sbs = s + value;
+    const size = count + value.length;
+    sb[CN1_SB_COUNT] = size;
+    const capacity = sb[CN1_SB_CAPACITY] | 0;
+    if (size > capacity) {
+      const grown = capacity * 2 + 2;
+      sb[CN1_SB_CAPACITY] = grown < size ? size : grown;
+    }
+    return sb;
+  }
   let wide = false;
   for (let i = 0; i < value.length; i++) if (value.charCodeAt(i) > 255) { wide = true; break; }
   const data = sbEnsureCapacity(sb, count + value.length, wide);
@@ -6010,7 +6173,7 @@ bindNative([
 });
 bindNative(["cn1_java_lang_Object_notify", "cn1_java_lang_Object_notify__"], function(__cn1ThisObject) { jvm.notifyOne(__cn1ThisObject); return null; });
 bindNative(["cn1_java_lang_Object_notifyAll", "cn1_java_lang_Object_notifyAll__"], function(__cn1ThisObject) { jvm.notifyAll(__cn1ThisObject); return null; });
-bindNative(["cn1_java_lang_Object_hashCode_R_int", "cn1_java_lang_Object_hashCode___R_int"], function(__cn1ThisObject) { return __cn1ThisObject == null ? 0 : (__cn1ThisObject.__id | 0); });
+bindNative(["cn1_java_lang_Object_hashCode_R_int", "cn1_java_lang_Object_hashCode___R_int"], function(__cn1ThisObject) { return identityHash(__cn1ThisObject); });
 bindNative([
   "cn1_java_lang_Object_getClass_R_java_lang_Class",
   "cn1_java_lang_Object_getClass___R_java_lang_Class",
@@ -6098,7 +6261,7 @@ bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function(__cn1T
   if (__cn1ThisObject == null) {
     return createJavaString("null");
   }
-  return createJavaString(javaClassName(__cn1ThisObject.__class) + "@" + ((__cn1ThisObject.__id | 0).toString(16)));
+  return createJavaString(javaClassName(__cn1ThisObject.__class) + "@" + ((identityHash(__cn1ThisObject) >>> 0).toString(16)));
 });
 bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_lang_Thread_currentThread___R_java_lang_Thread"], function() {
   if (jvm.currentThread && jvm.currentThread.object) {
@@ -6324,29 +6487,48 @@ bindNative(["cn1_java_lang_StringBuilder_tryAppendRange_java_lang_CharSequence_i
 bindNative(["cn1_java_lang_StringBuilder_resizeBufferImpl_int_boolean_R_boolean"], function(sb, capacity, wide) {
   capacity |= 0;
   if (capacity < 0 || (wide && capacity > 0x3fffffff)) return false;
+  if (sb.__sbs != null || (sb[CN1_SB_VALUE] == null && (sb[CN1_SB_COUNT] | 0) === 0)) {
+    // String mode (see sbContent): capacity and wide are only bookkeeping.
+    if (sb.__sbs == null) sb.__sbs = "";
+    sb[CN1_SB_CAPACITY] = Math.max(capacity, sb[CN1_SB_COUNT] | 0);
+    sb[CN1_SB_WIDE] = !!wide || !!sb[CN1_SB_WIDE];
+    return true;
+  }
   sbResize(sb, capacity, wide);
   return true;
 });
 bindNative(["cn1_java_lang_StringBuilder_unit_int_R_char"], function(sb, index) {
+  if (sb.__sbs != null) return sb.__sbs.charCodeAt(index) | 0;
   const data = sb[CN1_SB_VALUE];
   return sbIsLatin1(data) ? data[index] & 255 : data[index] | 0;
 });
 bindNative(["cn1_java_lang_StringBuilder_put_int_char"], function(sb, index, ch) {
+  sbMaterialize(sb);
   const data = sbEnsureCapacity(sb, sb[CN1_SB_CAPACITY] | 0, ch > 255);
   data[index] = sbIsLatin1(data) ? (ch << 24) >> 24 : ch;
 });
 bindNative(["cn1_java_lang_StringBuilder_move_int_int_int"], function(sb, from, to, length) {
-  const data = sb[CN1_SB_VALUE];
+  const data = sbMaterialize(sb);
   if (to > from) for (let i = length - 1; i >= 0; i--) data[to + i] = data[from + i];
   else for (let i = 0; i < length; i++) data[to + i] = data[from + i];
 });
 bindNative(["cn1_java_lang_StringBuilder_zero_int_int"], function(sb, from, length) {
-  const data = sb[CN1_SB_VALUE];
+  const data = sbMaterialize(sb);
   for (let i = 0; i < length; i++) data[from + i] = 0;
 });
 bindNative(["cn1_java_lang_StringBuilder_append_char_1ARRAY_int_int_R_java_lang_StringBuilder"], function(sb, input, offset, length) {
   if (input == null) throw new Error("NullPointerException");
   if (offset < 0 || length < 0 || offset > input.length - length) throw new Error("IndexOutOfBoundsException");
+  if (sb.__sbs != null) {
+    let text = "";
+    for (let start = 0; start < length; start += SB_CHUNK) {
+      const n = Math.min(SB_CHUNK, length - start);
+      sbScratch.length = n;
+      for (let i = 0; i < n; i++) sbScratch[i] = input[offset + start + i] & 65535;
+      text += String.fromCharCode.apply(null, sbScratch);
+    }
+    return sbAppendNativeString(sb, text);
+  }
   let wide = false;
   for (let i = 0; i < length; i++) if (input[offset + i] > 255) { wide = true; break; }
   const count = sb[CN1_SB_COUNT] | 0;
@@ -6375,24 +6557,22 @@ bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function(__cn1This
   if (index < 0 || index >= (__cn1ThisObject[CN1_SB_COUNT] | 0)) {
     throw new Error("ArrayIndexOutOfBoundsException");
   }
+  if (__cn1ThisObject.__sbs != null) return __cn1ThisObject.__sbs.charCodeAt(index);
   const data = __cn1ThisObject[CN1_SB_VALUE];
   return sbIsLatin1(data) ? data[index] & 255 : data[index] | 0;
 });
 bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
 bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function(__cn1ThisObject) {
-  const count = __cn1ThisObject[CN1_SB_COUNT] | 0;
-  const data = __cn1ThisObject[CN1_SB_VALUE];
-  let out = "";
-  if (sbIsLatin1(data)) {
-    for (let i = 0; i < count; i++) out += String.fromCharCode(data[i] & 255);
-  } else {
-    for (let i = 0; i < count; i++) out += String.fromCharCode(data[i] | 0);
-  }
-  return createJavaString(out);
+  return createJavaString(sbContent(__cn1ThisObject));
 });
 bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], function(__cn1ThisObject, start, end, dst, dstStart) {
   if ((start | 0) < 0 || (start | 0) > (end | 0) || (end | 0) > (__cn1ThisObject[CN1_SB_COUNT] | 0)) {
     throw new Error("ArrayIndexOutOfBoundsException");
+  }
+  const s = __cn1ThisObject.__sbs;
+  if (s != null) {
+    for (let i = start | 0; i < (end | 0); i++) dst[(dstStart | 0) + i - (start | 0)] = s.charCodeAt(i);
+    return null;
   }
   const value = __cn1ThisObject[CN1_SB_VALUE];
   for (let i = start | 0; i < (end | 0); i++) {
@@ -6415,14 +6595,23 @@ bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject,
 bindNative(["cn1_java_lang_String_cn1InlineCharAt_int_R_char"], function(__cn1ThisObject, index) {
   return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0;
 });
+// The scan is cached on the object: String.java asks isLatin1() at the top of
+// most methods, and a native-backed string never changes.
 bindNative(["cn1_java_lang_String_cn1InlineLatin1_R_boolean"], function(__cn1ThisObject) {
+  const cached = __cn1ThisObject.__latin1;
+  if (cached !== undefined) {
+    return cached;
+  }
   const ns = jvm.toNativeString(__cn1ThisObject);
+  let latin1 = 1;
   for (let i = 0; i < ns.length; i++) {
     if (ns.charCodeAt(i) > 255) {
-      return 0;
+      latin1 = 0;
+      break;
     }
   }
-  return 1;
+  __cn1ThisObject.__latin1 = latin1;
+  return latin1;
 });
 bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
@@ -6471,6 +6660,15 @@ bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return nu
 // The Java substring constructor is the portable fallback for this optional C fusion.
 bindNative(["cn1_java_lang_String_cn1SubstringFused_int_int_R_java_lang_String"], function() { return null; });
 function cn1FusedConcatArg(x) { return x == null ? "null" : jvm.toNativeString(x); }
+// Reached only for Latin-1 byte[]-backed Strings (see cn1FusedConcatN): unreachable here, bound for reachability.
+bindNative(["cn1_java_lang_String_cn1FusedJoin_java_lang_String_java_lang_Object_1ARRAY_int_int_R_java_lang_String"], function(sep, parts, n) {
+  let out = "";
+  for (let i = 0; i < (n | 0); i++) {
+    if (i > 0) { out += cn1FusedConcatArg(sep); }
+    out += cn1FusedConcatArg(parts[i]);
+  }
+  return createJavaString(out);
+});
 bindNative(["cn1_java_lang_String_cn1FusedConcat2_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b) {
   return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b));
 });

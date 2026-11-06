@@ -271,8 +271,17 @@ public final class PersistentTokenBasedRememberMeServices
         String token = random();
         tokenRepository.createNewToken(new PersistentRememberMeToken(
                 successfulAuthentication.getName(), series, hash(token),
-                clock.currentTimeMillis()));
+                clock.currentTimeMillis(), null, device(request.getHeader("User-Agent")),
+                device(request.getRemoteAddress())));
         setCookie(series + ":" + token);
+    }
+
+    // Kept for display only, and bounded: a header is the client's to choose.
+    private static String device(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() > 255 ? value.substring(0, 255) : value;
     }
 
     @Override

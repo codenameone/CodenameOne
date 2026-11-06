@@ -44,7 +44,12 @@ public final class StringBuffer {
 
     /** {@code StringBuffer([Object content = ""])} — seeds with the content's string. */
     public StringBuffer(Object content) {
-        sb.append(DartRuntime.str(content));
+        // The transpiler passes null for an omitted optional positional argument, so
+        // `StringBuffer()` arrives here as null and must start empty, as the default ""
+        // does. (An explicit `StringBuffer(null)` would read "null" in Dart.)
+        if (content != null) {
+            sb.append(DartRuntime.str(content));
+        }
     }
 
     /** Dart's {@code StringBuffer.length} getter — number of UTF-16 code units. */

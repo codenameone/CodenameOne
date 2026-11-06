@@ -251,6 +251,7 @@ import java.util.ArrayList;
 /// #### See also
 ///
 /// - RECompiler
+@com.codename1.impl.SharedWithBackend
 public class RE {
 
     /// Specifies normal, case-sensitive matching behaviour.
@@ -306,6 +307,9 @@ public class RE {
     static final char OP_RELUCTANTPLUS = '=';  // none/expr       reluctant '+' (mnemonic for char is unshifted '+')
     static final char OP_RELUCTANTMAYBE = '/';  // none/expr       reluctant '?' (mnemonic for char is unshifted '?')
     static final char OP_POSIXCLASS = 'P';  // classid         one of the posix character classes
+    static final char OP_LOOKAHEAD = 'L';  // offset          (?=...): the body must match here; offset reaches its OP_LOOKEND
+    static final char OP_NEGLOOKAHEAD = 'K';  // offset       (?!...): the body must not match here
+    static final char OP_LOOKEND = 'J';  //                 end of a lookahead body: the body matched
     // Escape codes
     static final char E_ALNUM = 'w';  // Alphanumeric
     static final char E_NALNUM = 'W';  // Non-alphanumeric
@@ -1207,6 +1211,24 @@ public class RE {
                     // Failed to match any branch!
                     return -1;
                 }
+
+                case OP_LOOKAHEAD:
+                case OP_NEGLOOKAHEAD: {
+                    // A zero-width assertion: the body is tried once, at idx (atomic, as in
+                    // JavaScript), and matching goes on after its OP_LOOKEND without
+                    // consuming input. Groups a positive lookahead captured are kept.
+                    boolean found = matchNodes(next, maxNode, idx) != -1;
+                    if (found != (opcode == OP_LOOKAHEAD)) {
+                        return -1;
+                    }
+                    int end = node + opdata;
+                    node = end + (short) instruction[end + offsetNext];
+                    continue;
+                }
+
+                case OP_LOOKEND:
+                    // Reached only by the call a lookahead makes for its body.
+                    return idx;
 
                 case OP_OPEN_CLUSTER:
                 case OP_CLOSE_CLUSTER:

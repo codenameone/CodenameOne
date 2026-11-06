@@ -10177,6 +10177,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void run() {
                 im.load();
+                im.awaitNaturalDimensions();
                 im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
@@ -10215,6 +10216,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void run() {
                 im.load();
+                im.awaitNaturalDimensions();
                 im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
@@ -10272,6 +10274,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void run() {
                 im.load();
+                im.awaitNaturalDimensions();
                 im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
@@ -10326,6 +10329,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             im.img = renderingBackend.createBlobImageElement(blob);
             registerImageResource(im, im.img);
             im.load();
+            im.awaitNaturalDimensions();
             return im;
         } else {
             InputStream in = this.getResourceAsStream(getClass(), path);
@@ -11422,6 +11426,52 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         return createFallbackTrueTypeFont(resolvedFontName, resolvedFileName);
 
+    }
+
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // The bytes travel as a data: URL, which both the worker's FontFace
+        // (measuring) and the host's document.fonts (painting) load as they load
+        // a bundled file. Encoded here in Java: the arrayBufferToBase64 helper
+        // goes through Window.current, which the worker cannot reach.
+        // FontFace rejects bytes that are not a font asynchronously, after this
+        // has already answered; the contract is null, so check the SFNT tag
+        // (0x00010000, 'true', 'OTTO', 'ttcf') up front as the other ports do.
+        //
+        // Because the browser loads the face asynchronously, a font whose header
+        // is valid but whose tables are corrupt is not detected here: it answers a
+        // font, and the browser draws its text in the fallback family.
+        if (!isSfntHeader(data)) {
+            return null;
+        }
+        // The browser family is keyed by content as well as name, so the same name
+        // given different bytes registers a second face instead of drawing with
+        // the first one loaded under that name.
+        int h = 1;
+        for (byte b : data) {
+            h = 31 * h + b;
+        }
+        String family = fontName + "_" + data.length + "_" + Integer.toHexString(h);
+        if (!loadedFonts.contains(family)) {
+            loadTrueTypeFont_(family,
+                    "data:font/ttf;base64," + com.codename1.util.Base64.encodeNoNewline(data), "truetype");
+            loadedFonts.add(family);
+        }
+        return createFallbackTrueTypeFont(family, null);
+    }
+
+    private static boolean isSfntHeader(byte[] data) {
+        if (data == null || data.length < 12) {
+            return false;
+        }
+        int tag = ((data[0] & 0xff) << 24) | ((data[1] & 0xff) << 16)
+                | ((data[2] & 0xff) << 8) | (data[3] & 0xff);
+        return tag == 0x00010000 || tag == 0x74727565 || tag == 0x4f54544f || tag == 0x74746366;
     }
 
     /**
@@ -13690,6 +13740,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         copyBytesToUint8Array(bytes, offset, len, arr);
         Blob blob = BlobUtil.createBlob(arr, "image/png");
         NativeImage nimg = new NativeImage();
+        // The size is known now, from the header, rather than when the browser
+        // finishes decoding: getWidth()/getHeight() never ask the host.
+        int[] size = ImageHeaderDimensions.read(bytes, offset, len);
+        if (size != null) {
+            nimg.width = size[0];
+            nimg.height = size[1];
+        }
         nimg.img = renderingBackend.createBlobImageElement(blob);
         registerImageResource(nimg, nimg.img);
         nimg.load();
@@ -13935,20 +13992,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
         
+        // Fields only, never the host: layout measures images everywhere, and a
+        // host query here made every caller a JavaScript generator. Images made
+        // from bytes know their size from the header (ImageHeaderDimensions), the
+        // load event fills it in for the rest, and the creation paths that cannot
+        // read a header wait for it themselves (awaitNaturalDimensions). Until
+        // then the answer is JavaScriptNativeImageAdapter's fallback.
         public int getWidth(){
-            awaitNaturalDimensions();
-            return JavaScriptNativeImageAdapter.resolveWidth(imageModel);
+            if (width > 0) {
+                return width;
+            }
+            return mutableGraphics != null ? mutableGraphics.getCanvasWidth() : 10;
         }
 
         public int getHeight(){
-            awaitNaturalDimensions();
-            return JavaScriptNativeImageAdapter.resolveHeight(imageModel);
+            if (height > 0) {
+                return height;
+            }
+            return mutableGraphics != null ? mutableGraphics.getCanvasHeight() : 10;
         }
 
         /**
          * Block briefly (up to ~200 ms total) until the underlying
-         * {@code HTMLImageElement} exposes a positive natural width,
-         * so that {@link #getWidth()} / {@link #getHeight()} don't
+         * {@code HTMLImageElement} exposes a positive natural width.
+         * Called where an element-backed image is created without bytes
+         * to read a header from (a file path, a URL download), never from
+         * {@link #getWidth()}, so that {@link #getWidth()} / {@link #getHeight()} don't
          * fall through to the hard-coded 10-pixel fallback in
          * {@link JavaScriptNativeImageAdapter} during the gap between
          * {@code createNativeImage()} returning and the main thread

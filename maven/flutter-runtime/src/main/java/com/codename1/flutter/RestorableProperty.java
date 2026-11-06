@@ -80,7 +80,7 @@ public class RestorableProperty<T> {
     }
 
     public void removeListener(Funcs.VoidFunc0 listener) {
-        listeners.remove(listener);
+        dart.runtime.DartRuntime.removeEq(listeners, listener);
     }
 
     public void notifyListeners() {

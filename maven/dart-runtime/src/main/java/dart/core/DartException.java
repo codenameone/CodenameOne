@@ -27,6 +27,12 @@ package dart.core;
  * Dart's Exception('message') — the generic exception users throw.
  */
 public class DartException extends RuntimeException {
+    /// For a user class that `implements Exception`: it extends this class so that it is
+    /// throwable and `on Exception` catches it; its own toString is what prints.
+    protected DartException() {
+        super((String) null);
+    }
+
     public DartException(String message) {
         super(message);
     }

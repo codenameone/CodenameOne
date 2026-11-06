@@ -166,6 +166,31 @@ public class CssTest {
         assertEquals(Pos.CENTER_RIGHT, bar.getAlignment());
     }
 
+    /// A pseudo-class an ancestor compound asks for restyles what is below
+    /// a node only when the node has the rest of that compound: pressing
+    /// the root must not restyle the scene for `.bar:pressed`, while
+    /// pressing the bar still does.
+    @Test
+    public void anAncestorPseudoClassCountsOnlyOnANodeOfItsCompound() throws Exception {
+        styled("ancestorpseudo", ".title { -fx-text-fill: blue; }\n"
+                + ".bar:pressed .title { -fx-text-fill: red; }\n"
+                + "HBox:hover Label { -fx-underline: true; }\n");
+        javafx.css.PseudoClass pressed = javafx.css.PseudoClass.getPseudoClass("pressed");
+        javafx.css.PseudoClass hover = javafx.css.PseudoClass.getPseudoClass("hover");
+        assertEquals(Color.BLUE, title.getTextFill());
+        root.pseudoClassStateChanged(pressed, true);
+        assertEquals(Color.BLUE, title.getTextFill());
+        bar.pseudoClassStateChanged(pressed, true);
+        assertEquals(Color.RED, title.getTextFill());
+        bar.pseudoClassStateChanged(pressed, false);
+        assertEquals(Color.BLUE, title.getTextFill());
+        root.pseudoClassStateChanged(hover, true);
+        assertFalse(title.isUnderline());
+        bar.pseudoClassStateChanged(hover, true);
+        assertTrue(title.isUnderline());
+        assertFalse(plain.isUnderline());
+    }
+
     @Test
     public void theCascadeOrdersBySpecificityThenSourceOrderThenImportance() throws Exception {
         styled("cascade", "#title { -fx-text-fill: green; }\n"

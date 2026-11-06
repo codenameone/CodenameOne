@@ -1,0 +1,9 @@
+variation: wght 600.0
+weight helper: wght
+variation equal: true
+style variations: 1 TextLeadingDistribution.even [serif]
+dynamic light: true dark: true
+icon theme: 500.0 1.0 25.0 48.0 null
+icon mirrors: false
+size zero: 0.0 0.0
+inline style: 12.0

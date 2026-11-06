@@ -33,11 +33,12 @@ public final class Convert {
     }
 
     public static final JsonCodec json = new JsonCodec();
-    public static final ByteCodec utf8 = new ByteCodec(ByteCodec.UTF8);
-    public static final ByteCodec ascii = new ByteCodec(ByteCodec.ASCII);
-    public static final ByteCodec latin1 = new ByteCodec(ByteCodec.LATIN1);
-    public static final ByteCodec base64 = new ByteCodec(ByteCodec.BASE64);
-    public static final ByteCodec base64Url = new ByteCodec(ByteCodec.BASE64_URL);
+    public static final HtmlEscape htmlEscape = new HtmlEscape();
+    public static final TextCodec utf8 = new TextCodec(ByteCodec.UTF8);
+    public static final TextCodec ascii = new TextCodec(ByteCodec.ASCII);
+    public static final TextCodec latin1 = new TextCodec(ByteCodec.LATIN1);
+    public static final Base64Codec base64 = new Base64Codec(ByteCodec.BASE64);
+    public static final Base64Codec base64Url = new Base64Codec(ByteCodec.BASE64_URL);
 
     public static Object jsonDecode(String source) {
         return json.decode(source, null);

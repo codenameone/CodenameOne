@@ -1,0 +1,12 @@
+v1
+v2
+v3
+sync after call, sequential 113
+for0 for1 for2 while1 while3 do0 a0 b0 two
+closure reads 5
+closure reads 6
+nullable future null
+futureor 4 5 dynamic dyn 9
+zone caught Bad state: void closure failed
+x-a y-a main x-b y-b
+end

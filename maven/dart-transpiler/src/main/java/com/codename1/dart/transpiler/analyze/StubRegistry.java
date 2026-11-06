@@ -48,6 +48,9 @@ public final class StubRegistry {
     public final Map<String, Ast.EnumDecl> enums = new LinkedHashMap<String, Ast.EnumDecl>();
     public final Map<String, Ast.FunctionDecl> functions = new LinkedHashMap<String, Ast.FunctionDecl>();
     public final Map<String, Ast.FieldDecl> topLevelVars = new LinkedHashMap<String, Ast.FieldDecl>();
+    /// Function typedefs the stubs declare (`ValueWidgetBuilder<T>`), so a value of one is
+    /// invoked through its signature like a user typedef's.
+    public final Map<String, Ast.TypedefDecl> typedefs = new LinkedHashMap<String, Ast.TypedefDecl>();
     /**
      * Top-level functions of a {@code dart:} library whose names collide with another
      * library's: {@code dart:developer}'s {@code log} is not {@code dart:math}'s. They are
@@ -57,6 +60,11 @@ public final class StubRegistry {
      */
     public final Map<String, Map<String, Ast.FunctionDecl>> libraryFunctions =
             new LinkedHashMap<String, Map<String, Ast.FunctionDecl>>();
+    /// dart:core types the transpiler lowers itself (String, List, Set, Map, Iterable),
+    /// declared with the SDK's member signatures in a {@code dartsdk_<library>.dart} file.
+    /// They are read for parameter types only and never emitted, so they are kept out of
+    /// {@link #classes}: listing List there would make it a stub class.
+    public final Map<String, Ast.ClassDecl> sdkClasses = new LinkedHashMap<String, Ast.ClassDecl>();
     /** Stub extension declarations (`extension X on T { ... }`), keyed via their {@code on} type. */
     public final List<Ast.ClassDecl> extensions = new ArrayList<Ast.ClassDecl>();
 
@@ -75,6 +83,7 @@ public final class StubRegistry {
      */
     private void loadBuiltins(Diagnostics diags) {
         loadResource("/com/codename1/dart/stubs/dart_collection.dart", diags);
+        loadResource("/com/codename1/dart/stubs/dartsdk_core.dart", diags);
     }
 
     /**
@@ -158,8 +167,11 @@ public final class StubRegistry {
         Ast.Library lib = builder.parse(name, source);
         java.util.regex.Matcher pm = PACKAGE_LINE.matcher(source);
         String pkg = pm.find() ? pm.group(1) : null;
+        boolean sdk = isSdkDeclarations(name);
         for (Ast.ClassDecl c : lib.classes) {
-            if (c.extensionOn != null) {
+            if (sdk) {
+                sdkClasses.put(c.name, c);
+            } else if (c.extensionOn != null) {
                 extensions.add(c);
             } else {
                 classes.put(c.name, c);
@@ -181,6 +193,11 @@ public final class StubRegistry {
                     libraryFunctions.put(scoped, m);
                 }
                 m.put(f.name, f);
+            }
+        }
+        for (Ast.TypedefDecl t : lib.typedefs) {
+            if (t.returnType != null && t.paramTypes != null) {
+                typedefs.put(t.name, t);
             }
         }
         for (Ast.FieldDecl v : lib.topLevelVars) {
@@ -247,6 +264,13 @@ public final class StubRegistry {
                 enums.put(name, (Ast.EnumDecl) chosen[1]);
             }
         }
+    }
+
+    /** Whether {@code stubName} is a {@code dartsdk_*.dart} file of SDK declarations. */
+    static boolean isSdkDeclarations(String stubName) {
+        String base = stubName.replace('\\', '/');
+        base = base.substring(base.lastIndexOf('/') + 1);
+        return base.startsWith("dartsdk_") && base.endsWith(".dart");
     }
 
     /** {@code developer} for {@code .../dartlib_developer.dart}, else null. */

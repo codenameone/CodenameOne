@@ -1,0 +1,17 @@
+60
+[700, 5, 700, 700, 706, 800, 0, 1, 700, 4, 700, 1, 900, 42, 700]
+[700, 700, 700, 706, 800, 0, 1, 700, 4, 700, 1, 900, 42, 700]
+24
+Symbol("_v")
+Symbol("_v")
+false
+Symbol("_name$p3")
+Symbol("_name$p3")
+false
+Symbol("_name$p3")
+7
+spy Symbol("_v") get
+spy Symbol("_v") set
+spy Symbol("_tick") call
+spy Symbol("_name$p3") get
+spy Symbol("_name$p3") set

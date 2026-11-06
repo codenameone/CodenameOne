@@ -86,6 +86,31 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "Maven backend-only: " + mavenBackend);
     }
 
+    /// A command-line project is the backend module with a command in place of the
+    /// routes, on both build tools.
+    private void validateCommandLineProject() throws Exception {
+        ProjectOptions.BuildTool[] tools = {ProjectOptions.BuildTool.GRADLE, ProjectOptions.BuildTool.MAVEN};
+        for (ProjectOptions.BuildTool tool : tools) {
+            String label = "[cli " + tool + "] ";
+            ProjectOptions options = ProjectOptions.defaults().withBuild(tool, ProjectOptions.ProjectType.COMMAND_LINE);
+            Map<String, byte[]> entries = tool == ProjectOptions.BuildTool.GRADLE
+                    ? readZipEntries(createProjectZip(IDE.INTELLIJ, Template.BAREBONES, "Hello", "com.acme.hello", options))
+                    : mavenEntries(GeneratorModel.cn1PluginVersion(), Template.BAREBONES, IDE.INTELLIJ, "Hello",
+                            "com.acme.hello", options);
+            String hello = null;
+            for (String path : entries.keySet()) {
+                assertFalse(path.endsWith("/Api.java") || path.endsWith("/ApiTest.java"),
+                        label + "server source in a command-line project: " + path);
+                if (path.endsWith("com/acme/hello/Hello.java")) {
+                    hello = path;
+                }
+            }
+            assertNotNull(hello, label + "missing Hello.java");
+            assertContains(getText(entries, hello), "@Command", label + "Hello.java is not a command");
+            assertFalse(getText(entries, hello).indexOf("__") >= 0, label + "unreplaced placeholder in Hello.java");
+        }
+    }
+
     @Override
     public boolean runTest() throws Exception {
         // Run the targeted regression checks first so they don't get masked when an
@@ -105,6 +130,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateMavenRefusals();
         validateFullStackTemplate();
         validateReelGate();
+        validateCommandLineProject();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
                 if (template.isFullStack() && type == ProjectOptions.ProjectType.APP) {
@@ -117,7 +143,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 }
                 for (IDE ide : IDE.values()) {
                     validateMavenLayoutCombination(template, type, false, ide);
-                    if (type != ProjectOptions.ProjectType.BACKEND_ONLY) {
+                    if (!type.hasNoClient()) {
                         validateMavenLayoutCombination(template, type, true, ide);
                     }
                 }
@@ -184,7 +210,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             // they do in every other backend layout. A backend-only project is
             // the server, so there they sit at the root.
             if (path.startsWith("src/")) {
-                boolean serverTest = type == ProjectOptions.ProjectType.BACKEND_ONLY
+                boolean serverTest = type.hasNoClient()
                         && path.startsWith("src/test/java/");
                 assertTrue(path.startsWith("src/main/") || serverTest, label + "unexpected source set: " + path);
             } else if (path.startsWith("backend/src/")) {
@@ -1607,9 +1633,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>7.0.280</cn1.plugin.version>",
+        assertContains(pom, "<cn1.plugin.version>7.0.281</cn1.plugin.version>",
                 "Root pom should use current CN1 plugin version");
-        assertContains(pom, "<cn1.version>7.0.280</cn1.version>",
+        assertContains(pom, "<cn1.version>7.0.281</cn1.version>",
                 "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");

@@ -155,8 +155,8 @@ public final class JdbcTotpRepository implements TotpRepository {
 
         @Override
         public Object run(Database db) throws Exception {
-            db.execute("DELETE FROM cn1_mfa_totp WHERE username_key = ?", new Object[] {user});
-            db.execute("INSERT INTO cn1_mfa_totp (username_key, secret, nonce, confirmed, "
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_mfa_totp") + " WHERE username_key = ?", new Object[] {user});
+            db.execute("INSERT INTO " + SecuritySchema.table("cn1_mfa_totp") + " (username_key, secret, nonce, confirmed, "
                     + "last_used_step, created_at) VALUES (?, ?, ?, 0, -1, ?)",
                     new Object[] {user, sealed, nonce, Long.valueOf(now)});
             return null;
@@ -171,7 +171,7 @@ public final class JdbcTotpRepository implements TotpRepository {
         String user = SecuritySchema.usernameKey(username);
         try {
             Map row = dataSource.queryOne("SELECT secret, nonce, confirmed, last_used_step FROM "
-                    + "cn1_mfa_totp WHERE username_key = ?", new Object[] {user});
+                    + SecuritySchema.table("cn1_mfa_totp") + " WHERE username_key = ?", new Object[] {user});
             if (row == null) {
                 return null;
             }
@@ -198,7 +198,7 @@ public final class JdbcTotpRepository implements TotpRepository {
     @Override
     public boolean confirm(String username) {
         try {
-            return dataSource.execute("UPDATE cn1_mfa_totp SET confirmed = 1 WHERE "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_mfa_totp") + " SET confirmed = 1 WHERE "
                     + "username_key = ? AND confirmed = 0",
                     new Object[] {SecuritySchema.usernameKey(username)}) == 1;
         } catch (IOException err) {
@@ -209,7 +209,7 @@ public final class JdbcTotpRepository implements TotpRepository {
     @Override
     public boolean advance(String username, long step) {
         try {
-            return dataSource.execute("UPDATE cn1_mfa_totp SET last_used_step = ? WHERE "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_mfa_totp") + " SET last_used_step = ? WHERE "
                     + "username_key = ? AND last_used_step < ?", new Object[] {Long.valueOf(step),
                         SecuritySchema.usernameKey(username), Long.valueOf(step)}) == 1;
         } catch (IOException err) {
@@ -233,7 +233,7 @@ public final class JdbcTotpRepository implements TotpRepository {
         }
         String user = SecuritySchema.usernameKey(username);
         try {
-            Map row = dataSource.queryOne("SELECT secret, nonce FROM cn1_mfa_totp "
+            Map row = dataSource.queryOne("SELECT secret, nonce FROM " + SecuritySchema.table("cn1_mfa_totp") + " "
                     + "WHERE username_key = ?", new Object[] {user});
             if (row == null) {
                 return false;
@@ -247,7 +247,7 @@ public final class JdbcTotpRepository implements TotpRepository {
             }
             // A concurrent save changes the sealed secret and nonce. The predicate
             // binds this update to the row just checked, even on another server.
-            return dataSource.execute("UPDATE cn1_mfa_totp SET confirmed = 1, last_used_step = ? "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_mfa_totp") + " SET confirmed = 1, last_used_step = ? "
                     + "WHERE username_key = ? AND secret = ? AND nonce = ? AND confirmed = ? "
                     + "AND last_used_step < ?", new Object[] {Long.valueOf(step), user, sealed,
                         nonce, Integer.valueOf(confirming ? 0 : 1), Long.valueOf(step)}) == 1;
@@ -259,7 +259,7 @@ public final class JdbcTotpRepository implements TotpRepository {
     @Override
     public boolean delete(String username) {
         try {
-            return dataSource.execute("DELETE FROM cn1_mfa_totp WHERE username_key = ?",
+            return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_mfa_totp") + " WHERE username_key = ?",
                     new Object[] {SecuritySchema.usernameKey(username)}) == 1;
         } catch (IOException err) {
             throw failed(err);

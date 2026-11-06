@@ -36,6 +36,7 @@ import java.util.stream.StreamSupport;
 /// `find`, groups by number and by name, regions, and the replacement
 /// methods with the JDK's `$1` and `${name}` syntax. `hitEnd`,
 /// `requireEnd` and the two bounds switches are not provided.
+@com.codename1.impl.SharedWithBackend
 public final class Matcher implements MatchResult {
 
     private Pattern pattern;

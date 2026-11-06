@@ -100,7 +100,7 @@ public class OverflowBar extends StatelessWidget {
         if (kids == null || kids.size() < 2) {
             return kids;
         }
-        DartList<Widget> out = new DartList<Widget>();
+        DartList<Widget> out = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < kids.size(); i++) {
             if (i > 0) {
                 SizedBox gap = new SizedBox();

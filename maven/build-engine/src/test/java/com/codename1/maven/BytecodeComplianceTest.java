@@ -49,6 +49,56 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceTest {
+    /// Two paths that join with a long on the stack, one pushed by LCONST_1
+    /// (ASM's own BasicValue.LONG_VALUE) and one loaded from a local (the
+    /// checker's value class), must still merge to a two-slot long: a DUP2
+    /// after the join was reported as illegal in generated Python code.
+    @Test
+    void longsFromBothValueClassesMergeAsLongs() throws Exception {
+        analyzeJoin(false);
+        analyzeJoin(true);
+    }
+
+    private static void analyzeJoin(boolean constantFirst) throws Exception {
+        org.objectweb.asm.tree.MethodNode m = new org.objectweb.asm.tree.MethodNode(
+                Opcodes.ACC_STATIC, "m", "(I)V", null, null);
+        org.objectweb.asm.Label a = new org.objectweb.asm.Label();
+        org.objectweb.asm.Label join = new org.objectweb.asm.Label();
+        m.visitVarInsn(Opcodes.ILOAD, 0);
+        m.visitInsn(Opcodes.I2L);
+        m.visitVarInsn(Opcodes.LSTORE, 1);
+        m.visitVarInsn(Opcodes.ILOAD, 0);
+        m.visitJumpInsn(Opcodes.IFEQ, a);
+        // The analyzer meets the join from either path first.
+        if (constantFirst) {
+            m.visitInsn(Opcodes.LCONST_1);
+        } else {
+            m.visitVarInsn(Opcodes.LLOAD, 1);
+        }
+        m.visitJumpInsn(Opcodes.GOTO, join);
+        m.visitLabel(a);
+        if (constantFirst) {
+            m.visitVarInsn(Opcodes.LLOAD, 1);
+        } else {
+            m.visitInsn(Opcodes.LCONST_1);
+        }
+        m.visitLabel(join);
+        m.visitInsn(Opcodes.DUP2);
+        m.visitInsn(Opcodes.POP2);
+        m.visitInsn(Opcodes.POP2);
+        m.visitInsn(Opcodes.RETURN);
+        m.maxStack = 4;
+        m.maxLocals = 3;
+        Class<?> type = Class.forName("com.codename1.maven.BytecodeCompliance$SimdAllocaInterpreter");
+        java.lang.reflect.Constructor<?> ctor = type.getDeclaredConstructor();
+        ctor.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        org.objectweb.asm.tree.analysis.Interpreter<org.objectweb.asm.tree.analysis.BasicValue> interpreter =
+                (org.objectweb.asm.tree.analysis.Interpreter<org.objectweb.asm.tree.analysis.BasicValue>) ctor.newInstance();
+        new org.objectweb.asm.tree.analysis.Analyzer<org.objectweb.asm.tree.analysis.BasicValue>(interpreter)
+                .analyze("app/Joins", m);
+    }
+
     /// A sibling module checked with the application is compiled by its own
     /// module, so its classes have to count when deciding whether the last
     /// check still holds; otherwise a change to it alone skips the check.
@@ -86,6 +136,68 @@ class BytecodeComplianceTest {
         writeApiClass(api, "javax/inject/Provider", "nativeOnly", "()V");
         org.junit.jupiter.api.Assertions.assertThrows(com.codename1.build.BuildFailureException.class, () ->
                 compliance.checkBackend(output.toFile(), api.toFile(), Collections.singletonList(dependency.toFile())));
+    }
+
+    @Test
+    void backendMovesRegularExpressionsOntoTheSharedEngine(@TempDir Path dir) throws Exception {
+        Path src = Files.createDirectories(dir.resolve("src/app"));
+        Path output = Files.createDirectories(dir.resolve("output"));
+        Path api = Files.createDirectories(dir.resolve("api"));
+        Path dependency = Files.createDirectories(dir.resolve("dependency"));
+        Files.write(src.resolve("Regex.java"), java.util.Arrays.asList(
+                "package app;",
+                "public class Regex {",
+                "    public static boolean run(String s) {",
+                "        boolean a = java.util.regex.Pattern.compile(\"[a-z]+\").matcher(s).matches();",
+                "        String[] p = s.split(\",\");",
+                "        String r = s.replaceAll(\"x\", \"y\").replaceFirst(\"y\", \"z\");",
+                "        return a && s.matches(\"b\") && p.length > 0 && r.length() > 0;",
+                "    }",
+                "}"), java.nio.charset.StandardCharsets.UTF_8);
+        javax.tools.JavaCompiler javac = javax.tools.ToolProvider.getSystemJavaCompiler();
+        assertEquals(0, javac.run(null, null, null, "-source", "8", "-target", "8", "-nowarn",
+                "-d", output.toString(), src.resolve("Regex.java").toString()));
+
+        // The server's class library: no java.util.regex, no String regex members.
+        writeJavaLangObject(api);
+        writeStub(api, "java/lang/String", "length()I");
+        writeStub(api, "java/lang/CharSequence");
+        String r = "com/codename1/util/regex/";
+        writeStub(dependency, r + "Pattern", "static compile(Ljava/lang/String;)L" + r + "Pattern;",
+                "matcher(Ljava/lang/CharSequence;)L" + r + "Matcher;");
+        writeStub(dependency, r + "Matcher", "matches()Z");
+        String str = "Ljava/lang/String;";
+        writeStub(dependency, r + "StringRegex", "static matches(" + str + str + ")Z",
+                "static split(" + str + str + ")[" + str,
+                "static replaceAll(" + str + str + str + ")" + str,
+                "static replaceFirst(" + str + str + str + ")" + str);
+
+        BytecodeCompliance compliance = new BytecodeCompliance(TestProjectHost.empty());
+        compliance.checkBackend(output.toFile(), api.toFile(), Collections.singletonList(dependency.toFile()));
+        assertEquals(4, compliance.lastRewrittenCallsites());
+        String rewritten = new String(Files.readAllBytes(output.resolve("app/Regex.class")),
+                java.nio.charset.StandardCharsets.ISO_8859_1);
+        org.junit.jupiter.api.Assertions.assertFalse(rewritten.contains("java/util/regex"));
+        org.junit.jupiter.api.Assertions.assertTrue(rewritten.contains(r + "StringRegex"));
+    }
+
+    /// A class whose methods are native: present for the compliance index,
+    /// nothing to run. A method spec is `[static ]name descriptor`.
+    private void writeStub(Path root, String className, String... methods) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+        for (String m : methods) {
+            int access = Opcodes.ACC_PUBLIC | Opcodes.ACC_NATIVE;
+            String spec = m;
+            if (spec.startsWith("static ")) {
+                access |= Opcodes.ACC_STATIC;
+                spec = spec.substring(7);
+            }
+            int paren = spec.indexOf('(');
+            writer.visitMethod(access, spec.substring(0, paren), spec.substring(paren), null, null).visitEnd();
+        }
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
     }
 
     @Test

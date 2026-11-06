@@ -125,6 +125,10 @@ public class ScrollPane extends Control {
     private final Viewport viewport = new Viewport();
     private final Region hbar = thumb();
     private final Region vbar = thumb();
+    private final com.codename1.fxcompat.runtime.ScrollIndicator indicatorX =
+            new com.codename1.fxcompat.runtime.ScrollIndicator(hbar);
+    private final com.codename1.fxcompat.runtime.ScrollIndicator indicatorY =
+            new com.codename1.fxcompat.runtime.ScrollIndicator(vbar);
     private double contentWidth;
     private double contentHeight;
     private double pressX;
@@ -153,6 +157,40 @@ public class ScrollPane extends Control {
         return r;
     }
 
+    /// Glides on after a touch pan, as a phone's scroll view does.
+    private final com.codename1.fxcompat.runtime.Fling fling = new com.codename1.fxcompat.runtime.Fling(
+            new com.codename1.fxcompat.runtime.Fling.Target() {
+                @Override
+                public boolean flingBy(double delta) {
+                    double extentY = contentHeight - viewport.getHeight();
+                    if (!(extentY > 0) || vvalue.isBound()) {
+                        return false;
+                    }
+                    double before = offset(getVvalue(), getVmin(), getVmax(), extentY);
+                    scrollBy(0, delta);
+                    double after = offset(getVvalue(), getVmin(), getVmax(), extentY);
+                    return Math.abs(after - before - delta) < 0.5;
+                }
+
+                @Override
+                public void reachedEnd(double speed) {
+                    overscroll.bounce(speed, viewport.getHeight());
+                }
+            });
+    /// The stretch past the top or the bottom while a finger drags beyond
+    /// it, and the spring back after.
+    private final com.codename1.fxcompat.runtime.Overscroll overscroll = new com.codename1.fxcompat.runtime.Overscroll(
+            new com.codename1.fxcompat.runtime.Overscroll.Target() {
+                @Override
+                public void overscrollChanged() {
+                    placeContent();
+                }
+            });
+    /// How far past an end the press began, so a press on a stretched
+    /// view holds it where it is.
+    private double pressBeyond;
+    private boolean pressCancelled;
+
     private void init() {
         getStyleClass().add("scroll-pane");
         setFocusTraversable(false);
@@ -160,6 +198,7 @@ public class ScrollPane extends Control {
         addEventHandler(ScrollEvent.SCROLL, new EventHandler<ScrollEvent>() {
             @Override
             public void handle(ScrollEvent event) {
+                overscroll.reset();
                 if (scrollBy(-event.getDeltaX(), -event.getDeltaY())) {
                     event.consume();
                 }
@@ -168,14 +207,27 @@ public class ScrollPane extends Control {
         addEventHandler(MouseEvent.MOUSE_PRESSED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
+                fling.stop();
                 rememberPress(event);
+                pressBeyond = overscroll.grab();
+                pressCancelled = false;
                 panning = isPannable() || (Display.isInitialized() && !Display.getInstance().isDesktop());
             }
         });
         addEventHandler(MouseEvent.MOUSE_DRAGGED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
+                if (panning && !pressCancelled && getScene() != null
+                        && Math.max(Math.abs(pressX - event.getSceneX()), Math.abs(pressY - event.getSceneY())) > 4) {
+                    // A drag is a scroll: what it began on is not being
+                    // pressed, and must not stay shaded as if it were.
+                    pressCancelled = true;
+                    getScene().cn1CancelPress();
+                }
                 if (panning && panTo(pressX - event.getSceneX(), pressY - event.getSceneY())) {
+                    if (com.codename1.fxcompat.runtime.Overscroll.touchScreen()) {
+                        fling.track(offset(getVvalue(), getVmin(), getVmax(), contentHeight - viewport.getHeight()));
+                    }
                     event.consume();
                 }
             }
@@ -183,6 +235,13 @@ public class ScrollPane extends Control {
         addEventHandler(MouseEvent.MOUSE_RELEASED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
+                if (panning) {
+                    if (overscroll.value() != 0) {
+                        overscroll.release();
+                    } else {
+                        fling.release();
+                    }
+                }
                 panning = false;
             }
         });
@@ -289,7 +348,11 @@ public class ScrollPane extends Control {
             setHvalue(valueAt(offset(pressH, getHmin(), getHmax(), extentX) + dx, getHmin(), getHmax(), extentX));
         }
         if (extentY > 0 && !vvalue.isBound()) {
-            setVvalue(valueAt(offset(pressV, getVmin(), getVmax(), extentY) + dy, getVmin(), getVmax(), extentY));
+            double to = offset(pressV, getVmin(), getVmax(), extentY) + pressBeyond + dy;
+            setVvalue(valueAt(to, getVmin(), getVmax(), extentY));
+            if (com.codename1.fxcompat.runtime.Overscroll.touchScreen()) {
+                overscroll.drag(to < 0 ? to : (to > extentY ? to - extentY : 0), viewport.getHeight());
+            }
         }
         return extentX > 0 || extentY > 0;
     }
@@ -305,20 +368,25 @@ public class ScrollPane extends Control {
         if (c != null && c.getParent() == viewport) {
             Bounds lb = c.getLayoutBounds();
             c.setLayoutX(-ox - lb.getMinX());
-            c.setLayoutY(-oy - lb.getMinY());
+            // A stretch past an end moves the content and nothing else.
+            c.setLayoutY(-oy - snapPositionY(overscroll.value()) - lb.getMinY());
         }
         Bounds old = viewportBounds.get();
         if (old == null || old.getMinX() != -ox || old.getMinY() != -oy || old.getWidth() != vw
                 || old.getHeight() != vh) {
             viewportBounds.set(new BoundingBox(-ox, -oy, vw, vh));
         }
-        placeThumb(hbar, true, getHbarPolicy(), extentX, vw, vh, contentWidth, ox);
-        placeThumb(vbar, false, getVbarPolicy(), extentY, vh, vw, contentHeight, oy);
+        // Both are read every time: each records where it last saw the pane.
+        boolean movedX = indicatorX.at(ox);
+        boolean movedY = indicatorY.at(oy);
+        placeThumb(hbar, true, getHbarPolicy(), extentX, vw, vh, contentWidth, ox, movedX);
+        placeThumb(vbar, false, getVbarPolicy(), extentY, vh, vw, contentHeight, oy, movedY);
     }
 
     private void placeThumb(Region bar, boolean horizontal, ScrollBarPolicy policy, double extent, double along,
-            double across, double contentLength, double scrolled) {
-        boolean shown = policy == ScrollBarPolicy.ALWAYS || (policy != ScrollBarPolicy.NEVER && extent > 0.5);
+            double across, double contentLength, double scrolled, boolean moving) {
+        boolean shown = policy == ScrollBarPolicy.ALWAYS
+                || (policy != ScrollBarPolicy.NEVER && extent > 0.5 && moving);
         double track = along - 2 * BAR_GAP;
         if (!shown || !(track > 0)) {
             bar.setVisible(false);

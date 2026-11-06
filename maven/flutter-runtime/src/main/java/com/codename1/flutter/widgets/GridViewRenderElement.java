@@ -36,10 +36,15 @@ public class GridViewRenderElement extends ScrollRenderElement {
     }
 
     @Override
+    protected boolean horizontal() {
+        return ((GridView) widget()).getScrollDirection() == com.codename1.flutter.Axis.horizontal;
+    }
+
+    @Override
     protected Widget buildContent() {
         GridView w = (GridView) widget();
         GridContent gc = new GridContent(w.getCrossAxisCount(), w.getChildAspectRatio(),
-                w.getMainAxisSpacing(), w.getCrossAxisSpacing(), w.getChildren());
+                w.getMainAxisSpacing(), w.getCrossAxisSpacing(), w.getChildren()).horizontal(horizontal());
         if (w.getPadding() == null) {
             return gc;
         }

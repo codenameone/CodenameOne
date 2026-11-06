@@ -29,13 +29,13 @@ import dart.core.DartList;
 
 /** firebase_ui_auth's {@code FirebaseUIAuth}: the providers a screen offers when it names none. */
 public final class FirebaseUIAuth {
-    private static DartList<Object> providers = new DartList<Object>();
+    private static DartList<Object> providers = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
 
     private FirebaseUIAuth() {
     }
 
     public static void configureProviders(DartList<Object> list, FirebaseApp app) {
-        providers = list == null ? new DartList<Object>() : list;
+        providers = list == null ? new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC) : list;
     }
 
     public static DartList<Object> providersFor(FirebaseApp app) {

@@ -96,6 +96,7 @@ public class SECursor extends AbstractDBCursor {
 
     @Override
     protected boolean stepForward() throws IOException {
+        forgetFetched();
         try {
             return resultSet.next();
         } catch (SQLException ex) {
@@ -158,10 +159,67 @@ public class SECursor extends AbstractDBCursor {
         }
     }
 
+    /// The value `isNullAt` fetched for the current row, by column, so `columnType` derives the
+    /// storage class from it rather than fetching the value a second time (a second copy of a
+    /// blob, and a second read some drivers refuse). Cleared on every step.
+    private Object[] fetched;
+
+    /// Which entries of `fetched` hold a value of the current row.
+    private boolean[] fetchedSet;
+
+    private Object fetch(int index) throws SQLException {
+        if (fetched != null && index < fetched.length && fetchedSet[index]) {
+            return fetched[index];
+        }
+        Object v = resultSet.getObject(index + 1);
+        if (fetched == null || index >= fetched.length) {
+            int size = Math.max(index + 1, resultSet.getMetaData().getColumnCount());
+            fetched = new Object[size];
+            fetchedSet = new boolean[size];
+        }
+        fetched[index] = v;
+        fetchedSet[index] = true;
+        return v;
+    }
+
+    private void forgetFetched() {
+        if (fetched != null) {
+            java.util.Arrays.fill(fetched, null);
+            java.util.Arrays.fill(fetchedSet, false);
+        }
+    }
+
+    @Override
+    protected int columnType(int index) throws IOException {
+        Object v;
+        try {
+            v = fetch(index);
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+        // The SQLite driver hands each value back in the class of its storage.
+        if (v == null) {
+            return com.codename1.db.Database.COLUMN_NULL;
+        }
+        if (v instanceof Integer || v instanceof Long || v instanceof Short || v instanceof Byte) {
+            return com.codename1.db.Database.COLUMN_INTEGER;
+        }
+        if (v instanceof Double || v instanceof Float) {
+            return com.codename1.db.Database.COLUMN_FLOAT;
+        }
+        if (v instanceof String) {
+            return com.codename1.db.Database.COLUMN_TEXT;
+        }
+        if (v instanceof byte[]) {
+            return com.codename1.db.Database.COLUMN_BLOB;
+        }
+        return com.codename1.db.Database.COLUMN_UNKNOWN;
+    }
+
     @Override
     protected boolean isNullAt(int index) throws IOException {
         try {
-            return resultSet.getObject(index + 1) == null;
+            return fetch(index) == null;
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);
         }

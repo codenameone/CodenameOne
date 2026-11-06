@@ -38,6 +38,8 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.ClassRemapper;
+import org.objectweb.asm.commons.SimpleRemapper;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -294,10 +296,82 @@ public class BytecodeCompliance {
     };
     private static final String SIMD_INTERNAL_NAME = "com/codename1/util/Simd";
     private static final Map<MethodRef, MethodRef> INVOCATION_REWRITE_RULES = createInvocationRewriteRules();
+    /// The rules a backend gets: the String regex members alone. The other
+    /// rules point at the client's JdkApiRewriteHelper, which the server
+    /// runtime does not have; vm/JavaAPI defines those methods itself.
+    private static final Map<MethodRef, MethodRef> BACKEND_INVOCATION_REWRITE_RULES = createBackendInvocationRewriteRules();
 
     private File complianceOutputFile;
     private InvocationRewriteSummary lastInvocationRewriteSummary = new InvocationRewriteSummary();
     private URLClassLoader validationClassLoader;
+
+    private static Map<MethodRef, MethodRef> createBackendInvocationRewriteRules() {
+        Map<MethodRef, MethodRef> rules = new LinkedHashMap<MethodRef, MethodRef>();
+        for (Map.Entry<MethodRef, MethodRef> rule : INVOCATION_REWRITE_RULES.entrySet()) {
+            if (STRING_REGEX_INTERNAL_NAME.equals(rule.getValue().owner)) {
+                rules.put(rule.getKey(), rule.getValue());
+            }
+        }
+        return Collections.unmodifiableMap(rules);
+    }
+
+    /// The `java.util.regex` rows of [Relocation#JDK_SHIMS], the only rows a
+    /// backend applies: the server shares the framework's regex engine
+    /// (`com.codename1.util.regex`, marked `SharedWithBackend`), and nothing
+    /// else of that table.
+    private static Map<String, String> backendRegexRelocation() {
+        Map<String, String> map = new HashMap<String, String>();
+        for (String[] row : Relocation.JDK_SHIMS) {
+            if (row[0].startsWith("java/util/regex/")) {
+                map.put(row[0], row[1]);
+            }
+        }
+        return map;
+    }
+
+    /// Moves a backend application's `java.util.regex` onto the framework's
+    /// engine and its String regex calls onto `StringRegex`, as a client build
+    /// does, IN PLACE. vm/JavaAPI has no `java.util.regex` and no String regex
+    /// members, so without this every such call is a forbidden reference.
+    private InvocationRewriteSummary applyBackendRegexRewrites(File output) throws BuildExecutionException {
+        InvocationRewriteSummary summary = new InvocationRewriteSummary();
+        List<File> classFiles = new ArrayList<File>();
+        collectClassFiles(output, classFiles);
+        final Map<String, String> relocation = backendRegexRelocation();
+        for (File classFile : classFiles) {
+            try {
+                byte[] original = FileUtils.readFileToByteArray(classFile);
+                final boolean[] moved = new boolean[1];
+                ClassReader reader = new ClassReader(original);
+                ClassWriter writer = new ClassWriter(0);
+                reader.accept(new ClassRemapper(writer, new SimpleRemapper(relocation) {
+                    @Override
+                    public String map(String key) {
+                        String mapped = super.map(key);
+                        if (mapped != null) {
+                            moved[0] = true;
+                        }
+                        return mapped;
+                    }
+                }), 0);
+                byte[] relocated = moved[0] ? writer.toByteArray() : original;
+                InvocationRewriteResult result = rewriteClassInvocations(relocated, BACKEND_INVOCATION_REWRITE_RULES);
+                if (moved[0] || result.rewrittenCallsites > 0) {
+                    FileUtils.writeByteArrayToFile(classFile, result.bytes);
+                    summary.rewrittenClasses++;
+                    summary.rewrittenCallsites += result.rewrittenCallsites;
+                }
+            } catch (IOException ex) {
+                throw new BuildExecutionException("Failed to rewrite regular expressions in " + classFile, ex);
+            }
+        }
+        return summary;
+    }
+
+    /// Callsites the last check rewrote, as its report states them.
+    int lastRewrittenCallsites() {
+        return lastInvocationRewriteSummary.rewrittenCallsites;
+    }
 
     private static Map<MethodRef, MethodRef> createInvocationRewriteRules() {
         Map<MethodRef, MethodRef> rules = new LinkedHashMap<MethodRef, MethodRef>();
@@ -565,6 +639,7 @@ public class BytecodeCompliance {
     public void checkBackend(File output, File javaApi, List<File> dependencies)
             throws BuildExecutionException {
         checkBackendBootstraps(output);
+        lastInvocationRewriteSummary = applyBackendRegexRewrites(output);
         complianceOutputFile = new File(output.getParentFile(), output.getName() + "-compliance.txt");
         Map<String, ClassMetadata> allowed = buildClassIndex(Collections.singletonList(javaApi));
         Map<String, ClassMetadata> project = buildClassIndexWithOutput(output, dependencies);
@@ -907,7 +982,7 @@ public class BytecodeCompliance {
             for (File classFile : classFiles) {
                 try {
                     byte[] originalBytes = FileUtils.readFileToByteArray(classFile);
-                    InvocationRewriteResult rewriteResult = rewriteClassInvocations(originalBytes);
+                    InvocationRewriteResult rewriteResult = rewriteClassInvocations(originalBytes, INVOCATION_REWRITE_RULES);
                     if (rewriteResult.rewrittenCallsites > 0) {
                         validateClass(rewriteResult.bytes, classFile, outputDir);
                         FileUtils.writeByteArrayToFile(classFile, rewriteResult.bytes);
@@ -928,10 +1003,11 @@ public class BytecodeCompliance {
     /// `classBytes` with every invocation rewrite rule applied, as a build
     /// applies them: for tests that run a class the way it ships.
     static byte[] rewriteInvocations(byte[] classBytes) {
-        return rewriteClassInvocations(classBytes).bytes;
+        return rewriteClassInvocations(classBytes, INVOCATION_REWRITE_RULES).bytes;
     }
 
-    private static InvocationRewriteResult rewriteClassInvocations(byte[] classBytes) {
+    private static InvocationRewriteResult rewriteClassInvocations(byte[] classBytes,
+            final Map<MethodRef, MethodRef> rules) {
         final InvocationRewriteResult result = new InvocationRewriteResult();
         final ClassReader reader = new ClassReader(classBytes);
         final ClassWriter writer = new ClassWriter(reader, 0);
@@ -943,7 +1019,7 @@ public class BytecodeCompliance {
                     @Override
                     public void visitMethodInsn(int opcode, String owner, String methodName, String methodDescriptor, boolean isInterface) {
                         MethodRef source = new MethodRef(opcode, owner, methodName, methodDescriptor);
-                        MethodRef target = INVOCATION_REWRITE_RULES.get(source);
+                        MethodRef target = rules.get(source);
                         if (target != null) {
                             result.rewrittenCallsites++;
                             super.visitMethodInsn(target.opcode, target.owner, target.name, target.descriptor, false);
@@ -964,7 +1040,7 @@ public class BytecodeCompliance {
                             int opcode = h.getTag() == Opcodes.H_INVOKESTATIC ? Opcodes.INVOKESTATIC
                                     : h.getTag() == Opcodes.H_INVOKEVIRTUAL ? Opcodes.INVOKEVIRTUAL : -1;
                             MethodRef target = opcode < 0 ? null
-                                    : INVOCATION_REWRITE_RULES.get(new MethodRef(opcode, h.getOwner(), h.getName(), h.getDesc()));
+                                    : rules.get(new MethodRef(opcode, h.getOwner(), h.getName(), h.getDesc()));
                             if (target == null) {
                                 continue;
                             }
@@ -1311,8 +1387,15 @@ public class BytecodeCompliance {
         @Override
         public BasicValue merge(BasicValue value1, BasicValue value2) {
             boolean alloca = isAllocaValue(value1) || isAllocaValue(value2);
-            if (value1.equals(value2)) {
-                return new SimdAllocaValue(value1.getType(), alloca);
+            // Compare the types, not the values: BasicInterpreter's own
+            // constants (LCONST_1 pushes BasicValue.LONG_VALUE) are not
+            // SimdAllocaValues, so equals() fails against ours for the same
+            // type and super.merge() would widen a long to a one-slot
+            // UNINITIALIZED_VALUE -- the next DUP2 then reports "Illegal use
+            // of DUP2" on bytecode ASM's plain analyzer accepts.
+            Type t1 = value1.getType();
+            if (t1 != null && t1.equals(value2.getType())) {
+                return new SimdAllocaValue(t1, alloca);
             }
             if (isReferenceValue(value1) && isReferenceValue(value2)) {
                 return new SimdAllocaValue(Type.getObjectType("java/lang/Object"), alloca);

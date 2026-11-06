@@ -75,7 +75,7 @@ public class GenerateInitializr {
    }
    // The Maven layouts, generated against the first plugin that has them whatever
    // release this checkout is on. MAVEN-FULL is every platform module plus backend/.
-   String[] layouts = {"APP", "APP_WITH_BACKEND", "BACKEND_ONLY", "FULL"};
+   String[] layouts = {"APP", "APP_WITH_BACKEND", "BACKEND_ONLY", "COMMAND_LINE", "FULL"};
    for (String layout : layouts) {
     boolean full = "FULL".equals(layout);
     ProjectOptions.ProjectType type = full ? ProjectOptions.ProjectType.APP_WITH_BACKEND

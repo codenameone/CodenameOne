@@ -16,6 +16,7 @@
  */
 package com.codename1.util.regex;
 
+@com.codename1.impl.SharedWithBackend
 public abstract class RECharacter {
 
     public static final byte UNASSIGNED = 0;

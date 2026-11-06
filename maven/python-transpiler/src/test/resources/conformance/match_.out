@@ -1,0 +1,25 @@
+none
+true
+small 0
+small 1
+negative -5
+number 7
+number 2.5
+the blue
+verb
+str hi
+empty
+one 9
+long 1 [2, 3, 4]
+3+ (1, 2, 3)
+pair (1, 2)
+circle 2
+shape sq {'w': 1, 'h': 2}
+origin
+on y 5
+diag 3
+point
+other set
+[1, -1, 2]
+loading file.txt
+done 5

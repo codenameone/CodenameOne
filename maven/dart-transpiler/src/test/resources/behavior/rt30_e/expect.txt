@@ -1,0 +1,16 @@
+10
+3
+k
+({int a, ({(int) => int f, ({(String) => int g, String k}) n}) inner})
+2
+9
+[25, -4]
+7
+4.0
+two
+() => int
+1two
+[1]
+List<String>
+true
+true

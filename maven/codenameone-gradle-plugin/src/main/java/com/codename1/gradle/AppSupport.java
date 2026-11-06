@@ -173,6 +173,8 @@ final class AppSupport {
         });
         main.getJava().srcDir(svg.flatMap(TranscodeSvgTask::getOutputDirectory));
 
+        registerPython(project, layout, ext, userProperties, main);
+
         registerGuiSources(project, layout, ext, userProperties, main);
 
         // Android compatibility: src/main/android (manifest, res/, assets/,
@@ -1151,6 +1153,45 @@ final class AppSupport {
             roots.add(new File(layout.projectDir(), "src/main/kotlin").getAbsolutePath());
         }
         return new ArrayList<String>(roots);
+    }
+
+    /// Python: src/main/python transpiles to Java the main source set
+    /// compiles, against codenameone-python-runtime, which only a project with
+    /// Python sources gets as a dependency. An application and a backend or
+    /// command-line tool alike; the transpiler reads the project's own class
+    /// path, so a backend's program imports the backend's Java classes.
+    static void registerPython(Project project, ProjectLayout layout, CodenameOneExtension ext,
+                               Provider<Map<String, String>> userProperties, SourceSet main) {
+        final File pythonDir = new File(layout.projectDir(), "src/main/python");
+        if (com.codename1.maven.PythonProjectBuilder.isPythonProject(pythonDir)) {
+            addFramework(project, "implementation", ext.getVersion(),
+                    com.codename1.maven.PythonProjectBuilder.RUNTIME_ARTIFACT);
+        }
+        final java.util.Properties pythonSettings = AppSettings.read(layout.settingsFile());
+        final String pythonMain = pythonSettings
+                .getProperty(com.codename1.maven.PythonProjectImporter.MAIN_MODULE_SETTING);
+        final String pythonStack = pythonSettings
+                .getProperty(com.codename1.maven.PythonProjectBuilder.VIRTUAL_THREAD_STACK_HINT);
+        TaskProvider<com.codename1.gradle.tasks.TranspilePythonTask> python = project.getTasks().register(
+                "transpilePython", com.codename1.gradle.tasks.TranspilePythonTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Transpiles the Python sources in src/main/python to Java");
+                    t.getPythonDirectory().set(pythonDir);
+                    t.getSources().from(project.fileTree(pythonDir, f -> f.include("**/*.py")));
+                    if (pythonMain != null) {
+                        t.getMainModule().set(pythonMain);
+                    }
+                    if (pythonStack != null) {
+                        t.getVirtualThreadStack().set(pythonStack);
+                    }
+                    t.getJavaClassPath().from(project.getConfigurations().getByName("compileClasspath"));
+                    t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-python"));
+                    File javaDir = project.file("src/main/java");
+                    t.getJavaSourceDirectory().set(javaDir);
+                    t.getJavaSources().from(project.fileTree(javaDir, f -> f.include("**/*.java")));
+                    t.getJavaImportsDirectory().set(new File(layout.buildDir(), "cn1-python-java-imports"));
+                });
+        main.getJava().srcDir(python.flatMap(com.codename1.gradle.tasks.TranspilePythonTask::getOutputDirectory));
     }
 
     static void addFramework(Project project, String configuration, Provider<String> version, String... artifactIds) {

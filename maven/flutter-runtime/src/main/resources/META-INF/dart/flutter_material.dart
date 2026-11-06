@@ -24,9 +24,11 @@ external void runApp(Widget app);
 @JavaName('com.codename1.flutter.Key')
 abstract class Key {}
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.ValueKey')
-class ValueKey extends Key {
-  external ValueKey(Object value);
+class ValueKey<T> extends Key {
+  external const ValueKey(T value);
+  external T get value;
 }
 
 @JavaName('com.codename1.flutter.BuildContext')
@@ -35,6 +37,7 @@ abstract class BuildContext {
   // Dart <T> witness (dropped from the call) as a trailing Class<T> token and
   // casts the result, so the Java runtime methods take a trailing Class<T>.
   external T dependOnInheritedWidgetOfExactType();
+  external T? getInheritedWidgetOfExactType();
   external T watch();
   external T read();
   // `witness` is filled in with the class of <T>, from the selector's parameter type.
@@ -47,20 +50,24 @@ abstract class BuildContext {
   external Size? get size;
 }
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.Widget')
 abstract class Widget {
-  external Widget({Key? key});
+  external const Widget({Key? key});
+  external Key? get key;
 }
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.StatelessWidget')
 abstract class StatelessWidget extends Widget {
-  external StatelessWidget({Key? key});
+  external const StatelessWidget({Key? key});
   Widget build(BuildContext context);
 }
 
+@ConstKeyed()
 @JavaName('com.codename1.flutter.StatefulWidget')
 abstract class StatefulWidget extends Widget {
-  external StatefulWidget({Key? key});
+  external const StatefulWidget({Key? key});
   State createState();
 }
 
@@ -70,6 +77,8 @@ abstract class State<T> {
   external BuildContext get context;
   external void setState(VoidCallback fn);
   external void initState();
+  external void didChangeDependencies();
+  external void didUpdateWidget(T oldWidget);
   external void dispose();
   Widget build(BuildContext context);
 }
@@ -84,49 +93,69 @@ class Color {
   // Cascade fixers: member access on a Color must stay statically typed (P2).
   external Color withOpacity(double opacity);
   external Color withAlpha(int a);
+  external Color withValues({double? alpha, double? red, double? green, double? blue, dynamic colorSpace});
+  external double get a;
+  external double get r;
+  external double get g;
+  external double get b;
   external Color copyWith({int? alpha, int? red, int? green, int? blue});
   external static Color alphaBlend(Color foreground, Color background);
   external static Color fromRGBO(int r, int g, int b, double opacity);
 }
 
+@JavaName('com.codename1.generated.flutter.MaterialColor')
+class MaterialColor extends Color {
+  external Color get shade50;
+  external Color get shade100;
+  external Color get shade200;
+  external Color get shade300;
+  external Color get shade400;
+  external Color get shade500;
+  external Color get shade600;
+  external Color get shade700;
+  external Color get shade800;
+  external Color get shade900;
+}
+
 @JavaName('com.codename1.flutter.Colors')
 abstract class Colors {
+  external static List<MaterialColor> get primaries;
   external static Color get transparent;
-  external static Color get red;
+  external static MaterialColor get red;
   external static Color get redAccent;
-  external static Color get pink;
+  external static MaterialColor get pink;
   external static Color get pinkAccent;
-  external static Color get purple;
+  external static MaterialColor get purple;
   external static Color get purpleAccent;
-  external static Color get deepPurple;
+  external static MaterialColor get deepPurple;
   external static Color get deepPurpleAccent;
-  external static Color get indigo;
+  external static MaterialColor get indigo;
   external static Color get indigoAccent;
-  external static Color get blue;
+  external static MaterialColor get blue;
   external static Color get blueAccent;
-  external static Color get lightBlue;
+  external static MaterialColor get lightBlue;
   external static Color get lightBlueAccent;
-  external static Color get cyan;
+  external static MaterialColor get cyan;
   external static Color get cyanAccent;
-  external static Color get teal;
+  external static MaterialColor get teal;
   external static Color get tealAccent;
-  external static Color get green;
+  external static MaterialColor get green;
   external static Color get greenAccent;
-  external static Color get lightGreen;
+  external static MaterialColor get lightGreen;
   external static Color get lightGreenAccent;
-  external static Color get lime;
+  external static MaterialColor get lime;
   external static Color get limeAccent;
-  external static Color get yellow;
+  external static MaterialColor get yellow;
   external static Color get yellowAccent;
-  external static Color get amber;
+  external static MaterialColor get amber;
   external static Color get amberAccent;
-  external static Color get orange;
+  external static MaterialColor get orange;
   external static Color get orangeAccent;
-  external static Color get deepOrange;
+  external static MaterialColor get deepOrange;
   external static Color get deepOrangeAccent;
-  external static Color get brown;
-  external static Color get grey;
-  external static Color get blueGrey;
+  external static MaterialColor get brown;
+  external static MaterialColor get grey;
+  external static MaterialColor get blueGrey;
   external static Color get white;
   external static Color get white70;
   external static Color get white60;
@@ -168,13 +197,13 @@ class EdgeInsets extends EdgeInsetsGeometry {
 enum MainAxisAlignment { start, end, center, spaceBetween, spaceAround, spaceEvenly }
 
 @JavaName('com.codename1.flutter.CrossAxisAlignment')
-enum CrossAxisAlignment { start, end, center, stretch }
+enum CrossAxisAlignment { start, end, center, stretch, baseline }
 
 @JavaName('com.codename1.flutter.MainAxisSize')
 enum MainAxisSize { min, max }
 
 @JavaName('com.codename1.flutter.TextAlign')
-enum TextAlign { left, right, center, start, end }
+enum TextAlign { left, right, center, start, end, justify }
 
 @JavaName('com.codename1.flutter.FontWeight')
 abstract class FontWeight {
@@ -193,7 +222,25 @@ abstract class FontWeight {
 
 @JavaName('com.codename1.flutter.TextStyle')
 class TextStyle {
-  external TextStyle({double? fontSize, FontWeight? fontWeight, Color? color, String? fontFamily, double? letterSpacing, double? height});
+  external TextStyle({double? fontSize, FontWeight? fontWeight, Color? color, String? fontFamily, double? letterSpacing, double? height,
+      TextDecoration? decoration, Color? decorationColor, TextDecorationStyle? decorationStyle, double? decorationThickness,
+      List<Shadow>? shadows, Color? backgroundColor, List<FontVariation>? fontVariations, List<Object>? fontFeatures,
+      List<String>? fontFamilyFallback, TextLeadingDistribution? leadingDistribution,
+      bool inherit = true, String? package, Paint? foreground, FontStyle? fontStyle});
+  external FontStyle? get fontStyle;
+  external bool get inherit;
+  external String? get package;
+  external Paint? get foreground;
+  external List<FontVariation>? get fontVariations;
+  external List<String>? get fontFamilyFallback;
+  external TextLeadingDistribution? get leadingDistribution;
+  external TextDecoration? get decoration;
+  external Color? get decorationColor;
+  external TextDecorationStyle? get decorationStyle;
+  external double? get decorationThickness;
+  external List<Shadow>? get shadows;
+  external Color? get backgroundColor;
+  external TextStyle merge(TextStyle? other);
   external Color? get color;
   external double? get fontSize;
   external FontWeight? get fontWeight;
@@ -202,13 +249,23 @@ class TextStyle {
   external double? get height;
   external TextStyle copyWith({bool? inherit, Color? color, Color? backgroundColor, String? fontFamily,
       double? fontSize, FontWeight? fontWeight, dynamic fontStyle, double? letterSpacing,
-      double? wordSpacing, double? height, dynamic background, dynamic foreground, dynamic decoration});
+      double? wordSpacing, double? height, dynamic background, dynamic foreground, dynamic decoration,
+      List<Shadow>? shadows, List<FontFeature>? fontFeatures, List<FontVariation>? fontVariations,
+      Color? decorationColor, dynamic decorationStyle, double? decorationThickness});
   external TextStyle apply({Color? color, Color? backgroundColor, String? fontFamily,
       double? fontSizeFactor, double? fontSizeDelta, dynamic decoration});
 }
 
 @JavaName('com.codename1.flutter.IconData')
-class IconData {}
+class IconData {
+  external const IconData(int codePoint, {String? fontFamily, String? fontPackage,
+      bool matchTextDirection = false, List<String>? fontFamilyFallback});
+  external int get codePoint;
+  external String? get fontFamily;
+  external String? get fontPackage;
+  external bool get matchTextDirection;
+  external List<String>? get fontFamilyFallback;
+}
 
 @JavaName('com.codename1.flutter.Icons')
 abstract class Icons {
@@ -1639,6 +1696,8 @@ abstract class Icons {
   external static IconData get psychology;
   external static IconData get psychology_alt;
   external static IconData get public_;
+  external static IconData get public;
+  external static IconData get more_horiz;
   external static IconData get public_off;
   external static IconData get publish;
   external static IconData get published_with_changes;
@@ -2325,6 +2384,7 @@ abstract class Icons {
   external static IconData get check;
   external static IconData get check_circle;
   external static IconData get check_circle_outline;
+  external static IconData get chevron_left;
   external static IconData get chevron_right;
   external static IconData get close;
   external static IconData get code;
@@ -2392,22 +2452,43 @@ abstract class Icons {
 
 @JavaName('com.codename1.flutter.widgets.Text')
 class Text extends Widget {
-  external Text(String data, {Key? key, TextStyle? style, TextAlign? textAlign});
+  external Text(String data, {Key? key, TextStyle? style, TextAlign? textAlign, TextScaler? textScaler});
+  external static Text rich(InlineSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, TextScaler? textScaler});
+  external InlineSpan? get textSpan;
+  external String? get data;
 }
 
 @JavaName('com.codename1.flutter.widgets.Icon')
 class Icon extends Widget {
-  external Icon(IconData icon, {Key? key, double? size, Color? color});
+  external Icon(IconData? icon, {Key? key, double? size, double? fill, double? weight,
+      double? grade, double? opticalSize, Color? color, List<Shadow>? shadows,
+      String? semanticLabel, TextDirection? textDirection, bool? applyTextScaling,
+      BlendMode? blendMode, FontWeight? fontWeight});
+  external IconData? get icon;
+  external double? get size;
+  external double? get fill;
+  external double? get weight;
+  external double? get grade;
+  external double? get opticalSize;
+  external Color? get color;
+  external List<Shadow>? get shadows;
+  external String? get semanticLabel;
+  external TextDirection? get textDirection;
+  external bool? get applyTextScaling;
+  external BlendMode? get blendMode;
+  external FontWeight? get fontWeight;
 }
 
 @JavaName('com.codename1.flutter.widgets.Column')
 class Column extends Widget {
-  external Column({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, List<Widget> children});
+  external Column({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, List<Widget> children});
+  external TextBaseline? get textBaseline;
 }
 
 @JavaName('com.codename1.flutter.widgets.Row')
 class Row extends Widget {
-  external Row({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, List<Widget> children});
+  external Row({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, List<Widget> children});
+  external TextBaseline? get textBaseline;
 }
 
 @JavaName('com.codename1.flutter.widgets.Center')
@@ -2446,7 +2527,8 @@ class MaterialApp extends Widget {
 
 @JavaName('com.codename1.flutter.material.Scaffold')
 class Scaffold extends Widget {
-  external Scaffold({Key? key, Widget? appBar, Widget? body, Widget? floatingActionButton, Widget? drawer, Widget? bottomNavigationBar});
+  external Scaffold({Key? key, Widget? appBar, Widget? body, Widget? floatingActionButton, Widget? drawer, Widget? bottomNavigationBar,
+      List<Widget>? persistentFooterButtons});
   external static ScaffoldState of(BuildContext context);
 }
 
@@ -2465,6 +2547,8 @@ class AppBar extends Widget {
 @JavaName('com.codename1.flutter.material.FloatingActionButton')
 class FloatingActionButton extends Widget {
   external FloatingActionButton({Key? key, VoidCallback? onPressed, String? tooltip, Widget? child});
+  external static FloatingActionButton small({Key? key, VoidCallback? onPressed, String? tooltip, Widget? child});
+  external static FloatingActionButton large({Key? key, VoidCallback? onPressed, String? tooltip, Widget? child});
   external static FloatingActionButton extended({Key? key, VoidCallback? onPressed, Widget? label, Widget? icon, String? tooltip, Object? heroTag, Color? backgroundColor});
 }
 
@@ -2479,13 +2563,15 @@ class ThemeData {
       ChipThemeData? chipTheme, CheckboxThemeData? checkboxTheme, CardTheme? cardTheme,
       BottomAppBarThemeData? bottomAppBarTheme, DividerThemeData? dividerTheme,
       dynamic snackBarTheme, dynamic inputDecorationTheme, dynamic radioTheme, dynamic switchTheme,
-      dynamic tooltipTheme, dynamic bottomSheetTheme, dynamic floatingActionButtonTheme,
+      dynamic tooltipTheme, BottomSheetThemeData? bottomSheetTheme, dynamic floatingActionButtonTheme,
       dynamic elevatedButtonTheme, dynamic textButtonTheme, dynamic outlinedButtonTheme,
-      dynamic pageTransitionsTheme, dynamic visualDensity, dynamic typography, dynamic platform,
-      NavigationRailThemeData? navigationRailTheme,
+      PageTransitionsTheme? pageTransitionsTheme, dynamic visualDensity, dynamic typography, dynamic platform,
+      NavigationRailThemeData? navigationRailTheme, NavigationBarThemeData? navigationBarTheme,
+      dynamic bottomNavigationBarTheme,
       bool? applyElevationOverlayColor, String? fontFamily});
   external static ThemeData dark({bool? useMaterial3});
   external ColorScheme get colorScheme;
+  external NavigationBarThemeData? get navigationBarTheme;
   external TextTheme get textTheme;
   external TextTheme get primaryTextTheme;
   external Brightness get brightness;
@@ -2558,6 +2644,14 @@ class ColorScheme {
   external Color get background;
   external Color get onBackground;
   external Color get outline;
+  external Color get surfaceContainerLowest;
+  external Color get surfaceContainerLow;
+  external Color get surfaceContainer;
+  external Color get surfaceContainerHigh;
+  external Color get surfaceContainerHighest;
+  external Color get surfaceDim;
+  external Color get surfaceBright;
+  external Color get surfaceTint;
   external Color get outlineVariant;
   external Color get shadow;
   external Color get scrim;
@@ -2596,7 +2690,7 @@ class TextTheme {
 }
 
 @JavaName('com.codename1.flutter.material.Theme')
-abstract class Theme {
+abstract class Theme extends InheritedWidget {
   external static ThemeData of(BuildContext context);
   external static Brightness brightnessOf(BuildContext context);
 }
@@ -2606,8 +2700,11 @@ abstract class Theme {
 @JavaName('com.codename1.flutter.BoxFit')
 enum BoxFit { fill, contain, cover, fitWidth, fitHeight, none }
 
+@JavaName('com.codename1.flutter.AlignmentGeometry')
+abstract class AlignmentGeometry {}
+
 @JavaName('com.codename1.flutter.Alignment')
-abstract class Alignment {
+abstract class Alignment extends AlignmentGeometry {
   external static Alignment get topLeft;
   external static Alignment get topCenter;
   external static Alignment get topRight;
@@ -2621,32 +2718,35 @@ abstract class Alignment {
 
 @JavaName('com.codename1.flutter.widgets.ListView')
 class ListView extends Widget {
-  external ListView({Key? key, List<Widget> children, EdgeInsets? padding, bool? shrinkWrap});
-  external static ListView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Object? scrollDirection, Object? controller, String? restorationId, bool? primary, double? itemExtent, bool? reverse});
-  external static ListView separated({Key? key, bool? primary, int? itemCount, IndexedWidgetBuilder itemBuilder, IndexedWidgetBuilder separatorBuilder, EdgeInsets? padding, bool? shrinkWrap});
+  external ListView({Key? key, List<Widget> children, EdgeInsets? padding, bool? shrinkWrap, Axis? scrollDirection});
+  external static ListView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Axis? scrollDirection, Object? controller, String? restorationId, bool? primary, double? itemExtent, bool? reverse});
+  external static ListView separated({Key? key, bool? primary, int? itemCount, IndexedWidgetBuilder itemBuilder, IndexedWidgetBuilder separatorBuilder, EdgeInsets? padding, bool? shrinkWrap, Axis? scrollDirection});
 }
 
 @JavaName('com.codename1.flutter.widgets.GridView')
 class GridView extends Widget {
-  external static GridView count({Key? key, String? restorationId, Object? physics, bool? primary, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children});
-  external static GridView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, Object? gridDelegate, EdgeInsets? padding, bool? shrinkWrap, Object? physics});
+  external static GridView count({Key? key, String? restorationId, Object? physics, bool? primary, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children, Object? scrollDirection});
+  external static GridView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, Object? gridDelegate, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Object? scrollDirection});
 }
 
 @JavaName('com.codename1.flutter.widgets.SingleChildScrollView')
 class SingleChildScrollView extends Widget {
-  external SingleChildScrollView({Key? key, EdgeInsets? padding, Axis? scrollDirection, Widget? child});
+  external SingleChildScrollView({Key? key, EdgeInsets? padding, Axis? scrollDirection, ScrollController? controller, Widget? child});
+  external ScrollController? get controller;
 }
 
 @JavaName('com.codename1.flutter.widgets.Image')
 class Image extends Widget {
-  external Image({Key? key, ImageProvider? image, double? width, double? height, BoxFit? fit, bool? excludeFromSemantics, Object? frameBuilder});
-  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit, String? package, bool? excludeFromSemantics, bool? gaplessPlayback, int? cacheWidth, int? cacheHeight, Color? color, Object? colorBlendMode, Object? alignment, Object? semanticLabel});
-  external static Image network(String src, {Key? key, double? width, double? height, BoxFit? fit});
+  external Image({Key? key, ImageProvider? image, double? width, double? height, BoxFit? fit, bool? excludeFromSemantics, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Widget child, ImageChunkEvent? loadingProgress)? loadingBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image file(Object file, {Key? key, double? scale, double? width, double? height, BoxFit? fit, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image memory(Uint8List bytes, {Key? key, double? scale, double? width, double? height, BoxFit? fit, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit, String? package, bool? excludeFromSemantics, bool? gaplessPlayback, int? cacheWidth, int? cacheHeight, Color? color, Object? colorBlendMode, Object? alignment, Object? semanticLabel, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image network(String src, {Key? key, double? width, double? height, BoxFit? fit, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Widget child, ImageChunkEvent? loadingProgress)? loadingBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
 }
 
 @JavaName('com.codename1.flutter.widgets.Stack')
 class Stack extends Widget {
-  external Stack({Key? key, Alignment? alignment, List<Widget> children});
+  external Stack({Key? key, AlignmentGeometry? alignment, List<Widget> children});
 }
 
 @JavaName('com.codename1.flutter.widgets.Positioned')
@@ -2657,7 +2757,7 @@ class Positioned extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.Align')
 class Align extends Widget {
-  external Align({Key? key, Alignment? alignment, Widget? child});
+  external Align({Key? key, AlignmentGeometry? alignment, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.ConstrainedBox')
@@ -2668,6 +2768,7 @@ class ConstrainedBox extends Widget {
 @JavaName('com.codename1.flutter.rendering.BoxConstraints')
 class BoxConstraints {
   external BoxConstraints({double? minWidth, double? maxWidth, double? minHeight, double? maxHeight});
+  external static BoxConstraints tightFor({double? width, double? height});
   external double get minWidth;
   external double get maxWidth;
   external double get minHeight;
@@ -2693,7 +2794,8 @@ class ElevatedButton extends Widget {
   external ElevatedButton({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? child});
   external static ButtonStyle styleFrom({Color? foregroundColor, Color? backgroundColor,
       Color? shadowColor, double? elevation, TextStyle? textStyle, EdgeInsets? padding,
-      dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity});
+      dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity,
+      Size? minimumSize, Size? maximumSize, Color? disabledForegroundColor, Color? disabledBackgroundColor});
   external static ElevatedButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label});
 }
 
@@ -2702,7 +2804,8 @@ class TextButton extends Widget {
   external TextButton({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? child});
   external static ButtonStyle styleFrom({Color? foregroundColor, Color? backgroundColor,
       Color? shadowColor, double? elevation, TextStyle? textStyle, EdgeInsets? padding,
-      dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity});
+      dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity,
+      Size? minimumSize, Size? maximumSize, Color? disabledForegroundColor, Color? disabledBackgroundColor});
   external static TextButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label});
 }
 
@@ -2710,7 +2813,7 @@ class TextButton extends Widget {
 class FilledButton extends ElevatedButton {
   external FilledButton({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? child});
   external static FilledButton tonal({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? child});
-  external static FilledButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label});
+  external static FilledButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label, IconAlignment? iconAlignment});
 }
 
 @JavaName('com.codename1.flutter.material.OutlinedButton')
@@ -2718,18 +2821,22 @@ class OutlinedButton extends Widget {
   external OutlinedButton({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? child});
   external static ButtonStyle styleFrom({Color? foregroundColor, Color? backgroundColor,
       Color? shadowColor, double? elevation, TextStyle? textStyle, EdgeInsets? padding,
-      dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity});
+      dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity,
+      Size? minimumSize, Size? maximumSize, Color? disabledForegroundColor, Color? disabledBackgroundColor});
   external static OutlinedButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label});
 }
 
 @JavaName('com.codename1.flutter.material.IconButton')
 class IconButton extends Widget {
   external IconButton({Key? key, VoidCallback? onPressed, Widget? icon, double? iconSize, Color? color});
+  external static IconButton filled({Key? key, VoidCallback? onPressed, Widget? icon, double? iconSize, Color? color});
+  external static IconButton filledTonal({Key? key, VoidCallback? onPressed, Widget? icon, double? iconSize, Color? color});
+  external static IconButton outlined({Key? key, VoidCallback? onPressed, Widget? icon, double? iconSize, Color? color});
 }
 
 @JavaName('com.codename1.flutter.widgets.GestureDetector')
 class GestureDetector extends Widget {
-  external GestureDetector({Key? key, VoidCallback? onTap, VoidCallback? onLongPress, Widget? child});
+  external GestureDetector({Key? key, VoidCallback? onTap, VoidCallback? onLongPress, VoidCallback? onDoubleTap, HitTestBehavior? behavior, bool excludeFromSemantics, Object? dragStartBehavior, GestureTapDownCallback? onTapDown, GestureTapUpCallback? onTapUp, GestureDragStartCallback? onVerticalDragStart, GestureDragUpdateCallback? onVerticalDragUpdate, GestureDragEndCallback? onVerticalDragEnd, GestureDragStartCallback? onHorizontalDragStart, GestureDragUpdateCallback? onHorizontalDragUpdate, GestureDragEndCallback? onHorizontalDragEnd, GestureDragStartCallback? onPanStart, GestureDragUpdateCallback? onPanUpdate, GestureDragEndCallback? onPanEnd, void Function(ScaleStartDetails details)? onScaleStart, void Function(ScaleUpdateDetails details)? onScaleUpdate, void Function(ScaleEndDetails details)? onScaleEnd, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.material.InkWell')
@@ -2817,11 +2924,29 @@ class Navigator extends Widget {
 }
 
 @JavaName('com.codename1.flutter.material.Dialogs.showDialog')
-external Future<T?> showDialog<T>({BuildContext context, WidgetBuilder builder});
+external Future<T?> showDialog<T>({BuildContext context, WidgetBuilder builder, bool? barrierDismissible,
+    Color? barrierColor, String? barrierLabel, bool? useSafeArea, bool? useRootNavigator, Object? routeSettings});
+
+@JavaName('com.codename1.flutter.material.Dialogs.showAdaptiveDialog')
+external Future<T?> showAdaptiveDialog<T>({BuildContext context, WidgetBuilder builder, bool? barrierDismissible,
+    Color? barrierColor, String? barrierLabel, bool? useSafeArea, bool? useRootNavigator, Object? routeSettings});
+
+@JavaName('com.codename1.flutter.material.Dialogs.showGeneralDialog')
+external Future<T?> showGeneralDialog<T>({BuildContext context,
+    Widget Function(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) pageBuilder,
+    bool? barrierDismissible, String? barrierLabel, Color? barrierColor, Duration? transitionDuration,
+    Object? transitionBuilder, bool? useRootNavigator, Object? routeSettings});
+
+// A plain Material dialog surface around one child -- Flutter's `Dialog`.
+@JavaName('com.codename1.flutter.material.Dialog')
+class Dialog extends Widget {
+  external Dialog({Key? key, Color? backgroundColor, double? elevation, EdgeInsets? insetPadding, Object? shape, Widget? child});
+}
 
 @JavaName('com.codename1.flutter.material.AlertDialog')
 class AlertDialog extends Widget {
   external AlertDialog({Key? key, Widget? title, Widget? content, List<Widget>? actions});
+  external static AlertDialog adaptive({Key? key, Widget? title, Widget? content, List<Widget>? actions});
 }
 
 @JavaName('com.codename1.flutter.material.SnackBar')
@@ -2830,8 +2955,9 @@ class SnackBar extends Widget {
 }
 
 @JavaName('com.codename1.flutter.material.ScaffoldMessenger')
-abstract class ScaffoldMessenger {
+abstract class ScaffoldMessenger extends Widget {
   external static ScaffoldMessengerState of(BuildContext context);
+  external static ScaffoldMessengerState? maybeOf(BuildContext context);
 }
 
 @JavaName('com.codename1.flutter.material.ScaffoldMessengerState')
@@ -2839,6 +2965,8 @@ abstract class ScaffoldMessengerState {
   external void showSnackBar(SnackBar snackBar);
   // Dismisses the visible SnackBar immediately — Flutter's `hideCurrentSnackBar`.
   external void hideCurrentSnackBar({dynamic reason});
+  external void removeCurrentSnackBar({dynamic reason});
+  external void clearSnackBars();
 }
 
 @JavaName('com.codename1.flutter.material.Drawer')
@@ -2874,14 +3002,26 @@ enum ThemeMode { system, light, dark }
 enum Brightness { light, dark }
 
 @JavaName('com.codename1.flutter.MediaQuery')
-abstract class MediaQuery {
+abstract class MediaQuery extends InheritedWidget {
   external static MediaQueryData of(BuildContext context);
   // Targeted inherited-lookup helpers that depend only on one MediaQueryData
   // aspect — Flutter's `MediaQuery.sizeOf` / `paddingOf` / `viewInsetsOf`.
   external static Size sizeOf(BuildContext context);
   external static EdgeInsets paddingOf(BuildContext context);
   external static EdgeInsets viewInsetsOf(BuildContext context);
+  external static EdgeInsets viewPaddingOf(BuildContext context);
+  external static TextScaler textScalerOf(BuildContext context);
+  external static Widget withClampedTextScaling({Key? key, double? minScaleFactor, double? maxScaleFactor, Widget child});
   external static Widget removePadding({BuildContext context, bool? removeLeft, bool? removeTop, bool? removeRight, bool? removeBottom, Widget? child});
+}
+
+@JavaName('com.codename1.flutter.TextScaler')
+class TextScaler {
+  external static TextScaler get noScaling;
+  external static TextScaler linear(double textScaleFactor);
+  external double scale(double fontSize);
+  external double get textScaleFactor;
+  external TextScaler clamp({double? minScaleFactor, double? maxScaleFactor});
 }
 
 @JavaName('com.codename1.flutter.MediaQueryData')
@@ -2890,6 +3030,7 @@ abstract class MediaQueryData {
   external double get devicePixelRatio;
   external Brightness get platformBrightness;
   external double get textScaleFactor;
+  external TextScaler get textScaler;
   external EdgeInsets get padding;
   // The insets covered by system UI (keyboard, notches) — Flutter's
   // `MediaQueryData.viewInsets` / `viewPadding`.
@@ -2908,7 +3049,12 @@ abstract class MediaQueryData {
 @JavaName('com.codename1.flutter.rendering.Size')
 class Size {
   external Size(double width, double height);
+  external static Size get zero;
   external static Size fromRadius(double radius);
+  external static Size square(double dimension);
+  external Offset bottomRight(Offset origin);
+  external Offset topRight(Offset origin);
+  external Offset bottomLeft(Offset origin);
   external static Size fromHeight(double height);
   external static Size fromWidth(double width);
   external double get width;
@@ -2929,18 +3075,31 @@ class Size {
 
 @JavaName('com.codename1.flutter.widgets.RichText')
 class RichText extends Widget {
-  external RichText({Key? key, TextSpan text, TextAlign? textAlign});
+  external RichText({Key? key, TextSpan text, TextAlign? textAlign, TextScaler? textScaler,
+      TextOverflow overflow = TextOverflow.clip, TextDirection? textDirection});
+  external TextOverflow get overflow;
+  external TextDirection? get textDirection;
+  external InlineSpan get text;
 }
 
 // The base of the styled-text tree — Flutter's `InlineSpan` (TextSpan's supertype).
 @JavaName('com.codename1.flutter.widgets.InlineSpan')
 class InlineSpan {
   external String toPlainText();
+  external TextStyle? get style;
+  external String? get semanticsLabel;
+  external Object? get recognizer;
+  external List<InlineSpan>? get children;
 }
 
 @JavaName('com.codename1.flutter.widgets.TextSpan')
 class TextSpan extends InlineSpan {
-  external TextSpan({String? text, TextStyle? style, List<TextSpan>? children});
+  external TextSpan({String? text, TextStyle? style, List<TextSpan>? children, Object? recognizer, String? semanticsLabel});
+  external String? get text;
+  external TextStyle? get style;
+  external List<TextSpan>? get children;
+  external Object? get recognizer;
+  external String? get semanticsLabel;
   // Flattens this span tree to its raw text — Flutter's `InlineSpan.toPlainText`.
   external String toPlainText();
 }
@@ -2965,3 +3124,9 @@ class PageTransitionsTheme {
 // type must resolve for its theme to compile.
 @JavaName('com.codename1.flutter.material.PageTransitionsBuilder')
 class PageTransitionsBuilder {}
+
+@JavaName('com.codename1.flutter.material.MaterialTapTargetSize')
+enum MaterialTapTargetSize { padded, shrinkWrap }
+
+@JavaName('com.codename1.flutter.material.IconAlignment')
+enum IconAlignment { start, end }

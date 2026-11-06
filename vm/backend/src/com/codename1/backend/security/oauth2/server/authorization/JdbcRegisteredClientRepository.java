@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security.oauth2.server.authorization;
 
+import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.security.Clock;
@@ -94,11 +95,11 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
             Object[] update = new Object[values.length + 1];
             System.arraycopy(values, 0, update, 0, values.length);
             update[values.length] = client.getId();
-            if (dataSource.execute("UPDATE cn1_oauth2_registered_client SET client_id = ?, "
+            if (dataSource.execute("UPDATE " + SecuritySchema.table("cn1_oauth2_registered_client") + " SET client_id = ?, "
                     + "client_secret = ?, client_name = ?, authentication_methods = ?, "
                     + "grant_types = ?, redirect_uris = ?, scopes = ?, settings = ? WHERE id = ?",
                     update) == 0 && dataSource.queryOne("SELECT id FROM "
-                    + "cn1_oauth2_registered_client WHERE id = ?",
+                    + SecuritySchema.table("cn1_oauth2_registered_client") + " WHERE id = ?",
                         new Object[] {client.getId()}) == null) {
                 // An update that changes nothing counts no row on MySQL, so the
                 // client is asked for before it is taken to be new.
@@ -106,7 +107,7 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
                 insert[0] = client.getId();
                 System.arraycopy(values, 0, insert, 1, values.length);
                 insert[values.length + 1] = Long.valueOf(clock.currentTimeMillis());
-                dataSource.execute("INSERT INTO cn1_oauth2_registered_client (" + COLUMNS
+                dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_oauth2_registered_client") + " (" + COLUMNS
                         + ", created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", insert);
             }
         } catch (IOException err) {
@@ -141,7 +142,7 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         }
         Map row;
         try {
-            row = dataSource.queryOne("SELECT " + COLUMNS + " FROM cn1_oauth2_registered_client "
+            row = dataSource.queryOne("SELECT " + COLUMNS + " FROM " + SecuritySchema.table("cn1_oauth2_registered_client") + " "
                     + "WHERE " + column + " = ?", new Object[] {value});
         } catch (IOException err) {
             // A store that cannot be asked knows no client: the request is

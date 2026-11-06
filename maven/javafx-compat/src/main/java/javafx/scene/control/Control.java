@@ -180,6 +180,21 @@ public abstract class Control extends Region {
         return nativeComponent == null ? 0 : 1;
     }
 
+    /// Repaints this node for its native component, which answers true;
+    /// false when there is no node peer yet and the component has to
+    /// repaint itself. A native button that repaints itself on a press is
+    /// drawn alone: over the graphic this node draws on top of it, and
+    /// outside the clips, opacity and effects of the nodes around it, so a
+    /// touched tab lost its icon until the next full repaint. Through the
+    /// node, the press repaints whatever the node's own changes would.
+    boolean repaintThroughNode() {
+        if (!cn1HasPeer()) {
+            return false;
+        }
+        cn1Repaint();
+        return true;
+    }
+
     @Override
     protected void cn1PeerCreated() {
         creating = true;
