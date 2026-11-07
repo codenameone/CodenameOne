@@ -3235,6 +3235,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-07T01:01:08+00:00"
+      },
+      "devto": {
+        "id": 4993883,
+        "url": "https://dev.to/codenameone/your-compose-code-on-more-screens-and-less-cpu-2o3e",
+        "syndicated_at": "2026-11-07T14:03:54+00:00"
       }
     }
   }
