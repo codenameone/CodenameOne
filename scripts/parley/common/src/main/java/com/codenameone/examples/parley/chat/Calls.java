@@ -143,6 +143,11 @@ public final class Calls {
         /// any other time is a stray -- a real stack refuses it in the stable
         /// state, and the failure would hang up a healthy call.
         boolean awaitingAnswer;
+        /// Candidates of a restarted offer, held until the offer is sent.
+        /// Gathering starts when the offer is set, which can be before its
+        /// callback runs; one sent first reaches a callee still holding the
+        /// old description, with credentials it does not know, and is lost.
+        List<String> heldIce;
         /// Every offer the callee answered. The server replays the first after
         /// ACCEPT and a slow replay can land after the call connected; told
         /// apart from a restart by its text, since a restarted offer carries
@@ -513,7 +518,10 @@ public final class Calls {
         call.connection = WebRtc.createPeerConnection(config, new PeerConnection.Listener() {
             @Override
             public void iceCandidate(PeerConnection connection, IceCandidate candidate) {
-                if (current == call) {
+                if (current == call && call.heldIce != null) {
+                    call.heldIce.add((candidate.getSdpMid() == null ? "" : candidate.getSdpMid())
+                            + "\t" + candidate.getSdpMLineIndex() + "\t" + candidate.getCandidate());
+                } else if (current == call) {
                     send(call, ICE, (candidate.getSdpMid() == null ? "" : candidate.getSdpMid())
                             + "\t" + candidate.getSdpMLineIndex() + "\t" + candidate.getCandidate());
                 }
@@ -603,12 +611,21 @@ public final class Calls {
             if (current != call) {
                 return;
             }
+            call.heldIce = new ArrayList<String>();
             call.connection.setLocalDescription(offer).ready(done -> {
                 // As for the first offer: set, then the flag, then sent. The
                 // callee holds the candidates that follow until it has set it.
                 call.awaitingAnswer = true;
                 send(call, OFFER, offer.getSdp());
-            }).except(why -> failed(call, why));
+                List<String> held = call.heldIce;
+                call.heldIce = null;
+                for (String each : held) {
+                    send(call, ICE, each);
+                }
+            }).except(why -> {
+                call.heldIce = null;
+                failed(call, why);
+            });
         }).except(why -> failed(call, why));
     }
 
