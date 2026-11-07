@@ -422,6 +422,30 @@ def strip_fence_attributes(body: str) -> str:
     return _FENCE_ATTRS_RE.sub(r"\1", body)
 
 
+_SVG_REF_RE = re.compile(r'(src="|\]\()(/[^")\s]+)\.svg(?=[")])')
+
+
+def svg_local_path(ref: str) -> Path:
+    """Where the file behind a site-relative ``/....svg`` reference lives."""
+    if ref.startswith("/developer-guide/img/"):
+        return REPO_ROOT / "docs/developer-guide/img" / ref.removeprefix("/developer-guide/img/")
+    return REPO_ROOT / "docs/website/static" / ref.lstrip("/")
+
+
+def prefer_png_over_svg(body: str) -> str:
+    """Point every SVG image at the PNG rendered beside it.
+
+    DEV's image proxy serves an SVG as image/webp, which no browser draws, so
+    the Flutter post's charts were blank there. rasterize_blog_svgs.py writes
+    the PNGs, and a test fails when a post's SVG has none.
+    """
+    def swap(match: re.Match[str]) -> str:
+        if svg_local_path(match[2] + ".png").exists():
+            return f"{match[1]}{match[2]}.png"
+        return match[0]
+    return _SVG_REF_RE.sub(swap, body)
+
+
 def render_syndicated_body(post: Post, posts: list[Post] | None = None, today: dt.date | None = None) -> str:
     body = post.body.strip("\n")
     body = _HUGO_FOOTER_RE.sub("", body)
@@ -429,6 +453,7 @@ def render_syndicated_body(post: Post, posts: list[Post] | None = None, today: d
     body = strip_fence_attributes(body)
     body = render_post_links(body, posts or [], today or dt.date.today())
     body = _HUGO_SHORTCODE_RE.sub("", body).rstrip()
+    body = prefer_png_over_svg(body)
     body = absolutize_links(body)
     body = insert_blurb(body, CN1_BLURB)
     return body
