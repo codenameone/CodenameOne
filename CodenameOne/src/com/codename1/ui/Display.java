@@ -2201,11 +2201,11 @@ public final class Display extends CN1Constants {
 
                     while (!runningSerialCallsQueue.isEmpty()) {
                         // Held as an Object and tested: the catch below takes RuntimeException,
-                            // and ParparVM's unchecked cast would never reach it.
-                            Object call = runningSerialCallsQueue.removeLast();
-                            if (call instanceof Runnable) {
-                                pendingSerialCalls.add(0, (Runnable) call);
-                            }
+                        // and ParparVM's unchecked cast would never reach it.
+                        Object call = runningSerialCallsQueue.removeLast();
+                        if (call instanceof Runnable) {
+                            pendingSerialCalls.add(0, (Runnable) call);
+                        }
                     }
                 }
 
