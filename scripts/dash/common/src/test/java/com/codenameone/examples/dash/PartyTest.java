@@ -61,11 +61,13 @@ public class PartyTest extends E2e {
             // race and not of a runner who hit the first barrier.
             // A race only moves as the server stamps ticks, so a stalled one
             // would spin here until the suite's timeout killed the test with
-            // no word of why; give it half a minute and say where it stood.
-            driveUntil(view, () -> view.driver().run().tick() >= 60 * 6, 30000);
+            // no word of why. Stalled means no tick for 10 s -- never a
+            // wall-clock budget for the whole stretch, which a loaded runner
+            // missed while still ticking (tick 78 of 360 in 30 s).
+            driveWhileTicking(view, () -> view.driver().run().tick() >= 60 * 6, 10000);
             int tick = view.driver().run().tick();
             assertTrue(tick >= 60 * 6 || view.driver().run().over(),
-                    "the race reached tick " + tick + " of " + 60 * 6 + " in 30 s");
+                    "the race stalled at tick " + tick + " of " + 60 * 6 + " (no tick for 10 s)");
             guest.emote("wow");
             guest.say("Catch me if you can!");
             click("emote-wave");
