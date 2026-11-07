@@ -613,7 +613,8 @@ public class OrmAnnotationProcessorTest {
             "@Query(value=\"SELECT name, score FROM note\",nativeSql=true) java.util.List<Object[]> rows();",
             "@Query(\"select e.name from badrepo.Note e\") java.util.List<String[]> names();",
             "@Query(\"update badrepo.Note e set e.name=:name\") int rename(@Param(\"name\") String name);",
-            "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) long countByName(String name);"
+            "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) long countByName(String name);",
+            "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) @Query(\"select distinct e.name from badrepo.Note e\") java.util.List<String> lockedNames();"
         }) {
             File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
             sources.put("badrepo.Note","package badrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; public String name; public long score; }");

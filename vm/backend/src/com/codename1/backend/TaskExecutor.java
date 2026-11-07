@@ -186,8 +186,11 @@ public final class TaskExecutor {
             // On the submitting thread, outside the lock: decorating is what
             // reads the submitter's context, and it is the application's code.
             Runnable decorated = wrap.decorate(task);
-            if (decorated != null) {
-                task = decorated;
+            if (decorated != null && decorated != task) { //NOPMD CompareObjectsWithEquals - same task back means undecorated
+                // The original is kept beside it: shutdown fails an unfinished
+                // @Async task's Future by finding the AsyncTask, which a
+                // decorator's wrapper hides.
+                task = new Decorated(decorated, task);
             }
         }
         boolean tryVirtual;
@@ -349,8 +352,9 @@ public final class TaskExecutor {
         // A dropped @Async call still has a Future someone may be waiting on;
         // it fails rather than never finishing.
         for (Object queued : queue) {
-            if (queued instanceof AsyncTask) {
-                ((AsyncTask) queued).abandon("dropped when the server stopped before it "
+            AsyncTask async = asyncOf(queued);
+            if (async != null) {
+                async.abandon("dropped when the server stopped before it "
                         + "could start");
             }
         }
@@ -402,8 +406,32 @@ public final class TaskExecutor {
                 c.owner.notifyAll();
             }
         }
-        if (inner instanceof AsyncTask) {
-            ((AsyncTask) inner).abandon("abandoned when the server stopped before it finished");
+        AsyncTask async = asyncOf(inner);
+        if (async != null) {
+            async.abandon("abandoned when the server stopped before it finished");
+        }
+    }
+
+    /// The `@Async` call behind a queued task, seen through a decorator's
+    /// wrapper; null for any other task.
+    private static AsyncTask asyncOf(Object task) {
+        Object inner = task instanceof Decorated ? ((Decorated) task).original : task;
+        return inner instanceof AsyncTask ? (AsyncTask) inner : null;
+    }
+
+    /// A task as the decorator returned it, with the task it was given.
+    private static final class Decorated implements Runnable {
+        private final Runnable decorated;
+        final Runnable original;
+
+        Decorated(Runnable decorated, Runnable original) {
+            this.decorated = decorated;
+            this.original = original;
+        }
+
+        @Override
+        public void run() {
+            decorated.run();
         }
     }
 
@@ -411,8 +439,9 @@ public final class TaskExecutor {
         active--;
         if (timedOut) {
             dropped++;
-            if (task instanceof AsyncTask) {
-                ((AsyncTask) task).abandon("dropped when the server stopped before it could "
+            AsyncTask async = asyncOf(task);
+            if (async != null) {
+                async.abandon("dropped when the server stopped before it could "
                         + "start");
             }
             notifyAll();

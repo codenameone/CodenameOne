@@ -36,6 +36,24 @@ import java.util.Set;
 final class RepositoryGenerator {
     static final String PREFIX = "Lcom/codename1/orm/repository/";
     static final String REPOSITORY = PREFIX + "Repository;";
+    private static final String[] UNLOCKABLE = {"DISTINCT", "GROUP", "UNION", "COUNT", "SUM", "AVG", "MIN", "MAX"};
+
+    /// Whether `jpql` names none of the words a row lock cannot apply to,
+    /// as whole words, compared without regard to case.
+    static boolean lockableSelect(String jpql) {
+        for (String word : UNLOCKABLE) {
+            for (int at = 0; at + word.length() <= jpql.length(); at++) {
+                if (jpql.regionMatches(true, at, word, 0, word.length())
+                        && (at == 0 || !Character.isJavaIdentifierPart(jpql.charAt(at - 1)))
+                        && (at + word.length() == jpql.length()
+                            || !Character.isJavaIdentifierPart(jpql.charAt(at + word.length())))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static final String BASE = "com/codename1/orm/repository/CrudRepository";
     private static final String PAGE = "com.codename1.orm.repository.PageRequest";
     private static final String ROW = "[Ljava/lang/Object;";
@@ -147,6 +165,12 @@ final class RepositoryGenerator {
             // below, once the method is known to select rows.
             lockMode = ((String[]) lock.get("value"))[1];
             if (modifying) throw invalid("@Lock applies to selects, not @Modifying statements");
+            if (query != null && !lockableSelect(String.valueOf(query.get("value")))) {
+                // PostgreSQL and MySQL refuse FOR UPDATE on a select whose rows
+                // are not table rows; refused here instead of at run time.
+                throw invalid("@Lock needs a select of rows, not one with DISTINCT, GROUP BY, "
+                        + "UNION or an aggregate");
+            }
         } else if (lock != null) {
             if (args.length != 1 || !args[0].getClassName().equals(keyType)
                     || !result.getClassName().equals(entityType) || query != null || modifying) {

@@ -283,6 +283,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         /// The last variable takes the rest of the path, slashes included:
         /// `{name:.+}`, `{name:.*}` or Spring's `{*name}`.
         boolean greedyLast;
+        /// `{name:.*}` and `{*name}`: the catch-all may also be empty.
+        boolean emptyLast;
         /**
          * The statements that write `result` through the generated codecs, when the
          * return type is one of the application's own classes or holds one; null
@@ -897,6 +899,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     return null;
                 }
                 route.greedyLast = true;
+                route.emptyLast = !".+".equals(constraint);
                 // Spelled as a plain variable from here on, so the overlap check,
                 // the contract and the trace all read one form.
                 route.pattern = route.pattern.substring(0, pos) + "{" + variableName + "}";
@@ -1970,6 +1973,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 if (byKind != 0) {
                     return byKind;
                 }
+                // A catch-all after every other dynamic route: /files/{id}/info
+                // must not lose /files/42/info to /files/{path:.+}, whichever
+                // pattern is spelled longer.
+                int byGreedy = (a.greedyLast ? 1 : 0) - (b.greedyLast ? 1 : 0);
+                if (byGreedy != 0) {
+                    return byGreedy;
+                }
                 return b.pattern.length() - a.pattern.length();
             }
         });
@@ -2031,7 +2041,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 } else {
                     sb.append("request.pathStartsWith(P").append(i).append(") && bindPath(request.pathFrom(P")
                       .append(i).append(".length), A").append(i).append(", ").append(route.greedyLast)
-                      .append(") != null");
+                      .append(", ").append(route.emptyLast).append(") != null");
                 }
                 sb.append(") return C").append(i).append(";\n");
             }
@@ -2130,7 +2140,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         } else {
             sb.append("            if (request.pathStartsWith(P").append(index).append(")) {\n");
             sb.append(pad).append("String[] bound = bindPath(request.pathFrom(P").append(index)
-              .append(".length), A").append(index).append(", ").append(route.greedyLast).append(");\n");
+              .append(".length), A").append(index).append(", ").append(route.greedyLast)
+              .append(", ").append(route.emptyLast).append(");\n");
             sb.append(pad).append("if (bound != null) {\n");
             pad = "                    ";
             bound = "bound";
@@ -3206,7 +3217,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("     * to the server's header limit. The same path now fails on the suffix\n");
         sb.append("     * check, before anything is searched at all.\n");
         sb.append("     */\n");
-        sb.append("    private static String[] bindPath(String rest, String[] after, boolean greedyLast) {\n");
+        sb.append("    private static String[] bindPath(String rest, String[] after, boolean greedyLast,\n            boolean emptyLast) {\n");
         sb.append("        int last = after.length - 1;\n");
         sb.append("        int end = rest.length();\n");
         sb.append("        if (after[last].length() > 0) {\n");
@@ -3236,7 +3247,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("            pos = at + literal.length();\n");
         sb.append("        }\n");
         sb.append("        // A catch-all ({path:.+}) is the one value allowed to span segments.\n");
-        sb.append("        if (pos >= end || (!greedyLast && crossesASlash(rest, pos, end))) {\n");
+        sb.append("        // {name:.*} and {*name} also take nothing at all: /static/ binds \"\".\n");
+        sb.append("        if ((pos >= end && !(emptyLast && pos == end))\n");
+        sb.append("                || (!greedyLast && crossesASlash(rest, pos, end))) {\n");
         sb.append("            return null;\n");
         sb.append("        }\n");
         sb.append("        bounds[last * 2] = pos;\n");

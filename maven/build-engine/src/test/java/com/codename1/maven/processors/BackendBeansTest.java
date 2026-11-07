@@ -2143,6 +2143,9 @@ public class BackendBeansTest {
                 + "    @GetMapping(\"/files/{path:.+}\") public String file(@PathVariable(\"path\") String p) {\n"
                 + "        return \"f:\" + p;\n"
                 + "    }\n"
+                + "    @GetMapping(\"/files/{id}/info\") public String info(@PathVariable(\"id\") String id) {\n"
+                + "        return \"i:\" + id;\n"
+                + "    }\n"
                 + "    @GetMapping(\"/raw/{*rest}\") public String raw(@PathVariable(\"rest\") String r) {\n"
                 + "        return \"r:\" + r;\n"
                 + "    }\n"
@@ -2154,6 +2157,10 @@ public class BackendBeansTest {
         try {
             assertEquals("f:a/b/c.txt", http("GET", port, "/files/a/b/c.txt"));
             assertEquals("r:x", http("GET", port, "/raw/x"));
+            // A catch-all spelled longer must not take a more specific route.
+            assertEquals("i:42", http("GET", port, "/files/42/info"));
+            // {*name} may be empty; {name:.+} may not.
+            assertEquals("r:", http("GET", port, "/raw/"));
         } finally {
             b.stop();
         }
