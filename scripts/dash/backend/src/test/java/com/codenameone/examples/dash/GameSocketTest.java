@@ -80,9 +80,16 @@ class GameSocketTest {
             assertEquals(0L, ((Number) startA.get("you")).longValue());
             assertEquals(1L, ((Number) startB.get("you")).longValue());
 
-            // After the countdown the host's jump reaches the guest, stamped
-            // for a tick to come.
-            Thread.sleep(GameProtocol.COUNTDOWN_MILLIS + 200);
+            // The host's jump reaches the guest, stamped for a tick to come.
+            // Sent during the countdown, which the server stamps for tick
+            // INPUT_DELAY like any other: two runners who never jump are both
+            // out about 6.4 s into Neon Causeway, the race then ends, and a
+            // jump sent after it is dropped. Sleeping out the countdown first
+            // left about 6 s for the jump to land; a CI container stalled
+            // past that once, and the guest saw the end and then nothing
+            // until the server's 300 s idle close. Sending now adds the
+            // countdown to that margin, and OnlineRaceTest holds the stamping
+            // of a jump made mid-race, on a clock of its own.
             writeText(a, "{\"type\":\"input\",\"b\":4}");
             String stamped = firstInput(b);
             assertTrue(stamped.endsWith(",0,4"), stamped);
@@ -129,10 +136,17 @@ class GameSocketTest {
         throw new IOException("no " + type + " message");
     }
 
-    /// The first input a `ticks` message carries.
+    /// The first input a `ticks` message carries. The race ending first is a
+    /// failure here, not something to wait past: nothing follows the end.
     private String firstInput(Tcp connection) throws IOException {
-        for (int i = 0; i < 2000; i++) {
-            Map m = until(connection, "ticks");
+        for (int i = 0; i < 4000; i++) {
+            Map m = next(connection);
+            if (GameProtocol.END.equals(m.get("type"))) {
+                throw new IOException("the race ended before an input arrived");
+            }
+            if (!GameProtocol.TICKS.equals(m.get("type"))) {
+                continue;
+            }
             String c = (String) m.get("i");
             if (c != null && c.length() > 0) {
                 return c;
@@ -143,6 +157,9 @@ class GameSocketTest {
 
     private Tcp open(String target) throws IOException {
         Tcp connection = Tcp.connect("127.0.0.1", port, 5000);
+        // A frame that never comes fails in seconds rather than at the
+        // server's 300 s idle close: the stream is ticks every 50 ms.
+        connection.setReadTimeout(30000);
         byte[] request = ascii("GET " + target + " HTTP/1.1\r\nHost: 127.0.0.1\r\n"
                 + "Upgrade: websocket\r\nConnection: Upgrade\r\n"
                 + "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n");

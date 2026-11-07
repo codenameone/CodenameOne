@@ -87,7 +87,8 @@ final class RaceRoom {
     }
 
     /// A player's input. Answers false when it is dropped: a flood, a runner
-    /// that is out, or a race that has not started.
+    /// that is out, or a race that is over. One sent during the countdown is
+    /// kept, stamped for tick INPUT_DELAY.
     boolean intent(int seat, int bits) {
         if (seat < 0 || run.over() || !run.runner(seat).running()) {
             return false;

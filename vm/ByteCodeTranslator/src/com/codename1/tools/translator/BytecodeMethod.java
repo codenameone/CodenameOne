@@ -843,6 +843,14 @@ public class BytecodeMethod implements SignatureSet {
                 hasRealInstruction = true;
                 continue;
             }
+            if (i instanceof LambdaCarriers.FunctionAddress) {
+                // Pushes a function's address as a long constant -- no call, no object.
+                // It is the one custom instruction of every lambda factory, and treating
+                // it as unrecognized gave each of those factories a full frame: about
+                // 580 KB of the Flutter gallery's native code.
+                hasRealInstruction = true;
+                continue;
+            }
             if (i instanceof BasicInstruction) {
                 if (isFramelessBasicOpcode(i.getOpcode())) {
                     hasRealInstruction = true;
@@ -3667,6 +3675,11 @@ public class BytecodeMethod implements SignatureSet {
         this.maxStack = maxStack;
     }
     
+    /** Appends a synthesized instruction (see {@link LambdaCarriers}). */
+    public void addRawInstruction(Instruction i) {
+        addInstruction(i);
+    }
+
     private void addInstruction(Instruction i) {
         instructions.add(i);
         i.setMethod(this);

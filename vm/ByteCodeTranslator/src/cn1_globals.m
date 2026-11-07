@@ -12302,6 +12302,27 @@ static JAVA_BOOLEAN cn1SweepRemoving = JAVA_FALSE;
 // byte-for-byte what it was, because trimming or growing it has measured slower on every
 // attempt (REGISTRY Rounds 38 and 39). Answers 0 when there is no current page or its free
 // list is empty; the caller then takes __NEW_X exactly as before.
+// The out-of-line half of CN1_FAST_NEW (see cn1_globals.h). Answers 0 when the class is
+// oversized for the page heap or no slot is free, and the site falls back to __NEW_X.
+JAVA_OBJECT cn1BibopFastNew(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci, uint16_t index, int finalizable) {
+    JAVA_OBJECT o = cn1BibopFastAlloc(threadStateData, size, parent, ci, index);
+    if(__builtin_expect(o == (JAVA_OBJECT)0, 0)) {
+        if(ci < 0) {
+            return o;
+        }
+        o = cn1BibopAllocRecycled(threadStateData, size, parent, ci);
+        if(o == (JAVA_OBJECT)0) {
+            return o;
+        }
+    }
+#if !defined(CN1_BIBOP_NO_FASTSWEEP)
+    if(finalizable && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS) {
+        ((CN1BibopPage*)((uintptr_t)(o) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcHasFinalizable = JAVA_TRUE;
+    }
+#endif
+    return o;
+}
+
 JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     // A trapped real-time cycle falls through to __NEW_X and codenameOneGcMalloc,
     // where cn1RtTrappedAlloc decides; a recycled slot taken here would bypass it.
