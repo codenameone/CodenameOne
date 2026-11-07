@@ -85,6 +85,12 @@ public class GeneratorModel {
     /// template's app does not compile, so it is neither offered nor generated.
     static final String REEL_SINCE = "7.0.280";
 
+    /// The first release whose core has the 3D engine the shooter template draws
+    /// its field with: PBR materials, shadow maps, fog and the post-processing
+    /// chain (`com.codename1.gpu`). Before it the template's app does not
+    /// compile, so it is neither offered nor generated.
+    static final String SPLAT_SINCE = "7.0.282";
+
     /// The first release whose framework has what the banking template's app calls:
     /// timed clipboard clearing, the P-256 key and signature API it signs requests
     /// with, and the `BigDecimal` arithmetic its ledger rounds with. Against an
@@ -101,7 +107,8 @@ public class GeneratorModel {
     /// The first release a template can be generated against.
     static String templateSince(Template template) {
         return template == Template.BASTION ? BASTION_SINCE
-                : template == Template.REEL ? REEL_SINCE : JAVA_TIME_ENTITIES_SINCE;
+                : template == Template.REEL ? REEL_SINCE
+                : template == Template.SPLAT ? SPLAT_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its

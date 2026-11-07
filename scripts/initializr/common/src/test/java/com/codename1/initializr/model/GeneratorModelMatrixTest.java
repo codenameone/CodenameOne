@@ -130,6 +130,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateMavenRefusals();
         validateFullStackTemplate();
         validateReelGate();
+        validateSplatGate();
         validateCommandLineProject();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
@@ -632,6 +633,18 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 GeneratorModel.REEL_SINCE, "Reel is not generated before its gate");
         assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
                 GeneratorModel.REEL_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.REEL)), "The page offers Reel from its gate on");
+    }
+
+    /// The shooter template needs the 3D engine of a newer core: below its own
+    /// gate it is refused, and the page does not list it.
+    private void validateSplatGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.SPLAT_SINCE),
+                "Splat's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.SPLAT, "OldSplat",
+                "com.acme.oldsplat", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.SPLAT_SINCE, "Splat is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.SPLAT_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.SPLAT)), "The page offers Splat from its gate on");
     }
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {
