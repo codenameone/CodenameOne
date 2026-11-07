@@ -140,10 +140,17 @@ final class RepositoryGenerator {
         // first (see Modifying.flushAutomatically).
         boolean clearAfter = modifying && modifyingValues.getBoolOrDefault("clearAutomatically", false);
         if (method.getSignature() != null && method.getSignature().startsWith("<")) throw invalid("Generic methods are unsupported");
-        if (lock != null) {
-            if (!name.equals("findById") || args.length != 1 || !args[0].getClassName().equals(keyType)
+        String lockMode = null;
+        if (lock != null && !name.equals("findById")) {
+            // Any other select takes the lock through its query: a derived
+            // find or a declared @Query select, as in Spring Data. Checked
+            // below, once the method is known to select rows.
+            lockMode = ((String[]) lock.get("value"))[1];
+            if (modifying) throw invalid("@Lock applies to selects, not @Modifying statements");
+        } else if (lock != null) {
+            if (args.length != 1 || !args[0].getClassName().equals(keyType)
                     || !result.getClassName().equals(entityType) || query != null || modifying) {
-                throw invalid("@Lock is supported only on an entity-returning findById(key) override");
+                throw invalid("@Lock on findById needs the entity-returning findById(key) override");
             }
             String[] mode = (String[]) lock.get("value");
             // Not read-only: PostgreSQL refuses SELECT ... FOR UPDATE in a
@@ -306,7 +313,12 @@ final class RepositoryGenerator {
                 && !scalar.equals("java.lang.Integer") && !scalar.equals("java.lang.Double") && !scalar.equals("java.lang.Boolean")) {
             throw invalid("Native repository selects return String, Long, Integer, Double or Boolean (or List thereof)");
         }
-        readOnly = !mutation;
+        if (lockMode != null && (mutation || count || exists)) {
+            throw invalid("@Lock applies to methods that select rows, not to counts, exists checks or deletes");
+        }
+        // Not read-only: PostgreSQL refuses SELECT ... FOR UPDATE in a
+        // read-only transaction.
+        readOnly = !mutation && lockMode == null;
         String create = "session." + (nativeSql ? "createNativeQuery" : "createQuery") + "(" + quote(statement) + "," + valueType + ".class)";
         String returned = list ? "java.util.List<" + scalar + ">" : optional ? "java.util.Optional<" + scalar + ">" : scalar;
         StringBuilder body = new StringBuilder();
@@ -314,6 +326,7 @@ final class RepositoryGenerator {
         for (int i = 0; i < names.size(); i++) body.append("q.setParameter(").append(quote(names.get(i))).append(",p").append(i).append(");");
         if (page >= 0) body.append("q.offset(p").append(page).append(".getOffset()).limit(p").append(page).append(".getSize());");
         if (limit > 0) body.append("q.limit(").append(limit).append(");");
+        if (lockMode != null) body.append("q.lockMode(com.codename1.orm.session.LockMode.").append(lockMode).append(");");
         body.append(mutation && clearAfter ? scalar.equals("void") ? "q.executeUpdate();session.clear();"
                         : "int changed=q.executeUpdate();session.clear();return changed;"
                 : mutation ? scalar.equals("void") ? "q.executeUpdate();" : "return q.executeUpdate();"

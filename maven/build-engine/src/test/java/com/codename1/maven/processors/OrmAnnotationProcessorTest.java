@@ -74,6 +74,8 @@ public class OrmAnnotationProcessorTest {
             + "List<Note> findByActiveTrue(); List<Note> findByArchivedFalse(); List<Note> findByNameAndScoreIn(String name,java.util.List<Long> scores); List<Note> findByScoreIn(Long[] scores); List<Note> findByNameIn(java.util.Set<String> names); "
             + "List<Note> findTop1ByNameOrderByScoreDesc(String name); java.util.Optional<Note> findFirstByNameOrderByScoreAsc(String name); long countByName(String name); boolean existsByName(String name); int deleteByName(String name); "
             + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findById(Long id); "
+            + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) List<Note> findByScoreGreaterThan(long score); "
+            + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_READ) @Query(\"select e from repositories.Note e where e.name=:name\") List<Note> lockedByName(@Param(\"name\") String name); "
             + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
             + "@Query(\"select max(e.score) from repositories.Note e where e.name='other'\") java.util.Optional<Long> highest(); "
             + "@Query(\"select e.name, count(e) from repositories.Note e group by e.name\") List<Object[]> countsByName(); "
@@ -97,6 +99,9 @@ public class OrmAnnotationProcessorTest {
             + "s.beginTransaction(); a.score=4; if(repo.revise(\"same\",11)!=2 || !s.contains(a) || a.score!=4) throw new AssertionError(\"bulk\"); s.rollbackTransaction(); "
             + "if(s.find(Note.class,a.id).score!=3) throw new AssertionError(\"rollback\"); "
             + "s.beginTransaction(); try { repo.findById(a.id); throw new AssertionError(\"SQLite should refuse row lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
+            + "s.beginTransaction(); try { repo.findByScoreGreaterThan(0); throw new AssertionError(\"derived find must lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
+            + "s.beginTransaction(); try { repo.lockedByName(\"same\"); throw new AssertionError(\"declared query must lock\"); } catch(UnsupportedOperationException expected) {} s.rollbackTransaction(); "
+            + "try { repo.findByScoreGreaterThan(0); throw new AssertionError(\"a lock needs a transaction\"); } catch(RuntimeException expected) {} "
             + "if(repo.countSame()!=2) throw new AssertionError(\"default method\"); "
             + "java.util.List<Note> byIds=repo.findAllById(java.util.Arrays.asList(b.id,-1L,a.id)); if(byIds.size()!=2 || byIds.get(0).id!=b.id || byIds.get(1).id!=a.id) throw new AssertionError(\"findAllById\"); "
             + "s.beginTransaction(); Note d=new Note(); d.name=\"bulk\"; Note e=new Note(); e.name=\"bulk\"; repo.insert(d); repo.insert(e); repo.flush(); s.commitTransaction(); "
@@ -608,7 +613,7 @@ public class OrmAnnotationProcessorTest {
             "@Query(value=\"SELECT name, score FROM note\",nativeSql=true) java.util.List<Object[]> rows();",
             "@Query(\"select e.name from badrepo.Note e\") java.util.List<String[]> names();",
             "@Query(\"update badrepo.Note e set e.name=:name\") int rename(@Param(\"name\") String name);",
-            "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) Note findByName(String name);"
+            "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) long countByName(String name);"
         }) {
             File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
             sources.put("badrepo.Note","package badrepo; import com.codename1.annotations.*; @Entity public class Note { @Id public long id; public String name; public long score; }");
