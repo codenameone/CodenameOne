@@ -613,6 +613,10 @@ public final class Calls {
             }
             call.heldIce = new ArrayList<String>();
             call.connection.setLocalDescription(offer).ready(done -> {
+                if (current != call) {
+                    // Hung up while the offer was being set.
+                    return;
+                }
                 // As for the first offer: set, then the flag, then sent. The
                 // callee holds the candidates that follow until it has set it.
                 call.awaitingAnswer = true;
