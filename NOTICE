@@ -139,6 +139,9 @@ Splat sample 3D models (scripts/splat/common/src/main/resources/model_*.glb)
   Ultimate Modular Men and Toon Shooter Game Kit by Quaternius
   (quaternius.com), and Blaster Kit and Survival Kit by Kenney (kenney.nl),
   all released under CC0 1.0. Repacked by scripts/splat/tools/pack-art.py.
+  Photo-scanned props and ground textures (model_car, model_barrier*,
+  model_sofa, model_barrel, model_streetlight, model_boxes, tex_*.jpg) by
+  Poly Haven (polyhaven.com), released under CC0 1.0.
 
 Splat sample fonts (scripts/splat/common/src/main/css/fonts/Rajdhani-*.ttf)
   Rajdhani, Copyright (c) 2014, Indian Type Foundry, licensed under the SIL

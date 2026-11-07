@@ -82,6 +82,7 @@ public final class Mission {
     }
 
     private static final Hashtable<String, Arena> REGISTERED = new Hashtable<String, Arena>();
+    private static final Hashtable<String, Mission> MISSIONS = new Hashtable<String, Mission>();
 
     public String code = "";
     public String name = "";
@@ -203,7 +204,13 @@ public final class Mission {
     public Arena register() {
         Arena a = arena();
         REGISTERED.put(a.id, a);
+        MISSIONS.put(a.id, this);
         return a;
+    }
+
+    /// The registered mission an arena id names, or null for a built-in arena.
+    public static Mission find(String arenaId) {
+        return arenaId == null ? null : MISSIONS.get(arenaId);
     }
 
     static Arena registered(String id) {

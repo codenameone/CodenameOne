@@ -13,6 +13,8 @@ engine's sky shader, set with `Environment.setSky`).
 | Markers (`model_mk-*.glb`) | Blaster Kit 2.1 | Kenney (kenney.nl) | CC0 1.0 |
 | Small props (crates, barrels, tents) | Survival Kit | Kenney (kenney.nl) | CC0 1.0 |
 | Trees, bushes, grass and rocks | Ultimate Nature | Quaternius (quaternius.com) | CC0 1.0 |
+| Photo-scanned props: covered car, concrete barriers, sofa, barrel, street lamp, cardboard boxes | covered_car, concrete_road_barrier(_02), sofa_02, barrel_03, street_lamp_01, cardboard_box_01 | Poly Haven (polyhaven.com) | CC0 1.0 |
+| Ground surfaces (`tex_*.jpg`) | asphalt_02, concrete_floor_02, grass_ground, gravel_road, corrugated_iron | Poly Haven (polyhaven.com) | CC0 1.0 |
 
 CC0 asks for no credit. We give it anyway.
 

@@ -22,6 +22,7 @@ import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.splat.api.AccountApi;
 import com.codenameone.examples.splat.api.AdminApi;
 import com.codenameone.examples.splat.api.GameApi;
+import com.codenameone.examples.splat.api.MissionApi;
 import com.codenameone.examples.splat.api.ProgressApi;
 import com.codenameone.examples.splat.api.ShopApi;
 import com.codenameone.examples.splat.api.SocialApi;
@@ -35,6 +36,7 @@ public final class Api {
     private static AdminApi admin;
     private static ProgressApi progress;
     private static SocialApi social;
+    private static MissionApi mission;
 
     private Api() {
     }
@@ -46,10 +48,15 @@ public final class Api {
         admin = RestClients.create(AdminApi.class, baseUrl);
         progress = RestClients.create(ProgressApi.class, baseUrl);
         social = RestClients.create(SocialApi.class, baseUrl);
+        mission = RestClients.create(MissionApi.class, baseUrl);
     }
 
     public static AccountApi account() {
         return account;
+    }
+
+    public static MissionApi mission() {
+        return mission;
     }
 
     public static GameApi game() {

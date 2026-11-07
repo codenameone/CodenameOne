@@ -27,6 +27,7 @@ import com.codenameone.examples.splat.rules.Arena;
 import com.codenameone.examples.splat.rules.Box;
 import com.codenameone.examples.splat.rules.Event;
 import com.codenameone.examples.splat.rules.Match;
+import com.codenameone.examples.splat.rules.Mission;
 import com.codenameone.examples.splat.rules.Mode;
 import com.codenameone.examples.splat.rules.Player;
 import com.codenameone.examples.splat.rules.Trig;
@@ -807,7 +808,9 @@ public final class Hud extends Component implements ArenaView.Hud {
         g.setColor(Type.HOSTILE);
         g.drawString("// CLASSIFIED -- EYES ONLY -- DO NOT SHOW MUM", left, y);
         y += tiny.getHeight() + CN.convertToPixels(2);
-        String[] title = wrap(new String[] {Type.caps(mode.operation)}, room, big);
+        // a player-built mission brings its own name and orders
+        Mission custom = Mission.find(match.arena().id);
+        String[] title = wrap(new String[] {Type.caps(custom != null ? custom.name : mode.operation)}, room, big);
         g.setFont(big);
         g.setColor(Type.AMBER);
         for (int i = 0; i < title.length; i++) {
@@ -827,7 +830,8 @@ public final class Hud extends Component implements ArenaView.Hud {
         y += CN.convertToPixels(3);
         String[] lines = {
             "OBJECTIVE: " + Type.caps(mode.title) + ". FIRST TO " + mode.target + ".",
-            "INTEL SUGGESTS THE ENEMY HAS BROUGHT [REDACTED] AND A COOLER.",
+            custom != null && custom.briefing.trim().length() > 0 ? Type.caps(custom.briefing.trim())
+                    : "INTEL SUGGESTS THE ENEMY HAS BROUGHT [REDACTED] AND A COOLER.",
             "RULES OF ENGAGEMENT: NO BLIND FIRING. NO WIPING. NO CRYING.",
             "YOU ARE " + (driver.interactive() ? Type.caps(ArenaView.TEAM_NAMES[match.player(me).team()])
                     : "ON THE SIDELINES") + ". GODSPEED.",

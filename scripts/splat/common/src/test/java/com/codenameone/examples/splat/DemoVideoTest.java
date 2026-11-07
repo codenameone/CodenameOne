@@ -62,53 +62,71 @@ public class DemoVideoTest extends E2e {
             waitForForm("home");
             waitFor(1500);
             record(out, desk ? RecordingOptions.Frame.SCREEN : RecordingOptions.Frame.SKIN);
-            caption("Splat -- team paintball", 2400);
-            waitFor(3000);
+            // Told as a story, at the pace of someone watching: every caption
+            // gets time to be read, every tap is a visible touch, and nothing
+            // changes screen while a caption is still up.
+            caption("Saturday, 0900. Lot 7 Self Storage.", 3200);
+            waitFor(3600);
+            caption("Four dads, four moms, one referee. This is Splat.", 3400);
+            waitFor(3800);
 
-            click("loadoutButton");
-            caption("Pick a marker", 2200);
-            waitFor(1600);
+            tap("loadoutButton");
+            caption("First, the gear: every marker trades rate for range", 3400);
+            waitFor(3800);
             if (has("choose-pump")) {
-                click("choose-pump");
-                waitFor(1400);
+                tap("choose-pump");
+                caption("The pump: slow, honest, devastating", 3000);
+                waitFor(3400);
             }
             home();
 
-            click("runButton");
+            tap("runButton");
             waitForForm("play");
-            waitFor(1500);
-            click("mission-cul-de-sac:CAPTURE_THE_FLAG");
-            caption("Every mission gets a briefing", 2400);
-            waitFor(4500);
-            click("practice-cul-de-sac:CAPTURE_THE_FLAG");
+            caption("Pick an operation", 2600);
+            waitFor(2800);
+            tap("mission-cul-de-sac:CAPTURE_THE_FLAG");
+            caption("The briefing: the map, the orders, the snacks at stake", 3600);
+            waitFor(4800);
+            tap("practice-cul-de-sac:CAPTURE_THE_FLAG");
             waitForForm("match");
             ArenaView view = arena();
-            // the countdown, its beeps and the horn
-            waitFor(4200);
+            // the briefing plays out in full with its beeps and the horn
+            waitFor(5200);
 
-            caption("Move and fire", 2200);
-            driveFor(view, 7000);
-            caption("Aim down the sights", 2200);
-            held(view, Input.AIM, 600);
-            held(view, Input.AIM | Input.FIRE, 2400);
-            caption("Splat grenade", 2000);
+            caption("Left thumb moves, right thumb looks", 3200);
+            driveFor(view, 6000);
+            caption("Paintballs are slow -- lead your target", 3200);
+            held(view, Input.FIRE, 3500);
+            caption("Aim down the sights for a tighter group", 3200);
+            held(view, Input.AIM, 800);
+            held(view, Input.AIM | Input.FIRE, 3200);
+            caption("Splat grenade over the cover", 3000);
             held(view, Input.THROW, 400);
-            driveFor(view, 3500);
-            caption("Reload", 1800);
-            held(view, Input.RELOAD, 400);
-            driveFor(view, 3000);
-            caption("Painted? Wipe it off -- if the ref is not looking", 2800);
-            held(view, Input.WIPE, 1600);
-            driveFor(view, 12000);
-            caption("Grab their flag", 2200);
+            driveFor(view, 4000);
+
+            caption("Sooner or later, everyone gets painted...", 3200);
+            if (untilPainted(view, 40000)) {
+                waitFor(1400);
+                caption("...and the instant replay shows exactly who did it", 3600);
+                waitFor(5200);
+                caption("Out? Try wiping it off -- if the ref is not looking", 3400);
+                held(view, Input.WIPE, 2200);
+                waitFor(2000);
+            }
+            caption("Bird's-eye view: the whole yard at once", 3400);
+            onEdt(view::toggleOverhead);
+            driveFor(view, 8000);
+            onEdt(view::toggleOverhead);
+            caption("Back to the goggles. Grab their flag.", 3200);
             driveFor(view, 10000);
             finish(view, 10 * 60 * Match.TICK_HZ);
             waitFor(3500);
             collectAll();
-            caption("Scoreboard, rewards, and back for another round", 2600);
-            waitFor(3000);
+            caption("The scoreboard. Somebody is disputing every hit.", 3400);
+            waitFor(4000);
             home();
-            waitFor(2500);
+            caption("Next: build your own field in the Mission Builder", 3200);
+            waitFor(3600);
 
             SimulatorRecorder.Result r = recorder.stop();
             recorder = null;
@@ -142,8 +160,32 @@ public class DemoVideoTest extends E2e {
         o.setFrame(frame);
         o.setTouches(TouchOverlay.Style.DOT);
         o.setAudio(RecordingOptions.Audio.APP);
-        o.setMaxSeconds(180);
+        o.setMaxSeconds(300);
         recorder.start(o);
+    }
+
+    /// A visible tap, held a moment before and after so the eye can follow.
+    private void tap(String name) {
+        waitFor(500);
+        touch(name);
+        waitFor(900);
+    }
+
+    /// Plays on until your own player is painted; answers whether it happened.
+    private boolean untilPainted(final ArenaView view, int millis) {
+        long end = System.currentTimeMillis() + millis;
+        while (System.currentTimeMillis() < end) {
+            final boolean[] out = new boolean[1];
+            onEdt(() -> {
+                Match m = view.driver().match();
+                out[0] = !m.player(view.driver().me()).alive();
+            });
+            if (out[0]) {
+                return true;
+            }
+            driveFor(view, 250);
+        }
+        return false;
     }
 
     private void caption(String text, long ms) {

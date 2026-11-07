@@ -258,6 +258,27 @@ A replay is the seed and the human inputs, nothing more. The bots aren't in the 
 they think inside the rules, so they make the same choices again. The replay screen
 follows any player, pauses, plays at double speed and skips ahead.
 
+=== The Mission Builder
+
+Players build fields of their own. The editor shows one half of the field from above;
+the other half is that half turned around, built by the same `Arena.Builder.mirror` the
+built-in yards use, so a player-made field is fair by construction. A `Mission` in the
+rules module holds the props, spawns, flag, mode and briefing, travels as JSON, and is
+checked by `Mission.problem()` on the phone and again on the server before it is
+stored:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/splat/common/src/main/java/com/codenameone/examples/splat/ui/MissionEditor.java[tag=splat-mission-editor,indent=0]
+----
+
+Play-testing registers the draft as an arena and starts a practice match on it, so the
+bots, the briefing and the camera see it as any other yard. Publishing stores it under a
+code the server assigns, and the published list shows your missions and your friends'.
+A mission is played online as the level `m-<code>:<MODE>`: before the server opens a
+lobby for such a level it loads the mission and registers it, and from there the match,
+the replay and the results are the same as for a built-in yard.
+
 [[splat-ops]]
 === Engagement, moderation and the console
 

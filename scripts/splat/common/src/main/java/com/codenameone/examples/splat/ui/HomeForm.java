@@ -156,6 +156,8 @@ public final class HomeForm {
         menu.add(item("OPERATIONS", "Modes, yards, practice vs bots", "runButton", false, PlayForm::show));
         menu.add(item("PARTY UP", "Private lobby with your squad", "partyButton", false,
                 () -> MatchLobby.host(null)));
+        menu.add(item("MISSION BUILDER", "Design a field, play it with friends", "builderButton", false,
+                MissionsForm::show));
         menu.add(item("OPERATOR", "Marker and kit", "loadoutButton", false, LoadoutForm::show));
         int ready = 0;
         if (g != null) {

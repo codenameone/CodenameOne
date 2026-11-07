@@ -2331,3 +2331,65 @@ SectionRule {
     margin: 1mm 4mm 0 4mm;
     font-size: 0.5mm;
 }
+
+/* Mission editor */
+EditorField {
+    font-family: "Rajdhani Medium";
+    font-size: 3.2mm;
+    color: #f2f4f5;
+    background-color: #12161a;
+    border: 1px solid #4f5862;
+    padding: 1.8mm;
+    margin: 0.8mm;
+}
+
+EditorChip, EditorChipOn {
+    font-family: "Rajdhani Bold";
+    font-size: 2.8mm;
+    color: #c9d1d8;
+    background-color: rgba(28, 33, 39, 0.9);
+    border: 1px solid #4f5862;
+    padding: 1.4mm 2mm;
+    margin: 0.5mm;
+    text-align: center;
+}
+
+EditorChipOn {
+    color: #0c0e10;
+    background-color: #f2b632;
+    border: 1px solid #f2b632;
+}
+
+EditorStatus {
+    font-family: "Rajdhani Bold";
+    font-size: 2.6mm;
+    color: #f2b632;
+    background-color: transparent;
+    padding: 1mm 1.5mm;
+    margin: 0;
+}
+
+MissionRow {
+    background-color: rgba(28, 33, 39, 0.9);
+    border: 1px solid #2c343c;
+    padding: 2mm;
+    margin: 0.6mm 1mm;
+}
+
+MissionRowTitle {
+    font-family: "Rajdhani Bold";
+    font-size: 3.4mm;
+    color: #f2f4f5;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+MissionRowSub {
+    font-family: "Rajdhani Medium";
+    font-size: 2.6mm;
+    color: #8a949e;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}

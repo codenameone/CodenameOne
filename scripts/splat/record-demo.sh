@@ -22,7 +22,7 @@ for _ in $(seq 1 90); do
   sleep 1
 done
 
-BASE="${JAVA_TOOL_OPTIONS:-} -Xmx2560m -Dsplat.server.url=http://localhost:$PORT -Dsplat.demo.dir=$OUT -Dsplat.e2e.only=DemoVideoTest -Djava.util.prefs.PreferencesFactory=com.codenameone.examples.splat.MemoryPreferences"
+BASE="${JAVA_TOOL_OPTIONS:-} -Xmx2560m -Dsplat.server.url=http://localhost:$PORT -Dsplat.demo.dir=$OUT -Dsplat.e2e.only=DemoVideoTest,MissionBuilderTest -Djava.util.prefs.PreferencesFactory=com.codenameone.examples.splat.MemoryPreferences"
 JAVA_TOOL_OPTIONS="$BASE" "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
 JAVA_TOOL_OPTIONS="$BASE -Dsplat.e2e.desktop=true -Dsplat.prefs.seed=desktopSkin=true -Dcodename1.arg.desktop.titleBar=toolbar" \
   "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify

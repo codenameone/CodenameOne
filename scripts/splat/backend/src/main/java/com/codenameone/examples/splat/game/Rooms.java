@@ -31,6 +31,7 @@ import com.codenameone.examples.splat.api.ChallengeDto;
 import com.codenameone.examples.splat.api.GameProtocol;
 import com.codenameone.examples.splat.api.LiveRaceDto;
 import com.codenameone.examples.splat.domain.Profile;
+import com.codenameone.examples.splat.mission.Missions;
 import com.codenameone.examples.splat.rules.Catalog;
 import com.codenameone.examples.splat.rules.Input;
 import com.codenameone.examples.splat.rules.Match;
@@ -68,6 +69,7 @@ public class Rooms {
     private final Challenges challenges;
     private final AdminChannel admins;
     private final Crews crews;
+    private final Missions missions;
     private final long botAfterMillis;
 
     private final Map<String, MatchRoom> byId = new HashMap<String, MatchRoom>();
@@ -118,8 +120,9 @@ public class Rooms {
     }
 
     public Rooms(Results results, Flags flags, Challenges challenges, AdminChannel admins,
-            Crews crews, @Value("${splat.race.bot-after-ms:6000}") long botAfterMillis) {
+            Crews crews, Missions missions, @Value("${splat.race.bot-after-ms:6000}") long botAfterMillis) {
         this.crews = crews;
+        this.missions = missions;
         this.results = results;
         this.flags = flags;
         this.challenges = challenges;
@@ -252,7 +255,7 @@ public class Rooms {
     /// Opens a party on `level` and answers its share link. With a `crew`
     /// code the host belongs to, the rest of that crew is pushed the invite.
     void host(Profile player, WebSocketSession session, String level, String crew) throws IOException {
-        String ref = Arenas.normalize(level);
+        String ref = Arenas.normalize(missions.resolve(level));
         if (ref == null) {
             send(session, Messages.error("No such field or mode"));
             return;
@@ -304,7 +307,7 @@ public class Rooms {
             return;
         }
         if (level != null) {
-            String ref = Arenas.normalize(level);
+            String ref = Arenas.normalize(missions.resolve(level));
             if (ref != null) {
                 party.level = ref;
             }
@@ -392,7 +395,7 @@ public class Rooms {
     // ------------------------------------------------------------ quick races
 
     synchronized void quick(Profile player, WebSocketSession session, String level) {
-        String ref = Arenas.normalize(level);
+        String ref = Arenas.normalize(missions.resolve(level));
         if (ref == null) {
             send(session, Messages.error("No such field or mode"));
             return;
@@ -477,6 +480,7 @@ public class Rooms {
         }
         MatchRoom room = new MatchRoom(id, level, Arenas.arena(level), Arenas.mode(level), seed, seats,
                 Clock.now() + GameProtocol.COUNTDOWN_MILLIS);
+        missions.played(Arenas.arena(level));
         byId.put(id, room);
         for (Seat s : seats) {
             if (!s.isBot()) {
