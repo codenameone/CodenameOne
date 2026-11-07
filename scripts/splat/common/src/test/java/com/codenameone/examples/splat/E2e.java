@@ -85,13 +85,19 @@ public abstract class E2e extends AbstractTest {
     }
 
     private boolean mine() {
+        // splat.e2e.only names the one test class a run is for (the demo
+        // recordings); the runner itself has no way to pick a test.
+        String only = System.getProperty("splat.e2e.only");
+        if (only != null && only.length() > 0 && !only.equals(getClass().getSimpleName())) {
+            return false;
+        }
         return desktop() == desktopRun();
     }
 
     @Override
     public final boolean runTest() throws Exception {
         if (!mine()) {
-            log("Not a test for " + (desktopRun() ? "the desktop" : "the phone") + "; skipped");
+            log("Not a test for this run; skipped");
             return true;
         }
         if (desktopRun()) {

@@ -54,8 +54,10 @@ final class PromoteTab {
     private static final String[] SEGMENTS = {"all", "lapsed", "new", "invited"};
     private static final String[] SEGMENT_NAMES = {"Everyone", "Away for a while", "Joined recently",
         "Came through an invite"};
-    static final String[] SCREENS = {"", "shop", "forge", "friends", "runner", "race", "daily", "crews"};
-    static final String[] SCREEN_NAMES = {"Home", "Shop", "Forge", "Friends", "Runner", "Quick race", "Daily run", "Crews"};
+    /// The screens a message can open: the ones `Nav.screen` routes, and the
+    /// only ones the server's `Promotion.SCREENS` accepts.
+    static final String[] SCREENS = {"", "shop", "friends", "loadout", "play", "crews"};
+    static final String[] SCREEN_NAMES = {"Home", "Store", "Friends", "Operator", "Operations", "Crews"};
 
     private final Container col = Desk.page();
     private String segment = SEGMENTS[0];

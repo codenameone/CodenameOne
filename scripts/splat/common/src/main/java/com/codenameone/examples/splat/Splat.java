@@ -21,6 +21,7 @@ package com.codenameone.examples.splat;
 import com.codename1.appreview.AppReview;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.system.Lifecycle;
+import com.codenameone.examples.splat.play.Music;
 import com.codenameone.examples.splat.play.Sfx;
 import com.codenameone.examples.splat.engage.Ads;
 import com.codenameone.examples.splat.engage.Friends;
@@ -57,6 +58,7 @@ public class Splat extends Lifecycle implements PurchaseCallback {
         Ui.desktopFonts();
         SettingsForm.apply();
         Sfx.load();
+        Music.menu();
         Telemetry.start();
         Ads.start();
         // tag::splat-app-review[]

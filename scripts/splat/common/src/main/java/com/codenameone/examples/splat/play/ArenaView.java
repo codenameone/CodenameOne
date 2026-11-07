@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.splat.play;
 
+
 import com.codename1.gaming.AnimatedModel;
 import com.codename1.gaming.GameCamera;
 import com.codename1.gaming.GameView;
@@ -33,6 +34,7 @@ import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.Primitives;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.util.MathUtil;
 import com.codenameone.examples.splat.rules.Arena;
 import com.codenameone.examples.splat.rules.Ball;
 import com.codenameone.examples.splat.rules.Box;
@@ -161,6 +163,15 @@ public class ArenaView extends GameView {
     /// end-to-end tests and the promo video play a match; null gives them back.
     public void setAutopilot(com.codenameone.examples.splat.rules.Rng rng) {
         autopilot = rng;
+    }
+
+    private int heldButtons;
+
+    /// Holds buttons down on top of whatever plays (the autopilot or your
+    /// thumbs), as `Input` bits; 0 lets go. The walkthrough video uses it to
+    /// show a control by name: aim, throw, reload, wipe.
+    public void hold(int buttons) {
+        heldButtons = buttons;
     }
 
     public Driver driver() {
@@ -691,14 +702,19 @@ public class ArenaView extends GameView {
                 break;
             }
             remember();
-            driver.step(!driver.interactive() ? Input.IDLE : autopilot != null
+            Input in = !driver.interactive() ? Input.IDLE : autopilot != null
                     ? com.codenameone.examples.splat.rules.Bot.think(driver.match(), driver.match().player(driver.me()), autopilot)
-                    : input());
+                    : input();
+            if (heldButtons != 0 && driver.interactive()) {
+                in = new Input(in.strafe, in.forward, in.yaw, in.pitch, in.buttons | heldButtons, in.viewTick);
+            }
+            driver.step(in);
             accumulator -= TICK;
             steps++;
         }
         alpha = (float) Math.min(1, accumulator / TICK);
         events();
+        bodySounds((float) dt);
         draw((float) dt);
         tick((float) dt);
     }
@@ -738,38 +754,150 @@ public class ArenaView extends GameView {
 
     private void events() {
         List<Event> happened = driver.drainEvents();
+        Match m = driver.match();
+        int me = driver.me();
+        int team = m.player(me).team();
         for (int i = 0; i < happened.size(); i++) {
             Event e = happened.get(i);
             if (e.kind == Event.SPLAT || e.kind == Event.GRENADE) {
                 decal(e.b & 1, e.x, e.y, e.z, e.kind == Event.GRENADE ? 2.6f : 0.55f);
                 burstImpact(e.b & 1, e.x, e.y, e.z, e.kind == Event.GRENADE);
-                if (near(e.x, e.z)) {
-                    Sfx.splat();
+                if (e.kind == Event.GRENADE) {
+                    Sfx.grenade(place(e.x, e.z, 45), pan);
+                } else {
+                    Sfx.splat(place(e.x, e.z, 25) * 0.8f, pan);
                 }
             } else if (e.kind == Event.PAINTED) {
-                Player shooter = driver.match().player(e.a);
+                Player shooter = m.player(e.a);
                 decal(shooter.team(), e.x, e.y, e.z, 0.7f);
                 burstImpact(shooter.team() & 1, e.x, e.y, e.z, false);
-                Sfx.whistle();
-                if (e.a == driver.me()) {
+                if (e.b == me) {
+                    Sfx.painted();
+                    Sfx.whistle(0.9f, 0);
+                } else {
+                    Sfx.splat(place(e.x, e.z, 30), pan);
+                    Sfx.whistle(Math.max(0.35f, place(e.x, e.z, 60)), pan * 0.5f);
+                }
+                if (e.a == me) {
                     Sfx.hit();
                 }
             } else if (e.kind == Event.SHOT) {
-                if (e.a == driver.me() && driver.interactive()) {
+                if (e.a == me && driver.interactive()) {
                     recoil = 1f;
-                    Sfx.pop();
+                    Sfx.fire();
                     // your own flash sits at the marker you hold, not the ball
                     flash.burst(viewMuzzleX, viewMuzzleY, viewMuzzleZ, 3);
-                } else if (near(e.x, e.z)) {
-                    flash.burst(-e.x * MM, e.y * MM, e.z * MM, 3);
+                } else {
+                    Sfx.fireAt(place(e.x, e.z, 35), pan);
+                    if (near(e.x, e.z)) {
+                        flash.burst(-e.x * MM, e.y * MM, e.z * MM, 3);
+                    }
                 }
+            } else if (e.kind == Event.WIPE_OK && e.a == me) {
+                Sfx.wipe();
             } else if (e.kind == Event.WIPE_CAUGHT) {
-                Sfx.whistle();
-            } else if (e.kind == Event.RESPAWN && e.a == driver.me()) {
+                if (e.a == me) {
+                    Sfx.wipe();
+                    Sfx.buzzer();
+                }
+                Sfx.whistle(e.a == me ? 1f : 0.5f, 0);
+            } else if (e.kind == Event.FRIENDLY && (e.a == me || e.b == me)) {
+                Sfx.boing();
+            } else if (e.kind == Event.RELOAD && e.a == me) {
+                Sfx.reload();
+            } else if (e.kind == Event.FLAG_TAKEN) {
+                Sfx.flag(e.b != team);
+            } else if (e.kind == Event.CAPTURE) {
+                Sfx.capture(e.b == team);
+            } else if (e.kind == Event.HILL_POINT) {
+                Sfx.point(e.b == team);
+            } else if (e.kind == Event.END) {
+                Sfx.whistleTwice();
+                Music.stop();
+                if (e.b >= 0 && driver.interactive()) {
+                    if (e.b == team) {
+                        Sfx.win();
+                    } else {
+                        Sfx.lose();
+                    }
+                }
+            } else if (e.kind == Event.RESPAWN && e.a == me) {
                 aimed = false;
             }
             if (hud != null) {
                 hud.event(e);
+            }
+        }
+    }
+
+    /// The pan of the last sound [#place] placed: -1 is hard left, 1 hard right.
+    private float pan;
+
+    /// How loud a sound at `x z` is where you stand: full within a few metres,
+    /// nothing beyond `range` metres. Leaves its direction in [#pan].
+    private float place(int x, int z, int range) {
+        Player p = driver.match().player(driver.me());
+        double dx = x - p.x();
+        double dz = z - p.z();
+        double d = Math.sqrt(dx * dx + dz * dz) / 1000;
+        int yaw = driver.interactive() && p.alive() ? lookYaw : p.yaw();
+        // the same frame as the damage arcs: 0 straight ahead, clockwise positive
+        double toward = MathUtil.atan2(-dx, dz);
+        double facing = -yaw * 2 * Math.PI / Trig.FULL;
+        pan = d < 1.5 ? 0 : (float) Math.sin(toward - facing) * 0.8f;
+        double v = 1 - (d - 3) / (range - 3);
+        return (float) Math.max(0, Math.min(1, v * v));
+    }
+
+    private int lastCount = -1;
+    private boolean wasGrounded = true;
+    private boolean hadGrenade;
+    private float stride;
+
+    /// The sounds that come from your own body and the clock rather than from
+    /// an event: the countdown, footsteps, landing and the grenade leaving
+    /// your hand.
+    private void bodySounds(float dt) {
+        Match m = driver.match();
+        int me = driver.me();
+        Player p = m.player(me);
+        int count = driver.countdownTicks();
+        int secs = (count + Match.TICK_HZ - 1) / Match.TICK_HZ;
+        if (lastCount >= 0 && secs != lastCount && driver.interactive()) {
+            if (secs == 0) {
+                Sfx.horn();
+                Sfx.whistleTwice();
+                Music.field();
+            } else if (secs <= 3) {
+                Sfx.beep();
+            }
+        }
+        lastCount = secs;
+        if (!p.alive() || m.over()) {
+            stride = 0;
+            wasGrounded = true;
+            hadGrenade = p.hasGrenade();
+            return;
+        }
+        if (driver.interactive() && hadGrenade && !p.hasGrenade()) {
+            Sfx.toss();
+        }
+        hadGrenade = p.hasGrenade();
+        boolean grounded = p.grounded();
+        if (grounded && !wasGrounded) {
+            Sfx.land();
+            stride = 0;
+        }
+        wasGrounded = grounded;
+        float dx = p.x() * MM - prevX[me];
+        float dz = p.z() * MM - prevZ[me];
+        float speed = (float) Math.sqrt(dx * dx + dz * dz) * Match.TICK_HZ;
+        if (grounded && speed > 0.8f) {
+            stride += speed * dt;
+            // a stride is about 1.6 m walking, a little longer at a sprint
+            if (stride > (speed > 5 ? 1.9f : 1.6f)) {
+                stride = 0;
+                Sfx.step(p.crouched() ? 0.25f : speed > 5 ? 0.6f : 0.45f);
             }
         }
     }

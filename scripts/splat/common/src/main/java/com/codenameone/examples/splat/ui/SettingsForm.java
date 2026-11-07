@@ -29,6 +29,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.splat.AppConfig;
 import com.codenameone.examples.splat.api.ProfileDto;
 import com.codenameone.examples.splat.play.ArenaView;
+import com.codenameone.examples.splat.play.Music;
 import com.codenameone.examples.splat.play.Sfx;
 import com.codenameone.examples.splat.engage.Notifications;
 import com.codenameone.examples.splat.engage.Telemetry;
@@ -36,9 +37,10 @@ import com.codenameone.examples.splat.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.splat.net.Session;
 
-/// Settings: the runner name, sound, analytics consent, push, the server.
+/// Settings: the callsign, sound, music, analytics consent, push, the server.
 public final class SettingsForm {
     static final String SOUND_KEY = "splat.sound";
+    static final String MUSIC_KEY = "splat.music";
 
     private SettingsForm() {
     }
@@ -46,16 +48,17 @@ public final class SettingsForm {
     /// Applies what was chosen in an earlier run.
     public static void apply() {
         Sfx.setMuted(!Preferences.get(SOUND_KEY, true));
+        Music.setMuted(!Preferences.get(MUSIC_KEY, true));
     }
 
     public static void show() {
         Form f = Ui.form("Settings", "settings");
         Ui.desktopColumn(f);
         Ui.back(f, Nav::home);
-        final TextField name = new TextField(Session.user().displayName(), "Runner name", 16, TextField.ANY);
+        final TextField name = new TextField(Session.user().displayName(), "Callsign", 16, TextField.ANY);
         name.setUIID("NameField");
         name.setName("displayName");
-        f.add(Ui.label("Runner name", "SectionTitle"));
+        f.add(Ui.label("Callsign", "SectionTitle"));
         f.add(Ui.panel(name, Ui.secondary("Rename", "rename", e -> Api.account().saveProfile(
                 new ProfileDto(name.getText().trim()), Net.to(p -> {
                     Session.setUser(p);
@@ -66,6 +69,10 @@ public final class SettingsForm {
                 toggle("Sound", "sound", !Sfx.isMuted(), on -> {
                     Preferences.set(SOUND_KEY, on);
                     Sfx.setMuted(!on);
+                }),
+                toggle("Music", "music", !Music.isMuted(), on -> {
+                    Preferences.set(MUSIC_KEY, on);
+                    Music.setMuted(!on);
                 }),
                 toggle("Invert look", "invertLook", Preferences.get(ArenaView.INVERT_KEY, false),
                         on -> Preferences.set(ArenaView.INVERT_KEY, on)),

@@ -57,9 +57,11 @@ import javax.sound.sampled.TargetDataLine;
 /// slow encode delays the file, not the next capture. Writing on the clock made
 /// every slow frame a repeated one, and the video stuttered.
 ///
-/// Audio is assembled when recording stops. The track is the microphone when that
-/// is on, silence otherwise, with a short synthesized click mixed in at every tap
-/// when tap sounds are on. The application's own audio output is not captured.
+/// Audio is assembled when recording stops. The track mixes what
+/// `RecordingOptions.Audio` asks for -- the application's own sound (media and
+/// the sound pool, through `AppAudioTap`), the microphone, or both -- with a
+/// short synthesized click at every tap when tap sounds are on, and is silent
+/// when nothing is chosen.
 ///
 /// Without ffmpeg the recorder writes a numbered PNG sequence next to the requested
 /// file and says so in its result, so a recording is never lost silently.

@@ -40,6 +40,7 @@ import com.codenameone.examples.splat.net.Session;
 import com.codenameone.examples.splat.play.ArenaView;
 import com.codenameone.examples.splat.play.Driver;
 import com.codenameone.examples.splat.play.Hud;
+import com.codenameone.examples.splat.play.Music;
 import com.codenameone.examples.splat.play.OnlineDriver;
 import com.codenameone.examples.splat.play.PracticeDriver;
 import com.codenameone.examples.splat.play.ReplayDriver;
@@ -185,6 +186,10 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
     private void start() {
         form.show();
         view.start();
+        if (!driver.interactive()) {
+            // a replay has no countdown to bring the field in
+            Music.field();
+        }
     }
 
     private void quit() {
@@ -201,6 +206,7 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
     private void close() {
         view.stop();
         driver.dispose();
+        Music.menu();
         back.run();
     }
 
