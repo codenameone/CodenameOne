@@ -235,10 +235,41 @@ final class RepositoryGenerator {
                 for (String term : or.split("And(?=[A-Z])", -1)) {
                     if (where.length() > begin) where.append(" AND ");
                     String suffix = "", operator = "=";
+                    // IgnoreCase folds both sides with LOWER, which the JPQL layer
+                    // renders per dialect; it applies to = , <> and LIKE on text.
+                    boolean ignoreCase = term.endsWith("IgnoreCase") && term.length() > 10;
+                    if (ignoreCase) term = term.substring(0, term.length() - 10);
                     String[][] operations = {{"IsNotNull","IS NOT NULL"},{"IsNull","IS NULL"},{"GreaterThanEqual",">="},{"LessThanEqual","<="},
-                        {"GreaterThan",">"},{"LessThan","<"},{"Not","<>"},{"Like","LIKE"},{"In","IN"},{"True","= TRUE"},{"False","= FALSE"}};
+                        {"GreaterThan",">"},{"LessThan","<"},{"Before","<"},{"After",">"},{"Between","BETWEEN"},
+                        {"Not","<>"},{"Like","LIKE"},{"In","IN"},{"True","= TRUE"},{"False","= FALSE"}};
                     for (String[] operation : operations) if (term.endsWith(operation[0])) { suffix=operation[0];operator=operation[1];break; }
                     String field = field(term.substring(0, term.length() - suffix.length()));
+                    if (ignoreCase) {
+                        OrmAnnotationProcessor.PersistedField property = property(field);
+                        if (!suffix.equals("") && !suffix.equals("Not") && !suffix.equals("Like")) {
+                            throw invalid("IgnoreCase applies to equality, Not and Like: " + field);
+                        }
+                        if (!domainType(property).equals("java.lang.String")
+                                || property.dialectKind != OrmAnnotationProcessor.KIND_TEXT) {
+                            throw invalid("IgnoreCase requires a String property with text storage: " + field);
+                        }
+                        if (names.size() >= values) throw invalid("Missing argument for " + field);
+                        checkArgument(field, suffix, args[names.size()], method, names.size());
+                        String binding = "p" + names.size(); names.add(binding);
+                        where.append("LOWER(e.").append(field).append(") ").append(operator)
+                                .append(" LOWER(:").append(binding).append(')');
+                        continue;
+                    }
+                    if (suffix.equals("Between")) {
+                        if (names.size() + 1 >= values) throw invalid("Between needs two arguments for " + field);
+                        checkArgument(field, suffix, args[names.size()], method, names.size());
+                        checkArgument(field, suffix, args[names.size() + 1], method, names.size() + 1);
+                        String low = "p" + names.size(); names.add(low);
+                        String high = "p" + names.size(); names.add(high);
+                        where.append("e.").append(field).append(" BETWEEN :").append(low)
+                                .append(" AND :").append(high);
+                        continue;
+                    }
                     if (suffix.equals("True") || suffix.equals("False")) {
                         OrmAnnotationProcessor.PersistedField property = property(field);
                         if (property.dialectKind != OrmAnnotationProcessor.KIND_BOOLEAN

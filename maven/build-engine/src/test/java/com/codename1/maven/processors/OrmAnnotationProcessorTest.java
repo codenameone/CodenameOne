@@ -265,7 +265,9 @@ public class OrmAnnotationProcessorTest {
             // Same names as the superclass's private and other-package callbacks, which they do not override.
             + "public void stamp() { throw new IllegalStateException(\"not a callback\"); } public void loaded() { throw new IllegalStateException(\"not a callback\"); } }");
         sources.put("hidden.Riders","package hidden; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Rider.class,key=Long.class) public interface Riders extends CrudRepository<Rider,Long> { "
-            + "List<Rider> findByNameOrderByScoreDesc(String name); long countByScoreGreaterThan(int score); }");
+            + "List<Rider> findByNameOrderByScoreDesc(String name); long countByScoreGreaterThan(int score); "
+            + "long countByScoreBetween(int low,int high); long countByScoreAfter(int score); long countByScoreBefore(int score); "
+            + "List<Rider> findByNameIgnoreCase(String name); long countByNameNotIgnoreCase(String name); }");
         sources.put("hidden.Check","package hidden; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
             + "Riders repo=Repositories.create(Riders.class,s); s.createTables(); s.beginTransaction(); "
             + "Rider a=new Rider(); a.name(\"ann\"); a.score(7); a.active(Boolean.TRUE); a.created(1234L); a.createdBy(\"ops\"); a.revision(3); a.cached(\"changed\"); Place p=new Place(); p.city(\"Haifa\"); p.zip(31000); a.home(p); repo.insert(a); "
@@ -281,6 +283,8 @@ public class OrmAnnotationProcessorTest {
             + "if(back.home()==null || !\"Haifa\".equals(back.home().city()) || back.home().zip()!=31000) throw new AssertionError(\"embedded fields\"); "
             + "if(!\"c\".equals(back.cached()) || !\"k\".equals(back.constant())) throw new AssertionError(\"transient and final fields must not be stored\"); "
             + "java.util.List<Rider> named=repo.findByNameOrderByScoreDesc(\"ann\"); if(named.size()!=2 || named.get(0).score()!=7 || repo.countByScoreGreaterThan(5)!=1) throw new AssertionError(\"derived queries\"); "
+            + "if(repo.countByScoreBetween(2,7)!=2 || repo.countByScoreBetween(3,7)!=1 || repo.countByScoreAfter(2)!=1 || repo.countByScoreBefore(7)!=2) throw new AssertionError(\"between/after/before\"); "
+            + "if(repo.findByNameIgnoreCase(\"ANN\").size()!=2 || repo.countByNameNotIgnoreCase(\"Ann\")!=1) throw new AssertionError(\"ignore case\"); "
             + "s.beginTransaction(); back.score(9); s.commitTransaction(); if(back.updates()!=1) throw new AssertionError(\"protected @PreUpdate \"+back.updates()); "
             + "s.clear(); if(repo.findById(a.id()).score()!=9) throw new AssertionError(\"update\"); }}");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
