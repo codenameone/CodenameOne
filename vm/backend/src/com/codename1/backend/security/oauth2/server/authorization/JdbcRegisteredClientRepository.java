@@ -86,6 +86,9 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         if (!client.getResources().isEmpty()) {
             settings.put("resources", new ArrayList<Object>(client.getResources()));
         }
+        if (client.getAudience() != null) {
+            settings.put("audience", client.getAudience());
+        }
         Object[] values = {client.getClientId(),
             client.getClientSecret() == null ? "" : client.getClientSecret(),
             client.getClientName(), OAuth2Parameters.scopes(methods),
@@ -200,6 +203,13 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         t.deviceCodeTimeToLive(seconds(settings, "deviceCodeTimeToLive", 300));
         t.reuseRefreshTokens(flag(settings, "reuseRefreshTokens"));
         b.tokenSettings(t.build());
+        Object audience = settings.get("audience");
+        if (audience != null) {
+            if (!(audience instanceof String)) {
+                throw new IllegalArgumentException("audience must be a string");
+            }
+            b.audience((String) audience);
+        }
         if (settings.containsKey("resources")) {
             Object resources = settings.get("resources");
             if (!(resources instanceof List)) {

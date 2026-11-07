@@ -359,6 +359,11 @@ final class BackendWiringWriter {
             parts.add(p.append("})").toString());
         }
         for (String[] c : b.propertyConditions) {
+            if (c.length == 1) {
+                parts.add("com.codename1.impl.backend.Wiring.expressionMatches(config, "
+                        + BackendSources.quote(c[0]) + ")");
+                continue;
+            }
             parts.add("com.codename1.impl.backend.Wiring.propertyMatches(config, "
                     + BackendSources.quote(c[0]) + ", " + BackendSources.quote(c[1]) + ", "
                     + c[2] + ")");
@@ -1020,7 +1025,7 @@ final class BackendWiringWriter {
             if (sb.length() > 0) {
                 sb.append(" and ");
             }
-            sb.append(c[0]).append(c[1].length() > 0 ? "=" + c[1] : " set");
+            sb.append(c.length == 1 ? "expression " + c[0] : c[0] + (c[1].length() > 0 ? "=" + c[1] : " set"));
         }
         return sb.toString();
     }

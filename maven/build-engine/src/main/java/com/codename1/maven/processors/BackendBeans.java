@@ -83,6 +83,7 @@ final class BackendBeans {
     static final String SCOPE = PKG + "Scope;";
     static final String PROFILE = PKG + "Profile;";
     static final String ON_PROPERTY = PKG + "ConditionalOnProperty;";
+    static final String ON_EXPRESSION = PKG + "ConditionalOnExpression;";
     static final String ON_MISSING = PKG + "ConditionalOnMissingBean;";
     static final String POST_CONSTRUCT = PKG + "PostConstruct;";
     static final String PRE_DESTROY = PKG + "PreDestroy;";
@@ -121,7 +122,7 @@ final class BackendBeans {
     static final Set<String> DESCRIPTORS = Collections.unmodifiableSet(
             new LinkedHashSet<String>(java.util.Arrays.asList(COMPONENT,
                     CONFIGURATION, BEAN, AUTOWIRED, VALUE, CONFIG_PROPERTIES, SCOPE,
-                    PROFILE, ON_PROPERTY, ON_MISSING,
+                    PROFILE, ON_PROPERTY, ON_EXPRESSION, ON_MISSING,
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
                     MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
@@ -1152,10 +1153,17 @@ final class BackendBeans {
             }
             for (String k : keys) {
                 String key = prefix.length() == 0 ? k : prefix + "." + k;
+                // An empty havingValue matching anything but "false" is
+                // Spring's own rule (OnPropertyCondition), kept as it is.
                 bean.propertyConditions.add(new String[] {key,
                         prop.getStringOrDefault("havingValue", ""),
                         String.valueOf(prop.getBoolOrDefault("matchIfMissing", false))});
             }
+        }
+        AnnotationValues expression = annotations.get(ON_EXPRESSION);
+        if (expression != null) {
+            // One element: an expression, evaluated by Wiring.expressionMatches.
+            bean.propertyConditions.add(new String[] {expression.getStringOrDefault("value", "true")});
         }
     }
 

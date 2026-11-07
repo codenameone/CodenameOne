@@ -32,6 +32,10 @@ families spell that collation differently. Which one is used comes from the
 server rather than from the URL scheme, so a `mysql://` URL pointed at MariaDB
 is still correct.
 
+MariaDB 10.3 works too. It has the same collation, which MariaDB added in 10.2.2,
+but it reached its upstream end of life in 2023 and isn't among the versions the
+tests run against, so 10.4 is the oldest release that's verified.
+
 ==== Encrypted connections
 
 TLS is set on the URL. `sslmode=require` and its synonym `verify-full` demand

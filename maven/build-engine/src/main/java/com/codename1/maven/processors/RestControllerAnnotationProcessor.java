@@ -2073,7 +2073,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("String result = ").append(call).append(";\n");
             sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
             sb.append(pad).append("        : request.respond(").append(route.status)
-              .append(", \"text/plain; charset=utf-8\", utf8(result));\n");
+              .append(", ").append(quote(stringContentType(route.produces))).append(", utf8(result));\n");
         } else if (route.codecWrite != null) {
             // The application's own classes: written straight into the connection's
             // buffer by the codec the build generated, with no Map in between.
@@ -2091,6 +2091,29 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("        : request.respondJson(").append(route.status)
               .append(", result);\n");
         }
+    }
+
+    /// The Content-Type a String result is sent with: the first concrete type
+    /// the route declares it produces, as Spring answers `produces =
+    /// TEXT_HTML_VALUE` with text/html, and text/plain when it declares none.
+    /// A text type without a charset gets UTF-8, which is how the String is
+    /// encoded.
+    static String stringContentType(String produces) {
+        if (produces != null) {
+            for (String type : produces.split(",")) {
+                String t = type.trim();
+                if (t.length() == 0 || t.indexOf('*') >= 0) {
+                    continue;
+                }
+                boolean textual = t.regionMatches(true, 0, "text/", 0, 5)
+                        || t.regionMatches(true, 0, "application/json", 0, 16)
+                        || t.regionMatches(true, 0, "application/xml", 0, 15)
+                        || t.regionMatches(true, 0, "application/javascript", 0, 22);
+                return textual && t.toLowerCase(java.util.Locale.ROOT).indexOf("charset=") < 0
+                        ? t + "; charset=utf-8" : t;
+            }
+        }
+        return "text/plain; charset=utf-8";
     }
 
     /// The checks of every constrained parameter, before the call. A form

@@ -6692,13 +6692,13 @@ public final class HttpServer {
                     // failure of the handler: nothing is logged and the span
                     // is not marked as an error.
                     if (chosen.getStatus() >= 500) {
-                        System.err.println("handler failed: " + chosen);
+                        handlerFailed(chosen);
                         handlerError = chosen;
                     }
                     response = fallback(request, chosen.getStatus(), chosen.getReason());
                 } catch (Throwable err) {
                     rethrowIfFatal(err);
-                    System.err.println("handler failed: " + err);
+                    handlerFailed(err);
                     handlerError = err;
                     response = fallback(request, 500, "internal error");
                 }
@@ -6714,7 +6714,7 @@ public final class HttpServer {
                         response.writeDeferredJson(conn.bodySink());
                     } catch (Throwable err) {
                         rethrowIfFatal(err);
-                        System.err.println("handler failed: " + err);
+                        handlerFailed(err);
                         handlerError = err;
                         response = fallback(request, 500, "internal error");
                     }
@@ -7174,13 +7174,13 @@ public final class HttpServer {
                     // failure of the handler: nothing is logged and the span
                     // is not marked as an error.
                     if (chosen.getStatus() >= 500) {
-                        System.err.println("handler failed: " + chosen);
+                        handlerFailed(chosen);
                         handlerError = chosen;
                     }
                     response = fallback(request, chosen.getStatus(), chosen.getReason());
                 } catch (Throwable err) {
                     rethrowIfFatal(err);
-                    System.err.println("handler failed: " + err);
+                    handlerFailed(err);
                     handlerError = err;
                     response = fallback(request, 500, "internal error");
                 }
@@ -7191,7 +7191,7 @@ public final class HttpServer {
                         response.serializeDeferredJson();
                     } catch (Throwable err) {
                         rethrowIfFatal(err);
-                        System.err.println("handler failed: " + err);
+                        handlerFailed(err);
                         handlerError = err;
                         response = fallback(request, 500, "internal error");
                     }
@@ -7548,6 +7548,14 @@ public final class HttpServer {
     /// drop the connection with no answer at all. What Tomcat rethrows,
     /// VirtualMachineError other than a stack overflow, is rethrown here too:
     /// after running out of memory there is nothing a 500 can promise.
+    /// Reports a handler that failed, WITH its stack trace: the message alone
+    /// names the exception but not where it was thrown, and finding that then
+    /// took a debugger (#6184).
+    static void handlerFailed(Throwable err) {
+        System.err.println("handler failed: " + err);
+        err.printStackTrace();
+    }
+
     static void rethrowIfFatal(Throwable err) {
         if (err instanceof VirtualMachineError && !(err instanceof StackOverflowError)) {
             throw (VirtualMachineError) err;

@@ -2470,6 +2470,10 @@ public final class Backend {
             }
         }
 
+        private static String blankToNull(String value) {
+            return value == null || value.trim().length() == 0 ? null : value;
+        }
+
         private Tls resolveTls() throws IOException {
             if (tls != null) {
                 return tls;
@@ -2477,6 +2481,10 @@ public final class Backend {
             String certificate = tlsCertificate != null ? tlsCertificate
                     : config.get(Config.TLS_CERTIFICATE);
             String key = tlsKey != null ? tlsKey : config.get(Config.TLS_KEY);
+            // An empty setting is no setting: `cn1.server.tls.certificate=` in a
+            // properties file, or the variable exported empty, serves plaintext.
+            certificate = blankToNull(certificate);
+            key = blankToNull(key);
             if (certificate == null || key == null) {
                 if (certificate != null || key != null) {
                     // One without the other is a deployment that believes it is

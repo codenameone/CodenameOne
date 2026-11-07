@@ -2011,6 +2011,53 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void anExpressionConditionReadsPropertiesWithDefaults() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Feature", PKG + "public interface Feature { String name(); }\n");
+        s.put("com.example.On", PKG + "@Component @ConditionalOnExpression(\n"
+                + "    \"${mode:dev} == 'prod' && !${legacy:false}\")\n"
+                + "public class On implements Feature { public String name() { return \"on\"; } }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired(required = false) private Feature feature;\n"
+                + "    @GetMapping(\"/x\") public String x() {\n"
+                + "        return feature == null ? \"off\" : feature.name();\n"
+                + "    }\n"
+                + "    @GetMapping(value = \"/csv\", produces = \"text/csv\") public String csv() {\n"
+                + "        return \"a,b\";\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend off = start(classes, port, new Properties());
+        try {
+            assertEquals("off", http("GET", port, "/x"));
+            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/csv")
+                    .openConnection();
+            assertEquals("text/csv; charset=utf-8", c.getContentType());
+            c.getInputStream().close();
+        } finally {
+            off.stop();
+        }
+        Properties prod = new Properties();
+        prod.setProperty("mode", "prod");
+        Backend on = start(classes, port, prod);
+        try {
+            assertEquals("on", http("GET", port, "/x"));
+        } finally {
+            on.stop();
+        }
+        prod.setProperty("legacy", "true");
+        Backend legacy = start(classes, port, prod);
+        try {
+            assertEquals("off", http("GET", port, "/x"));
+        } finally {
+            legacy.stop();
+        }
+    }
+
+    @Test
     public void aRestartedApplicationForgetsTheBeansOfTheLastStart() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Feature", PKG + "@Component @ConditionalOnProperty(\"feature.x\")\n"
