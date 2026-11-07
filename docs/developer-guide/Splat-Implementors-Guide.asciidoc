@@ -2,7 +2,7 @@
 == Splat: Making the paintball game your own
 
 Splat is a first-person team paintball shooter, four against four, that takes itself
-exactly as seriously as a dad in a borrowed tactical vest. Every match opens with a
+with the same gravity as a dad in a borrowed tactical vest. Every match opens with a
 grim mission briefing ("Operation: Borrowed Bedsheet"). Every hit lands a big red
 *PAINTED* stamp, and every player who is out may try to wipe the paint off before the
 referee notices. Under the jokes it's a real-time shooter that most game frameworks
@@ -16,7 +16,7 @@ would split across an engine, a networking product and a separate server:
 * Bots think inside the rules, so a practice match, a match the server fills with
   bots and a replay all play the same way from the same seed.
 
-All of it is ordinary Codename One code in one project: the 3D field drawn with
+Everything is ordinary Codename One code in one project: the 3D field drawn with
 `GameView`, the HUD as a component layered over it, and the server as a Codename One
 Backend. Splat shares the module layout, the accounts, push notifications, the shop and
 the operations console with <<dash-implementors-guide,Dash>> and
@@ -88,7 +88,7 @@ image::img/splat-match-practice.png["A practice match: minimap, score bar and ki
 image::img/splat-scoreboard.png["The scoreboard: both teams, best painter first",scaledwidth=30%]
 
 A party is a private lobby: a code, two rosters and a chat. The friends who join it play the next match together,
-talk over WebRTC voice and trade emotes during it ("It bounced!", "REF!").
+talk over WebRTC voice and trade emotes during it ("It bounced!" and "REF!").
 
 image::img/splat-party-chat.png["A party: the code, the members and the chat",scaledwidth=30%]
 image::img/splat-party-match.png["A party match with a friend's emote and chat on screen",scaledwidth=30%]
@@ -110,7 +110,7 @@ image::img/splat-desktop-shop.png["The store on a desktop, with its title bar an
 * `shared` holds the REST interfaces and the objects they carry.
 * `backend` is the server: accounts, matchmaking, the match rooms, results, the shop,
   social features and the admin API.
-* `common` is the app. `play/` is the match itself, `ui/` the screens around it,
+* `common` is the app. `play/` is the match itself, `ui/` the surrounding screens,
   `engage/` ads, analytics, push and the store, and `admin/` the operations console.
 
 What every full-stack sample needs and none of them is about comes from the
@@ -130,7 +130,7 @@ include::../../scripts/splat/rules/src/main/java/com/codenameone/examples/splat/
 ----
 
 A field is a size, a base, a hill for the snack bar mode, the spawns, and boxes of
-cover given by centre and size in decimetres. `mirror` places each box twice, once per
+cover given by center and size in decimeters. `mirror` places each box twice, once per
 side, so a field is fair by construction:
 
 [source,java,role=cn1-no-try]
@@ -167,7 +167,7 @@ include::../../scripts/splat/common/src/main/java/com/codenameone/examples/splat
 
 The look is the engine's, not a texture pack's: haze that thins with height,
 an open sky with clouds and the sun, shadows from the props and trees, and a
-colour grade with bloom on the paint. It is a dozen lines at the start of the
+color grade with bloom on the paint. It's a dozen lines at the start of the
 view, and the menu backdrop uses the same calls with dusk colours:
 
 [source,java,role=cn1-no-try]
@@ -184,7 +184,7 @@ include::../../scripts/splat/common/src/main/java/com/codenameone/examples/splat
 ----
 
 The HUD is a plain component layered over the view, so it's styled from `theme.css`
-and respects the safe area like any other screen. On a phone it is compact -- a
+and respects the safe area like any other screen. On a phone it's compact -- a
 small minimap, a two line killfeed, the hopper in one tab -- and on a desktop or
 tablet it shows everything. It steps aside entirely for the briefing and the
 result card, so nothing in a match ever draws over a menu:
@@ -207,7 +207,7 @@ include::../../scripts/splat/backend/src/main/java/com/codenameone/examples/spla
 ----
 
 The phone doesn't wait for the snapshots. It applies its own input at once, and when a
-snapshot arrives it puts the match back where the server says it is and plays the
+snapshot arrives it puts the match back where the server says it's and plays the
 inputs the server hasn't seen yet on top of it again:
 
 [source,java,role=cn1-no-try]
@@ -226,7 +226,7 @@ few ticks later, the ball is flown forward the ticks it lost on the way:
 include::../../scripts/splat/rules/src/main/java/com/codenameone/examples/splat/rules/Match.java[tag=splat-lag-comp,indent=0]
 ----
 
-The cap keeps a player with a very slow connection from painting people around corners.
+The cap keeps a player with a slow connection from painting people around corners.
 The match test plays a full party match and checks that the server's result replays to
 the same paints:
 

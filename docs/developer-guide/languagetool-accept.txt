@@ -903,3 +903,7 @@ picocli
 subcommand
 subcommands
 transpiles
+minimap
+killfeed
+paintballs
+Paintballs

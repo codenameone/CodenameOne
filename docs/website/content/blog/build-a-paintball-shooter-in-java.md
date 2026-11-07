@@ -18,7 +18,7 @@ Waiting for the server would make the marker feel like it fires through mud, so 
 
 ## Shots that land where you aimed
 
-Paintballs in Splat are real projectiles with an arc and a drop, not instant hits. That keeps the server honest, but it means a player on a slow connection would always aim at where people *were*. Every input carries the tick the player was looking at, and the server flies the ball forward the ticks it lost on the way. The catch-up is capped at a fifth of a second, so a very slow connection can't paint people around corners.
+Paintballs in Splat are real projectiles with an arc and a drop, not instant hits. The server checks every one, but that means a player on a slow connection would always aim at where people *were*. Every input carries the tick the player was looking at, and the server flies the ball forward the ticks it lost on the way. The catch-up is capped at a fifth of a second, so a very slow connection can't paint people around corners.
 
 ## One rules module, three ways to play
 

@@ -484,25 +484,23 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_i
     (void) contextPeer; (void) pipelinePeer; (void) vboPeer; (void) strideBytes; (void) vertexCount; (void) primitive; (void) uniforms; (void) uniformFloats; (void) texturePeer; (void) texFilter; (void) texWrap; (void) shadowMap;
     cn1LinuxStubOnce("gl3dDrawArrays");
 }
-
-/* shadows and post processing are unavailable without a GL context: false
-   makes the device draw the scene directly */
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT size) {
     (void) contextPeer; (void) size;
+    cn1LinuxStubOnce("gl3dBeginShadowPass");
     return JAVA_FALSE;
 }
-
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndShadowPass___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer) {
     (void) contextPeer;
+    cn1LinuxStubOnce("gl3dEndShadowPass");
 }
-
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginPost___long_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_BOOLEAN bloom) {
     (void) contextPeer; (void) bloom;
+    cn1LinuxStubOnce("gl3dBeginPost");
     return JAVA_FALSE;
 }
-
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long_boolean_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG brightPeer, JAVA_LONG blurPeer, JAVA_LONG compositePeer, JAVA_BOOLEAN bloom, JAVA_OBJECT params) {
     (void) contextPeer; (void) brightPeer; (void) blurPeer; (void) compositePeer; (void) bloom; (void) params;
+    cn1LinuxStubOnce("gl3dEndPost");
 }
 #endif /* CN1_EMBEDDED_HAS_GL */
 

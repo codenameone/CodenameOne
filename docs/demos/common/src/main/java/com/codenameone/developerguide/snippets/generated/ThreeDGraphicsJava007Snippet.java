@@ -82,6 +82,10 @@ class ThreeDGraphicsJava007Snippet {
     
     void snippet() throws Exception {
         // tag::3d-graphics-java-007[]
+        GameView view = new GameView() {
+            protected void update(double deltaSeconds) {
+            }
+        };
         view.getEnvironment()
                 .setFog(0xffb9c6cf, 0.0075f, 0.05f)
                 .setHemisphere(0xffa9bdd2, 0xff4f5a3c)
