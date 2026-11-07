@@ -182,20 +182,9 @@ A `PostProcess` on the view renders the scene offscreen and adds bloom, a
 colour grade, a vignette and film grain on the way to the screen. Touch
 controls are drawn after it and are never graded.
 
-[source,java,role=cn1-no-try]
+[source,java]
 ----
-view.getEnvironment()
-        .setFog(0xffb9c6cf, 0.0075f, 0.05f)
-        .setHemisphere(0xffa9bdd2, 0xff4f5a3c)
-        .setToneMapping(true)
-        .setExposure(1.3f)
-        .setSky(0xff4f7fb8, 0xffb9c6cf, 0xfffff0d0, 0.45f);
-view.getLight().setShadows(true).setShadowMap(2048, 18f);
-view.setPostProcess(new PostProcess()
-        .setBloom(0.78f, 0.55f)
-        .setGrade(1.12f, 0.86f, 0xff0b1720, 0xfffff2dc)
-        .setVignette(0.42f)
-        .setGrain(0.035f));
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava007Snippet.java[tag=3d-graphics-java-007,indent=0]
 ----
 
 Match the horizon colour to the fog colour and the far edge of the world

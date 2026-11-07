@@ -149,7 +149,8 @@ replays aren't judged by new rules.
 
 `ArenaView` is a `GameView`. It builds the field from the arena's boxes when it starts,
 keeps a pool of paintballs and paint splats, and places the camera at the player's eyes
-on every frame:
+on every frame. It tells the HUD what happened through one small interface, once per
+drawn frame and once per event:
 
 [source,java,role=cn1-no-try]
 ----

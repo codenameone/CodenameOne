@@ -177,7 +177,7 @@ def validate_includes(includes):
             # compiled by its project's CSS goal, and the sample's workflow
             # builds the sample.
             relative_css_path = None
-            for css_dir in ("docs/demos/common/src/main/css", "scripts/skirmish/common/src/main/css", "scripts/dash/common/src/main/css"):
+            for css_dir in ("docs/demos/common/src/main/css", "scripts/skirmish/common/src/main/css", "scripts/dash/common/src/main/css", "scripts/splat/common/src/main/css"):
                 try:
                     relative_css_path = target_path.relative_to(Path(css_dir).resolve())
                     break

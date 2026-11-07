@@ -63,6 +63,7 @@ public class ArenaView extends GameView {
 
         void event(Event e);
     }
+    // end::splat-arena-view[]
 
     public static final double TICK = 1.0 / Match.TICK_HZ;
     /// The preference that flips vertical look, for pilots.
