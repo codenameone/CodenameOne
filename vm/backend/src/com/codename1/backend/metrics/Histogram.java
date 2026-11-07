@@ -211,6 +211,41 @@ public final class Histogram extends Instrument {
         return String.valueOf(a).equals(String.valueOf(b));
     }
 
+    /// Every value recorded so far, across all label sets: what a `@Timed`
+    /// method's timer or a histogram reads as in the process, without an
+    /// exporter.
+    public synchronized long getCount() {
+        long total = plain.count();
+        for (Object list : byFirst.values()) {
+            for (Object element : (List) list) {
+                total += ((Series) element).count();
+            }
+        }
+        return total + (overflow == null ? 0 : overflow.count());
+    }
+
+    /// The sum of every value recorded so far, across all label sets.
+    public synchronized double getSum() {
+        double total = plain.sum();
+        for (Object list : byFirst.values()) {
+            for (Object element : (List) list) {
+                total += ((Series) element).sum();
+            }
+        }
+        return total + (overflow == null ? 0 : overflow.sum());
+    }
+
+    /// The mean of the values recorded so far, or NaN when there are none.
+    public double getMean() {
+        long count;
+        double sum;
+        synchronized (this) {
+            count = getCount();
+            sum = getSum();
+        }
+        return count == 0 ? Double.NaN : sum / count;
+    }
+
     @Override
     public List points() {
         List out = new ArrayList();
@@ -273,6 +308,10 @@ public final class Histogram extends Instrument {
 
         synchronized long count() {
             return count;
+        }
+
+        synchronized double sum() {
+            return sum;
         }
 
         synchronized Map point(double[] bounds, String[] keys, boolean isOverflow) {

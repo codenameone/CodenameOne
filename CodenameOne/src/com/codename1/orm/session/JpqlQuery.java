@@ -59,6 +59,17 @@ public interface JpqlQuery<T> {
     /// @throws IllegalArgumentException if value is negative
     JpqlQuery<T> offset(int value);
 
+    /// Locks the selected rows for the rest of the transaction, as
+    /// [Session#find(Class, Object, LockMode)] locks one: the select ends
+    /// with the dialect's `FOR UPDATE` (or `FOR SHARE`). It needs an active
+    /// transaction, and SQLite, which has no row locks, refuses it. A row
+    /// already in the session is returned as the managed instance, as any
+    /// select returns it; the lock is held either way.
+    /// @param mode the lock to take; `NONE` selects without one
+    /// @return this query
+    /// @throws IllegalArgumentException if mode is null
+    JpqlQuery<T> lockMode(LockMode mode);
+
     /// Executes a select with the configured pagination.
     /// @return selected entities, scalars, or tuples
     /// @throws IllegalStateException if this is a bulk mutation

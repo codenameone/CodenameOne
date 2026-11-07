@@ -232,6 +232,22 @@ class CryptoPrimitivesTest {
     }
 
     @Test
+    @DisplayName("SHA1withRSA verifies openssl's signature, and is never made")
+    void rsaSha1VerifiesOnly() throws Exception {
+        byte[] publicKey = Base64.decode(KeyFixtures.RSA_PUBLIC_DER);
+        byte[] theirs = Base64.decode(KeyFixtures.RS1_SIGNATURE);
+        assertTrue(Crypto.verify(Crypto.RS1, publicKey, MESSAGE, theirs));
+        assertFalse(Crypto.verify(Crypto.RS1, publicKey, ascii("another message"), theirs));
+        assertFalse(Crypto.verify(Crypto.RS256, publicKey, MESSAGE, theirs));
+        assertFalse(Crypto.verify(Crypto.RS1, publicKey, MESSAGE,
+                Base64.decode(KeyFixtures.RS256_SIGNATURE)));
+        assertThrows(IOException.class, () -> Crypto.sign(Crypto.RS1,
+                Base64.decode(KeyFixtures.RSA_PKCS8_DER), MESSAGE));
+        assertThrows(IOException.class, () -> Crypto.verify(Crypto.RS1,
+                Base64.decode(KeyFixtures.EC256_PUBLIC_DER), MESSAGE, theirs));
+    }
+
+    @Test
     @DisplayName("PS256, ES256 and ES384: openssl's signatures verify, and so do our own")
     void randomizedSchemes() throws Exception {
         Object[][] cases = {

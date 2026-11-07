@@ -47,6 +47,10 @@ package com.codename1.impl;
 ///   digests rather than shipping a second implementation of each.
 /// - [#localeNumberSymbols]: `DecimalFormatSymbols` reports the device
 ///   locale's separators, which only the platform knows.
+/// - [#resource]: `Class.getResourceAsStream` and
+///   `ClassLoader.getResourceAsStream` find a resource compiled into the
+///   program. Only a packaged server answers; an application's lookups stay
+///   exactly as they were.
 ///
 /// On Java SE and Android the real JDK runs and nothing calls this class.
 /// Copies of it ship in those ports only so that `CoreJdkHost`, which is part
@@ -111,6 +115,12 @@ public abstract class JdkHost {
     /// device's locale, any of them null when unknown; or null when the
     /// platform cannot tell.
     public String[] localeNumberSymbols() {
+        return null;
+    }
+
+    /// The resource at `absolute` -- a '/'-separated path from the root of the
+    /// class path, without the leading '/' -- compiled into the program, or null.
+    public java.io.InputStream resource(String absolute) {
         return null;
     }
 
