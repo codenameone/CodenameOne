@@ -426,37 +426,33 @@ public class SpriteRenderer implements Renderer {
     }
 
     /// A button label in white on a transparent square, cached per label
-    /// string. The font is scaled down until the label fits inside the disc,
-    /// so multi-letter labels (e.g. "Jump") are not clipped.
+    /// string. The text is drawn at its natural size and then scaled to fit
+    /// the disc, so a label of any length is shown whole: stepping down
+    /// through the system sizes alone still clipped a word like "Jump" on a
+    /// dense screen, where even the small font is wider than the texture.
     private Image labelImage(String label) {
         Image img = (Image) labelImages.get(label);
         if (img == null) {
             int size = 128;
-            float maxTextWidth = size * 0.74f;
+            com.codename1.ui.Font f = com.codename1.ui.Font.createSystemFont(
+                    com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
+                    com.codename1.ui.Font.SIZE_LARGE);
+            int tw = Math.max(1, f.stringWidth(label));
+            int th = Math.max(1, f.getHeight());
+            Image text = Image.createImage(tw + 4, th, 0);
+            com.codename1.ui.Graphics tg = text.getGraphics();
+            tg.setAntiAliased(true);
+            tg.setAntiAliasedText(true);
+            tg.setFont(f);
+            tg.setColor(0xffffff);
+            tg.drawString(label, 2, 0);
+            float fit = Math.min(size * 0.74f / (tw + 4), size * 0.5f / th);
+            int dw = Math.max(1, (int) ((tw + 4) * fit));
+            int dh = Math.max(1, (int) (th * fit));
             img = Image.createImage(size, size, 0);
             com.codename1.ui.Graphics g = img.getGraphics();
             g.setAntiAliased(true);
-            g.setAntiAliasedText(true);
-            int[] fontSizes = {
-                com.codename1.ui.Font.SIZE_LARGE,
-                com.codename1.ui.Font.SIZE_MEDIUM,
-                com.codename1.ui.Font.SIZE_SMALL
-            };
-            com.codename1.ui.Font f = null;
-            int tw = 0;
-            for (int fontSize : fontSizes) {
-                f = com.codename1.ui.Font.createSystemFont(
-                        com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
-                        fontSize);
-                tw = f.stringWidth(label);
-                if (tw <= maxTextWidth) {
-                    break;
-                }
-            }
-            g.setFont(f);
-            g.setColor(0xffffff);
-            int th = f.getHeight();
-            g.drawString(label, (size - tw) / 2, (size - th) / 2);
+            g.drawImage(text, (size - dw) / 2, (size - dh) / 2, dw, dh);
             labelImages.put(label, img);
         }
         return img;

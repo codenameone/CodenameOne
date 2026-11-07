@@ -88,6 +88,8 @@ public final class Match {
     private final int[] flagCarrier = {-1, -1};
     private final int[] flagDroppedAt = new int[2];
 
+    private final List<Slot> slots;
+
     public Match(long seed, Arena arena, Mode mode, List<Slot> slots) {
         if (slots.isEmpty()) {
             throw new IllegalArgumentException("no players");
@@ -95,6 +97,7 @@ public final class Match {
         this.seed = seed;
         this.arena = arena;
         this.mode = mode;
+        this.slots = new java.util.ArrayList<Slot>(slots);
         this.rng = new Rng(seed);
         this.botRng = new Rng(seed ^ 0x5EED0B07L);
         players = new Player[slots.size()];
@@ -605,6 +608,13 @@ public final class Match {
             balls.get(i).write(b);
         }
         return b.toArray();
+    }
+
+    /// A new match with the same seed, arena, mode and roster, which any
+    /// snapshot of this one can be restored into: the instant replay plays
+    /// the last seconds back in one without touching the match in play.
+    public Match fork() {
+        return new Match(seed, arena, mode, slots);
     }
 
     public void restore(int[] data) {

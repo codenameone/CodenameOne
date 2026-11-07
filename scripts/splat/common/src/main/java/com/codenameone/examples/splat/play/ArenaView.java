@@ -32,6 +32,8 @@ import com.codename1.gpu.Material;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.Primitives;
+import com.codename1.gpu.RenderState;
+import com.codename1.gpu.Texture;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.util.MathUtil;
@@ -93,11 +95,33 @@ public class ArenaView extends GameView {
     static final int KEY_THROW = 'g';
     static final int KEY_WIPE = 'x';
     static final int KEY_AIM = 'q';
+    static final int KEY_VIEW = 'v';
 
     private final Driver driver;
     private Hud hud;
     private GraphicsDevice device;
     private Mesh sphere;
+
+    /// Five seconds of the match, one snapshot a tick, for the instant replay.
+    private static final int HISTORY = 150;
+    private final int[][] history = new int[HISTORY][];
+    private int recordedTick = -1;
+    /// The replay plays in its own match, restored from the history, so the
+    /// match in play goes on underneath it.
+    private Match ghost;
+    private int replayShooter = -1;
+    private int replayTo;
+    private float replayPos;
+    private long replayStartAt;
+    private boolean overheadChosen;
+    private boolean viewHeld;
+    private boolean overheadNow;
+    private float overX;
+    private float overZ;
+    private boolean overSet;
+    /// The jolt of a ball to the goggles: 1 on the hit, settling to 0.
+    private float knock;
+    private Material[][][] splatPaint;
     private Model sky;
     private boolean controlsHidden;
     private Mesh quad;
@@ -215,6 +239,23 @@ public class ArenaView extends GameView {
             teamPaint[t] = new Material(Material.Type.PBR).setColor(TEAM_COLORS[t]).setRoughness(0.22f)
                     .setEmissive(dim(TEAM_COLORS[t], 0.18f));
         }
+        // Paint on the field: a splat-shaped texture per variant, flat ones for
+        // floors and tops, dripping ones for walls, tinted per team.
+        splatPaint = new Material[2][2][PaintDecals.VARIANTS];
+        for (int v = 0; v < PaintDecals.VARIANTS; v++) {
+            for (int wall = 0; wall < 2; wall++) {
+                Texture tex = d.createTexture(PaintDecals.SIZE, PaintDecals.SIZE,
+                        PaintDecals.splat(31L * v + 7 * wall + 1, wall == 1));
+                for (int t = 0; t < 2; t++) {
+                    Material m = new Material(Material.Type.PBR).setColor(TEAM_COLORS[t]).setRoughness(0.3f)
+                            .setEmissive(dim(TEAM_COLORS[t], 0.12f)).setTexture(tex);
+                    m.setRenderState(RenderState.transparent().setDepthWrite(false)
+                            .setCullMode(RenderState.CullMode.NONE));
+                    m.setCastShadows(false);
+                    splatPaint[t][wall][v] = m;
+                }
+            }
+        }
         float w = arena.width * MM;
         float dpt = arena.depth * MM;
         addModel(flat(new Material(Material.Type.PBR).setColor(0xff4a4d50).setRoughness(0.92f), -w / 2f, 0f, dpt / 2f,
@@ -274,7 +315,7 @@ public class ArenaView extends GameView {
             addModel(balls[i]);
         }
         for (int i = 0; i < MAX_DECALS; i++) {
-            decals[i] = new Model(sphere, teamPaint[0]);
+            decals[i] = new Model(quad, splatPaint[0][0][0]);
             decals[i].setVisible(false);
             addModel(decals[i]);
         }
@@ -485,15 +526,33 @@ public class ArenaView extends GameView {
         TouchControls c = getControls();
         float gap = CN.convertToPixels(3);
         c.addJoystick(CN.convertToPixels(11), TouchControls.LEFT, TouchControls.BOTTOM, gap);
-        float big = CN.convertToPixels(8);
-        float small = CN.convertToPixels(5.5f);
+        float big = CN.convertToPixels(9);
+        float small = CN.convertToPixels(6);
+        // The small buttons sit on an arc around FIRE where the right thumb
+        // rolls to them: left of it, up and to the left, and above it.
+        float fire = gap + big;
+        float arc = big + small + CN.convertToPixels(2.5f);
         buttons = new VirtualButton[] {
-            button(c, KEY_FIRE, "FIRE", big, gap),
-            button(c, KEY_JUMP, "JUMP", small, gap + big * 2.1f),
-            button(c, KEY_THROW, "NADE", small, gap + big * 2.1f + small * 2.3f),
-            // aiming while you are in, wiping the paint off while you are out
-            button(c, KEY_AIM, "ADS", small, gap + big * 2.1f + small * 4.6f),
+            c.addButton(KEY_FIRE, big, TouchControls.RIGHT, TouchControls.BOTTOM, gap, gap),
+            onArc(c, KEY_AIM, small, fire, arc, 0),
+            onArc(c, KEY_THROW, small, fire, arc, 45),
+            onArc(c, KEY_JUMP, small, fire, arc, 90),
+            // the bird's-eye view, out of the way of the thumb
+            c.addButton(KEY_VIEW, CN.convertToPixels(4.5f), TouchControls.RIGHT, TouchControls.BOTTOM,
+                    gap, fire + arc + small + CN.convertToPixels(4)),
         };
+        String[] labels = {"FIRE", "AIM", "NADE", "JUMP", "VIEW"};
+        for (int i = 0; i < buttons.length; i++) {
+            style(buttons[i], labels[i]);
+        }
+    }
+
+    /// A button `deg` degrees round from straight left of FIRE's centre.
+    private static VirtualButton onArc(TouchControls c, int key, float r, float fire, float arc, int deg) {
+        double a = Math.toRadians(deg);
+        float dx = fire + (float) (Math.cos(a) * arc);
+        float dy = fire + (float) (Math.sin(a) * arc);
+        return c.addButton(key, r, TouchControls.RIGHT, TouchControls.BOTTOM, dx - r, dy - r);
     }
 
     /// Takes the touch buttons off the screen for good, for the result card.
@@ -516,7 +575,9 @@ public class ArenaView extends GameView {
         if (show != getControls().isVisible()) {
             getControls().setVisible(show);
         }
-        buttons[3].setLabel(isOut(m) ? "WIPE" : "ADS");
+        // aiming while you are in, wiping the paint off while you are out
+        buttons[1].setLabel(isOut(m) ? "WIPE" : "AIM");
+        buttons[4].setLabel(overheadChosen ? "EYES" : "VIEW");
     }
 
     /// True while your own player is painted and waiting to come back.
@@ -525,13 +586,12 @@ public class ArenaView extends GameView {
         return me >= 0 && me < m.playerCount() && !m.player(me).alive();
     }
 
-    private static VirtualButton button(TouchControls c, int key, String label, float r, float margin) {
-        VirtualButton b = c.addButton(key, r, TouchControls.RIGHT, TouchControls.BOTTOM, margin);
+    private static void style(VirtualButton b, String label) {
+        int key = b.getKeyCode();
         b.setLabel(label);
         // dark glass with a light label: readable over sky and asphalt alike
-        b.setColor(key == KEY_FIRE ? 0xb0b8861e : 0x8c0c0e10);
-        b.setLabelColor(0xf2eef1f4);
-        return b;
+        b.setColor(key == KEY_FIRE ? 0xc0b8861e : 0xa80c0e10);
+        b.setLabelColor(0xffeef1f4);
     }
 
     private boolean onControl(int x, int y) {
@@ -640,6 +700,12 @@ public class ArenaView extends GameView {
         if (key(Display.getInstance().getKeyCode(Display.GAME_RIGHT))) {
             lookYaw = Trig.wrap(lookYaw + 60);
         }
+        // V (or the VIEW button) flips the bird's-eye view, once a press
+        boolean view = key(KEY_VIEW);
+        if (view && !viewHeld) {
+            toggleOverhead();
+        }
+        viewHeld = view;
         boolean sprint = key(KEY_SPRINT);
         VirtualJoystick j = getControls().getJoystick();
         if (j != null && j.isActive()) {
@@ -714,6 +780,7 @@ public class ArenaView extends GameView {
             steps++;
         }
         alpha = (float) Math.min(1, accumulator / TICK);
+        record();
         events();
         bodySounds((float) dt);
         draw((float) dt);
@@ -740,6 +807,83 @@ public class ArenaView extends GameView {
         } else {
             getLight().setShadows(false);
         }
+    }
+
+    private void record() {
+        Match m = driver.match();
+        if (m.tick() != recordedTick) {
+            recordedTick = m.tick();
+            history[recordedTick % HISTORY] = m.snapshot();
+        }
+    }
+
+    /// Plays back the seconds before you were painted, from over the
+    /// shooter's shoulder: it starts once the stamp has landed, runs at half
+    /// speed and ends at the hit, or when you are back in.
+    private void replayFrom(int shooter, int hitTick) {
+        int from = hitTick - 3 * Match.TICK_HZ;
+        while (from < hitTick && !recorded(from)) {
+            from++;
+        }
+        if (from >= hitTick - Match.TICK_HZ / 2) {
+            return;
+        }
+        replayShooter = shooter;
+        replayPos = from;
+        replayTo = hitTick + Match.TICK_HZ / 3;
+        replayStartAt = System.currentTimeMillis() + 1100;
+    }
+
+    private boolean recorded(int tick) {
+        int[] snap = tick < 0 ? null : history[tick % HISTORY];
+        return snap != null && snap[1] == tick;
+    }
+
+    /// The shooter of the replay on screen, or -1 when none is playing.
+    public int replayingShooter() {
+        return replayShooter >= 0 && System.currentTimeMillis() >= replayStartAt ? replayShooter : -1;
+    }
+
+    /// Whether the camera is above the field rather than at the eye.
+    public boolean isOverhead() {
+        return overheadNow;
+    }
+
+    /// Switches between your eyes and the view from above.
+    public void toggleOverhead() {
+        overheadChosen = !overheadChosen;
+        overSet = false;
+    }
+
+    /// The match to draw this frame: the replay's, positioned between two of
+    /// its ticks, or the one in play.
+    private Match shown(float dt) {
+        if (replayShooter < 0 || System.currentTimeMillis() < replayStartAt) {
+            return driver.match();
+        }
+        Match live = driver.match();
+        int t = (int) replayPos;
+        if (t + 1 >= replayTo || live.player(driver.me()).alive() || !recorded(t) || !recorded(t + 1)) {
+            replayShooter = -1;
+            remember();
+            return live;
+        }
+        if (ghost == null) {
+            ghost = live.fork();
+        }
+        // where everyone was a tick before, then where they are, for the lerp
+        ghost.restore(history[t % HISTORY]);
+        int n = Math.min(prevX.length, ghost.playerCount());
+        for (int i = 0; i < n; i++) {
+            Player p = ghost.player(i);
+            prevX[i] = p.x() * MM;
+            prevY[i] = p.y() * MM;
+            prevZ[i] = p.z() * MM;
+        }
+        ghost.restore(history[(t + 1) % HISTORY]);
+        alpha = replayPos - t;
+        replayPos += dt * Match.TICK_HZ * 0.5f;
+        return ghost;
     }
 
     private void remember() {
@@ -775,6 +919,10 @@ public class ArenaView extends GameView {
                 if (e.b == me) {
                     Sfx.painted();
                     Sfx.whistle(0.9f, 0);
+                    knock = 1f;
+                    if (driver.interactive() && e.a != me) {
+                        replayFrom(e.a, e.tick);
+                    }
                 } else {
                     Sfx.splat(place(e.x, e.z, 30), pan);
                     Sfx.whistle(Math.max(0.35f, place(e.x, e.z, 60)), pan * 0.5f);
@@ -980,9 +1128,11 @@ public class ArenaView extends GameView {
     private void decal(int team, int x, int y, int z, float size) {
         Model d = decals[nextDecal];
         nextDecal = (nextDecal + 1) % MAX_DECALS;
-        d.setMaterial(teamPaint[team]);
-        float s = size * (0.8f + ((x ^ z) & 7) / 20f);
-        float flat = 0.03f;
+        int variant = ((x * 31) ^ (z * 17) ^ y) & (PaintDecals.VARIANTS - 1);
+        // a mirror on either axis makes four shapes look like sixteen
+        float s = size * 1.7f * (0.8f + ((x ^ z) & 7) / 20f);
+        float sx = ((x >> 3) & 1) == 0 ? s : -s;
+        float sy = ((z >> 3) & 1) == 0 ? s : -s;
         Box hit = null;
         List<Box> boxes = driver.match().arena().boxes();
         for (int i = 0; i < boxes.size(); i++) {
@@ -995,9 +1145,12 @@ public class ArenaView extends GameView {
         float px = -x * MM;
         float py = y * MM;
         float pz = z * MM;
+        boolean wall = false;
+        // The quad faces +z; turned to lie on whatever was hit.
+        float rx = -90;
+        float ry = 0;
         if (hit == null || y < 120) {
-            d.setScale(s, flat, s);
-            py = 0.015f;
+            py = 0.012f + (nextDecal & 7) * 0.0004f;
         } else {
             int dx0 = Math.abs(x - hit.x0);
             int dx1 = Math.abs(x - hit.x1);
@@ -1006,25 +1159,41 @@ public class ArenaView extends GameView {
             int dTop = Math.abs(y - hit.height);
             int best = Math.min(Math.min(dx0, dx1), Math.min(Math.min(dz0, dz1), dTop));
             if (best == dTop) {
-                d.setScale(s, flat, s);
-                py = hit.height * MM + 0.015f;
-            } else if (best == dx0 || best == dx1) {
-                d.setScale(flat, s, s);
-                px = -(best == dx0 ? hit.x0 - 15 : hit.x1 + 15) * MM;
+                py = hit.height * MM + 0.012f;
             } else {
-                d.setScale(s, s, flat);
-                pz = (best == dz0 ? hit.z0 - 15 : hit.z1 + 15) * MM;
+                // drips run down a wall, so the texture is not mirrored upside down
+                wall = true;
+                rx = 0;
+                sy = s;
+                if (best == dx0 || best == dx1) {
+                    // world x is drawn mirrored, so the x0 face looks toward +x on screen
+                    px = -(best == dx0 ? hit.x0 - 12 : hit.x1 + 12) * MM;
+                    ry = best == dx0 ? 90 : -90;
+                } else {
+                    pz = (best == dz0 ? hit.z0 - 12 : hit.z1 + 12) * MM;
+                    ry = best == dz0 ? 180 : 0;
+                }
             }
         }
+        d.setMaterial(splatPaint[team & 1][wall ? 1 : 0][variant]);
+        d.setRotation(rx, ry, 0);
+        d.setScale(sx, sy, 1);
         d.setPosition(px, py, pz);
         d.setVisible(true);
     }
 
     private void draw(float dt) {
-        Match m = driver.match();
+        Match m = shown(dt);
         int me = driver.me();
+        boolean replaying = m != driver.match();
+        Player self = m.player(me);
+        // Above the field when asked for, and while you wait to go back in
+        // once the replay has played: the floor was all there was to see.
+        overheadNow = !replaying && (overheadChosen || driver.interactive() && !self.alive()
+                && System.currentTimeMillis() > replayStartAt + 600 && !m.over());
+        boolean firstPerson = driver.interactive() && !replaying && !overheadNow;
         for (int i = 0; i < operators.length && i < m.playerCount(); i++) {
-            operator(m, i, i == me && driver.interactive(), dt);
+            operator(m, i, i == me && firstPerson, dt);
         }
         List<Ball> live = m.balls();
         for (int i = 0; i < MAX_BALLS; i++) {
@@ -1047,9 +1216,15 @@ public class ArenaView extends GameView {
                 flags[t].setPosition(-m.flagX(t) * MM, m.flagY(t) * MM, m.flagZ(t) * MM);
             }
         }
-        camera(m, me, dt);
+        if (replaying) {
+            chase(m, replayShooter);
+        } else if (overheadNow) {
+            overhead(m, me, dt);
+        } else {
+            camera(m, me, dt);
+        }
         if (hud != null) {
-            hud.frame(m, me, lookYaw, lookPitch);
+            hud.frame(driver.match(), me, lookYaw, lookPitch);
         }
     }
 
@@ -1104,6 +1279,54 @@ public class ArenaView extends GameView {
         }
     }
 
+    /// Over the shooter's right shoulder, looking where they look.
+    private void chase(Match m, int s) {
+        Player p = m.player(s);
+        float x = -lerp(prevX[s], p.x() * MM);
+        float y = lerp(prevY[s], p.y() * MM);
+        float z = lerp(prevZ[s], p.z() * MM);
+        double yr = p.yaw() * 2 * Math.PI / Trig.FULL;
+        float fx = (float) -Math.sin(yr);
+        float fz = (float) Math.cos(yr);
+        float rx = (float) -Math.cos(yr);
+        float rz = (float) -Math.sin(yr);
+        float cx = x - fx * 2.6f + rx * 0.7f;
+        float cy = y + 1.95f;
+        float cz = z - fz * 2.6f + rz * 0.7f;
+        getCamera().setPerspective(HIP_FOV - 8f, 0.03f, 400f);
+        getCamera().setPosition(cx, cy, cz);
+        getCamera().setTarget(x + fx * 9f, y + 1.2f, z + fz * 9f);
+        sky.setPosition(cx, cy, cz);
+        getLight().setShadowCenter(x + fx * SHADOW_AHEAD * 0.6f, 0f, z + fz * SHADOW_AHEAD * 0.6f);
+        if (viewModel != null) {
+            viewModel.setVisible(false);
+        }
+    }
+
+    /// High above the field, north up, drifting after the player: the whole
+    /// fight in one picture.
+    private void overhead(Match m, int me, float dt) {
+        Player p = m.player(me);
+        float x = -lerp(prevX[me], p.x() * MM);
+        float z = lerp(prevZ[me], p.z() * MM);
+        if (!overSet) {
+            overX = x;
+            overZ = z;
+            overSet = true;
+        }
+        float k = Math.min(1f, dt * 2.5f);
+        overX += (x - overX) * k;
+        overZ += (z - overZ) * k;
+        getCamera().setPerspective(52f, 0.5f, 400f);
+        getCamera().setPosition(overX, 25f, overZ - 15f);
+        getCamera().setTarget(overX, 0f, overZ + 1.5f);
+        sky.setPosition(overX, 25f, overZ - 15f);
+        getLight().setShadowCenter(overX, 0f, overZ + 2f);
+        if (viewModel != null) {
+            viewModel.setVisible(false);
+        }
+    }
+
     private void camera(Match m, int me, float dt) {
         Player p = m.player(me);
         float x = -lerp(prevX[me], p.x() * MM);
@@ -1113,10 +1336,13 @@ public class ArenaView extends GameView {
         // dragging is drawn now, a tick before the rules have it.
         int yaw = driver.interactive() && p.alive() ? lookYaw : p.yaw();
         int pitch = driver.interactive() && p.alive() ? lookPitch : p.pitch();
+        knock = Math.max(0f, knock - dt * 1.6f);
         if (!p.alive()) {
-            // Painted: the view sinks and looks at the floor in shame.
-            eye -= 0.5f;
-            pitch = -500;
+            // Painted: the head snaps back, then the view sinks and looks at
+            // the floor in shame.
+            float sink = 1f - knock * knock;
+            eye -= 0.5f * sink;
+            pitch = (int) (-500 * sink + 260 * knock * knock);
         }
         double yr = yaw * 2 * Math.PI / Trig.FULL;
         double pr = pitch * 2 * Math.PI / Trig.FULL;
@@ -1125,7 +1351,7 @@ public class ArenaView extends GameView {
         float dz = (float) (Math.cos(yr) * Math.cos(pr));
         boolean aiming = p.alive() && p.input().has(Input.AIM);
         ads += ((aiming ? 1f : 0f) - ads) * Math.min(1f, dt * 14f);
-        getCamera().setPerspective(HIP_FOV + (ADS_FOV - HIP_FOV) * ads, 0.03f, 400f);
+        getCamera().setPerspective(HIP_FOV + (ADS_FOV - HIP_FOV) * ads + knock * knock * 14f, 0.03f, 400f);
         getCamera().setPosition(x, eye, z);
         sky.setPosition(x, eye, z);
         getCamera().setTarget(x + dx, eye + dy, z + dz);

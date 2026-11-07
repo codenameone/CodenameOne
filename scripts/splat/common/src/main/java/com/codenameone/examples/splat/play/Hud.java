@@ -320,7 +320,30 @@ public final class Hud extends Component implements ArenaView.Hud {
         if (now - bannerAt < 2200 && now - stampAt >= STAMP_MILLIS) {
             plate(g, banner, x0 + w / 2, y0 + h * 58 / 100, small, Type.WHITE);
         }
+        replayBars(g, x0, y0, w, h);
         stamp(g, now, x0, y0, w, h);
+    }
+
+    /// While the view plays the shot back: cinema bars, and a plate naming
+    /// who did it, so a replay is never mistaken for the live match.
+    private void replayBars(Graphics g, int x0, int y0, int w, int h) {
+        int shooter = view == null ? -1 : view.replayingShooter();
+        if (shooter < 0 || shooter >= match.playerCount()) {
+            if (view != null && view.isOverhead() && driver.interactive()) {
+                plate(g, "OVERHEAD", x0 + w / 2, y0 + h - safeBottom() - CN.convertToPixels(compact ? 40 : 8),
+                        tiny, Type.WHITE);
+            }
+            return;
+        }
+        int bar = h / 9;
+        g.setColor(0);
+        g.setAlpha(230);
+        g.fillRect(x0, y0, w, bar);
+        g.fillRect(x0, y0 + h - bar, w, bar);
+        g.setAlpha(255);
+        plate(g, "INSTANT REPLAY", x0 + w / 2, y0 + bar + CN.convertToPixels(1.5f), medium, Type.AMBER);
+        plate(g, "PAINTED BY " + Type.caps(driver.name(shooter)), x0 + w / 2,
+                y0 + h - bar - small.getHeight() - CN.convertToPixels(2), small, Type.WHITE);
     }
 
     /// Top left: the yard from above, north up, cover in steel, your squad in
