@@ -34,6 +34,7 @@ import java.util.Map;
 @com.codename1.impl.SharedWithBackend
 public final class NativeQueryImpl<T> implements JpqlQuery<T> {
     private final SessionImpl session;
+    private com.codename1.orm.session.LockMode lock = com.codename1.orm.session.LockMode.NONE;
     private final String sql;
     private final boolean mutation;
     private final int kind;
@@ -125,6 +126,14 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         maximum = value; return this;
     }
     @Override
+    public JpqlQuery<T> lockMode(com.codename1.orm.session.LockMode mode) {
+        if (mode == null) {
+            throw new IllegalArgumentException("lock mode is null");
+        }
+        lock = mode;
+        return this;
+    }
+    @Override
     public JpqlQuery<T> offset(int value) {
         if (value < 0) {
             throw new IllegalArgumentException("Negative offset");
@@ -162,7 +171,7 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         if (max == 0) {
             return result;
         }
-        for (Object[] row : session.read(sql + session.limit(max, skip), args, new int[]{SqlAccess.NATIVE_SCALAR})) {
+        for (Object[] row : session.read(sql + session.limit(max, skip) + session.lockClause(lock), args, new int[]{SqlAccess.NATIVE_SCALAR})) {
             Object value = row[0];
             try {
                 if (kind == Attribute.REAL && value instanceof Number) {

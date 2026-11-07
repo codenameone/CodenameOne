@@ -13,7 +13,7 @@ Under the jokes it's a real-time shooter of the kind that usually needs an engin
 
 **[Generate your project](/initializr/)** · **[Read the guide](/developer-guide/splat-implementors-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/splat)**
 
-In the Initializr, choose the **Splat** paintball template, set your application name and package, and generate the project. The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/splat/LICENSE): you can modify it, use it commercially and keep your changes private without royalties. The fields, players and markers are built in code: there are no third-party models or textures to license.
+In the Initializr, choose the **Splat** paintball template, set your application name and package, and generate the project. The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/splat/LICENSE): you can modify it, use it commercially and keep your changes private without royalties. The players, markers and props are CC0 models from Quaternius and Kenney, and the type is Rajdhani under the SIL Open Font License, so there is nothing to buy or license.
 
 ## What comes with the application?
 

@@ -180,6 +180,10 @@ include::Pulse-Users-Guide.asciidoc[]
 
 include::Pulse-Implementors-Guide.asciidoc[]
 
+include::Slate-Users-Guide.asciidoc[]
+
+include::Slate-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

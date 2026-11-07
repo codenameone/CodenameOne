@@ -3263,6 +3263,13 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #else
 #define CN1_BIBOP_NOTE_FINALIZABLE(X, o) do {} while(0)
 #endif
+/* The bump allocation is OUT OF LINE (cn1BibopFastNew), and only the class-init guard
+ * stays at the site. The site used to expand cn1BibopFastAlloc -- an always_inline bump,
+ * body zero, header store and publish -- at every NEW in the program: measured on the
+ * Flutter gallery, 9,951 sites and 894 KB of its 16.0 MB executable, more than any
+ * library it links. One direct call per allocation buys that back. -DCN1_INLINE_ALLOC_SITES
+ * restores the inline expansion for an A/B. */
+#ifdef CN1_INLINE_ALLOC_SITES
 #define CN1_FAST_NEW(X) ({ \
     if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X)), CN1_CLASS_HEADER_INDEX(X)); \
@@ -3272,6 +3279,14 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
     } \
     CN1_BIBOP_NOTE_FINALIZABLE(X, __cn1fo); \
     __cn1fo; })
+#else
+extern JAVA_OBJECT cn1BibopFastNew(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci, uint16_t index, int finalizable);
+#define CN1_FAST_NEW(X) ({ \
+    if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
+    JAVA_OBJECT __cn1fo = cn1BibopFastNew(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X)), CN1_CLASS_HEADER_INDEX(X), CN1_FINALIZABLE_##X); \
+    if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
+    __cn1fo; })
+#endif
 // No-body-zero variant (init-before-publish). The slow-path fallback __NEW_X
 // still fully zeroes (calloc) -- correct, just un-elided on the rare page-full
 // path.

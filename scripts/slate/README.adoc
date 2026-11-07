@@ -1,0 +1,207 @@
+= Slate
+
+An appointment booking application and its server, in one Maven project and one
+language. Clients book a salon treatment, a lesson, a training session or a
+consultation, and see only the times that are really free: every provider's
+hours, bookings, buffers, travel between locations, the rooms a service needs,
+the gaps the business refuses to leave and the provider's own calendars are
+weighed together, and a start shows only when all of them agree. Providers see
+their day, week and agenda in one timeline and connect the phone's calendars,
+Google, Microsoft or any calendar address; owners read the numbers, edit the
+catalogue and change the booking rules with a preview of what each change does.
+Which of these a person sees is decided by the roles the server gives their
+account.
+
+It is a sample of how a Codename One application and a Codename One Backend fit
+together, and of the calendar API: the phone's calendars are read for busy
+times, without a title ever leaving the device, and every appointment can be
+added to them with a reminder that follows it when it moves.
+
+== Start here
+
+Two chapters of the developer guide cover this project:
+
+* https://www.codenameone.com/developer-guide/#slate-users-guide[The user's guide]
+  (link:../../docs/developer-guide/Slate-Users-Guide.asciidoc[source]) shows the
+  application as a client, a provider and the owner see it, with the demo
+  accounts and test cards.
+* https://www.codenameone.com/developer-guide/#slate-implementors-guide[The implementor's guide]
+  (link:../../docs/developer-guide/Slate-Implementors-Guide.asciidoc[source])
+  explains how the project is built and what to change to make it yours: the
+  slot engine and its rules, the hold that never double-books, calendar sync in
+  both directions, deposits, the providers and the database, and what a
+  business needs before it runs on it.
+
+To see it running first, the two commands under <<Running it>> are all it takes.
+
+== The modules
+
+[cols="1,4"]
+|===
+| `shared`
+| The contract: the data classes both sides exchange and the `@RestClient`
+  interfaces that name every call. The app's build generates a client from them
+  and the server's build generates the interfaces it implements, so a change the
+  other side did not follow is a compile error.
+
+| `common`
+| The application: sign-in, the client's booking flow and agenda, the
+  provider's timeline, hours, time off and calendars, the owner's dashboard,
+  day board, catalogue and booking rules, the wallet, the settings and the live
+  channel. Styled in `src/main/css/theme.css`. The text is in
+  `src/main/l10n`, in English, Spanish, French, German and Hebrew; the
+  translations are machine-generated, so have them checked before you ship.
+  What it reports to Codename One analytics about how it is used, once the user
+  has agreed, is all in `Telemetry`.
+
+| `backend`
+| The server: accounts and roles, phone verification, the catalogue of
+  services, providers, locations and resources, the slot engine, holds,
+  bookings, reschedules and cancellations with their deadlines, deposits, the
+  waiting list, calendar links and their sync, `.ics` files, the owner's
+  dashboard and policy preview, and a WebSocket that pushes changes as they
+  happen. The data is entity classes in `domain`, read and written by the
+  repositories in `repository`. The schema is the migration scripts in
+  `src/main/resources/db/migration`, and the same server runs on SQLite,
+  PostgreSQL, MySQL and MariaDB.
+|===
+
+There are no platform modules: `common` builds the application for the
+simulator, the desktop, Android, iOS and the browser itself.
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, text messages and push notifications are printed on the
+console, cards and the Google and Microsoft calendars are simulated.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the application in the simulator, from another terminal:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The development profile creates a salon with two locations twenty minutes
+apart, its services, three providers with a working week, the chairs and rooms
+the services need, four weeks of history and a few appointments to come. Set
+`slate.demo.vertical` to `TUTOR`, `TRAINER`, `CONSULTANT` or `CLINIC` for one of
+the other kinds of business; the words and the services change, the rules do
+not. These accounts all have the password `slate-demo`:
+
+[cols="2,3"]
+|===
+| `client@slate.example` | a client with a card on file and a history
+| `client2@slate.example` | a new client: no card, nothing booked
+| `client3@slate.example` | a client the owner has flagged
+| `provider@slate.example` | the provider most demo appointments are with
+| `provider2@slate.example` | a second provider
+| `provider3@slate.example` | works at both locations, for the travel rule
+| `owner@slate.example` | runs the business
+|===
+
+On a phone, set the server's address on the welcome screen: `localhost` on a
+phone is the phone.
+
+=== In a browser, with nothing installed
+
+The server can host the application itself. Build the browser version once, and
+again when the application changes:
+
+[source,bash]
+----
+backend/server.sh web
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then open `http://localhost:8080/`. `server.sh run --web` does both in one step.
+
+== What each role does
+
+A client picks a service, a location and a provider, or anyone, and sees the
+free starts of a day or a week. With "Check my calendar" on, starts that clash
+with the phone's own calendar are marked before they are chosen. Choosing one
+holds it for a few minutes while the deposit and a note are settled; confirming
+books it, and it can be put in the phone's calendar with a reminder. An
+appointment is moved or cancelled from the app until the business's deadlines,
+and the screen says exactly what cancelling costs at that moment. A full day
+offers the waiting list, and a time that frees up is offered by push.
+
+A provider sees their day, week or agenda: working hours, appointments and
+every block a connected calendar says is busy, in one timeline. They mark an
+appointment done or missed, cancel one, set their hours and time off, and
+connect calendars: the phone's own, whose busy times are uploaded without
+titles, or Google, Microsoft and any `.ics` address, which the server reads.
+
+The owner reads bookings, completions, no-shows, cancellations, takings and how
+full the providers' hours were, sees every provider's day side by side, edits
+services, providers, locations and resources, and changes the booking rules --
+start step, notice, horizon, packing, the shortest gap worth leaving, client
+limits, deposits and deadlines -- with a preview of tomorrow under the edited
+rules before saving them.
+
+== What is real and what is simulated
+
+Text messages go through the provider `slate.sms.provider` names: `twilio`,
+`vonage` or `messagebird`, each with its own credentials. On a development
+profile they are printed on the console instead, and the app is handed the code
+so a sign-up can finish. Any other profile needs a provider; one whose
+credentials are missing is logged as a configuration error, naming the missing
+settings.
+
+Deposits are simulated on a development profile: the card
+`4242 4242 4242 4242` is accepted, `4000 0000 0000 0002` is declined, and no
+money moves. With `slate.payments.provider=stripe` and
+`SLATE_PAYMENTS_STRIPE_SECRET` set in the server's environment, a card is added
+on Stripe's own page, so its number never reaches the app or this server.
+
+Google and Microsoft calendars are simulated on a development profile when no
+OAuth client is configured: connecting one needs no account, and it reports a
+plausible week of busy time. `slate.calendar.google.id`/`.secret` and
+`slate.calendar.microsoft.id`/`.secret` connect the real ones. Calendar
+addresses (`.ics`) and the phone's calendars are always real.
+
+Push notifications go through the Codename One push service with
+`slate.push.provider=cloud`, `slate.push.app` and `SLATE_PUSH_KEY`.
+
+`backend/application.properties` lists every setting a deployment supplies. The
+database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
+address, or the path of a SQLite file. Every setting is also read from the
+environment in upper case with `_` for every dot (`SLATE_SMS_TWILIO_TOKEN`).
+
+== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # <2>
+../ci/sample-server-tests-on-database.sh .   # <3>
+./run-e2e.sh   # <4>
+./run-web-e2e.sh   # <5>
+----
+<1> The server's tests, on the JVM.
+<2> The same tests again, translated to a native binary, which is how the server
+    ships.
+<3> The server's tests against PostgreSQL or MySQL, named by
+    `CN1_TEST_DATABASE_URL`.
+<4> Starts the server on the `test` profile and runs the application's tests
+    against it in the simulator. Pass `--native` to run them against the
+    compiled server.
+<5> Builds the browser version of the application, starts the server hosting
+    it, and drives it in a headless browser. Needs Node with Playwright and its
+    Chromium (`npm ci` and `npx playwright install chromium` in `scripts/`).
+
+`.github/workflows/slate.yml` runs them, and builds the application for Android
+and iOS through `scripts/build-android-app.sh` and `scripts/build-ios-app.sh`
+with `CN1_APP_DIR=scripts/slate`.
+
+== Licence
+
+Slate is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep.

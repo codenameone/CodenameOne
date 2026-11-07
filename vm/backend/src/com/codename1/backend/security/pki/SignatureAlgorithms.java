@@ -35,6 +35,7 @@ import com.codename1.backend.security.crypto.Der;
 /// and SHA-384 over P-384. SHA-1 and MD5 signatures are refused, and so is
 /// ECDSA with a digest that does not match its curve.
 final class SignatureAlgorithms {
+    static final String SHA1_RSA = "1.2.840.113549.1.1.5";
     static final String SHA256_RSA = "1.2.840.113549.1.1.11";
     static final String SHA384_RSA = "1.2.840.113549.1.1.12";
     static final String SHA512_RSA = "1.2.840.113549.1.1.13";
@@ -54,6 +55,11 @@ final class SignatureAlgorithms {
         String oid = id.oid();
         if (SHA256_RSA.equals(oid)) {
             return Crypto.RS256;
+        }
+        if (SHA1_RSA.equals(oid)) {
+            // Verify only: Apple's older intermediates and some CMS signers
+            // still carry it, and Crypto refuses to make one.
+            return Crypto.RS1;
         }
         if (SHA384_RSA.equals(oid)) {
             return Crypto.RS384;

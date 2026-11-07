@@ -373,21 +373,9 @@ public final class Dyn {
             args = NONE;
         }
         if (o instanceof DynamicObject) {
-            Object v = ((DynamicObject) o).$dcall(name, args, named);
+            Object v = objectCall((DynamicObject) o, name, args, named);
             if (v != NO_MEMBER) {
                 return v;
-            }
-            // A field holding a function: `obj.callback(x)`.
-            Object f = ((DynamicObject) o).$dget(name);
-            if (f != NO_MEMBER && f != null && isFunction(f)) {
-                return invoke(f, args);
-            }
-            if (!(args.length == 0 && name.equals("toString")) && !(args.length == 1 && name.equals("=="))) {
-                // No member: Dart hands the call to noSuchMethod before throwing.
-                Object r = ((DynamicObject) o).noSuchMethod(dart.core.Invocation.method(name, args, named));
-                if (r != NO_MEMBER) {
-                    return r;
-                }
             }
         } else if (name.equals("call") && isFunction(o)) {
             return invoke(o, args);
@@ -446,6 +434,31 @@ public final class Dyn {
             return Boolean.valueOf(o == null ? args[0] == null : o.equals(args[0]));
         }
         throw noSuch(o, name + "()");
+    }
+
+    /// A member call on a transpiled object, or NO_MEMBER when it has none and its
+    /// noSuchMethod declines. Kept apart from {@link #call}, whose built-in dispatch
+    /// (every member of List, Map, String, num, ...) a caller that only ever holds a
+    /// transpiled object must not make reachable: invoking a callable object went
+    /// through call() and cost a native build about 180 KB.
+    private static Object objectCall(DynamicObject o, String name, Object[] args, DartMap<String, Object> named) {
+        Object v = o.$dcall(name, args, named);
+        if (v != NO_MEMBER) {
+            return v;
+        }
+        // A field holding a function: `obj.callback(x)`.
+        Object f = o.$dget(name);
+        if (f != NO_MEMBER && f != null && isFunction(f)) {
+            return invoke(f, args);
+        }
+        if (!(args.length == 0 && name.equals("toString")) && !(args.length == 1 && name.equals("=="))) {
+            // No member: Dart hands the call to noSuchMethod before throwing.
+            Object r = o.noSuchMethod(dart.core.Invocation.method(name, args, named));
+            if (r != NO_MEMBER) {
+                return r;
+            }
+        }
+        return NO_MEMBER;
     }
 
     /// The most positional arguments the built-in member {@code name} accepts on a Map,
@@ -840,27 +853,30 @@ public final class Dyn {
                 }
                 return Double.valueOf(d % o.doubleValue());
             }
-            case "clamp": {
-                Number lo = num(arg(a, 0));
-                Number hi = num(arg(a, 1));
-                // num.clamp: ordered by compareTo (NaN greatest), and the operand that wins
-                // is answered as it is -- 1.5.clamp(2, 3) is the int 2.
-                // Compared exactly, as num.compareTo does: through doubleValue() an int
-                // past 2^53 rounds and 9007199254740993.clamp(0, 9007199254740992.0)
-                // answered the receiver instead of the upper bound.
-                if (numCompare(lo, hi) > 0) {
-                    throw new dart.core.ArgumentError(DartRuntime.str(lo));
-                }
-                if (numCompare(n, lo) < 0) {
-                    return lo;
-                }
-                return numCompare(n, hi) > 0 ? hi : n;
-            }
+            case "clamp":
+                return numClamp(n, num(arg(a, 0)), num(arg(a, 1)));
             case "toString":
                 return DartRuntime.str(n);
             default:
                 return NO_MEMBER;
         }
+    }
+
+    /// Dart's `num.clamp`: ordered by compareTo (NaN greatest), and the operand that wins
+    /// is answered as it is -- 1.5.clamp(2, 3) is the int 2. Compared exactly, as
+    /// num.compareTo does: through doubleValue() an int past 2^53 rounds and
+    /// 9007199254740993.clamp(0, 9007199254740992.0) answered the receiver instead of
+    /// the upper bound. Public so a statically typed `clamp` calls it directly: reaching
+    /// it through `call` makes every builtin's dynamic dispatch reachable, about 180 KB
+    /// of a native executable for one clamp.
+    public static Number numClamp(Number n, Number lo, Number hi) {
+        if (numCompare(lo, hi) > 0) {
+            throw new dart.core.ArgumentError(DartRuntime.str(lo));
+        }
+        if (numCompare(n, lo) < 0) {
+            return lo;
+        }
+        return numCompare(n, hi) > 0 ? hi : n;
     }
 
     /**
@@ -980,7 +996,11 @@ public final class Dyn {
             for (int k = 0; k < names.length; k++) {
                 named.put(names[k], values[k]);
             }
-            return call(f, "call", positional, named);
+            Object v = objectCall((DynamicObject) f, "call", positional, named);
+            if (v == NO_MEMBER) {
+                throw noSuch(f, "call()");
+            }
+            return v;
         }
         if (!(f instanceof Signed) || ((Signed) f).$named() == null || ((Signed) f).$generic()) {
             throw noSuch(f, "call");
@@ -1051,7 +1071,11 @@ public final class Dyn {
         f = SignedFns.unwrap(f);
         if (f instanceof DynamicObject && !isFunction(f)) {
             // A callable object (`dynamic p = P(); p(21)`): Dart calls its call method.
-            return call(f, "call", a, null);
+            Object v = objectCall((DynamicObject) f, "call", a, null);
+            if (v == NO_MEMBER) {
+                throw noSuch(f, "call()");
+            }
+            return v;
         }
         if (f instanceof Signed && ((Signed) f).$named() == null && !((Signed) f).$generic()) {
             // A dynamic call checks each argument against the closure's own parameter

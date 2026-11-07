@@ -393,6 +393,15 @@ A start-up that fails partway runs the destroy methods of the beans already
 built, so a server a supervisor restarts doesn't leak what their constructors
 opened.
 
+Once the server is listening, every bean implementing `CommandLineRunner` or
+`ApplicationRunner` runs, ordered by `@Order`. The first receives the command
+line as it was given; the second receives it as `ApplicationArguments`, with
+`--name=value` options parsed. After them, every method annotated
+`@EventListener` that takes an `ApplicationReadyEvent` is called.
+`Backend.getArguments()` returns the same command line anywhere. A listener for
+any other event is refused at build time: the ready event is the only one the
+backend publishes.
+
 [[backend-libraries]]
 === Controllers and beans from a library
 

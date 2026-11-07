@@ -126,7 +126,16 @@ public enum Template {
             "com.codenameone.examples.pulse", "Pulse", "/pulse-preview.jpg",
             "The fitness studio template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/pulse-modules.zip", "/pulse-settings.properties");
+            new String[0], "/pulse-modules.zip", "/pulse-settings.properties"),
+    // The same kind of template as WAYLINE: an appointment booking app (clients,
+    // providers, the front desk and the owner) and its server. It is the project
+    // in scripts/slate, and its resources come from
+    // `scripts/sync-initializr-template.py slate`.
+    SLATE(false, "/slate-src.zip", "/slate-css.zip", "/slate-pom.xml",
+            "com.codenameone.examples.slate", "Slate", "/slate-preview.jpg",
+            "The booking template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/slate-modules.zip", "/slate-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.

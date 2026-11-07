@@ -39,6 +39,7 @@ import java.util.Map;
 @com.codename1.impl.SharedWithBackend
 public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQuery<T> {
     private final SessionImpl session;
+    private com.codename1.orm.session.LockMode lock = com.codename1.orm.session.LockMode.NONE;
     private final Class<T> resultType;
     private final Plan plan;
     private final Map<String, Object> parameters = new LinkedHashMap<String, Object>();
@@ -79,6 +80,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         return this;
     }
     @Override
+    public JpqlQueryImpl<T> lockMode(com.codename1.orm.session.LockMode mode) {
+        if (mode == null) {
+            throw new IllegalArgumentException("lock mode is null");
+        }
+        lock = mode;
+        return this;
+    }
+    @Override
     public JpqlQueryImpl<T> offset(int value) {
         if (value < 0) {
             throw new IllegalArgumentException("Negative offset");
@@ -105,7 +114,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         if (max == 0) {
             return result;
         }
-        List<Object[]> rows = session.read(bound.sql + session.limit(max, offset), bound.args, plan.kinds);
+        List<Object[]> rows = session.read(bound.sql + session.limit(max, offset) + session.lockClause(lock), bound.args, plan.kinds);
         if (plan.entity != null) {
             List entities = session.hydrateAll(plan.entity, rows, plan.fetches);
             for (Object entity : entities) {

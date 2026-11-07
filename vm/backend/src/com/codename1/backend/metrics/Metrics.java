@@ -155,6 +155,36 @@ public final class Metrics {
         return g;
     }
 
+    /// A gauge whose one value carries fixed `tags`, as Micrometer's
+    /// `Gauge.builder(...).tags(...)` does: `pool="main"`, `region="eu"`.
+    /// @param tags label keys and values, in export order; empty for none
+    public static Gauge gauge(String name, String description, String unit,
+                              final Map tags, final Gauge.Source source) {
+        if (source == null) {
+            throw new IllegalArgumentException("A gauge needs a source");
+        }
+        final Map attributes = new LinkedHashMap();
+        if (tags != null) {
+            Iterator entries = tags.entrySet().iterator();
+            while (entries.hasNext()) {
+                Map.Entry e = (Map.Entry) entries.next();
+                if (!(e.getKey() instanceof String) || ((String) e.getKey()).length() == 0) {
+                    throw new IllegalArgumentException("Gauge " + name
+                            + ": a tag key must be a non-empty string");
+                }
+                attributes.put(e.getKey(), e.getValue());
+            }
+        }
+        return gauge(name, description, unit, new Gauge.MultiSource() {
+            @Override
+            public List read() {
+                List out = new ArrayList(1);
+                out.add(Instrument.point(new LinkedHashMap(attributes), source.read()));
+                return out;
+            }
+        });
+    }
+
     /// A gauge with several labelled values. See [Gauge.MultiSource].
     public static Gauge gauge(String name, String description, String unit,
                               Gauge.MultiSource source) {
