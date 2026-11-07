@@ -271,6 +271,33 @@ public final class HttpServer {
             return null;
         }
 
+        /// Every value of a repeated query parameter, in the order sent:
+        /// `?tag=a&tag=b` is `[a, b]`. Empty when the request did not send it.
+        public List<String> queryParams(String name) {
+            List<String> out = new ArrayList<String>();
+            int length = targetByteLength();
+            int pos = pathByteLength();
+            if (pos >= length || name == null) {
+                return out;
+            }
+            pos++;
+            while (pos <= length) {
+                int end = pos;
+                while (end < length && byteAt(end) != '&') {
+                    end++;
+                }
+                int eq = pos;
+                while (eq < end && byteAt(eq) != '=') {
+                    eq++;
+                }
+                if (nameEquals(name, pos, eq)) {
+                    out.add(percentDecode(eq < end ? eq + 1 : end, end));
+                }
+                pos = end + 1;
+            }
+            return out;
+        }
+
         /// One byte of the request target, from whichever form this Request holds.
         ///
         /// The String form is one char per OCTET -- the h2 natives build it with
@@ -1232,6 +1259,30 @@ public final class HttpServer {
         /// route whose parameters are all optional ran on a body nothing parsed
         /// @throws IllegalStateException when the field is a multipart part that is
         /// not UTF-8 text. A generated `@RequestParam` binding answers either with 400
+        /// Every value of a request parameter, as `@RequestParam List<String>`
+        /// binds it and `getParameterValues` answers in a servlet container: the
+        /// query string's values, then the form body's.
+        ///
+        /// @throws IllegalArgumentException and IllegalStateException as [#param]
+        public List<String> params(String name) {
+            List<String> out = queryParams(name);
+            if (name == null) {
+                return out;
+            }
+            String type = getHeader("Content-Type");
+            if (Multipart.isForm(type)) {
+                out.addAll(Multipart.formValues(getBody(), name));
+            } else if (Multipart.isMultipart(type)) {
+                for (Object each : getParts()) {
+                    Part p = (Part) each;
+                    if (name.equals(p.getName()) && p.getFilename() == null) {
+                        out.add(p.getText());
+                    }
+                }
+            }
+            return out;
+        }
+
         public String param(String name) {
             String query = queryParam(name);
             if (query != null || name == null) {

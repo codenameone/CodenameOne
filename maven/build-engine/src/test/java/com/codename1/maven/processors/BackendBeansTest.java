@@ -2058,6 +2058,36 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void repeatedAndBoxedRequestParamsBind() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/tags\") public String tags(@RequestParam(\"t\") List<String> t,\n"
+                + "            @RequestParam(value = \"x\", required = false) String[] x,\n"
+                + "            @RequestParam(value = \"n\", required = false) Integer n,\n"
+                + "            @RequestParam(value = \"d\", defaultValue = \"7\") Long d) {\n"
+                + "        return t + \" \" + x.length + \" \" + n + \" \" + d;\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend b = start(classes, port, new Properties());
+        try {
+            assertEquals("[a, b] 0 null 7", http("GET", port, "/tags?t=a&t=b"));
+            assertEquals("[c] 2 5 9", http("GET", port, "/tags?t=c&x=1&x=2&n=5&d=9"));
+            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/tags?x=1").openConnection();
+            assertEquals(400, c.getResponseCode());
+            c = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/tags?t=a&n=zz").openConnection();
+            assertEquals(400, c.getResponseCode());
+        } finally {
+            b.stop();
+        }
+    }
+
+    @Test
     public void aRestartedApplicationForgetsTheBeansOfTheLastStart() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Feature", PKG + "@Component @ConditionalOnProperty(\"feature.x\")\n"

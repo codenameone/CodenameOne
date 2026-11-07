@@ -983,6 +983,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 p.name = requestParam.getStringOrDefault("value", "");
                 p.defaultValue = requestParam.getStringOrDefault("defaultValue", "");
                 p.required = requestParam.getBoolOrDefault("required", true);
+                if ("java.util.List".equals(p.javaType) && genericType != null
+                        && !"java.util.List<java.lang.String>".equals(genericType)) {
+                    ctx.error(cls, "A multi-value @RequestParam is List<String> or String[]; "
+                            + cls.getBinaryName() + "." + m.getName() + " declares "
+                            + genericType);
+                    return null;
+                }
                 if (p.name.length() == 0) {
                     ctx.error(cls, "@RequestParam needs the parameter name: "
                             + cls.getBinaryName() + "." + m.getName());
@@ -1119,7 +1126,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     && !isBindable(p.javaType, p.kind)) {
                 ctx.error(cls, "Cannot bind " + p.javaType + " from the request on "
                         + cls.getBinaryName() + "." + m.getName() + ". Path, query and "
-                        + "header values bind to String and the primitive types; a body "
+                        + "header values bind to String, the primitive types and their "
+                        + "wrappers, a query parameter also to List<String> or String[]; a body "
                         + "binds to String or java.util.Map");
                 return null;
             }
@@ -1131,7 +1139,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // wrote. This is the author's own configuration, not a client's input,
             // and it is wrong at build time or never.
             if (p.defaultValue != null && p.defaultValue.length() > 0
-                    && !defaultParsesAs(p.javaType, p.defaultValue)) {
+                    && !defaultParsesAs(unboxed(p.javaType), p.defaultValue)) {
                 ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares "
                         + "defaultValue=\"" + p.defaultValue + "\" for a " + p.javaType
                         + " parameter, which is not a " + p.javaType + ". It would be "
@@ -1326,6 +1334,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return "java.lang.String".equals(javaType) || "java.util.Map".equals(javaType)
                     || "java.util.List".equals(javaType);
         }
+        if ("QUERY".equals(kind) && isMultiValue(javaType)) {
+            return true;
+        }
+        javaType = unboxed(javaType);
         return "java.lang.String".equals(javaType) || "int".equals(javaType)
                 || "long".equals(javaType) || "boolean".equals(javaType)
                 || "double".equals(javaType) || "float".equals(javaType)
@@ -2266,7 +2278,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             String test;
             String what;
-            if ("QUERY".equals(p.kind)) {
+            if ("QUERY".equals(p.kind) && isMultiValue(p.javaType)) {
+                test = "request.params(" + quote(p.name) + ").isEmpty()";
+                what = "query parameter " + p.name;
+            } else if ("QUERY".equals(p.kind)) {
                 test = "request.param(" + quote(p.name) + ") == null";
                 what = "query parameter " + p.name;
             } else if ("HEADER".equals(p.kind)) {
@@ -2610,7 +2625,30 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return value.trim().indexOf("Infinity") >= 0;
     }
 
+    /// The primitive a wrapper binds as -- an absent value is null rather than
+    /// zero -- or `javaType` itself.
+    static String unboxed(String javaType) {
+        if (javaType == null || !javaType.startsWith("java.lang.")) {
+            return javaType;
+        }
+        String simple = javaType.substring(10);
+        if ("Integer".equals(simple)) {
+            return "int";
+        }
+        if ("Long".equals(simple) || "Double".equals(simple) || "Float".equals(simple)
+                || "Short".equals(simple) || "Byte".equals(simple) || "Boolean".equals(simple)) {
+            return simple.toLowerCase(java.util.Locale.ROOT);
+        }
+        return javaType;
+    }
+
+    /// A `@RequestParam` that takes every value of a repeated parameter.
+    static boolean isMultiValue(String javaType) {
+        return "java.util.List".equals(javaType) || "java.lang.String[]".equals(javaType);
+    }
+
     private static String numericChecker(String javaType) {
+        javaType = unboxed(javaType);
         if ("boolean".equals(javaType)) return "parsesBoolean";
         if ("int".equals(javaType)) return "parsesInt";
         if ("long".equals(javaType)) return "parsesLong";
@@ -2838,6 +2876,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String raw;
         if ("PATH".equals(p.kind)) {
             raw = "bound[" + p.variableIndex + "]";
+        } else if ("QUERY".equals(p.kind) && isMultiValue(p.javaType)) {
+            String all = "request.params(" + quote(p.name) + ")";
+            if (p.defaultValue != null && p.defaultValue.length() > 0) {
+                all = "(" + all + ".isEmpty() ? java.util.Collections.singletonList("
+                        + quote(p.defaultValue) + ") : " + all + ")";
+            }
+            return "java.util.List".equals(p.javaType) ? all
+                    : all + ".toArray(new String[0])";
         } else if ("QUERY".equals(p.kind)) {
             raw = "request.param(" + quote(p.name) + ")";
         } else if ("HEADER".equals(p.kind)) {
@@ -2878,6 +2924,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      */
     private static String convert(String javaType, String raw, String defaultValue) {
         String fallback = defaultValue == null ? "" : defaultValue;
+        String primitive = unboxed(javaType);
+        if (!primitive.equals(javaType)) {
+            // A wrapper is null when the request omits the value and has no
+            // default, as Spring binds it.
+            String value = javaType.replace("java.lang.", "") + ".valueOf("
+                    + convert(primitive, raw, defaultValue) + ")";
+            return fallback.length() > 0 ? value
+                    : "(" + raw + " == null ? null : " + value + ")";
+        }
         if ("java.lang.String".equals(javaType)) {
             return fallback.length() == 0 ? raw
                     : "orDefault(" + raw + ", " + quote(fallback) + ")";
