@@ -77,6 +77,13 @@ public class Rooms {
     /// Parties by challenge code, and the code each member is in.
     private final Map<String, Party> parties = new HashMap<String, Party>();
     private final Map<String, String> partyOf = new HashMap<String, String>();
+    /// Every socket an account has open, seated or not: a suspension closes
+    /// them all, including one idling on the home screen.
+    private final Map<String, List<WebSocketSession>> open = new HashMap<String, List<WebSocketSession>>();
+    /// When each account last chatted or emoted; the server throttles what a
+    /// modified client would otherwise relay to every seat.
+    private final Map<String, Long> saidAt = new HashMap<String, Long>();
+    static final long SAY_INTERVAL = 400;
     private final Map<String, String> handles = new HashMap<String, String>();
     private final Map<String, String> owners = new HashMap<String, String>();
     private long handleCount;
@@ -123,14 +130,27 @@ public class Rooms {
     // ------------------------------------------------------------ connections
 
     synchronized void connected(String username, boolean admin, WebSocketSession session) {
+        List<WebSocketSession> mine = open.get(username);
+        if (mine == null) {
+            mine = new ArrayList<WebSocketSession>();
+            open.put(username, mine);
+        }
+        if (!mine.contains(session)) {
+            mine.add(session);
+        }
         if (admin) {
             admins.add(username, session);
         }
         MatchRoom room = byPlayer.get(username);
-        if (room != null) {
+        // A seat its player left -- or was removed from by a suspension -- is
+        // not theirs to resume.
+        if (room != null && !room.seats[room.seatOf(username)].left) {
             // Back from a drop: the new socket gets the whole log and catches up.
             int seat = room.seatOf(username);
             room.seats[seat].session = session;
+            // A relaunched app numbers its inputs from 1 again; the old count
+            // would drop every one of them until the new one passed it.
+            room.seats[seat].lastSeq = -1;
             send(session, startMessage(room, seat, room.startedAt - Clock.now()));
             return;
         }
@@ -146,6 +166,14 @@ public class Rooms {
     }
 
     synchronized void disconnected(String username, WebSocketSession session) {
+        List<WebSocketSession> mine = open.get(username);
+        if (mine != null) {
+            mine.remove(session);
+            if (mine.isEmpty()) {
+                open.remove(username);
+                saidAt.remove(username);
+            }
+        }
         admins.remove(username, session);
         removeQueued(username);
         MatchRoom room = byPlayer.get(username);
@@ -184,6 +212,14 @@ public class Rooms {
             Party party = parties.get(partyOf.get(username));
             if (party != null) {
                 collect(party.members, username, sessions);
+            }
+            List<WebSocketSession> mine = open.remove(username);
+            if (mine != null) {
+                for (WebSocketSession s : mine) {
+                    if (!sessions.contains(s)) {
+                        sessions.add(s);
+                    }
+                }
             }
             removeQueued(username);
             leaveParty(username);
@@ -476,6 +512,19 @@ public class Rooms {
     /// with the sender.
     /// Both carry the sender's display name, never the account name: that is
     /// an email address, and other runners see it.
+    /// Whether `username` may chat or emote now, at most once per
+    /// `SAY_INTERVAL`; asked before the profile is read, so a flood costs
+    /// the server neither a database read nor a relay.
+    synchronized boolean maySay(String username) {
+        long now = Clock.now();
+        Long last = saidAt.get(username);
+        if (last != null && now - last.longValue() < SAY_INTERVAL) {
+            return false;
+        }
+        saidAt.put(username, Long.valueOf(now));
+        return true;
+    }
+
     synchronized void emote(String username, String name, String emote) {
         if (emote == null || emote.length() > 32) {
             return;

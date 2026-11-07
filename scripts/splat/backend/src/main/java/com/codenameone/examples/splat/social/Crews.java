@@ -123,7 +123,8 @@ public class Crews {
             m.setUsername(username);
             m.setJoinedAt(Instant.now());
             members.insert(m);
-            c.setMembers(c.getMembers() + 1);
+            // Counted, not incremented: two joins at once must not lose one.
+            c.setMembers(count(code));
             crews.save(c);
         }
         return view(c);
@@ -137,7 +138,7 @@ public class Crews {
             throw new ResponseStatusException(404, "You are not in that crew");
         }
         members.deleteById(m.getId());
-        c.setMembers(Math.max(0, c.getMembers() - 1));
+        c.setMembers(count(code));
         crews.save(c);
         return view(c);
     }
@@ -151,5 +152,9 @@ public class Crews {
             names.add(p == null ? m.getUsername() : p.getDisplayName());
         }
         return new CrewDto(c.getCode(), c.getName(), c.getOwner(), usernames, names);
+    }
+
+    private int count(String code) {
+        return members.members(code, new PageRequest(0, MAX_MEMBERS + 8)).size();
     }
 }

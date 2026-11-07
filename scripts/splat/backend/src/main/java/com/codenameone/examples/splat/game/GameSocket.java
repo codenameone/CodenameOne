@@ -82,6 +82,9 @@ public class GameSocket implements WebSocket {
         } else if (GameProtocol.MUTE.equals(type)) {
             rooms.mute(username, Boolean.TRUE.equals(m.get("on")));
         } else if (GameProtocol.EMOTE.equals(type) || GameProtocol.CHAT.equals(type)) {
+            if (!rooms.maySay(username)) {
+                return;
+            }
             Profile p = accounts.profile(username);
             if (p.isMuted()) {
                 return;
@@ -104,7 +107,7 @@ public class GameSocket implements WebSocket {
         } else if (GameProtocol.LEAVE.equals(type)) {
             rooms.leave(username);
         } else if (GameProtocol.RESUME.equals(type)) {
-            rooms.connected(username, false, session);
+            rooms.connected(username, accounts.isAdmin(username), session);
         } else if (GameProtocol.SPECTATE.equals(type)) {
             if (!accounts.isAdmin(username) || !rooms.spectate(string(m, "match"), session)) {
                 session.sendText(Messages.error("No such match"));

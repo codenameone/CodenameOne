@@ -101,8 +101,8 @@ public final class Music {
             final Media[] self = new Media[1];
             self[0] = MediaManager.createMedia(new ByteArrayInputStream(wav), "audio/wav", () -> CN.callSerially(() -> {
                 // At the end, go round again: the clips are written to loop.
+                // halt() releases the finished player before the next starts.
                 if (media == self[0] && playing == what) {
-                    media = null;
                     playing = 0;
                     apply();
                 }
@@ -137,13 +137,23 @@ public final class Music {
         }
         building = true;
         new Thread(() -> {
-            final byte[] m = theme().wav();
-            final byte[] f = ambience().wav();
+            byte[] m = null;
+            byte[] f = null;
+            try {
+                m = theme().wav();
+                f = ambience().wav();
+            } catch (Throwable outOfMemory) {
+                // Leave both null: the next screen that wants music tries again.
+            }
+            final byte[] menuWav = m;
+            final byte[] fieldWav = f;
             CN.callSerially(() -> {
-                menu = m;
-                field = f;
                 building = false;
-                apply();
+                if (menuWav != null && fieldWav != null) {
+                    menu = menuWav;
+                    field = fieldWav;
+                    apply();
+                }
             });
         }, "splat-music").start();
     }

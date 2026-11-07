@@ -74,6 +74,11 @@ final class Deadlines {
         RECEIVE_TIMEOUTS.put(Integer.valueOf(fd), Integer.valueOf(millis));
     }
 
+    /// Forgets the descriptor, called once its channel is closed. A writer
+    /// still inside `enterNonBlocking` then finds no count on leaving and
+    /// restores nothing, which is right: the channel it would restore is
+    /// closed, and leaving the entry would hand its count and saved mode to the
+    /// next connection the kernel gives the same number.
     static void clear(int fd) {
         TIMEOUTS.remove(Integer.valueOf(fd));
         RECEIVE_TIMEOUTS.remove(Integer.valueOf(fd));

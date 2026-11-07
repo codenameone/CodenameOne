@@ -847,13 +847,27 @@ static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
     if (texturePeer != 0) {
         id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *) texturePeer;
         [enc setFragmentTexture:tex atIndex:0];
-        MTLSamplerDescriptor *sd = [[MTLSamplerDescriptor alloc] init];
-        sd.minFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
-        sd.magFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
-        sd.sAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
-        sd.tAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
-        id<MTLSamplerState> sampler = [view.device newSamplerStateWithDescriptor:sd];
-        [enc setFragmentSamplerState:sampler atIndex:0];
+        // One sampler per filter/wrap pair, made once per device: a scene of
+        // sprites draws hundreds of textured quads a frame, and a new sampler
+        // state for each was an allocation per draw.
+        static id<MTLSamplerState> cn1Samplers[4];
+        static void *cn1SamplerDevice = NULL;
+        if (cn1SamplerDevice != (__bridge void *) view.device) {
+            for (int i = 0; i < 4; i++) {
+                cn1Samplers[i] = nil;
+            }
+            cn1SamplerDevice = (__bridge void *) view.device;
+        }
+        int key = (texFilter ? 1 : 0) | (texWrap ? 2 : 0);
+        if (cn1Samplers[key] == nil) {
+            MTLSamplerDescriptor *sd = [[MTLSamplerDescriptor alloc] init];
+            sd.minFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+            sd.magFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+            sd.sAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
+            sd.tAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
+            cn1Samplers[key] = [view.device newSamplerStateWithDescriptor:sd];
+        }
+        [enc setFragmentSamplerState:cn1Samplers[key] atIndex:0];
     }
 }
 

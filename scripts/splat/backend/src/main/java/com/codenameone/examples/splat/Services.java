@@ -58,6 +58,7 @@ public class Services {
     public ReceiptValidator receipts(Config config,
             @Value("${splat.iap.provider:}") String chosen,
             @Value("${splat.iap.apple.secret:}") String appleSecret,
+            @Value("${splat.iap.apple.bundle:}") String appleBundle,
             @Value("${splat.iap.google.package:}") String googlePackage,
             @Value("${splat.iap.google.token:}") String googleToken) {
         String kind = chosen.trim().length() > 0 ? chosen.trim()
@@ -80,7 +81,12 @@ public class Services {
                     + "splat.iap.apple.secret, or splat.iap.google.package and "
                     + "splat.iap.google.token");
         }
-        return new StoreReceipts(appleSecret.trim(), googlePackage.trim(), googleToken.trim());
+        if (appleSecret.trim().length() > 0 && appleBundle.trim().length() == 0) {
+            // Without it, a genuine receipt from any other app could buy gems.
+            return new MisconfiguredReceipts("splat.iap.apple.secret is set without "
+                    + "splat.iap.apple.bundle, the bundle id receipts must belong to");
+        }
+        return new StoreReceipts(appleSecret.trim(), appleBundle.trim(), googlePackage.trim(), googleToken.trim());
     }
     // end::splat-receipt-choice[]
 

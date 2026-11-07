@@ -85,6 +85,7 @@ public final class Sfx {
         try {
             SoundPool created = SoundPool.create(16);
             if (!created.isNativeAccelerated()) {
+                created.release();
                 return;
             }
             pool = created;

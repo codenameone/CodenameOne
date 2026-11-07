@@ -168,6 +168,11 @@ public abstract class GraphicsDevice {
     /// The default implementation supports no shadows and returns false; the
     /// caller then skips the pass and draws as usual.
     ///
+    /// Render the shadow pass before `beginPostProcess`, never inside it: both
+    /// passes return to the target that was active when they began, so a
+    /// shadow pass started offscreen would hand the post process its own
+    /// image to draw into.
+    ///
     /// #### Parameters
     ///
     /// - `light`: the light whose shadows to render; it must have shadows on

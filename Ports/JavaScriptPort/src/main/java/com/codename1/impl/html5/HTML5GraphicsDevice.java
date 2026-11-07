@@ -634,15 +634,29 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         setViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
     }
 
+    private boolean shadowUnavailable;
+    private boolean postUnavailable;
+
     private void passInto(Target t) {
         gl.bindFramebuffer(FRAMEBUFFER, t.fbo);
         setViewport(0, 0, t.width, t.height);
     }
 
     public boolean beginShadowPass(Light light) {
+        if (shadowUnavailable) {
+            return false;
+        }
         if (shadowProgram == null) {
-            shadowProgram = buildProgram(GlslShaderGenerator.shadowVertex(),
-                    GlslShaderGenerator.shadowFragment());
+            try {
+                shadowProgram = buildProgram(GlslShaderGenerator.shadowVertex(),
+                        GlslShaderGenerator.shadowFragment());
+            } catch (RuntimeException rejected) {
+                // A browser that cannot link the depth shader draws without
+                // shadows, as a device without the feature does, and is not
+                // asked again every frame.
+                shadowUnavailable = true;
+                return false;
+            }
         }
         saveTarget();
         int size = light.getShadowMapSize();
@@ -706,11 +720,23 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         if (effects == null) {
             return false;
         }
+        if (postUnavailable) {
+            return false;
+        }
         if (compositeProgram == null) {
             String v = GlslShaderGenerator.postVertex();
-            brightProgram = buildProgram(v, GlslShaderGenerator.brightFragment());
-            blurProgram = buildProgram(v, GlslShaderGenerator.blurFragment());
-            compositeProgram = buildProgram(v, GlslShaderGenerator.compositeFragment());
+            try {
+                brightProgram = buildProgram(v, GlslShaderGenerator.brightFragment());
+                blurProgram = buildProgram(v, GlslShaderGenerator.blurFragment());
+                compositeProgram = buildProgram(v, GlslShaderGenerator.compositeFragment());
+            } catch (RuntimeException rejected) {
+                // Drawn straight to the screen instead, as without the feature.
+                brightProgram = null;
+                blurProgram = null;
+                compositeProgram = null;
+                postUnavailable = true;
+                return false;
+            }
         }
         saveTarget();
         int w = savedViewport[2];

@@ -33,7 +33,7 @@ import java.util.Map;
 ///   method for a call to `/inApps/v1/transactions/{id}` when you outgrow it.
 /// - Google Play: the purchase token is checked with the Play Developer API,
 ///   authorized by an OAuth access token for a service account with the
-///   "View financial data" perlevel (`splat.iap.google.token`). Minting
+///   "View financial data" permission (`splat.iap.google.token`). Minting
 ///   that token from the service account key is left to your deployment.
 // tag::splat-store-receipts[]
 public class StoreReceipts implements ReceiptValidator {
@@ -41,11 +41,13 @@ public class StoreReceipts implements ReceiptValidator {
     static final String APPLE_SANDBOX = "https://sandbox.itunes.apple.com/verifyReceipt";
 
     private final String appleSecret;
+    private final String appleBundle;
     private final String googlePackage;
     private final String googleToken;
 
-    public StoreReceipts(String appleSecret, String googlePackage, String googleToken) {
+    public StoreReceipts(String appleSecret, String appleBundle, String googlePackage, String googleToken) {
         this.appleSecret = appleSecret;
+        this.appleBundle = appleBundle;
         this.googlePackage = googlePackage;
         this.googleToken = googleToken;
     }
@@ -75,6 +77,10 @@ public class StoreReceipts implements ReceiptValidator {
             return null;
         }
         Object r = answer.get("receipt");
+        // A receipt is only good for the app it was issued to.
+        if (!(r instanceof Map) || !appleBundle.equals(((Map) r).get("bundle_id"))) {
+            return null;
+        }
         Object inApp = r instanceof Map ? ((Map) r).get("in_app") : null;
         if (!(inApp instanceof List)) {
             return null;
@@ -95,6 +101,11 @@ public class StoreReceipts implements ReceiptValidator {
         if (googleToken.length() == 0 || googlePackage.length() == 0 || purchaseToken == null) {
             return null;
         }
+        // The token and the SKU come from the client: anything but the
+        // characters Play uses would change which resource the request reads.
+        if (!pathSafe(sku) || !pathSafe(purchaseToken)) {
+            return null;
+        }
         String url = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
                 + googlePackage + "/purchases/products/" + sku + "/tokens/" + purchaseToken;
         Web.Result answer = Web.getJson(url, googleToken);
@@ -108,6 +119,20 @@ public class StoreReceipts implements ReceiptValidator {
             return null;
         }
         return "play:" + order;
+    }
+
+    private static boolean pathSafe(String s) {
+        if (s == null || s.length() == 0 || s.length() > 512) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
+                    || c == '.' || c == '_' || c == '-')) {
+                return false;
+            }
+        }
+        return !s.contains("..");
     }
 }
 // end::splat-store-receipts[]

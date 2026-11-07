@@ -309,14 +309,20 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             o += 3;
             uniforms[o++] = env.getCloudCover();
         } else {
-            o += 10;
+            // zeroed rather than skipped: the array is reused, and a stale
+            // sky from the previous draw must not reach a shader that reads it
+            for (int i = 0; i < 10; i++) {
+                uniforms[o++] = 0f;
+            }
         }
         if (shadowed) {
             uniforms[o++] = light.getShadowBias();
             uniforms[o++] = light.getShadowStrength();
             uniforms[o++] = shadowSize > 0 ? 1.0f / shadowSize : 0.0f;
         } else {
-            o += 3;
+            uniforms[o++] = 0f;
+            uniforms[o++] = 0f;
+            uniforms[o++] = 0f;
         }
     }
 
