@@ -103,6 +103,13 @@ def main() -> None:
             continue
         if rel_path in allowed_unused:
             continue
+        # A PNG beside a referenced SVG is that SVG rasterized for
+        # syndication (scripts/website/rasterize_blog_svgs.py): platforms
+        # that cannot draw an SVG are sent the PNG instead.
+        if image_path.suffix.lower() == ".png":
+            twin = image_path.with_suffix(".svg").relative_to(doc_root).as_posix()
+            if twin in references:
+                continue
         unused.append(rel_path)
 
     report = {"unused_images": unused}

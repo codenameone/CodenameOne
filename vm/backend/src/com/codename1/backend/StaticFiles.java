@@ -90,6 +90,38 @@ public final class StaticFiles implements HttpServer.Handler {
         this.cacheControl = cacheControl;
     }
 
+    /// Several document roots as one mount, as Spring's
+    /// `addResourceLocations(a, b)`: each request is answered by the first
+    /// source that has the file, so an application's own `static` directory
+    /// can override a library's copy. A source that is not mounted at the
+    /// path, or has no such file, passes the request to the next; the last
+    /// one's answer stands.
+    /// @param sources the roots, in the order they are asked
+    /// @return a handler serving from all of them
+    public static HttpServer.Handler firstOf(final StaticFiles... sources) {
+        if (sources == null || sources.length == 0) {
+            throw new IllegalArgumentException("firstOf needs at least one source");
+        }
+        final StaticFiles[] copy = new StaticFiles[sources.length];
+        System.arraycopy(sources, 0, copy, 0, sources.length);
+        return new HttpServer.Handler() {
+            @Override
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response last = null;
+                for (StaticFiles source : copy) {
+                    HttpServer.Response r = source.handle(request);
+                    if (r != null && r.getStatus() != 404) {
+                        return r;
+                    }
+                    if (r != null) {
+                        last = r;
+                    }
+                }
+                return last;
+            }
+        };
+    }
+
     /// True when the body is sent by the kernel rather than copied through here.
     public static boolean isZeroCopy() {
         return HAVE_SENDFILE;

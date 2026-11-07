@@ -41,12 +41,19 @@ public abstract class ClassLoader extends Object {
         return systemClassLoader;
     }
 
+    /// A resource by its path from the root of the class path (no leading
+    /// '/', as on the JDK), or null. Only what the program's class library host
+    /// compiled in can be found -- on a packaged server, its resources.
     public InputStream getResourceAsStream(String name) {
-        throw new UnsupportedOperationException();
+        return getSystemResourceAsStream(name);
     }
 
+    /// See [#getResourceAsStream].
     public static InputStream getSystemResourceAsStream(String name) {
-        throw new UnsupportedOperationException();
+        if (name == null || name.startsWith("/")) {
+            return null;
+        }
+        return Class.cn1HostResource("/" + name);
     }
 
     /// Always empty: nothing on a device can be listed by name the way a class path's

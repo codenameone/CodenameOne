@@ -240,6 +240,63 @@ public final class Tcp {
         return tls != 0;
     }
 
+    /// The certificates the server presented in the TLS handshake, leaf first,
+    /// each as DER; empty while the connection is plaintext. For pinning a
+    /// server's key or reading its expiry -- what `openssl s_client -showcerts`
+    /// prints. The chain has already been verified when this answers: an
+    /// untrusted one failed [#startTls(String)].
+    public byte[][] getPeerCertificates() throws IOException {
+        checkOpen();
+        long[] claimed = new long[1];
+        long session = claim(claimed);
+        byte[] all;
+        try {
+            all = session == 0 ? null : tlsPeerChainImpl(session);
+        } finally {
+            release();
+        }
+        if (all == null) {
+            return new byte[0][];
+        }
+        // The natives hand back the certificates end to end; each is a DER
+        // SEQUENCE, so its own header says where it stops.
+        java.util.List<byte[]> out = new java.util.ArrayList<byte[]>();
+        int at = 0;
+        while (at < all.length) {
+            int length = derLength(all, at);
+            byte[] one = new byte[length];
+            System.arraycopy(all, at, one, 0, length);
+            out.add(one);
+            at += length;
+        }
+        return out.toArray(new byte[out.size()][]);
+    }
+
+    /// The whole length, header included, of the DER element at `at`.
+    private static int derLength(byte[] der, int at) throws IOException {
+        if (at + 2 > der.length) {
+            throw new IOException("A peer certificate is cut short");
+        }
+        int first = der[at + 1] & 0xff;
+        int header = 2;
+        int length = first;
+        if (first >= 0x80) {
+            int count = first & 0x7f;
+            if (count == 0 || count > 4 || at + 2 + count > der.length) {
+                throw new IOException("A peer certificate has a bad length");
+            }
+            length = 0;
+            for (int iter = 0 ; iter < count ; iter++) {
+                length = (length << 8) | (der[at + 2 + iter] & 0xff);
+            }
+            header += count;
+        }
+        if (length < 0 || length > der.length - at - header) {
+            throw new IOException("A peer certificate runs past the chain");
+        }
+        return header + length;
+    }
+
     /// A receive and send deadline for this connection, in milliseconds; 0 for
     /// none.
     ///
@@ -387,6 +444,7 @@ public final class Tcp {
     private static native int tlsReadImpl(long session, byte[] buffer, int offset, int length);
     private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);
     private static native void tlsCloseImpl(long session);
+    private static native byte[] tlsPeerChainImpl(long session);
 
     /// shutdown(2) on the descriptor: wakes whatever is blocked on it WITHOUT
     /// giving the number back to the process. See close().

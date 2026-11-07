@@ -83,12 +83,15 @@ final class BackendBeans {
     static final String SCOPE = PKG + "Scope;";
     static final String PROFILE = PKG + "Profile;";
     static final String ON_PROPERTY = PKG + "ConditionalOnProperty;";
+    static final String ON_EXPRESSION = PKG + "ConditionalOnExpression;";
     static final String ON_MISSING = PKG + "ConditionalOnMissingBean;";
     static final String POST_CONSTRUCT = PKG + "PostConstruct;";
     static final String PRE_DESTROY = PKG + "PreDestroy;";
     static final String TRANSACTIONAL = PKG + "Transactional;";
     static final String ASYNC = PKG + "Async;";
     static final String SCHEDULED = PKG + "Scheduled;";
+    static final String EVENT_LISTENER = PKG + "EventListener;";
+    static final String READY_EVENT = "Lcom/codename1/backend/ApplicationReadyEvent;";
     static final String MANAGED_RESOURCE = PKG + "ManagedResource;";
     static final String MANAGED_ATTRIBUTE = PKG + "ManagedAttribute;";
     static final String MANAGED_OPERATION = PKG + "ManagedOperation;";
@@ -121,7 +124,7 @@ final class BackendBeans {
     static final Set<String> DESCRIPTORS = Collections.unmodifiableSet(
             new LinkedHashSet<String>(java.util.Arrays.asList(COMPONENT,
                     CONFIGURATION, BEAN, AUTOWIRED, VALUE, CONFIG_PROPERTIES, SCOPE,
-                    PROFILE, ON_PROPERTY, ON_MISSING,
+                    PROFILE, ON_PROPERTY, ON_EXPRESSION, ON_MISSING,
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
                     MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
@@ -342,6 +345,8 @@ final class BackendBeans {
         boolean controller;
         boolean webSocket;
         final List<Job> jobs = new ArrayList<Job>();
+        /// `@EventListener` methods, each taking the ready event or nothing.
+        final List<MethodInfo> readyListeners = new ArrayList<MethodInfo>();
         final List<Tool> tools = new ArrayList<Tool>();
         Managed managed;
         /// Request, session and lazy beans: the number the build gives each.
@@ -1152,10 +1157,17 @@ final class BackendBeans {
             }
             for (String k : keys) {
                 String key = prefix.length() == 0 ? k : prefix + "." + k;
+                // An empty havingValue matching anything but "false" is
+                // Spring's own rule (OnPropertyCondition), kept as it is.
                 bean.propertyConditions.add(new String[] {key,
                         prop.getStringOrDefault("havingValue", ""),
                         String.valueOf(prop.getBoolOrDefault("matchIfMissing", false))});
             }
+        }
+        AnnotationValues expression = annotations.get(ON_EXPRESSION);
+        if (expression != null) {
+            // One element: an expression, evaluated by Wiring.expressionMatches.
+            bean.propertyConditions.add(new String[] {expression.getStringOrDefault("value", "true")});
         }
     }
 
@@ -1684,6 +1696,20 @@ final class BackendBeans {
     private void collectJobs(Bean bean) {
         AnnotatedClass cls = bean.cls;
         for (MethodInfo m : inheritedMembers(cls)) {
+            if (m.getAnnotation(EVENT_LISTENER) != null) {
+                Type[] args = Type.getArgumentTypes(m.getDescriptor());
+                if (m.isStatic() || args.length > 1
+                        || args.length == 1 && !READY_EVENT.equals(args[0].getDescriptor())) {
+                    // Spring's context events all fall at one moment here and
+                    // there is no application event bus -- see EventListener.
+                    ctx.error(cls, "@EventListener method " + cls.getSourceName() + "."
+                            + m.getName() + " must be an instance method taking an "
+                            + "ApplicationReadyEvent or nothing; that is the one event "
+                            + "the server sends.");
+                } else {
+                    bean.readyListeners.add(m);
+                }
+            }
             AnnotationValues s = m.getAnnotation(SCHEDULED);
             if (s == null) {
                 continue;

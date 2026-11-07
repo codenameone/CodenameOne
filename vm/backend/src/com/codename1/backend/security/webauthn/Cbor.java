@@ -53,11 +53,20 @@ import java.util.Map;
 /// limited to [#MAX_DEPTH]; and an input over [#MAX_BYTES] is refused before
 /// it is looked at. Every failure is a [WebAuthnException] with the reason
 /// [WebAuthnException#MALFORMED_CBOR].
-final class Cbor {
+///
+/// It is public for what is built the same way outside WebAuthn: an App
+/// Attest attestation object is the same CBOR map of `fmt`, `attStmt` and
+/// `authData`, and reads with [#decode(byte[])] as it stands.
+///
+/// ```java
+/// Map attestation = (Map) Cbor.decode(attestationObject);
+/// byte[] authData = (byte[]) attestation.get("authData");
+/// ```
+public final class Cbor {
     /// The deepest nesting read. An attestation statement nests four deep.
-    static final int MAX_DEPTH = 8;
+    public static final int MAX_DEPTH = 8;
     /// The largest input read, in bytes.
-    static final int MAX_BYTES = 65536;
+    public static final int MAX_BYTES = 65536;
 
     private static final int BREAK = -2;
 
@@ -72,7 +81,10 @@ final class Cbor {
     }
 
     /// The one value `data` is; anything after it is refused.
-    static Object decode(byte[] data) {
+    ///
+    /// @throws WebAuthnException when `data` is not one value of the kinds
+    /// above, with the reason [WebAuthnException#MALFORMED_CBOR]
+    public static Object decode(byte[] data) {
         int[] next = new int[1];
         Object value = decode(data, 0, next);
         if (next[0] != data.length) {
@@ -84,7 +96,8 @@ final class Cbor {
     /// The value that starts at `offset`.
     ///
     /// @param next receives, at index 0, the offset of the byte after the value
-    static Object decode(byte[] data, int offset, int[] next) {
+    /// @throws WebAuthnException when no value of the kinds above starts there
+    public static Object decode(byte[] data, int offset, int[] next) {
         if (data == null) {
             throw malformed("no input");
         }
