@@ -258,10 +258,12 @@ public class ArenaView extends GameView {
         }
         float w = arena.width * MM;
         float dpt = arena.depth * MM;
-        addModel(flat(new Material(Material.Type.PBR).setColor(0xff4a4d50).setRoughness(0.92f), -w / 2f, 0f, dpt / 2f,
-                w, dpt));
-        addModel(flat(new Material(Material.Type.PBR).setColor(0xff55683a).setRoughness(1f), -w / 2f, -0.02f, dpt / 2f,
-                400f, 400f));
+        // Photo-scanned surfaces (Poly Haven, CC0), tiled every few metres:
+        // the yard is concrete, the street asphalt, and beyond the wire grass.
+        boolean street = arena.id.indexOf("sac") >= 0;
+        addModel(ground(surface(street ? "asphalt" : "concrete", 0xff4a4d50), 0.92f, -w / 2f, 0f, dpt / 2f,
+                w, dpt, street ? 5f : 4f));
+        addModel(ground(surface("grass", 0xff55683a), 1f, -w / 2f, -0.02f, dpt / 2f, 400f, 400f, 6f));
         perimeter(w, dpt);
         greenery(w, dpt);
         List<Box> boxes = arena.boxes();
@@ -332,8 +334,43 @@ public class ArenaView extends GameView {
         Sfx.load();
     }
 
-    private Model flat(Material m, float x, float y, float z, float sx, float sz) {
-        Model model = new Model(quad, m);
+    /// A tiling texture from the resources, or a plain `fallback` colour
+    /// where it cannot be read.
+    private Texture surface(String name, int fallback) {
+        try {
+            java.io.InputStream in = CN.getResourceAsStream("/tex_" + name + ".jpg");
+            if (in != null) {
+                try {
+                    return device.createTexture(com.codename1.ui.Image.createImage(in)).setWrap(Texture.Wrap.REPEAT);
+                } finally {
+                    in.close();
+                }
+            }
+        } catch (java.io.IOException e) {
+            // drawn in the fallback colour below
+        }
+        return device.createTexture(1, 1, new int[] {fallback});
+    }
+
+    /// A flat rectangle of ground with `tex` repeated every `tile` metres.
+    private Model ground(Texture tex, float roughness, float x, float y, float z, float sx, float sz, float tile) {
+        float u = sx / tile;
+        float v = sz / tile;
+        float[] vs = {
+            -0.5f, -0.5f, 0, 0, 0, 1, 0, v,
+            0.5f, -0.5f, 0, 0, 0, 1, u, v,
+            0.5f, 0.5f, 0, 0, 0, 1, u, 0,
+            -0.5f, 0.5f, 0, 0, 0, 1, 0, 0,
+        };
+        com.codename1.gpu.VertexBuffer vb = device.createVertexBuffer(
+                com.codename1.gpu.VertexFormat.POSITION_NORMAL_TEXCOORD, 4);
+        vb.setData(vs);
+        com.codename1.gpu.IndexBuffer ib = device.createIndexBuffer(6);
+        ib.setData(new int[] {0, 1, 2, 0, 2, 3});
+        Mesh mesh = new Mesh(vb, ib, com.codename1.gpu.PrimitiveType.TRIANGLES);
+        Material m = new Material(Material.Type.PBR).setColor(0xffffffff).setRoughness(roughness);
+        m.setTexture(tex);
+        Model model = new Model(mesh, m);
         model.setRotation(-90f, 0f, 0f);
         model.setScale(sx, sz, 1f);
         model.setPosition(x, y, z);
@@ -538,8 +575,8 @@ public class ArenaView extends GameView {
             onArc(c, KEY_THROW, small, fire, arc, 45),
             onArc(c, KEY_JUMP, small, fire, arc, 90),
             // the bird's-eye view, out of the way of the thumb
-            c.addButton(KEY_VIEW, CN.convertToPixels(4.5f), TouchControls.RIGHT, TouchControls.BOTTOM,
-                    gap, fire + arc + small + CN.convertToPixels(4)),
+            c.addButton(KEY_VIEW, CN.convertToPixels(4.5f), TouchControls.RIGHT, TouchControls.CENTER,
+                    gap, 0),
         };
         String[] labels = {"FIRE", "AIM", "NADE", "JUMP", "VIEW"};
         for (int i = 0; i < buttons.length; i++) {

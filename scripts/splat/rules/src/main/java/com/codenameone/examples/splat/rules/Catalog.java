@@ -104,6 +104,10 @@ public final class Catalog {
                 return ARENAS[i];
             }
         }
+        Arena mission = Mission.registered(id);
+        if (mission != null) {
+            return mission;
+        }
         throw new IllegalArgumentException("arena " + id);
     }
 }

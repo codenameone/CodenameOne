@@ -22,6 +22,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codenameone.examples.splat.rules.Arena;
 import com.codenameone.examples.splat.rules.Box;
 import com.codenameone.examples.splat.rules.Event;
@@ -892,33 +893,39 @@ public final class Hud extends Component implements ArenaView.Hud {
         if (p.paintedBy() >= 0 && p.paintedBy() < match.playerCount()) {
             color = ArenaView.TEAM_COLORS[match.player(p.paintedBy()).team()] & 0xffffff;
         }
-        g.setColor(color);
         int s = splatSeed * 2654435 + 7;
         int unit = Math.min(w, h);
-        // A few splats hugging the edges of the visor, each a blob ringed by
-        // droplets with one thin run down from it: the middle stays clear.
+        // A few real splats hugging the edges of the visor, running down as
+        // they age: the middle stays clear so you can see who did it.
         for (int i = 0; i < 4; i++) {
             s = s * 1103515245 + 12345;
             int along = ((s >>> 8) & 0x7fff) % Math.max(1, unit);
             int edge = (s >>> 3) & 3;
             int bx = edge == 0 ? x0 + unit / 14 : edge == 1 ? x0 + w - unit / 14 : x0 + along * w / Math.max(1, unit);
             int by = edge >= 2 ? (edge == 2 ? y0 + h / 7 : y0 + h - h / 7) : y0 + along * h / Math.max(1, unit);
-            int r = unit / 14 + (i % 3) * unit / 40;
+            int r = unit / 6 + (i % 3) * unit / 20;
+            int drip = (int) Math.min(r / 2, age * r / 2600);
             g.setAlpha(alpha);
-            g.fillArc(bx - r, by - r, r * 2, r * 2, 0, 360);
-            for (int k = 0; k < 7; k++) {
-                s = s * 1103515245 + 12345;
-                double ang = ((s >>> 8) & 1023) / 1023.0 * Math.PI * 2;
-                int dist = r + ((s >>> 18) & 63) * r / 63;
-                int dr = Math.max(2, r / (3 + (k & 3)));
-                g.fillArc(bx + (int) (Math.cos(ang) * dist) - dr, by + (int) (Math.sin(ang) * dist) - dr,
-                        dr * 2, dr * 2, 0, 360);
-            }
-            int drip = (int) Math.min(r * 2, age * r / 900);
-            g.setAlpha(alpha * 3 / 4);
-            g.fillRect(bx - r / 10, by, Math.max(2, r / 5), r / 2 + drip);
+            g.drawImage(visorSplat(color, (splatSeed + i) & 3), bx - r, by - r + drip / 2, r * 2, r * 2 + drip);
         }
         g.setAlpha(255);
+    }
+
+    private final java.util.Map<Integer, Image> visorSplats = new java.util.HashMap<Integer, Image>();
+
+    /// A dripping splat in `rgb`, one of four shapes, built once and kept.
+    private Image visorSplat(int rgb, int variant) {
+        Integer key = Integer.valueOf((rgb << 2) | variant);
+        Image img = visorSplats.get(key);
+        if (img == null) {
+            int[] px = PaintDecals.splat(9001L + variant * 7919L, true);
+            for (int i = 0; i < px.length; i++) {
+                px[i] = (px[i] & 0xff000000) | rgb;
+            }
+            img = Image.createImage(px, PaintDecals.SIZE, PaintDecals.SIZE);
+            visorSplats.put(key, img);
+        }
+        return img;
     }
 
     /// The stamp: slammed on at twice the size and settling, a little crooked,

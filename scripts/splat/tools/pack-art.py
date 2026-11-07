@@ -5,7 +5,12 @@ The models are CC0 packs (see ART.md): Quaternius's Ultimate Modular Men and
 Toon Shooter Game Kit and Ultimate Nature, and Kenney's Blaster Kit and Survival Kit. Unzip them
 anywhere and run
 
-    tools/pack-art.py <directory holding the unzipped packs>
+    tools/pack-art.py <directory holding the unzipped packs> [<poly haven directory>]
+
+The optional second directory holds the Poly Haven (CC0) downloads, one
+folder per model under models/ and per surface under textures/; with it the
+props in REALISTIC replace their low-poly namesakes and the SURFACES are
+written as tex_<name>.jpg.
 
 Every model is written as a self-contained binary glTF,
 common/src/main/resources/model_<name>.glb: external textures are embedded
@@ -177,7 +182,7 @@ def embed_images(g, bin_, base):
         g['bufferViews'].append({'buffer': 0, 'byteOffset': len(out), 'byteLength': len(raw)})
         out += raw
         img['bufferView'] = len(g['bufferViews']) - 1
-        img['mimeType'] = 'image/png'
+        img['mimeType'] = 'image/jpeg' if raw[:2] == b'\xff\xd8' else 'image/png'
     return bytes(out)
 
 
@@ -276,10 +281,72 @@ def pack(root, name, stem, clips=None):
     return os.path.getsize(path)
 
 
+# Poly Haven (CC0) photo-scanned props, replacing the low-poly ones by name.
+# Only the base colour is kept -- the engine reads no normal or ARM maps --
+# shrunk to 512 px so a prop costs tens of KB, not megabytes.
+REALISTIC = {
+    'car': 'covered_car', 'barrier': 'concrete_road_barrier_02', 'barrier-single': 'concrete_road_barrier',
+    'sofa': 'sofa_02', 'barrel': 'barrel_03', 'streetlight': 'street_lamp_01',
+    'boxes': 'cardboard_box_01',
+}
+# Tiling ground and wall surfaces, base colour only.
+SURFACES = {'asphalt': 'asphalt_02', 'concrete': 'concrete_floor_02', 'grass': 'grass_ground',
+            'gravel': 'gravel_road', 'iron': 'corrugated_iron'}
+
+
+def shrink(raw, size=512, quality=82):
+    from PIL import Image
+    import io
+    im = Image.open(io.BytesIO(raw)).convert('RGB')
+    im.thumbnail((size, size), Image.LANCZOS)
+    out = io.BytesIO()
+    im.save(out, 'JPEG', quality=quality, optimize=True)
+    return out.getvalue()
+
+
+def pack_real(real, name, stem):
+    src = os.path.join(real, 'models', stem, stem + '_1k.gltf')
+    g, bin_ = read(src)
+    base = os.path.dirname(src)
+    keep = set()
+    for m in g.get('materials', []):
+        pbr = m.setdefault('pbrMetallicRoughness', {})
+        if 'baseColorTexture' in pbr:
+            keep.add(g['textures'][pbr['baseColorTexture']['index']]['source'])
+        pbr.pop('metallicRoughnessTexture', None)
+        for k in ('normalTexture', 'occlusionTexture', 'emissiveTexture'):
+            m.pop(k, None)
+    for i, img in enumerate(g.get('images', [])):
+        path = os.path.join(base, img['uri'])
+        raw = open(path, 'rb').read() if i in keep else b''
+        if i not in keep:
+            # a 1x1 placeholder keeps every texture index valid
+            from PIL import Image
+            import io
+            o = io.BytesIO()
+            Image.new('RGB', (1, 1), (128, 128, 255)).save(o, 'JPEG')
+            raw = o.getvalue()
+        img['uri'] = 'data:image/jpeg;base64,' + base64.b64encode(shrink(raw)).decode()
+    bin_ = embed_images(g, bin_, base)
+    g['animations'] = []
+    bin_ = keep_clips(g, bin_, [])
+    path = os.path.join(OUT, 'model_' + name + '.glb')
+    write_glb(g, bin_, path)
+    return os.path.getsize(path)
+
+
+def pack_surface(real, name, stem):
+    raw = open(os.path.join(real, 'textures', stem, stem + '_diff_1k.jpg'), 'rb').read()
+    path = os.path.join(OUT, 'tex_' + name + '.jpg')
+    open(path, 'wb').write(shrink(raw))
+    return os.path.getsize(path)
+
+
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         raise SystemExit(__doc__)
     root = sys.argv[1]
+    real = sys.argv[2] if len(sys.argv) == 3 else None
     os.makedirs(OUT, exist_ok=True)
     total = 0
     for name, stem in OPERATORS.items():
@@ -289,6 +356,11 @@ def main():
             total += pack(root, name, stem)
     for name, stem in NATURE.items():
         total += pack_obj(root, name, stem)
+    if real is not None:
+        for name, stem in REALISTIC.items():
+            total += pack_real(real, name, stem)
+        for name, stem in SURFACES.items():
+            total += pack_surface(real, name, stem)
     print('packed %d models, %d KB' % (len(OPERATORS) + len(MARKERS) + len(PROPS) + len(NATURE), total // 1024))
 
 
