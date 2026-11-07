@@ -280,6 +280,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String prefix;
         /** For each variable, the literal that must follow it; "" when it runs to the end. */
         List<String> after = new ArrayList<String>();
+        /// The last variable takes the rest of the path, slashes included:
+        /// `{name:.+}`, `{name:.*}` or Spring's `{*name}`.
+        boolean greedyLast;
         /**
          * The statements that write `result` through the generated codecs, when the
          * return type is one of the application's own classes or holds one; null
@@ -865,6 +868,40 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             String variableName = route.pattern.substring(pos + 1, close);
+            int next = route.pattern.indexOf('{', close);
+            // A PATTERN IN A VARIABLE. The one form a real API needs is the
+            // catch-all at the end -- a file path, a proxied remainder -- and
+            // that is a matcher flag, not a regex: /files/{path:.+} takes
+            // every segment that is left. Any other regex is refused rather
+            // than ignored. The device's class library has no regex engine
+            // the generated router could call, and a variable whose constraint
+            // was silently dropped would answer requests the author meant to
+            // reject; a constraint is checked in the handler instead.
+            String constraint = null;
+            if (variableName.startsWith("*")) {
+                variableName = variableName.substring(1);
+                constraint = ".*";
+            } else if (variableName.indexOf(':') >= 0) {
+                constraint = variableName.substring(variableName.indexOf(':') + 1);
+                variableName = variableName.substring(0, variableName.indexOf(':'));
+            }
+            if (constraint != null) {
+                boolean catchAll = ".+".equals(constraint) || ".*".equals(constraint)
+                        || "**".equals(constraint);
+                if (!catchAll || next >= 0 || close != route.pattern.length() - 1) {
+                    ctx.error(cls, "The route " + route.pattern + " on "
+                            + cls.getBinaryName() + "." + m.getName() + " constrains {"
+                            + variableName + "} with " + constraint + ". Only a catch-all "
+                            + "({name:.+} or {*name}) as the last part of a route is "
+                            + "supported; check any other format in the method");
+                    return null;
+                }
+                route.greedyLast = true;
+                // Spelled as a plain variable from here on, so the overlap check,
+                // the contract and the trace all read one form.
+                route.pattern = route.pattern.substring(0, pos) + "{" + variableName + "}";
+                close = route.pattern.length() - 1;
+            }
             // A NAME ONCE. Every binding is resolved with indexOf, which answers
             // the FIRST match, so /pairs/{id}/{id} bound both @PathVariable("id")
             // parameters to the first segment and dropped the second without a
@@ -878,7 +915,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             variableNames.add(variableName);
-            int next = route.pattern.indexOf('{', close);
             String following = next < 0 ? route.pattern.substring(close + 1)
                                         : route.pattern.substring(close + 1, next);
             // Two variables with nothing between them cannot be split. There is
@@ -1882,7 +1918,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     sb.append("request.pathIs(P").append(i).append(")");
                 } else {
                     sb.append("request.pathStartsWith(P").append(i).append(") && bindPath(request.pathFrom(P")
-                      .append(i).append(".length), A").append(i).append(") != null");
+                      .append(i).append(".length), A").append(i).append(", ").append(route.greedyLast)
+                      .append(") != null");
                 }
                 sb.append(") return C").append(i).append(";\n");
             }
@@ -1981,7 +2018,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         } else {
             sb.append("            if (request.pathStartsWith(P").append(index).append(")) {\n");
             sb.append(pad).append("String[] bound = bindPath(request.pathFrom(P").append(index)
-              .append(".length), A").append(index).append(");\n");
+              .append(".length), A").append(index).append(", ").append(route.greedyLast).append(");\n");
             sb.append(pad).append("if (bound != null) {\n");
             pad = "                    ";
             bound = "bound";
@@ -3057,7 +3094,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("     * to the server's header limit. The same path now fails on the suffix\n");
         sb.append("     * check, before anything is searched at all.\n");
         sb.append("     */\n");
-        sb.append("    private static String[] bindPath(String rest, String[] after) {\n");
+        sb.append("    private static String[] bindPath(String rest, String[] after, boolean greedyLast) {\n");
         sb.append("        int last = after.length - 1;\n");
         sb.append("        int end = rest.length();\n");
         sb.append("        if (after[last].length() > 0) {\n");
@@ -3086,7 +3123,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("            bounds[i * 2 + 1] = at;\n");
         sb.append("            pos = at + literal.length();\n");
         sb.append("        }\n");
-        sb.append("        if (pos >= end || crossesASlash(rest, pos, end)) {\n");
+        sb.append("        // A catch-all ({path:.+}) is the one value allowed to span segments.\n");
+        sb.append("        if (pos >= end || (!greedyLast && crossesASlash(rest, pos, end))) {\n");
         sb.append("            return null;\n");
         sb.append("        }\n");
         sb.append("        bounds[last * 2] = pos;\n");

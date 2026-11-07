@@ -2058,6 +2058,43 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aCatchAllVariableTakesTheRestOfThePath() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Files", PKG
+                + "@RestController public class Files {\n"
+                + "    @GetMapping(\"/files/{path:.+}\") public String file(@PathVariable(\"path\") String p) {\n"
+                + "        return \"f:\" + p;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/raw/{*rest}\") public String raw(@PathVariable(\"rest\") String r) {\n"
+                + "        return \"r:\" + r;\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend b = start(classes, port, new Properties());
+        try {
+            assertEquals("f:a/b/c.txt", http("GET", port, "/files/a/b/c.txt"));
+            assertEquals("r:x", http("GET", port, "/raw/x"));
+        } finally {
+            b.stop();
+        }
+    }
+
+    @Test
+    public void anyOtherVariablePatternIsRefused() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Files", PKG
+                + "@RestController public class Files {\n"
+                + "    @GetMapping(\"/n/{id:[0-9]+}\") public String n(@PathVariable(\"id\") String id) {\n"
+                + "        return id;\n"
+                + "    }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Only a catch-all"));
+    }
+
+    @Test
     public void repeatedAndBoxedRequestParamsBind() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Api", PKG
