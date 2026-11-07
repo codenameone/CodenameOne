@@ -70,6 +70,13 @@ import java.util.Map;
 /// description it belongs to waits for it. Either side ends with END; the
 /// callee can DECLINE instead of answering.
 ///
+/// A connected call whose path is lost -- one phone moved from Wi-Fi to mobile
+/// data -- shows "Reconnecting..." over the last frame rather than a frozen
+/// picture that still says connected. The caller restarts ICE and sends a
+/// new OFFER on the same connection, the callee answers it as before, and
+/// the call carries on; one that has not recovered in [#GIVE_UP_MS] ends.
+/// Only the caller restarts, so the two never offer at once.
+///
 /// Where the platform has a system call screen -- CallKit, Android's
 /// ConnectionService -- the call is reported to it as well, so it rings on
 /// the lock screen and shows in the phone's call log, and the system's own
@@ -88,7 +95,14 @@ public final class Calls {
     public static final String CALLING = "calling";
     public static final String CONNECTING = "connecting";
     public static final String CONNECTED = "connected";
+    public static final String RECONNECTING = "reconnecting";
     public static final String ENDED = "ended";
+
+    /// How long a disconnected path gets to come back by itself before the
+    /// caller restarts ICE. A failed one is restarted at once.
+    static final int RESTART_AFTER_MS = 2000;
+    /// How long a call may stay reconnecting before it is given up.
+    static final int GIVE_UP_MS = 20000;
 
     private static Call current;
     private static boolean systemReady;
@@ -120,6 +134,11 @@ public final class Calls {
         boolean cameraOff;
         MediaTrack remoteVideo;
         long answeredAt;
+        /// When the path was lost, 0 while it is up. Timers compare it, so one
+        /// set for an earlier loss does nothing.
+        long lostAt;
+        /// An ICE restart was offered and its answer has not been set.
+        boolean restarting;
 
         Call(String id, String uuid, String conversationId, String peerName, boolean video,
                 boolean outgoing) {
@@ -496,11 +515,16 @@ public final class Calls {
                     if (call.answeredAt == 0) {
                         call.answeredAt = System.currentTimeMillis();
                     }
+                    call.lostAt = 0;
                     state(call, CONNECTED);
                     if (call.system != null) {
                         call.system.reportConnected();
                     }
+                } else if (call.answeredAt > 0 && (PeerConnection.DISCONNECTED.equals(state)
+                        || PeerConnection.FAILED.equals(state))) {
+                    lost(call, PeerConnection.FAILED.equals(state));
                 } else if (PeerConnection.FAILED.equals(state)) {
+                    // Never connected: there is no path to go back to.
                     Ui.say(Lang.tr("The call was lost"));
                     hangUp();
                 }
@@ -523,6 +547,55 @@ public final class Calls {
         WebRtc.setSpeakerphone(call.video);
         call.speaker = call.video;
         then.run();
+    }
+
+    /// The path of a connected call went away. Called again for each further
+    /// DISCONNECTED or FAILED while reconnecting, which retries the restart.
+    private static void lost(final Call call, boolean failed) {
+        if (!RECONNECTING.equals(call.state)) {
+            final long at = System.currentTimeMillis();
+            call.lostAt = at;
+            state(call, RECONNECTING);
+            CN.setTimeout(GIVE_UP_MS, () -> {
+                if (current == call && call.lostAt == at) {
+                    Ui.say(Lang.tr("The call was lost"));
+                    hangUp();
+                }
+            });
+            if (call.outgoing && !failed) {
+                // DISCONNECTED can be a moment's loss that recovers by itself.
+                CN.setTimeout(RESTART_AFTER_MS, () -> {
+                    if (current == call && call.lostAt == at) {
+                        restart(call);
+                    }
+                });
+                return;
+            }
+        }
+        if (call.outgoing) {
+            restart(call);
+        }
+    }
+
+    /// Offers new paths on the same connection: tracks and views stay.
+    private static void restart(final Call call) {
+        if (call.restarting || call.connection == null) {
+            return;
+        }
+        call.restarting = true;
+        // The callee's new candidates wait for its answer, as at the start.
+        call.remoteSet = false;
+        call.connection.restartIce();
+        call.connection.createOffer().ready(offer -> {
+            if (current != call) {
+                return;
+            }
+            // Sent before it is set: candidates are gathered only once it is,
+            // and signals go out in order, so the callee has the new offer
+            // before any candidate that belongs to it.
+            send(call, OFFER, offer.getSdp());
+            call.connection.setLocalDescription(offer).except(why -> failed(call, why));
+        }).except(why -> failed(call, why));
     }
 
     private static void remoteSet(Call call) {
@@ -581,7 +654,14 @@ public final class Calls {
         String payload = text(frame, "payload");
         String state = text(frame, "state");
         if (OFFER.equals(signal) && !call.outgoing) {
+            if (call.offerTaken && call.answeredAt > 0 && call.connection != null) {
+                // The caller restarted ICE: answered on the same connection.
+                call.offer = new SessionDescription(SessionDescription.OFFER, payload);
+                answerOffer(call);
+                return;
+            }
             if (call.offerTaken) {
+                // The server's replay of the first offer, already answered.
                 return;
             }
             call.offer = new SessionDescription(SessionDescription.OFFER, payload);
@@ -589,10 +669,14 @@ public final class Calls {
                 answerOffer(call);
             }
         } else if (ANSWER.equals(signal) && call.outgoing && call.connection != null) {
-            state(call, CONNECTING);
+            if (!RECONNECTING.equals(call.state)) {
+                state(call, CONNECTING);
+            }
             call.connection.setRemoteDescription(new SessionDescription(
-                    SessionDescription.ANSWER, payload)).ready(done -> remoteSet(call))
-                    .except(why -> failed(call, why));
+                    SessionDescription.ANSWER, payload)).ready(done -> {
+                        call.restarting = false;
+                        remoteSet(call);
+                    }).except(why -> failed(call, why));
         } else if (ACCEPT.equals(signal) && call.outgoing) {
             state(call, CONNECTING);
         } else if (ICE.equals(signal)) {

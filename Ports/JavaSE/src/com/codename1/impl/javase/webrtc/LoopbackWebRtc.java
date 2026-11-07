@@ -42,6 +42,10 @@ import java.util.Map;
 /// call may be two simulators or a simulator and a test that answers through
 /// the app's own signalling, and the flow is identical either way. A video
 /// view paints a test pattern naming its track.
+///
+/// [#dropNetwork()] is a phone changing network: every connected peer
+/// reports disconnected and stays that way until the app restarts ICE and
+/// the new offer and answer are exchanged. The tracks it had keep going.
 public final class LoopbackWebRtc implements WebRtcBridge {
     private static final int[] BARS = {0xc0c0c0, 0xc0c000, 0x00c0c0, 0x00c000, 0xc000c0, 0xc00000,
             0x0000c0};
@@ -56,7 +60,18 @@ public final class LoopbackWebRtc implements WebRtcBridge {
         String remote;
         boolean local;
         boolean connected;
+        /// Tracks were handed over once; a restart reconnects without
+        /// handing them over again.
+        boolean tracksDelivered;
+        boolean restarting;
+        /// The path was dropped. A lost peer reconnects only on an exchange
+        /// made after a restart: a restarted offer, or an offer the other
+        /// side restarted, together with its answer.
+        boolean lost;
+        boolean freshLocal;
+        boolean freshRemote;
         int session;
+        int version = 2;
     }
 
     public synchronized int createPeerConnection(String iceServers, boolean relayOnly) {
@@ -101,7 +116,8 @@ public final class LoopbackWebRtc implements WebRtcBridge {
             return;
         }
         StringBuilder sdp = new StringBuilder();
-        sdp.append("v=0\r\no=- ").append(p.session).append(" 2 IN IP4 127.0.0.1\r\n")
+        sdp.append("v=0\r\no=- ").append(p.session).append(' ').append(p.version)
+                .append(" IN IP4 127.0.0.1\r\n")
                 .append("s=-\r\nt=0 0\r\n");
         for (int iter = 0; iter < p.sending.size(); iter++) {
             String kind = p.sending.get(iter);
@@ -121,15 +137,29 @@ public final class LoopbackWebRtc implements WebRtcBridge {
                 WebRtc.deliverResult(requestId, "closed");
                 return;
             }
+            boolean offer = "offer".equals(type);
             if (remote) {
                 p.remote = sdp == null ? "" : sdp;
+                if (p.lost && (offer || p.freshLocal)) {
+                    p.freshRemote = true;
+                }
             } else {
                 p.local = true;
+                if (p.lost && (offer ? p.restarting : p.freshRemote)) {
+                    p.freshLocal = true;
+                }
             }
-            if (p.local && p.remote != null && !p.connected) {
+            if (p.lost && p.freshLocal && p.freshRemote) {
+                p.lost = false;
+                p.restarting = false;
+                p.freshLocal = false;
+                p.freshRemote = false;
+            }
+            if (!p.lost && p.local && p.remote != null && !p.connected) {
                 p.connected = true;
                 connect = true;
-                arriving = kinds(p.remote);
+                arriving = p.tracksDelivered ? new ArrayList<String>() : kinds(p.remote);
+                p.tracksDelivered = true;
             }
         }
         WebRtc.deliverResult(requestId, null);
@@ -173,6 +203,37 @@ public final class LoopbackWebRtc implements WebRtcBridge {
 
     public void addIceCandidate(int peer, String sdpMid, int sdpMLineIndex, String candidate) {
         // Nothing to try: the loopback is connected by its descriptions.
+    }
+
+    /// The next exchange of descriptions finds a new path. Until then the
+    /// peer stays as it is; a disconnected one stays disconnected.
+    public synchronized void restartIce(int peer) {
+        Peer p = peers.get(Integer.valueOf(peer));
+        if (p != null) {
+            p.restarting = true;
+            p.version++;
+        }
+    }
+
+    /// The device changed network: every connected peer loses its path.
+    /// One whose ICE is not restarted never comes back.
+    public void dropNetwork() {
+        List<Integer> dropped = new ArrayList<Integer>();
+        synchronized (this) {
+            for (Map.Entry<Integer, Peer> e : peers.entrySet()) {
+                Peer p = e.getValue();
+                if (p.connected) {
+                    p.connected = false;
+                    p.lost = true;
+                    p.freshLocal = false;
+                    p.freshRemote = false;
+                    dropped.add(e.getKey());
+                }
+            }
+        }
+        for (int iter = 0; iter < dropped.size(); iter++) {
+            WebRtc.stateChanged(dropped.get(iter).intValue(), "disconnected");
+        }
     }
 
     public synchronized void closePeerConnection(int peer) {

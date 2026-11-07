@@ -18,12 +18,14 @@
  */
 package com.codenameone.examples.parley;
 
+import com.codename1.ui.Display;
 import java.util.List;
 import java.util.Map;
 
 /// A voice call from the app, answered by the other side through the
 /// signalling relay: ringing, connected through the simulator's WebRTC,
-/// muted, hung up, and the server's record of it.
+/// muted, reconnected after a network change, hung up, and the server's
+/// record of it.
 public class CallTest extends E2e {
     private static final String ANSWER_SDP =
             "v=0\\r\\no=- 1 2 IN IP4 127.0.0.1\\r\\ns=-\\r\\nt=0 0\\r\\n"
@@ -49,6 +51,25 @@ public class CallTest extends E2e {
         signal(bob, id[0], "ANSWER", ANSWER_SDP);
         untilText("callState", "End-to-end encrypted");
         shot("call-connected");
+
+        // One phone moves from Wi-Fi to mobile data: the path is gone. The
+        // screen must stop saying connected, the app must restart ICE on the
+        // same call, and the call must come back once that offer is answered.
+        // Bob answers each time until Alice's restarted offer has gone out;
+        // the simulator's WebRTC reconnects only on an answer to that one.
+        onEdt(() -> Display.getInstance().setProperty("platformHint.webrtc.dropNetwork",
+                "true"));
+        untilText("callState", "Reconnecting...");
+        shot("call-reconnecting");
+        long[] next = new long[1];
+        until(() -> {
+            if (System.currentTimeMillis() >= next[0]) {
+                next[0] = System.currentTimeMillis() + 1000;
+                signal(bob, id[0], "ANSWER", ANSWER_SDP);
+            }
+            return "End-to-end encrypted".equals(text("callState"));
+        }, 20000, "the call to reconnect after the network changed");
+        assertEqual("ACCEPTED", state(bob, id[0]), "the call kept going on the server");
 
         click("mute");
         until(() -> has("mute"), 20000, "the mute button again");

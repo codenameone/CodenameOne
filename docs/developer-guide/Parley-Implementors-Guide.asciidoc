@@ -226,6 +226,12 @@ callee's phone already holds it when the person answers. A candidate that arrive
 before the description it belongs to waits for it. A call nobody ended is closed
 by a sweep after it has been ringing too long, or running for hours.
 
+A connected call survives a change of network, such as one phone moving from Wi-Fi
+to mobile data. The call screen shows "Reconnecting..." over the last frame. The
+caller restarts ICE and sends a new `OFFER` on the same connection, and the callee
+answers it as it answered the first. The server needs nothing new: it relays the
+second offer like the first. A call that hasn't recovered in 20 seconds ends.
+
 Where the platform has a system call screen the call is reported to it as well:
 CallKit on iOS and the ConnectionService on Android, through `com.codename1.call`.
 The call rings on the lock screen, shows in the phone's call log, and the system's
