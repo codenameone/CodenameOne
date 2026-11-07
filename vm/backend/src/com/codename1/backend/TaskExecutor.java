@@ -29,8 +29,11 @@ import java.util.LinkedList;
 /// A named place background work runs: a pool of platform threads, or virtual
 /// threads on the server's hosts.
 ///
-/// Configured as `cn1.task.executor.<name>.threads` and
+/// Configured as `cn1.task.executor.<name>.threads`,
 /// `cn1.task.executor.<name>.kind` (`platform` or `virtual`),
+/// `cn1.task.executor.<name>.queue-capacity` (how many tasks may wait for a
+/// pool thread before [TaskRejectedException]; unbounded by default) and
+/// `cn1.task.executor.<name>.thread-name-prefix`,
 /// and listed by [Tasks#executors]. The threads of a pool start on the
 /// first task, so an executor the configuration names and nothing uses costs a
 /// map entry.
@@ -86,6 +89,23 @@ public final class TaskExecutor {
     }
 
     private boolean auto;
+    /// Pool tasks that may wait for a thread; set once, before any task.
+    private int queueCapacity = Integer.MAX_VALUE;
+    private String threadNamePrefix;
+    private TaskDecorator decorator;
+
+    /// The settings Tasks reads for this executor, applied before it is shared.
+    void configure(int capacity, String prefix) {
+        queueCapacity = capacity < 1 ? Integer.MAX_VALUE : capacity;
+        threadNamePrefix = prefix;
+    }
+
+    /// Wraps every task submitted from now on; null removes the decorator.
+    /// Tasks already submitted run as they were.
+    /// @param decorator the decorator, or null
+    public synchronized void setTaskDecorator(TaskDecorator decorator) {
+        this.decorator = decorator;
+    }
 
     /// Fixes an AUTO executor to one kind of thread, when another caller of the
     /// same name asks for that kind explicitly. Otherwise which kind a
@@ -158,6 +178,18 @@ public final class TaskExecutor {
         if (task == null) {
             return;
         }
+        TaskDecorator wrap;
+        synchronized (this) {
+            wrap = decorator;
+        }
+        if (wrap != null) {
+            // On the submitting thread, outside the lock: decorating is what
+            // reads the submitter's context, and it is the application's code.
+            Runnable decorated = wrap.decorate(task);
+            if (decorated != null) {
+                task = decorated;
+            }
+        }
         boolean tryVirtual;
         synchronized (this) {
             tryVirtual = virtual || auto;
@@ -191,6 +223,10 @@ public final class TaskExecutor {
             if (shutdown) {
                 throw new IllegalStateException("Executor " + name + " has been shut down");
             }
+            if (queue.size() >= queueCapacity) {
+                throw new TaskRejectedException("Executor " + name + " has "
+                        + queue.size() + " tasks waiting, its queue-capacity");
+            }
             queue.addLast(task);
             if (workers == null) {
                 startWorkers();
@@ -207,7 +243,7 @@ public final class TaskExecutor {
                 public void run() {
                     work();
                 }
-            }, "cn1-task-" + name + "-" + iter);
+            }, (threadNamePrefix != null ? threadNamePrefix : "cn1-task-" + name + "-") + iter);
             t.setDaemon(true);
             workers[iter] = t;
             t.start();
