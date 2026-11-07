@@ -518,10 +518,10 @@ Conditional requests and ranges are honoured, and where the platform supports it
 the file is sent from the page cache to the socket without passing through the
 process.
 
-[[backend-web-errors]]
 `StaticFiles.firstOf(a, b, ...)` serves from the first of several roots that has
 the file, so an application can overlay its own assets on a library's.
 
+[[backend-web-errors]]
 ==== When a method throws
 
 A method that throws answers 500 with a body that reveals nothing about the
@@ -643,7 +643,6 @@ A request passes through these stages in order:
 Because interceptors run inside the security chain and never see the failures
 security owns, an interceptor can't let through a request security refused.
 
-[[backend-web-servlet-equivalents]]
 `MappedInterceptor` limits an interceptor to some paths, as Spring's
 `addPathPatterns` and `excludePathPatterns` do: `*` matches within one segment
 and `/**` matches any number of them.
@@ -652,6 +651,7 @@ and `/**` matches any number of them.
 path to another, or a bare status for a path. A backend renders no server-side
 views, so there is no view-name form.
 
+[[backend-web-servlet-equivalents]]
 ==== Coming from Servlets and Spring MVC
 
 The backend has no Servlet container. The usual extension points map as
@@ -1171,13 +1171,13 @@ A static binary in a `scratch` image has no certificate store. Copy a
 `ca-certificates.crt` into the image and name it in `CURL_CA_BUNDLE` or
 `SSL_CERT_FILE`.
 
-[[backend-push]]
 The proxy can also rename a request header on the way out
 (`renameRequestHeader`), rename a response header on the way back
 (`renameResponseHeader`) and replace the status the other service answered with
 (`rewriteStatus`), for a service whose conventions differ from the one the app
 expects.
 
+[[backend-push]]
 === Sending push notifications
 
 A WebSocket reaches an app that's running. A push notification reaches a phone
