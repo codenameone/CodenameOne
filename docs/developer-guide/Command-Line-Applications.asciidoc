@@ -111,7 +111,7 @@ The process exits with:
 The `com.codename1.cli` package has what a tool needs on a terminal: styled
 text, tables, trees, progress bars, spinners and interactive questions.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/cli/Deploy.java[tag=cli-console-output,indent=0]
 ----
@@ -136,14 +136,14 @@ draw with ASCII.
 moving bar when the total isn't known; `ProgressBar.track(items, "label")` wraps
 a loop. `MultiProgress` shows several bars at once, and its `println` writes a
 log line above them. A `Spinner` shows that work is under way and ends with a
-success, failure, warning or information line. All of them redraw in place
+success, failure, warning or information line. They all redraw in place
 on a terminal. When the output goes elsewhere they print a few plain lines
 instead, so a log file or a build server shows what happened without escape
 codes.
 
 `Prompt` asks questions:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/cli/Deploy.java[tag=cli-console-prompts,indent=0]
 ----
