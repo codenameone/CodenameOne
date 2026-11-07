@@ -25,7 +25,8 @@
             <artifactId>myappname-rules</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- The client plumbing every full-stack sample shares; see cn1-app-kit. -->
+        <!-- The Codename One app kit, a cn1lib: the network calls, skeleton
+             rows and charts. -->
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>cn1-app-kit-lib</artifactId>
