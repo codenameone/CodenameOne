@@ -47,6 +47,10 @@ import java.util.List;
 /// default -- and nobody else can book it meanwhile. Leaving the screen lets
 /// it go at once, so a client who changes their mind does not keep a slot
 /// from the next one for the rest of the hold.
+///
+/// On a wide window it is not a screen at all: [#beside] draws it next to the
+/// times on the booking screen, so picking another time is one tap and the
+/// price and terms are read while the times are still in view.
 public final class ConfirmForm {
     private final Form form;
     private final AppointmentDto held;
@@ -58,13 +62,20 @@ public final class ConfirmForm {
     private UITimer ticking;
     private boolean done;
 
-    private ConfirmForm(final Form previous, AppointmentDto held, ServiceDto service) {
+    /// @param host the screen it is drawn on when `pane` is given
+    /// @param pane where on `host` it goes, or null for a screen of its own
+    private ConfirmForm(final Form previous, Form host, Container pane, AppointmentDto held,
+            ServiceDto service) {
         this.held = held;
-        form = Ui.form("Confirm", "Confirm");
-        Ui.back(form, () -> {
-            letGo();
-            previous.showBack();
-        });
+        if (pane == null) {
+            form = Ui.form("Confirm", "Confirm");
+            Ui.back(form, () -> {
+                letGo();
+                previous.showBack();
+            });
+        } else {
+            form = host;
+        }
         countdown.setName("countdown");
         page.add(Ui.label(held.serviceName(), "SvTitle"));
         page.add(Ui.text(Ui.weekday(held.start()) + Ui.DOT + Times.clock(held.start()) + " - "
@@ -106,14 +117,30 @@ public final class ConfirmForm {
         Ui.section(page, "Note");
         page.add(note);
         page.add(Ui.primary("Confirm booking", "confirm", e -> confirm(note.getText())));
-        Layouts.broaden(page);
-        form.add(BorderLayout.CENTER, page);
+        if (pane == null) {
+            Layouts.broaden(page);
+            form.add(BorderLayout.CENTER, page);
+        } else {
+            page.setName("confirm-pane");
+            pane.removeAll();
+            pane.add(BorderLayout.CENTER, page);
+            Layouts.dress(pane);
+            Ui.relayout(pane);
+        }
     }
 
     public static void show(Form previous, AppointmentDto held, ServiceDto service) {
-        ConfirmForm confirm = new ConfirmForm(previous, held, service);
+        ConfirmForm confirm = new ConfirmForm(previous, null, null, held, service);
         confirm.form.show();
         confirm.tick();
+    }
+
+    /// Draws the hold into `pane` on the booking screen `book`, replacing
+    /// whatever was there; the caller lets the last hold go.
+    static ConfirmForm beside(Form book, Container pane, AppointmentDto held, ServiceDto service) {
+        ConfirmForm confirm = new ConfirmForm(book, book, pane, held, service);
+        confirm.tick();
+        return confirm;
     }
 
     /// The cancellation and no-show terms, as the business set them.
@@ -187,8 +214,9 @@ public final class ConfirmForm {
         }, Ui::fail));
     }
 
-    /// The client went back: the hold is given up rather than left to run out.
-    private void letGo() {
+    /// The client went back, or picked another time beside this one: the hold
+    /// is given up rather than left to run out.
+    void letGo() {
         if (done) {
             return;
         }

@@ -254,6 +254,38 @@ provider's starts, with the reason for each one that's refused.
 
 image::img/slate-owner-preview.png["The booking rules preview: each provider's starts tomorrow, with the reason each refused one is refused",scaledwidth=40%]
 
+=== On the desktop
+
+The same app runs as a desktop application, and on a window that wide it isn't
+a phone screen stretched out. It opens at the size of a desktop window and is
+laid out for one:
+
+* The menu is docked down the side, with who is signed in at its top. You move
+  between screens with it, so there are no back arrows; Back is in the
+  window's menu, with its shortcut.
+* The controls are the platform's own: macOS, Windows or GNOME buttons, fields
+  and lists.
+* The dashboard spreads its numbers across the window, and the day board shows
+  every provider's day side by side.
+
+image::img/slate-desktop-owner-dashboard.png["The owner's dashboard on the desktop, with the menu docked down the side",scaledwidth=80%]
+
+* The catalogue keeps its list on the left and edits the row picked on the
+  right, so working down the services never leaves the list.
+
+image::img/slate-desktop-owner-catalog.png["The services list with the editor of the one picked beside it",scaledwidth=80%]
+
+* The provider's week shows all seven days at once.
+
+image::img/slate-desktop-provider-week.png["A provider's week on the desktop, seven days side by side",scaledwidth=80%]
+
+* Booking has no confirm screen. Picking a time holds it and shows the price,
+  the terms and the button that books it beside the times, so picking another
+  time is one click and the hold on the last one is let go.
+* The client's home shows what is coming up beside what can be booked.
+
+image::img/slate-desktop-client-confirm.png["Booking on the desktop: the free times on the left, the held time with its price and the confirm button on the right",scaledwidth=80%]
+
 === In a browser
 
 The server can host the app itself, so the whole business can be tried in a
