@@ -88,6 +88,14 @@ public final class Builtins {
         } else {
             out.write(sb.toString());
         }
+        Object flush = a.kw("flush");
+        if (flush != null && Py.isTrue(flush)) {
+            if (file != null) {
+                Py.callMethod(file, "flush");
+            } else {
+                System.out.flush();
+            }
+        }
         return Py.NONE;
     });
 
@@ -262,7 +270,30 @@ public final class Builtins {
         return new PySuper((PyType) a[0], a[1]);
     });
     public static final Object INPUT = PyBuiltin.positional("input", a -> {
-        throw Py.error(Py.OS_ERROR, "input() has no console on this platform");
+        PyTerminal t = PyTerminal.get();
+        if (t == null) {
+            throw Py.error(Py.OS_ERROR, "input() has no console on this platform");
+        }
+        String prompt = a.length > 0 ? Py.toStr(a[0]) : "";
+        System.out.flush();
+        int saved = Gil.release();
+        String line = null;
+        boolean cancelled = false;
+        try {
+            line = t.readLine(prompt);
+        } catch (PyTerminal.Cancelled e) {
+            // Raised below, once the GIL is held again.
+            cancelled = true;
+        } finally {
+            Gil.restore(saved);
+        }
+        if (cancelled) {
+            throw Py.error(Py.KEYBOARD_INTERRUPT, "");
+        }
+        if (line == null) {
+            throw Py.error(Py.EOF_ERROR, "EOF when reading a line");
+        }
+        return Py.str(line);
     });
 
     private Builtins() {
