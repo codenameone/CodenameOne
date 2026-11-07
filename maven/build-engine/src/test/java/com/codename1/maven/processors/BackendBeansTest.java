@@ -2058,6 +2058,36 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void mappingsAreInheritedFromBaseClassesAndInterfaces() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.ItemApi", PKG
+                + "@RequestMapping(\"/items\") public interface ItemApi {\n"
+                + "    @GetMapping(\"/{id}\") String get(@PathVariable(\"id\") String id);\n"
+                + "}\n");
+        s.put("com.example.Base", PKG
+                + "public abstract class Base {\n"
+                + "    @GetMapping(\"/ping\") public String ping() { return \"pong\"; }\n"
+                + "    @GetMapping(\"/over\") public String over() { return \"base\"; }\n"
+                + "}\n");
+        s.put("com.example.Items", PKG
+                + "@RestController public class Items extends Base implements ItemApi {\n"
+                + "    public String get(String id) { return \"item \" + id; }\n"
+                + "    @Override public String over() { return \"derived\"; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend b = start(classes, port, new Properties());
+        try {
+            assertEquals("item 4", http("GET", port, "/items/4"));
+            assertEquals("pong", http("GET", port, "/items/ping"));
+            assertEquals("derived", http("GET", port, "/items/over"));
+        } finally {
+            b.stop();
+        }
+    }
+
+    @Test
     public void aCatchAllVariableTakesTheRestOfThePath() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Files", PKG

@@ -415,14 +415,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         controller.packageName = RestClientAnnotationProcessor.packageOf(controller.binaryName);
         controller.simpleName = RestClientAnnotationProcessor.simpleName(controller.binaryName);
         controller.routerSimpleName = controller.simpleName + "Router";
-        controller.basePaths.addAll(pathsOf(cls.getClassAnnotation(REQUEST_MAPPING)));
+        controller.basePaths.addAll(pathsOf(inheritedClassMapping(ctx, cls)));
         if (controller.basePaths.isEmpty()) {
             controller.basePaths.add("");
         }
         // What the constructor is given is the bean pass's to decide -- see
         // BackendBeans -- like every other bean's.
 
-        for (MethodInfo m : cls.getMethods()) {
+        for (MethodInfo m : mappedMethods(ctx, cls)) {
             if (m.isConstructor() || m.isSynthetic() || m.isStatic() || !m.isPublic()) {
                 continue;
             }
@@ -1461,6 +1461,118 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         RestClientAnnotationProcessor.packageOf(endpoint.binaryName);
                 endpoint.path = full;
                 webSockets.put(full, endpoint);
+            }
+        }
+    }
+
+    /// The class's own `@RequestMapping`, or else the nearest one up the
+    /// hierarchy -- superclasses first, then interfaces -- as Spring merges a
+    /// base controller's mapping into the subclass that declares none.
+    private static AnnotationValues inheritedClassMapping(ProcessorContext ctx,
+            AnnotatedClass cls) {
+        Set<String> seen = new LinkedHashSet<String>();
+        List<AnnotatedClass> order = new ArrayList<AnnotatedClass>();
+        hierarchy(ctx, cls, seen, order);
+        for (AnnotatedClass c : order) {
+            AnnotationValues v = c.getClassAnnotation(REQUEST_MAPPING);
+            if (v != null) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /// Every handler of the controller, inherited ones included.
+    ///
+    /// A method is taken once per name and descriptor. Its mapping and its
+    /// parameter annotations come from the most derived declaration that maps
+    /// it -- the class itself, then its superclasses, then its interfaces --
+    /// and it is routed only if the class really has a public, concrete
+    /// implementation of it, the one the router will call. That is Spring's
+    /// rule for a base controller and for an API interface that carries the
+    /// mappings. A generic interface method is matched by its erased
+    /// descriptor, so a mapping on `get(T)` reaches only a bridge, which is
+    /// synthetic and skipped: put such a mapping on the class.
+    private static List<MethodInfo> mappedMethods(ProcessorContext ctx, AnnotatedClass cls) {
+        Set<String> seen = new LinkedHashSet<String>();
+        List<AnnotatedClass> order = new ArrayList<AnnotatedClass>();
+        hierarchy(ctx, cls, seen, order);
+        Map<String, MethodInfo> implementation = new LinkedHashMap<String, MethodInfo>();
+        for (AnnotatedClass c : order) {
+            if (c.isInterface()) {
+                continue;
+            }
+            for (MethodInfo m : c.getMethods()) {
+                String key = m.getName() + m.getDescriptor();
+                if (!implementation.containsKey(key) && !m.isAbstract()) {
+                    implementation.put(key, m);
+                }
+            }
+        }
+        Map<String, MethodInfo> mapped = new LinkedHashMap<String, MethodInfo>();
+        for (AnnotatedClass c : order) {
+            for (MethodInfo m : c.getMethods()) {
+                String key = m.getName() + m.getDescriptor();
+                if (mapped.containsKey(key) || !isMapped(m)) {
+                    continue;
+                }
+                MethodInfo impl = implementation.get(key);
+                if (impl == null || !impl.isPublic() || impl.isStatic() || impl.isSynthetic()) {
+                    continue;
+                }
+                mapped.put(key, m);
+            }
+        }
+        // The class's own unmapped methods still go through the loop, which
+        // skips them; keeping them costs nothing and keeps its order.
+        List<MethodInfo> out = new ArrayList<MethodInfo>(mapped.values());
+        for (MethodInfo m : cls.getMethods()) {
+            if (!mapped.containsKey(m.getName() + m.getDescriptor())) {
+                out.add(m);
+            }
+        }
+        return out;
+    }
+
+    private static boolean isMapped(MethodInfo m) {
+        if (m.getAnnotation(REQUEST_MAPPING) != null) {
+            return true;
+        }
+        for (String annotation : MAPPINGS.keySet()) {
+            if (m.getAnnotation(annotation) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The class, its superclasses up to Object, then every interface, each once.
+    private static void hierarchy(ProcessorContext ctx, AnnotatedClass cls, Set<String> seen,
+            List<AnnotatedClass> order) {
+        List<AnnotatedClass> supers = new ArrayList<AnnotatedClass>();
+        AnnotatedClass c = cls;
+        while (c != null) {
+            supers.add(c);
+            String parent = c.getSuperInternalName();
+            if (parent == null || "java/lang/Object".equals(parent) || !seen.add(parent)) {
+                break;
+            }
+            c = resolve(ctx, parent);
+        }
+        order.addAll(supers);
+        List<String> pending = new ArrayList<String>();
+        for (AnnotatedClass s : supers) {
+            pending.addAll(s.getInterfaceInternalNames());
+        }
+        for (int i = 0 ; i < pending.size() ; i++) {
+            String itf = pending.get(i);
+            if (!seen.add(itf)) {
+                continue;
+            }
+            AnnotatedClass resolved = resolve(ctx, itf);
+            if (resolved != null) {
+                order.add(resolved);
+                pending.addAll(resolved.getInterfaceInternalNames());
             }
         }
     }
