@@ -550,13 +550,24 @@ public final class Transactions {
     }
 
     private static void finishNew(Physical p) {
-        p.completing = true;
         checkCommitAllowed(p);
         if (p.completed) {
             return;
         }
         boolean commitAttempted = false;
         try {
+            // The commit-time flush runs BEFORE completion begins, as
+            // Hibernate's does in beforeCommit: a @PrePersist or @PreUpdate it
+            // fires may still register a synchronization, which then runs with
+            // the rest. Registration closes after it, so a beforeCommit hook
+            // still cannot add another; what such a hook writes is flushed by
+            // the commit below.
+            flushSession(p);
+            p.completing = true;
+            checkCommitAllowed(p);
+            if (p.completed) {
+                return;
+            }
             for (int i = 0; i < p.synchronizations.size(); i++) {
                 Registration r = (Registration) p.synchronizations.get(i);
                 if (r.commitEligible) {

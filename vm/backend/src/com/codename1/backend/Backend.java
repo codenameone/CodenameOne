@@ -83,6 +83,32 @@ public final class Backend {
         // digests and random bytes on a ParparVM server (a no-op on the JDK).
         ClassLibraryHost.install();
         Crypto.installCryptoEngine();
+        // Every method of a generated repository bound to the injected session
+        // runs REQUIRED, as in Spring Data: it joins the caller's transaction or
+        // runs in one of its own, read-only for a finder.
+        com.codename1.impl.orm.RepositoryTransactions.install(new RepositoryScope());
+    }
+
+    private static final class RepositoryScope implements com.codename1.impl.orm.RepositoryTransactions.Scope {
+        @Override
+        public Object begin(com.codename1.orm.session.Session session, int propagation, boolean readOnly,
+                            int timeoutSeconds, String isolation) {
+            if (!(session instanceof com.codename1.impl.backend.TransactionSession)) {
+                return null;
+            }
+            return Transactions.begin(propagation, readOnly, timeoutSeconds,
+                    com.codename1.backend.annotations.Isolation.valueOf(isolation));
+        }
+
+        @Override
+        public void end(Object token, boolean succeeded) {
+            Transactions.Transaction tx = (Transactions.Transaction) token;
+            if (succeeded) {
+                Transactions.commit(tx);
+            } else {
+                Transactions.afterThrow(tx, true);
+            }
+        }
     }
 
     private final HttpServer server;

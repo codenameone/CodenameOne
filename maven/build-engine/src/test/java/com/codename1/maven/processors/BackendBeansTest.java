@@ -1516,8 +1516,17 @@ public class BackendBeansTest {
         s.put("com.example.Trip", "package com.example;\n"
                 + "import com.codename1.annotations.*;\n"
                 + "@Entity(table = \"injected_trips\") public class Trip {\n"
+                + "    public static int committed;\n"
                 + "    @Id(autoIncrement = true) public long id;\n"
                 + "    private String rider;\n"
+                // Fires during the flush the commit performs, which must still
+                // accept a synchronization (#6184), as Hibernate's does.
+                + "    @com.codename1.annotations.db.PrePersist void track() {\n"
+                + "        com.codename1.backend.Transactions.registerSynchronization(\n"
+                + "            new com.codename1.backend.Transactions.Synchronization() {\n"
+                + "                public void afterCommit() { committed++; }\n"
+                + "            });\n"
+                + "    }\n"
                 + "    public String rider() { return rider; }\n"
                 + "    public void rider(String r) { rider = r; }\n"
                 + "}\n");
@@ -1546,7 +1555,8 @@ public class BackendBeansTest {
                 + "                + \":\" + (trips == same);\n"
                 + "    }\n"
                 + "    public String outside() {\n"
-                + "        try { trips.count(); return \"ran\"; }\n"
+                + "        try { trips.count(); Trip t = new Trip(); t.rider(\"eve\"); trips.insert(t);\n"
+                + "              return trips.countByRider(\"eve\") == 1 ? \"ran\" : \"lost\"; }\n"
                 + "        catch (RuntimeException e) { return \"refused\"; }\n"
                 + "    }\n"
                 + "}\n");
@@ -1601,8 +1611,10 @@ public class BackendBeansTest {
                 assertEquals("1", http("POST", port, "/trips/" + rider));
             }
             assertEquals("2:2:2:false:true", http("GET", port, "/trips/ada"));
-            // The same contract as the injected Session: no transaction, no work.
-            assertEquals("refused", http("GET", port, "/outside"));
+            // Spring Data's contract, not the bare Session's: a repository method
+            // with no transaction open runs in one of its own (#6184).
+            assertEquals("ran", http("GET", port, "/outside"));
+            assertEquals(4, loader.loadClass("com.example.Trip").getField("committed").getInt(null));
         } finally {
             backend.stop();
             loader.close();
