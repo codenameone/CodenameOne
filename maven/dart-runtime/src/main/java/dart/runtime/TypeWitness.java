@@ -622,7 +622,7 @@ public final class TypeWitness {
                 || sig.length != params.length + 1) {
             return false;
         }
-        String[] own = vars[0].split(", ");
+        String[] own = FunctionType.splitLiteral(vars[0], ", ");
         if (own.length != typeParamCount) {
             return false;
         }

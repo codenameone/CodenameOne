@@ -51,6 +51,11 @@ final class JavaKeywordEscaper {
     private JavaKeywordEscaper() {
     }
 
+    /// Whether `name`, used as an identifier, is one this pass renames.
+    static boolean renames(String name) {
+        return CANDIDATES.contains(name);
+    }
+
     static String apply(String src) {
         boolean any = false;
         for (String k : CANDIDATES) {
