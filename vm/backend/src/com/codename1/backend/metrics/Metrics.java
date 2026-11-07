@@ -159,15 +159,15 @@ public final class Metrics {
     /// `Gauge.builder(...).tags(...)` does: `pool="main"`, `region="eu"`.
     /// @param tags label keys and values, in export order; empty for none
     public static Gauge gauge(String name, String description, String unit,
-                              final java.util.Map tags, final Gauge.Source source) {
+                              final Map tags, final Gauge.Source source) {
         if (source == null) {
             throw new IllegalArgumentException("A gauge needs a source");
         }
-        final java.util.Map attributes = new java.util.LinkedHashMap();
+        final Map attributes = new LinkedHashMap();
         if (tags != null) {
-            java.util.Iterator entries = tags.entrySet().iterator();
+            Iterator entries = tags.entrySet().iterator();
             while (entries.hasNext()) {
-                java.util.Map.Entry e = (java.util.Map.Entry) entries.next();
+                Map.Entry e = (Map.Entry) entries.next();
                 if (!(e.getKey() instanceof String) || ((String) e.getKey()).length() == 0) {
                     throw new IllegalArgumentException("Gauge " + name
                             + ": a tag key must be a non-empty string");
@@ -179,7 +179,7 @@ public final class Metrics {
             @Override
             public List read() {
                 List out = new ArrayList(1);
-                out.add(Instrument.point(new java.util.LinkedHashMap(attributes), source.read()));
+                out.add(Instrument.point(new LinkedHashMap(attributes), source.read()));
                 return out;
             }
         });

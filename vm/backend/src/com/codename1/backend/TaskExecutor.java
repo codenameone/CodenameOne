@@ -95,7 +95,7 @@ public final class TaskExecutor {
     private TaskDecorator decorator;
 
     /// The settings Tasks reads for this executor, applied before it is shared.
-    void configure(int capacity, String prefix) {
+    synchronized void configure(int capacity, String prefix) {
         queueCapacity = capacity < 1 ? Integer.MAX_VALUE : capacity;
         threadNamePrefix = prefix;
     }

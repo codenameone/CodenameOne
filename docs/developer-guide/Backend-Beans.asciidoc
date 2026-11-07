@@ -394,6 +394,15 @@ built, so a server a supervisor restarts doesn't leak what their constructors
 opened.
 
 [[backend-libraries]]
+Once the server is listening, every bean implementing `CommandLineRunner` or
+`ApplicationRunner` runs, ordered by `@Order`. The first receives the command
+line as it was given; the second receives it as `ApplicationArguments`, with
+`--name=value` options parsed. After them, every method annotated
+`@EventListener` that takes an `ApplicationReadyEvent` is called.
+`Backend.getArguments()` returns the same command line anywhere. A listener for
+any other event is refused at build time: the ready event is the only one the
+backend publishes.
+
 === Controllers and beans from a library
 
 A server's wiring is generated while it builds, from the classes it compiles.

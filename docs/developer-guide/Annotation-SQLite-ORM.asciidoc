@@ -622,7 +622,9 @@ Derived methods support the following bounded grammar:
   (affected rows) or `void`.
 * Direct scalar property names combine with `And` and `Or`; AND has higher precedence than OR.
   Comparison suffixes are `Not`, `GreaterThan`, `GreaterThanEqual`, `LessThan`,
-  `LessThanEqual`, `Like`, and `In`. No suffix means equality. `IsNull`,
+  `LessThanEqual`, `Before`, `After`, `Between`, `Like`, and `In`. `Between`
+  takes two parameters. `IgnoreCase` after a text property compares both sides
+  in lower case. No suffix means equality. `IsNull`,
   `IsNotNull`, `True`, and `False` consume no parameter. `In` takes an Iterable or
   object array whose concrete element type matches the property. Raw and wildcard
   collections are rejected at build time. `Like` requires String properties with
@@ -672,8 +674,9 @@ sort arguments, and arbitrary DTO projections aren't supported.
 Repositories never open, commit, roll back, or close transactions or sessions.
 The caller owns those boundaries, including when the supplied Session is injected
 into a backend `@Transactional` service. Writes require an active usable
-transaction. Reads follow Session's automatic flush rules. Redeclare only
-`findById(Key)` with `@Lock` to request a lock; pessimistic locks need an active
+transaction. Reads follow Session's automatic flush rules. Put `@Lock` on
+`findById(Key)`, a derived find or a declared `@Query` select to request a lock;
+counts, existence checks, deletes and modifications refuse it at build time; pessimistic locks need an active
 transaction and an engine supporting row locks. SQLite rejects them explicitly.
 
 Derived deletes and declared JPQL/native modifications flush pending changes,
