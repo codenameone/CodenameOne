@@ -296,7 +296,7 @@ jobs:
           export PATH="${JAVA_HOME_8}/bin:$PATH"
           cd maven
           bash ../scripts/ci/retry.sh mvn -B \
-              -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test -am install \
+              -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test,cn1-app-kit/backend,cn1-app-kit/common,cn1-app-kit/lib -am install \
               -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true \
               -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true
 
