@@ -36,20 +36,47 @@ import java.util.Set;
 final class RepositoryGenerator {
     static final String PREFIX = "Lcom/codename1/orm/repository/";
     static final String REPOSITORY = PREFIX + "Repository;";
-    private static final String[] UNLOCKABLE = {"DISTINCT", "GROUP", "UNION", "COUNT", "SUM", "AVG", "MIN", "MAX"};
-
-    /// Whether `jpql` names none of the words a row lock cannot apply to,
-    /// as whole words, compared without regard to case.
+    /// Whether `jpql` selects rows a lock can apply to: no DISTINCT or UNION,
+    /// no GROUP BY and no aggregate call. String literals are skipped, and so
+    /// is a word after a dot, so a field named `count` or `group` is a field.
     static boolean lockableSelect(String jpql) {
-        for (String word : UNLOCKABLE) {
-            for (int at = 0; at + word.length() <= jpql.length(); at++) {
-                if (jpql.regionMatches(true, at, word, 0, word.length())
-                        && (at == 0 || !Character.isJavaIdentifierPart(jpql.charAt(at - 1)))
-                        && (at + word.length() == jpql.length()
-                            || !Character.isJavaIdentifierPart(jpql.charAt(at + word.length())))) {
+        int n = jpql.length();
+        int at = 0;
+        while (at < n) {
+            char c = jpql.charAt(at);
+            if (c == '\'') {
+                int close = jpql.indexOf('\'', at + 1);
+                at = close < 0 ? n : close + 1;
+                continue;
+            }
+            if (!Character.isJavaIdentifierStart(c)) {
+                at++;
+                continue;
+            }
+            int end = at + 1;
+            while (end < n && Character.isJavaIdentifierPart(jpql.charAt(end))) {
+                end++;
+            }
+            if (!(at > 0 && jpql.charAt(at - 1) == '.')) {
+                String word = jpql.substring(at, end);
+                int next = end;
+                while (next < n && jpql.charAt(next) == ' ') {
+                    next++;
+                }
+                if (word.equalsIgnoreCase("DISTINCT") || word.equalsIgnoreCase("UNION")) {
+                    return false;
+                }
+                if (word.equalsIgnoreCase("GROUP") && jpql.regionMatches(true, next, "BY", 0, 2)
+                        && (next + 2 == n || !Character.isJavaIdentifierPart(jpql.charAt(next + 2)))) {
+                    return false;
+                }
+                if (next < n && jpql.charAt(next) == '(' && (word.equalsIgnoreCase("COUNT")
+                        || word.equalsIgnoreCase("SUM") || word.equalsIgnoreCase("AVG")
+                        || word.equalsIgnoreCase("MIN") || word.equalsIgnoreCase("MAX"))) {
                     return false;
                 }
             }
+            at = end;
         }
         return true;
     }

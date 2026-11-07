@@ -61,6 +61,14 @@ public class OrmAnnotationProcessorTest {
     public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
+    public void lockableSelectReadsKeywordsNotFieldNames() {
+        assertTrue(RepositoryGenerator.lockableSelect("select e from Item e where e.count > 0 and e.max < :m and e.group = 'MAX(1)'"));
+        assertFalse(RepositoryGenerator.lockableSelect("select distinct e from Item e"));
+        assertFalse(RepositoryGenerator.lockableSelect("select e.name, count(e) from Item e group by e.name"));
+        assertFalse(RepositoryGenerator.lockableSelect("select max (e.score) from Item e"));
+    }
+
+    @Test
     public void generatedRepositoryExecutesCrudDerivedPagingLocksAndDeclaredQueries() throws Exception {
         generatedRepository(false);
         generatedRepository(true);
