@@ -86,7 +86,7 @@ jobs:
       - name: Install the framework and the plugin
         working-directory: maven
         run: |
-          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,codenameone-maven-plugin,cn1-app-kit,cn1-app-kit/common,cn1-app-kit/lib \
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,codenameone-maven-plugin,cn1-app-kit,cn1-app-kit/common,cn1-app-kit/backend,cn1-app-kit/lib \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true \
