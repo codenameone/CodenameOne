@@ -349,11 +349,11 @@ public final class Calls {
             Telemetry.callStarted(video);
             report(call);
             CallScreen.show(call);
-            // Before the offer exists: an answer can only follow it, but the
-            // flag must already be up when that answer is taken.
-            call.awaitingAnswer = true;
             connect(call, () -> call.connection.createOffer().ready(offer ->
                     call.connection.setLocalDescription(offer).ready(done -> {
+                        // Up once the offer is set, so an answer taken now has
+                        // an offer to answer.
+                        call.awaitingAnswer = true;
                         send(call, OFFER, offer.getSdp());
                     }).except(why -> failed(call, why))).except(why -> failed(call, why)));
         }, Ui::fail));
@@ -598,17 +598,17 @@ public final class Calls {
         call.restarting = true;
         // The callee's new candidates wait for its answer, as at the start.
         call.remoteSet = false;
-        call.awaitingAnswer = true;
         call.connection.restartIce();
         call.connection.createOffer().ready(offer -> {
             if (current != call) {
                 return;
             }
-            // Sent before it is set: candidates are gathered only once it is,
-            // and signals go out in order, so the callee has the new offer
-            // before any candidate that belongs to it.
-            send(call, OFFER, offer.getSdp());
-            call.connection.setLocalDescription(offer).except(why -> failed(call, why));
+            call.connection.setLocalDescription(offer).ready(done -> {
+                // As for the first offer: set, then the flag, then sent. The
+                // callee holds the candidates that follow until it has set it.
+                call.awaitingAnswer = true;
+                send(call, OFFER, offer.getSdp());
+            }).except(why -> failed(call, why));
         }).except(why -> failed(call, why));
     }
 
