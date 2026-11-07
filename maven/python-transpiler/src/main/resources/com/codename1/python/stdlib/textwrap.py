@@ -83,7 +83,7 @@ class TextWrapper:
             space_left = 1
         else:
             space_left = width - cur_len
-        if self.break_long_words:
+        if self.break_long_words and space_left > 0:
             end = space_left
             chunk = reversed_chunks[-1]
             if self.break_on_hyphens and len(chunk) > space_left:

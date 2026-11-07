@@ -95,6 +95,10 @@ class Post:
         return f"{SITE_BASE_URL}/blog/{self.slug}/"
 
     @property
+    def is_draft(self) -> bool:
+        return str(self.front_matter.get("draft", "")).strip().lower() == "true"
+
+    @property
     def cover_image(self) -> str | None:
         match = re.search(r"!\[[^\]]*\]\((/blog/[^)\s]+)\)", self.body)
         if match:
@@ -216,10 +220,25 @@ def discover_posts(blog_dir: Path) -> list[Post]:
         if path.name.startswith("_"):
             continue
         post = parse_post(path)
-        if post is not None:
+        # Hugo does not publish a draft, so its canonical URL is a 404. A draft
+        # sharing a date with the real post once sorted first by file name and
+        # was syndicated in its place on every platform.
+        if post is not None and not post.is_draft:
             posts.append(post)
     posts.sort(key=lambda p: p.date)
     return posts
+
+
+def canonical_is_live(post: Post, timeout: float = 20.0) -> bool:
+    """True when the post's canonical page answers 200: the last check before
+    anything is published elsewhere pointing at it."""
+    request = urllib.request.Request(post.canonical_url, method="HEAD",
+                                     headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
 
 
 def select_candidate(
@@ -403,6 +422,30 @@ def strip_fence_attributes(body: str) -> str:
     return _FENCE_ATTRS_RE.sub(r"\1", body)
 
 
+_SVG_REF_RE = re.compile(r'(src="|\]\()(/[^")\s]+)\.svg(?=[")])')
+
+
+def svg_local_path(ref: str) -> Path:
+    """Where the file behind a site-relative ``/....svg`` reference lives."""
+    if ref.startswith("/developer-guide/img/"):
+        return REPO_ROOT / "docs/developer-guide/img" / ref.removeprefix("/developer-guide/img/")
+    return REPO_ROOT / "docs/website/static" / ref.lstrip("/")
+
+
+def prefer_png_over_svg(body: str) -> str:
+    """Point every SVG image at the PNG rendered beside it.
+
+    DEV's image proxy serves an SVG as image/webp, which no browser draws, so
+    the Flutter post's charts were blank there. rasterize_blog_svgs.py writes
+    the PNGs, and a test fails when a post's SVG has none.
+    """
+    def swap(match: re.Match[str]) -> str:
+        if svg_local_path(match[2] + ".png").exists():
+            return f"{match[1]}{match[2]}.png"
+        return match[0]
+    return _SVG_REF_RE.sub(swap, body)
+
+
 def render_syndicated_body(post: Post, posts: list[Post] | None = None, today: dt.date | None = None) -> str:
     body = post.body.strip("\n")
     body = _HUGO_FOOTER_RE.sub("", body)
@@ -410,6 +453,7 @@ def render_syndicated_body(post: Post, posts: list[Post] | None = None, today: d
     body = strip_fence_attributes(body)
     body = render_post_links(body, posts or [], today or dt.date.today())
     body = _HUGO_SHORTCODE_RE.sub("", body).rstrip()
+    body = prefer_png_over_svg(body)
     body = absolutize_links(body)
     body = insert_blurb(body, CN1_BLURB)
     return body

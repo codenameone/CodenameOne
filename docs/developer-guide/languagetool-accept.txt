@@ -899,3 +899,7 @@ preallocated
 cgroup
 gunicorn
 Gunicorn
+picocli
+subcommand
+subcommands
+transpiles

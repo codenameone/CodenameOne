@@ -31,8 +31,18 @@ import java.io.OutputStream;
 
 /// The file system of a Codename One application: `FileSystemStorage`,
 /// whose paths are `file://` URLs.
-final class Cn1FileSystem extends PyFileSystem {
+public final class Cn1FileSystem extends PyFileSystem {
     private static final String SCHEME = "file://";
+
+    private Cn1FileSystem() {
+    }
+
+    /// Installs this file system unless the host installed one first.
+    public static void installDefault() {
+        if (!installed()) {
+            install(new Cn1FileSystem());
+        }
+    }
 
     private static FileSystemStorage fs() {
         return FileSystemStorage.getInstance();

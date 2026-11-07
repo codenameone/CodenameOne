@@ -25,6 +25,54 @@ sys.modules[spec.name] = syndicate
 spec.loader.exec_module(syndicate)
 
 
+class DraftDiscoveryTest(unittest.TestCase):
+    def test_draft_sharing_a_date_never_displaces_the_published_post(self):
+        with tempfile.TemporaryDirectory() as directory:
+            blog = Path(directory)
+            (blog / "a-draft.md").write_text(
+                "---\ntitle: Draft\ndate: '2026-10-30'\ndraft: true\n---\nbody\n", encoding="utf-8")
+            (blog / "b-live.md").write_text(
+                "---\ntitle: Live\ndate: '2026-10-30'\n---\nbody\n", encoding="utf-8")
+            posts = syndicate.discover_posts(blog)
+            self.assertEqual(["b-live"], [p.slug for p in posts])
+
+
+class SvgFallbackTest(unittest.TestCase):
+    def test_every_svg_a_post_shows_has_a_png_for_syndication(self):
+        import re
+        missing = set()
+        for path in syndicate.BLOG_DIR.glob("*.md"):
+            for ref in re.findall(r'(?:src="|\]\()(/[^")\s]+)\.svg[")]', path.read_text(encoding="utf-8")):
+                if syndicate.svg_local_path(ref + ".svg").exists() and not syndicate.svg_local_path(ref + ".png").exists():
+                    missing.add(ref + ".svg")
+        self.assertEqual(set(), missing, "run scripts/website/rasterize_blog_svgs.py: DEV cannot show an SVG")
+
+    def test_flutter_charts_syndicate_as_png(self):
+        posts = syndicate.discover_posts(syndicate.BLOG_DIR)
+        post = next(p for p in posts if p.slug == "flutter-better-in-java")
+        body = syndicate.render_syndicated_body(post, posts, dt.date(2026, 11, 7))
+        self.assertIn("/blog/release-2026-10-30/flutter-memory.png", body)
+        self.assertNotIn("flutter-memory.svg", body)
+
+
+class SvgFallbackTest(unittest.TestCase):
+    def test_every_svg_a_post_shows_has_a_png_for_syndication(self):
+        import re
+        missing = set()
+        for path in syndicate.BLOG_DIR.glob("*.md"):
+            for ref in re.findall(r'(?:src="|\]\()(/[^")\s]+)\.svg[")]', path.read_text(encoding="utf-8")):
+                if syndicate.svg_local_path(ref + ".svg").exists() and not syndicate.svg_local_path(ref + ".png").exists():
+                    missing.add(ref + ".svg")
+        self.assertEqual(set(), missing, "run scripts/website/rasterize_blog_svgs.py: DEV cannot show an SVG")
+
+    def test_flutter_charts_syndicate_as_png(self):
+        posts = syndicate.discover_posts(syndicate.BLOG_DIR)
+        post = next(p for p in posts if p.slug == "flutter-better-in-java")
+        body = syndicate.render_syndicated_body(post, posts, dt.date(2026, 11, 7))
+        self.assertIn("/blog/release-2026-10-30/flutter-memory.png", body)
+        self.assertNotIn("flutter-memory.svg", body)
+
+
 class SyndicatedMediaTest(unittest.TestCase):
     def test_tab_bar_article_keeps_both_playable_videos(self):
         posts = syndicate.discover_posts(syndicate.BLOG_DIR)

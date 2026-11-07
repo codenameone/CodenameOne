@@ -199,37 +199,42 @@ public final class PythonTranspiler {
             db |= text.contains("_cn1db");
             image |= text.contains("_cn1image");
         }
+        boolean backend;
+        // Asked of every program, not only of servers: the file system
+        // open() and os reach is FileSystemStorage in an application and
+        // java.io in a backend build, whose class library lacks the former
+        // (a command-line tool reads files and serves nothing).
+        try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
+                new com.codename1.python.transpiler.codegen.ClassPathReader(classPath)) {
+            backend = cp.find("com/codename1/backend/HttpServer") != null;
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
+        }
         if (server || db || image) {
             // A web framework is bundled: serve it over the backend's HTTP
             // server when the build has one (a backend build). Elsewhere
             // serving raises, and the frameworks' test clients still work.
-            try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
-                    new com.codename1.python.transpiler.codegen.ClassPathReader(classPath)) {
-                // The database bridge is wanted by any program reaching
-                // _cn1db (SQLAlchemy's server dialects): a batch job or a
-                // worker as much as a web application.
-                boolean backend = cp.find("com/codename1/backend/HttpServer") != null;
-                server &= backend;
-                db = backend && (db || server);
-                // PIL's engine: on a server the generated BackendImage over
-                // com.codename1.backend.image (Pillow's exact pixels); on a
-                // client PyImageNative over the UI Image, which a backend
-                // build does not have (and leaves out of its classes).
-                // Chosen by the class path rather than by a build target on
-                // purpose: the transpiler runs once, in the common module's
-                // generate-sources, before any target is known, and the
-                // classes it writes serve every target built from them. What
-                // separates a backend from a client application is the
-                // artifact it compiles against -- codenameone-backend is on
-                // a backend's class path and on no client's -- so the probe
-                // answers exactly the question "can these classes reach
-                // com.codename1.backend.image", which is what the engine
-                // needs; a target name could disagree with the classes.
-                serverImage = image && backend;
-                image &= !backend;
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
-            }
+            // The database bridge is wanted by any program reaching
+            // _cn1db (SQLAlchemy's server dialects): a batch job or a
+            // worker as much as a web application.
+            server &= backend;
+            db = backend && (db || server);
+            // PIL's engine: on a server the generated BackendImage over
+            // com.codename1.backend.image (Pillow's exact pixels); on a
+            // client PyImageNative over the UI Image, which a backend
+            // build does not have (and leaves out of its classes).
+            // Chosen by the class path rather than by a build target on
+            // purpose: the transpiler runs once, in the common module's
+            // generate-sources, before any target is known, and the
+            // classes it writes serve every target built from them. What
+            // separates a backend from a client application is the
+            // artifact it compiles against -- codenameone-backend is on
+            // a backend's class path and on no client's -- so the probe
+            // answers exactly the question "can these classes reach
+            // com.codename1.backend.image", which is what the engine
+            // needs; a target name could disagree with the classes.
+            serverImage = image && backend;
+            image &= !backend;
         }
         for (Map.Entry<String, String> e : sources.entrySet()) {
             String path = e.getKey().replace('\\', '/');
@@ -265,14 +270,20 @@ public final class PythonTranspiler {
         if (server) {
             out.put(PACKAGE.replace('.', '/') + "/BackendServer.java", backendServer(virtualThreadStack));
         }
-        if (db) {
+        if (db || backend && classes.containsKey("sqlite3")) {
             out.put(PACKAGE.replace('.', '/') + "/BackendDb.java", backendDb());
+        }
+        if (backend && classes.containsKey("_cn1_http")) {
+            out.put(PACKAGE.replace('.', '/') + "/BackendHttp.java", template("BackendHttp.java.txt"));
         }
         if (serverImage) {
             out.put(PACKAGE.replace('.', '/') + "/BackendImage.java", backendImage());
         }
+        if (backend) {
+            out.put(PACKAGE.replace('.', '/') + "/BackendFileSystem.java", template("BackendFileSystem.java.txt"));
+        }
         out.put(PACKAGE.replace('.', '/') + "/PythonModules.java", registry(classes, mainModule, interop != null, server, db,
-                image, serverImage, nativeModules));
+                image, serverImage, backend, nativeModules));
         return out;
     }
 
@@ -759,6 +770,27 @@ public final class PythonTranspiler {
                 + "    static void install() {\n"
                 + "        PyDb.install(new BackendDb());\n"
                 + "    }\n\n"
+                // sqlite3 in a backend build: the same connections, opened by
+                // file name, in place of the application's Database.
+                + "    static void installSql() {\n"
+                + "        if (!PySql.installed()) {\n"
+                + "            PySql.install(new PySql() {\n"
+                + "                @Override\n"
+                + "                public PySql.Connection open(String name) throws IOException {\n"
+                // sqlite3.connect names a file, never a server: Database.open
+                // would take a postgres:// or mysql:// name as one.
+                + "                    if (name.indexOf(\"://\") >= 0) {\n"
+                + "                        throw new IOException(\"unable to open database file\");\n"
+                + "                    }\n"
+                // io.py's rooted /C:/x is C:/x on Windows, as BackendFileSystem maps it.
+                + "                    if (name.length() >= 3 && name.charAt(0) == '/' && name.charAt(2) == ':') {\n"
+                + "                        name = name.substring(1);\n"
+                + "                    }\n"
+                + "                    return new Conn(Database.open(name.length() == 0 ? \":memory:\" : name));\n"
+                + "                }\n"
+                + "            });\n"
+                + "        }\n"
+                + "    }\n\n"
                 + "    @Override\n"
                 + "    public PyDb.Connection open(String url) throws IOException {\n"
                 + "        return new Conn(Database.open(url));\n"
@@ -844,9 +876,14 @@ public final class PythonTranspiler {
     /// a resource: it names `com.codename1.backend.image`, so it is compiled
     /// only into a backend build and the runtime never depends on the backend.
     private static String backendImage() {
-        try (InputStream in = PythonTranspiler.class.getResourceAsStream("BackendImage.java.txt")) {
+        return template("BackendImage.java.txt");
+    }
+
+    /// A generated class kept as a resource beside this one, in [#PACKAGE].
+    private static String template(String name) {
+        try (InputStream in = PythonTranspiler.class.getResourceAsStream(name)) {
             if (in == null) {
-                throw new IllegalStateException("BackendImage.java.txt is missing from the transpiler");
+                throw new IllegalStateException(name + " is missing from the transpiler");
             }
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
@@ -855,7 +892,7 @@ public final class PythonTranspiler {
             }
             return new String(out.toByteArray(), StandardCharsets.UTF_8).replace("@PACKAGE@", PACKAGE);
         } catch (IOException e) {
-            throw new IllegalStateException("cannot read BackendImage.java.txt: " + e.getMessage(), e);
+            throw new IllegalStateException("cannot read " + name + ": " + e.getMessage(), e);
         }
     }
 
@@ -1063,7 +1100,7 @@ public final class PythonTranspiler {
     }
 
     private static String registry(Map<String, String> classes, String mainModule, boolean interop, boolean server, boolean db,
-            boolean image, boolean serverImage, Map<String, String> nativeModules) {
+            boolean image, boolean serverImage, boolean backend, Map<String, String> nativeModules) {
         StringBuilder sb = new StringBuilder();
         sb.append("// Generated by the Codename One Python transpiler.\n");
         sb.append("package ").append(PACKAGE).append(";\n\n");
@@ -1090,11 +1127,20 @@ public final class PythonTranspiler {
         if (serverImage) {
             sb.append("        BackendImage.install();\n");
         }
+        if (backend) {
+            sb.append("        BackendFileSystem.install();\n");
+        } else {
+            sb.append("        com.codename1.python.runtime.Cn1FileSystem.installDefault();\n");
+        }
+        // The network manager and Database are a client application's; a
+        // backend's class library has neither, so it gets its own bridges.
         if (classes.containsKey("_cn1_http")) {
-            sb.append("        com.codename1.python.runtime.Cn1Http.installDefault();\n");
+            sb.append(backend ? "        BackendHttp.install();\n"
+                    : "        com.codename1.python.runtime.Cn1Http.installDefault();\n");
         }
         if (classes.containsKey("sqlite3")) {
-            sb.append("        com.codename1.python.runtime.Cn1Sql.installDefault();\n");
+            sb.append(backend ? "        BackendDb.installSql();\n"
+                    : "        com.codename1.python.runtime.Cn1Sql.installDefault();\n");
         }
         for (String cls : new java.util.TreeSet<String>(nativeModules.values())) {
             sb.append("        ").append(cls).append(".install();\n");

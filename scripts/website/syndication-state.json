@@ -3193,6 +3193,48 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-05T01:01:12+00:00"
+      },
+      "devto": {
+        "id": 4984372,
+        "url": "https://dev.to/codenameone/webrtc-calls-key-agreement-and-orm-checks-at-build-time-2cgb",
+        "syndicated_at": "2026-11-05T21:17:48+00:00"
+      }
+    },
+    "flutter-better-in-java": {
+      "foojay": {
+        "id": 192,
+        "url": "https://github.com/foojayio/website/pull/192",
+        "pull_request_url": "https://github.com/foojayio/website/pull/192",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-06T04:24:28+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/flutter-better-in-java",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aedf98e9e48a18824c9a440",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-06T16:01:12+00:00"
+      },
+      "devto": {
+        "id": 4989336,
+        "url": "https://dev.to/codenameone/flutter-better-in-java-1e48",
+        "syndicated_at": "2026-11-06T16:03:34+00:00"
+      }
+    },
+    "compose-on-more-screens": {
+      "hashnode": {
+        "url": "https://debugagent.com/your-compose-code-on-more-screens-and-less-cpu",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aee781d93c75ceeabce1579",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-07T01:01:08+00:00"
       }
     }
   }

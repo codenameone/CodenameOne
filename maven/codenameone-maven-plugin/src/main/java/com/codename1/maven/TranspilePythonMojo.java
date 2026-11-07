@@ -113,8 +113,8 @@ public class TranspilePythonMojo extends AbstractCN1Mojo {
             }
         }
         throw new MojoFailureException("src/main/python contains Python sources but the project does not declare "
-                + "the Python runtime dependency. Add this to common/pom.xml, or run cn1:import-python-project, "
-                + "which adds it:\n\n"
+                + "the Python runtime dependency. Add this to the pom (common/pom.xml in an application), or run "
+                + "cn1:import-python-project, which adds it:\n\n"
                 + "    <dependency>\n"
                 + "        <groupId>com.codenameone</groupId>\n"
                 + "        <artifactId>" + PythonProjectBuilder.RUNTIME_ARTIFACT + "</artifactId>\n"
