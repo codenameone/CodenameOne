@@ -22,6 +22,7 @@
  */
 package com.codenameone.developerguide.snippets.generated;
 
+import com.codename1.gaming.GameView;
 import com.codename1.gpu.*;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.*;
