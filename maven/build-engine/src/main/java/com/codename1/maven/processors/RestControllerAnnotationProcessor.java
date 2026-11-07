@@ -3574,7 +3574,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // "serve" sibling; a module with no commands still answers --help and
         // otherwise starts the server whatever it was passed, as it always did.
         String appName = cliName != null ? cliName : "server";
+        // Kept for the runners, which Spring Boot hands the whole command line.
+        sb.append("    private static String[] cn1Args = new String[0];\n\n");
         sb.append("    public static void main(String[] args) throws Exception {\n");
+        sb.append("        cn1Args = args == null ? new String[0] : args;\n");
         sb.append("        int code = com.codename1.cli.CommandLine.serve(")
           .append(quote(appName)).append(", ")
           .append(cliApplication != null ? cliApplication + ".commands()" : "null")
@@ -3616,7 +3619,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
               .append(virtualThreadStack).append(");\n");
         }
         sb.append("        com.codename1.backend.Backend.Builder cn1Builder = "
-                + "com.codename1.backend.Backend.builder()");
+                + "com.codename1.backend.Backend.builder().arguments(cn1Args)");
         if (telemetry) {
             // The ONLY references to the OTLP exporters anywhere in the program,
             // which is what keeps them out of a binary that does not ask for

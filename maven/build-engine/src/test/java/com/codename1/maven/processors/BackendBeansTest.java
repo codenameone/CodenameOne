@@ -2058,6 +2058,54 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void runnersAndReadyListenersRunInOrderOnceTheServerIsUp() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Log", PKG
+                + "public class Log { public static final StringBuilder SEEN = new StringBuilder(); }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api { @GetMapping(\"/\") public String home() { return \"\"; } }\n");
+        s.put("com.example.Second", PKG
+                + "@Component @Order(2) public class Second implements com.codename1.backend.ApplicationRunner {\n"
+                + "    public void run(com.codename1.backend.ApplicationArguments a) {\n"
+                + "        Log.SEEN.append(\"app\").append(a.getOptionValues(\"mode\")).append(' ');\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.First", PKG
+                + "@Component @Order(1) public class First implements com.codename1.backend.CommandLineRunner {\n"
+                + "    public void run(String... args) { Log.SEEN.append(\"line\").append(args.length).append(' '); }\n"
+                + "    @com.codename1.backend.annotations.EventListener public void ready(com.codename1.backend.ApplicationReadyEvent e) {\n"
+                + "        Log.SEEN.append(e.getBackend() != null ? \"ready\" : \"none\");\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend b = withApplication(Backend.builder(Config.of(settings, "dev")).quiet()
+                .arguments("--mode=x", "file"), app).start();
+        try {
+            Object seen = loader.loadClass("com.example.Log").getField("SEEN").get(null);
+            assertEquals("line2 app[x] ready", seen.toString());
+            assertEquals(Arrays.asList("file"), b.getArguments().getNonOptionArgs());
+        } finally {
+            b.stop();
+        }
+    }
+
+    @Test
+    public void aListenerForAnyOtherEventIsRefused() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.L", PKG
+                + "@Component public class L { @com.codename1.backend.annotations.EventListener public void on(String event) { } }\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("ApplicationReadyEvent or nothing"));
+    }
+
+    @Test
     public void mappingsAreInheritedFromBaseClassesAndInterfaces() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.ItemApi", PKG

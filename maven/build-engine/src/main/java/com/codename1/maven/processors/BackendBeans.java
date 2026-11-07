@@ -90,6 +90,8 @@ final class BackendBeans {
     static final String TRANSACTIONAL = PKG + "Transactional;";
     static final String ASYNC = PKG + "Async;";
     static final String SCHEDULED = PKG + "Scheduled;";
+    static final String EVENT_LISTENER = PKG + "EventListener;";
+    static final String READY_EVENT = "Lcom/codename1/backend/ApplicationReadyEvent;";
     static final String MANAGED_RESOURCE = PKG + "ManagedResource;";
     static final String MANAGED_ATTRIBUTE = PKG + "ManagedAttribute;";
     static final String MANAGED_OPERATION = PKG + "ManagedOperation;";
@@ -343,6 +345,8 @@ final class BackendBeans {
         boolean controller;
         boolean webSocket;
         final List<Job> jobs = new ArrayList<Job>();
+        /// `@EventListener` methods, each taking the ready event or nothing.
+        final List<MethodInfo> readyListeners = new ArrayList<MethodInfo>();
         final List<Tool> tools = new ArrayList<Tool>();
         Managed managed;
         /// Request, session and lazy beans: the number the build gives each.
@@ -1692,6 +1696,20 @@ final class BackendBeans {
     private void collectJobs(Bean bean) {
         AnnotatedClass cls = bean.cls;
         for (MethodInfo m : inheritedMembers(cls)) {
+            if (m.getAnnotation(EVENT_LISTENER) != null) {
+                Type[] args = Type.getArgumentTypes(m.getDescriptor());
+                if (m.isStatic() || args.length > 1
+                        || args.length == 1 && !READY_EVENT.equals(args[0].getDescriptor())) {
+                    // Spring's context events all fall at one moment here and
+                    // there is no application event bus -- see EventListener.
+                    ctx.error(cls, "@EventListener method " + cls.getSourceName() + "."
+                            + m.getName() + " must be an instance method taking an "
+                            + "ApplicationReadyEvent or nothing; that is the one event "
+                            + "the server sends.");
+                } else {
+                    bean.readyListeners.add(m);
+                }
+            }
             AnnotationValues s = m.getAnnotation(SCHEDULED);
             if (s == null) {
                 continue;

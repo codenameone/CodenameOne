@@ -156,6 +156,8 @@ public final class Backend {
     /// included. The listener accepts before that hook runs, so health must not
     /// report the server ready to a load balancer until it has returned.
     private boolean ready;
+    /// Set once by the builder, before the started() hook reads it.
+    private ApplicationArguments arguments = new ApplicationArguments();
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
                     Config config, int shutdownMillis, Tracer ownTracer,
@@ -226,6 +228,12 @@ public final class Backend {
     /// The entity manager, or null when this build generated no entities.
     public EntityManager getEntityManager() {
         return entities;
+    }
+
+    /// The arguments the program was started with, as the builder was given
+    /// them; empty when it was given none.
+    public ApplicationArguments getArguments() {
+        return arguments;
     }
 
     /// The configuration this server resolved its settings from.
@@ -1840,6 +1848,16 @@ public final class Backend {
             return this;
         }
 
+        private String[] programArguments = new String[0];
+
+        /// The program's command-line arguments, which the
+        /// [CommandLineRunner] and [ApplicationRunner] beans are given. The
+        /// generated main passes its own.
+        public Builder arguments(String... args) {
+            this.programArguments = args == null ? new String[0] : args.clone();
+            return this;
+        }
+
         /// Suppresses the line this prints when the server comes up.
         public Builder quiet() {
             this.quiet = true;
@@ -2356,6 +2374,7 @@ public final class Backend {
                         readerOpen ? metricReader : null,
                         managedBeans, sessions, tasks, requestLog,
                         environment == null ? new ArrayList() : environment.gauges());
+                backend.arguments = new ApplicationArguments(programArguments);
                 backend.serving = serving;
                 owned = true;
             } finally {
