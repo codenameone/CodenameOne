@@ -69,9 +69,10 @@ public class CityRunTest extends E2e {
             click("runCity");
             waitForForm("run");
             final RunView view = track();
-            while (view.driver().run().tick() < 60 * 12 && !driveFor(view, 200)) {
-                // the bot steers for the first stretch
-            }
+            // the bot steers for the first stretch
+            driveWhileTicking(view, () -> view.driver().run().tick() >= 60 * 12, 10000);
+            assertTrue(view.driver().run().tick() >= 60 * 12 || view.driver().run().over(),
+                    "the run stalled at tick " + view.driver().run().tick() + " (no tick for 10 s)");
             assertTrue(has("minimap"), "the route's minimap");
             assertTrue(has("street"), "the street the runner is on");
             shot("city-run", view);
@@ -86,12 +87,11 @@ public class CityRunTest extends E2e {
                 }
             }
             final int ahead = mark - 45;
-            long give = System.currentTimeMillis() + 60000;
-            while (view.driver().run().runner(view.driver().me()).z / Track.UNIT < ahead
-                    && System.currentTimeMillis() < give && !driveFor(view, 100)) {
-                // the bot steers up to the landmark
-            }
+            // the bot steers up to the landmark
+            driveWhileTicking(view, () -> view.driver().run().runner(view.driver().me()).z / Track.UNIT >= ahead, 10000);
             assertTrue(!view.driver().run().over(), "still running at the landmark");
+            assertTrue(view.driver().run().runner(view.driver().me()).z / Track.UNIT >= ahead,
+                    "the run stalled short of the landmark (no tick for 10 s)");
             shot("city-landmark", view);
             finish(view, 60 * 900);
             awaitResult("the result");

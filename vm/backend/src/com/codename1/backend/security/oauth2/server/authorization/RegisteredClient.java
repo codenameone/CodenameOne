@@ -58,6 +58,7 @@ public final class RegisteredClient {
     private final Set<String> redirectUris;
     private final Set<String> scopes;
     private final Set<String> resources;
+    private final String audience;
     private final ClientSettings clientSettings;
     private final TokenSettings tokenSettings;
 
@@ -73,6 +74,7 @@ public final class RegisteredClient {
         this.redirectUris = Collections.unmodifiableSet(new LinkedHashSet<String>(b.redirectUris));
         this.scopes = Collections.unmodifiableSet(new LinkedHashSet<String>(b.scopes));
         this.resources = Collections.unmodifiableSet(new LinkedHashSet<String>(b.resources));
+        this.audience = b.audience;
         this.clientSettings = b.clientSettings;
         this.tokenSettings = b.tokenSettings;
     }
@@ -122,6 +124,13 @@ public final class RegisteredClient {
     /// registered with none, and may then name any. See [Builder#resource].
     public Set<String> getResources() {
         return resources;
+    }
+
+    /// The `aud` of an access token issued to this client whose request named
+    /// no `resource`, or null for the server's default; see
+    /// [Builder#audience].
+    public String getAudience() {
+        return audience;
     }
 
     public ClientSettings getClientSettings() {
@@ -180,6 +189,7 @@ public final class RegisteredClient {
         private final Set<String> redirectUris = new LinkedHashSet<String>();
         private final Set<String> scopes = new LinkedHashSet<String>();
         private final Set<String> resources = new LinkedHashSet<String>();
+        private String audience;
         private ClientSettings clientSettings = ClientSettings.builder().build();
         private TokenSettings tokenSettings = TokenSettings.builder().build();
 
@@ -240,6 +250,21 @@ public final class RegisteredClient {
         /// not be trusted to choose it should be given a list.
         public Builder resource(String resource) {
             this.resources.add(resource);
+            return this;
+        }
+
+        /// The `aud` this client's access tokens carry when the request named no
+        /// `resource`, in place of the server's default audience. Any non-empty
+        /// value, not only an absolute address: tokens issued by Spring
+        /// Authorization Server carry the client id here, and a server taking
+        /// over its clients keeps their resource servers accepting the new
+        /// tokens by registering `audience(clientId)`. The user info endpoint
+        /// accepts such a token too.
+        public Builder audience(String audience) {
+            if (audience == null || audience.length() == 0) {
+                throw new IllegalArgumentException("audience cannot be empty");
+            }
+            this.audience = audience;
             return this;
         }
 

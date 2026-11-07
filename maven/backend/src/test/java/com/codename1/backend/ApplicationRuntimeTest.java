@@ -206,6 +206,46 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a decorated @Async call dropped at the shutdown deadline still fails its Future")
+    void decoratedDroppedAsyncFails() throws Exception {
+        Tasks.Registry registry = Tasks.open(null);
+        TaskExecutor one = new TaskExecutor("one", false, 1, registry);
+        one.setTaskDecorator(new TaskDecorator() {
+            public Runnable decorate(final Runnable task) {
+                return new Runnable() {
+                    public void run() {
+                        task.run();
+                    }
+                };
+            }
+        });
+        final CountDownLatch started = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        one.execute(new Runnable() {
+            public void run() {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException err) {
+                    // interrupted by the shutdown
+                }
+            }
+        });
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        AsyncTask queued = new AsyncTask("test.decorated", false) {
+            protected Object call() {
+                return "ran";
+            }
+        };
+        one.execute(queued);
+        one.shutdown(50);
+        release.countDown();
+        assertTrue(queued.isDone(), "a decorator hid the dropped call from the shutdown");
+        assertThrows(java.util.concurrent.ExecutionException.class, () -> queued.get());
+        Tasks.shutdown(registry, 0);
+    }
+
+    @Test
     @DisplayName("two metrics that render as one Prometheus name are refused")
     void prometheusNameClash() {
         Metrics.gauge("test.clash.total", "", "", new com.codename1.backend.metrics.Gauge.Source() {

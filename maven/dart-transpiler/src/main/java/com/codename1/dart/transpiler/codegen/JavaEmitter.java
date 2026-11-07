@@ -160,6 +160,70 @@ public final class JavaEmitter {
         return pruned;
     }
 
+    /// Every class given a `$constKey()`: its Java name to {the program superclass whose
+    /// key it extends or null, whether a runtime superclass implements ConstCanon.Keyed}.
+    private final Map<String, String[]> constKeyedClasses = new java.util.HashMap<String, String[]>();
+
+    /// A class's `$constKey()` is read only when one of its constants is canonicalized,
+    /// `ConstCanon.object(new X(..))`, or a subclass's is (its key starts with the
+    /// superclass's). Every other one is dead code that a native build still compiles --
+    /// the gallery had 278 of them for 64 classes ever constructed as constants, about
+    /// 160 KB of its Linux executable -- so those are dropped once every file is known.
+    private List<GeneratedFile> dropUnusedConstKeys(List<GeneratedFile> files) {
+        if (constKeyedClasses.isEmpty()) {
+            return files;
+        }
+        java.util.Set<String> needed = new java.util.HashSet<String>();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("ConstCanon\\.object\\(new ([A-Za-z0-9_$.]+)").matcher("");
+        for (GeneratedFile g : files) {
+            if (g == null || !g.relativePath.endsWith(".java")) {
+                continue;
+            }
+            m.reset(g.content);
+            while (m.find()) {
+                String cn = m.group(1).substring(m.group(1).lastIndexOf('.') + 1);
+                while (cn != null && constKeyedClasses.containsKey(cn) && needed.add(cn)) {
+                    cn = constKeyedClasses.get(cn)[0];
+                }
+            }
+        }
+        List<GeneratedFile> out = new ArrayList<GeneratedFile>(files.size());
+        for (GeneratedFile g : files) {
+            String cn = g == null ? null : g.relativePath.substring(g.relativePath.lastIndexOf('/') + 1);
+            cn = cn != null && cn.endsWith(".java") ? cn.substring(0, cn.length() - 5) : null;
+            String[] info = cn == null ? null : constKeyedClasses.get(cn);
+            if (info == null || needed.contains(cn)) {
+                out.add(g);
+                continue;
+            }
+            String c = g.content;
+            int at = c.indexOf("    public Object[] $constKey() {\n");
+            int end = at < 0 ? -1 : c.indexOf("\n    }\n\n", at);
+            if (end < 0) {
+                out.add(g);
+                continue;
+            }
+            c = c.substring(0, at) + c.substring(end + "\n    }\n\n".length());
+            if (!Boolean.parseBoolean(info[1])) {
+                // Unless a runtime superclass implements it, the interface goes too: a
+                // program superclass that is Keyed loses its $constKey() by this same rule
+                // whenever this class does (a needed class keeps its superclasses').
+                // Wherever it sits in the list: other interfaces are added after it.
+                String k = "dart.runtime.ConstCanon.Keyed";
+                if (c.contains("implements " + k + ", ")) {
+                    c = c.replaceFirst("implements " + java.util.regex.Pattern.quote(k) + ", ", "implements ");
+                } else if (c.contains(", " + k)) {
+                    c = c.replaceFirst(", " + java.util.regex.Pattern.quote(k), "");
+                } else {
+                    c = c.replaceFirst(" implements " + java.util.regex.Pattern.quote(k), "");
+                }
+            }
+            out.add(new GeneratedFile(g.relativePath, c));
+        }
+        return out;
+    }
+
     /// The Dart file each generated Java file was emitted from, by its relative path.
     private final Map<String, String> dartFileOf = new java.util.HashMap<String, String>();
 
@@ -168,7 +232,7 @@ public final class JavaEmitter {
         pinMemberTypesToOwnLibraries();
         computeBoxedReturnSets();
         checkStubInterfaceReturnConflicts();
-        List<GeneratedFile> pruned = new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll()));
+        List<GeneratedFile> pruned = dropUnusedConstKeys(new ArrayList<GeneratedFile>(pruneDynamicCases(emitAll())));
         if (!closureSignatures.isEmpty() || !signedSams.isEmpty() || !callbackTearOffs.isEmpty()) {
             pruned.add(closureSignatureFile(pruned));
         }
@@ -1491,8 +1555,30 @@ public final class JavaEmitter {
         sb.append("/** Generated entry-point registry for transpiled Flutter code. */\n");
         sb.append("public final class FlutterRegistry {\n");
         sb.append("    private FlutterRegistry() {\n    }\n\n");
+        // The Dart spelling of every renamed private name ({@code _x$p2}), which only a
+        // Symbol's toString reads, registered once before any Dart code runs. Each class
+        // of a renaming library used to register its library's whole table from a static
+        // initializer of its own: in a native build that was a kilobyte or more per
+        // class, repeated across every class of the library. Each library's table is one
+        // packed string literal (Symbol.spellPacked), which costs far less natively
+        // than an array of separate constants.
+        List<String> spellers = new ArrayList<String>();
+        for (Map.Entry<String, Map<String, String>> lib : new java.util.TreeMap<String, Map<String, String>>(
+                program.privateSpellings).entrySet()) {
+            if (lib.getValue() == null || lib.getValue().isEmpty()) {
+                continue;
+            }
+            StringBuilder a = new StringBuilder();
+            for (Map.Entry<String, String> e : lib.getValue().entrySet()) {
+                a.append(e.getKey()).append('\n').append(e.getValue()).append('\n');
+            }
+            spellers.add("dart.core.Symbol.spellPacked(" + quote(a.toString()) + ")");
+        }
         sb.append("    /** Invokes the Dart main() of the application's main library. */\n");
         sb.append("    public static void invokeMain() {\n");
+        for (String m : spellers) {
+            sb.append("        ").append(m).append(";\n");
+        }
         sb.append("        ").append(mainLib).append(".main$();\n");
         // The end of main() is the end of Dart's first synchronous turn: what it queued
         // (a controller's deliveries, scheduleMicrotask) runs now, on this thread.
@@ -1702,21 +1788,29 @@ public final class JavaEmitter {
         // Dart's `EnumType.values` is a `List<EnumType>`; expose it as a DartList field
         // (coexisting with Java's implicit values() method) so `.values.idx(i)` resolves.
         sb.append(";\n\n");
-        sb.append(privateSpellingInit("public enum ", e.file != null ? e.file : e.ownerLibrary != null ? e.ownerLibrary.fileName : null));
         sb.append("    public static final dart.core.DartList<").append(enumJava)
                 .append("> values = dart.core.DartList.<").append(enumJava).append(">of(")
                 .append(names).append(");\n\n");
         // The Dart names, which a value whose name is a Java keyword (`native`)
         // does not keep as its Java constant (JavaKeywordEscaper renames it).
+        // Only an enum with such a value carries the table: every string in it is
+        // built in the class's static initializer, which in a native build costs
+        // hundreds of bytes per value, and the gallery has dozens of enums.
         StringBuilder dartNames = new StringBuilder();
+        boolean renamed = false;
         for (String nm : names.toString().split(", ")) {
             if (dartNames.length() > 0) {
                 dartNames.append(", ");
             }
             dartNames.append('"').append(nm).append('"');
+            renamed |= JavaKeywordEscaper.renames(nm);
         }
-        sb.append("    private static final String[] $dartNames = {").append(dartNames).append("};\n\n");
-        sb.append("    public String name$() {\n        return $dartNames[ordinal()];\n    }\n\n");
+        if (renamed) {
+            sb.append("    private static final String[] $dartNames = {").append(dartNames).append("};\n\n");
+            sb.append("    public String name$() {\n        return $dartNames[ordinal()];\n    }\n\n");
+        } else {
+            sb.append("    public String name$() {\n        return name();\n    }\n\n");
+        }
         sb.append(body);
         // Dart's Enum.toString is "Mode.only" -- what print and string interpolation
         // show -- where Java's is the bare constant name; .name is still name().
@@ -2991,12 +3085,14 @@ public final class JavaEmitter {
                     kb.append(kb.length() > 0 ? ", " : "").append("this.").append(f.name);
                 }
             }
+            boolean keyedSuper = constKeyed(ksup) || ksup == null && stubConstKeyed(c.superclass);
+            constKeyedClasses.put(javaClassName(c), new String[] {
+                    constKeyed(ksup) ? javaClassName(ksup) : null,
+                    String.valueOf(ksup == null && stubConstKeyed(c.superclass))});
             body.append("    public Object[] $constKey() {\n");
-            if (constKeyed(ksup) || ksup == null && stubConstKeyed(c.superclass)) {
-                body.append("        Object[] s = super.$constKey();\n        Object[] o = new Object[] {")
-                        .append(kb).append("};\n        Object[] r = new Object[s.length + o.length];\n")
-                        .append("        System.arraycopy(s, 0, r, 0, s.length);\n")
-                        .append("        System.arraycopy(o, 0, r, s.length, o.length);\n        return r;\n");
+            if (keyedSuper) {
+                body.append("        return dart.runtime.ConstCanon.join(super.$constKey(), new Object[] {")
+                        .append(kb).append("});\n");
             } else {
                 body.append("        return new Object[] {").append(kb).append("};\n");
             }
@@ -5056,26 +5152,6 @@ public final class JavaEmitter {
         return subs;
     }
 
-    /// A class of a library whose private names were renamed ({@code _x$p2}) registers the
-    /// Dart spelling of each with the runtime when it is initialized; code of the library
-    /// runs only in its own classes, so the table is filled before any of its dynamic
-    /// accesses can make an Invocation. An interface cannot have a static block; a field
-    /// initializer is run when an implementing class is initialized, the interface having
-    /// default methods, or else when it runs none of the library's code at all.
-    private String privateSpellingInit(String decl, String dartFile) {
-        Map<String, String> sp = dartFile == null ? null : program.privateSpellings.get(dartFile);
-        if (sp == null || sp.isEmpty()) {
-            return "";
-        }
-        StringBuilder a = new StringBuilder();
-        for (Map.Entry<String, String> e : sp.entrySet()) {
-            a.append(a.length() == 0 ? "" : ", ").append(quote(e.getKey())).append(", ").append(quote(e.getValue()));
-        }
-        String call = "dart.core.Symbol.spell(" + a + ")";
-        return decl.contains(" interface ") ? "    Object $privateSpelling = " + call + ";\n\n"
-                : "    static {\n        " + call + ";\n    }\n\n";
-    }
-
     private GeneratedFile finishClassFile(String name, String decl, String ext, String impls,
                                           CharSequence body, Ctx ctx, String dartFile) {
         return finishClassFile(name, decl, ext, impls, null, body, ctx, dartFile);
@@ -5102,7 +5178,7 @@ public final class JavaEmitter {
         if (permits != null && !permits.isEmpty()) {
             sb.append(" permits ").append(permits);
         }
-        sb.append(" {\n\n").append(privateSpellingInit(decl, dartFile)).append(body).append("}\n");
+        sb.append(" {\n\n").append(body).append("}\n");
         return new GeneratedFile(name + ".java", sb.toString());
     }
 
@@ -11703,6 +11779,9 @@ public final class JavaEmitter {
         boolean simple = SIMPLE_RECEIVER.matcher(recv).matches();
         if (name.equals("new") || !name.matches("[\\w$]+")
                 || simple && STATIC_TEAR_OFF.matcher(recv + "::" + name).matches() && ctx.lookup(recv) == null
+                // A library-private class (`_DialogDemoState::_route`) fails the capital-letter
+                // test above, and its name is no receiver: a static tear-off has none.
+                || simple && recv.startsWith("_") && ctx.lookup(recv) == null && programClass(recv, ctx) != null
                 || !simple && (e instanceof Ident || COMPLEX_TYPE_RECEIVER.matcher(recv).matches()
                 || recv.endsWith(".super") || recv.endsWith(".this"))) {
             return out;
@@ -15035,6 +15114,28 @@ public final class JavaEmitter {
     }
 
     /// The holder of every signed SAM interface signClosure used.
+    /// The members a closure signature's `SIG` gives the interface that carries it.
+    private static void appendSignatureBody(StringBuilder sb, String[] m) {
+        sb.append("        dart.runtime.TypeWitness[] SIG = {").append(m[1])
+                .append("};\n\n        @Override\n        default dart.runtime.TypeWitness[] $sig() {\n")
+                .append("            return SIG;\n        }\n");
+        if (Boolean.parseBoolean(m[2])) {
+            sb.append("\n        @Override\n        default boolean $generic() {\n            return true;\n        }\n");
+        }
+        if (!"-1".equals(m[3])) {
+            sb.append("\n        @Override\n        default int $required() {\n            return ").append(m[3])
+                    .append(";\n        }\n");
+        }
+        if (m[4] != null) {
+            sb.append("\n        String[] NAMED = {").append(m[4]).append("};\n\n        @Override\n")
+                    .append("        default String[] $named() {\n            return NAMED;\n        }\n");
+        }
+        if (m.length > 5 && m[5] != null) {
+            sb.append("\n        String[] TYPE_VARS = {").append(m[5]).append("};\n\n        @Override\n")
+                    .append("        default String[] $typeVars() {\n            return TYPE_VARS;\n        }\n");
+        }
+    }
+
     private GeneratedFile closureSignatureFile(List<GeneratedFile> files) {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(pkg).append(";\n\n");
@@ -15042,29 +15143,52 @@ public final class JavaEmitter {
         sb.append("import dart.core.*;\nimport dart.runtime.Funcs;\n\n");
         sb.append("/** Closure SAMs carrying their reified Dart signatures (dart.runtime.Signed). */\n");
         sb.append("public final class DartFnSigs {\n    private DartFnSigs() {\n    }\n");
+        // Every member below is a class of its own, and the native executable carries
+        // each one's metadata and static initializer whether or not it is called; the
+        // gallery once got 105 bridges for 18 calls. Only what a generated file names is
+        // emitted (explicit type arguments, `DartFnSigs.<A, B>s9(..)`,
+        // included), and a signature that one SAM carries alone is written into that SAM
+        // rather than into an interface of its own.
+        java.util.Set<String> refs = new java.util.HashSet<String>();
+        java.util.regex.Matcher rm = java.util.regex.Pattern.compile("DartFnSigs\\.(?:<[^()]*?>\\s*)?([MSsbc][0-9]+)\\b").matcher("");
+        for (GeneratedFile g : files) {
+            if (g != null && g.relativePath.endsWith(".java")) {
+                rm.reset(g.content);
+                while (rm.find()) {
+                    refs.add(rm.group(1));
+                }
+            }
+        }
+        java.util.Map<String, String[]> sigByName = new java.util.HashMap<String, String[]>();
         for (String[] m : closureSignatures.values()) {
-            sb.append("\n    public interface ").append(m[0]).append(" extends dart.runtime.Signed {\n")
-                    .append("        dart.runtime.TypeWitness[] SIG = {").append(m[1])
-                    .append("};\n\n        @Override\n        default dart.runtime.TypeWitness[] $sig() {\n")
-                    .append("            return SIG;\n        }\n");
-            if (Boolean.parseBoolean(m[2])) {
-                sb.append("\n        @Override\n        default boolean $generic() {\n            return true;\n        }\n");
+            sigByName.put(m[0], m);
+        }
+        java.util.Map<String, Integer> samsPerSig = new java.util.HashMap<String, Integer>();
+        java.util.List<String[]> liveSams = new java.util.ArrayList<String[]>();
+        for (String[] e : signedSams.values()) {
+            String num = e[0].substring(1);
+            if (refs.contains(e[0]) || refs.contains("s" + num) || refs.contains("b" + num)) {
+                liveSams.add(e);
+                Integer k = samsPerSig.get(e[3]);
+                samsPerSig.put(e[3], k == null ? 1 : k + 1);
             }
-            if (!"-1".equals(m[3])) {
-                sb.append("\n        @Override\n        default int $required() {\n            return ").append(m[3])
-                        .append(";\n        }\n");
+        }
+        java.util.Set<String> folded = new java.util.HashSet<String>();
+        for (String[] m : closureSignatures.values()) {
+            Integer k = samsPerSig.get(m[0]);
+            boolean named = refs.contains(m[0]);
+            if (!named && k != null && k == 1 && sigByName.containsKey(m[0])) {
+                folded.add(m[0]);
+                continue;
             }
-            if (m[4] != null) {
-                sb.append("\n        String[] NAMED = {").append(m[4]).append("};\n\n        @Override\n")
-                        .append("        default String[] $named() {\n            return NAMED;\n        }\n");
+            if (!named && k == null) {
+                continue;
             }
-            if (m.length > 5 && m[5] != null) {
-                sb.append("\n        String[] TYPE_VARS = {").append(m[5]).append("};\n\n        @Override\n")
-                        .append("        default String[] $typeVars() {\n            return TYPE_VARS;\n        }\n");
-            }
+            sb.append("\n    public interface ").append(m[0]).append(" extends dart.runtime.Signed {\n");
+            appendSignatureBody(sb, m);
             sb.append("    }\n");
         }
-        for (String[] e : signedSams.values()) {
+        for (String[] e : liveSams) {
             int n = Integer.parseInt(e[2]);
             StringBuilder tp = new StringBuilder();
             for (int i = 0; i < n; i++) {
@@ -15073,17 +15197,24 @@ public final class JavaEmitter {
             if (n > 0) {
                 tp.append('>');
             }
+            String num = e[0].substring(1);
+            boolean fold = folded.contains(e[3]);
             sb.append("\n    public interface ").append(e[0]).append(tp).append(" extends ").append(e[1]).append(tp)
-                    .append(", ").append(e[3]).append(" {\n    }\n");
-            sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(e[0]).append(tp).append(" s")
-                    .append(e[0].substring(1)).append("(").append(e[0]).append(tp).append(" f) {\n")
-                    .append("        return f;\n    }\n");
+                    .append(", ").append(fold ? "dart.runtime.Signed" : e[3]).append(" {\n");
+            if (fold) {
+                appendSignatureBody(sb, sigByName.get(e[3]));
+            }
+            sb.append("    }\n");
+            if (refs.contains("s" + num)) {
+                sb.append("\n    public static ").append(n > 0 ? tp + " " : "").append(e[0]).append(tp).append(" s")
+                        .append(num).append("(").append(e[0]).append(tp).append(" f) {\n")
+                        .append("        return f;\n    }\n");
+            }
             java.util.regex.Matcher fm = FUNCS_SAM.matcher(e[1]);
-            if (fm.matches()) {
+            if (refs.contains("b" + num) && fm.matches()) {
                 // The value of an instance-method tear-off held as this SAM (valueTearOff).
                 boolean isVoid = fm.group(1) != null;
                 int arity = Integer.parseInt(fm.group(2));
-                String num = e[0].substring(1);
                 StringBuilder ps = new StringBuilder();
                 StringBuilder as = new StringBuilder();
                 for (int i = 0; i < arity; i++) {
@@ -15105,6 +15236,9 @@ public final class JavaEmitter {
             }
         }
         for (String[] w : callbackTearOffs.values()) {
+            if (!refs.contains("c" + w[1].substring(1))) {
+                continue;
+            }
             // The value of an instance-method tear-off held as a stub's callback interface.
             String[] pt = w[2].isEmpty() ? new String[0] : w[2].split(",");
             StringBuilder ps = new StringBuilder();
@@ -17406,10 +17540,22 @@ public final class JavaEmitter {
     /// marking a required one), so the Type prints and compares as Dart's does.
     private String functionWitness(TypeRef t, boolean nullable, Ctx ctx) {
         String erased = erasedJavaType(t, ctx);
-        String test = functionTest("$twf", t, erased, ctx);
-        return test == null ? null : "dart.runtime.TypeWitness.function(" + erased + ".class, " + nullable
-                + ", ($twf) -> " + test + functionSigWitnesses(t, ctx) + ")";
+        // One name per nesting level: a function type whose parameter is a function type
+        // nests its witness's lambda in this one's, and Java refuses a lambda parameter
+        // that shadows an enclosing one ("variable $twf is already defined").
+        String fv = functionWitnessDepth == 0 ? "$twf" : "$twf" + functionWitnessDepth;
+        functionWitnessDepth++;
+        try {
+            String test = functionTest(fv, t, erased, ctx);
+            return test == null ? null : "dart.runtime.TypeWitness.function(" + erased + ".class, " + nullable
+                    + ", (" + fv + ") -> " + test + functionSigWitnesses(t, ctx) + ")";
+        } finally {
+            functionWitnessDepth--;
+        }
     }
+
+    /// How deeply functionWitness is nested in itself, for its lambda parameter's name.
+    private int functionWitnessDepth;
 
     private String functionSigWitnesses(TypeRef t, Ctx ctx) {
         StringBuilder sb = new StringBuilder(", new dart.runtime.TypeWitness[] {");
@@ -23620,6 +23766,10 @@ public final class JavaEmitter {
         return right.code;
     }
 
+    /// The operators whose result is a double when either operand is a double.
+    private static final java.util.Set<String> ARITH_DOUBLE_OPS = new HashSet<String>(
+            java.util.Arrays.asList("+", "-", "*", "/"));
+
     private Out emitBinary(Binary b, Ctx ctx) {
         if (b.left instanceof SuperExpr && (b.op.equals("==") || b.op.equals("!="))) {
             // `super == other` invokes the superclass's operator ==, which every class
@@ -23726,7 +23876,17 @@ public final class JavaEmitter {
         }
         Out l = emitExpr(b.left, genericCtorValueSlot(b.left, ctx), ctx);
         ctx.pushWriter(ctx.currentIndent());
-        Out r = emitExpr(b.right, genericCtorValueSlot(b.right, ctx), ctx);
+        // `w * h + (n > 0 ? gap : 0)`: a double plus an int-or-double conditional is a
+        // double whichever arm is taken, so the conditional is read as one -- its int arm
+        // promoted, as Java's ternary does. With no context it took the Number arms a num
+        // slot needs, and the sum fell to dynBinary, a Number no double parameter takes
+        // (the Flutter gallery's Shrine bottom sheet).
+        TypeRef rSlot = genericCtorValueSlot(b.right, ctx);
+        if (rSlot == null && stripParens(b.right) instanceof Conditional && ARITH_DOUBLE_OPS.contains(b.op)
+                && l.type != null && l.type.is("double") && !l.type.nullable) {
+            rSlot = TypeRef.DOUBLE;
+        }
+        Out r = emitExpr(b.right, rSlot, ctx);
         String rLifted = ctx.popWriter();
         if (NUMERIC_BOUND_OPS.contains(b.op)) {
             // `T extends num` operand: Dart types `n * 2` by T's bound, so it is a num
@@ -24642,6 +24802,22 @@ public final class JavaEmitter {
                     }
                 } else if (!(a instanceof Lambda)) {
                     unifyTypeVars(p.type, inferExprTypeQuiet(a, ctx), tps, m);
+                }
+            }
+            // Named arguments bind too, as the witnesses (methodWitnessCall) already read
+            // them: `ease<T>({required T begin, required T end})` called with
+            // `begin: radius, end: 0` is ease<double>, and its `0` is the double 0.0. Left
+            // unbound, T erased to dynamic and the literal was emitted as a long the
+            // double-typed call then rejected (the Flutter gallery's Shrine bottom sheet).
+            // After the positionals, so an argument written first still binds first.
+            for (NamedArg na : c.args.named) {
+                if (na.value instanceof Lambda || na.value instanceof ListLit) {
+                    continue;
+                }
+                for (Param p : params) {
+                    if (p.named && p.name.equals(na.name)) {
+                        unifyTypeVars(p.type, inferExprTypeQuiet(na.value, ctx), tps, m);
+                    }
                 }
             }
         }
@@ -27759,12 +27935,19 @@ public final class JavaEmitter {
                 if (c.typeArgs != null && !c.typeArgs.isEmpty() && c.typeArgs.size() == m.typeParams.size()) {
                     StringBuilder tb = new StringBuilder("<");
                     for (int i = 0; i < c.typeArgs.size(); i++) {
-                        if (i > 0) {
-                            tb.append(", ");
+                        String jt = javaType(c.typeArgs.get(i), true, ctx);
+                        if ("Number".equals(jt)) {
+                            // `_sort<num>((d) => d.calories)` with `Comparable<T> Function(D)`:
+                            // Dart's int is a Comparable<num>, Java's Long only a
+                            // Comparable<Long>, so `<Number>` cannot type the argument (the
+                            // Flutter gallery's data table). javac infers T instead; the
+                            // witness still says num.
+                            tb = null;
+                            break;
                         }
-                        tb.append(javaType(c.typeArgs.get(i), true, ctx));
+                        tb.append(i > 0 ? ", " : "").append(jt);
                     }
-                    targs = tb.append('>').toString();
+                    targs = tb == null ? "" : tb.append('>').toString();
                 }
                 List<Param> mps = m.params;
                 if (cc.method(n) == null && !m.isStatic) {
@@ -29135,8 +29318,11 @@ public final class JavaEmitter {
     /// Dart's num.clamp on a boxed receiver: dispatched on the values, so the operand that
     /// wins comes back as it is, a Long or a Double.
     private Out numClamp(String boxedTarget, Out lo, Out hi, Ctx ctx) {
-        return new Out("((Number) dart.runtime.Dyn.call(" + boxedTarget + ", \"clamp\", new Object[] {"
-                + boxIfPrimitive(lo, ctx) + ", " + boxIfPrimitive(hi, ctx) + "}))", new TypeRef("num"));
+        // Straight to the helper, not through Dyn.call: dynamic dispatch on a builtin
+        // reaches every builtin's members, which a native build then has to carry.
+        return new Out("dart.runtime.Dyn.numClamp((Number) " + paren(boxedTarget) + ", (Number) "
+                + paren(boxIfPrimitive(lo, ctx)) + ", (Number) " + paren(boxIfPrimitive(hi, ctx)) + ")",
+                new TypeRef("num"));
     }
 
     private Out coreArg(Expr a, TypeRef param, Ctx ctx) {
@@ -29507,6 +29693,10 @@ public final class JavaEmitter {
                 || n.equals("clamp") && pos.size() == 2)) {
             // `(c ? 7 : 2.0).abs()`: a num is a boxed Long or Double, and these answer the
             // receiver's own kind (an int stays an int), so they dispatch on the value.
+            if (n.equals("clamp")) {
+                return numClamp(boxIfPrimitive(target, ctx), coreArg(pos.get(0), new TypeRef("num"), ctx),
+                        coreArg(pos.get(1), new TypeRef("num"), ctx), ctx);
+            }
             StringBuilder args = new StringBuilder();
             for (int i = 0; i < pos.size(); i++) {
                 Out ao = coreArg(pos.get(i), new TypeRef("num"), ctx);
@@ -30490,7 +30680,17 @@ public final class JavaEmitter {
             return new Out(cls + witness + "filled(" + args + ")", listType);
         }
         // generate: the generator's index parameter is typed via the IndexedGenerator typedef
-        String gen = emitExpr(pos.get(1), new TypeRef("IndexedGenerator"), ctx).code;
+        // With a known element type the generator is an `E Function(int)`, as Dart types it:
+        // `List<double>.generate(n, (i) => i.isEven ? 0 : gap)` returns 0.0, not a num the
+        // primitive list's Func1<Long, Double> cannot take (the Flutter gallery's Shrine).
+        TypeRef genType = new TypeRef("IndexedGenerator");
+        if (elem != null && isConcreteType(elem) && !isDynamicType(elem) && typeVarsInScope(elem, ctx)) {
+            genType = new TypeRef("Function");
+            genType.funcParams = new ArrayList<TypeRef>();
+            genType.funcParams.add(TypeRef.INT);
+            genType.funcReturn = elem;
+        }
+        String gen = emitExpr(pos.get(1), genType, ctx).code;
         String args = len + ", " + gen + (growable != null ? ", " + growable : "");
         return new Out(cls + witness + "generate" + sfx + "(" + args + ")", listType);
     }

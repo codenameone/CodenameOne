@@ -130,6 +130,9 @@ public class GeneratorModel {
     /// The fitness studio template's `--brand`, held to its theme.css the same way.
     public static final int PULSE_BRAND = 0xff5a1f;
 
+    /// The booking template's `--brand`, held to its theme.css the same way.
+    public static final int SLATE_BRAND = 0xdb3416;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
@@ -141,6 +144,9 @@ public class GeneratorModel {
         }
         if (template == Template.PULSE) {
             return PULSE_BRAND;
+        }
+        if (template == Template.SLATE) {
+            return SLATE_BRAND;
         }
         if (template == Template.BASTION) {
             return BASTION_BRAND;
@@ -2125,9 +2131,13 @@ public class GeneratorModel {
             boolean chat = template == Template.PARLEY;
             boolean video = template == Template.REEL;
             boolean studio = template == Template.PULSE;
+            boolean booking = template == Template.SLATE;
             String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append(studio
+                    .append(booking
+                            ? "This project is a working appointment booking app: a client, a provider and an "
+                            + "owner mode in one "
+                            : studio
                             ? "This project is a working fitness studio app: a member, a trainer, the front desk "
                             + "and an owner mode in one "
                             : video
@@ -2143,7 +2153,11 @@ public class GeneratorModel {
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append(studio
+                    .append(booking
+                            ? "- `backend/` is the server: accounts and roles, the business and its services, the "
+                            + "slot engine, holds and bookings, deposits, the waitlist, calendar sync, the live "
+                            + "channel and the database migrations.\n"
+                            : studio
                             ? "- `backend/` is the server: accounts and households, the timetable and bookings, "
                             + "door passes and check-in, memberships and billing, nudges, the live channel and "
                             + "the database migrations.\n"
@@ -2172,7 +2186,13 @@ public class GeneratorModel {
                     .append("Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
-                    .append(studio
+                    .append(booking
+                            ? "`client@" + lower + ".example`, who has a card on file and a history, `client2@"
+                            + lower + ".example`, `provider@" + lower + ".example`, `provider2@" + lower
+                            + ".example`, `provider3@" + lower + ".example`, who works at both locations, `owner@"
+                            + lower + ".example`, who runs the business, and `client3@" + lower + ".example`, "
+                            + "whom the owner has flagged "
+                            : studio
                             ? "`member@" + lower + ".example`, who books for two children, `member2@" + lower
                             + ".example`, `trainer@" + lower + ".example`, `desk@" + lower + ".example`, who works "
                             + "the front desk and the door kiosk, `owner@" + lower + ".example`, who runs the "
@@ -2192,7 +2212,7 @@ public class GeneratorModel {
                             + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
                             : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
-                    .append(studio ? "for the owner to act on. " : chat || video ? "for the admin to act on. " : "and waits for the admin's decision. ")
+                    .append(studio || booking ? "for the owner to act on. " : chat || video ? "for the admin to act on. " : "and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
                     .append(chat
                             ? "configured. Calls use a public STUN server until the server is given a TURN "
@@ -2205,7 +2225,12 @@ public class GeneratorModel {
                     .append("serves it at `http://localhost:8080/`. In a desktop window or a desktop browser the ")
                     .append("admin mode becomes a console with the operating system's own look.\n\n")
                     .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
-                    .append(studio
+                    .append(booking
+                            ? "cover the sample this project started as: \"An appointment booking app from every "
+                            + "side\" shows it as a client, a provider and the owner see it, and \"Building on the "
+                            + "sample\" explains how it is built and what to change: the slot engine, the gap "
+                            + "rules, calendar sync and the database.\n\n"
+                            : studio
                             ? "cover the sample this project started as: \"A fitness studio app from every side\" "
                             + "shows it as a member, a trainer, the front desk and the owner see it, and "
                             + "\"Building on the sample\" explains how it is built and what to change: billing, "

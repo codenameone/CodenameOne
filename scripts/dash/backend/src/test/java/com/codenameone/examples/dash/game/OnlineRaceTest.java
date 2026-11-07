@@ -139,6 +139,28 @@ class OnlineRaceTest {
                 "{\"raceId\":\"" + id + "\",\"player\":\"1\",\"reason\":\"too good\"}"), who)));
     }
 
+    /// A jump a second into the race is stamped INPUT_DELAY ticks after the
+    /// tick it arrived on, not at the start: the socket test sends its jump
+    /// during the countdown, so this is where a running race's stamping is held.
+    @Test
+    void anInputMidRaceIsStampedForATickToCome() throws Exception {
+        String who = Api.player(accounts, "midrace");
+        rooms.quick(profile(who), null, Content.CAUSEWAY);
+        String id = rooms.raceOf(who);
+        rooms.tick(System.currentTimeMillis() + GameProtocol.COUNTDOWN_MILLIS + 1000);
+        rooms.input(who, Input.JUMP);
+        rooms.fastForward(id);
+        Map stored = Api.json(mvc, Api.as(get("/api/races/" + id), who));
+        Replay replay = Replay.decode((String) stored.get("replay"));
+        int first = -1;
+        for (int i = 0; i < replay.eventCount() && first < 0; i++) {
+            if (replay.event(i)[1] == 0) {
+                first = replay.event(i)[0];
+            }
+        }
+        assertTrue(first > GameProtocol.INPUT_DELAY, "stamped for tick " + first);
+    }
+
     @Test
     void anInputFloodIsCut() throws Exception {
         String who = Api.player(accounts, "masher");

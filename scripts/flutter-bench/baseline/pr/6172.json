@@ -1,0 +1,109 @@
+{
+ "pr": 6172,
+ "rebaseline": {
+  "android": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 4965216
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that, so this is the first measurement of the gallery's dex under #6154's code generation. Executable code grows 4,965,216 -> 5,447,152 bytes while the APK itself, gated at 2%, went 82,093,372 -> 82,262,888 (+0.21%) in the same run.",
+     "runs": 1,
+     "value": 5447152
+    }
+   }
+  },
+  "ios": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 18307800
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that (and gives the build the heap it then needs on a macOS runner), so this is the first measurement of the iOS gallery under #6154's code generation. Code grows 18,307,800 -> 20,376,264 bytes while install (113,756,645 -> 115,825,110, +1.82%) and wire_bytes (83,914,831 -> 84,538,531, +0.74%) stay inside their 2% tolerance in the same run.",
+     "runs": 1,
+     "value": 20376264
+    }
+   }
+  },
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 16457801
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that, so this is the first measurement of the gallery under #6154's code generation (async lowering, signed tear-offs, type witnesses). The raw script grows by 1,208,552 bytes (code and install move by the same amount) while the gallery's own wire_bytes, gated at 2%, went 80,155,363 -> 80,334,160 (+0.22%) in the same run: the growth is repetitive generated code gzip absorbs.",
+     "runs": 1,
+     "value": 17666353
+    },
+    "install_bytes": {
+     "from": {
+      "value": 111957604
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that, so this is the first measurement of the gallery under #6154's code generation (async lowering, signed tear-offs, type witnesses). The raw script grows by 1,208,552 bytes (code and install move by the same amount) while the gallery's own wire_bytes, gated at 2%, went 80,155,363 -> 80,334,160 (+0.22%) in the same run: the growth is repetitive generated code gzip absorbs.",
+     "runs": 1,
+     "value": 113166156
+    }
+   }
+  },
+  "linux": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 16754402
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled, and with a Dart runtime calling String.split, which the native translation lacks; this PR fixes both, so this is the first measurement of the Linux gallery under #6154's code generation. Code grows 16,754,402 -> 18,748,258 bytes and install 119,197,408 -> 121,747,040 by about the same amount, while the gallery's wire_bytes, gated at 2%, went 85,769,588 -> 86,583,233 (+0.95%) in the same run.",
+     "runs": 1,
+     "value": 18748258
+    },
+    "cold_start_ratio": {
+     "from": {
+      "value": 0.67
+     },
+     "reason": "First start-up measurements of the gallery under #6154's code generation, which this PR makes compile: every run of this branch since then measured Codename One/Flutter between 0.76 and 0.85 (still a win, 1.17-1.31x faster), against 0.67 from the gallery before #6154. The lambda-carrier and allocation commits do not move it: pre- and post-change gallery binaries launched alternately in the Linux container reached their first frame in the same time (median 1.21s vs 1.17s, 6 launches each).",
+     "runs": 3,
+     "value": 0.821
+    },
+    "install_bytes": {
+     "from": {
+      "value": 119197408
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled, and with a Dart runtime calling String.split, which the native translation lacks; this PR fixes both, so this is the first measurement of the Linux gallery under #6154's code generation. Code grows 16,754,402 -> 18,748,258 bytes and install 119,197,408 -> 121,747,040 by about the same amount, while the gallery's wire_bytes, gated at 2%, went 85,769,588 -> 86,583,233 (+0.95%) in the same run.",
+     "runs": 1,
+     "value": 121747040
+    }
+   }
+  },
+  "macos": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 35268200
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that (and gives the build the heap it then needs on a macOS runner), so this is the first measurement of the macOS gallery under #6154's code generation. Code grows 35,268,200 -> 39,385,912 bytes and install 130,793,677 -> 134,911,389 by the same 4,117,712, while the gallery's wire_bytes, gated at 2%, went 89,829,730 -> 91,095,323 (+1.41%) in the same run.",
+     "runs": 1,
+     "value": 39385912
+    },
+    "install_bytes": {
+     "from": {
+      "value": 130793677
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled; this PR fixes that (and gives the build the heap it then needs on a macOS runner), so this is the first measurement of the macOS gallery under #6154's code generation. Code grows 35,268,200 -> 39,385,912 bytes and install 130,793,677 -> 134,911,389 by the same 4,117,712, while the gallery's wire_bytes, gated at 2%, went 89,829,730 -> 91,095,323 (+1.41%) in the same run.",
+     "runs": 1,
+     "value": 134911389
+    }
+   }
+  },
+  "windows": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "value": 12399104
+     },
+     "reason": "Flutter port gaps (#6154) reached master with a transpiler under which the gallery no longer compiled, and with a Dart runtime calling String.split, which the native translation lacks; this PR fixes both, so this is the first measurement of the Windows gallery under #6154's code generation. Code grows 12,399,104 -> 13,748,224 bytes while install (115,558,400, +1.66%) and wire_bytes (82,434,526, +0.69%) stay inside their 2% tolerance in the same run.",
+     "runs": 1,
+     "value": 13748224
+    }
+   }
+  }
+ }
+}

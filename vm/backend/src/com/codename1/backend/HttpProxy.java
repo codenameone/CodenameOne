@@ -80,6 +80,11 @@ public final class HttpProxy {
     private WebClient client;
     private int followRedirects;
     private boolean forwardedHeaders = true;
+    /// Lower-case header name -> the name it is sent under, each way.
+    private final Map requestRenames = new LinkedHashMap();
+    private final Map responseRenames = new LinkedHashMap();
+    /// Upstream status -> the status the client is answered with.
+    private final Map statusRewrites = new LinkedHashMap();
 
     /// - `target`: the upstream's origin and optional base path, such as
     ///   `https://api.internal:8443` or `http://10.0.0.5/service`
@@ -125,6 +130,70 @@ public final class HttpProxy {
     public HttpProxy setForwardedHeaders(boolean forwardedHeaders) {
         this.forwardedHeaders = forwardedHeaders;
         return this;
+    }
+
+    /// Sends the client's `from` header upstream as `to`, as Spring Cloud
+    /// Gateway's `MapRequestHeader` filter does -- `X-Api-Key` to
+    /// `Authorization`, say. An upstream header already called `to` is
+    /// replaced. Hop-by-hop and framing headers cannot be renamed.
+    /// @param from the header the client sends; case does not matter
+    /// @param to the name it is forwarded under
+    /// @return this proxy
+    public HttpProxy renameRequestHeader(String from, String to) {
+        requestRenames.put(asciiLower(checkedName(from)), asciiLower(checkedName(to)));
+        return this;
+    }
+
+    /// Answers the client with the upstream's `from` header under the name
+    /// `to`.
+    /// @param from the header the upstream sends; case does not matter
+    /// @param to the name the client receives it under
+    /// @return this proxy
+    public HttpProxy renameResponseHeader(String from, String to) {
+        responseRenames.put(asciiLower(checkedName(from)), asciiLower(checkedName(to)));
+        return this;
+    }
+
+    /// Answers the client with `to` whenever the upstream answers `from`, as
+    /// Spring Cloud Gateway's `SetStatus` filter does: an upstream that
+    /// answers 401 to a missing key the client should see as 403, say. The
+    /// body and headers are passed on as they came.
+    /// @param from the upstream status, 100 to 599
+    /// @param to the status the client gets, 100 to 599
+    /// @return this proxy
+    public HttpProxy rewriteStatus(int from, int to) {
+        if (from < 100 || from > 599 || to < 100 || to > 599) {
+            throw new IllegalArgumentException("a status is between 100 and 599");
+        }
+        statusRewrites.put(Integer.valueOf(from), Integer.valueOf(to));
+        return this;
+    }
+
+    /// The header names a rename overwrites: the target of every rename whose
+    /// source is present, unless that target is itself renamed away.
+    private static java.util.Set replacedBy(Map renames, Map headers) {
+        java.util.Set out = new java.util.HashSet();
+        Iterator it = renames.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry e = (Map.Entry) it.next();
+            if (headers.containsKey(e.getKey()) && !renames.containsKey(e.getValue())) {
+                out.add(e.getValue());
+            }
+        }
+        return out;
+    }
+
+    private static String checkedName(String name) {
+        if (name == null || name.length() == 0 || name.indexOf(':') >= 0
+                || name.indexOf('\r') >= 0 || name.indexOf('\n') >= 0) {
+            throw new IllegalArgumentException("not a header name: " + name);
+        }
+        String lower = asciiLower(name);
+        if (isHopByHop(lower) || "content-length".equals(lower) || "host".equals(lower)
+                || "content-type".equals(lower)) {
+            throw new IllegalArgumentException("the " + name + " header cannot be renamed");
+        }
+        return name;
     }
 
     /// Forwards to the target with the request's own path and query appended.
@@ -189,7 +258,9 @@ public final class HttpProxy {
                     method = "HEAD".equals(method) ? "HEAD" : "GET";
                 }
             }
-            HttpServer.Response response = respond(request, exchange, status);
+            Integer rewritten = (Integer) statusRewrites.get(Integer.valueOf(status));
+            HttpServer.Response response = respond(request, exchange,
+                    rewritten == null ? status : rewritten.intValue(), responseRenames);
             handedOver = true;
             return response;
         } catch (IOException err) {
@@ -211,12 +282,14 @@ public final class HttpProxy {
     /// The client's response: the upstream status and end-to-end headers, and a
     /// body that streams from the exchange, which the writer then owns.
     private static HttpServer.Response respond(HttpServer.Request request,
-                                               final Web.Exchange exchange, int status)
+                                               final Web.Exchange exchange, int status,
+                                               Map renames)
             throws IOException {
         Map values = exchange.getHeaderValueMap();
         List dropped = connectionTokens(values.get("connection"));
         Map out = new LinkedHashMap();
         String contentType = null;
+        java.util.Set replaced = replacedBy(renames, values);
         Iterator it = values.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry e = (Map.Entry) it.next();
@@ -231,7 +304,12 @@ public final class HttpProxy {
                 continue;
             }
             List all = (List) e.getValue();
-            out.put(name, all.size() == 1 ? all.get(0) : new ArrayList(all));
+            if (replaced.contains(name)) {
+                continue;
+            }
+            String renamed = (String) renames.get(name);
+            out.put(renamed != null ? renamed : name,
+                    all.size() == 1 ? all.get(0) : new ArrayList(all));
         }
         boolean bodiless = "HEAD".equals(request.getMethod()) || status == 204 || status == 304
                 || (status >= 100 && status < 200);
@@ -323,6 +401,7 @@ public final class HttpProxy {
         List dropped = connectionTokens(headers.get("connection"));
         List out = new ArrayList();
         String forwardedFor = null;
+        java.util.Set replaced = replacedBy(requestRenames, headers);
         Iterator it = headers.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry e = (Map.Entry) it.next();
@@ -345,7 +424,11 @@ public final class HttpProxy {
                     || "x-forwarded-host".equals(name))) {
                 continue;
             }
-            out.add(name + ": " + value);
+            if (replaced.contains(name)) {
+                continue;
+            }
+            String renamed = (String) requestRenames.get(name);
+            out.add((renamed != null ? renamed : name) + ": " + value);
         }
         if (forwardedHeaders) {
             String peer = request.getPeerAddress();

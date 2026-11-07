@@ -55,7 +55,7 @@ public final class FunctionType {
     /// The slot is a Dart type spelling (`T`, `List<K>`, `(V) => K`); every identifier in
     /// it that is one of the type parameters is renamed.
     private String canonical(String spelled) {
-        String[] params = typeVars[0].split(", ");
+        String[] params = splitLiteral(typeVars[0], ", ");
         StringBuilder sb = new StringBuilder();
         int i = 0;
         while (i < spelled.length()) {
@@ -112,7 +112,7 @@ public final class FunctionType {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         if (typeVars != null && typeVars.length > 0) {
-            String[] params = typeVars[0].split(", ");
+            String[] params = splitLiteral(typeVars[0], ", ");
             sb.append('<');
             for (int k = 0; k < params.length; k++) {
                 sb.append(k > 0 ? ", " : "").append('Y').append(k);
@@ -231,5 +231,22 @@ public final class FunctionType {
     @Override
     public int hashCode() {
         return toString().hashCode();
+    }
+
+    /// `s` split at every `sep`, keeping empty pieces (Java's `split(sep, -1)` for a
+    /// literal). `String.split` is not in ParparVM's class library (`vm/JavaAPI`) nor
+    /// in `Ports/CLDC11`: it compiles and runs on the JVM, and the native translation
+    /// then fails to compile on an undeclared `java_lang_String_split`.
+    static String[] splitLiteral(String s, String sep) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        int start = 0;
+        int at = s.indexOf(sep);
+        while (at >= 0) {
+            out.add(s.substring(start, at));
+            start = at + sep.length();
+            at = s.indexOf(sep, start);
+        }
+        out.add(s.substring(start));
+        return out.toArray(new String[out.size()]);
     }
 }
