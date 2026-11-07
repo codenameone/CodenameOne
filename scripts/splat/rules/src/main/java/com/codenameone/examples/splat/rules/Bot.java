@@ -77,11 +77,18 @@ public final class Bot {
             // weave: change direction every couple of seconds
             int weave = ((t / 50 + p.index) & 1) == 0 ? 110 : -110;
             if (m.mode() == Mode.TEAM_PAINT || p.carrying() < 0 && (p.index & 3) == 1) {
+                // weave the other way rather than into a wall
+                if (!open(m.arena(), p, Trig.wrap(yaw + (weave > 0 ? Trig.FULL / 4 : -Trig.FULL / 4)), 900)) {
+                    weave = -weave;
+                }
                 strafe = weave;
                 forward = dist > 14 * Arena.UNIT ? 100 : (dist < 6 * Arena.UNIT ? -60 : 0);
+                if (forward < 0 && !open(m.arena(), p, Trig.wrap(yaw + Trig.HALF), 900)) {
+                    forward = 0;
+                }
             } else {
                 // an objective to reach: keep shooting, keep walking there
-                int rel = steer(m, p, Trig.atan2((long) goal[0] - p.x(), (long) goal[1] - p.z())) - yaw;
+                int rel = steer(m, p, goal) - yaw;
                 forward = 127 * Trig.cos(rel) / Trig.ONE;
                 strafe = FixedMath.clamp(127 * Trig.sin(rel) / Trig.ONE + weave / 3, -127, 127);
             }
@@ -98,7 +105,7 @@ public final class Bot {
             }
         } else {
             boolean there = FixedMath.within(p.x(), p.z(), goal[0], goal[1], 1500);
-            int want = steer(m, p, Trig.atan2((long) goal[0] - p.x(), (long) goal[1] - p.z()));
+            int want = steer(m, p, goal);
             yaw = turn(p.yaw(), want, maxTurn);
             int rel = want - yaw;
             forward = there ? 0 : 127 * Trig.cos(rel) / Trig.ONE;
@@ -117,21 +124,11 @@ public final class Bot {
         return new Input(strafe, forward, yaw, pitch, buttons, -1);
     }
 
-    private static final int[] DETOURS = {0, 285, -285, 570, -570, 910, -910, 1250, -1250, 1700, -1700};
-
-    /// The first direction near `want` that is open for a couple of metres. Every
-    /// box is convex, so walking along its side until the way is clear goes round
-    /// it; the side tried first alternates by player so a team splits up.
-    static int steer(Match m, Player p, int want) {
-        Arena a = m.arena();
-        int side = (p.index & 1) == 0 ? 1 : -1;
-        for (int i = 0; i < DETOURS.length; i++) {
-            int dir = Trig.wrap(want + DETOURS[i] * side);
-            if (open(a, p, dir, 700) && open(a, p, dir, 1600)) {
-                return dir;
-            }
-        }
-        return want;
+    /// The heading toward the next point on the arena's path to `goal`, so a
+    /// bot goes round cover instead of walking into it.
+    static int steer(Match m, Player p, int[] goal) {
+        int[] to = m.arena().nav().next(p.x(), p.z(), goal[0], goal[1]);
+        return Trig.atan2((long) to[0] - p.x(), (long) to[1] - p.z());
     }
 
     private static boolean open(Arena a, Player p, int dir, int dist) {

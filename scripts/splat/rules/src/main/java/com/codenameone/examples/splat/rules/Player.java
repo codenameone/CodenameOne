@@ -28,6 +28,10 @@ public final class Player {
     int y;
     int z;
     int vy;
+    /// Ground velocity, mm a tick: movement speeds up and slows down rather
+    /// than starting and stopping dead.
+    int vx;
+    int vz;
     int yaw;
     int pitch;
     boolean grounded;
@@ -150,7 +154,7 @@ public final class Player {
     }
 
     void write(IntBuf b) {
-        b.add(x).add(y).add(z).add(vy).add(yaw).add(pitch).add(grounded).add(crouched).add(alive)
+        b.add(x).add(y).add(z).add(vx).add(vy).add(vz).add(yaw).add(pitch).add(grounded).add(crouched).add(alive)
                 .add(respawnAt).add(wipeUntil).add(wiped).add(paintedBy).add(protectedUntil)
                 .add(cooldownUntil).add(ammo).add(reloadUntil).add(grenade).add(carrying).add(paints)
                 .add(outs).add(captures).add(lastButtons);
@@ -162,7 +166,9 @@ public final class Player {
         x = r.next();
         y = r.next();
         z = r.next();
+        vx = r.next();
         vy = r.next();
+        vz = r.next();
         yaw = r.next();
         pitch = r.next();
         grounded = r.bool();

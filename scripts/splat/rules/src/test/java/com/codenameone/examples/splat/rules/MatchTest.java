@@ -220,12 +220,12 @@ class MatchTest {
     /// Rewrites one player's position in a snapshot (layout from Match/Player.write).
     static void place(int[] snap, Match m, int index, int x, int z, int yaw) {
         int header = 1 + 1 + 2 + 2 + 2 + 1 + 1 + 2 * 6 + 1;
-        int perPlayer = 23 + 6;
+        int perPlayer = 25 + 6;
         int base = header + index * perPlayer;
         snap[base] = x;
         snap[base + 1] = 0;
         snap[base + 2] = z;
-        snap[base + 4] = yaw;
+        snap[base + 6] = yaw;
         assertEquals(m.playerCount(), snap[header - 1]);
     }
 }

@@ -21,6 +21,7 @@ package com.codenameone.examples.splat.rules;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// A paintball field: a fenced rectangle of boxes, two team bases and the snack bar.
 ///
@@ -44,6 +45,8 @@ public final class Arena {
     public final int hillX;
     public final int hillZ;
     public final int hillRadius;
+    /// Built the first time a bot asks; the same for every match on this arena.
+    private final AtomicReference<Nav> nav = new AtomicReference<Nav>();
 
     Arena(String id, String name, int width, int depth, List<Box> boxes, int[][] spawns,
             int[][] bases, int hillX, int hillZ, int hillRadius) {
@@ -109,6 +112,15 @@ public final class Arena {
             }
         }
         return g;
+    }
+
+    Nav nav() {
+        Nav n = nav.get();
+        if (n == null) {
+            nav.compareAndSet(null, new Nav(this));
+            n = nav.get();
+        }
+        return n;
     }
 
     /// True when a circle at `(x, z)` with feet at `feet` and the given height would

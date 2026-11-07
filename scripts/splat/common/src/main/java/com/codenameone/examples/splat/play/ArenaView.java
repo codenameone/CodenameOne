@@ -83,6 +83,10 @@ public class ArenaView extends GameView {
     private static final int MAX_BALLS = 120;
     private static final int MAX_DECALS = 260;
     private static final float MM = 0.001f;
+    /// The near plane. Further out than looks necessary: depth precision is
+    /// spent on the first metre, and at 3 cm paint on the floor fought the
+    /// floor for every pixel past twenty metres.
+    private static final float NEAR = 0.07f;
     private static final float OPERATOR_HEIGHT = 1.8f;
     private static final float MARKER_LENGTH = 0.28f;
 
@@ -131,6 +135,17 @@ public class ArenaView extends GameView {
     private float[] opScale = new float[0];
     private float[] heldScale = new float[0];
     private String[] clips = new String[0];
+    /// Per operator, smoothed so one jittery tick never changes the clip:
+    /// ground speed forward and sideways in m/s, the yaw drawn, and how long
+    /// a different clip has been asked for.
+    private float[] moveF = new float[0];
+    private float[] moveS = new float[0];
+    private float[] bodyYaw = new float[0];
+    private float[] pending = new float[0];
+    /// The ground speed, in m/s, each locomotion clip was authored at; the
+    /// clip plays faster or slower so the feet keep pace with the ground.
+    private static final float RUN_PACE = 4.2f;
+    private static final float WALK_PACE = 1.7f;
     private final Model[] balls = new Model[MAX_BALLS];
     private final Model[] decals = new Model[MAX_DECALS];
     private int nextDecal;
@@ -226,7 +241,7 @@ public class ArenaView extends GameView {
         setPostProcess(new PostProcess().setBloom(0.78f, 0.55f)
                 .setGrade(1.12f, 0.86f, 0xff0b1720, 0xfffff2dc).setVignette(0.42f).setGrain(0.035f));
         // end::splat-atmosphere[]
-        getCamera().setPerspective(HIP_FOV, 0.03f, 400f);
+        getCamera().setPerspective(HIP_FOV, NEAR, 400f);
         sphere = Primitives.sphere(d, 0.5f, 10, 14, false);
         // the sky is a shader on the inside of a sphere that follows the eye
         sky = new Model(Primitives.sphere(d, 300f, 16, 24, true), new Material(Material.Type.SKYBOX));
@@ -292,6 +307,10 @@ public class ArenaView extends GameView {
         opScale = new float[n];
         heldScale = new float[n];
         clips = new String[n];
+        moveF = new float[n];
+        moveS = new float[n];
+        bodyYaw = new float[n];
+        pending = new float[n];
         prevX = new float[n];
         prevY = new float[n];
         prevZ = new float[n];
@@ -303,6 +322,7 @@ public class ArenaView extends GameView {
             opScale[i] = fit(op, OPERATOR_HEIGHT);
             op.play(Models.IDLE, true);
             clips[i] = Models.IDLE;
+            bodyYaw[i] = (float) -(p.yaw() * 360.0 / Trig.FULL);
             op.addTo(this);
             operators[i] = op;
             AnimatedModel m = Models.create(d, Models.marker(p.marker.id));
@@ -1162,6 +1182,13 @@ public class ArenaView extends GameView {
 
     /// Paint where a ball burst, squashed flat against whatever it hit: the
     /// ground, the top of a box or the nearest of its sides.
+    /// Props whose sides are the sides of their box, so paint can lie on them.
+    private static boolean flatSided(String kind) {
+        return "container".equals(kind) || "container-small".equals(kind) || "crate".equals(kind)
+                || "boxes".equals(kind) || "dumpster".equals(kind) || "snackbar".equals(kind)
+                || "barrier".equals(kind) || "barrier-single".equals(kind) || "watertower".equals(kind);
+    }
+
     private void decal(int team, int x, int y, int z, float size) {
         Model d = decals[nextDecal];
         nextDecal = (nextDecal + 1) % MAX_DECALS;
@@ -1187,7 +1214,9 @@ public class ArenaView extends GameView {
         float rx = -90;
         float ry = 0;
         if (hit == null || y < 120) {
-            py = 0.012f + (nextDecal & 7) * 0.0004f;
+            // Each splat a layer of its own, 2 mm apart, so two that overlap
+            // never trade places from one frame to the next.
+            py = 0.02f + (nextDecal & 15) * 0.002f;
         } else {
             int dx0 = Math.abs(x - hit.x0);
             int dx1 = Math.abs(x - hit.x1);
@@ -1195,8 +1224,18 @@ public class ArenaView extends GameView {
             int dz1 = Math.abs(z - hit.z1);
             int dTop = Math.abs(y - hit.height);
             int best = Math.min(Math.min(dx0, dx1), Math.min(Math.min(dz0, dz1), dTop));
-            if (best == dTop) {
-                py = hit.height * MM + 0.012f;
+            if (!flatSided(hit.kind)) {
+                // a car or a barrel is round: paint on its box would float
+                // in the air beside it, so the splat lands at its foot
+                py = 0.02f + (nextDecal & 15) * 0.002f;
+                int out = (int) (size * 400);
+                if (Math.min(dx0, dx1) <= Math.min(dz0, dz1)) {
+                    px = -(dx0 < dx1 ? hit.x0 - out : hit.x1 + out) * MM;
+                } else {
+                    pz = (dz0 < dz1 ? hit.z0 - out : hit.z1 + out) * MM;
+                }
+            } else if (best == dTop) {
+                py = hit.height * MM + 0.02f + (nextDecal & 7) * 0.002f;
             } else {
                 // drips run down a wall, so the texture is not mirrored upside down
                 wall = true;
@@ -1204,10 +1243,10 @@ public class ArenaView extends GameView {
                 sy = s;
                 if (best == dx0 || best == dx1) {
                     // world x is drawn mirrored, so the x0 face looks toward +x on screen
-                    px = -(best == dx0 ? hit.x0 - 12 : hit.x1 + 12) * MM;
+                    px = -(best == dx0 ? hit.x0 - 25 : hit.x1 + 25) * MM;
                     ry = best == dx0 ? 90 : -90;
                 } else {
-                    pz = (best == dz0 ? hit.z0 - 12 : hit.z1 + 12) * MM;
+                    pz = (best == dz0 ? hit.z0 - 25 : hit.z1 + 25) * MM;
                     ry = best == dz0 ? 180 : 0;
                 }
             }
@@ -1279,31 +1318,65 @@ public class ArenaView extends GameView {
         float x = -lerp(prevX[i], p.x() * MM);
         float y = lerp(prevY[i], p.y() * MM);
         float z = lerp(prevZ[i], p.z() * MM);
-        double yr = p.yaw() * 2 * Math.PI / Trig.FULL;
-        float yawDeg = (float) -Math.toDegrees(yr);
-        // Motion in the operator's own frame, from the last tick's step.
-        float vx = -(p.x() * MM - prevX[i]);
-        float vz = p.z() * MM - prevZ[i];
-        float fwd = (float) (vx * -Math.sin(yr) + vz * Math.cos(yr));
-        float side = (float) (vx * -Math.cos(yr) + vz * -Math.sin(yr));
+        // The body turns smoothly toward the look; the rules turn in steps.
+        float target = (float) -(p.yaw() * 360.0 / Trig.FULL);
+        float turn = target - bodyYaw[i];
+        while (turn > 180f) {
+            turn -= 360f;
+        }
+        while (turn < -180f) {
+            turn += 360f;
+        }
+        bodyYaw[i] += turn * Math.min(1f, dt * 14f);
+        float yawDeg = bodyYaw[i];
+        double yr = Math.toRadians(-yawDeg);
+        // Motion in the operator's own frame, in m/s, smoothed over a fifth
+        // of a second so a bot's steering jitter never reaches the legs.
+        float vx = -(p.x() * MM - prevX[i]) * Match.TICK_HZ;
+        float vz = (p.z() * MM - prevZ[i]) * Match.TICK_HZ;
+        float k = Math.min(1f, dt * 6f);
+        moveF[i] += ((float) (vx * -Math.sin(yr) + vz * Math.cos(yr)) - moveF[i]) * k;
+        moveS[i] += ((float) (vx * -Math.cos(yr) + vz * -Math.sin(yr)) - moveS[i]) * k;
+        float fwd = moveF[i];
+        float side = moveS[i];
+        float speed = (float) Math.sqrt(fwd * fwd + side * side);
         boolean firing = p.input().has(Input.FIRE);
+        boolean slow = p.crouched() || p.input().has(Input.AIM);
         String want;
         if (!p.alive()) {
             want = p.input().has(Input.WIPE) ? Models.WAVE : Models.DEATH;
-        } else if (Math.abs(fwd) + Math.abs(side) < 0.02f) {
+        } else if (speed < 0.6f) {
             want = firing ? Models.IDLE_SHOOT : Models.IDLE;
-        } else if (Math.abs(fwd) >= Math.abs(side)) {
-            want = fwd < 0 ? Models.RUN_BACK : firing ? Models.RUN_SHOOT
-                    : p.crouched() || p.input().has(Input.AIM) ? Models.WALK : Models.RUN;
+        } else if (slow || speed < 2.6f) {
+            want = Models.WALK;
+        } else if (Math.abs(fwd) >= Math.abs(side) * 0.8f) {
+            want = fwd < 0 ? Models.RUN_BACK : firing ? Models.RUN_SHOOT : Models.RUN;
         } else {
             want = side > 0 ? Models.RUN_RIGHT : Models.RUN_LEFT;
         }
+        // A new clip has to be wanted for a moment before it plays, except
+        // being painted, which is never late.
+        boolean urgent = !p.alive() || clips[i] == null;
         if (!want.equals(clips[i])) {
-            clips[i] = want;
-            op.crossFade(want, Models.DEATH.equals(want) ? 0.08f : 0.18f, !Models.DEATH.equals(want));
+            pending[i] += dt;
+            if (urgent || pending[i] > 0.15f) {
+                clips[i] = want;
+                pending[i] = 0;
+                op.crossFade(want, Models.DEATH.equals(want) ? 0.08f : 0.25f, !Models.DEATH.equals(want));
+            }
+        } else {
+            pending[i] = 0;
+        }
+        String now = clips[i];
+        if (Models.WALK.equals(now)) {
+            op.setSpeed(Math.max(0.5f, Math.min(1.6f, speed / WALK_PACE)));
+        } else if (now != null && now.startsWith("Run")) {
+            op.setSpeed(Math.max(0.6f, Math.min(1.5f, speed / RUN_PACE)));
+        } else {
+            op.setSpeed(1f);
         }
         op.update(dt);
-        op.setPosition(x, y - (p.crouched() ? 0.25f : 0f), z);
+        op.setPosition(x, y, z);
         op.setRotation(0f, yawDeg, 0f);
         if (p.alive() && op.getNodeMatrix(Models.HAND, hand)) {
             float s = opScale[i];
@@ -1330,7 +1403,7 @@ public class ArenaView extends GameView {
         float cx = x - fx * 2.6f + rx * 0.7f;
         float cy = y + 1.95f;
         float cz = z - fz * 2.6f + rz * 0.7f;
-        getCamera().setPerspective(HIP_FOV - 8f, 0.03f, 400f);
+        getCamera().setPerspective(HIP_FOV - 8f, NEAR, 400f);
         getCamera().setPosition(cx, cy, cz);
         getCamera().setTarget(x + fx * 9f, y + 1.2f, z + fz * 9f);
         sky.setPosition(cx, cy, cz);
@@ -1388,7 +1461,7 @@ public class ArenaView extends GameView {
         float dz = (float) (Math.cos(yr) * Math.cos(pr));
         boolean aiming = p.alive() && p.input().has(Input.AIM);
         ads += ((aiming ? 1f : 0f) - ads) * Math.min(1f, dt * 14f);
-        getCamera().setPerspective(HIP_FOV + (ADS_FOV - HIP_FOV) * ads + knock * knock * 14f, 0.03f, 400f);
+        getCamera().setPerspective(HIP_FOV + (ADS_FOV - HIP_FOV) * ads + knock * knock * 14f, NEAR, 400f);
         getCamera().setPosition(x, eye, z);
         sky.setPosition(x, eye, z);
         getCamera().setTarget(x + dx, eye + dy, z + dz);

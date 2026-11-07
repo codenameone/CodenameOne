@@ -45,6 +45,12 @@ public final class Match {
     public static final int WALK = 150;
     public static final int SPRINT = 215;
     public static final int CROUCH_WALK = 70;
+    /// How fast a player gets up to speed and stops, mm a tick per tick, on
+    /// the ground and in the air: a tenth of a second to a run, a little
+    /// less to a stop, and not much steering once your feet leave the ground.
+    public static final int ACCEL = 45;
+    public static final int FRICTION = 55;
+    public static final int AIR_ACCEL = 9;
     /// Speed while aiming down the sights, in percent.
     public static final int ADS_SPEED = 55;
     public static final int PITCH_LIMIT = 900;
@@ -254,13 +260,27 @@ public final class Match {
         long full = 127L * Trig.ONE;
         long mag = FixedMath.isqrt(mx * mx + mz * mz);
         long den = mag > full ? mag : full;
-        int dx = (int) (mx * speed / den);
-        int dz = (int) (mz * speed / den);
-        if (dx != 0 && !arena.blocked(p.x + dx, p.z, RADIUS, p.y, STEP_UP)) {
-            p.x += dx;
+        int wantX = (int) (mx * speed / den);
+        int wantZ = (int) (mz * speed / den);
+        boolean stopping = wantX == 0 && wantZ == 0;
+        int rate = !p.grounded ? AIR_ACCEL : stopping ? FRICTION : ACCEL;
+        p.vx = approach(p.vx, wantX, rate);
+        p.vz = approach(p.vz, wantZ, rate);
+        // Each axis moves as far as it can: right up to a wall rather than
+        // stopping a step short of it, and along it rather than into it.
+        if (p.vx != 0) {
+            int got = reach(p, p.vx, true);
+            p.x += got;
+            if (got != p.vx) {
+                p.vx = 0;
+            }
         }
-        if (dz != 0 && !arena.blocked(p.x, p.z + dz, RADIUS, p.y, STEP_UP)) {
-            p.z += dz;
+        if (p.vz != 0) {
+            int got = reach(p, p.vz, false);
+            p.z += got;
+            if (got != p.vz) {
+                p.vz = 0;
+            }
         }
         if (p.grounded && (pressed & Input.JUMP) != 0 && !p.crouched) {
             p.vy = JUMP_SPEED;
@@ -293,6 +313,34 @@ public final class Match {
             b.grenade = true;
             balls.add(b);
         }
+    }
+
+    private static int approach(int v, int want, int rate) {
+        return v < want ? Math.min(want, v + rate) : Math.max(want, v - rate);
+    }
+
+    /// The furthest part of a step of `d` along one axis that is free, found
+    /// by halving: whole millimetres, so every machine finds the same answer.
+    private int reach(Player p, int d, boolean alongX) {
+        if (free(p, d, alongX)) {
+            return d;
+        }
+        int lo = 0;
+        int hi = d;
+        while (Math.abs(hi - lo) > 1) {
+            int mid = lo + (hi - lo) / 2;
+            if (free(p, mid, alongX)) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        return lo;
+    }
+
+    private boolean free(Player p, int d, boolean alongX) {
+        return alongX ? !arena.blocked(p.x + d, p.z, RADIUS, p.y, STEP_UP)
+                : !arena.blocked(p.x, p.z + d, RADIUS, p.y, STEP_UP);
     }
 
     private void startReload(Player p, int t) {
@@ -471,6 +519,8 @@ public final class Match {
         p.z = arena.spawnZ(team, spawnIndex);
         p.y = arena.groundAt(p.x, p.z, RADIUS, Integer.MAX_VALUE);
         p.vy = 0;
+        p.vx = 0;
+        p.vz = 0;
         p.grounded = true;
         p.crouched = false;
         p.alive = true;
