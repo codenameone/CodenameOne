@@ -1,0 +1,44 @@
+name: Re-sync DEV articles
+
+# One-off repair, run by hand: re-renders every already-syndicated DEV article
+# with the current renderer and PUTs the body back (title, tags, canonical URL
+# and cover are untouched). Fixes SVG charts DEV cannot show and post links
+# that went out empty. Safe to re-run: unchanged articles are skipped.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Push the updates (otherwise dry run).'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blog-syndication
+  cancel-in-progress: false
+
+jobs:
+  resync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Require the PNGs to be live
+        # The rewritten bodies point at PNGs the site deploy publishes; pushing
+        # before that deploy would swap blank charts for broken images.
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://www.codenameone.com/blog/release-2026-10-30/flutter-memory.png)
+          [ "$code" = 200 ] || { echo "PNG not live yet (HTTP $code); wait for the website deploy"; exit 1; }
+      - name: Re-sync
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+        run: |
+          if [ "${{ inputs.apply }}" = "true" ]; then
+            python3 scripts/website/resync_devto_post_links.py --apply
+          else
+            python3 scripts/website/resync_devto_post_links.py
+          fi
