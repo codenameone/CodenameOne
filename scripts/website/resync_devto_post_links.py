@@ -30,6 +30,7 @@ import datetime as dt
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -43,6 +44,7 @@ from syndicate_blog_posts import (  # noqa: E402  (sibling module on sys.path)
     _POST_LINK_RE,
     _shortcode_attr,
     discover_posts,
+    prefer_png_over_svg,
     render_post_links,
     render_syndicated_body,
 )
@@ -64,7 +66,43 @@ def preview_post_links(post: Post, posts: list[Post], today: dt.date) -> list[st
     return lines
 
 
+PUT_INTERVAL_SECONDS = 4  # DEV answered 429 to back-to-back PUTs (2026-11-07)
+
+
+def http_get_json(url: str, api_key: str) -> dict:
+    request = urllib.request.Request(url)
+    request.add_header("User-Agent", USER_AGENT)
+    request.add_header("Accept", "application/vnd.forem.api-v1+json")
+    request.add_header("api-key", api_key)
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as err:
+            if err.code != 429 or attempt == 5:
+                raise RuntimeError(f"{url} returned HTTP {err.code}") from err
+            time.sleep(int(err.headers.get("Retry-After") or 30))
+    return {}
+
+
 def http_put_json(url: str, api_key: str, payload: dict) -> dict:
+    for attempt in range(6):
+        try:
+            return _http_put_json_once(url, api_key, payload)
+        except _RateLimited as limited:
+            if attempt == 5:
+                raise RuntimeError(f"{url} still rate limited after retries") from None
+            time.sleep(limited.retry_after)
+    return {}
+
+
+class _RateLimited(Exception):
+    def __init__(self, retry_after: int) -> None:
+        super().__init__(retry_after)
+        self.retry_after = retry_after
+
+
+def _http_put_json_once(url: str, api_key: str, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(url, data=data, method="PUT")
     request.add_header("Content-Type", "application/json")
@@ -75,6 +113,8 @@ def http_put_json(url: str, api_key: str, payload: dict) -> dict:
         with urllib.request.urlopen(request, timeout=60) as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as err:
+        if err.code == 429:
+            raise _RateLimited(int(err.headers.get("Retry-After") or 30)) from err
         detail = err.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"{url} returned HTTP {err.code}: {detail}") from err
     return json.loads(body) if body else {}
@@ -112,7 +152,9 @@ def main(argv: list[str]) -> int:
         if not (entry and entry.get("id")):
             continue
         post = by_slug.get(slug)
-        if post is None or "post-link" not in post.body:
+        # SVG images too: DEV cannot show them, and the renderer now swaps in
+        # the PNG beside each one.
+        if post is None or ("post-link" not in post.body and prefer_png_over_svg(post.body) == post.body):
             continue
         candidates.append((slug, entry["id"]))
 
@@ -131,9 +173,16 @@ def main(argv: list[str]) -> int:
                 print(ln)
             print("    (dry-run — pass --apply to push)")
             continue
+        # Skip what is already right, so a re-run after a failure (or a rate
+        # limit) only touches the articles still wrong.
+        current = http_get_json(url, api_key).get("body_markdown", "")
+        if current.strip() == body.strip():
+            print("    already current.")
+            continue
         http_put_json(url, api_key, {"article": {"body_markdown": body}})
         print("    updated.")
         updated += 1
+        time.sleep(PUT_INTERVAL_SECONDS)
 
     if args.apply:
         print(f"\nDone. Updated {updated} dev.to article(s).")
