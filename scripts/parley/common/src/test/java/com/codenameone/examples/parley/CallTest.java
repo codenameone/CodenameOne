@@ -55,8 +55,10 @@ public class CallTest extends E2e {
         // One phone moves from Wi-Fi to mobile data: the path is gone. The
         // screen must stop saying connected, the app must restart ICE on the
         // same call, and the call must come back once that offer is answered.
-        // Bob answers each time until Alice's restarted offer has gone out;
-        // the simulator's WebRTC reconnects only on an answer to that one.
+        // Bob answers every second until Alice's restarted offer has gone
+        // out. The answers before it are strays the app must ignore: the
+        // simulator, like a real stack, refuses an answer with no offer
+        // pending, and the app would hang up on that refusal.
         onEdt(() -> Display.getInstance().setProperty("platformHint.webrtc.dropNetwork",
                 "true"));
         untilText("callState", "Reconnecting...");

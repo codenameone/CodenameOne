@@ -70,6 +70,9 @@ public final class LoopbackWebRtc implements WebRtcBridge {
         boolean lost;
         boolean freshLocal;
         boolean freshRemote;
+        /// A local offer is set and its answer is not; a real stack refuses
+        /// an answer at any other time, and so does this one.
+        boolean offerPending;
         int session;
         int version = 2;
     }
@@ -131,6 +134,7 @@ public final class LoopbackWebRtc implements WebRtcBridge {
     public void setDescription(int peer, int requestId, boolean remote, String type, String sdp) {
         boolean connect = false;
         List<String> arriving = null;
+        String failure = null;
         synchronized (this) {
             Peer p = peers.get(Integer.valueOf(peer));
             if (p == null) {
@@ -138,13 +142,17 @@ public final class LoopbackWebRtc implements WebRtcBridge {
                 return;
             }
             boolean offer = "offer".equals(type);
-            if (remote) {
+            if (remote && !offer && !p.offerPending) {
+                failure = "Called in wrong state: stable";
+            } else if (remote) {
+                p.offerPending = false;
                 p.remote = sdp == null ? "" : sdp;
                 if (p.lost && (offer || p.freshLocal)) {
                     p.freshRemote = true;
                 }
             } else {
                 p.local = true;
+                p.offerPending = offer;
                 if (p.lost && (offer ? p.restarting : p.freshRemote)) {
                     p.freshLocal = true;
                 }
@@ -161,6 +169,10 @@ public final class LoopbackWebRtc implements WebRtcBridge {
                 arriving = p.tracksDelivered ? new ArrayList<String>() : kinds(p.remote);
                 p.tracksDelivered = true;
             }
+        }
+        if (failure != null) {
+            WebRtc.deliverResult(requestId, failure);
+            return;
         }
         WebRtc.deliverResult(requestId, null);
         if (!remote) {

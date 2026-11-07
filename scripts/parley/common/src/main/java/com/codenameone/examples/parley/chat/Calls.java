@@ -139,6 +139,15 @@ public final class Calls {
         long lostAt;
         /// An ICE restart was offered and its answer has not been set.
         boolean restarting;
+        /// This side sent an offer and has not set its answer. An ANSWER at
+        /// any other time is a stray -- a real stack refuses it in the stable
+        /// state, and the failure would hang up a healthy call.
+        boolean awaitingAnswer;
+        /// Every offer the callee answered. The server replays the first after
+        /// ACCEPT and a slow replay can land after the call connected; told
+        /// apart from a restart by its text, since a restarted offer carries
+        /// new ICE credentials, never by when it arrives.
+        final List<String> answeredOffers = new ArrayList<String>();
 
         Call(String id, String uuid, String conversationId, String peerName, boolean video,
                 boolean outgoing) {
@@ -340,6 +349,9 @@ public final class Calls {
             Telemetry.callStarted(video);
             report(call);
             CallScreen.show(call);
+            // Before the offer exists: an answer can only follow it, but the
+            // flag must already be up when that answer is taken.
+            call.awaitingAnswer = true;
             connect(call, () -> call.connection.createOffer().ready(offer ->
                     call.connection.setLocalDescription(offer).ready(done -> {
                         send(call, OFFER, offer.getSdp());
@@ -391,6 +403,7 @@ public final class Calls {
         final SessionDescription offer = call.offer;
         call.offer = null;
         call.offerTaken = true;
+        call.answeredOffers.add(offer.getSdp());
         call.connection.setRemoteDescription(offer).ready(set -> {
             remoteSet(call);
             call.connection.createAnswer().ready(answer ->
@@ -585,6 +598,7 @@ public final class Calls {
         call.restarting = true;
         // The callee's new candidates wait for its answer, as at the start.
         call.remoteSet = false;
+        call.awaitingAnswer = true;
         call.connection.restartIce();
         call.connection.createOffer().ready(offer -> {
             if (current != call) {
@@ -654,14 +668,21 @@ public final class Calls {
         String payload = text(frame, "payload");
         String state = text(frame, "state");
         if (OFFER.equals(signal) && !call.outgoing) {
-            if (call.offerTaken && call.answeredAt > 0 && call.connection != null) {
+            if (call.answeredOffers.contains(payload)) {
+                // The server's replay of an offer already answered.
+                return;
+            }
+            if (call.offerTaken && call.connection != null) {
                 // The caller restarted ICE: answered on the same connection.
+                // Its new candidates follow the offer and wait for it to be
+                // set; added before, they carry credentials the connection
+                // does not know yet and are dropped.
+                call.remoteSet = false;
                 call.offer = new SessionDescription(SessionDescription.OFFER, payload);
                 answerOffer(call);
                 return;
             }
             if (call.offerTaken) {
-                // The server's replay of the first offer, already answered.
                 return;
             }
             call.offer = new SessionDescription(SessionDescription.OFFER, payload);
@@ -669,6 +690,10 @@ public final class Calls {
                 answerOffer(call);
             }
         } else if (ANSWER.equals(signal) && call.outgoing && call.connection != null) {
+            if (!call.awaitingAnswer) {
+                return;
+            }
+            call.awaitingAnswer = false;
             if (!RECONNECTING.equals(call.state)) {
                 state(call, CONNECTING);
             }
