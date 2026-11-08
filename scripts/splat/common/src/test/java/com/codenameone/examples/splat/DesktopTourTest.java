@@ -51,24 +51,28 @@ public class DesktopTourTest extends E2e {
         final ArenaView view = arena();
         shot("desktop-briefing");
         until(() -> view.driver().countdownTicks() == 0, 20000, "the briefing to end");
-        long give = System.currentTimeMillis() + 20000;
-        // the HUD as you play it: a few seconds in, and not while painted out
-        while ((view.driver().match().tick() < 3 * Match.TICK_HZ || !alive(view))
+        long give;
+        give = System.currentTimeMillis() + 40000;
+        // the HUD as you play it: in play twice in a row, never painted out
+        // or facing a wall, and shot at once so the bot cannot walk into one
+        while ((view.driver().match().tick() < 3 * Match.TICK_HZ
+                || !(PracticeTest.inPlay(view) && !driveFor(view, 1500) && PracticeTest.inPlay(view)))
                 && System.currentTimeMillis() < give) {
-            driveFor(view, 200);
+            driveFor(view, 150);
         }
-        shot("desktop-match", view);
+        // a ball in the air can still land in the instant the capture takes
+        shotNow("desktop-match");
+        while (!PracticeTest.inPlay(view) && System.currentTimeMillis() < give) {
+            driveFor(view, 1500);
+            if (PracticeTest.inPlay(view)) {
+                shotNow("desktop-match");
+            }
+        }
         finish(view, 10 * 60 * Match.TICK_HZ);
         awaitResult("the scoreboard");
         shot("desktop-scoreboard");
         click("done");
         waitForForm("play");
         return true;
-    }
-
-    private static boolean alive(ArenaView view) {
-        Match m = view.driver().match();
-        int me = view.driver().me();
-        return me >= 0 && me < m.playerCount() && m.player(me).alive();
     }
 }

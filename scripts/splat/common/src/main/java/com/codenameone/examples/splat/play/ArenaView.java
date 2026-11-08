@@ -106,8 +106,11 @@ public class ArenaView extends GameView {
     private GraphicsDevice device;
     private Mesh sphere;
 
-    /// Five seconds of the match, one snapshot a tick, for the instant replay.
-    private static final int HISTORY = 150;
+    /// Twelve seconds of the match, one snapshot a tick, for the instant
+    /// replay: it starts three seconds before the hit, a second after it, and
+    /// plays at half speed while the live match runs on, so five seconds was
+    /// overwritten under it before it reached the hit.
+    private static final int HISTORY = 360;
     private final int[][] history = new int[HISTORY][];
     private int recordedTick = -1;
     /// The replay plays in its own match, restored from the history, so the
@@ -833,10 +836,13 @@ public class ArenaView extends GameView {
                 in = new Input(in.strafe, in.forward, in.yaw, in.pitch, in.buttons | heldButtons, in.viewTick);
             }
             driver.step(in);
+            // every tick, not every frame: a slow frame steps several
+            record();
             accumulator -= TICK;
             steps++;
         }
         alpha = (float) Math.min(1, accumulator / TICK);
+        // and once a frame for a driver whose ticks arrive from the server
         record();
         events();
         bodySounds((float) dt);
@@ -891,9 +897,18 @@ public class ArenaView extends GameView {
         replayStartAt = System.currentTimeMillis() + 1100;
     }
 
+    /// The most ticks a replay blends across: a frame of four at a slow 8 fps.
+    private static final int GAP = 4;
+
     private boolean recorded(int tick) {
         int[] snap = tick < 0 ? null : history[tick % HISTORY];
         return snap != null && snap[1] == tick;
+    }
+
+    /// True from the moment you are painted until your replay has played:
+    /// the stamp is up, and the replay is waiting for it or on screen.
+    public boolean replayQueued() {
+        return replayShooter >= 0;
     }
 
     /// The shooter of the replay on screen, or -1 when none is playing.
@@ -919,8 +934,18 @@ public class ArenaView extends GameView {
             return driver.match();
         }
         Match live = driver.match();
+        // An online driver's ticks arrive with the server's snapshots, so some
+        // can be missing from the history: blend the nearest recorded ones.
         int t = (int) replayPos;
-        if (t + 1 >= replayTo || live.player(driver.me()).alive() || !recorded(t) || !recorded(t + 1)) {
+        int a = t;
+        while (a > t - GAP && !recorded(a)) {
+            a--;
+        }
+        int b = t + 1;
+        while (b < t + 1 + GAP && !recorded(b)) {
+            b++;
+        }
+        if (t + 1 >= replayTo || live.player(driver.me()).alive() || !recorded(a) || !recorded(b)) {
             replayShooter = -1;
             remember();
             return live;
@@ -929,7 +954,7 @@ public class ArenaView extends GameView {
             ghost = live.fork();
         }
         // where everyone was a tick before, then where they are, for the lerp
-        ghost.restore(history[t % HISTORY]);
+        ghost.restore(history[a % HISTORY]);
         int n = Math.min(prevX.length, ghost.playerCount());
         for (int i = 0; i < n; i++) {
             Player p = ghost.player(i);
@@ -937,8 +962,8 @@ public class ArenaView extends GameView {
             prevY[i] = p.y() * MM;
             prevZ[i] = p.z() * MM;
         }
-        ghost.restore(history[(t + 1) % HISTORY]);
-        alpha = replayPos - t;
+        ghost.restore(history[b % HISTORY]);
+        alpha = (replayPos - a) / (b - a);
         replayPos += dt * Match.TICK_HZ * 0.5f;
         return ghost;
     }
@@ -1031,7 +1056,11 @@ public class ArenaView extends GameView {
                 aimed = false;
             }
             if (hud != null) {
-                hud.event(e);
+                // The HUD is a component the EDT paints; this runs on the
+                // render thread, so its lists change on the EDT's turn.
+                final Hud h = hud;
+                final Event ev = e;
+                CN.callSerially(() -> h.event(ev));
             }
         }
     }

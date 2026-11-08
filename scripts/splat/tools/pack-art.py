@@ -6,6 +6,7 @@ Toon Shooter Game Kit and Ultimate Nature, and Kenney's Blaster Kit and Survival
 anywhere and run
 
     tools/pack-art.py <directory holding the unzipped packs> [<poly haven directory>]
+    tools/pack-art.py --smooth   (re-shade the operators already packed)
 
 The optional second directory holds the Poly Haven (CC0) downloads, one
 folder per model under models/ and per surface under textures/; with it the
@@ -267,7 +268,81 @@ def write_glb(g, bin_, path):
         f.write(struct.pack('<II', len(bin_), 0x004E4942) + bin_)
 
 
-def pack(root, name, stem, clips=None):
+# Quaternius' operators are flat shaded: every corner is stored once per face
+# with that face's normal, so each polygon lights as a facet. Averaging the
+# normals of the corners that share a position -- across faces that meet at
+# less than CREASE degrees, so a boot sole or a cuff stays sharp -- shades them
+# as smooth surfaces. Positions and UVs are untouched; only NORMAL changes.
+CREASE = 65.0
+
+
+def smooth_normals(g, bin_):
+    import math
+    buf = bytearray(bin_)
+    lim = math.cos(math.radians(CREASE))
+
+    def where(i):
+        a = g['accessors'][i]
+        v = g['bufferViews'][a['bufferView']]
+        return a, v.get('byteOffset', 0) + a.get('byteOffset', 0), v.get('byteStride', 0)
+
+    for mesh in g.get('meshes', []):
+        for prim in mesh['primitives']:
+            at = prim['attributes']
+            if 'NORMAL' not in at or 'indices' not in prim or prim.get('mode', 4) != 4:
+                continue
+            pa, po, ps = where(at['POSITION'])
+            na, no, ns = where(at['NORMAL'])
+            ia, io_, _ = where(prim['indices'])
+            if pa['componentType'] != 5126 or na['componentType'] != 5126:
+                continue
+            ps = ps or 12
+            ns = ns or 12
+            n = pa['count']
+            pos = [struct.unpack_from('<3f', buf, po + k * ps) for k in range(n)]
+            fmt = {5121: 'B', 5123: 'H', 5125: 'I'}[ia['componentType']]
+            idx = struct.unpack_from('<%d%s' % (ia['count'], fmt), buf, io_)
+            faces = []
+            touching = [[] for _ in range(n)]
+            for f in range(0, len(idx) - 2, 3):
+                a, b, c = idx[f], idx[f + 1], idx[f + 2]
+                p0, p1, p2 = pos[a], pos[b], pos[c]
+                u = [p1[i] - p0[i] for i in range(3)]
+                w = [p2[i] - p0[i] for i in range(3)]
+                cr = (u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0])
+                faces.append(cr)
+                for v in (a, b, c):
+                    touching[v].append(len(faces) - 1)
+            groups = {}
+            for k in range(n):
+                groups.setdefault(tuple(round(x, 4) for x in pos[k]), []).append(k)
+
+            def unit(v):
+                l = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+                return (v[0] / l, v[1] / l, v[2] / l) if l > 1e-12 else None
+
+            for members in groups.values():
+                around = set()
+                for k in members:
+                    around.update(touching[k])
+                around = [f for f in around if unit(faces[f]) is not None]
+                for k in members:
+                    own = [unit(faces[f]) for f in touching[k] if unit(faces[f]) is not None]
+                    if not own:
+                        continue
+                    ref = unit([sum(o[i] for o in own) for i in range(3)]) or own[0]
+                    acc = [0.0, 0.0, 0.0]
+                    for f in around:
+                        fu = unit(faces[f])
+                        if fu[0] * ref[0] + fu[1] * ref[1] + fu[2] * ref[2] >= lim:
+                            for i in range(3):
+                                acc[i] += faces[f][i]
+                    out = unit(acc) or ref
+                    struct.pack_into('<3f', buf, no + k * ns, *out)
+    return bytes(buf)
+
+
+def pack(root, name, stem, clips=None, smooth=False):
     src = find(root, stem)
     g, bin_ = read(src)
     bin_ = embed_images(g, bin_, os.path.dirname(src))
@@ -276,6 +351,8 @@ def pack(root, name, stem, clips=None):
     else:
         g['animations'] = []
         bin_ = keep_clips(g, bin_, [])
+    if smooth:
+        bin_ = smooth_normals(g, bin_)
     path = os.path.join(OUT, 'model_' + name + '.glb')
     write_glb(g, bin_, path)
     return os.path.getsize(path)
@@ -342,7 +419,20 @@ def pack_surface(real, name, stem):
     return os.path.getsize(path)
 
 
+def smooth_packed():
+    """Re-shades the operators already in the resources; the normals come
+    from the faces alone, so this equals packing them again."""
+    for name in OPERATORS:
+        path = os.path.join(OUT, 'model_' + name + '.glb')
+        g, bin_ = read(path)
+        write_glb(g, smooth_normals(g, bin_), path)
+        print('smoothed', name)
+
+
 def main():
+    if sys.argv[1:] == ['--smooth']:
+        smooth_packed()
+        return
     if len(sys.argv) not in (2, 3):
         raise SystemExit(__doc__)
     root = sys.argv[1]
@@ -350,7 +440,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     total = 0
     for name, stem in OPERATORS.items():
-        total += pack(root, name, stem, CLIPS)
+        total += pack(root, name, stem, CLIPS, smooth=True)
     for table in (MARKERS, PROPS):
         for name, stem in table.items():
             total += pack(root, name, stem)

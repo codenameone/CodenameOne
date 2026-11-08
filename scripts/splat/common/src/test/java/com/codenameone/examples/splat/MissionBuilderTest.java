@@ -24,6 +24,7 @@ import com.codename1.impl.javase.record.SimulatorRecorder;
 import com.codename1.impl.javase.record.TouchOverlay;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codenameone.examples.splat.play.ArenaView;
 import java.io.File;
 
 /// The Mission Builder end to end: start a field, place cover, spawns and a
@@ -88,12 +89,20 @@ public class MissionBuilderTest extends E2e {
             waitFor(1200);
             type("missionBriefing", "The Hendersons parked across the cul-de-sac again. Reclaim the driveway.");
             waitFor(2500);
+            shot("mission-editor");
 
             caption("Play-test it against bots", 3000);
             tap("playTest");
             waitForForm("match");
-            arena();
+            final ArenaView test = arena();
             waitFor(9000);
+            // in play, not painted out or showing a replay
+            long give = System.currentTimeMillis() + 40000;
+            while (!(PracticeTest.inPlay(test) && !driveFor(test, 1500) && PracticeTest.inPlay(test))
+                    && System.currentTimeMillis() < give) {
+                driveFor(test, 150);
+            }
+            shotNow("mission-playtest");
             caption("Your briefing, your field", 3000);
             waitFor(5000);
             onEdt(com.codenameone.examples.splat.ui.MissionsForm::show);

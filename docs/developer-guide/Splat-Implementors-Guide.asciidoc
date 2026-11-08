@@ -87,6 +87,22 @@ image::img/splat-briefing.png["The briefing over the field before the whistle",s
 image::img/splat-match-practice.png["A practice match: minimap, score bar and killfeed above, the marker and hopper below",scaledwidth=30%]
 image::img/splat-scoreboard.png["The scoreboard: both teams, best painter first",scaledwidth=30%]
 
+The view button lifts the camera to a bird's-eye view of the whole field, in a match, while
+spectating and in a replay. When a ball finds you, the match shows an instant replay of
+the last seconds from the shooter's eyes, at half speed, while the live match runs on
+under it.
+
+image::img/splat-match-overhead.png["The overhead view: the whole field from above, the paint on the ground",scaledwidth=30%]
+image::img/splat-instant-replay.png["An instant replay of a hit, seen from behind the shooter",scaledwidth=30%]
+
+The Mission Builder lets a player lay out half a field on a grid: drag props, place spawns
+and the flag, pick the mode and write the briefing. The other half is the mirror image, so
+every mission is fair. A play test puts the draft in front of bots at once, and publishing
+it lets friends and parties play it like any built-in field.
+
+image::img/splat-mission-editor.png["The mission editor: the props palette, the grid and the mirrored enemy half",scaledwidth=30%]
+image::img/splat-mission-playtest.png["Play testing a mission against bots",scaledwidth=30%]
+
 A party is a private lobby: a code, two rosters and a chat. The friends who join it play the next match together,
 talk over WebRTC voice and trade emotes during it ("It bounced!" and "REF!").
 
@@ -323,9 +339,11 @@ work in Splat unchanged.
 * *Markers*: add a `MarkerDef`, then sell it in the backend's shop `Catalog`. The
   shipped markers are side-grades, not upgrades: the pump hits harder at range and the
   ramping marker sprays.
-* *Characters*: there are no model files. `ArenaView` builds every player from
-  primitives in the team color, and `Portraits` paints the same figure flat for the
-  menus.
+* *Characters*: every operator is a rigged glTF model, `model_op-*.glb` in
+  `common/src/main/resources`, listed by team in `Models`. `tools/pack-art.py` packs
+  them from the CC0 sources in `ART.md`, keeps the clips the game plays, and smooths
+  their normals so a low-poly body shades as a round one; `tools/pack-art.py --smooth`
+  re-shades models already packed. Swap a model by packing your own under the same name.
 * *The jokes*: the briefings are in `Mode`, the killfeed's excuses in `Hud`, and the
   emotes in `MatchForm`.
 * *The look*: every color is a variable at the top of `theme.css`:

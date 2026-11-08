@@ -312,6 +312,17 @@ public abstract class E2e extends AbstractTest {
         capture(dir, name);
     }
 
+    /// A shot of this very moment, for a frame that would not survive the
+    /// bot driving on: a stamp, a replay, a clear view down the field.
+    protected void shotNow(String name) {
+        String dir = System.getProperty("splat.shots.dir");
+        if (dir == null || dir.length() == 0) {
+            return;
+        }
+        waitFor(150);
+        capture(dir, name);
+    }
+
     private void capture(String dir, String name) {
         String out = dir.startsWith("file:") ? dir : "file://" + dir;
         final Image[] captured = new Image[1];
