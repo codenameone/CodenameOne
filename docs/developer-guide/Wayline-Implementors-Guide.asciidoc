@@ -1366,13 +1366,14 @@ push. Add the file and delete that line, and Android gets notifications too.
 A server that's missing a setting
 still starts and serves rides; the sender it gets instead, `MisconfiguredPushSender`,
 logs a `[config]` line naming the setting when the server starts and again for
-every notification it can't send. `CloudPushSender` sends on a thread of its own,
+every notification it can't send. Both come from the Codename One app kit
+(`com.codename1.appkit.server.push`). `CloudPushSender` sends on a thread of its own,
 so a ride's request never waits on the push service, and it logs a refusal
 rather than throwing it:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/CloudPushSender.java[tag=wayline-push-cloud,indent=0]
+include::../../maven/cn1-app-kit/backend/src/main/java/com/codename1/appkit/server/push/CloudPushSender.java[tag=appkit-push-cloud,indent=0]
 ----
 
 To send through another service, implement `PushSender`, one method, and return
@@ -1380,7 +1381,7 @@ it from `Services.pushSender`:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/wayline/backend/src/main/java/com/codenameone/examples/wayline/push/PushSender.java[tag=wayline-push-sender,indent=0]
+include::../../maven/cn1-app-kit/backend/src/main/java/com/codename1/appkit/server/push/PushSender.java[tag=appkit-push-sender,indent=0]
 ----
 
 [[wayline-live-activity]]

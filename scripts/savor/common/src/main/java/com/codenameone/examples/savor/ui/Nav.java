@@ -34,7 +34,7 @@ import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.merchant.MerchantForm;
 import com.codenameone.examples.savor.net.Account;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.net.Session;
 import com.codenameone.examples.savor.notify.Notifications;
 import com.codenameone.examples.savor.customer.CustomerForm;

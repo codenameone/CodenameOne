@@ -24,6 +24,13 @@
             <artifactId>skirmish-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The Codename One app kit, a cn1lib. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-app-kit-lib</artifactId>
+            <version>${cn1.version}</version>
+            <type>pom</type>
+        </dependency>
         <dependency>
             <groupId>com.codenameone.examples.skirmish</groupId>
             <artifactId>skirmish-rules</artifactId>

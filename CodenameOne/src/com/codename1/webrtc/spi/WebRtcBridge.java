@@ -85,6 +85,12 @@ public interface WebRtcBridge {
     /// Adds a candidate the other side gathered.
     void addIceCandidate(int peer, String sdpMid, int sdpMLineIndex, String candidate);
 
+    /// Makes the next offer created on a peer connection gather new ICE
+    /// credentials and candidates, as `RTCPeerConnection.restartIce()`. The
+    /// connection keeps its tracks and its descriptions until that offer is
+    /// exchanged.
+    void restartIce(int peer);
+
     /// Closes a peer connection and frees its handle.
     void closePeerConnection(int peer);
 

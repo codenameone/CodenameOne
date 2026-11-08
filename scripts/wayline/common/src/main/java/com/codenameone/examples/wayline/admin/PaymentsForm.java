@@ -26,7 +26,7 @@ import com.codenameone.examples.wayline.Telemetry;
 import com.codenameone.examples.wayline.api.ReasonDto;
 import com.codenameone.examples.wayline.api.ReceiptDto;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.pay.ReceiptForm;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Ui;

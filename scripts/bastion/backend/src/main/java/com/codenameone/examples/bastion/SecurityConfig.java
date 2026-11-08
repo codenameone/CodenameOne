@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion;
 
+import com.codename1.appkit.server.Grants;
 import com.codename1.backend.Config;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.HttpServer;
@@ -244,6 +245,19 @@ public class SecurityConfig {
     /// The keys the tokens are signed with: the files named by
     /// `cn1.security.authorizationserver.jwk.keys`. On a development profile
     /// with none configured, a key made at start-up.
+    /// The sign-ins an account has open, from the Codename One app kit. The kit
+    /// declares no beans of its own, so the server that runs the authorization
+    /// server declares it here.
+    ///
+    /// The rest of this class does not delegate to the kit's `AccountSecurity`,
+    /// as the other samples do: a bank's tokens are shorter lived, its refresh
+    /// tokens are never reused, and signing in takes passkeys and a second
+    /// factor, so each of those beans is stricter than the kit's.
+    @Bean
+    public Grants grants(DataSource db, OAuth2AuthorizationService authorizations) {
+        return new Grants(db, authorizations);
+    }
+
     @Bean
     public JwkSource signingKeys(Config config) throws IOException {
         return AuthorizationServerKeys.load(config);

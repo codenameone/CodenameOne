@@ -19,7 +19,7 @@
 package com.codenameone.examples.dash.forge;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.dash.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.dash.Roles;
 import com.codenameone.examples.dash.api.AssetDto;
 import com.codenameone.examples.dash.api.AssetUploadDto;

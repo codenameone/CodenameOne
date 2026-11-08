@@ -22,7 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
 import com.codename1.backend.annotations.Transactional;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.account.Accounts;
 import com.codenameone.examples.pulse.account.Moderation;
 import com.codenameone.examples.pulse.api.AdminApiServer;

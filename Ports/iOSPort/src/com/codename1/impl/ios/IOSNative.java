@@ -2360,6 +2360,9 @@ public class IOSNative {
     /** Closes a peer connection and frees its handle. */
     native void webRtcClosePeerConnection(int peer);
 
+    /** Makes the next offer restart ICE. */
+    native void webRtcRestartIce(int peer);
+
     /** Mutes or unmutes a track. */
     native void webRtcSetTrackEnabled(int track, boolean enabled);
 

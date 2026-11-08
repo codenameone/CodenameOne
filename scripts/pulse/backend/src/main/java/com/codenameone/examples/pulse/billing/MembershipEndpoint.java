@@ -19,7 +19,7 @@
 package com.codenameone.examples.pulse.billing;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.api.FreezeDto;
 import com.codenameone.examples.pulse.api.InvoiceDto;
 import com.codenameone.examples.pulse.api.JoinDto;

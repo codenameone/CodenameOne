@@ -27,7 +27,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.parley.AppConfig;
 import com.codenameone.examples.parley.api.PushDeviceDto;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.chat.Calls;
 import com.codenameone.examples.parley.chat.Messenger;
 import com.codenameone.examples.parley.live.LiveChannel;

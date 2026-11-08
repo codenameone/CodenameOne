@@ -21,7 +21,7 @@ package com.codenameone.examples.reel.studio;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.Ids;
 import com.codenameone.examples.reel.Kinds;
 import com.codenameone.examples.reel.Roles;

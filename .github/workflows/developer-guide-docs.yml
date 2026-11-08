@@ -27,6 +27,8 @@ on:
       - 'scripts/parley/**'
       - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'scripts/reel/**'
+      # The Wayline chapter includes the app kit's push senders.
+      - 'maven/cn1-app-kit/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
       # java/util/List.html among them. A change that renames or deletes one
@@ -151,6 +153,7 @@ jobs:
               - 'scripts/slate/**'
               - 'scripts/splat/**'
               - 'scripts/hellocodenameone/common/src/main/kmp/**'
+              - 'maven/cn1-app-kit/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 

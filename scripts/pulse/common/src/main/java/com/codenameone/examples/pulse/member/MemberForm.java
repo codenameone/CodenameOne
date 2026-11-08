@@ -37,9 +37,9 @@ import com.codenameone.examples.pulse.api.UserDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.watch.WatchBridge;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.net.Session;
-import com.codenameone.examples.pulse.ui.Chart;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;
@@ -252,7 +252,7 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
                 values[iter] = value == null ? 0 : value.intValue();
             }
             stats.add(Ui.label(Lang.tr("Visits each week"), "SvChartTitle"));
-            stats.add(Chart.of("weekly", values, Lang.tr("{0} weeks ago",
+            stats.add(Chart.of("Sv", "weekly", values, Lang.tr("{0} weeks ago",
                     Integer.valueOf(values.length)), Lang.tr("This week")));
         }
         stats.add(Ui.label(Lang.tr("Badges  {0}/{1}", Integer.valueOf(Badges.count(found.badges())),

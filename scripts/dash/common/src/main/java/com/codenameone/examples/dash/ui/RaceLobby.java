@@ -34,7 +34,7 @@ import com.codenameone.examples.dash.api.GameProtocol;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.net.Api;
 import com.codenameone.examples.dash.net.GameLink;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 import com.codenameone.examples.dash.rules.Content;
 import com.codenameone.examples.dash.rules.Json;

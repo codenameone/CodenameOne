@@ -24,8 +24,8 @@ import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.parley.account.Accounts;
 import com.codenameone.examples.parley.chat.Conversations;
 import com.codenameone.examples.parley.push.PushDevices;
-import com.codenameone.examples.parley.push.PushSender;
-import com.codenameone.examples.parley.push.RecordingPushSender;
+import com.codename1.appkit.server.push.PushSender;
+import com.codename1.appkit.server.push.RecordingPushSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

@@ -29,7 +29,7 @@ import com.codenameone.examples.savor.Telemetry;
 import com.codenameone.examples.savor.api.RegisterDto;
 import com.codenameone.examples.savor.AppConfig;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.net.Session;
 
 /// Creates an account, signs in with it and goes on to verify the phone.

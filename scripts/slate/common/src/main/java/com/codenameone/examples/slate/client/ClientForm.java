@@ -31,6 +31,7 @@ import com.codenameone.examples.slate.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.net.Session;
 import com.codenameone.examples.slate.ui.Lang;
+import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Menu;
 import com.codenameone.examples.slate.ui.Nav;
 import com.codenameone.examples.slate.ui.SettingsForm;
@@ -93,11 +94,17 @@ public class ClientForm extends LiveChannel.Adapter implements Nav.Home {
         page.setName("home");
         next.setName("next");
         services.setName("services");
-        page.add(next);
-        page.add(Ui.primary("Book an appointment", "home-book", e -> BookForm.show(form, null)));
-        Ui.section(page, "What you can book");
-        page.add(services);
-        page.add(Ui.link("Settings", "home-settings", e -> SettingsForm.show(form)));
+        // Side by side on a wide window: what is coming up on the left, what
+        // can be booked on the right, both in view at once.
+        Container[] halves = Layouts.halves(page);
+        if (Layouts.wide()) {
+            Layouts.broaden(page);
+        }
+        halves[0].add(next);
+        halves[0].add(Ui.primary("Book an appointment", "home-book", e -> BookForm.show(form, null)));
+        Ui.section(halves[1], "What you can book");
+        halves[1].add(services);
+        halves[0].add(Ui.link("Settings", "home-settings", e -> SettingsForm.show(form)));
         Ui.pull(page, this::load);
 
         Container shell = new Container(new BorderLayout());

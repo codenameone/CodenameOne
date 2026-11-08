@@ -35,8 +35,8 @@ import com.codenameone.examples.savor.api.NameCountDto;
 import com.codenameone.examples.savor.api.StatsSeriesDto;
 import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
-import com.codenameone.examples.savor.ui.Chart;
+import com.codename1.appkit.Net;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Layouts;
 import com.codenameone.examples.savor.ui.StatRow;
@@ -243,10 +243,10 @@ final class Dashboard extends LiveChannel.Adapter {
         column[next++ % columns].add(tile("Orders", String.valueOf(placed), "seriesOrders",
                 Lang.tr("{0} delivered, {1} cancelled", String.valueOf(delivered),
                         String.valueOf(cancelled)),
-                Chart.of("chartOrders", orders, from, to)));
+                Chart.of("Sv", "chartOrders", orders, from, to)));
         column[next++ % columns].add(tile("Sales", Ui.money(taken, found.currency()),
                 "seriesRevenue", Lang.tr("{0} new accounts", String.valueOf(joined)),
-                Chart.of("chartRevenue", revenue, from, to)));
+                Chart.of("Sv", "chartRevenue", revenue, from, to)));
         if (columns == 1) {
             series.add(rates);
         }
@@ -258,7 +258,7 @@ final class Dashboard extends LiveChannel.Adapter {
             hourly[iter] = value == null ? 0 : value.intValue();
         }
         column[next++ % columns].add(tile("Orders by hour", null, null,
-                "The busy hours, in UTC", Chart.of("chartHours", hourly, "00:00", "23:00")));
+                "The busy hours, in UTC", Chart.of("Sv", "chartHours", hourly, "00:00", "23:00")));
         column[next++ % columns].add(shares("By outcome", found.byState(), true));
         column[next++ % columns].add(shares("Busiest restaurants", found.byRestaurant(), false));
 
@@ -357,7 +357,7 @@ final class Dashboard extends LiveChannel.Adapter {
             tile.add(Ui.fact(name.length() == 0 ? part.name() : name,
                     String.valueOf(part.count())));
             // A total of nothing has no shares; the bars are then empty.
-            tile.add(new Chart.Meter(total == 0 ? 0 : part.count() / (double) total));
+            tile.add(new Chart.Meter("Sv", total == 0 ? 0 : part.count() / (double) total));
         }
         return tile;
     }

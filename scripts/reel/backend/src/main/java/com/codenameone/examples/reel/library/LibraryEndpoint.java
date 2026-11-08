@@ -19,7 +19,7 @@
 package com.codenameone.examples.reel.library;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.api.DownloadDto;
 import com.codenameone.examples.reel.api.HistoryEntryDto;
 import com.codenameone.examples.reel.api.LibraryApiServer;

@@ -51,7 +51,7 @@ import com.codenameone.examples.pulse.api.HeartRateDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.WorkoutDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.ArrayList;
 import java.util.List;

@@ -19,7 +19,7 @@
 package com.codenameone.examples.dash.shop;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.dash.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.dash.api.AdRewardDto;
 import com.codenameone.examples.dash.api.BuyDto;
 import com.codenameone.examples.dash.api.EquipDto;

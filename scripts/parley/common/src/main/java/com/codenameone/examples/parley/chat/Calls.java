@@ -50,7 +50,7 @@ import com.codenameone.examples.parley.api.IceServerDto;
 import com.codenameone.examples.parley.api.PushDeviceDto;
 import com.codenameone.examples.parley.crypto.Identity;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.store.Store;
 import com.codenameone.examples.parley.ui.CallScreen;

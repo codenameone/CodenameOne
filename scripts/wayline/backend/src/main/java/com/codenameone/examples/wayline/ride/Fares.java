@@ -22,7 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
-import com.codenameone.examples.wayline.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.wayline.api.PricingDto;
 import com.codenameone.examples.wayline.api.RideRequestDto;
 import com.codenameone.examples.wayline.domain.Pricing;

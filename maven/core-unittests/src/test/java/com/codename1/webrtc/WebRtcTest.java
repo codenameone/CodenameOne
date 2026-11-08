@@ -74,6 +74,10 @@ class WebRtcTest extends UITestBase {
             calls.add("ice " + peer + " " + candidate);
         }
 
+        public void restartIce(int peer) {
+            calls.add("restart " + peer);
+        }
+
         public void closePeerConnection(int peer) {
             calls.add("close " + peer);
         }
@@ -198,5 +202,44 @@ class WebRtcTest extends UITestBase {
         });
         assertThrows(IllegalArgumentException.class,
                 () -> pc.addTrack(new MediaTrack(5, MediaTrack.VIDEO, false)));
+    }
+
+    /// A network change: the connection reports disconnected, the app
+    /// restarts ICE and offers again, and the same connection is connected.
+    @Test
+    void aLostPathIsRestartedOnTheSameConnection() {
+        Fake fake = new Fake();
+        TestCodenameOneImplementation.getInstance().setWebRtcBridge(fake);
+        final List<String> states = new ArrayList<String>();
+        PeerConnection pc = WebRtc.createPeerConnection(null, new PeerConnection.Listener() {
+            public void iceCandidate(PeerConnection c, IceCandidate candidate) {
+            }
+
+            public void stateChanged(PeerConnection c, String state) {
+                states.add(state);
+            }
+
+            public void remoteTrack(PeerConnection c, MediaTrack track) {
+            }
+        });
+        await(pc.setRemoteDescription(new SessionDescription(SessionDescription.ANSWER, "v=0")));
+        assertEquals(PeerConnection.CONNECTED, pc.getState());
+
+        WebRtc.stateChanged(1, PeerConnection.DISCONNECTED);
+        flushSerialCalls();
+        assertEquals(PeerConnection.DISCONNECTED, pc.getState());
+
+        pc.restartIce();
+        assertTrue(fake.calls.contains("restart 1"));
+        SessionDescription offer = await(pc.createOffer());
+        assertEquals(SessionDescription.OFFER, offer.getType());
+        await(pc.setRemoteDescription(new SessionDescription(SessionDescription.ANSWER, "v=0")));
+        assertEquals(PeerConnection.CONNECTED, pc.getState());
+        assertEquals(PeerConnection.DISCONNECTED, states.get(states.size() - 2));
+
+        pc.close();
+        fake.calls.clear();
+        pc.restartIce();
+        assertFalse(fake.calls.contains("restart 1"), "a closed connection restarts nothing");
     }
 }

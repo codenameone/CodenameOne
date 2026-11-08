@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor.ui;
 
+import com.codename1.appkit.Skeleton;
+
 import com.codename1.components.SpanLabel;
 import com.codename1.components.Switch;
 import com.codename1.components.ToastBar;
@@ -45,7 +47,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.Prefs;
 import com.codenameone.examples.savor.Telemetry;
 import com.codenameone.examples.savor.api.DeliveryState;
@@ -484,7 +486,7 @@ public final class Ui {
         list.setScrollVisible(false);
         list.setName(name);
         // Until it is filled: every list is emptied by what fills it.
-        list.add(new Skeleton(5));
+        list.add(new Skeleton(5, "SvSkeleton"));
         return list;
     }
 
@@ -669,7 +671,7 @@ public final class Ui {
             if (load != null) {
                 list.add(FlowLayout.encloseCenter(link("Try again", "retry", e -> {
                     list.removeAll();
-                    list.add(new Skeleton(5));
+                    list.add(new Skeleton(5, "SvSkeleton"));
                     list.revalidate();
                     load.run();
                 })));

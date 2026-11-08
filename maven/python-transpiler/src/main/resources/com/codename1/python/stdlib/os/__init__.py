@@ -334,7 +334,10 @@ def getpid():
 
 
 def get_terminal_size(fd=1):
-    return terminal_size((80, 24))
+    import _cn1term
+    if not _cn1term.isatty(fd):
+        raise OSError(25, "Inappropriate ioctl for device")
+    return terminal_size(_cn1term.size())
 
 
 class terminal_size(tuple):

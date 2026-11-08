@@ -180,11 +180,19 @@ class PaymentsTest {
                 .andExpect(jsonPath("$.isDefault").value(true));
         mvc.perform(People.asRider(get("/api/payments/methods"), rider))
                 .andExpect(jsonPath("$.length()").value(3))
-                .andExpect(jsonPath("$[0].id").value(visaId))
-                .andExpect(jsonPath("$[0].isDefault").value(false))
-                .andExpect(jsonPath("$[1].isDefault").value(true))
                 .andExpect(jsonPath("$[2].id").value("cash"))
                 .andExpect(jsonPath("$[2].isDefault").value(false));
+        // The two cards were saved within the same millisecond here, which a
+        // person never manages, so their order is the ids' and random: each is
+        // found by id rather than by place.
+        Map<String, Object> defaults = new java.util.HashMap<String, Object>();
+        for (Object card : Trips.list(mvc, People.asRider(get("/api/payments/methods"), rider))) {
+            if (card instanceof Map) {
+                defaults.put(String.valueOf(((Map) card).get("id")), ((Map) card).get("isDefault"));
+            }
+        }
+        assertEquals(Boolean.FALSE, defaults.get(visaId));
+        assertEquals(Boolean.TRUE, defaults.get(secondId));
 
         // A card is its owner's: nobody else sees it, chooses it or removes it.
         mvc.perform(People.asRider(get("/api/payments/methods"), other))

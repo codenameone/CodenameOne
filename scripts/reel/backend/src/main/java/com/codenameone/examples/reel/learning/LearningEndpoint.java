@@ -19,7 +19,7 @@
 package com.codenameone.examples.reel.learning;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.api.AnswerDto;
 import com.codenameone.examples.reel.api.AnswerResultDto;
 import com.codenameone.examples.reel.api.CertificateDto;

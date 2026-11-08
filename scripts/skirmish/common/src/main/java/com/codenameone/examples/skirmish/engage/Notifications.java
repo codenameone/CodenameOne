@@ -29,7 +29,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.skirmish.AppConfig;
 import com.codenameone.examples.skirmish.api.PushDeviceDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.ui.Nav;
 

@@ -32,7 +32,7 @@ import com.codename1.util.OnComplete;
 import com.codenameone.examples.parley.api.MediaUploadDto;
 import com.codenameone.examples.parley.crypto.Codec;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.ui.Lang;
 
 import java.io.ByteArrayOutputStream;

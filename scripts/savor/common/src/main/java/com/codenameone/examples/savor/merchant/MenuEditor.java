@@ -37,10 +37,10 @@ import com.codenameone.examples.savor.api.PhotoDto;
 import com.codenameone.examples.savor.api.RestaurantDto;
 import com.codenameone.examples.savor.customer.Food;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Photos;
-import com.codenameone.examples.savor.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.savor.ui.Ui;
 
 import java.util.ArrayList;
@@ -56,7 +56,7 @@ final class MenuEditor {
     MenuEditor(Form form) {
         this.form = form;
         page.setName("menu-editor");
-        page.add(new Skeleton(5));
+        page.add(new Skeleton(5, "SvSkeleton"));
         load();
     }
 

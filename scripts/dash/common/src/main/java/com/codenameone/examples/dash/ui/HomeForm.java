@@ -42,7 +42,7 @@ import com.codenameone.examples.dash.engage.Ads;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.forge.PackScreen;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 
 /// The menu between runs, built to pull the player into the next one: their

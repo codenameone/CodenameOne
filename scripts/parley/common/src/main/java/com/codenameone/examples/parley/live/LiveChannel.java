@@ -24,7 +24,7 @@ import com.codename1.io.WebSocket;
 import com.codename1.io.WebSocketState;
 import com.codename1.ui.CN;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.ui.Nav;
 

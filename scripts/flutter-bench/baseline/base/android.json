@@ -2,7 +2,7 @@
  "gallery": {
   "code_bytes": {
    "runs": 1,
-   "value": 4965216
+   "value": 5377960
   },
   "cold_start_ratio": {
    "runs": 8,
@@ -20,11 +20,11 @@
   },
   "install_bytes": {
    "runs": 1,
-   "value": 82093372
+   "value": 82236019
   },
   "wire_bytes": {
    "runs": 1,
-   "value": 82093372
+   "value": 82236019
   }
  }
 }
