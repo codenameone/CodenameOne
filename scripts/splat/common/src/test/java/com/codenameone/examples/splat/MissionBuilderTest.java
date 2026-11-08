@@ -95,7 +95,10 @@ public class MissionBuilderTest extends E2e {
             tap("playTest");
             waitForForm("match");
             final ArenaView test = arena();
-            waitFor(9000);
+            // play the test, as a player would: standing still until a ball
+            // arrives is what the tour showed before
+            until(() -> test.driver().countdownTicks() == 0, 20000, "the briefing to end");
+            driveFor(test, 9000);
             // in play, not painted out or showing a replay
             long give = System.currentTimeMillis() + 40000;
             while (!(PracticeTest.inPlay(test) && !driveFor(test, 1500) && PracticeTest.inPlay(test))

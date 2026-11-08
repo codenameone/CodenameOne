@@ -117,6 +117,9 @@ public class ArenaView extends GameView {
     /// match in play goes on underneath it.
     private Match ghost;
     private int replayShooter = -1;
+    /// The replay camera's heading, in radians, eased toward the shooter's
+    /// look; NaN until a replay's first frame sets it.
+    private double chaseYaw = Double.NaN;
     private int replayTo;
     private float replayPos;
     private long replayStartAt;
@@ -892,6 +895,7 @@ public class ArenaView extends GameView {
             return;
         }
         replayShooter = shooter;
+        chaseYaw = Double.NaN;
         replayPos = from;
         replayTo = hitTick + Match.TICK_HZ / 3;
         replayStartAt = System.currentTimeMillis() + 1100;
@@ -1265,12 +1269,32 @@ public class ArenaView extends GameView {
                 }
             } else if (best == dTop) {
                 py = hit.height * MM + 0.02f + (nextDecal & 7) * 0.002f;
+                // kept inside the top, or its edge hangs in the air
+                int half = Math.min((int) (s * 500), Math.min(hit.x1 - hit.x0, hit.z1 - hit.z0) / 2);
+                px = -fit(x, hit.x0, hit.x1, half) * MM;
+                pz = fit(z, hit.z0, hit.z1, half) * MM;
+                s = half / 500f;
+                sx = sx < 0 ? -s : s;
+                sy = sy < 0 ? -s : s;
             } else {
                 // drips run down a wall, so the texture is not mirrored upside down
                 wall = true;
                 rx = 0;
+                // kept inside the face it hit: one past an edge or above the
+                // top is paint in mid air
+                boolean xFace = best == dx0 || best == dx1;
+                int half = Math.min((int) (s * 500), Math.min(xFace ? hit.z1 - hit.z0 : hit.x1 - hit.x0,
+                        hit.height) / 2);
+                if (xFace) {
+                    pz = fit(z, hit.z0, hit.z1, half) * MM;
+                } else {
+                    px = -fit(x, hit.x0, hit.x1, half) * MM;
+                }
+                py = fit(y, 0, hit.height, half) * MM;
+                s = half / 500f;
+                sx = sx < 0 ? -s : s;
                 sy = s;
-                if (best == dx0 || best == dx1) {
+                if (xFace) {
                     // world x is drawn mirrored, so the x0 face looks toward +x on screen
                     px = -(best == dx0 ? hit.x0 - 25 : hit.x1 + 25) * MM;
                     ry = best == dx0 ? 90 : -90;
@@ -1285,6 +1309,11 @@ public class ArenaView extends GameView {
         d.setScale(sx, sy, 1);
         d.setPosition(px, py, pz);
         d.setVisible(true);
+    }
+
+    /// `v` moved so a span of `half` either side of it stays in `[lo, hi]`.
+    private static int fit(int v, int lo, int hi, int half) {
+        return Math.max(lo + half, Math.min(hi - half, v));
     }
 
     private void draw(float dt) {
@@ -1322,7 +1351,7 @@ public class ArenaView extends GameView {
             }
         }
         if (replaying) {
-            chase(m, replayShooter);
+            chase(m, replayShooter, dt);
         } else if (overheadNow) {
             overhead(m, me, dt);
         } else {
@@ -1419,19 +1448,44 @@ public class ArenaView extends GameView {
     }
 
     /// Over the shooter's right shoulder, looking where they look.
-    private void chase(Match m, int s) {
+    private void chase(Match m, int s, float dt) {
         Player p = m.player(s);
         float x = -lerp(prevX[s], p.x() * MM);
         float y = lerp(prevY[s], p.y() * MM);
         float z = lerp(prevZ[s], p.z() * MM);
-        double yr = p.yaw() * 2 * Math.PI / Trig.FULL;
+        // The rules turn in steps, and a bot's aim twitches every tick: a
+        // camera 2.6 m behind on that raw heading swings the shooter about
+        // the screen, so it eases after the look instead.
+        double want = p.yaw() * 2 * Math.PI / Trig.FULL;
+        if (Double.isNaN(chaseYaw)) {
+            chaseYaw = want;
+        }
+        double turn = want - chaseYaw;
+        while (turn > Math.PI) {
+            turn -= 2 * Math.PI;
+        }
+        while (turn < -Math.PI) {
+            turn += 2 * Math.PI;
+        }
+        chaseYaw += turn * Math.min(1f, dt * 4f);
+        double yr = chaseYaw;
         float fx = (float) -Math.sin(yr);
         float fz = (float) Math.cos(yr);
         float rx = (float) -Math.cos(yr);
         float rz = (float) -Math.sin(yr);
-        float cx = x - fx * 2.6f + rx * 0.7f;
+        // Pulled in toward the shooter while a prop is in the way, or the
+        // replay is a close-up of the inside of a container.
+        float back = 2.6f;
+        int eye = p.y() + 1950;
+        // tested 0.4 m past the camera, in the rules' millimetres (x mirrored)
+        while (back > 0.6f && !m.arena().clear(p.x(), eye, p.z(),
+                (int) (-(x - fx * (back + 0.4f) + rx * 0.7f) * 1000f), eye,
+                (int) ((z - fz * (back + 0.4f) + rz * 0.7f) * 1000f))) {
+            back -= 0.2f;
+        }
+        float cx = x - fx * back + rx * 0.7f;
         float cy = y + 1.95f;
-        float cz = z - fz * 2.6f + rz * 0.7f;
+        float cz = z - fz * back + rz * 0.7f;
         getCamera().setPerspective(HIP_FOV - 8f, NEAR, 400f);
         getCamera().setPosition(cx, cy, cz);
         getCamera().setTarget(x + fx * 9f, y + 1.2f, z + fz * 9f);
