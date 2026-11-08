@@ -1183,6 +1183,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     List<String[]> components=new ArrayList<String[]>();
                     for(FieldInfo component:embedded.getFields()) {
                         if(component.isStatic()) continue;
+                        if(component.getName().indexOf('$')>=0) ctx.error("An embedded record component name cannot contain '$': "+path+"."+component.getName());
                         String generic=genericSourceType(component.getSignature());
                         components.add(new String[] {component.getName(), generic!=null?generic
                                 :sourceType(org.objectweb.asm.Type.getType(component.getDescriptor()))});

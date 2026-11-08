@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -2367,20 +2366,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             loading--;
         }
     }
-    /// Drops, at commit, each forward from a record to a copy of the same row: a
-    /// version, a refreshed value. Either instance still names its row by its
-    /// key, so nothing needs to follow it, and keeping them would hold every
-    /// copy a long-lived session ever made. A forward from a record the session
-    /// gave a generated key stays: the instance the caller kept has no key, and
-    /// the forward is the only way back to its row.
+    /// At commit, points every forward straight at the copy its chain ends in,
+    /// and drops each one whose record already named that copy's row by its key:
+    /// a version, a refreshed value. Keeping those would hold every copy a
+    /// long-lived session ever made. A forward from a record whose key the
+    /// session generated stays, since the instance the caller kept has no key
+    /// and the forward is the only way back to its row; a copy made before the
+    /// insert has no key either, so collapsing first keeps that way open.
     private void pruneForwards() {
-        for (Iterator<Map.Entry<Object, Object>> i = forwards.entrySet().iterator(); i.hasNext();) {
-            Map.Entry<Object, Object> forward = i.next();
-            Object key = Models.identifierOf(forward.getKey());
-            if (key != null && key.equals(Models.identifierOf(forward.getValue()))) {
-                i.remove();
+        IdentityHashMap<Object, Object> collapsed = new IdentityHashMap<Object, Object>();
+        for (Object previous : forwards.keySet()) {
+            Object last = current(previous);
+            Object key = Models.identifierOf(previous);
+            if (key == null || !key.equals(Models.identifierOf(last))) {
+                collapsed.put(previous, last);
             }
         }
+        forwards.clear();
+        forwards.putAll(collapsed);
     }
     /// Replaces each record in `values` by the copy that now stands for it.
     private <T> void follow(List<T> values) {
