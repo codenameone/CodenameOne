@@ -139,7 +139,7 @@ public final class Sfx {
     }
 
     public static void splat(float volume, float pan) {
-        play(splats[(int) (Math.random() * splats.length)], volume, pan, 0.9f + (float) Math.random() * 0.2f);
+        play(any(splats), volume, pan, 0.9f + (float) Math.random() * 0.2f);
     }
 
     /// The tick that says your ball landed on somebody.
@@ -176,6 +176,9 @@ public final class Sfx {
 
     /// One footstep; the four takes go round so a run never sounds like a loop.
     public static void step(float volume) {
+        if (steps == null) {
+            return;
+        }
         step = (step + 1 + (int) (Math.random() * 2)) % steps.length;
         play(steps[step], volume, 0, 0.92f + (float) Math.random() * 0.16f);
     }
@@ -229,6 +232,12 @@ public final class Sfx {
 
     public static void click() {
         play(click, 0.6f, 0, 1);
+    }
+
+    /// One of `clips` at random, or null while there is no mixer: `load`
+    /// leaves every clip unset on a device without one.
+    private static SoundEffect any(SoundEffect[] clips) {
+        return clips == null ? null : clips[(int) (Math.random() * clips.length)];
     }
 
     private static void play(SoundEffect e, float volume, float pan, float rate) {
