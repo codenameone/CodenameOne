@@ -764,6 +764,54 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
+    /// A copy of a found record that keeps its unread `Ref` shares that holder
+    /// with the original, and an embedded record component may be named like a
+    /// method of the generated stand-ins.
+    @Test
+    public void recordSharedHoldersAndStandInNamesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        StringBuilder out=new StringBuilder();
+        sharedHolders(false,out); sharedHolders(true,out);
+        assertTrue(out.toString(),out.length()==0);
+    }
+    private void sharedHolders(boolean backend,StringBuilder out) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package sh; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("sh.Buyer",imports+"@Entity(table=\"sh_buyer\") public record Buyer(@Id long id, String name) { }");
+        sources.put("sh.Spot",imports+"@Embeddable public record Spot(double lat, String of) { }");
+        sources.put("sh.Place",imports+"@Embeddable public record Place(String city, @Embedded Spot build) { }");
+        sources.put("sh.Order",imports+"@Entity(table=\"sh_order\") public record Order(@Id long id, String note, @ManyToOne Ref<Buyer> buyer, @Embedded Place build) { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("sh.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static StringBuilder f=new StringBuilder(); static void ok(boolean b,String m) { if(!b) f.append(m).append(\"; \"); } "
+            + "interface R { void run() throws Exception; } static void t(String n,R r) { try { r.run(); } catch(Throwable e) { f.append(n).append(\" threw \").append(e).append(\"; \"); } } "
+            + "public static String run(Session s) { f.setLength(0); s.createTables(); "
+            + "t(\"copy\",()->{ s.beginTransaction(); Buyer b=s.merge(BuyerBuilder.create().name(\"b\").build()); "
+            + "Order o=s.merge(OrderBuilder.create().note(\"n\").buyer(Ref.of(b)).build(new Place(\"c\",new Spot(1.5,\"x\"))).build()); s.commitTransaction(); s.clear(); "
+            + "s.beginTransaction(); Order found=s.find(Order.class,o.id()); Order dup=s.merge(OrderBuilder.of(found).id(0).note(\"d\").build()); s.commitTransaction(); "
+            + "ok(found.buyer().isPresent() && Long.valueOf(b.id()).equals(found.buyer().id()),\"original lost its ref \"+found.buyer()); s.clear(); "
+            + "Order back=s.find(Order.class,dup.id()); ok(back!=null && back.buyer().isPresent() && Long.valueOf(b.id()).equals(back.buyer().id()),\"copy saved without its key\"); "
+            + "Order first=s.find(Order.class,o.id()); ok(first.build()!=null && \"c\".equals(first.build().city()) && first.build().build().lat()==1.5 && \"x\".equals(first.build().build().of()),\"embedded build \"+first.build()); }); "
+            + "return f.toString(); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        String tag=backend?"backend: ":"client: ";
+        try {
+            String r=(String)loader.loadClass("sh.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            if(r.length()>0) out.append(tag).append(r).append('\n');
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { out.append(tag+error.getCause()+"\n"); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
     /// Adopts tables that existed before the application: explicit names, a key the
     /// database generates, native timestamp and date columns, a legacy epoch column and
     /// a tag set keyed by value. Runs on SQLite on both runtimes, and on the backend

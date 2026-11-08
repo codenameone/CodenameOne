@@ -53,7 +53,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     // state of each managed record, keyed by the instance that currently stands
     // for its row, and the copy each replaced record became. A related record
     // that was persisted through a cascade is replaced by the copy carrying its
-    // key, while the record pointing at it still holds the old instance.
+    // key, while the record pointing at it still holds the old instance. The
+    // copies are followed until the transaction ends.
     private final IdentityHashMap<Object, EntityState> valueStates = new IdentityHashMap<Object, EntityState>();
     private final IdentityHashMap<Object, Object> forwards = new IdentityHashMap<Object, Object>();
     private int loading;
@@ -281,6 +282,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             flush();
             sql.commit();
             transaction = false;
+            // The flush has given every record that pointed at a replaced one the
+            // copy's key; following stale instances past that would only keep
+            // every replaced copy alive for the life of the session.
+            forwards.clear();
         } catch (IOException e) {
             recoverTransactionFailure();
             throw failure(e);
@@ -2630,7 +2635,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (record) {
                 // The holder in the component carries the lazy state from here.
                 Object holder = entry.model.holder(entry.entity, i);
-                Refs.bind(holder, state, i, relations[i].target, state.keys[i], keyless(relations[i]));
+                Object key = state.keys[i];
+                if (values == null) {
+                    // A new record: what it carries is what it holds. An unread
+                    // holder shared with another record keeps that record's key.
+                    Refs.share(holder, state);
+                    key = Refs.storedKey(holder);
+                }
+                Refs.bind(holder, state, i, relations[i].target, key, keyless(relations[i]));
                 if (!state.loaded[i] && holder instanceof Holder && Refs.loaded(holder)) {
                     // A to-one with no key is read already: there is nothing.
                     state.loaded[i] = true;

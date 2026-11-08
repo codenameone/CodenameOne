@@ -3187,13 +3187,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     /// Where generated code writes `f` into `inst`: the field, or, for a value
-    /// embedded in a record, the field of the stand-in each `path()` makes on
+    /// embedded in a record, the field of the stand-in each `path$()` makes on
     /// first use.
     private static String target(String inst, PersistedField f) {
         if (!f.record) return inst + "." + f.fieldName;
         int last = f.fieldName.lastIndexOf('.');
         return last < 0 ? inst + "." + f.fieldName
-                : inst + "." + f.fieldName.substring(0, last).replace(".", "().") + "()" + f.fieldName.substring(last);
+                : inst + "." + f.fieldName.substring(0, last).replace(".", "$().") + "$()" + f.fieldName.substring(last);
     }
 
     /// The guard a read of a value embedded in a record needs, empty for any
@@ -3284,12 +3284,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// The stand-in for the record embedded at `path`.
     private static String standIn(String path) {
-        return "Fields_" + path.replace('.', '_');
+        return "Fields$" + path.replace('.', '$');
     }
 
     /// A stand-in for `type`, built from `components`. A component that is
     /// itself an embedded record is held as that record's stand-in, made on
-    /// first write through the method named like it; it builds to null when
+    /// first write through the method named like it with a `$` after it, so no
+    /// component name can collide with `of` or `build`; it builds to null when
     /// nothing was written into it, which is how a value whose columns are all
     /// null reads back as no value at all.
     private static void emitStandIn(StringBuilder sb, EntityClass ec, String name, String type,
@@ -3299,7 +3300,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             String nested = ec.embeddedComponents.containsKey(prefix + c[0]) ? standIn(prefix + c[0]) : null;
             sb.append("    ").append(nested != null ? nested : c[1]).append(' ').append(c[0]).append(";\n");
             if (nested != null) {
-                sb.append("    ").append(nested).append(' ').append(c[0]).append("() {\n")
+                sb.append("    ").append(nested).append(' ').append(c[0]).append("$() {\n")
                   .append("      if (").append(c[0]).append(" == null) ").append(c[0]).append(" = new ").append(nested).append("();\n")
                   .append("      return ").append(c[0]).append(";\n    }\n");
             }
