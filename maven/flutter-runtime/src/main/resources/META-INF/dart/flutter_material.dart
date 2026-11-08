@@ -2916,7 +2916,8 @@ class Navigator extends Widget {
   external static Future<Object?> push(BuildContext context, MaterialPageRoute route);
   external static void pop(BuildContext context, [Object? result]);
   external static NavigatorState of(BuildContext context, {bool? rootNavigator});
-  external static String restorablePush(BuildContext context, dynamic routeBuilder, {dynamic arguments});
+  // routeBuilder as the Func2 Navigator.restorablePush takes (see NavigatorState's).
+  external static String restorablePush(BuildContext context, Object? Function(BuildContext, Object?) routeBuilder, {dynamic arguments});
   // Future<bool>, matching Flutter's own Navigator.maybePop(context, [result]) --
   // this used to answer a synchronous bool, so `await Navigator.maybePop(context)`
   // did not compile against the stub.

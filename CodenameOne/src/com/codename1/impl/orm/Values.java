@@ -330,6 +330,12 @@ public final class Values {
         if (value instanceof Boolean) {
             return (Boolean) value;
         }
+        if (value instanceof byte[] && ((byte[]) value).length == 1) {
+            // MySQL and MariaDB answer a BIT(1) column -- Hibernate's default
+            // boolean column there -- as a one-byte array. Only that width is a
+            // flag; a longer blob still refuses through asLongObject below.
+            return Boolean.valueOf(((byte[]) value)[0] != 0);
+        }
         Long number = asLongObject(value);
         return number == null ? null : Boolean.valueOf(number.longValue() != 0);
     }

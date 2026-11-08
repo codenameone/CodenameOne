@@ -2791,6 +2791,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String q(String value) {
         return sql.quote(value);
     }
+    /// The clause a locking select ends with, after its LIMIT; empty for NONE.
+    String lockClause(LockMode mode) {
+        if (mode == LockMode.NONE) {
+            return "";
+        }
+        requireTransaction();
+        return sql.lockClause(mode);
+    }
     String limit(int count, int offset) {
         return sql.limit(count, offset);
     }

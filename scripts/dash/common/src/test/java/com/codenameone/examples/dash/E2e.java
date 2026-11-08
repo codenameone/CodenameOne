@@ -217,6 +217,27 @@ public abstract class E2e extends AbstractTest {
     /// so a test waiting on the screen does not leave the runner to crash.
     /// Answers whether the run ended.
     protected boolean driveFor(final RunView view, int millis) {
+        return driveUntil(view, null, millis);
+    }
+
+    /// Steers with the bot until `done` holds, the run ends or `millis` of real
+    /// time pass, and answers whether the run ended. One bot steers the whole
+    /// stretch: calling `driveFor` in a loop instead took the bot off between
+    /// calls, the game kept ticking with nobody at the controls, and on a slow
+    /// CI runner a city run crashed in one of those gaps before its landmark.
+    protected boolean driveUntil(final RunView view, Check done, int millis) {
+        return drive(view, done, millis, false);
+    }
+
+    /// Steers like `driveUntil`, but `stallMillis` is how long the run may go
+    /// without a tick, not a budget for the whole stretch: a stall still fails
+    /// fast, while a runner that merely shares its CPUs with a dozen other jobs
+    /// gets there later instead of failing on a wall-clock total.
+    protected boolean driveWhileTicking(final RunView view, Check done, int stallMillis) {
+        return drive(view, done, stallMillis, true);
+    }
+
+    private boolean drive(final RunView view, Check done, int millis, boolean resetOnTick) {
         // A race applies an input when the server has stamped it, at least
         // INPUT_DELAY ticks on, so the bot looks that much further ahead.
         final Bot bot = new Bot(7, 90, view.driver() instanceof RaceDriver ? GameProtocol.INPUT_DELAY + 4 : 0);
@@ -228,11 +249,20 @@ public abstract class E2e extends AbstractTest {
         }));
         try {
             long end = System.currentTimeMillis() + millis;
-            while (System.currentTimeMillis() < end) {
+            int lastTick = -1;
+            while (System.currentTimeMillis() < end && (done == null || !done.ok())) {
                 final boolean[] over = new boolean[1];
-                onEdt(() -> over[0] = view.driver().run().over());
+                final int[] tick = new int[1];
+                onEdt(() -> {
+                    over[0] = view.driver().run().over();
+                    tick[0] = view.driver().run().tick();
+                });
                 if (over[0]) {
                     return true;
+                }
+                if (resetOnTick && tick[0] != lastTick) {
+                    lastTick = tick[0];
+                    end = System.currentTimeMillis() + millis;
                 }
                 waitFor(16);
             }
@@ -334,10 +364,7 @@ public abstract class E2e extends AbstractTest {
 
     /// Lets the bot run, for at most `millis`, until the track ahead is busy.
     protected void driveToBusy(RunView view, int items, int millis) {
-        long give = System.currentTimeMillis() + millis;
-        while (System.currentTimeMillis() < give && !busyAhead(view, items) && !driveFor(view, 100)) {
-            // the bot steers
-        }
+        driveUntil(view, () -> busyAhead(view, items), millis);
     }
 
     /// A shot of a run in progress: the bot keeps steering while the frame

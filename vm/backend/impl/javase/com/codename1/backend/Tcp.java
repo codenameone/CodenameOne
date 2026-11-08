@@ -37,6 +37,7 @@ import java.util.Iterator;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import java.security.cert.CertificateEncodingException;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -205,6 +206,27 @@ public final class Tcp {
     /// Whether this connection is encrypted.
     public boolean isSecure() {
         return secure;
+    }
+
+    /// The certificates the server presented in the TLS handshake, leaf first,
+    /// each as DER; empty while the connection is plaintext. For pinning a
+    /// server's key or reading its expiry -- what `openssl s_client -showcerts`
+    /// prints. The chain has already been verified when this answers: an
+    /// untrusted one failed [#startTls(String)].
+    public byte[][] getPeerCertificates() throws IOException {
+        if (!secure || !(socket instanceof SSLSocket)) {
+            return new byte[0][];
+        }
+        try {
+            Certificate[] chain = ((SSLSocket) socket).getSession().getPeerCertificates();
+            byte[][] out = new byte[chain.length][];
+            for (int iter = 0 ; iter < chain.length ; iter++) {
+                out[iter] = chain[iter].getEncoded();
+            }
+            return out;
+        } catch (CertificateEncodingException err) {
+            throw new IOException("A peer certificate could not be encoded", err);
+        }
     }
 
     /// A factory that trusts exactly the certificates in one PEM bundle. The

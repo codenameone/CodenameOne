@@ -284,7 +284,7 @@ JAVA_OBJECT com_codename1_backend_Crypto_pbkdf2DigestImpl___int_byte_1ARRAY_byte
  */
 static int cn1KeyFits(EVP_PKEY* key, JAVA_INT algorithm) {
     int type = EVP_PKEY_base_id(key);
-    if(algorithm >= 1 && algorithm <= 4) {
+    if((algorithm >= 1 && algorithm <= 4) || algorithm == 7) {
         return type == EVP_PKEY_RSA;
     }
     if(algorithm == 5 || algorithm == 6) {
@@ -306,6 +306,8 @@ static const EVP_MD* cn1SignatureDigest(JAVA_INT algorithm) {
         case 1: case 4: case 5: return EVP_sha256();
         case 2: case 6: return EVP_sha384();
         case 3: return EVP_sha512();
+        /* RS1: verify only; Crypto.sign refuses it before reaching here. */
+        case 7: return EVP_sha1();
         default: return NULL;
     }
 }

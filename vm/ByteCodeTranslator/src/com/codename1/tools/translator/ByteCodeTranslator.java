@@ -569,6 +569,15 @@ public class ByteCodeTranslator {
         File srcRoot = new File(root, appName + "-src");
         srcRoot.mkdirs();
 
+        // A dependency jar may carry a main of its own -- bcprov's
+        // org.bouncycastle.LICENSE is enough -- and without a name the scan
+        // refuses the second main it meets. The backend packager names its entry
+        // point here (a binary class name), and every other main is then ignored.
+        String preferredMain = System.getProperty("cn1.mainClass");
+        if (preferredMain != null && preferredMain.length() > 0) {
+            ByteCodeClass.setPreferredMainClass(preferredMain.replace('.', '_').replace('/', '_')
+                    .replace('$', '_').replace('-', '_'));
+        }
         b.execute(sources, srcRoot);
 
         File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");

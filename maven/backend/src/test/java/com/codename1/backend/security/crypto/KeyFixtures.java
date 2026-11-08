@@ -279,6 +279,14 @@ public final class KeyFixtures {
             "K4SQu2Gg8LAW3lD7xdm+XaghT48L2hXkcMMQQN5byhlFQzhXJqU2tOLJFs7Ky1m8WhwwVjC4z17/" +
             "X/fjWbId";
 
+    /// openssl dgst -sha1 -sign, base64.
+    public static final String RS1_SIGNATURE =
+            "nOa7dR9R6wak4FTegIqUeswb+R1buBp1aPxNT17VFAi80Q5Kw1hsv/bgyCscmWeq2PiymikfsmYB" +
+            "PMRsHSIg+60zxfWCH3/pz2sy8bKwy9XtCMNFmx+dgGgn0iouzJjZPEOsu5AwdhdpD1pfRR1r2upV" +
+            "O9VoQzvRgRo0iFGvEMAuERZdS0HajwyH1lhEZzQkAoYQlCGc+G+8MGu3thZlnLDyYCS4452qJXbx" +
+            "344cV7KaNEfWZXUJok8vPskK+A2T0lfUWreu0ru7tDtAyFy4tXURKcchgUo2NALnIL5LGhEuKzif" +
+            "dl2/ibD/8SI/DdC7EKPXgXlXJVyav8Ns39gWbA==";
+
     /// openssl dgst -sha256 -sign, base64.
     public static final String RS256_SIGNATURE =
             "PGfzHoC0p2A3fhbldgq5NKXCJTtZ+2e70RNQ1H9ocxiHTvl2SLJoWjusbGglKB7RDllBFW8dPz3w" +
