@@ -215,11 +215,6 @@ public final class CallScreen {
         if (Calls.CONNECTING.equals(state)) {
             return "Connecting...";
         }
-        if (Calls.RECONNECTING.equals(state)) {
-            // Over the last frame, so a lost path never reads as a frozen
-            // picture of a call that still says it is connected.
-            return "Reconnecting...";
-        }
         if (Calls.CONNECTED.equals(state)) {
             return "End-to-end encrypted";
         }
