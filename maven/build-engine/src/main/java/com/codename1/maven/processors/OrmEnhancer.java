@@ -172,7 +172,10 @@ final class OrmEnhancer {
     }
     static void enhance(Map<String,OrmAnnotationProcessor.EntityClass> entities,ProcessorContext ctx) throws IOException {
         final Map<String,OrmAnnotationProcessor.EntityClass> owners=new HashMap<String,OrmAnnotationProcessor.EntityClass>();
-        for(OrmAnnotationProcessor.EntityClass entity:entities.values()) if(needsState(entity)) owners.put(entity.binaryName.replace('.','/'),entity);
+        // A record gets no session state woven in: the session replaces a record
+        // with a copy on every change, and state carried by one instance would
+        // be lost by the next.
+        for(OrmAnnotationProcessor.EntityClass entity:entities.values()) if(needsState(entity) && !entity.record) owners.put(entity.binaryName.replace('.','/'),entity);
         // Accessors declared by mapped superclasses must use the same state as their entities.
         for(OrmAnnotationProcessor.EntityClass entity:entities.values()) for(OrmAnnotationProcessor.RelationField relation:entity.relations) {
             String declaring=relation.declaringType.replace('.','/');

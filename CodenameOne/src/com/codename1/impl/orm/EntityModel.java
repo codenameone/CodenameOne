@@ -55,6 +55,25 @@ public abstract class EntityModel<T> {
         return get(entity, index);
     }
     public abstract void set(T entity, int index, Object value);
+    /// True for an entity whose fields cannot be written after construction, a
+    /// record. The session never writes into one: every change it makes, a
+    /// generated key, a version, a refreshed row, builds a copy through [#with]
+    /// or [#hydrate] and the copy takes the original's place in the session.
+    public boolean immutable() {
+        return false;
+    }
+    /// `entity` with attribute `index` set to `value`. A mutable entity is
+    /// written in place and returned; an immutable one answers a copy.
+    public T with(T entity, int index, Object value) {
+        set(entity, index, value);
+        return entity;
+    }
+    /// A new entity holding `values`, in attribute order.
+    public T hydrate(Object[] values) {
+        T entity = create();
+        read(entity, values);
+        return entity;
+    }
     public boolean requiresSession() {
         return relationships().length > 0 || versionIndex() >= 0 || generation() != 0 || idIndexes().length > 1 ||
                 indexes().length > 0 || discriminatorIndex() >= 0;

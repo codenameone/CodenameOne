@@ -110,6 +110,10 @@ class EntityManagerTest extends UITestBase {
         public void insert(SampleEntity entity) throws IOException {
         }
 
+        public SampleEntity save(SampleEntity entity) throws IOException {
+            return entity;
+        }
+
         public void update(SampleEntity entity) throws IOException {
         }
 

@@ -329,6 +329,119 @@ public class OrmAnnotationProcessorTest {
         assertEquals(riderMethods,methodNames(new File(classes,"hidden/Rider.class")));
     }
 
+    /// A record entity: read through its canonical constructor, never written,
+    /// and changed by saving a copy. The session writes a record through and
+    /// answers the copy that carries the generated key and version; saving the
+    /// stale copy again fails on its version. Records need a JDK that compiles
+    /// them, so the test is skipped on JDK 8.
+    @Test
+    public void recordEntitiesAreSavedAsCopiesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordEntities(false);
+        recordEntities(true);
+    }
+    private static int javaFeature() {
+        String version=System.getProperty("java.specification.version");
+        return version.startsWith("1.") ? Integer.parseInt(version.substring(2)) : Integer.parseInt(version);
+    }
+    private void recordEntities(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("records.Mood","package records; public enum Mood { CALM, LOUD }");
+        sources.put("records.Note","package records; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
+            + "@Entity public record Note(@Id long id, String title, int score, Mood mood, java.util.Date when, @Version long version, @DbTransient String scratch) { "
+            + "public Note { if (score < 0) throw new IllegalArgumentException(\"score\"); } }");
+        sources.put("records.Tag","package records; import com.codename1.annotations.*; @Entity public record Tag(@Id long id, String name, boolean pinned) { }");
+        sources.put("records.Notes","package records; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
+            + "List<Note> findByTitle(String title); }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        // Nothing is woven into a record.
+        assertFalse(methodNames(new File(classes,"records/Note.class")).contains("__cn1OrmState"));
+        assertTrue(new File(classes,"records/NoteBuilder.class").isFile());
+        // The check uses the generated builder, so it compiles after the processor ran.
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("records.Check","package records; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
+            + "Notes repo=Repositories.create(Notes.class,s); s.createTables(); s.beginTransaction(); "
+            + "Note draft=NoteBuilder.create().title(\"a\").score(3).mood(Mood.LOUD).when(new java.util.Date(5000L)).scratch(\"x\").build(); "
+            + "Note saved=repo.save(draft); "
+            + "if(saved==draft || draft.id()!=0) throw new AssertionError(\"the caller's record must not change\"); "
+            + "if(saved.id()==0) throw new AssertionError(\"generated key in the copy\"); "
+            + "if(!\"x\".equals(saved.scratch())) throw new AssertionError(\"a copy keeps transient components\"); "
+            + "if(!s.contains(saved) || s.contains(draft)) throw new AssertionError(\"the copy is the managed instance\"); "
+            + "if(s.find(Note.class,saved.id())!=saved) throw new AssertionError(\"identity map holds the copy\"); "
+            + "Note changed=repo.save(NoteBuilder.of(saved).score(5).build()); "
+            + "if(changed.version()!=saved.version()+1 || changed.score()!=5) throw new AssertionError(\"version in the copy \"+changed); "
+            + "if(s.find(Note.class,saved.id())!=changed) throw new AssertionError(\"identity map follows the newest copy\"); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Note back=repo.findById(saved.id()); "
+            + "if(back.score()!=5 || !\"a\".equals(back.title()) || back.mood()!=Mood.LOUD || back.when().getTime()!=5000L || back.version()!=changed.version() || back.scratch()!=null) throw new AssertionError(\"read back \"+back); "
+            + "if(!back.equals(NoteBuilder.of(changed).scratch(null).build())) throw new AssertionError(\"record equality\"); "
+            + "if(repo.findByTitle(\"a\").size()!=1) throw new AssertionError(\"derived query\"); "
+            + "s.beginTransaction(); boolean stale=false; try { repo.save(saved); } catch(OptimisticLockException expected) { stale=true; } s.rollbackTransaction(); "
+            + "if(!stale) throw new AssertionError(\"saving a stale copy must fail on its version\"); "
+            + "s.clear(); s.beginTransaction(); Note current=repo.findById(saved.id()); s.refresh(current); repo.delete(s.find(Note.class,saved.id())); s.commitTransaction(); "
+            + "s.clear(); if(repo.findById(saved.id())!=null) throw new AssertionError(\"delete\"); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("records.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            // The plain daos answer the copy too. Both refuse a versioned mapping
+            // outright, record or not -- that needs a session -- so this is an
+            // unversioned one.
+            Class tag=loader.loadClass("records.Tag");
+            java.lang.reflect.Constructor make=tag.getConstructors()[0];
+            Object fresh=make.newInstance(0L,"t",Boolean.TRUE);
+            Object saved,renamed;
+            if (backend) {
+                com.codename1.backend.orm.Dao dao=server.dao(tag);
+                dao.createTable();
+                saved=dao.save(fresh);
+                long id=((Long)tag.getMethod("id").invoke(saved)).longValue();
+                assertTrue(saved.toString(),id!=0);
+                assertEquals(saved,dao.findById(Long.valueOf(id)));
+                renamed=make.newInstance(Long.valueOf(id),"u",Boolean.FALSE);
+                assertTrue(dao.save(renamed)==renamed);
+                assertEquals(renamed,dao.findById(Long.valueOf(id)));
+                assertEquals(1,dao.findAll().size());
+            } else {
+                com.codename1.orm.Dao dao=client.dao(tag);
+                dao.createTable();
+                saved=dao.save(fresh);
+                long id=((Long)tag.getMethod("id").invoke(saved)).longValue();
+                assertTrue(saved.toString(),id!=0);
+                assertEquals(saved,dao.findById(Long.valueOf(id)));
+                renamed=make.newInstance(Long.valueOf(id),"u",Boolean.FALSE);
+                assertTrue(dao.save(renamed)==renamed);
+                assertEquals(renamed,dao.findById(Long.valueOf(id)));
+                assertEquals(1,dao.findAll().size());
+            }
+            assertEquals(0L,((Long)tag.getMethod("id").invoke(fresh)).longValue());
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// A record entity with a relationship, an embedded value or a Property is
+    /// refused by name rather than generated into code that cannot compile.
+    @Test
+    public void recordEntitiesRefuseWhatTheyCannotHoldYet() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("refused.Owner","package refused; import com.codename1.annotations.*; @Entity public class Owner { @Id public long id; public Owner() {} }");
+        sources.put("refused.Pet","package refused; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
+            + "@Entity public record Pet(@Id long id, @ManyToOne Owner owner) { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes);
+        assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Relationships are not supported in a record entity yet: owner"));
+    }
+
     /// Adopts tables that existed before the application: explicit names, a key the
     /// database generates, native timestamp and date columns, a legacy epoch column and
     /// a tag set keyed by value. Runs on SQLite on both runtimes, and on the backend

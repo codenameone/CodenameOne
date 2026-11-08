@@ -477,13 +477,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private <T> void persistInternal(T entity, IdentityHashMap<Object, Boolean> visited) {
         persistInternal(entity, visited, true);
     }
-    private <T> void persistInternal(T entity, IdentityHashMap<Object, Boolean> visited, boolean cascade) {
+    /// Registers `entity` and answers the instance the session now holds for
+    /// it: `entity` itself, or for an immutable entity whose key came from a
+    /// sequence, the copy that carries the key.
+    private <T> T persistInternal(T entity, IdentityHashMap<Object, Boolean> visited, boolean cascade) {
         requireTransaction();
         if (entity == null) {
             throw new IllegalArgumentException("entity is null");
         }
         if (visited.put(entity, Boolean.TRUE) != null) {
-            return;
+            Entry visitedEntry = entries.get(entity);
+            return visitedEntry == null ? entity : (T) visitedEntry.entity;
         }
         if (entries.containsKey(entity)) {
             Entry entry = entries.get(entity);
@@ -491,7 +495,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (cascade) {
                 cascadePersist(entry, visited);
             }
-            return;
+            return entity;
         }
         EntityState previous = state(entity);
         if (previous != null && previous.attached && !sameInstance(previous.session, this)) {
@@ -505,7 +509,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 throw new PersistenceException("persist requires a new entity; use merge for detached entities");
             }
             try {
-                model.set(entity, id,
+                entity = model.with(entity, id,
                         sql.nextIdentifier(model.generation(), model.generator(), model.attributes()[id].kind));
             } catch (IOException error) {
                 rollbackOnly = true;
@@ -531,13 +535,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (cascade) {
             cascadePersist(e, visited);
         }
+        return entity;
     }
     @Override
     public <T> T merge(T entity) {
         // Relationship lookups must not flush a partially copied merge graph.
+        T merged;
         mergeDepth++;
         try {
-            return merge(entity, new IdentityHashMap<Object, Object>());
+            merged = merge(entity, new IdentityHashMap<Object, Object>());
         } catch (RuntimeException error) {
             if (transaction) {
                 rollbackOnly = true;
@@ -546,6 +552,21 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         } finally {
             mergeDepth--;
         }
+        Entry entry = merged == null ? null : entries.get(merged);
+        if (entry == null || !entry.model.immutable() || mergeDepth > 0) {
+            return merged;
+        }
+        // AN IMMUTABLE ENTITY IS WRITTEN THROUGH. A record cannot be handed back
+        // and then completed at the next flush, the way a mutable entity has
+        // its generated key and version written into it: the caller holds a
+        // value, and a later flush could only replace the session's copy, never
+        // theirs. So the row is written now, and the answer is the copy that
+        // carries everything the database decided -- the key, the version --
+        // which is the instance to keep and to pass to the next merge. Merging
+        // the stale one again fails on its version, as a stale detached entity
+        // does.
+        flush();
+        return (T) entry.entity;
     }
     private <T> T merge(T entity, IdentityHashMap<Object, Object> merging) {
         requireTransaction();
@@ -579,17 +600,31 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (generated && id != null && (!(id instanceof Number) || ((Number) id).longValue() != 0)) {
                 throw new OptimisticLockException("Detached row no longer exists: " + model.table());
             }
-            managed = model.create();
-            copy(model, entity, managed);
+            if (model.immutable()) {
+                // A value needs no copy of its own: the caller's instance
+                // is registered as it is.
+                managed = entity;
+            } else {
+                managed = model.create();
+                copy(model, entity, managed);
+            }
             // Register the copy without traversing constructor-created relations.
             // Flush cascades only after the entire source graph has been copied.
-            persistInternal(managed, new IdentityHashMap<Object, Boolean>(), false);
+            managed = persistInternal(managed, new IdentityHashMap<Object, Boolean>(), false);
         } else {
             int version = model.versionIndex();
             if (version >= 0 && !same(model.get(entity, version), model.get(managed, version))) {
                 throw new OptimisticLockException("Stale entity: " + model.table());
             }
-            copy(model, entity, managed);
+            if (model.immutable()) {
+                // The incoming value takes the managed one's place; the flush
+                // diffs it against the snapshot like any other change.
+                Entry entry = entries.get(managed);
+                replace(entry, entity);
+                managed = entity;
+            } else {
+                copy(model, entity, managed);
+            }
         }
         merging.put(entity, managed);
         mergeRelations(model, entity, managed, merging);
@@ -805,7 +840,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new OptimisticLockException("Row no longer exists: " + model.table());
         }
         attachState(entry, false, rows.get(0));
-        assign(model, entity, rows.get(0));
+        if (model.immutable()) {
+            entity = model.hydrate(rows.get(0));
+            replace(entry, entity);
+        } else {
+            assign(model, entity, rows.get(0));
+        }
         entry.snapshot = snapshot(model, entity);
         Relationship[] relations = model.relationships();
         loading++;
@@ -2901,10 +2941,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             checkManagedIdentity(entries.get(entity));
             return entity;
         }
-        entity = model.create();
-        Entry entry = new Entry(model, entity, null);
-        attachState(entry, false, values);
-        assign(model, entity, values);
+        Entry entry;
+        if (model.immutable()) {
+            entity = model.hydrate(values);
+            entry = new Entry(model, entity, null);
+            attachState(entry, false, values);
+        } else {
+            entity = model.create();
+            entry = new Entry(model, entity, null);
+            attachState(entry, false, values);
+            assign(model, entity, values);
+        }
         claim(model, entity);
         entries.put(entity, entry);
         entry.snapshot = snapshot(model, entity);
@@ -2954,7 +3001,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         List<Object> args = new ArrayList<Object>();
         int version = model.versionIndex();
         if (version >= 0) {
-            model.set(entry.entity, version, Long.valueOf(0));
+            replace(entry, model.with(entry.entity, version, Long.valueOf(0)));
         }
         for (int i = 0; i < attrs.length; i++) {
             if (!inserted(attrs[i])) {
@@ -2993,7 +3040,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int id = model.idIndex();
         if (attrs[id].generated) {
             try {
-                model.set(entry.entity, id, Long.valueOf(sql.insert(statement, args.toArray(), attrs[id].column)));
+                replace(entry, model.with(entry.entity, id, Long.valueOf(sql.insert(statement, args.toArray(), attrs[id].column))));
             } catch (IOException e) {
                 throw failure(e);
             }
@@ -3192,7 +3239,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new OptimisticLockException("Stale or missing row: " + model.table());
         }
         if (version >= 0) {
-            model.set(entry.entity, version, next);
+            replace(entry, model.with(entry.entity, version, next));
         }
         entry.snapshot = snapshot(model, entry.entity);
         return true;
@@ -3415,6 +3462,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return result.toString();
     }
+    /// Puts `next` in the place `entry`'s entity held: in the entry, in the
+    /// identity map and as the key of the entry itself. A no-op for a mutable
+    /// entity, which [EntityModel#with] answers unchanged.
+    private void replace(Entry entry, Object next) {
+        Object previous = entry.entity;
+        if (sameInstance(previous, next)) {
+            return;
+        }
+        entries.remove(previous);
+        entry.entity = next;
+        entries.put(next, entry);
+        // Keyed by the previous instance's identifier: a generated key is not
+        // claimed until its row exists, so an unclaimed one finds nothing here.
+        Key key = key(entry.model, previous);
+        if (sameInstance(identities.get(key), previous)) {
+            identities.put(key, next);
+        }
+    }
     private void claim(EntityModel model, Object entity) {
         Key key = key(model, entity);
         Object existing = identities.get(key);
@@ -3476,7 +3541,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     private static final class Entry {
         final EntityModel model;
-        final Object entity;
+        // Not final: an immutable entity is replaced by a copy each time the
+        // session changes it. See replace.
+        Object entity;
         Object[] snapshot;
         Object initialId;
         boolean fresh;
