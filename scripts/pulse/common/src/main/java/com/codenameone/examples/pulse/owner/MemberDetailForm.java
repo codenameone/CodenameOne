@@ -29,10 +29,10 @@ import com.codenameone.examples.pulse.api.MemberDetailDto;
 import com.codenameone.examples.pulse.api.NameCountDto;
 import com.codenameone.examples.pulse.api.OwnerMemberDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
-import com.codenameone.examples.pulse.ui.Chart;
+import com.codename1.appkit.Net;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.pulse.ui.Lang;
-import com.codenameone.examples.pulse.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
@@ -57,7 +57,7 @@ public final class MemberDetailForm {
     public static void into(final Form form, final Container page, final String id) {
         page.setName("member");
         page.removeAll();
-        page.add(new Skeleton(6));
+        page.add(new Skeleton(6, "SvSkeleton"));
         page.revalidate();
         final Runnable[] load = new Runnable[1];
         load[0] = () -> Api.owner().member(id, Net.to(found -> {
@@ -101,7 +101,7 @@ public final class MemberDetailForm {
             Integer value = weeks.get(iter);
             values[iter] = value == null ? 0 : value.intValue();
         }
-        Container chart = Chart.of("memberVisits", values, Lang.tr("11 weeks ago"),
+        Container chart = Chart.of("Sv", "memberVisits", values, Lang.tr("11 weeks ago"),
                 Lang.tr("This week"));
         page.add(chart);
 

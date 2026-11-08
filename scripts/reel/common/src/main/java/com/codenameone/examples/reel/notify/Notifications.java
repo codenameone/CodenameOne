@@ -28,7 +28,7 @@ import com.codenameone.examples.reel.AppConfig;
 import com.codenameone.examples.reel.api.PushDeviceDto;
 import com.codenameone.examples.reel.Prefs;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.net.Session;
 import com.codenameone.examples.reel.ui.Nav;
 

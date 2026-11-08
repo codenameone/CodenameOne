@@ -91,8 +91,20 @@ public abstract class E2e extends AbstractTest {
         return false;
     }
 
+    /// Whether this test films the demo videos. A run that films them
+    /// (`run-e2e.sh --video`, which names the directory in `slate.e2e.video`)
+    /// runs nothing else: the videos walk the same screens the tests cover.
+    protected boolean films() {
+        return false;
+    }
+
+    static boolean videoRun() {
+        String dir = System.getProperty("slate.e2e.video");
+        return dir != null && dir.length() > 0;
+    }
+
     private boolean mine() {
-        return desktop() == desktopRun();
+        return desktop() == desktopRun() && films() == videoRun();
     }
 
     /// The test itself.
@@ -350,7 +362,8 @@ public abstract class E2e extends AbstractTest {
 
     /// Signs out through the menu of a home screen.
     protected void signOut() {
-        click("menu-open");
+        // Behind its button on a phone; docked beside the screen on a wide window.
+        clickIfThere("menu-open");
         click("menu-signOut");
         waitForForm("Welcome");
     }

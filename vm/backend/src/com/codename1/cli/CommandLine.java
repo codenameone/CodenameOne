@@ -314,6 +314,12 @@ public final class CommandLine {
             err.println(e.getMessage());
             usage(e.getCommandSpec() == null ? last : e.getCommandSpec(), err);
             return USAGE_ERROR;
+        } catch (Prompt.Cancelled e) {
+            // Ctrl-C at a prompt: the shell's convention for an interrupted
+            // command, 128 + SIGINT, with nothing printed -- the prompt already
+            // said it was cancelled.
+            out.flush();
+            return Prompt.CANCELLED_EXIT_CODE;
         } catch (Throwable t) {
             String m = t.getMessage();
             err.println("Error: " + (m == null ? t.toString() : m));

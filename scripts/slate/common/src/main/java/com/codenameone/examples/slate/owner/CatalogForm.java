@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.slate.owner;
 
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -33,6 +34,7 @@ import com.codenameone.examples.slate.client.Times;
 import com.codenameone.examples.slate.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.ui.Layouts;
+import com.codenameone.examples.slate.ui.Split;
 import com.codenameone.examples.slate.ui.Ui;
 
 import java.util.ArrayList;
@@ -42,6 +44,10 @@ import java.util.List;
 /// or equipment a service may need. One list screen and one editor per kind;
 /// nothing is ever deleted, only switched off, so past appointments keep
 /// the names they were booked under.
+///
+/// On a wide window the list keeps the left and the editor of the row picked
+/// fills the right, so working down a catalogue never leaves the list; on a
+/// phone each row opens its editor as a screen of its own.
 public final class CatalogForm {
     static final String SERVICES = "services";
     static final String PROVIDERS = "providers";
@@ -51,17 +57,31 @@ public final class CatalogForm {
     private final Form form;
     private final Container list = Ui.list("catalog");
     private final String kind;
+    private final Split split;
 
     private CatalogForm(Form previous, String kind) {
         this.kind = kind;
         form = Ui.form(SERVICES.equals(kind) ? "Services" : PROVIDERS.equals(kind) ? "Providers"
                 : LOCATIONS.equals(kind) ? "Locations" : "Rooms and equipment", "Catalog");
         Ui.back(form, previous);
-        if (!PROVIDERS.equals(kind)) {
-            form.add(BorderLayout.SOUTH, Ui.primary("Add", "add", e -> edit(null)));
+        Component add = PROVIDERS.equals(kind) ? null : Ui.primary("Add", "add", e -> edit(null));
+        if (Layouts.wide()) {
+            // Under the list it belongs to, not across the editor beside it.
+            Container master = new Container(new BorderLayout());
+            master.add(BorderLayout.CENTER, list);
+            if (add != null) {
+                master.add(BorderLayout.SOUTH, add);
+            }
+            split = new Split(form, null, master);
+        } else {
+            split = null;
+            if (add != null) {
+                form.add(BorderLayout.SOUTH, add);
+            }
+            form.add(BorderLayout.CENTER, list);
         }
-        form.add(BorderLayout.CENTER, list);
         form.addShowListener(e -> load());
+        Layouts.onChange(form, () -> new CatalogForm(previous, kind).form.show());
     }
 
     public static void show(Form previous, String kind) {
@@ -83,15 +103,29 @@ public final class CatalogForm {
 
     private void fill(List<Object> rows) {
         list.removeAll();
+        Container first = null;
         for (int iter = 0; iter < rows.size(); iter++) {
             final Object row = rows.get(iter);
-            list.add(Ui.tap(Ui.row(icon(), title(row), detail(row), null), "row-" + iter,
-                    e -> edit(row)));
+            final Container[] tapped = new Container[1];
+            tapped[0] = Ui.tap(Ui.row(icon(), title(row), detail(row), null), "row-" + iter,
+                    e -> edit(row, tapped[0]));
+            list.add(tapped[0]);
+            if (first == null) {
+                first = tapped[0];
+            }
         }
         if (rows.isEmpty()) {
             list.add(Ui.empty(icon(), "Nothing here yet", "Add the first one below."));
         }
         Ui.relayout(list);
+        if (split != null) {
+            split.clear();
+            if (first != null) {
+                edit(rows.get(0), first);
+            } else {
+                edit(null);
+            }
+        }
     }
 
     private char icon() {
@@ -131,9 +165,36 @@ public final class CatalogForm {
     }
 
     private void edit(Object row) {
+        edit(row, null);
+    }
+
+    /// Opens the editor of `row`, or of a new one when it is null: beside the
+    /// list on a wide window, with `tapped` marked as the row picked; as a
+    /// screen of its own anywhere else.
+    private void edit(Object row, Container tapped) {
+        if (split != null) {
+            if (tapped != null) {
+                split.pick(tapped);
+            }
+            Container detail = split.detail();
+            detail.removeAll();
+            detail.add(row == null ? Ui.label("Add", "SvHeading")
+                    : Ui.plain(title(row), "SvHeading"));
+            fields(detail, row);
+            Layouts.dress(detail);
+            Ui.relayout(detail);
+            return;
+        }
         final Form edit = Ui.form(row == null ? "Add" : title(row), "CatalogEdit");
         Ui.back(edit, form);
         Container page = Ui.page();
+        fields(page, row);
+        Layouts.broaden(page);
+        edit.add(BorderLayout.CENTER, page);
+        edit.show();
+    }
+
+    private void fields(Container page, Object row) {
         if (SERVICES.equals(kind)) {
             service(page, (ServiceDto) row);
         } else if (PROVIDERS.equals(kind)) {
@@ -143,9 +204,6 @@ public final class CatalogForm {
         } else {
             resource(page, (ResourceDto) row);
         }
-        Layouts.broaden(page);
-        edit.add(BorderLayout.CENTER, page);
-        edit.show();
     }
 
     private void service(Container page, final ServiceDto s) {
@@ -216,7 +274,11 @@ public final class CatalogForm {
     private <T> com.codename1.util.OnComplete<com.codename1.io.rest.Response<T>> saved() {
         return Net.to(done -> {
             Ui.say("Saved");
-            form.showBack();
+            if (split != null) {
+                load();
+            } else {
+                form.showBack();
+            }
         }, Ui::fail);
     }
 

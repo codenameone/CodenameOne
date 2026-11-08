@@ -117,4 +117,15 @@ public class WebRtcSnippets {
         }
         // end::webrtc-hangup[]
     }
+
+    /** The caller restarts ICE when the path is lost, on the same connection. */
+    public void reconnect(Signalling signalling, String state) {
+        // tag::webrtc-restart[]
+        if (PeerConnection.FAILED.equals(state)) {
+            pc.restartIce();
+            pc.createOffer().ready(offer -> pc.setLocalDescription(offer)
+                    .ready(done -> signalling.send(offer)));
+        }
+        // end::webrtc-restart[]
+    }
 }

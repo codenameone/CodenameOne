@@ -68,6 +68,11 @@ class IOSWebRtc implements WebRtcBridge {
     }
 
     @Override
+    public void restartIce(int peer) {
+        nativeInstance.webRtcRestartIce(peer);
+    }
+
+    @Override
     public void setDescription(int peer, int requestId, boolean remote, String type, String sdp) {
         nativeInstance.webRtcSetDescription(peer, requestId, remote,
                 type == null ? "" : type, sdp == null ? "" : sdp);

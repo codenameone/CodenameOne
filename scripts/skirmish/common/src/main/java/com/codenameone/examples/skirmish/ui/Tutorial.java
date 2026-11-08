@@ -37,7 +37,7 @@ import com.codenameone.examples.skirmish.battle.BattleView;
 import com.codenameone.examples.skirmish.battle.TutorialDriver;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.Arena;
 import com.codenameone.examples.skirmish.rules.Cards;

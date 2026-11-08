@@ -32,7 +32,7 @@ import com.codenameone.examples.skirmish.api.PackReportDto;
 import com.codenameone.examples.skirmish.api.PackSummaryDto;
 import com.codenameone.examples.skirmish.api.RateDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.forge.CampaignDef;
 import com.codenameone.examples.skirmish.rules.forge.ContentPack;

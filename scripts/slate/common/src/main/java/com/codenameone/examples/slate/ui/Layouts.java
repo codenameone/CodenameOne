@@ -86,6 +86,18 @@ public final class Layouts {
         return CN.getDisplayWidth() >= CN.convertToPixels(WIDE_MM);
     }
 
+    /// Opens the app at the size of a desktop window when it runs as one and
+    /// was started narrower than [#wide()]: a desktop launch otherwise gets
+    /// whatever size the platform starts a window at, which can be a phone's,
+    /// and the console would open laid out for a phone. The size is the
+    /// window's own, in the desktop's units; a window already wide enough, or
+    /// one the user has since resized, is left alone.
+    public static void desktopWindow() {
+        if (CN.isDesktop() && !wide()) {
+            CN.setWindowSize(1280, 800);
+        }
+    }
+
     /// The client property that lets a page of figures grow to [#broad()].
     private static final String BROAD = "slate.broad";
     /// The widest a page of figures side by side is left to grow.

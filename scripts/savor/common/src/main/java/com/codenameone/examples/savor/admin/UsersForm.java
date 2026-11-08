@@ -38,7 +38,7 @@ import com.codenameone.examples.savor.api.SuspendDto;
 import com.codenameone.examples.savor.api.UserDetailDto;
 import com.codenameone.examples.savor.api.UserDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.StatRow;
 import com.codenameone.examples.savor.ui.Ui;

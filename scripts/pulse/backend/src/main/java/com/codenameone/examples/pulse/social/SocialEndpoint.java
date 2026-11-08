@@ -19,7 +19,7 @@
 package com.codenameone.examples.pulse.social;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.api.FeedItemDto;
 import com.codenameone.examples.pulse.api.FriendDto;
 import com.codenameone.examples.pulse.api.FriendRequestDto;

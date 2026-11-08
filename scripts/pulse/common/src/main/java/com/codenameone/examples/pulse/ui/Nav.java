@@ -33,7 +33,7 @@ import com.codenameone.examples.pulse.member.NudgesForm;
 import com.codenameone.examples.pulse.member.Reminders;
 import com.codenameone.examples.pulse.net.Account;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.notify.Notifications;
 import com.codenameone.examples.pulse.owner.OwnerForm;

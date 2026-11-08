@@ -25,7 +25,7 @@ import com.codename1.ui.TextField;
 import com.codenameone.examples.skirmish.api.RegisterDto;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 
 /// Creating an account. The player name is the one piece of text a player

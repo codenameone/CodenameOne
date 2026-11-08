@@ -35,7 +35,7 @@ import com.codenameone.examples.reel.api.AccountClosureDto;
 import com.codenameone.examples.reel.api.PasswordChangeDto;
 import com.codenameone.examples.reel.api.AccountDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.net.Session;
 import com.codenameone.examples.reel.pay.WalletForm;
 

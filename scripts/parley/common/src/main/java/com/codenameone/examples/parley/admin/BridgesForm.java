@@ -24,7 +24,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.parley.api.BridgeLinkDto;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.ui.Ui;
 import java.util.List;
 

@@ -20,9 +20,11 @@ package com.codenameone.examples.slate.client;
 
 import com.codename1.io.Preferences;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
@@ -68,6 +70,8 @@ public final class BookForm extends LiveChannel.Adapter {
     private static final int DAYS_SHOWN = 21;
     private static final String DAY = "day";
     private static final String WEEK = "week";
+    /// The width of the summary beside the times on a wide window, in millimetres.
+    private static final float SUMMARY_MM = 100f;
 
     private final Form form;
     private final AppointmentDto moving;
@@ -85,18 +89,47 @@ public final class BookForm extends LiveChannel.Adapter {
     private long day = Times.dayStart(System.currentTimeMillis());
     /// The client's own busy time on this phone over the days shown, once read.
     private List<long[]> mine = new ArrayList<long[]>();
+    /// Beside the times on a wide window: the start picked, held, with its
+    /// price and the button that books it. Null on a phone.
+    private final Container summary;
+    private ConfirmForm open;
 
     private BookForm(Form previous, ServiceDto service, AppointmentDto moving) {
         this.service = service;
         this.moving = moving;
         form = Ui.form(moving == null ? "Book" : "Move appointment", "Book");
-        Ui.back(form, previous);
+        Ui.back(form, () -> {
+            if (open != null) {
+                open.letGo();
+            }
+            previous.showBack();
+        });
         Container page = Ui.page();
         choices.setName("choices");
         slots.setName("slots");
         page.add(choices).add(slots).add(myCalendar);
         Layouts.broaden(page);
-        form.add(BorderLayout.CENTER, page);
+        if (Layouts.wide() && moving == null) {
+            summary = new Container(new BorderLayout()) {
+                @Override
+                protected Dimension calcPreferredSize() {
+                    Dimension size = super.calcPreferredSize();
+                    size.setWidth(CN.convertToPixels(SUMMARY_MM));
+                    return size;
+                }
+            };
+            summary.setUIID("SvMaster");
+            summary.setName("summary");
+            summary.add(BorderLayout.CENTER, Ui.empty(FontImage.MATERIAL_EVENT, "Pick a time",
+                    "What it costs and how it is paid show here."));
+            Container both = new Container(new BorderLayout());
+            both.add(BorderLayout.CENTER, page);
+            both.add(BorderLayout.EAST, summary);
+            form.add(BorderLayout.CENTER, both);
+        } else {
+            summary = null;
+            form.add(BorderLayout.CENTER, page);
+        }
         form.addShowListener(e -> LiveChannel.listen(this));
     }
 
@@ -348,7 +381,11 @@ public final class BookForm extends LiveChannel.Adapter {
     }
 
     private Container grid(List<SlotDto> list) {
-        int columns = Layouts.columns(Layouts.column(), 18f, 6);
+        // As many as fit the room the times really have: beside the summary on
+        // a wide window that is less than a column.
+        int room = slots.getWidth() > 0 ? Math.min(slots.getWidth(), Layouts.column())
+                : Layouts.column();
+        int columns = Layouts.columns(room, 18f, 6);
         Container grid = new Container(new GridLayout(Math.max(1, (list.size() + columns - 1) / columns),
                 columns));
         grid.setUIID("SvSlotGrid");
@@ -391,7 +428,16 @@ public final class BookForm extends LiveChannel.Adapter {
             return;
         }
         Api.appointments().hold(new HoldRequestDto(service.id(), location, s.start(), who),
-                Net.to(held -> ConfirmForm.show(form, held, service), this::refused));
+                Net.to(held -> {
+                    if (summary == null) {
+                        ConfirmForm.show(form, held, service);
+                        return;
+                    }
+                    if (open != null) {
+                        open.letGo();
+                    }
+                    open = ConfirmForm.beside(form, summary, held, service);
+                }, this::refused));
     }
 
     /// The start went to someone else between the list and the tap, or a

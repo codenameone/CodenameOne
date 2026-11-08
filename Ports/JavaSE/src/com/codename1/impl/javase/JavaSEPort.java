@@ -1203,6 +1203,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (key.equalsIgnoreCase("platformHint.showEDTWarnings")) {
             setShowEDTWarnings("true".equalsIgnoreCase(value));
         }
+        if (key.equalsIgnoreCase("platformHint.webrtc.dropNetwork") && webRtc != null) {
+            // The simulator's stand-in for a phone changing network mid-call:
+            // calls lose their path until the app restarts ICE.
+            webRtc.dropNetwork();
+        }
         super.setPlatformHint(key, value);
 
     }

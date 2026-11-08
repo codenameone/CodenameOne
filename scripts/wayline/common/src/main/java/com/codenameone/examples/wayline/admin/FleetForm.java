@@ -30,7 +30,7 @@ import com.codenameone.examples.wayline.map.Locator;
 import com.codenameone.examples.wayline.map.MapStage;
 import com.codenameone.examples.wayline.map.Maps;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Ui;
 import com.codename1.ui.util.UITimer;

@@ -19,7 +19,7 @@
 package com.codenameone.examples.dash.social;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.dash.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.dash.api.FriendDto;
 import com.codenameone.examples.dash.api.InviteClaimDto;
 import com.codenameone.examples.dash.api.InviteDto;

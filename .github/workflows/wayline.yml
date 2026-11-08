@@ -34,6 +34,8 @@ on:
   pull_request:
     paths:
       - 'scripts/wayline/**'
+      # The app kit is part of the sample: its classes are the sample's own.
+      - 'maven/cn1-app-kit/**'
       - '.github/workflows/wayline.yml'
   workflow_dispatch:
   schedule:
@@ -99,7 +101,7 @@ jobs:
       - name: Install the framework, the backend runtime and the plugin
         working-directory: maven
         run: |
-          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin \
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin,cn1-app-kit/backend \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true \
@@ -198,7 +200,7 @@ jobs:
       - name: Install the framework, the backend runtime and the plugin
         working-directory: maven
         run: |
-          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin \
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin,cn1-app-kit/backend \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true \
@@ -248,7 +250,7 @@ jobs:
           export PATH="${JAVA_HOME_8}/bin:$PATH"
           cd maven
           bash ../scripts/ci/retry.sh mvn -B \
-              -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test -am install \
+              -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test,cn1-app-kit/backend,cn1-app-kit/common,cn1-app-kit/lib -am install \
               -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true \
               -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true
 
@@ -348,7 +350,7 @@ jobs:
         working-directory: maven
         run: |
           bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
-            -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test \
+            -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test,cn1-app-kit/backend,cn1-app-kit/common,cn1-app-kit/lib \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true

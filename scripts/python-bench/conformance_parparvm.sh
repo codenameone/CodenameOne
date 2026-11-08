@@ -25,8 +25,11 @@ progs="$*"
 # java_interop* call the Codename One UI classes, pil_* draw through the
 # port's images, and sqlite3_ and the SQLAlchemy programs (through its
 # sqlite dialect) open core's Database: each needs a port to link.
+# cli_* are command-line tools and run on the backend's console, which this
+# client build does not link (a client has no terminal); the native console
+# is driven under a real pty by scripts/check-cli-console.py instead.
 [ -n "$progs" ] || progs=$(cd "$CONF" && ls *.py | sed 's/\.py$//' \
-    | grep -vE '^(http_|java_interop|pil_|sqlalchemy_|guide_sqlalchemy$|sqlite3_$)')
+    | grep -vE '^(cli_|http_|java_interop|pil_|sqlalchemy_|guide_sqlalchemy$|sqlite3_$)')
 K=conformance_all
 STAGE="$HERE/target/$K-stage"
 mkdir -p "$STAGE"

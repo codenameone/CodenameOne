@@ -1,0 +1,77 @@
+False False False
+'plain'
+echo 1 2
+3 4
++--------+----+
+| Name   | MB |
++--------+----+
+| api    | 12 |
+| worker |    |
++--------+----+
+a  b
+app
+├── README
+├── src
+│   ├── Main.java
+│   └── util
+│       └── Io.java
+└── pom.xml
+True
+sum: 20% (1/5)
+sum: done 5/5 in 0:00
+total 10
+copy: 60% (2/3)
+copy: done 3/3 in 0:00
+broken: 20% (1/4)
+broken: failed 1/4 in 0:00
+caught disk
+loading...
+✔ loaded
+fetch...
+⚠ slow
+upload...
+✖ upload
+caught net
+Deploy? (Y/n) 
+True
+Delete? (y/n) 
+False
+Name [anon]: 
+anon
+Db
+  1) pg
+  2) mysql
+  3) sqlite
+Enter a number [2]: 
+mysql
+Db
+  1) pg
+  2) mysql
+Enter a number [1]: 
+pg
+Features
+  1) auth
+  2) mail
+  3) jobs
+Enter numbers separated by commas [2]: 
+['mail']
+ValueError
+brk: 20% (1/5)
+brk: done 5/5 in 0:00
+TypeError
+Last
+  1) a
+  2) b
+  3) c
+Enter a number [3]: 
+c
+One
+  1) a
+  2) b
+Enter numbers separated by commas [2]: 
+['b']
+Num
+  1) 10
+  2) 20
+Enter a number [2]: 
+20

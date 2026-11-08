@@ -30,7 +30,7 @@ import com.codenameone.examples.reel.api.UserDetailDto;
 import com.codenameone.examples.reel.api.UserDto;
 import com.codenameone.examples.reel.moderation.ModerationForm;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Nav;
 import com.codenameone.examples.reel.ui.Ui;

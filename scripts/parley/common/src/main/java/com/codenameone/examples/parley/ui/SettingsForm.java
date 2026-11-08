@@ -35,7 +35,7 @@ import com.codenameone.examples.parley.api.AccountClosureDto;
 import com.codenameone.examples.parley.api.PasswordChangeDto;
 import com.codenameone.examples.parley.api.UserDto;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.net.Session;
 
 /// Settings: the account, and everything about the app a person may want

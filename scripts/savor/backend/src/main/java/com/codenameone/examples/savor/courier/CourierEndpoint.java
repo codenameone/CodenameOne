@@ -20,7 +20,7 @@ package com.codenameone.examples.savor.courier;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
-import com.codenameone.examples.savor.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.savor.api.CourierApiServer;
 import com.codenameone.examples.savor.api.CourierDto;
 import com.codenameone.examples.savor.api.CourierStatusDto;

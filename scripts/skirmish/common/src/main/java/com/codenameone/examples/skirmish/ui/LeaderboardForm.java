@@ -24,7 +24,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.skirmish.api.LeaderDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 
 /// The top players by trophies.
 public final class LeaderboardForm {

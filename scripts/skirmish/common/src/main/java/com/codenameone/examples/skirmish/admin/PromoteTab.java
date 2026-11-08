@@ -31,7 +31,7 @@ import com.codenameone.examples.skirmish.api.SpotlightDto;
 import com.codenameone.examples.skirmish.engage.Friends;
 import com.codenameone.examples.skirmish.forge.Fields;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.ui.Ui;
 import java.util.Date;
 

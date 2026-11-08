@@ -34,9 +34,9 @@ import com.codenameone.examples.savor.api.OrderLineDto;
 import com.codenameone.examples.savor.api.RestaurantDto;
 import com.codenameone.examples.savor.api.RestaurantSummaryDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
-import com.codenameone.examples.savor.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.savor.ui.Ui;
 
 import java.util.ArrayList;
@@ -55,7 +55,7 @@ public final class RestaurantForm implements Cart.Listener {
         this.previous = previous;
         form = Ui.form("", "restaurant");
         Ui.back(form, previous);
-        page.add(new Skeleton(5));
+        page.add(new Skeleton(5, "SvSkeleton"));
         form.add(BorderLayout.CENTER, page);
         cart.setName("restaurant-cart");
         cart.addActionListener(e -> CheckoutForm.show(form));

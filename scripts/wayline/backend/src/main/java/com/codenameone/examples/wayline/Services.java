@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.wayline;
 
+import com.codename1.appkit.server.security.AccountSecurity;
+
 import com.codename1.backend.Config;
 import com.codename1.backend.annotations.Bean;
 import com.codename1.backend.annotations.Configuration;
@@ -30,11 +32,11 @@ import com.codenameone.examples.wayline.pay.MisconfiguredPayments;
 import com.codenameone.examples.wayline.pay.PaymentProvider;
 import com.codenameone.examples.wayline.pay.SimulatedPayments;
 import com.codenameone.examples.wayline.pay.StripePayments;
-import com.codenameone.examples.wayline.push.CloudPushSender;
-import com.codenameone.examples.wayline.push.ConsolePushSender;
-import com.codenameone.examples.wayline.push.MisconfiguredPushSender;
-import com.codenameone.examples.wayline.push.PushSender;
-import com.codenameone.examples.wayline.push.RecordingPushSender;
+import com.codename1.appkit.server.push.CloudPushSender;
+import com.codename1.appkit.server.push.ConsolePushSender;
+import com.codename1.appkit.server.push.MisconfiguredPushSender;
+import com.codename1.appkit.server.push.PushSender;
+import com.codename1.appkit.server.push.RecordingPushSender;
 import com.codenameone.examples.wayline.sms.ConsoleSmsSender;
 import com.codenameone.examples.wayline.sms.MessageBirdSmsSender;
 import com.codenameone.examples.wayline.sms.MisconfiguredSmsSender;
@@ -147,7 +149,7 @@ public class Services {
             @Value("${wayline.payments.provider:}") String chosen,
             @Value("${wayline.payments.stripe.secret:}") String secret,
             @Value("${wayline.public.url:}") String publicUrl,
-            @Value("${" + SecurityConfig.ISSUER_KEY + ":}") String issuer) {
+            @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer) {
         String kind = chosen.trim().length() > 0 ? chosen.trim()
                 : config.isDevelopmentProfile() ? "simulated" : "stripe";
         if ("simulated".equalsIgnoreCase(kind)) {
@@ -159,7 +161,7 @@ public class Services {
         }
         String address = publicUrl.length() > 0 ? publicUrl : issuer;
         String missing = missing("", new String[] {"wayline.payments.stripe.secret", secret,
-            "wayline.public.url (or " + SecurityConfig.ISSUER_KEY + ")", address});
+            "wayline.public.url (or " + AccountSecurity.ISSUER_KEY + ")", address});
         if (missing.length() > 0) {
             return new MisconfiguredPayments("stripe", unset("payments", "stripe", missing));
         }

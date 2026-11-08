@@ -19,7 +19,7 @@
 package com.codenameone.examples.reel.account;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.api.AccountApiServer;
 import com.codenameone.examples.reel.api.AccountClosureDto;
 import com.codenameone.examples.reel.api.AccountDto;

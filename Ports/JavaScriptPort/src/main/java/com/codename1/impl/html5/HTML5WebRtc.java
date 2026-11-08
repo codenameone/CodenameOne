@@ -120,6 +120,8 @@ final class HTML5WebRtc implements WebRtcBridge {
             + "R.ice = function(peer, mid, index, cand) { var p = R.peers[peer]; if (!p) return;\n"
             + "  var c = { sdpMid: mid, sdpMLineIndex: index, candidate: cand };\n"
             + "  if (p.remoteSet) { p.pc.addIceCandidate(c).catch(function() {}); } else { p.early.push(c); } };\n"
+            + "R.restart = function(peer) { var p = R.peers[peer];"
+            + " if (p && p.pc.restartIce) { p.pc.restartIce(); } };\n"
             + "R.close = function(peer) { var p = R.peers[peer]; if (p) { delete R.peers[peer]; p.pc.close();\n"
             + "  (p.audio || []).forEach(function(a) { a.srcObject = null;"
             + " if (a.parentNode) a.parentNode.removeChild(a); }); } };\n"
@@ -176,6 +178,9 @@ final class HTML5WebRtc implements WebRtcBridge {
             "window.cn1WebRtc.ice(peer, mid == null ? null : jvm.toNativeString(mid), index,"
             + " jvm.toNativeString(cand));")
     private static native void nativeRtcIce(int peer, String mid, int index, String cand);
+
+    @JSBody(params = {"peer"}, script = "window.cn1WebRtc.restart(peer);")
+    private static native void nativeRtcRestart(int peer);
 
     @JSBody(params = {"peer"}, script = "window.cn1WebRtc.close(peer);")
     private static native void nativeRtcClose(int peer);
@@ -258,6 +263,10 @@ final class HTML5WebRtc implements WebRtcBridge {
         if (candidate != null) {
             nativeRtcIce(peer, sdpMid, sdpMLineIndex, candidate);
         }
+    }
+
+    public void restartIce(int peer) {
+        nativeRtcRestart(peer);
     }
 
     public void closePeerConnection(int peer) {

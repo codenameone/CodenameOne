@@ -19,7 +19,7 @@
 package com.codenameone.examples.parley.device;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.parley.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.parley.api.DeviceApiServer;
 import com.codenameone.examples.parley.api.DeviceDto;
 import com.codenameone.examples.parley.api.DeviceRegistrationDto;

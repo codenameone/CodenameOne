@@ -27,7 +27,7 @@ import com.codenameone.examples.reel.Telemetry;
 import com.codenameone.examples.reel.api.UploadDto;
 import com.codenameone.examples.reel.api.UploadStartDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.net.Session;
 import java.io.IOException;
 import java.io.InputStream;
