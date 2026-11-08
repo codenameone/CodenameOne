@@ -282,7 +282,7 @@ image::img/slate-desktop-provider-week.png["A provider's week on the desktop, se
 * Booking has no confirm screen. Picking a time holds it and shows the price,
   the terms and the button that books it beside the times, so picking another
   time is one click and the hold on the last one is let go.
-* The client's home shows what is coming up beside what can be booked.
+* The client's home shows what's coming up beside what can be booked.
 
 image::img/slate-desktop-client-confirm.png["Booking on the desktop: the free times on the left, the held time with its price and the confirm button on the right",scaledwidth=80%]
 

@@ -237,7 +237,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // Gradle builds -- from the IDE or ./gradlew -- report through the plugin's
         // settings half; a backend-only project has no client build to report.
         String gradleProperties = getText(entries, "gradle.properties");
-        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+        if (type.hasNoClient()) {
             assertFalse(gradleProperties.indexOf("cn1.telemetry.") >= 0,
                     label + "a backend-only project does not report builds");
         } else {
@@ -266,16 +266,24 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertFalse(readme.indexOf("build.sh") >= 0, label + "Gradle README must not mention the Maven launchers");
 
         String apiPath;
-        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+        if (type.hasNoClient()) {
             assertNull(entries.get("codenameone_settings.properties"),
                     label + "a backend has no Codename One app settings");
             assertNull(entries.get("icon.png"), label + "a backend has no icon");
             assertNull(entries.get("src/main/css/theme.css"), label + "a backend has no theme");
             assertNull(entries.get("AGENTS.md"), label + "the UI authoring skill is not shipped with a backend");
             assertNotNull(entries.get("application.properties"), label + "backend settings belong at the root");
-            assertNotNull(entries.get("application-dev.properties"), label + "backend dev profile belongs at the root");
             assertContains(getText(entries, "build.gradle.kts"), "runBackend",
                     label + "a backend-only root build script is the backend template");
+        }
+        if (type == ProjectOptions.ProjectType.COMMAND_LINE) {
+            // The backend's module and build script, holding a tool instead of a server.
+            apiPath = null;
+            assertContains(getText(entries, "src/main/java/" + packagePath + "/Hello.java"),
+                    "package " + packageName + ";", label + "Hello.java in the chosen package");
+            assertNull(entries.get("application-dev.properties"), label + "a tool has no dev profile");
+        } else if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            assertNotNull(entries.get("application-dev.properties"), label + "backend dev profile belongs at the root");
             apiPath = "src/main/java/" + packagePath + "/Api.java";
             String api = getText(entries, apiPath);
             assertContains(api, "./gradlew runBackend", label + "backend-only tasks are addressed from the root");
@@ -333,7 +341,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(getText(entries, ".idea/gradle.xml"), "GradleProjectSettings",
                     label + "IntelliJ should link the Gradle build");
             assertNull(entries.get(".idea/workspace.xml"), label + "Maven run configurations must not ship with Gradle");
-            if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            if (type.hasNoClient()) {
                 assertContains(getText(entries, ".idea/runConfigurations/Run_Backend.xml"),
                         "<option value=\"runBackend\" />", label + "IntelliJ backend run configuration");
             } else {
@@ -350,7 +358,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         } else if (ide == IDE.VS_CODE) {
             String tasks = getText(entries, ".vscode/tasks.json");
             assertContains(tasks, "\"command\": \"./gradlew\"", label + "VS Code tasks run the wrapper");
-            assertContains(tasks, type == ProjectOptions.ProjectType.BACKEND_ONLY ? "[\"runBackend\"]" : "[\"run\"]",
+            assertContains(tasks, type.hasNoClient() ? "[\"runBackend\"]" : "[\"run\"]",
                     label + "VS Code should have a run task");
             assertContains(getText(entries, ".vscode/extensions.json"), "vscjava.vscode-gradle",
                     label + "VS Code should recommend the Gradle extension");
@@ -789,8 +797,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertFalse(path.startsWith("gradle") || path.endsWith(".kts"), label + "Gradle file leaked: " + path);
         }
 
-        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
-            validateMavenBackendOnly(entries, ide, packageName, label);
+        if (type.hasNoClient()) {
+            validateMavenBackendOnly(entries, type, ide, packageName, label);
             return;
         }
 
@@ -847,7 +855,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertNotNull(entries.get("common/codenameone_settings.properties"), label + "missing app settings");
     }
 
-    private void validateMavenBackendOnly(Map<String, byte[]> entries, IDE ide, String packageName, String label) {
+    private void validateMavenBackendOnly(Map<String, byte[]> entries, ProjectOptions.ProjectType type, IDE ide, String packageName, String label) {
         String packagePath = packageName.replace('.', '/');
         for (String path : entries.keySet()) {
             assertFalse(path.startsWith("common/") || path.startsWith("backend/"),
@@ -871,13 +879,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(pom, "<goal>process-annotations</goal>", label + "the generated entry point");
         assertContains(pom, "<groupId>" + packageName + "</groupId>", label + "the chosen groupId");
         assertNotNull(entries.get("application.properties"), label + "settings at the root");
+        assertNotNull(entries.get(".gitignore"), label + "missing .gitignore");
+        if (type == ProjectOptions.ProjectType.COMMAND_LINE) {
+            // A command-line tool shares the server's single-module layout but
+            // has no server: no dev profile, no API, no cn1:backend run actions.
+            String hello = getText(entries, "src/main/java/" + packagePath + "/Hello.java");
+            assertContains(hello, "package " + packageName + ";", label + "Hello.java in the chosen package");
+            return;
+        }
         assertNotNull(entries.get("application-dev.properties"), label + "dev profile at the root");
         String api = getText(entries, "src/main/java/" + packagePath + "/Api.java");
         assertContains(api, "package " + packageName + ";", label + "Api.java in the chosen package");
         assertContains(api, "./mvnw cn1:backend", label + "Api.java should give the Maven command");
         assertNotNull(entries.get("src/main/java/" + packagePath + "/Greeter.java"), label + "missing Greeter.java");
         assertContains(getText(entries, "README.md"), "./mvnw cn1:backend-package", label + "README should give the goals");
-        assertNotNull(entries.get(".gitignore"), label + "missing .gitignore");
         if (ide == IDE.INTELLIJ) {
             assertContains(getText(entries, ".idea/runConfigurations/Run_Backend.xml"), "<option value=\"cn1:backend\" />",
                     label + "IntelliJ should run the backend");
