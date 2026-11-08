@@ -105,6 +105,12 @@ public final class Ref<T> extends Holder {
             return false;
         }
         Ref<?> ref = (Ref<?>) other;
+        if (unreadable() || ref.unreadable()) {
+            // An unread inverse side of a detached record: nothing is known
+            // about its target, so it is equal only to itself. Throwing here
+            // would keep every such record out of sets and maps.
+            return false;
+        }
         Object id = identifier();
         Object otherId = ref.identifier();
         if (id == null || otherId == null) {
@@ -119,6 +125,9 @@ public final class Ref<T> extends Holder {
 
     @Override
     public int hashCode() {
+        if (unreadable()) {
+            return 0;
+        }
         Object id = identifier();
         if (id != null) {
             return id.hashCode();

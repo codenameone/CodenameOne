@@ -647,6 +647,73 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
+    /// Inverse one-to-one refs and nested embedded records under pressure: an
+    /// eager inverse side, owners that are classes, copies that replace the
+    /// owner, targets moved or removed in the same transaction, a detached
+    /// unread inverse side in a set, and plain Daos with embedded records.
+    @Test
+    public void recordInverseRefsAndNestedValuesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        StringBuilder out=new StringBuilder();
+        inverseRefs(false,out);
+        inverseRefs(true,out);
+        assertTrue(out.toString(),out.length()==0);
+    }
+    private void inverseRefs(boolean backend,StringBuilder out) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package rt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("rt.Inner",imports+"@Embeddable public record Inner(String a, Integer n) { }");
+        sources.put("rt.Mid",imports+"@Embeddable public record Mid(String b, @Embedded Inner in) { }");
+        sources.put("rt.User",imports+"@Entity(table=\"rt_user\") public record User(@Id long id, String name, @OneToOne(mappedBy=\"user\") Ref<Profile> profile, @OneToOne(mappedBy=\"user\",fetch=FetchType.EAGER) Ref<Badge> badge, @OneToOne(mappedBy=\"owner\") Ref<Note> note, @Embedded Mid mid) { }");
+        sources.put("rt.Profile",imports+"@Entity(table=\"rt_profile\") public record Profile(@Id long id, String bio, @OneToOne Ref<User> user) { }");
+        sources.put("rt.Badge",imports+"@Entity(table=\"rt_badge\") public record Badge(@Id long id, String label, @OneToOne Ref<User> user) { }");
+        sources.put("rt.Note",imports+"@Entity(table=\"rt_note\") public class Note { @Id public long id; public String text; @OneToOne public User owner; }");
+        sources.put("rt.Tag",imports+"@Entity(table=\"rt_tag\") public record Tag(@Id long id, String name, @Embedded Mid mid) { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("rt.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static StringBuilder f=new StringBuilder(); static void ok(boolean b,String m) { if(!b) f.append(m).append(\"; \"); } "
+            + "interface R { void run() throws Exception; } static void t(String n,R r) { try { r.run(); } catch(Throwable e) { f.append(n).append(\" threw \").append(e).append(\"; \"); } } "
+            + "public static String run(Session s) { f.setLength(0); s.createTables(); s.beginTransaction(); "
+            + "User u=s.merge(UserBuilder.create().name(\"u\").mid(new Mid(\"m\",null)).build()); final long uid=u.id(); "
+            + "Profile p=s.merge(ProfileBuilder.create().bio(\"b\").user(Ref.of(u)).build()); s.merge(BadgeBuilder.create().label(\"L\").user(Ref.of(u)).build()); "
+            + "Note n=new Note(); n.text=\"t\"; n.owner=u; s.persist(n); s.commitTransaction(); s.clear(); "
+            + "t(\"eager\",()->{ User b=s.find(User.class,uid); ok(b.badge().isLoaded() && b.badge().isPresent() && \"L\".equals(b.badge().get().label()),\"eager inverse \"+b.badge()); }); s.clear(); "
+            + "t(\"classOwner\",()->{ User b=s.find(User.class,uid); ok(b.note().isPresent() && \"t\".equals(b.note().get().text),\"class owner inverse \"+b.note()); }); s.clear(); "
+            + "t(\"toString\",()->{ User b=s.find(User.class,uid); String x=b.profile().toString()+b.toString(); ok(!b.profile().isLoaded(),\"toString loaded \"+x); }); s.clear(); "
+            + "t(\"hash\",()->{ User b=s.find(User.class,uid); Ref<Profile> r1=b.profile(); User c=s.find(User.class,uid); Ref<Profile> r2=c.profile(); Set<Ref<Profile>> set=new HashSet<>(); set.add(r1); ok(set.contains(r2) && r1.equals(r2) && r1.hashCode()==r2.hashCode(),\"hash/equals \"+r1+\" \"+r2); ok(set.contains(r1),\"self contains\"); }); s.clear(); "
+            + "t(\"detachedHash\",()->{ User b=s.find(User.class,uid); s.clear(); Set<User> set=new HashSet<>(); set.add(b); ok(set.contains(b) && b.equals(b),\"detached record in a set\"); }); s.clear(); "
+            + "t(\"rebind\",()->{ s.beginTransaction(); User old=s.find(User.class,uid); User nu=s.merge(UserBuilder.of(old).name(\"v\").build()); s.commitTransaction(); ok(nu.profile().isPresent() && \"b\".equals(nu.profile().get().bio()),\"new copy inverse \"+nu.profile()); ok(old.profile().isPresent() && \"b\".equals(old.profile().get().bio()),\"old copy inverse \"+old.profile()); }); s.clear(); "
+            + "t(\"userRef\",()->{ s.beginTransaction(); User cur=s.find(User.class,uid); Profile other=s.merge(ProfileBuilder.create().bio(\"o\").build()); User nu=s.merge(UserBuilder.of(cur).profile(Ref.of(other)).build()); s.commitTransaction(); s.clear(); User b=s.find(User.class,uid); ok(\"b\".equals(b.profile().get().bio()),\"user Ref.of on inverse changed db \"+b.profile().get()); }); s.clear(); "
+            + "t(\"removeSameTx\",()->{ s.beginTransaction(); User b=s.find(User.class,uid); Profile pr=s.find(Profile.class,p.id()); s.remove(pr); s.flush(); ok(!b.profile().isPresent(),\"removed target still present \"+b.profile()); s.rollbackTransaction(); }); s.clear(); "
+            + "t(\"retarget\",()->{ s.beginTransaction(); User b=s.find(User.class,uid); User w=s.merge(UserBuilder.create().name(\"w\").build()); Profile pr=s.find(Profile.class,p.id()); s.merge(ProfileBuilder.of(pr).user(Ref.of(w)).build()); s.flush(); ok(!b.profile().isPresent(),\"retargeted target still present \"+b.profile()); s.rollbackTransaction(); }); s.clear(); "
+            + "t(\"nestedNull\",()->{ User b=s.find(User.class,uid); ok(b.mid()!=null && \"m\".equals(b.mid().b()) && (b.mid().in()==null || b.mid().in().a()==null),\"nested embedded \"+b.mid()); }); s.clear(); "
+            + "t(\"nestedAllNull\",()->{ s.beginTransaction(); User z=s.merge(UserBuilder.create().name(\"z\").mid(new Mid(null,new Inner(\"deep\",3))).build()); s.commitTransaction(); s.clear(); User b=s.find(User.class,z.id()); ok(b.mid()!=null && b.mid().in()!=null && \"deep\".equals(b.mid().in().a()) && b.mid().in().n()==3,\"deep embedded with null middle field \"+b.mid()); }); s.clear(); "
+            + "return f.toString(); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        String tag=backend?"backend: ":"client: ";
+        try {
+            String r=(String)loader.loadClass("rt.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            if(r.length()>0) out.append(tag).append(r).append('\n');
+            Class tg=loader.loadClass("rt.Tag");
+            // An embedded value needs a session, for a record as for a class.
+            boolean refused=false;
+            try { if(backend) server.dao(tg); else client.dao(tg); }
+            catch(IllegalStateException expected) { refused=true; }
+            if(!refused) out.append(tag+"the plain dao must refuse an embedded mapping\n");
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { out.append(tag+error.getCause()+"\n"); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
     /// Adopts tables that existed before the application: explicit names, a key the
     /// database generates, native timestamp and date columns, a legacy epoch column and
     /// a tag set keyed by value. Runs on SQLite on both runtimes, and on the backend

@@ -67,6 +67,12 @@ public abstract class Holder {
         return storedIdentifier();
     }
 
+    /// True for the inverse side of a to-one that was never read and can no
+    /// longer be: its identifier is unknown for good.
+    protected final boolean unreadable() {
+        return !link.loaded && link.keyless && (link.state == null || !link.state.attached);
+    }
+
     /// The identifier as far as it is known, without reading anything.
     protected final Object storedIdentifier() {
         return link.loaded ? Models.identifierOf(value) : id;
