@@ -29,7 +29,7 @@ import com.codenameone.examples.parley.Telemetry;
 import com.codenameone.examples.parley.api.PhoneCodeDto;
 import com.codenameone.examples.parley.api.UserDto;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.net.Session;
 
 /// Proves the phone number is the user's, which the server asks for before the

@@ -3,10 +3,12 @@
 # The end-to-end tests: starts the Slate server on the `test` profile, then
 # runs the app's test suite against it in the Codename One simulator.
 #
-#   run-e2e.sh [--native] [--prebuilt]
+#   run-e2e.sh [--native] [--prebuilt] [--video]
 #
 #   --native     runs the tests against the compiled server
 #   --prebuilt   uses the server as it was last built, without building it again
+#   --video      films the demo walkthroughs (DemoVideoTest) into target/videos
+#                instead of running the tests
 #
 # The tests drive the real screens: they sign in, book an appointment, run a
 # provider's day and the business, while a second user acts through the API. They capture a few
@@ -25,10 +27,12 @@ LOG="${SLATE_SERVER_LOG:-$HERE/target/e2e-server.log}"
 SHOTS="$HERE/target/e2e-shots"
 MODE="--jvm"
 BUILD=1
+VIDEO=""
 for arg in "$@"; do
   case "$arg" in
     --native) MODE="--native" ;;
     --prebuilt) BUILD=0 ;;
+    --video) VIDEO="-Dslate.e2e.video=$HERE/target/videos" ;;
     *) echo "[slate-e2e] unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -78,12 +82,15 @@ fi
 # The heap is given a ceiling too. Left alone a JVM takes a quarter of the
 # machine's memory before it collects anything, which on a shared runner is
 # enough to have the kernel end it between two tests.
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx768m -Dslate.server.url=http://localhost:$PORT -Dslate.shots.dir=$SHOTS -Dslate.goldens.dir=$HERE/screenshots"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx768m -Dslate.server.url=http://localhost:$PORT -Dslate.shots.dir=$SHOTS -Dslate.goldens.dir=$HERE/screenshots $VIDEO"
 
-set +e
-${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
-STATUS=$?
-set -e
+STATUS=0
+if [ "${SLATE_E2E_DESKTOP:-}" != "only" ]; then
+  set +e
+  ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
+  STATUS=$?
+  set -e
+fi
 
 # The second pass: the same tests with the simulator as a desktop window and
 # not a phone, which is where the admin console is laid out side by side and
@@ -96,7 +103,17 @@ set -e
 # this run's own -- so that is where this pass runs, which covers CI and a
 # container. Elsewhere it would mean rewriting the developer's own simulator
 # preferences, and it is skipped with a word.
-if [ "$STATUS" -eq 0 ] && [ "$(uname -s)" = "Linux" ]; then
+# SLATE_E2E_DESKTOP=only runs this pass alone, anywhere, with the simulator's
+# preferences as they are: for a developer who has switched their simulator to
+# a desktop skin themselves, on a machine where they cannot be pointed away.
+if [ "${SLATE_E2E_DESKTOP:-}" = "only" ]; then
+  echo "[slate-e2e] the desktop pass, with this machine's simulator preferences"
+  export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dslate.e2e.desktop=true -Dcodename1.arg.nativeTheme=native -Dcodename1.arg.desktop.titleBar=native"
+  set +e
+  ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
+  STATUS=$?
+  set -e
+elif [ "$STATUS" -eq 0 ] && [ "$(uname -s)" = "Linux" ]; then
   PREFS="$HERE/target/e2e-desktop-prefs"
   NODE="$PREFS/.java/.userPrefs/com/codename1/impl/javase"
   rm -rf "$PREFS"

@@ -35,7 +35,7 @@ import com.codenameone.examples.savor.api.AccountClosureDto;
 import com.codenameone.examples.savor.api.PasswordChangeDto;
 import com.codenameone.examples.savor.api.UserDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.net.Session;
 import com.codenameone.examples.savor.pay.WalletForm;
 

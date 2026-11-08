@@ -23,7 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.skirmish.Clock;
 import com.codenameone.examples.skirmish.Ids;
-import com.codenameone.examples.skirmish.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.skirmish.account.Lists;
 import com.codenameone.examples.skirmish.api.ReceiptDto;
 import com.codenameone.examples.skirmish.api.ShopItemDto;

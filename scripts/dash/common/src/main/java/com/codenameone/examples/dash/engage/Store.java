@@ -26,7 +26,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.dash.api.ReceiptDto;
 import com.codenameone.examples.dash.api.WalletDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import java.util.List;
 
 /// In-app purchases, through `com.codename1.payment`.

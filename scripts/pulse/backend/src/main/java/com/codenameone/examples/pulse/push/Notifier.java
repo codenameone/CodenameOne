@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.pulse.push;
 
+import com.codename1.appkit.server.push.PushSender;
+
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;

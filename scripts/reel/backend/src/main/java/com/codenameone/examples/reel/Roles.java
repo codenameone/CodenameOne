@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel;
 
+import com.codename1.appkit.server.Caller;
+
 /// The roles, as the backend's user store names them (without `ROLE_`). The
 /// shared [com.codenameone.examples.reel.api.Roles] holds the same names for the app.
 public final class Roles {

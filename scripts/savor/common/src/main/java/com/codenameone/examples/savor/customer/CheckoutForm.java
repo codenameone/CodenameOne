@@ -33,11 +33,11 @@ import com.codenameone.examples.savor.api.CartDto;
 import com.codenameone.examples.savor.api.PaymentMethodDto;
 import com.codenameone.examples.savor.api.QuoteDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.pay.WalletForm;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Nav;
-import com.codenameone.examples.savor.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.savor.ui.Ui;
 
 /// The cart, and everything the order still needs before the kitchen sees
@@ -227,7 +227,7 @@ public final class CheckoutForm {
             form.revalidateLater();
             return;
         }
-        totals.add(new Skeleton(3));
+        totals.add(new Skeleton(3, "SvSkeleton"));
         form.revalidateLater();
         Api.orders().quote(cart(), Net.to(quote -> {
             if (asked != quotes) {

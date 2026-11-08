@@ -33,7 +33,7 @@ import com.codenameone.examples.dash.run.Sfx;
 import com.codenameone.examples.dash.engage.Notifications;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 
 /// Settings: the runner name, sound, analytics consent, push, the server.

@@ -27,7 +27,7 @@ import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.StatsDto;
 import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import java.util.ArrayList;
 import java.util.List;
 

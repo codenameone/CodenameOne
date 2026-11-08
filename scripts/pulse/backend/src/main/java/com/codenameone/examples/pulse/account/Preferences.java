@@ -21,7 +21,7 @@ package com.codenameone.examples.pulse.account;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
-import com.codenameone.examples.pulse.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.pulse.api.PreferencesDto;
 import com.codenameone.examples.pulse.domain.Preference;
 import com.codenameone.examples.pulse.domain.Profile;

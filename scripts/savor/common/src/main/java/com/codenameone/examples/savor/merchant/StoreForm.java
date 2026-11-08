@@ -28,7 +28,7 @@ import com.codenameone.examples.savor.api.RestaurantDto;
 import com.codenameone.examples.savor.api.RestaurantEditDto;
 import com.codenameone.examples.savor.customer.Food;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Ui;
 

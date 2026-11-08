@@ -173,12 +173,13 @@ public final class Ui {
 
     /// Gives `form` a back arrow that runs `leave`.
     ///
-    /// On a desktop whose window owns the title bar there is no title bar in
-    /// the app to carry an arrow. The command is then named, so that it is in
-    /// the window's menu, and the screen gets a line of its own to go back
-    /// from. A screen that has put something of its own at its top keeps it,
-    /// under that line: a screen with no way back is one nobody can leave
-    /// without a device's back button, and a desktop has none.
+    /// On a desktop whose window owns the title bar there is no arrow at all:
+    /// a desktop app is moved around through its sidebar, not stepped back
+    /// through like a phone's stack. The command is named instead, so that
+    /// Back is in the window's menu with its shortcut, and the screen gets a
+    /// line of its own carrying its title, which the window's title bar does
+    /// not show. A screen that has put something of its own at its top keeps
+    /// it, under that line.
     public static void back(final Form form, final Runnable leave) {
         boolean window = CN.isDesktop() && form.getToolbar().getParent() == null;
         Command back = form.getToolbar().setBackCommand(window ? Lang.tr("Back") : "",
@@ -202,9 +203,14 @@ public final class Ui {
             added[0] = true;
             Container bar = new Container(new BorderLayout());
             bar.setUIID("SvPaneBar");
-            Button arrow = button("Back", "back-bar", "SvLink", e2 -> leave.run());
-            icon(arrow, FontImage.MATERIAL_ARROW_BACK, 3.4f);
-            bar.add(BorderLayout.WEST, arrow);
+            // No arrow: a desktop app is left through its sidebar, and Back
+            // is in the window's menu with its shortcut. The window's title
+            // bar names the app, not the screen, so the screen's name goes on
+            // a line of its own.
+            String title = form.getTitle();
+            if (title != null && title.length() > 0) {
+                bar.add(BorderLayout.CENTER, plain(title, "SvPaneTitle"));
+            }
             Component top = ((BorderLayout) form.getContentPane().getLayout()).getNorth();
             if (top == null) {
                 form.add(BorderLayout.NORTH, bar);

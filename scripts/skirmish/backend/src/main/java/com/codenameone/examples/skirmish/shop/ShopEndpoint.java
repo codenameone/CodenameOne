@@ -19,7 +19,7 @@
 package com.codenameone.examples.skirmish.shop;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.skirmish.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.skirmish.api.AdRewardDto;
 import com.codenameone.examples.skirmish.api.BuyDto;
 import com.codenameone.examples.skirmish.api.EquipDto;

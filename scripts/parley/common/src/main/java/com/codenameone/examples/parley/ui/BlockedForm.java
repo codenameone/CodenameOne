@@ -25,7 +25,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.parley.Telemetry;
 import com.codenameone.examples.parley.api.ContactDto;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 
 import java.util.List;
 

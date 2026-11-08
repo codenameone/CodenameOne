@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor.push;
 
+import com.codename1.appkit.server.push.PushSender;
+
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
@@ -26,7 +28,7 @@ import com.codename1.backend.annotations.Value;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;
 import com.codename1.orm.repository.PageRequest;
-import com.codenameone.examples.savor.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.savor.api.DeliveryActivityDto;
 import com.codenameone.examples.savor.api.DeliveryActivityKeys;
 import com.codenameone.examples.savor.api.DeliveryState;

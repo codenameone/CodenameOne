@@ -20,7 +20,7 @@ package com.codenameone.examples.pulse.trainer;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.Roles;
 import com.codenameone.examples.pulse.api.AttendanceDto;
 import com.codenameone.examples.pulse.api.RosterEntryDto;

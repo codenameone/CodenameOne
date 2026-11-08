@@ -23,7 +23,7 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.savor.api.OrderDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.StatRow;
 import com.codenameone.examples.savor.ui.Ui;

@@ -28,7 +28,7 @@ import com.codename1.backend.security.core.userdetails.UserDetails;
 import com.codename1.backend.security.crypto.PasswordEncoder;
 import com.codenameone.examples.dash.Clock;
 import com.codenameone.examples.dash.Roles;
-import com.codenameone.examples.dash.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.dash.api.PlayerDto;
 import com.codenameone.examples.dash.api.RegisterDto;
 import com.codenameone.examples.dash.domain.Profile;

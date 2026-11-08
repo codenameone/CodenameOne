@@ -36,7 +36,7 @@ import com.codenameone.examples.skirmish.api.ProgressDto;
 import com.codenameone.examples.skirmish.api.RewardDto;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import java.util.ArrayList;
 import java.util.List;

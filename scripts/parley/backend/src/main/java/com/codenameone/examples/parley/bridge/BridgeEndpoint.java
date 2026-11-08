@@ -20,7 +20,7 @@ package com.codenameone.examples.parley.bridge;
 
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.parley.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.parley.api.BridgeApiServer;
 import com.codenameone.examples.parley.api.BridgeLinkDto;
 import com.codenameone.examples.parley.api.BridgeRequestDto;

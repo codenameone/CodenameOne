@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel;
 
+import com.codename1.appkit.server.security.AccountSecurity;
+
 import com.codename1.backend.Json;
 import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
 import com.codename1.backend.test.MockMvc;
@@ -68,7 +70,7 @@ final class SignIn {
         }
         String location = mvc.perform(get("/oauth2/authorize?response_type=code&client_id="
                         + SecurityConfig.CLIENT_ID + "&redirect_uri="
-                        + OAuth2Parameters.encode(SecurityConfig.LOOPBACK_REDIRECT)
+                        + OAuth2Parameters.encode(AccountSecurity.LOOPBACK_REDIRECT)
                         + "&scope=openid%20profile&state=s-1&nonce=n-1&code_challenge=" + CHALLENGE
                         + "&code_challenge_method=S256")
                         .header("Host", HOST).cookie("CN1SESSION", session))
@@ -82,7 +84,7 @@ final class SignIn {
         String body = mvc.perform(formPost("/oauth2/token",
                         "grant_type", "authorization_code",
                         "code", code,
-                        "redirect_uri", SecurityConfig.LOOPBACK_REDIRECT,
+                        "redirect_uri", AccountSecurity.LOOPBACK_REDIRECT,
                         "code_verifier", VERIFIER,
                         "client_id", SecurityConfig.CLIENT_ID).header("Host", HOST))
                 .andReturn().getResponse().getContentAsString();

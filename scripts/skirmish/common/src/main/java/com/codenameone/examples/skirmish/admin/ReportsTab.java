@@ -31,7 +31,7 @@ import com.codenameone.examples.skirmish.api.AdminStatsDto;
 import com.codenameone.examples.skirmish.api.InsightsDto;
 import com.codenameone.examples.skirmish.api.NameCountDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.ui.Ui;
 import java.util.ArrayList;
 import java.util.Date;

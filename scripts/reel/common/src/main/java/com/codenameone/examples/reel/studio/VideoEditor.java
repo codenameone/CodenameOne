@@ -36,7 +36,7 @@ import com.codenameone.examples.reel.api.SubtitleDto;
 import com.codenameone.examples.reel.api.SubtitleUploadDto;
 import com.codenameone.examples.reel.api.StudioVideoEditDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Ui;
 import java.util.ArrayList;

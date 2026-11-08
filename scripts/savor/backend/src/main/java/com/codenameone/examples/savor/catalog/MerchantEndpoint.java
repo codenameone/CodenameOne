@@ -19,7 +19,7 @@
 package com.codenameone.examples.savor.catalog;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.savor.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.savor.api.AcceptDto;
 import com.codenameone.examples.savor.api.DishDto;
 import com.codenameone.examples.savor.api.MenuSectionDto;

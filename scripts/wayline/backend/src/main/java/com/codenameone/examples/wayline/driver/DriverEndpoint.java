@@ -20,7 +20,7 @@ package com.codenameone.examples.wayline.driver;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
-import com.codenameone.examples.wayline.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.wayline.api.DriverApiServer;
 import com.codenameone.examples.wayline.api.DriverDto;
 import com.codenameone.examples.wayline.api.DriverStatusDto;

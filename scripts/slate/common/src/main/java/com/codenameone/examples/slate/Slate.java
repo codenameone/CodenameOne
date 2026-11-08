@@ -25,6 +25,7 @@ import com.codenameone.examples.slate.notify.Notifications;
 import com.codenameone.examples.slate.client.Reminders;
 import com.codenameone.examples.slate.pay.CardForm;
 import com.codenameone.examples.slate.ui.Lang;
+import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Look;
 import com.codenameone.examples.slate.ui.Nav;
 
@@ -56,6 +57,7 @@ public class Slate extends Lifecycle {
         // words it was built with.
         Look.apply();
         Lang.apply();
+        Layouts.desktopWindow();
         Telemetry.start();
         Session.start(AppConfig.serverUrl());
         Account.start();

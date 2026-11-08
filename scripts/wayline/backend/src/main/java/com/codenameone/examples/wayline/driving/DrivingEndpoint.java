@@ -19,7 +19,7 @@
 package com.codenameone.examples.wayline.driving;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.wayline.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.wayline.api.DocumentContentDto;
 import com.codenameone.examples.wayline.api.DocumentUploadDto;
 import com.codenameone.examples.wayline.api.DriverApplicationDto;

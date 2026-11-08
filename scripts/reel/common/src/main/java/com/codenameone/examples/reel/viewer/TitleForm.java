@@ -46,7 +46,7 @@ import com.codenameone.examples.reel.api.TitleDto;
 import com.codenameone.examples.reel.net.Account;
 import com.codenameone.examples.reel.net.Api;
 import com.codenameone.examples.reel.net.Device;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.player.PlayerForm;
 import com.codenameone.examples.reel.ui.Backdrop;
 import com.codenameone.examples.reel.ui.Layouts;

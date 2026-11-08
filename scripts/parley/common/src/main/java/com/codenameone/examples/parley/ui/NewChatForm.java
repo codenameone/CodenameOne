@@ -32,7 +32,7 @@ import com.codenameone.examples.parley.api.ContactDto;
 import com.codenameone.examples.parley.api.NewConversationDto;
 import com.codenameone.examples.parley.chat.Messenger;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.store.Message;
 import com.codenameone.examples.parley.store.Store;
 import java.util.ArrayList;

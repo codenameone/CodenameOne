@@ -31,7 +31,7 @@ import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.savor.Days;
 import com.codenameone.examples.savor.Roles;
 import com.codenameone.examples.savor.Rows;
-import com.codenameone.examples.savor.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.savor.account.Moderation;
 import com.codenameone.examples.savor.api.DocumentContentDto;
 import com.codenameone.examples.savor.api.DocumentDto;

@@ -33,7 +33,7 @@ import com.codenameone.examples.reel.Telemetry;
 import com.codenameone.examples.reel.api.CardDto;
 import com.codenameone.examples.reel.api.PaymentSetupDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Ui;
 

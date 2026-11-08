@@ -27,7 +27,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.pulse.AppConfig;
 import com.codenameone.examples.pulse.api.PushDeviceDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.ui.Nav;
 
