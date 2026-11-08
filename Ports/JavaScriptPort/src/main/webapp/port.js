@@ -2937,6 +2937,10 @@ bindNative(cn1RtcNames("nativeRtcIce", "int_java_lang_String_int_java_lang_Strin
   yield* cn1RtcHost({ op: "ice", peer: peer | 0, mid: cn1RtcStr(mid), index: index | 0, cand: cn1RtcStr(cand) });
 });
 
+bindNative(cn1RtcNames("nativeRtcRestart", "int", null), function*(peer) {
+  yield* cn1RtcHost({ op: "restart", peer: peer | 0 });
+});
+
 bindNative(cn1RtcNames("nativeRtcClose", "int", null), function*(peer) {
   yield* cn1RtcHost({ op: "close", peer: peer | 0 });
 });

@@ -332,6 +332,14 @@ public class AndroidWebRtc implements WebRtcBridge {
         }
     }
 
+    @Override
+    public void restartIce(int peer) {
+        Peer p = peer(peer);
+        if (p != null) {
+            p.connection.restartIce();
+        }
+    }
+
     private static String typeName(SessionDescription.Type type) {
         switch (type) {
             case OFFER:
