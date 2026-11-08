@@ -769,9 +769,10 @@
                                              dest="${user.home}/UpdateCodenameOne.jar"
                                              skipexisting="true"
                                              ignoreerrors="true"/>
-                                        <available file="${user.home}/UpdateCodenameOne.jar" property="cn1.updater.present"/>
+                                        <!-- Checks the copy the next step runs, which is not where the gets write. -->
+                                        <available file="${user.home}/.codenameone/UpdateCodenameOne.jar" property="cn1.updater.present"/>
                                         <fail unless="cn1.updater.present"
-                                              message="Could not download UpdateCodenameOne.jar from codenameone.com or GitHub"/>
+                                              message="No ${user.home}/.codenameone/UpdateCodenameOne.jar to run"/>
                                         <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
                                             <arg value="${project.build.directory}/generated-sources/project"/>
                                             <arg value="force" />
