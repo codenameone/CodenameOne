@@ -704,7 +704,12 @@ Purchase moved = session.merge(PurchaseBuilder.of(p)
 an element collection, is changed in place on the managed record, as on a
 class entity: `p.tags().add("gift")` is saved at flush. When you build a new
 record, give it a collection you create, such as `new ArrayList<>()`, and the
-session puts its own collection in the managed copy.
+session puts its own collection in the managed copy. A copy saved over an
+existing row replaces each collection it carries: build changes with
+`PurchaseBuilder.of(managed)`, which keeps the managed collections. A
+collection left null in the copy is saved as empty, as a merged class entity's
+is: its join rows are removed and, under `orphanRemoval`, its children are
+deleted.
 
 A cascade reaches through a `Ref` or an `Optional`. A purchase built with
 `Ref.of(newCustomer)` and saved under `CascadeType.PERSIST` inserts the customer
