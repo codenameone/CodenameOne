@@ -122,6 +122,10 @@ public final class StdModules {
             PyModule.registerModule(http());
             return true;
         }
+        if ("_cn1term".equals(name)) {
+            PyModule.registerModule(terminal());
+            return true;
+        }
         if ("builtins".equals(name)) {
             PyModule m = new PyModule("builtins", new String[0]);
             for (java.util.Map.Entry<String, Object> e : Builtins.NAMES.entrySet()) {
@@ -158,6 +162,11 @@ public final class StdModules {
             }
             System.err.println(Py.toStr(code));
             return 1;
+        }
+        if (e.matches(Py.KEYBOARD_INTERRUPT)) {
+            // What a shell reports for a program SIGINT ended, as CPython
+            // gives it by re-raising the signal.
+            return 130;
         }
         System.err.println("Traceback (most recent call last):");
         System.err.print(traceback(e));
@@ -919,7 +928,16 @@ public final class StdModules {
                     });
                 }
                 if ("flush".equals(name)) {
-                    return PyBuiltin.positional("flush", a -> Py.NONE);
+                    return PyBuiltin.positional("flush", a -> {
+                        // A prompt written without a newline must show
+                        // before the read that follows it.
+                        System.out.flush();
+                        return Py.NONE;
+                    });
+                }
+                Object t = ttyAttr(name, 1);
+                if (t != null) {
+                    return t;
                 }
                 return super.getAttrOrNull(name);
             }
@@ -934,11 +952,56 @@ public final class StdModules {
                     });
                 }
                 if ("flush".equals(name)) {
-                    return PyBuiltin.positional("flush", a -> Py.NONE);
+                    return PyBuiltin.positional("flush", a -> {
+                        System.err.flush();
+                        return Py.NONE;
+                    });
+                }
+                Object t = ttyAttr(name, 2);
+                if (t != null) {
+                    return t;
                 }
                 return super.getAttrOrNull(name);
             }
         };
+        Object stdin = new PyInstance(Py.OBJECT_TYPE) {
+            @Override
+            public Object getAttrOrNull(String name) {
+                if ("readline".equals(name)) {
+                    return PyBuiltin.positional("readline", a -> {
+                        String line = stdinLine();
+                        return Py.str(line == null ? "" : line);
+                    });
+                }
+                // Whole-input reads, for a tool fed by a pipe. Iterating
+                // sys.stdin is not supported: for line in iter(sys.stdin.readline, "").
+                if ("readlines".equals(name)) {
+                    return PyBuiltin.positional("readlines", a -> {
+                        java.util.List<Object> lines = new java.util.ArrayList<>();
+                        for (String line = stdinLine(); line != null; line = stdinLine()) {
+                            lines.add(Py.str(line));
+                        }
+                        return new PyList(lines.toArray());
+                    });
+                }
+                if ("read".equals(name)) {
+                    return PyBuiltin.positional("read", a -> {
+                        StringBuilder sb = new StringBuilder();
+                        for (String line = stdinLine(); line != null; line = stdinLine()) {
+                            sb.append(line);
+                        }
+                        return Py.str(sb.toString());
+                    });
+                }
+                Object t = ttyAttr(name, 0);
+                if (t != null) {
+                    return t;
+                }
+                return super.getAttrOrNull(name);
+            }
+        };
+        m.setAttr("stdin", stdin);
+        m.setAttr("__stdin__", stdin);
         m.setAttr("stdout", stdout);
         m.setAttr("stderr", stderr);
         m.setAttr("__stdout__", stdout);
@@ -946,6 +1009,214 @@ public final class StdModules {
         sysModule = m;
         originalStdout = stdout;
         return m;
+    }
+
+    /// `_cn1term`: the terminal under `getpass`, `input()`,
+    /// `os.get_terminal_size` and `cn1console`, over [PyTerminal]. With
+    /// none installed nothing is a terminal and reading raises `OSError`.
+    private static PyModule terminal() {
+        PyModule m = new PyModule("_cn1term", new String[0]);
+        m.setAttr("isatty", PyBuiltin.positional("isatty", a -> {
+            PyTerminal t = PyTerminal.get();
+            return Py.bool(t != null && t.isTerminal((int) Py.asLong(a[0])));
+        }));
+        m.setAttr("size", PyBuiltin.positional("size", a -> {
+            PyTerminal t = PyTerminal.get();
+            return PyTuple.of(PyInt.of(t == null ? 80 : t.columns()), PyInt.of(t == null ? 24 : t.rows()));
+        }));
+        m.setAttr("color", PyBuiltin.positional("color", a -> {
+            PyTerminal t = PyTerminal.get();
+            return Py.bool(t != null && t.colorEnabled());
+        }));
+        m.setAttr("color_level", PyBuiltin.positional("color_level", a -> {
+            PyTerminal t = PyTerminal.get();
+            return PyInt.of(t == null ? 0 : t.colorLevel());
+        }));
+        m.setAttr("unicode", PyBuiltin.positional("unicode", a -> {
+            PyTerminal t = PyTerminal.get();
+            return Py.bool(t != null && t.unicode());
+        }));
+        m.setAttr("style", PyBuiltin.positional("style", a -> {
+            PyTerminal t = PyTerminal.get();
+            return t == null ? a[0] : Py.str(t.style(Py.toStr(a[0]), strings(a[1])));
+        }));
+        m.setAttr("width", PyBuiltin.positional("width", a -> {
+            PyTerminal t = PyTerminal.get();
+            String s = Py.toStr(a[0]);
+            return PyInt.of(t == null ? s.length() : t.width(s));
+        }));
+        m.setAttr("table", PyBuiltin.positional("table", a -> {
+            Object[] rows = Py.toArray(a[1]);
+            String[][] cells = new String[rows.length][];
+            for (int i = 0; i < rows.length; i++) {
+                cells[i] = strings(rows[i]);
+            }
+            return Py.str(terminalOrThrow().table(strings(a[0]), cells, strings(a[2]), Py.toStr(a[3])));
+        }));
+        m.setAttr("tree", PyBuiltin.positional("tree", a -> {
+            Object[] depths = Py.toArray(a[1]);
+            int[] d = new int[depths.length];
+            for (int i = 0; i < d.length; i++) {
+                d[i] = (int) Py.asLong(depths[i]);
+            }
+            return Py.str(terminalOrThrow().tree(strings(a[0]), d));
+        }));
+        // Every argument is converted before prompt() releases the GIL, and
+        // every result wrapped after it takes it back: Py.toStr and the
+        // Py* constructors may run Python code or allocate interpreter state.
+        m.setAttr("read_line", PyBuiltin.positional("read_line", a -> {
+            final String q = Py.toStr(a[0]);
+            String line = prompt(t -> t.readLine(q));
+            return line == null ? Py.NONE : Py.str(line);
+        }));
+        m.setAttr("password", PyBuiltin.positional("password", a -> {
+            final String q = Py.toStr(a[0]);
+            return Py.str(prompt(t -> t.password(q)));
+        }));
+        m.setAttr("confirm", PyBuiltin.positional("confirm", a -> {
+            final String q = Py.toStr(a[0]);
+            final int def = a[1] == Py.NONE ? -1 : Py.isTrue(a[1]) ? 1 : 0; //NOPMD CompareObjectsWithEquals - identity is meant
+            boolean yes = prompt(t -> t.confirm(q, def));
+            return Py.bool(yes);
+        }));
+        m.setAttr("text", PyBuiltin.positional("text", a -> {
+            final String q = Py.toStr(a[0]);
+            final String def = a[1] == Py.NONE ? null : Py.toStr(a[1]); //NOPMD CompareObjectsWithEquals - identity is meant
+            return Py.str(prompt(t -> t.text(q, def)));
+        }));
+        m.setAttr("select", PyBuiltin.positional("select", a -> {
+            final String q = Py.toStr(a[0]);
+            final String[] choices = strings(a[1]);
+            final int def = (int) Py.asLong(a[2]);
+            int chosen = prompt(t -> t.select(q, choices, def));
+            return PyInt.of(chosen);
+        }));
+        m.setAttr("multiselect", PyBuiltin.positional("multiselect", a -> {
+            final String q = Py.toStr(a[0]);
+            final String[] choices = strings(a[1]);
+            Object[] pre = Py.toArray(a[2]);
+            final int[] p = new int[pre.length];
+            for (int i = 0; i < p.length; i++) {
+                p[i] = (int) Py.asLong(pre[i]);
+            }
+            int[] chosen = prompt(t -> t.multiSelect(q, choices, p));
+            Object[] r = new Object[chosen.length];
+            for (int i = 0; i < r.length; i++) {
+                r[i] = PyInt.of(chosen[i]);
+            }
+            return new PyList(r);
+        }));
+        m.setAttr("progress", PyBuiltin.positional("progress", a -> {
+            final PyTerminal.Progress p = terminalOrThrow().progress(Py.toStr(a[0]), Py.asLong(a[1]),
+                    a[2] == Py.NONE ? null : Py.toStr(a[2])); //NOPMD CompareObjectsWithEquals - identity is meant
+            PyModule h = new PyModule("progress", new String[0]);
+            h.setAttr("step", PyBuiltin.positional("step", b -> {
+                p.step(Py.asLong(b[0]));
+                return Py.NONE;
+            }));
+            h.setAttr("total", PyBuiltin.positional("total", b -> {
+                p.total(Py.asLong(b[0]));
+                return Py.NONE;
+            }));
+            h.setAttr("message", PyBuiltin.positional("message", b -> {
+                p.message(Py.toStr(b[0]));
+                return Py.NONE;
+            }));
+            h.setAttr("close", PyBuiltin.positional("close", b -> {
+                p.close(Py.isTrue(b[0]));
+                return Py.NONE;
+            }));
+            return h;
+        }));
+        m.setAttr("spinner", PyBuiltin.positional("spinner", a -> {
+            final PyTerminal.Spinner sp = terminalOrThrow().spinner(Py.toStr(a[0]));
+            PyModule h = new PyModule("spinner", new String[0]);
+            h.setAttr("message", PyBuiltin.positional("message", b -> {
+                sp.message(Py.toStr(b[0]));
+                return Py.NONE;
+            }));
+            h.setAttr("finish", PyBuiltin.positional("finish", b -> {
+                sp.finish(Py.toStr(b[0]), b[1] == Py.NONE ? null : Py.toStr(b[1])); //NOPMD CompareObjectsWithEquals - identity is meant
+                return Py.NONE;
+            }));
+            return h;
+        }));
+        return m;
+    }
+
+    private interface TermOp<T> {
+        T run(PyTerminal t);
+    }
+
+    private static PyTerminal terminalOrThrow() {
+        PyTerminal t = PyTerminal.get();
+        if (t == null) {
+            throw Py.error(Py.OS_ERROR, "there is no terminal on this platform");
+        }
+        return t;
+    }
+
+    /// Runs a read with the GIL released -- other Python threads keep
+    /// running while the person types -- and turns Ctrl-C into
+    /// `KeyboardInterrupt`.
+    private static <T> T prompt(TermOp<T> op) {
+        PyTerminal t = terminalOrThrow();
+        System.out.flush();
+        int saved = Gil.release();
+        boolean cancelled = false;
+        T result = null;
+        try {
+            result = op.run(t);
+        } catch (PyTerminal.Cancelled e) {
+            // Raised below, once the GIL is held again.
+            cancelled = true;
+        } finally {
+            Gil.restore(saved);
+        }
+        if (cancelled) {
+            throw Py.error(Py.KEYBOARD_INTERRUPT, "");
+        }
+        return result;
+    }
+
+    private static String[] strings(Object seq) {
+        Object[] items = Py.toArray(seq);
+        String[] r = new String[items.length];
+        for (int i = 0; i < r.length; i++) {
+            r[i] = Py.toStr(items[i]);
+        }
+        return r;
+    }
+
+    /// One line of standard input with its terminator, null at the end.
+    private static String stdinLine() {
+        PyTerminal term = PyTerminal.get();
+        if (term == null) {
+            return null;
+        }
+        System.out.flush();
+        int saved = Gil.release();
+        String line;
+        try {
+            line = term.readLine("");
+        } finally {
+            Gil.restore(saved);
+        }
+        return line == null ? null : line + "\n";
+    }
+
+    /// `isatty()` and `fileno()` of the standard stream on descriptor `fd`.
+    private static Object ttyAttr(String name, final int fd) {
+        if ("isatty".equals(name)) {
+            return PyBuiltin.positional("isatty", a -> {
+                PyTerminal t = PyTerminal.get();
+                return Py.bool(t != null && t.isTerminal(fd));
+            });
+        }
+        if ("fileno".equals(name)) {
+            return PyBuiltin.positional("fileno", a -> PyInt.of(fd));
+        }
+        return null;
     }
 
     /// The sys module once something imported it, and the stdout it started with.

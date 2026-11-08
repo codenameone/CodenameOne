@@ -145,7 +145,11 @@ class ConformanceTest {
         // pil_ programs are built as a server is (the backend on the class
         // path), so PIL runs on com.codename1.backend.image and its output
         // stays Pillow's exact bytes.
-        String backend = stem.startsWith("pil_") ? location(com.codename1.backend.image.RasterImage.class) : null;
+        // cli_ programs are built as a command-line tool is, with the backend's
+        // console (com.codename1.cli) behind _cn1term; standard output is
+        // captured, so they see no terminal and take the piped path.
+        String backend = stem.startsWith("pil_") || stem.startsWith("cli_")
+                ? location(com.codename1.backend.image.RasterImage.class) : null;
         // A pilclient_ program is built as a client app is (no backend), so
         // PIL runs on PyImageNative over a headless Display.
         boolean client = stem.startsWith("pilclient_");
@@ -186,10 +190,14 @@ class ConformanceTest {
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         PrintStream saved = System.out;
         PrintStream savedErr = System.err;
+        java.io.InputStream savedIn = System.in;
         String failure = null;
         try (URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader())) {
             System.setOut(new PrintStream(out, true, "UTF-8"));
             System.setErr(new PrintStream(err, true, "UTF-8"));
+            // Surefire holds the forked JVM's standard input open, so a read
+            // would block for ever; a cli_ program reads an empty one.
+            System.setIn(new java.io.ByteArrayInputStream(new byte[0]));
             try {
                 Class<?> fsType = loader.loadClass("com.codename1.python.runtime.PyFileSystem");
                 Object fs = loader.loadClass(JvmFileSystem.class.getName()).getConstructor(String.class)
@@ -247,6 +255,7 @@ class ConformanceTest {
             System.out.flush();
             System.setOut(saved);
             System.setErr(savedErr);
+            System.setIn(savedIn);
         }
         String expected = read(ROOT.resolve(stem + ".out"));
         String actual = out.toString("UTF-8");

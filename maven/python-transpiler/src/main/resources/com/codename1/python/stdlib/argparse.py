@@ -41,7 +41,35 @@ def _terminal_width():
             return columns
     except (ValueError, TypeError):
         pass
-    return 80
+    import _cn1term
+    return _cn1term.size()[0]
+
+
+def _colorize(message, file, prog, headings):
+    """Help and usage in color when written to a terminal that wants it,
+    as CPython 3.14 prints them: the usage prefix and section headings in
+    bold blue, the program name in bold magenta. Colored after wrapping,
+    so the escape codes never count toward a line's width. Only this
+    parser's own program name and group titles are matched, so a
+    description line that happens to end in a colon stays plain."""
+    import _cn1term
+    if file is sys.stdout:
+        fd = 1
+    elif file is sys.stderr:
+        fd = 2
+    else:
+        return message
+    if not _cn1term.isatty(fd) or not _cn1term.color():
+        return message
+    out = []
+    for line in message.split("\n"):
+        if prog and line.startswith("usage: " + prog):
+            tail = line[7 + len(prog):]
+            line = "\x1b[1;34musage: \x1b[0m\x1b[1;35m" + prog + "\x1b[0m" + tail
+        elif line.endswith(":") and line[:-1] in headings:
+            line = "\x1b[1;34m" + line + "\x1b[0m"
+        out.append(line)
+    return "\n".join(out)
 
 
 class Namespace:
@@ -895,6 +923,7 @@ class ArgumentParser(_ActionsContainer):
         self.allow_abbrev = allow_abbrev
         self.exit_on_error = exit_on_error
         self.suggest_on_error = suggest_on_error
+        self.color = color
         self.version = None
         self._actions = []
         self._option_string_actions = {}
@@ -1386,6 +1415,9 @@ class ArgumentParser(_ActionsContainer):
         if message:
             if file is None:
                 file = sys.stderr
+            if self.color:
+                headings = [g.title for g in self._action_groups if g.title]
+                message = _colorize(message, file, self.prog, headings)
             file.write(message)
 
     def exit(self, status=0, message=None):

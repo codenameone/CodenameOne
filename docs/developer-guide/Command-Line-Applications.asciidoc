@@ -106,12 +106,74 @@ The process exits with:
 * 2 when the command line doesn't parse; the error and the usage are printed to
   standard error.
 
-`com.codename1.cli.Console` helps with terminal output. `Console.width()` is the
-width help is wrapped to, from `COLUMNS`. `Console.style(text, Style.BOLD,
-Style.RED)` adds ANSI colour only when colour is wanted: never under `NO_COLOR`,
-always under `CLICOLOR_FORCE`, never on a terminal that declares itself
-`dumb`, and never when standard output is redirected to a file or a pipe.
-`Console.isTerminal()` answers that last question.
+=== Console output and prompts
+
+The `com.codename1.cli` package has what a tool needs on a terminal: styled
+text, tables, trees, progress bars, spinners and interactive questions.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/cli/Deploy.java[tag=cli-console-output,indent=0]
+----
+
+`Console` answers questions about the terminal. `width()` and `height()` come
+from `COLUMNS` and `LINES` when they're set, then from the terminal itself.
+`isTerminal()`, `isErrorTerminal()` and `isInputTerminal()` say which standard
+streams are attached to one. `colorEnabled()` decides whether escape codes are
+written: never under `NO_COLOR`, always under `CLICOLOR_FORCE`, never on a
+`dumb` terminal or when standard output goes to a file or a pipe. `colorLevel()`
+reports 16, 256 or true color from `COLORTERM` and `TERM`, and `Ansi` builds
+styled text with any of them, converting a color the terminal can't show to the
+nearest one it can. `Ansi` also moves the cursor, erases lines, switches to the
+alternate screen and writes hyperlinks.
+
+image::img/cli-console-output.svg["A table with green, yellow and red status cells, a colored file tree, a 24-bit color ramp and the text attributes",scaledwidth=80%]
+
+`Table` sizes its columns to the terminal and wraps cells that don't fit;
+`Tree` draws a hierarchy. Both measure text by what it looks like on screen, so
+wide characters, emoji and styled text line up. Without a UTF-8 locale they
+draw with ASCII.
+
+`ProgressBar` shows a count, a percentage, the rate and the time left, or a
+moving bar when the total isn't known; `ProgressBar.track(items, "label")` wraps
+a loop. `MultiProgress` shows several bars at once, and its `println` writes a
+log line above them. A `Spinner` shows that work is under way and ends with a
+success, failure, warning or information line. They all redraw in place
+on a terminal. When the output goes elsewhere they print a few plain lines
+instead, so a log file or a build server shows what happened without escape
+codes.
+
+image::img/cli-console-progress.svg["Spinner results marked with a check, a warning and an information sign above three progress bars: one finished in green and two under way in cyan",scaledwidth=80%]
+
+`Prompt` asks questions:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/cli/Deploy.java[tag=cli-console-prompts,indent=0]
+----
+
+On a terminal the questions are interactive. Arrow keys move through a list,
+typing filters it, space checks an item in a multiple choice, and a text answer
+can be edited with the usual keys. `Prompt.Text`, `Prompt.Select` and
+`Prompt.MultiSelect` add defaults, validation, masks and page sizes. When
+standard input isn't a terminal, each question reads a line instead: a number
+or a label for a choice, a comma separated list for a multiple choice. That
+keeps a tool scriptable with `printf 'staging\n1,2\n' | tool`. Ctrl-C at a
+question throws `Prompt.Cancelled`, and the command exits with 130, as a shell
+reports an interrupted program. The terminal is restored however the program
+ends, including on Ctrl-C and `kill`.
+
+A choice from a list, with the arrow on the second item:
+
+image::img/cli-console-select.svg["A select prompt after an answered text question, with the arrow and highlight on staging",scaledwidth=80%]
+
+A multiple choice, with two regions checked:
+
+image::img/cli-console-checkbox.svg["A multiple choice prompt with two regions checked in green and the arrow on the last region",scaledwidth=80%]
+
+A masked password, an answered confirmation and a number that failed validation:
+
+image::img/cli-console-prompts.svg["A masked token, a confirmation answered Yes and a number prompt showing a red error for 12",scaledwidth=80%]
 
 === Testing
 
@@ -165,8 +227,22 @@ the Maven project switches to that level by itself once `src/main/python`
 exists. `argparse` covers the module as programs use it: positional and
 optional arguments, every action and `nargs`, `type`, `choices`, defaults,
 subcommands with `add_subparsers`, argument groups, mutually exclusive groups,
-`fromfile_prefix_chars` and the help formatters. `parse_intermixed_args` and
-colored help aren't supported.
+`fromfile_prefix_chars` and the help formatters. On a terminal that accepts
+color, the usage line, program name and section headings are colored as in
+CPython 3.14. `parse_intermixed_args`
+isn't supported.
+
+The console API is available to Python as the `cn1console` module:
+
+[source,python]
+----
+include::../demos/common/src/main/python/developer_guide/deploy_cli.py[tag=cli-python-console,indent=0]
+----
+
+The standard modules read the same terminal: `input()`, `getpass.getpass()`,
+`os.get_terminal_size()`, `shutil.get_terminal_size()` and
+`sys.stdout.isatty()` behave as they do under CPython. A question cancelled with
+Ctrl-C raises `KeyboardInterrupt`, which ends the program with status 130.
 
 === Commands in a backend
 
