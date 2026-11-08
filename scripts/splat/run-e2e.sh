@@ -76,10 +76,29 @@ fi
 # back into buffers on the Java heap, so 1536m ran out there in the tutorial.
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx2560m -Dsplat.server.url=http://localhost:$PORT -Dsplat.shots.dir=$SHOTS $VIDEO"
 
+# On CI a test that hangs is killed by its timeout with nothing said about
+# where; every two minutes print the stacks of the simulator's busy threads,
+# so the log shows what the event dispatch thread was doing.
+DUMPER=""
+if [ -n "${CI:-}" ] && command -v jcmd >/dev/null 2>&1; then
+  (
+    while sleep 120; do
+      for pid in $(jcmd -l 2>/dev/null | grep -iE "simulator|Executor|codename1" | awk '{print $1}'); do
+        echo "[splat-e2e] stacks of $pid"
+        jcmd "$pid" Thread.print 2>/dev/null | awk '/^"(EDT|main|AWT-EventQueue|CN1)/{p=1;n=0} p{print; if(++n>30){p=0}}'
+      done
+    done
+  ) &
+  DUMPER=$!
+fi
+
 set +e
 ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
 STATUS=$?
 set -e
+if [ -n "$DUMPER" ]; then
+  kill "$DUMPER" 2>/dev/null || true
+fi
 
 # The second pass: the same tests with the simulator as a desktop window and
 # not a phone, which is where the admin console is a side bar and a page and
