@@ -532,6 +532,234 @@ projections are also outside the current query subset. Use the builder's
 `count()` for distinct composite identities. Native device execution and each
 backend database version still require application integration testing.
 
+=== Record entities
+
+An `@Entity` can be a Java `record`. A record can't change after it's built, so
+you never edit a managed record in place: you build a changed copy and save it,
+and the session answers the copy that it now manages. That copy carries what
+the database assigned, such as a generated key or a new version. The same
+mappings work on the client and the backend, and nothing is woven into a
+record: the build reads it through its accessors and builds it through its
+canonical constructor.
+
+[source,java]
+----
+@Entity
+public record Note(@Id long id, String title, int score,
+        @Version long version, @DbTransient String scratch) {
+    public Note {
+        if (score < 0) {
+            throw new IllegalArgumentException("score");
+        }
+    }
+}
+----
+
+Every component is persistent unless it's `@DbTransient`, and `@Column`,
+`@Id`, `@Version`, `@Convert`, `@Temporal` and the other field annotations go
+on the component. A compact constructor runs for every instance the ORM builds,
+including the rows it reads, so it can validate them. A record entity can't
+declare a `Property` component: a property is a mutable holder, which is what a
+record avoids. Declare the value's own type instead.
+
+==== Builders
+
+For every record entity the build generates a builder named after it, in the
+same package: `NoteBuilder` for `Note`. `create()` starts from default
+component values, `of(note)` copies every component of an existing record, each
+setter replaces one component, and `build()` calls the canonical constructor.
+The builder is plain Java over the record's public API, so you can also write
+your own `withScore`-style methods on the record and never use it.
+
+[source,java]
+----
+Notes notes = Repositories.create(Notes.class, session);
+session.beginTransaction();
+Note draft = NoteBuilder.create().title("Groceries").score(3).build();
+Note saved = notes.save(draft);       // saved.id() is the generated key
+Note changed = notes.save(NoteBuilder.of(saved).score(5).build());
+session.commitTransaction();
+----
+
+==== Saving a record
+
+Use `merge`, or a repository's `save`, which calls it, and keep working with
+the record it returns:
+
+* The record you pass in is never changed or managed. After the save above,
+  `draft.id()` is still 0, `session.contains(draft)` is false and
+  `session.contains(saved)` is true.
+* The returned copy is what the session's identity map holds:
+  `session.find(Note.class, saved.id())` answers `saved`, and after the second
+  save it answers `changed`.
+* Saving a copy is an update of the components that differ from the managed
+  record's, and it increments the `@Version`. A copy built from a record that
+  another save has replaced since is stale: saving it again fails with
+  `OptimisticLockException`, exactly like a stale detached object.
+* `@DbTransient` components travel with every copy the session builds, so the
+  managed copy keeps the value you set; a record read from the database has
+  the component's default.
+
+`persist` works too, but it returns nothing: the session manages the record you
+pass in until it inserts the row, and then replaces it with the copy that holds
+the key. Use `merge` or `save` when you need that copy, or find the record
+again by its key. `refresh`, `remove`, `detach` and queries work as they do for
+any entity; `refresh` replaces the managed record with a copy that holds the
+row's current values, so read the result through `find` afterwards.
+
+The plain `Dao` API answers the copy too: `dao.save(draft)` returns the record
+with its generated key. Like any versioned mapping, a record with a `@Version`
+needs a session.
+
+==== Relationships
+
+A record can't be given a relationship after it's built, so each kind of
+relationship is a component whose type holds it:
+
+[cols="1,2,3",options="header"]
+|===
+|Relationship |Component type |Behavior
+
+|Lazy to-one
+|`Ref<T>` (`com.codename1.orm.Ref`)
+|Read on first `get()`. `id()` and `isPresent()` never run a query.
+
+|Eager to-one
+|`Optional<T>`
+|Read together with the row.
+
+|To-many
+|`List<T>` or `Set<T>`
+|A session collection, read on first use and changed in place.
+
+|Element collection
+|`List<V>` or `Set<V>` with `@ElementCollection`
+|The same, holding values.
+|===
+
+[source,java]
+----
+@Entity
+public record Customer(@Id long id, String name) {}
+
+@Entity
+public record Purchase(@Id long id, String code,
+        @ManyToOne(cascade = CascadeType.PERSIST) Ref<Customer> customer,
+        @ManyToOne Optional<Customer> reviewer,
+        @OneToMany(mappedBy = "purchase") List<Line> lines,
+        @ElementCollection Set<String> tags,
+        @Version long version) {}
+
+@Entity
+public record Line(@Id long id, String label,
+        @ManyToOne Ref<Purchase> purchase) {}
+----
+
+A `Ref` is lazy unless the annotation says `fetch = FetchType.EAGER`, even
+though `@ManyToOne` and `@OneToOne` default to eager: reading on first use is
+what a `Ref` is for. An `Optional` is always read with the row, so a lazy
+`Optional` fails the build. A record holding the entity type itself, a `Map`
+relationship, and a `Ref` in a class entity fail the build too, each with a
+message naming the component.
+
+Reading:
+
+[source,java]
+----
+Purchase p = session.find(Purchase.class, id);
+Object customerKey = p.customer().id();          // no query
+boolean hasOne = p.customer().isPresent();       // no query
+String name = p.customer().get().name();         // reads the customer now
+String reviewer = p.reviewer().map(Customer::name).orElse("nobody");
+int lines = p.lines().size();                    // reads the lines now
+----
+
+`isLoaded()` says whether a `Ref` was read already. A `Ref` or a collection
+that was never read can't be read once its session is closed or the record is
+detached: `get()` throws `LazyInitializationException`, while `id()` keeps
+answering. Two refs are equal when they point at the same entity type and key,
+so `p.customer().equals(Ref.of(customer))` compares targets without reading
+either.
+
+Changing a to-one relationship is a copy with another `Ref` or `Optional`, and
+saving it updates the foreign key and the version:
+
+[source,java]
+----
+Customer ada = session.find(Customer.class, adaId);
+Purchase moved = session.merge(PurchaseBuilder.of(p)
+        .customer(Ref.of(ada))
+        .reviewer(Optional.empty())
+        .build());
+----
+
+`Ref.empty()` and `Optional.empty()` hold no target. A to-many collection, or
+an element collection, is changed in place on the managed record, as on a
+class entity: `p.tags().add("gift")` is saved at flush. When you build a new
+record, give it a collection you create, such as `new ArrayList<>()`, and the
+session puts its own collection in the managed copy.
+
+A cascade reaches through a `Ref` or an `Optional`. A purchase built with
+`Ref.of(newCustomer)` and saved under `CascadeType.PERSIST` inserts the customer
+once, and the managed purchase's `Ref` holds the customer's managed copy, which
+carries its generated key. Point a `Ref` at a managed record, a `find` result
+or a `merge` result, unless a cascade is meant to save the target: a detached
+record without a cascade is rejected at flush, as it is for a class entity.
+
+==== Embedded values
+
+A record entity embeds values that are records too, annotated
+`@Embeddable`. Their components become columns named after the path, as for
+class entities, and an embedded record can embed another one:
+
+[source,java]
+----
+@Embeddable
+public record Geo(double lat, double lng) {}
+
+@Embeddable
+public record Address(String street, String city, @Embedded Geo geo) {}
+
+@Entity
+public record Venue(@Id long id, String name,
+        @Embedded Address home, @Embedded Address billing,
+        @Version long version) {}
+----
+
+The `Venue` table has `home_street`, `home_city`, `home_geo_lat`,
+`home_geo_lng`, and the same four `billing_` columns. A value whose columns
+are all null reads back as `null`, at any depth: a billing address saved as
+`new Address("PO 7", null, null)` reads back with a null `geo`. Query an
+embedded component by its path:
+
+[source,java]
+----
+List<Venue> local = session.query(Venue.class)
+        .eq("home.city", "Springfield").list();
+
+Venue moved = session.merge(VenueBuilder.of(venue)
+        .home(new Address("2 Elm", "Springfield", new Geo(1.5, 2.5)))
+        .build());
+----
+
+Changing an embedded value is a copy with a new value, and it bumps the version
+like any other change; the old copy keeps its old value. Setting the component
+to `null` clears its columns.
+
+An embedded value in a record entity must be a record, and a record embeddable
+can only be embedded in a record entity. A class embeddable is writable, and
+the copies of a record would share it: changing it through one copy would
+change every other copy too, and the session's snapshot of it with them. Both
+mistakes fail the build with a message naming the component.
+
+==== What records require
+
+Records need the application's sources compiled at Java 17, the bytecode level
+Codename One builds. The build translates a record's generated `equals`, `hashCode` and
+`toString` for every target, so records also run on iOS and the other
+translated targets. Relationships inside an embedded record aren't supported,
+for records or classes.
+
 === Validation
 
 The annotation processor fails the build when:
