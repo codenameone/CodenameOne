@@ -31,7 +31,10 @@ struct Session {
 const int MAX_SESSIONS = 16;
 Session *sessions[MAX_SESSIONS + 1];
 std::mutex table_lock;
-std::string open_error;
+// Per thread: two clients failing to open at once on their own workers must
+// not reallocate the string the other is still reading through last_error(0).
+// Everything else on a Session is touched only by its client's one worker.
+thread_local std::string open_error;
 std::once_flag backend_once;
 
 Session *get(int h) {
@@ -98,6 +101,9 @@ extern "C" int cn1llama_open(const char *path, int n_ctx, int n_gpu_layers, int 
     if (n_ctx > 0) {
         cp.n_ctx = (uint32_t) n_ctx;
     }
+    // An embedding model (non-causal) must take a whole input in one micro
+    // batch; llama.cpp asserts on n_ubatch rather than failing.
+    cp.n_ubatch = cp.n_batch;
     if (n_threads > 0) {
         cp.n_threads = n_threads;
         cp.n_threads_batch = n_threads;
@@ -216,6 +222,10 @@ extern "C" int cn1llama_next(int handle, const char **out) {
     while (!s->done) {
         if (s->completion_tokens >= s->max_tokens
                 || (uint32_t) (s->prompt_tokens + s->completion_tokens) >= llama_n_ctx(s->ctx)) {
+            if (s->completion_tokens < s->max_tokens) {
+                // LocalLlmClient.CONTEXT_FULL matches this text exactly.
+                s->error = "The context window is full";
+            }
             s->done = true;
             break;
         }

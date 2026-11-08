@@ -1,5 +1,6 @@
 #import "com_codename1_ai_whisper_NativeWhisperRecognizerImpl.h"
 #include "cn1_globals.h"
+#import "CodenameOne_GLViewController.h"
 #include <stdlib.h>
 
 // whisper.cpp comes from the cn1-whisper-ios xcframework, which the build
@@ -9,8 +10,10 @@
 // prototypes are that header's. Never declare whisper.h's structs here: a
 // hand-written whisper_full_params is how this file once handed whisper_full
 // a struct a fraction of the real size.
+#if defined(INCLUDE_CN1_WHISPER)
 extern char *cn1whisper_transcribe(const char *model_path, const char *wav_path, int segments);
 extern void cn1whisper_free(char *text);
+#endif
 
 @implementation com_codename1_ai_whisper_NativeWhisperRecognizerImpl
 
@@ -19,6 +22,9 @@ extern void cn1whisper_free(char *text);
 // CN1_RESUME_THREAD. Only C strings are touched in between: the arguments
 // are already NSStrings and the result becomes one after the resume.
 -(NSString*)run:(NSString*)model audio:(NSString*)audio segments:(int)segments {
+#if !defined(INCLUDE_CN1_WHISPER)
+    return @"";
+#else
     if (model == nil || audio == nil) {
         return @"";
     }
@@ -39,6 +45,7 @@ extern void cn1whisper_free(char *text);
     [out autorelease];
 #endif
     return out == nil ? @"" : out;
+#endif
 }
 
 -(NSString*)transcribe:(NSString*)param param1:(NSString*)param1 {
@@ -50,7 +57,11 @@ extern void cn1whisper_free(char *text);
 }
 
 -(BOOL)isSupported{
+#if defined(INCLUDE_CN1_WHISPER)
     return YES;
+#else
+    return NO;
+#endif
 }
 
 @end

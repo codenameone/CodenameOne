@@ -2187,6 +2187,7 @@ public class IPhoneBuilder extends Executor {
         usesCn1Language = false;
         usesCn1Inference = false;
         usesCn1LocalLlm = false;
+        minDeploymentTargets = "12.0";
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         if (request.getArg("ios.deployment_target", null) == null) {
@@ -6495,6 +6496,18 @@ public class IPhoneBuilder extends Executor {
                 // scripts/ai-natives/build.sh compiles every slice for 13.0
                 // (IOS_MIN): the oldest target the current libc++ still builds.
                 addMinDeploymentTarget("13.0");
+            }
+            if (catalogNatives && aiAcc.iosXcframeworks().toString()
+                    .indexOf(":cn1-whisper-ios:") > 0) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_WHISPER",
+                            "#define INCLUDE_CN1_WHISPER");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_WHISPER", ex);
+                }
             }
             if (usesCn1LocalLlm && catalogNatives) {
                 try {

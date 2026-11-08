@@ -79,6 +79,10 @@ public final class LocalLlmClient extends LlmClient {
     private int threads;
     private EasyThread worker;
     private LocalLlmImpl impl;
+    /// The error text cn1_llama.cpp sets when generation ran out of context
+    /// before `maxTokens`; a "length" finish, not a failure.
+    static final String CONTEXT_FULL = "The context window is full";
+
     private int handle;
 
     LocalLlmClient(String modelPath) {
@@ -163,6 +167,8 @@ public final class LocalLlmClient extends LlmClient {
                     deliver(result, generate(req, listener), null, listener);
                 } catch (LlmException ex) {
                     deliver(result, null, ex, listener);
+                } catch (RuntimeException ex) {
+                    deliver(result, null, failure(String.valueOf(ex)), listener);
                 }
             }
         }, result, listener);
@@ -193,28 +199,25 @@ public final class LocalLlmClient extends LlmClient {
                             result.complete(r);
                         }
                     });
-                } catch (final LlmException ex) {
-                    Display.getInstance().callSerially(new Runnable() {
-                        @Override
-                        public void run() {
-                            result.error(ex);
-                        }
-                    });
+                } catch (LlmException ex) {
+                    fail(result, ex);
+                } catch (RuntimeException ex) {
+                    fail(result, failure(String.valueOf(ex)));
                 }
             }
         }, result, null);
         return result;
     }
 
-    /// Unloads the model and stops the worker thread. Requests already queued
-    /// still run first; a later request loads the model again.
+    /// Unloads the model. Requests already queued still run first; a later
+    /// request loads the model again. The worker thread is kept, idle, so a
+    /// request after `close()` can never reach the native session on a second
+    /// thread while the first is still using or closing it.
     public void close() {
         if (worker == null) {
             return;
         }
-        final EasyThread w = worker;
-        worker = null;
-        w.run(new Runnable() {
+        worker.run(new Runnable() {
             @Override
             public void run() {
                 if (impl != null && handle != 0) {
@@ -223,7 +226,16 @@ public final class LocalLlmClient extends LlmClient {
                 handle = 0;
             }
         });
-        w.killWhenIdle();
+    }
+
+    private static void fail(final AsyncResource<EmbeddingResponse> result,
+            final LlmException ex) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                result.error(ex);
+            }
+        });
     }
 
     private void submit(Runnable task, AsyncResource<?> result, StreamingListener listener) {
@@ -282,7 +294,14 @@ public final class LocalLlmClient extends LlmClient {
         }
         if (piece == null) {
             emit(listener, stops.flush());
-            if (llm.getCompletionTokens(handle) < maxTokens) {
+            String err = llm.getLastError(handle);
+            if (CONTEXT_FULL.equals(err)) {
+                finish = "length";
+            } else if (err != null) {
+                // A decode failure ends the stream early; reporting "stop"
+                // would pass a truncated answer off as a complete one.
+                throw failure(err);
+            } else if (llm.getCompletionTokens(handle) < maxTokens) {
                 finish = "stop";
             }
         }

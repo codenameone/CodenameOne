@@ -91,6 +91,10 @@ public final class AndroidLocalLlmImpl extends LocalLlmImpl {
     // speak modified UTF-8, in which every emoji a model emits is invalid,
     // and CheckJNI aborts the process on it.
     private static byte[] utf8(String s) {
+        if (s == null) {
+            // As the iOS glue does: an absent string is an empty one.
+            s = "";
+        }
         try {
             byte[] b = s.getBytes("UTF-8");
             byte[] z = new byte[b.length + 1];

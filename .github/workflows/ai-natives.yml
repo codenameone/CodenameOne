@@ -11,8 +11,10 @@ name: AI natives
 on:
   workflow_dispatch:
 
+# Its own group: sharing "release" would let a dispatch here replace a pending
+# release run, which GitHub drops without a trace.
 concurrency:
-  group: release
+  group: ai-natives
   cancel-in-progress: false
 
 jobs:
