@@ -762,17 +762,12 @@
                                              skipexisting="true"
                                              ignoreerrors="true"/>
 
-                                        <!-- A fallback: failing here only when neither source answered and no
-                                             copy is on disk, so a GitHub outage no longer fails a build that
-                                             already has the updater. -->
+                                        <!-- Best effort, like the <java> below (no failonerror): a GitHub
+                                             outage must not fail the framework build. -->
                                         <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
                                              dest="${user.home}/UpdateCodenameOne.jar"
                                              skipexisting="true"
                                              ignoreerrors="true"/>
-                                        <!-- Checks the copy the next step runs, which is not where the gets write. -->
-                                        <available file="${user.home}/.codenameone/UpdateCodenameOne.jar" property="cn1.updater.present"/>
-                                        <fail unless="cn1.updater.present"
-                                              message="No ${user.home}/.codenameone/UpdateCodenameOne.jar to run"/>
                                         <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
                                             <arg value="${project.build.directory}/generated-sources/project"/>
                                             <arg value="force" />
