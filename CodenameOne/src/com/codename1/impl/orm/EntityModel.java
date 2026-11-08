@@ -163,6 +163,20 @@ public abstract class EntityModel<T> {
     public void relation(T entity, int index, Object value) {
         throw new IllegalArgumentException("Unknown relationship");
     }
+    /// `entity` with relationship `index` holding `value`. A mutable entity is
+    /// written in place and returned; a record puts the value into the holder
+    /// its component carries when it can, and answers a copy when it cannot --
+    /// an `Optional`, or no holder at all.
+    public T withRelation(T entity, int index, Object value) {
+        relation(entity, index, value);
+        return entity;
+    }
+    /// The object a record's relationship component holds -- a `Ref`, a
+    /// collection, an `Optional` -- for the session to bind its lazy state to;
+    /// null for a mutable entity, which carries that state itself.
+    public Object holder(T entity, int index) {
+        return null;
+    }
     /// Whether an attribute belongs to a type included by this query model.
     public boolean queryAttribute(int index) {
         return true;

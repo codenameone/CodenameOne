@@ -49,6 +49,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private final Map<String, EntityModel<?>> models;
     private final Map<Key, Object> identities = new LinkedHashMap<Key, Object>();
     private final IdentityHashMap<Object, Entry> entries = new IdentityHashMap<Object, Entry>();
+    // A record cannot carry woven state, so the session keeps it here: the lazy
+    // state of each managed record, keyed by the instance that currently stands
+    // for its row, and the copy each replaced record became. A related record
+    // that was persisted through a cascade is replaced by the copy carrying its
+    // key, while the record pointing at it still holds the old instance.
+    private final IdentityHashMap<Object, EntityState> valueStates = new IdentityHashMap<Object, EntityState>();
+    private final IdentityHashMap<Object, Object> forwards = new IdentityHashMap<Object, Object>();
     private int loading;
     private int mergeDepth;
     private int deferredFetch;
@@ -364,6 +371,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             state.attached = false;
             state.session = null;
         }
+        valueStates.remove(entity);
     }
     @Override
     public void clear() {
@@ -377,6 +385,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         entries.clear();
         identities.clear();
+        valueStates.clear();
+        forwards.clear();
     }
     @Override
     public void close() {
@@ -485,6 +495,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (entity == null) {
             throw new IllegalArgumentException("entity is null");
         }
+        // A record reached through a relationship that still holds the instance
+        // the session replaced by a copy is the copy's row, not a new one.
+        Object forwarded = current(entity);
+        if (!sameInstance(forwarded, entity) && entries.containsKey(forwarded)) {
+            entity = (T) forwarded;
+        }
         if (visited.put(entity, Boolean.TRUE) != null) {
             Entry visitedEntry = entries.get(entity);
             return visitedEntry == null ? entity : (T) visitedEntry.entity;
@@ -582,8 +598,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 throw new PersistenceException("Cannot merge a removed entity");
             }
             merging.put(entity, entity);
-            mergeRelations(entry.model, entity, entity, merging);
-            return entity;
+            T current = (T) mergeRelations(entry.model, entity, entity, merging);
+            merging.put(entity, current);
+            return current;
         }
         EntityModel<T> model = model((Class<T>) entity.getClass());
         Object id = model.identifier(entity);
@@ -627,13 +644,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         merging.put(entity, managed);
-        mergeRelations(model, entity, managed, merging);
+        managed = (T) mergeRelations(model, entity, managed, merging);
+        merging.put(entity, managed);
         return managed;
     }
-    private void mergeRelations(EntityModel model, Object entity, Object managed,
+    /// Answers the managed instance, which is a copy when a record could not
+    /// take a merged value in place.
+    private Object mergeRelations(EntityModel model, Object entity, Object managed,
             IdentityHashMap<Object, Object> merging) {
         Relationship[] relations = model.relationships();
         EntityState sourceState = state(entity);
+        boolean self = sameInstance(entity, managed);
         for (int i = 0; i < relations.length; i++) {
             if (sourceState != null && !sourceState.loaded[i]) {
                 continue;
@@ -641,7 +662,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             Relationship relation = relations[i];
             // A managed source already owns its values; only MERGE cascades
             // need traversal. In particular, leave unloaded associations alone.
-            if (sameInstance(entity, managed) && (relation.element || (relation.cascade & Relationship.MERGE) == 0)) {
+            if (self && (relation.element || (relation.cascade & Relationship.MERGE) == 0)) {
                 continue;
             }
             Object value = model.relation(entity, i);
@@ -659,7 +680,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 }
                 initialize(managed, i);
-                model.relation(managed, i, relation.mapKey.length() > 0 ? mapping : copy);
+                managed = install(model, managed, i, relation.mapKey.length() > 0 ? mapping : copy);
                 continue;
             }
             if (relation.many && value != null) {
@@ -672,12 +693,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 value = mergeTarget(relation, value, merging);
             }
             initialize(managed, i);
-            model.relation(managed, i, value);
+            managed = install(model, managed, i, value);
             EntityState targetState = state(managed);
             if (targetState != null) {
                 targetState.loaded[i] = true;
             }
         }
+        return managed;
     }
     private Object mergeTarget(Relationship relation, Object child, IdentityHashMap<Object, Object> merging) {
         if ((relation.cascade & Relationship.MERGE) != 0) {
@@ -839,11 +861,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
             throw new OptimisticLockException("Row no longer exists: " + model.table());
         }
-        attachState(entry, false, rows.get(0));
         if (model.immutable()) {
-            entity = model.hydrate(rows.get(0));
-            replace(entry, entity);
+            // The copy first, so the fresh state is bound to the holders it carries.
+            replace(entry, model.hydrate(rows.get(0)));
+            entity = entry.entity;
+            attachState(entry, false, rows.get(0));
         } else {
+            attachState(entry, false, rows.get(0));
             assign(model, entity, rows.get(0));
         }
         entry.snapshot = snapshot(model, entity);
@@ -854,6 +878,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 boolean cascade = (relations[i].cascade & Relationship.REFRESH) != 0;
                 if (!relations[i].lazy || cascade) {
                     initialize(entity, i);
+                    entity = entry.entity;
                 }
                 if (!cascade || !state(entity).loaded[i]) {
                     continue;
@@ -2226,6 +2251,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (relation.lazy && !fetches.contains(relation.field)) {
                     continue;
                 }
+                // A record that took the previous relationship as a copy is
+                // carried on by the copy.
+                follow(roots);
                 List<Object> keys = new ArrayList<Object>();
                 List<T> unloaded = new ArrayList<T>();
                 for (T entity : roots) {
@@ -2286,9 +2314,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                                 throw new PersistenceException("One-to-one relationship returned multiple rows");
                             }
                             Object value = relation.many ? matches : matches.isEmpty() ? null : matches.get(0);
-                            owner.relation(entity, i, value);
-                            state(entity).loaded[i] = true;
-                            Entry entry = entries.get(entity);
+                            Object installed = install(owner, entity, i, value);
+                            state(installed).loaded[i] = true;
+                            Entry entry = entries.get(installed);
                             if (entry != null) {
                                 entry.collections[i] = relationshipKeys(relation, value);
                             }
@@ -2300,12 +2328,93 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     }
                 } finally {
                     for (T entity : unloaded) {
-                        state(entity).fetching[i] = false;
+                        EntityState fetching = state(current(entity));
+                        if (fetching != null) {
+                            fetching.fetching[i] = false;
+                        }
                     }
                 }
             }
+            follow(roots);
         } finally {
             loading--;
+        }
+    }
+    /// Replaces each record in `values` by the copy that now stands for it.
+    private <T> void follow(List<T> values) {
+        if (forwards.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < values.size(); i++) {
+            values.set(i, (T) current(values.get(i)));
+        }
+    }
+    /// The instance that now stands for `value`: itself, or the last copy a
+    /// replaced record became.
+    private Object current(Object value) {
+        Object next = value == null ? null : forwards.get(value);
+        while (next != null) {
+            value = next;
+            next = forwards.get(value);
+        }
+        return value;
+    }
+    /// Puts a relationship value into `entity`, and answers the instance that
+    /// now carries it: `entity`, or the copy a record had to be replaced by.
+    private Object install(EntityModel model, Object entity, int index, Object value) {
+        Object next = model.withRelation(entity, index, value);
+        if (!sameInstance(next, entity)) {
+            Entry entry = entries.get(entity);
+            if (entry != null) {
+                replace(entry, next);
+            } else {
+                EntityState state = valueStates.remove(entity);
+                if (state != null) {
+                    state.entity = next;
+                    valueStates.put(next, state);
+                }
+                forwards.put(entity, next);
+            }
+        }
+        return next;
+    }
+    /// Points a record's relationships at the copies the targets became, so its
+    /// foreign keys carry the keys those copies were given.
+    private void resolveTargets(Entry entry) {
+        if (forwards.isEmpty()) {
+            return;
+        }
+        EntityModel model = entry.model;
+        Relationship[] relations = model.relationships();
+        for (int i = 0; i < relations.length; i++) {
+            EntityState state = state(entry.entity);
+            if (relations[i].element || state != null && !state.loaded[i]) {
+                continue;
+            }
+            Object value = model.relation(entry.entity, i);
+            if (value == null) {
+                continue;
+            }
+            if (relations[i].many) {
+                if (relations[i].mapKey.length() > 0) {
+                    continue;
+                }
+                boolean moved = false;
+                List next = new ArrayList();
+                for (Object child : relatedValues(value)) {
+                    Object target = current(child);
+                    moved |= !sameInstance(target, child);
+                    next.add(target);
+                }
+                if (moved) {
+                    install(model, entry.entity, i, next);
+                }
+            } else {
+                Object target = current(value);
+                if (!sameInstance(target, value)) {
+                    install(model, entry.entity, i, target);
+                }
+            }
         }
     }
 
@@ -2360,7 +2469,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         Relationship relation = model.relationships()[index];
         if (relation.element) {
             Object value = loadElements(model, entity, relation);
-            model.relation(entity, index, value);
+            entity = install(model, entity, index, value);
             state.loaded[index] = true;
             Entry entry = entries.get(entity);
             if (entry != null) {
@@ -2409,7 +2518,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     value = found.isEmpty() ? null : found.get(0);
                 }
             }
-            model.relation(entity, index, value);
+            entity = install(model, entity, index, value);
             state.loaded[index] = true;
             Entry entry = entries.get(entity);
             if (entry != null) {
@@ -2460,19 +2569,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 target, read(statement.toString(), owner.keyValues(id), kinds(target)), new ArrayList<String>());
     }
     private EntityState state(Object entity) {
-        return entity instanceof ManagedEntity ? ((ManagedEntity) entity).__cn1OrmState() : null;
+        return entity instanceof ManagedEntity ? ((ManagedEntity) entity).__cn1OrmState() : valueStates.get(entity);
     }
     private void attachState(Entry entry, boolean loaded, Object[] values) {
         Relationship[] relations = entry.model.relationships();
         entry.collections = new List[relations.length];
+        boolean record = entry.model.immutable();
         if (relations.length == 0 && !(entry.entity instanceof ManagedEntity)) {
             return;
         }
-        if (!(entry.entity instanceof ManagedEntity)) {
+        if (!record && !(entry.entity instanceof ManagedEntity)) {
             throw new PersistenceException("Entity has not been enhanced: " + entry.model.type().getName());
         }
         EntityState state = new EntityState(this, entry.entity, relations.length);
-        ((ManagedEntity) entry.entity).__cn1OrmState(state);
+        if (record) {
+            valueStates.put(entry.entity, state);
+        } else {
+            ((ManagedEntity) entry.entity).__cn1OrmState(state);
+        }
         for (int i = 0; i < relations.length; i++) {
             state.loaded[i] = loaded || !entry.model.hasRelationship(entry.entity, i);
             if (values != null && relations[i].column >= 0) {
@@ -2487,6 +2601,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 if (any) {
                     target.keyValues(key);
                     state.keys[i] = count == 1 ? key[0] : Identifier.of(key);
+                }
+            }
+            if (record) {
+                // The holder in the component carries the lazy state from here.
+                Object holder = entry.model.holder(entry.entity, i);
+                Refs.bind(holder, state, i, relations[i].target, state.keys[i]);
+                if (!state.loaded[i] && holder instanceof Holder && Refs.loaded(holder)) {
+                    // A to-one with no key is read already: there is nothing.
+                    state.loaded[i] = true;
                 }
             }
             if (state.loaded[i]) {
@@ -2961,13 +3084,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (deferredFetch == 0) {
                 for (int i = 0; i < relations.length; i++) {
                     if (!relations[i].lazy) {
-                        initialize(entity, i);
+                        initialize(entry.entity, i);
                     }
                 }
             }
         } finally {
             loading--;
         }
+        entity = (T) entry.entity;
         model.lifecycle(entity, 6);
         return entity;
     }
@@ -2981,6 +3105,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         Attribute[] attrs = model.attributes();
         model.lifecycle(entry.entity, 0);
         cascadePersist(entry);
+        resolveTargets(entry);
         checkTransientAssociations(entry);
         if (!attrs[model.idIndex()].generated && !same(entry.initialId, model.identifier(entry.entity))) {
             throw new PersistenceException("Managed primary key cannot change");
@@ -2996,6 +3121,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 insert(dependency, inserted);
             }
         }
+        resolveTargets(entry);
         StringBuilder cols = new StringBuilder();
         StringBuilder marks = new StringBuilder();
         List<Object> args = new ArrayList<Object>();
@@ -3067,6 +3193,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return !a.generated && a.insertable;
     }
     private void completeInsert(Entry entry) {
+        resolveTargets(entry);
         checkManagedIdentity(entry);
         checkTransientAssociations(entry);
         EntityModel model = entry.model;
@@ -3164,6 +3291,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     private boolean update(Entry entry, List<Entry> inserted, boolean checkCollections) {
+        resolveTargets(entry);
         checkTransientAssociations(entry);
         EntityModel model = entry.model;
         Attribute[] attrs = model.attributes();
@@ -3473,11 +3601,35 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         entries.remove(previous);
         entry.entity = next;
         entries.put(next, entry);
+        forwards.put(previous, next);
+        EntityState state = valueStates.remove(previous);
+        if (state != null) {
+            state.entity = next;
+            valueStates.put(next, state);
+            rebind(entry.model, state, previous, next);
+        }
         // Keyed by the previous instance's identifier: a generated key is not
         // claimed until its row exists, so an unclaimed one finds nothing here.
         Key key = key(entry.model, previous);
         if (sameInstance(identities.get(key), previous)) {
             identities.put(key, next);
+        }
+    }
+    /// Binds the holders a replacing record brought with it. A holder the copy
+    /// shares with the record it replaces is bound already; a new one says
+    /// itself whether its value has been read.
+    private void rebind(EntityModel model, EntityState state, Object previous, Object next) {
+        Relationship[] relations = model.relationships();
+        for (int i = 0; i < relations.length; i++) {
+            Object holder = model.holder(next, i);
+            if (sameInstance(holder, model.holder(previous, i))) {
+                continue;
+            }
+            Refs.bind(holder, state, i, relations[i].target, Refs.storedKey(holder));
+            state.loaded[i] = Refs.loaded(holder);
+            if (!state.loaded[i] && relations[i].column >= 0) {
+                state.keys[i] = Refs.storedKey(holder);
+            }
         }
     }
     private void claim(EntityModel model, Object entity) {
@@ -3495,9 +3647,30 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         model.read(entity, values);
     }
     private static void copy(EntityModel model, Object from, Object to) {
-        assign(model, to, snapshot(model, from));
+        assign(model, to, values(model, from));
     }
-    private static Object[] snapshot(EntityModel model, Object entity) {
+    private Object[] snapshot(EntityModel model, Object entity) {
+        Object[] result = values(model, entity);
+        EntityState state = model.immutable() ? valueStates.get(entity) : null;
+        if (state != null) {
+            // An eager to-one of a record is an Optional, empty until it is
+            // read; its foreign key is the one the row was read with.
+            Relationship[] relations = model.relationships();
+            for (int i = 0; i < relations.length; i++) {
+                if (relations[i].column < 0 || state.loaded[i]) {
+                    continue;
+                }
+                Object key = state.keys[i];
+                int width = model(relations[i].target).idIndexes().length;
+                for (int part = 0; part < width; part++) {
+                    result[relations[i].column + part] = key instanceof Identifier
+                            ? ((Identifier) key).values()[part] : key;
+                }
+            }
+        }
+        return result;
+    }
+    private static Object[] values(EntityModel model, Object entity) {
         Object[] result = new Object[model.attributes().length];
         for (int i = 0; i < result.length; i++) {
             Object value = model.get(entity, i);

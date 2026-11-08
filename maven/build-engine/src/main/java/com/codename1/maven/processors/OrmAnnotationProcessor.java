@@ -411,8 +411,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // canonical constructor's parameter list.
         if (ec.record) for (FieldInfo field : cls.getFields()) {
             if (field.isStatic()) continue;
-            ec.components.add(new String[] {field.getName(),
-                    sourceType(org.objectweb.asm.Type.getType(field.getDescriptor()))});
+            String generic = genericSourceType(field.getSignature());
+            ec.components.add(new String[] {field.getName(), generic != null ? generic
+                    : sourceType(org.objectweb.asm.Type.getType(field.getDescriptor()))});
         }
         ec.daoSimpleName = ec.simpleName + (backend ? BACKEND_DAO_SUFFIX : "Cn1Dao");
         ec.daoBinaryName = (ec.packageName.length() == 0)
@@ -472,7 +473,6 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if (!ec.record) hide(ec,fieldPath.owner.replace('.','/'),f);
             if (ec.record && fieldPath.prefix.length()>0) { ctx.error(cls,"Embedded values are not supported in a record entity yet: "+fieldPath.path);continue; }
             RelationField relationship = relation(f, ec, ctx);
-            if (relationship != null && ec.record) { ctx.error(cls,"Relationships are not supported in a record entity yet: "+fieldPath.path);continue; }
             if (relationship != null) {
                 // Element collections and relationships keep their own column
                 // format; a @Temporal there would be silently ignored.
@@ -1319,8 +1319,27 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
         }
         if(annotation==null) return null;
-        if(field.isFinal()) ctx.error("Relationship fields must be writable: "+owner.binaryName+"."+field.getName());
+        if(field.isFinal() && !owner.record) ctx.error("Relationship fields must be writable: "+owner.binaryName+"."+field.getName());
         RelationField relation=new RelationField(); relation.field=field.getName();relation.descriptor=field.getDescriptor();
+        boolean ref=REF_DESCRIPTOR.equals(field.getDescriptor()),optional="Ljava/util/Optional;".equals(field.getDescriptor());
+        if(owner.record) {
+            // A record cannot be written after it is built, so it holds what the
+            // session fills in: a Ref (read on first use) or an Optional (read
+            // with the row) for a to-one, a session list or set for a to-many.
+            boolean many=kind.endsWith("ToMany") || "ElementCollection".equals(kind);
+            if(many) {
+                if(!"Ljava/util/List;".equals(field.getDescriptor()) && !"Ljava/util/Set;".equals(field.getDescriptor()))
+                    ctx.error("A record's to-many relationship is a List or a Set: "+owner.binaryName+"."+field.getName());
+                relation.holder="Ljava/util/Set;".equals(field.getDescriptor())?"set":"list";
+            } else if(ref || optional) {
+                relation.holder=ref?"ref":"optional";
+            } else {
+                ctx.error("A record's to-one relationship is a Ref<T>, read on first use, or an Optional<T>, read with the row: "
+                        +owner.binaryName+"."+field.getName());
+            }
+        } else if(ref) {
+            ctx.error("Ref<T> holds a record's relationship; a class holds the entity itself: "+owner.binaryName+"."+field.getName());
+        }
         relation.element="ElementCollection".equals(kind);relation.many=relation.element || kind.endsWith("ToMany");relation.unique="OneToOne".equals(kind) || "OneToMany".equals(kind);relation.kind=kind;
         relation.mappedBy=annotation.getStringOrDefault("mappedBy","");
         AnnotationValues mapKey=field.getAnnotation(prefix+"MapKey;"),orderColumn=field.getAnnotation(prefix+"OrderColumn;"),orderBy=field.getAnnotation(prefix+"OrderBy;");
@@ -1355,8 +1374,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(("ManyToMany".equals(kind) || "ManyToOne".equals(kind)) && relation.orphan)
             ctx.error("orphanRemoval requires OneToOne or OneToMany: "+owner.binaryName+"."+relation.field);
         if("ManyToOne".equals(kind) && relation.mappedBy.length()>0) ctx.error("ManyToOne must own its join column");
-        relation.lazy=relation.many;
+        relation.lazy=relation.many || "ref".equals(relation.holder);
         Object fetch=annotation.get("fetch");if(fetch instanceof String[]) relation.lazy="LAZY".equals(((String[])fetch)[1]);
+        if("optional".equals(relation.holder) && relation.lazy)
+            ctx.error("An Optional is read with the row; a lazy to-one is a Ref<T>: "+owner.binaryName+"."+relation.field);
         Object cascades=annotation.get("cascade");
         if(cascades instanceof List) for(Object cascade:(List)cascades) {
             String op=((String[])cascade)[1];
@@ -1368,6 +1389,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             else if("DETACH".equals(op)) relation.cascade|=16;
         }
         relation.target=org.objectweb.asm.Type.getType(field.getDescriptor()).getClassName();
+        if(ref || optional) {
+            String signature=field.getSignature();
+            int start=signature==null?-1:signature.indexOf("<L");
+            int end=start<0?-1:signature.indexOf(';',start);
+            if(start<0 || end<0 || signature.indexOf('<',start+1)>=0 && signature.indexOf('<',start+1)<end)
+                ctx.error("Relationship needs a concrete entity type: "+owner.binaryName+"."+relation.field);
+            else relation.target=signature.substring(start+2,end).replace('/','.');
+        }
         if(relation.many) {
             String signature=field.getSignature();
             int start=signature==null?-1:signature.indexOf("<L");
@@ -1471,6 +1500,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     fk.columnName=relation.columnName+(target.idFields.size()==1?"":"_"+key.columnName);
                     fk.kind=key.kind;fk.dialectKind=key.dialectKind;fk.boxed=key.boxed;fk.sqlType=key.sqlType;
                     fk.explicitSqlType=key.explicitSqlType;fk.nullable=relation.nullable;fk.relation=relation;fk.relationPart=part;
+                    fk.record=owner.record;
                     owner.fields.add(fk);
                 }
             }
@@ -1743,8 +1773,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 emitBackendWrite(setter, ec.fields.get(i));
                 sb.append("      value = values[").append(i).append("]; ").append(setter.toString().replace(ORM, pkg)).append('\n');
             }
-            sb.append("    } catch(Exception ex) { throw new com.codename1.orm.session.PersistenceException(ex.getMessage(),ex); }\n")
-              .append("    return e.build();\n  }\n");
+            sb.append("    } catch(Exception ex) { throw new com.codename1.orm.session.PersistenceException(ex.getMessage(),ex); }\n");
+            // Every relationship starts unread; the session binds the holders and
+            // fills them in.
+            for (RelationField relation : ec.relations) {
+                sb.append("    e.").append(relation.field).append(" = ").append(
+                        "ref".equals(relation.holder) ? pkg + "Refs.unloadedRef()"
+                        : "set".equals(relation.holder) ? pkg + "Refs.unloadedSet()"
+                        : "list".equals(relation.holder) ? pkg + "Refs.unloadedList()"
+                        : "java.util.Optional.empty()").append(";\n");
+            }
+            sb.append("    return e.build();\n  }\n");
             emitRecordFields(sb, ec);
         }
         sb.append("public Object project(int index,Object value) { try { switch(index) {\n");
@@ -1783,6 +1822,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
               .append(escape(relation.table)).append("\", ").append('"').append(escape(relation.ownerColumn)).append("\", ").append('"')
               .append(escape(relation.targetColumn)).append("\", ").append(relation.cascade).append(", ").append(relation.orphan).append(", ").append(relation.unique).append(", \"").append(escape(relation.mapKey)).append("\", \"").append(escape(relation.orderColumn)).append("\", \"").append(escape(relation.orderBy)).append("\", ").append(relation.element).append(", \"").append(escape(relation.elementType)).append("\"),\n");
         }
+        if (ec.record) {
+            emitRecordRelations(sb, ec, pkg);
+        } else {
         sb.append("}; }\n  public Object relation(").append(ec.binaryName).append(" e, int index) { switch(index) {\n");
         for (RelationField relation : ec.relations) {
             sb.append("case ").append(relation.index).append(": return ");
@@ -1804,6 +1846,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sb.append("; return;\n");
         }
         sb.append("default: throw new IllegalArgumentException(); }}\n");
+        }
         if(OrmEnhancer.needsState(ec)) sb.append("  public boolean requiresSession() { return true; }\n");
         if(!ec.embedded.isEmpty()) {
             sb.append("  public void read(").append(ec.binaryName).append(" e,Object[] values) {\n");
@@ -2654,6 +2697,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// which is the set `Database` binds and returns on every engine.
     private static void emitBackendRead(StringBuilder sb, PersistedField f) {
         String field = f.relation==null ? ref("e", f) : "e." + f.relation.field;
+        if (f.relation != null && f.record) {
+            sb.append("com.codename1.impl.orm.Refs.key(e.").append(f.relation.field).append("(), ").append(f.relationPart).append(")");
+            return;
+        }
         if (f.relation != null) {
             sb.append("com.codename1.impl.orm.Models.foreignKey(e, ").append(f.relation.index)
               .append(", ").append(field).append(", ").append(f.relationPart).append(")");
@@ -3072,6 +3119,44 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return "TEXT";
     }
 
+    /// A record's relationships: each is read out of the holder its component
+    /// carries, and put back into it in place. Only an `Optional`, or a
+    /// component with no holder, needs a copy of the record, which
+    /// `withRelation` answers and the session takes in its place.
+    private static void emitRecordRelations(StringBuilder sb, EntityClass ec, String pkg) {
+        sb.append("}; }\n  public Object relation(").append(ec.binaryName).append(" e, int index) { switch(index) {\n");
+        for (RelationField relation : ec.relations) {
+            sb.append("case ").append(relation.index).append(": return ").append(pkg).append("Refs.value(e.")
+              .append(relation.field).append("());\n");
+        }
+        sb.append("default: throw new IllegalArgumentException(); }}\n");
+        sb.append("  public Object holder(").append(ec.binaryName).append(" e, int index) { switch(index) {\n");
+        for (RelationField relation : ec.relations) {
+            sb.append("case ").append(relation.index).append(": return e.").append(relation.field).append("();\n");
+        }
+        sb.append("default: throw new IllegalArgumentException(); }}\n");
+        sb.append("  public ").append(ec.binaryName).append(" withRelation(").append(ec.binaryName)
+          .append(" e, int index, Object value) { switch(index) {\n");
+        for (RelationField relation : ec.relations) {
+            sb.append("case ").append(relation.index).append(": {\n");
+            String copy;
+            if ("optional".equals(relation.holder)) {
+                sb.append("  if (e.").append(relation.field).append("() != null && e.").append(relation.field)
+                  .append("().orElse(null) == value) return e;\n");
+                copy = "java.util.Optional.ofNullable((" + relation.target + ")value)";
+            } else {
+                sb.append("  if (").append(pkg).append("Refs.fill(e.").append(relation.field).append("(), value)) return e;\n");
+                copy = "ref".equals(relation.holder) ? "com.codename1.orm.Ref.of((" + relation.target + ")value)"
+                        : "set".equals(relation.holder) ? pkg + "Refs.set(value)" : pkg + "Refs.list(value)";
+            }
+            sb.append("  Fields s = Fields.of(e);\n  s.").append(relation.field).append(" = ").append(copy)
+              .append(";\n  return s.build();\n}\n");
+        }
+        sb.append("default: throw new IllegalArgumentException(); }}\n");
+        sb.append("  public void relation(").append(ec.binaryName).append(" e, int index, Object value) {\n")
+          .append("    if (withRelation(e, index, value) != e) throw new IllegalStateException(\"A record takes this relationship as a copy\");\n  }\n");
+    }
+
     /// How generated code reads `f` from the entity held in `inst`: the field,
     /// or a record's accessor of the same name.
     private static String ref(String inst, PersistedField f) {
@@ -3080,6 +3165,66 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// A type as source can name it. A nested type's binary name has a dollar
     /// where source has a dot.
+    private static final String REF_DESCRIPTOR = "Lcom/codename1/orm/Ref;";
+
+    /// A field's generic signature as source names the type, so a builder
+    /// setter takes a `Ref<Customer>` rather than a raw `Ref`. Null when there
+    /// is no signature, or it names a type variable, which falls back to the
+    /// erased type.
+    static String genericSourceType(String signature) {
+        if (signature == null) return null;
+        int[] at = {0};
+        String result = genericType(signature, at);
+        return result != null && at[0] == signature.length() ? result : null;
+    }
+
+    private static String genericType(String sig, int[] at) {
+        if (at[0] >= sig.length()) return null;
+        char c = sig.charAt(at[0]);
+        if (c == '[') {
+            at[0]++;
+            String component = genericType(sig, at);
+            return component == null ? null : component + "[]";
+        }
+        if (c != 'L') {
+            String primitive = c == 'Z' ? "boolean" : c == 'B' ? "byte" : c == 'S' ? "short"
+                    : c == 'I' ? "int" : c == 'J' ? "long" : c == 'F' ? "float" : c == 'D' ? "double" : c == 'C' ? "char" : null;
+            if (primitive != null) at[0]++;
+            return primitive;
+        }
+        at[0]++;
+        StringBuilder out = new StringBuilder();
+        while (at[0] < sig.length()) {
+            c = sig.charAt(at[0]);
+            if (c == ';') { at[0]++; return out.toString(); }
+            if (c == '<') {
+                at[0]++;
+                out.append('<');
+                boolean first = true;
+                while (at[0] < sig.length() && sig.charAt(at[0]) != '>') {
+                    if (!first) out.append(", ");
+                    first = false;
+                    char wildcard = sig.charAt(at[0]);
+                    if (wildcard == '*') { at[0]++; out.append('?'); continue; }
+                    if (wildcard == '+' || wildcard == '-') {
+                        at[0]++;
+                        out.append(wildcard == '+' ? "? extends " : "? super ");
+                    }
+                    String argument = genericType(sig, at);
+                    if (argument == null) return null;
+                    out.append(argument);
+                }
+                if (at[0] >= sig.length()) return null;
+                at[0]++;
+                out.append('>');
+                continue;
+            }
+            out.append(c == '/' || c == '$' ? '.' : c);
+            at[0]++;
+        }
+        return null;
+    }
+
     private static String sourceType(org.objectweb.asm.Type type) {
         return type.getClassName().replace('$', '.');
     }
@@ -3111,6 +3256,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     private static void emitFieldRead(StringBuilder sb, PersistedField f, String inst) {
         if(f.converter!=null) {
             sb.append("com.codename1.impl.orm.Values.storage(new ").append(f.converter).append("().toDatabase(").append(ref(inst, f)).append("))");return;
+        }
+        if (f.relation != null && f.record) {
+            sb.append("com.codename1.impl.orm.Refs.key(").append(inst).append('.').append(f.relation.field).append("(), ").append(f.relationPart).append(")");
+            return;
         }
         if (f.relation != null) {
             sb.append("com.codename1.impl.orm.Models.foreignKey(").append(inst).append(", ")
@@ -3361,6 +3510,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     static final class RelationField {
         String field, descriptor, target, mappedBy, columnName, table, ownerColumn, targetColumn,kind,declaringType,elementType="";
         String mapKey="",orderColumn="",orderBy="",mapKeyType="";
+        /// What a record's component holds: ref, optional, list or set. Empty
+        /// for a class, which holds the value itself.
+        String holder="";
         boolean many,lazy,orphan,nullable,unique,element;
         int cascade,index,column=-1;
     }

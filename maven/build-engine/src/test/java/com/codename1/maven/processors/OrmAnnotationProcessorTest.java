@@ -436,10 +436,85 @@ public class OrmAnnotationProcessorTest {
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("refused.Owner","package refused; import com.codename1.annotations.*; @Entity public class Owner { @Id public long id; public Owner() {} }");
         sources.put("refused.Pet","package refused; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
-            + "@Entity public record Pet(@Id long id, @ManyToOne Owner owner) { }");
+            + "@Entity public record Pet(@Id long id, @ManyToOne Owner owner, @ManyToOne(fetch=FetchType.LAZY) java.util.Optional<Owner> vet, "
+            + "@OneToMany(mappedBy=\"x\") java.util.Map<String,Owner> byName) { }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
         ProcessorContext ctx=runProcessor(classes);
-        assertTrue(ctx.getErrors().toString(),ctx.getErrors().toString().contains("Relationships are not supported in a record entity yet: owner"));
+        String errors=ctx.getErrors().toString();
+        assertTrue(errors,errors.contains("A record's to-one relationship is a Ref<T>, read on first use, or an Optional<T>, read with the row: refused.Pet.owner"));
+        assertTrue(errors,errors.contains("An Optional is read with the row; a lazy to-one is a Ref<T>: refused.Pet.vet"));
+        assertTrue(errors,errors.contains("A record's to-many relationship is a List or a Set: refused.Pet.byName"));
+    }
+
+    /// Relationships of a record: a lazy to-one is a Ref, read on first use and
+    /// refused once the session is gone; an eager one is an Optional, read with
+    /// the row; a to-many is a session list or set, changed in place. Changing a
+    /// to-one is a copy with another Ref, and a target persisted through a
+    /// cascade gives its key to the record pointing at it.
+    @Test
+    public void recordRelationshipsOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordRelationships(false);
+        recordRelationships(true);
+    }
+    private void recordRelationships(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package shop; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("shop.Customer",imports+"@Entity public record Customer(@Id long id, String name) { }");
+        sources.put("shop.Purchase",imports+"@Entity public record Purchase(@Id long id, String code, "
+            + "@ManyToOne(cascade=CascadeType.PERSIST) Ref<Customer> customer, @ManyToOne Optional<Customer> reviewer, "
+            + "@OneToMany(mappedBy=\"purchase\") List<Line> lines, @ElementCollection Set<String> tags, @Version long version) { }");
+        sources.put("shop.Line",imports+"@Entity public record Line(@Id long id, String label, @ManyToOne Ref<Purchase> purchase) { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("shop.Check","package shop; import com.codename1.orm.Ref; import com.codename1.orm.session.*; import java.util.*; public class Check { "
+            + "static void ok(boolean b,String m) { if(!b) throw new AssertionError(m); } "
+            + "public static void run(Session s) { s.createTables(); s.beginTransaction(); "
+            + "Customer ada=s.merge(CustomerBuilder.create().name(\"Ada\").build()); ok(ada.id()!=0,\"customer key\"); "
+            + "Customer draftBob=CustomerBuilder.create().name(\"Bob\").build(); "
+            + "Purchase p=s.merge(PurchaseBuilder.create().code(\"p1\").customer(Ref.of(draftBob)).reviewer(Optional.of(ada)).lines(new ArrayList<Line>()).tags(new HashSet<String>(Arrays.asList(\"x\"))).build()); "
+            + "ok(p.id()!=0,\"purchase key\"); Object bobId=p.customer().id(); "
+            + "ok(bobId!=null && ((Long)bobId).longValue()!=0,\"the cascaded customer's key reaches the ref \"+bobId); "
+            + "ok(p.customer().get()!=draftBob && \"Bob\".equals(p.customer().get().name()),\"the ref follows the saved copy\"); "
+            + "ok(s.query(Customer.class).list().size()==2,\"the cascaded customer is one row\"); Line line=s.merge(LineBuilder.create().label(\"l1\").purchase(Ref.of(p)).build()); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Purchase back=s.find(Purchase.class,p.id()); "
+            + "ok(!back.customer().isLoaded() && back.customer().isPresent() && bobId.equals(back.customer().id()),\"a lazy ref answers its id without reading \"+back.customer()); "
+            + "ok(back.reviewer().isPresent() && \"Ada\".equals(back.reviewer().get().name()),\"an Optional is read with the row\"); "
+            + "ok(s.find(Purchase.class,p.id())==back,\"the identity map holds the copy carrying the Optional\"); "
+            + "ok(\"Bob\".equals(back.customer().get().name()) && back.customer().isLoaded(),\"a ref reads on first use\"); "
+            + "ok(back.lines().size()==1 && \"l1\".equals(back.lines().get(0).label()),\"to-many \"+back.lines()); "
+            + "ok(back.lines().get(0).purchase().get()==back,\"back reference resolves to the managed copy\"); "
+            + "ok(back.tags().contains(\"x\"),\"element collection\"); "
+            + "ok(back.customer().equals(Ref.of(s.find(Customer.class,bobId))),\"refs are equal by target\"); "
+            + "s.clear(); Purchase cold=s.find(Purchase.class,p.id()); s.clear(); boolean refused=false; "
+            + "try { cold.customer().get(); } catch(LazyInitializationException expected) { refused=true; } "
+            + "ok(refused,\"a detached unread ref refuses\"); ok(bobId.equals(cold.customer().id()),\"but still knows its id\"); "
+            + "s.beginTransaction(); Purchase current=s.find(Purchase.class,p.id()); "
+            + "current.tags().add(\"y\"); "
+            + "Purchase moved=s.merge(PurchaseBuilder.of(current).customer(Ref.of(s.find(Customer.class,ada.id()))).build()); "
+            + "ok(moved.version()==current.version()+1,\"changing a ref is an update \"+moved.version()); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Purchase last=s.find(Purchase.class,p.id()); "
+            + "ok(Long.valueOf(ada.id()).equals(last.customer().id()),\"the new ref is stored\"); "
+            + "ok(last.tags().equals(new HashSet<String>(Arrays.asList(\"x\",\"y\"))),\"a session set changes in place \"+last.tags()); "
+            + "s.beginTransaction(); boolean stale=false; try { s.merge(cold); } catch(OptimisticLockException expected) { stale=true; } s.rollbackTransaction(); "
+            + "ok(stale,\"a detached copy from before the move is stale\"); "
+            + "}}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("shop.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
     /// Adopts tables that existed before the application: explicit names, a key the
