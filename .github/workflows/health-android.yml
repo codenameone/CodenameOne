@@ -77,7 +77,8 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-health-${{ hashFiles('scripts/hellocodenameone/**/build.gradle*', 'Ports/Android/build.gradle*') }}
+            ~/.codenameone/gradle8
+          key: ${{ runner.os }}-gradle-g8-health-${{ hashFiles('scripts/hellocodenameone/**/build.gradle*', 'Ports/Android/build.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-health-
             ${{ runner.os }}-gradle-

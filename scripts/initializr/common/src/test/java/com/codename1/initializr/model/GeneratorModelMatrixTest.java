@@ -234,6 +234,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 label + "settings.gradle.kts should name the project like the Maven artifactId");
         assertContains(getText(entries, "gradle.properties"), "org.gradle.configuration-cache=true",
                 label + "gradle.properties should come from the shared template");
+        if (type == ProjectOptions.ProjectType.COMMAND_LINE) {
+            // The backend-only layout with a command in place of the routes; what
+            // follows is about apps and servers. validateCommandLineProject covers the command.
+            assertNull(entries.get("codenameone_settings.properties"), label + "a tool has no Codename One app settings");
+            assertNull(entries.get("src/main/css/theme.css"), label + "a tool has no theme");
+            assertContains(getText(entries, "src/main/java/" + packagePath + "/Hello.java"), "@Command",
+                    label + "the command ships at the root");
+            return;
+        }
         // Gradle builds -- from the IDE or ./gradlew -- report through the plugin's
         // settings half; a backend-only project has no client build to report.
         String gradleProperties = getText(entries, "gradle.properties");
@@ -793,6 +802,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             validateMavenBackendOnly(entries, ide, packageName, label);
             return;
         }
+        if (type == ProjectOptions.ProjectType.COMMAND_LINE) {
+            // The backend-only layout with a command in place of the routes: none of
+            // the app layout below applies to it.
+            validateMavenCommandLine(entries, packageName, label);
+            return;
+        }
 
         for (String path : entries.keySet()) {
             for (int i = 0; i < PLATFORM_DIRS.length; i++) {
@@ -845,6 +860,23 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertCommonPom(entries, template, packageName, mainClassName, true);
         assertNotNull(entries.get("build.sh"), label + "an app keeps its launchers");
         assertNotNull(entries.get("common/codenameone_settings.properties"), label + "missing app settings");
+    }
+
+    private void validateMavenCommandLine(Map<String, byte[]> entries, String packageName, String label) {
+        String packagePath = packageName.replace('.', '/');
+        for (String path : entries.keySet()) {
+            assertFalse(path.startsWith("common/") || path.startsWith("backend/"),
+                    label + "a command-line project is the tool alone: " + path);
+            assertFalse(path.endsWith("/pom.xml"), label + "a command-line project has one pom: " + path);
+            assertFalse(path.endsWith("/Api.java") || path.endsWith("/ApiTest.java"),
+                    label + "server source in a command-line project: " + path);
+        }
+        String pom = removeWhitespace(getText(entries, "pom.xml"));
+        assertContains(pom, "<artifactId>codenameone-backend</artifactId>", label + "the backend runtime");
+        assertContains(pom, "<groupId>" + packageName + "</groupId>", label + "the chosen groupId");
+        String tool = getText(entries, "src/main/java/" + packagePath + "/Hello.java");
+        assertContains(tool, "package " + packageName + ";", label + "the command in the chosen package");
+        assertContains(tool, "@Command", label + "the main class is a command");
     }
 
     private void validateMavenBackendOnly(Map<String, byte[]> entries, IDE ide, String packageName, String label) {

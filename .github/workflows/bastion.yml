@@ -480,7 +480,8 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-bastion-${{ hashFiles('Ports/Android/build.gradle*') }}
+            ~/.codenameone/gradle8
+          key: ${{ runner.os }}-gradle-g8-bastion-${{ hashFiles('Ports/Android/build.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-bastion-
             ${{ runner.os }}-gradle-

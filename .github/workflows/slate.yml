@@ -400,7 +400,8 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-slate-${{ hashFiles('Ports/Android/build.gradle*') }}
+            ~/.codenameone/gradle8
+          key: ${{ runner.os }}-gradle-g8-slate-${{ hashFiles('Ports/Android/build.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-slate-
             ${{ runner.os }}-gradle-
