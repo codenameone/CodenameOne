@@ -637,6 +637,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 // The incoming value takes the managed one's place; the flush
                 // diffs it against the snapshot like any other change.
                 Entry entry = entries.get(managed);
+                readReplacedRelations(entry, entity);
                 replace(entry, entity);
                 managed = entity;
             } else {
@@ -647,6 +648,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         managed = (T) mergeRelations(model, entity, managed, merging);
         merging.put(entity, managed);
         return managed;
+    }
+    /// Before `incoming` takes a managed record's place: reads every relationship
+    /// it carries a holder of its own for that the flush diffs against what was
+    /// stored -- a to-many, or the inverse side of a to-one that removes orphans.
+    /// Left unread, the stored targets were never recorded, and the flush saw
+    /// nothing to unlink or delete.
+    private void readReplacedRelations(Entry entry, Object incoming) {
+        Relationship[] relations = entry.model.relationships();
+        for (int i = 0; i < relations.length; i++) {
+            Relationship relation = relations[i];
+            if (relation.element || !(relation.many || relation.orphanRemoval && relation.column < 0)) {
+                continue;
+            }
+            Object replacing = entry.model.holder(incoming, i);
+            if (replacing != entry.model.holder(entry.entity, i)) {
+                initialize(entry.entity, i);
+            }
+        }
     }
     /// Answers the managed instance, which is a copy when a record could not
     /// take a merged value in place.

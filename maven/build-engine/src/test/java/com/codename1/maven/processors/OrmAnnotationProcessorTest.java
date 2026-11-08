@@ -714,6 +714,56 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
+    /// A merged record copy that replaces a relationship the managed record
+    /// never read: the stored targets are read first, so an orphan on the
+    /// inverse side of a one-to-one is deleted and the join rows of a replaced
+    /// many-to-many set are unlinked.
+    @Test
+    public void recordReplacedUnreadRelationsOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        StringBuilder out=new StringBuilder();
+        replacedUnread(false,out); replacedUnread(true,out);
+        assertTrue(out.toString(),out.length()==0);
+    }
+    private void replacedUnread(boolean backend,StringBuilder out) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package rt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("rt.User",imports+"@Entity(table=\"pc_user\") public record User(@Id long id, String name, @OneToOne(mappedBy=\"user\",cascade=CascadeType.REMOVE) Ref<Profile> profile) { }");
+        sources.put("rt.Profile",imports+"@Entity(table=\"pc_profile\") public record Profile(@Id long id, String bio, @OneToOne Ref<User> user) { }");
+        sources.put("rt.Owner",imports+"@Entity(table=\"pc_owner\") public record Owner(@Id long id, String name, @OneToOne(mappedBy=\"owner\",orphanRemoval=true) Ref<Pet> pet) { }");
+        sources.put("rt.Pet",imports+"@Entity(table=\"pc_pet\") public record Pet(@Id long id, String bio, @OneToOne Ref<Owner> owner) { }");
+        sources.put("rt.Club",imports+"@Entity(table=\"pc_club\") public record Club(@Id long id, String name, @ManyToMany Set<Pet> members) { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("rt.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static StringBuilder f=new StringBuilder(); static void ok(boolean b,String m) { if(!b) f.append(m).append(\"; \"); } "
+            + "interface R { void run() throws Exception; } static void t(String n,R r) { try { r.run(); } catch(Throwable e) { f.append(n).append(\" threw \").append(e).append(\"; \"); } } "
+            + "public static String run(Session s) { f.setLength(0); s.createTables(); "
+            + "t(\"orphan\",()->{ s.beginTransaction(); Owner u=s.merge(OwnerBuilder.create().name(\"u\").build()); Pet p=s.merge(PetBuilder.create().bio(\"b\").owner(Ref.of(u)).build()); s.commitTransaction(); s.clear(); s.beginTransaction(); Owner c=s.find(Owner.class,u.id()); s.merge(OwnerBuilder.of(c).pet(Ref.<Pet>empty()).build()); s.commitTransaction(); s.clear(); ok(s.find(Pet.class,p.id())==null,\"orphanRemoval on inverse Ref ignored Ref.empty()\"); }); s.clear(); "
+            + "t(\"m2m\",()->{ s.beginTransaction(); Pet a=s.merge(PetBuilder.create().bio(\"a\").build()); Pet b=s.merge(PetBuilder.create().bio(\"z\").build()); "
+            + "Club c=s.merge(ClubBuilder.create().name(\"c\").members(new HashSet<Pet>(Arrays.asList(a,b))).build()); s.commitTransaction(); s.clear(); "
+            + "s.beginTransaction(); Club cold=s.find(Club.class,c.id()); Pet keep=s.find(Pet.class,a.id()); "
+            + "s.merge(ClubBuilder.of(cold).members(new HashSet<Pet>(Collections.singleton(keep))).build()); s.commitTransaction(); s.clear(); "
+            + "Set<Pet> now=s.find(Club.class,c.id()).members(); ok(now.size()==1 && \"a\".equals(now.iterator().next().bio()),\"replaced unread set \"+now); }); "
+            + "return f.toString(); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        String tag=backend?"backend: ":"client: ";
+        try {
+            String r=(String)loader.loadClass("rt.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            if(r.length()>0) out.append(tag).append(r).append('\n');
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { out.append(tag+error.getCause()+"\n"); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
     /// Adopts tables that existed before the application: explicit names, a key the
     /// database generates, native timestamp and date columns, a legacy epoch column and
     /// a tag set keyed by value. Runs on SQLite on both runtimes, and on the backend
