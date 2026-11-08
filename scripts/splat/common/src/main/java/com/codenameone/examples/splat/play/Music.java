@@ -78,7 +78,14 @@ public final class Music {
         want(0);
     }
 
-    private static void want(int what) {
+    private static void want(final int what) {
+        // A GameView's update can run on the renderer's thread (the AWT one in
+        // the simulator), and creating a Media there waits for the EDT while
+        // the EDT waits on AWT to blit: a deadlock. Media is the EDT's.
+        if (!CN.isEdt()) {
+            CN.callSerially(() -> want(what));
+            return;
+        }
         wanted = what;
         apply();
     }
