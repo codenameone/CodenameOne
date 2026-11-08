@@ -121,14 +121,20 @@ public final class MultiProgress implements AutoCloseable {
 
     String[] frame(long now) {
         List<ProgressBar> list = bars.get();
+        // Measured across the group first, so every bar is drawn at one
+        // width and the bars and their numbers line up in columns.
         int labelWidth = 0;
+        int statsWidth = 0;
+        int messageWidth = 0;
         for (ProgressBar bar : list) { // NOPMD CloseResource - the group owns its bars
             labelWidth = Math.max(labelWidth, TextWidth.width(bar.label()));
+            statsWidth = Math.max(statsWidth, bar.stats(now).length());
+            messageWidth = Math.max(messageWidth, bar.messageWidth());
         }
         int width = Console.width();
         String[] lines = new String[list.size()];
         for (int i = 0; i < lines.length; i++) {
-            lines[i] = list.get(i).render(now, width, labelWidth);
+            lines[i] = list.get(i).render(now, width, labelWidth, statsWidth, messageWidth);
         }
         return lines;
     }

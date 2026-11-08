@@ -39,10 +39,10 @@ public class Deploy implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         // tag::cli-console-output[]
-        Console.print(new Table("Service", "Replicas")
-                .align(1, Table.Align.RIGHT)
-                .addRow("api", 3)
-                .addRow("worker", 2)
+        Console.print(new Table("Service", "Status", "Replicas")
+                .align(2, Table.Align.RIGHT)
+                .addRow("api", Console.style("running", Console.Style.GREEN), 3)
+                .addRow("worker", Console.style("degraded", Console.Style.YELLOW), 2)
                 .render());
 
         try (ProgressBar bar = new ProgressBar("upload", 40).unit("files")) {

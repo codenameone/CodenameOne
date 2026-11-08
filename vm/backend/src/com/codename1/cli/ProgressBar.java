@@ -242,13 +242,58 @@ public final class ProgressBar implements AutoCloseable {
     /// One line of the bar at time `now`, `width` columns wide, with the
     /// label padded to `labelWidth`.
     String render(long now, int width, int labelWidth) {
+        return render(now, width, labelWidth, stats(now).length(), messageWidth());
+    }
+
+    /// The columns the message takes, 0 without one.
+    int messageWidth() {
+        String msg = message.get();
+        return msg == null || msg.length() == 0 ? 0 : TextWidth.width(msg);
+    }
+
+    /// One line of a group: every bar of a [MultiProgress] is drawn with the
+    /// same `statsWidth` (the widest statistics) and room for the longest
+    /// message, `messageWidth`, so the bars line up and keep the same width.
+    String render(long now, int width, int labelWidth, int statsWidth, int messageWidth) {
+        String stats = TextWidth.pad(stats(now), statsWidth, Table.Align.LEFT);
+        String msg = message.get();
+        boolean isDone = done.get();
+        boolean known = total.get() > 0;
+        boolean unicode = Console.unicode();
+
+        String prefix = TextWidth.pad(label, labelWidth, Table.Align.LEFT);
+        int fixed = TextWidth.width(prefix) + 2 + 2 + statsWidth + (messageWidth > 0 ? 2 + messageWidth : 0);
+        int barWidth = Math.max(10, Math.min(40, width - 1 - fixed));
+        String bar;
+        if (known || isDone) {
+            double fraction = known ? Math.min(1.0, (double) current.get() / total.get()) : 1.0;
+            bar = filled(fraction, barWidth, unicode);
+        } else {
+            bar = bounce(now - started, barWidth, unicode);
+        }
+        Console.Style color = failed.get() ? Console.Style.RED
+                : isDone ? Console.Style.GREEN : Console.Style.CYAN;
+        StringBuilder line = new StringBuilder();
+        if (prefix.length() > 0) {
+            line.append(prefix).append("  ");
+        }
+        line.append(Console.style(bar, color)).append("  ");
+        if (msg != null && msg.length() > 0) {
+            line.append(stats).append("  ").append(Console.style(msg, Console.Style.FAINT));
+        } else {
+            line.append(stats(now));
+        }
+        return line.toString();
+    }
+
+    /// The percentage, count, rate and time of the bar at time `now`.
+    String stats(long now) {
         long cur = current.get();
         long tot = total.get();
         boolean isDone = done.get();
         boolean known = tot > 0;
         long end = isDone ? finishedAt.get() : now;
         long elapsed = Math.max(0, end - started);
-        boolean unicode = Console.unicode();
 
         StringBuilder stats = new StringBuilder();
         if (known) {
@@ -270,29 +315,7 @@ public final class ProgressBar implements AutoCloseable {
         } else {
             stats.append("  -:--");
         }
-        String msg = message.get();
-
-        String prefix = TextWidth.pad(label, labelWidth, Table.Align.LEFT);
-        int fixed = TextWidth.width(prefix) + 2 + 2 + stats.length();
-        int barWidth = Math.max(10, Math.min(40, width - 1 - fixed));
-        String bar;
-        if (known || isDone) {
-            double fraction = known ? Math.min(1.0, (double) cur / tot) : 1.0;
-            bar = filled(fraction, barWidth, unicode);
-        } else {
-            bar = bounce(now - started, barWidth, unicode);
-        }
-        Console.Style color = failed.get() ? Console.Style.RED
-                : isDone ? Console.Style.GREEN : Console.Style.CYAN;
-        StringBuilder line = new StringBuilder();
-        if (prefix.length() > 0) {
-            line.append(prefix).append("  ");
-        }
-        line.append(Console.style(bar, color)).append("  ").append(stats);
-        if (msg != null && msg.length() > 0) {
-            line.append("  ").append(Console.style(msg, Console.Style.FAINT));
-        }
-        return line.toString();
+        return stats.toString();
     }
 
     static String filled(double fraction, int width, boolean unicode) {

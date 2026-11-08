@@ -127,6 +127,8 @@ styled text with any of them, converting a color the terminal can't show to the
 nearest one it can. `Ansi` also moves the cursor, erases lines, switches to the
 alternate screen and writes hyperlinks.
 
+image::img/cli-console-output.svg["A table with green, yellow and red status cells, a colored file tree, a 24-bit color ramp and the text attributes",scaledwidth=80%]
+
 `Table` sizes its columns to the terminal and wraps cells that don't fit;
 `Tree` draws a hierarchy. Both measure text by what it looks like on screen, so
 wide characters, emoji and styled text line up. Without a UTF-8 locale they
@@ -140,6 +142,8 @@ success, failure, warning or information line. They all redraw in place
 on a terminal. When the output goes elsewhere they print a few plain lines
 instead, so a log file or a build server shows what happened without escape
 codes.
+
+image::img/cli-console-progress.svg["Spinner results marked with a check, a warning and an information sign above three progress bars: one finished in green and two under way in cyan",scaledwidth=80%]
 
 `Prompt` asks questions:
 
@@ -158,6 +162,18 @@ keeps a tool scriptable with `printf 'staging\n1,2\n' | tool`. Ctrl-C at a
 question throws `Prompt.Cancelled`, and the command exits with 130, as a shell
 reports an interrupted program. The terminal is restored however the program
 ends, including on Ctrl-C and `kill`.
+
+A choice from a list, with the arrow on the second item:
+
+image::img/cli-console-select.svg["A select prompt after an answered text question, with the arrow and highlight on staging",scaledwidth=80%]
+
+A multiple choice, with two regions checked:
+
+image::img/cli-console-checkbox.svg["A multiple choice prompt with two regions checked in green and the arrow on the last region",scaledwidth=80%]
+
+A masked password, an answered confirmation and a number that failed validation:
+
+image::img/cli-console-prompts.svg["A masked token, a confirmation answered Yes and a number prompt showing a red error for 12",scaledwidth=80%]
 
 === Testing
 

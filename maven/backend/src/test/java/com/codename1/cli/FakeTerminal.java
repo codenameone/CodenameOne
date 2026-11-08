@@ -122,6 +122,12 @@ final class FakeTerminal implements TerminalBackend {
     @Override
     public int readByte(int timeoutMs) {
         if (input.isEmpty()) {
+            if (snapshotWhenIdle && timeoutMs < 0) {
+                // The program waits for a key the script has none of: the
+                // screen up to here is the screenshot.
+                snapshot = out.length();
+                throw new Snapshot();
+            }
             return timeoutMs >= 0 ? -2 : -1;
         }
         return input.removeFirst();
@@ -160,4 +166,14 @@ final class FakeTerminal implements TerminalBackend {
     }
 
     boolean cursorHiddenFlag;
+
+    /// When set, a blocking read with no scripted input left ends the program
+    /// with [Snapshot], recording in [#snapshot] how much output came first.
+    boolean snapshotWhenIdle;
+    int snapshot = -1;
+
+    /// Thrown out of a prompt once its screen is ready to be captured.
+    static final class Snapshot extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
 }

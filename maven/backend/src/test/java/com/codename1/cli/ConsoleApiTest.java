@@ -385,6 +385,27 @@ class ConsoleApiTest {
     // ---- Progress ----
 
     @Test
+    void groupedBarsShareOneWidthAndKeepTheirMessage() {
+        FakeTerminal t = install(FakeTerminal.tty(true));
+        MultiProgress group = new MultiProgress(t, true, false);
+        ProgressBar a = group.add("assets", 128).unit("files");
+        ProgressBar b = group.add("upload", 120L * 1024 * 1024).bytes();
+        t.now += 3000;
+        a.stepTo(128);
+        b.stepTo(53L * 1024 * 1024);
+        b.setMessage("backend.jar");
+        List<String> lines = VirtualScreen.play(t.output()).lines();
+        assertEquals(2, lines.size(), lines.toString());
+        // Each bar ends where its statistics begin; in a group they all end
+        // in the same column, whatever their numbers say.
+        int endA = lines.get(0).lastIndexOf('\u2588') + 1;
+        int endB = Math.max(lines.get(1).lastIndexOf('\u2591'), lines.get(1).lastIndexOf('\u2588')) + 1;
+        assertEquals(endA, endB, lines.toString());
+        assertTrue(lines.get(1).endsWith("backend.jar"), lines.get(1));
+        group.close();
+    }
+
+    @Test
     void progressBarRendersCountRateAndEta() {
         FakeTerminal t = install(FakeTerminal.tty(true));
         MultiProgress group = new MultiProgress(t, true, false);
