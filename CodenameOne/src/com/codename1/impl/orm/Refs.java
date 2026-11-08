@@ -146,20 +146,17 @@ public final class Refs {
         }
     }
 
-    /// Readies a holder that another record still carries, unread, for a record
-    /// the session is about to bind it to. Two records then share one holder,
-    /// a copy built from a managed record, and binding it would re-point the
-    /// lazy state at the new record, which stores nothing yet: the shared `Ref`
-    /// would empty for both and the new row would lose its key. So the holder is
-    /// read through its owner first. A detached `Ref` that knows its stored key is
-    /// kept as that key; a collection or an inverse `Ref` whose owner is detached cannot be
-    /// read, and is refused rather than saved as empty.
+    /// Readies a holder that another record still carries, unread, for a new
+    /// record the session is about to bind it to: a copy built from a found
+    /// record shares its holders. Binding re-points the lazy state at the new
+    /// record, so a collection is read through its owner first, while that
+    /// owner can still read it; a `Ref` keeps the key it already holds. The
+    /// inverse side of a to-one is left unread: nothing points at a row that is
+    /// not inserted yet, so for the new record it reads back empty.
     static void share(Object holder, EntityState state) {
         Link link = link(holder);
-        if (link == null || link.loaded || link.state == null || link.state == state) {
-            return;
-        }
-        if (holder instanceof Holder && !link.keyless && (link.state.session == null || !link.state.attached)) {
+        if (link == null || link.loaded || link.state == null || link.state == state
+                || holder instanceof Holder || !link.state.attached || link.state.session == null) {
             return;
         }
         link.load();

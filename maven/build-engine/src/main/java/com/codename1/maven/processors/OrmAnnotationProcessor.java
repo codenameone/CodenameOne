@@ -1173,6 +1173,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 }
                 if(embedded==null || embedded.getClassAnnotation("Lcom/codename1/annotations/db/Embeddable;")==null
                         || !embedded.isRecord() && !hasPublicNoArgConstructor(embedded)) { ctx.error("Embedded value requires @Embeddable and a public no-arg constructor: "+path);continue; }
+                if(embedded.isRecord() && path.indexOf('$')>=0) {
+                    // The generated stand-ins are named after the path with a `$`
+                    // between its parts; a `$` in a name could give two paths one.
+                    ctx.error("An embedded record component name cannot contain '$': "+path);continue;
+                }
                 entity.embedded.put(path,type);
                 if(embedded.isRecord()) {
                     List<String[]> components=new ArrayList<String[]>();

@@ -781,7 +781,8 @@ public class OrmAnnotationProcessorTest {
         sources.put("sh.Buyer",imports+"@Entity(table=\"sh_buyer\") public record Buyer(@Id long id, String name) { }");
         sources.put("sh.Spot",imports+"@Embeddable public record Spot(double lat, String of) { }");
         sources.put("sh.Place",imports+"@Embeddable public record Place(String city, @Embedded Spot build) { }");
-        sources.put("sh.Order",imports+"@Entity(table=\"sh_order\") public record Order(@Id long id, String note, @ManyToOne Ref<Buyer> buyer, @Embedded Place build) { }");
+        sources.put("sh.Order",imports+"@Entity(table=\"sh_order\") public record Order(@Id long id, String note, @ManyToOne Ref<Buyer> buyer, @Embedded Place build, @OneToOne(mappedBy=\"order\") Ref<Memo> memo) { }");
+        sources.put("sh.Memo",imports+"@Entity(table=\"sh_memo\") public record Memo(@Id long id, String text, @OneToOne Ref<Order> order) { }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         Map<String,String> check=new java.util.LinkedHashMap<String,String>();
@@ -795,6 +796,13 @@ public class OrmAnnotationProcessorTest {
             + "ok(found.buyer().isPresent() && Long.valueOf(b.id()).equals(found.buyer().id()),\"original lost its ref \"+found.buyer()); s.clear(); "
             + "Order back=s.find(Order.class,dup.id()); ok(back!=null && back.buyer().isPresent() && Long.valueOf(b.id()).equals(back.buyer().id()),\"copy saved without its key\"); "
             + "Order first=s.find(Order.class,o.id()); ok(first.build()!=null && \"c\".equals(first.build().city()) && first.build().build().lat()==1.5 && \"x\".equals(first.build().build().of()),\"embedded build \"+first.build()); }); "
+            + "t(\"detached inverse\",()->{ s.beginTransaction(); Order o=s.merge(OrderBuilder.create().note(\"i\").build()); s.merge(MemoBuilder.create().text(\"m\").order(Ref.of(o)).build()); s.commitTransaction(); s.clear(); "
+            + "Order found=s.find(Order.class,o.id()); s.clear(); s.beginTransaction(); Order dup=s.merge(OrderBuilder.of(found).id(0).build()); s.commitTransaction(); s.clear(); "
+            + "ok(!s.find(Order.class,dup.id()).memo().isPresent(),\"new copy took the original's inverse\"); ok(s.find(Order.class,o.id()).memo().isPresent(),\"original lost its inverse\"); }); "
+            + "t(\"draft across transactions\",()->{ s.beginTransaction(); Buyer draft=BuyerBuilder.create().name(\"late\").build(); s.persist(draft); s.commitTransaction(); "
+            + "s.beginTransaction(); Order o=s.merge(OrderBuilder.create().note(\"t\").buyer(Ref.of(draft)).build()); s.commitTransaction(); s.clear(); "
+            + "Order back=s.find(Order.class,o.id()); Long n=s.createNativeQuery(\"SELECT COUNT(*) FROM sh_buyer WHERE name='late'\",Long.class).first(); "
+            + "ok(back.buyer().isPresent() && n.longValue()==1,\"draft from an earlier transaction: \"+back.buyer()+\" rows \"+n); }); "
             + "return f.toString(); }}");
         List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
         JavaSourceCompiler.compile(check,classes,classpath,"17");
