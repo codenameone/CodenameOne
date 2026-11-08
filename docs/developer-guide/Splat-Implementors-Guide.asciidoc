@@ -138,7 +138,7 @@ side, so a field is fair by construction:
 include::../../scripts/splat/rules/src/main/java/com/codenameone/examples/splat/rules/Catalog.java[tag=splat-arena,indent=0]
 ----
 
-A box's kind (`bunker`, `minivan`, `snackbar`) picks its colour and shape in the
+A box's kind (`bunker`, `minivan`, `snackbar`) picks its color and shape in the
 client; the rules only see its extent. Change any of these and run
 `mvn -pl rules test`: the golden replays report which recorded matches no longer end
 the same way. Bump `RulesVersion.ID` when you change the rules themselves, so old
@@ -168,7 +168,7 @@ include::../../scripts/splat/common/src/main/java/com/codenameone/examples/splat
 The look is the engine's, not a texture pack's: haze that thins with height,
 an open sky with clouds and the sun, shadows from the props and trees, and a
 color grade with bloom on the paint. It's a dozen lines at the start of the
-view, and the menu backdrop uses the same calls with dusk colours:
+view, and the menu backdrop uses the same calls with dusk colors:
 
 [source,java,role=cn1-no-try]
 ----
@@ -264,7 +264,7 @@ Players build fields of their own. The editor shows one half of the field from a
 the other half is that half turned around, built by the same `Arena.Builder.mirror` the
 built-in yards use, so a player-made field is fair by construction. A `Mission` in the
 rules module holds the props, spawns, flag, mode and briefing, travels as JSON, and is
-checked by `Mission.problem()` on the phone and again on the server before it is
+checked by `Mission.problem()` on the phone and again on the server before it's
 stored:
 
 [source,java,role=cn1-no-try]
@@ -318,17 +318,17 @@ work in Splat unchanged.
 === Making it yours
 
 * *Fields*: add an `Arena.Builder` to `Catalog.ARENAS`. The mission list, the server's
-  playlist and the bots pick it up at once. Give a new box kind a colour in
+  playlist and the bots pick it up at once. Give a new box kind a color in
   `ArenaView`.
 * *Markers*: add a `MarkerDef`, then sell it in the backend's shop `Catalog`. The
   shipped markers are side-grades, not upgrades: the pump hits harder at range and the
   ramping marker sprays.
 * *Characters*: there are no model files. `ArenaView` builds every player from
-  primitives in the team colour, and `Portraits` paints the same figure flat for the
+  primitives in the team color, and `Portraits` paints the same figure flat for the
   menus.
 * *The jokes*: the briefings are in `Mode`, the killfeed's excuses in `Hud`, and the
   emotes in `MatchForm`.
-* *The look*: every colour is a variable at the top of `theme.css`:
+* *The look*: every color is a variable at the top of `theme.css`:
 +
 [source,css]
 ----
