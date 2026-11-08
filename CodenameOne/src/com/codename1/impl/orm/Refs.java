@@ -126,14 +126,17 @@ public final class Refs {
 
     /// Ties a holder to the session state of the record that carries it. A
     /// holder still unread takes the stored key, so a `Ref` answers its id
-    /// without a query; an unread `Ref` with no key is simply empty.
-    static void bind(Object holder, EntityState state, int index, Class target, Object key) {
+    /// without a query; an unread `Ref` with no key is simply empty. The inverse
+    /// side of a to-one, `keyless`, has no stored key to take, so it stays
+    /// unread and reads its target when it is first asked anything.
+    static void bind(Object holder, EntityState state, int index, Class target, Object key, boolean keyless) {
         Link link = link(holder);
         if (link == null) {
             return;
         }
         link.bind(state, index, target);
-        if (holder instanceof Holder && !link.loaded) {
+        link.keyless = keyless;
+        if (holder instanceof Holder && !link.loaded && !keyless) {
             Holder ref = (Holder) holder;
             ref.id = key;
             if (key == null) {

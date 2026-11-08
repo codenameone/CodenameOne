@@ -584,6 +584,69 @@ public class OrmAnnotationProcessorTest {
         assertTrue(errors,errors.contains("An @Embeddable record is held by a record entity: f"));
     }
 
+    /// What the guide says of records beyond the main paths: the inverse side of
+    /// a one-to-one as a Ref reads its target on first use, since the row stores
+    /// no key for it, and refuses once detached; persist hands the keyed copy to
+    /// the identity map; Ref.empty and Optional.empty clear a foreign key; field
+    /// annotations work on components; embedded columns are named by path.
+    @Test
+    public void recordCornersOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordCorners(false);
+        recordCorners(true);
+    }
+    private void recordCorners(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package corner; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("corner.Code",imports+"public record Code(String text) { }");
+        sources.put("corner.CodeConverter",imports+"public class CodeConverter implements com.codename1.orm.session.AttributeConverter<Code,String> { public CodeConverter() {} "
+            + "public String toDatabase(Code c) { return c == null ? null : c.text(); } public Code fromDatabase(String v) { return v == null ? null : new Code(v); } }");
+        sources.put("corner.Pin",imports+"@Embeddable public record Pin(double lat, double lng) { }");
+        sources.put("corner.User",imports+"@Entity(table=\"people\") public record User(@Id long id, @Column(name=\"handle\") String name, "
+            + "@Temporal(TemporalType.DATE) java.util.Date born, @Convert(converter=CodeConverter.class, storageType=String.class) Code code, "
+            + "@Embedded Pin spot, @OneToOne(mappedBy=\"user\") Ref<Profile> profile, @ManyToOne Ref<User> mentor, @ManyToOne Optional<User> buddy) { }");
+        sources.put("corner.Profile",imports+"@Entity public record Profile(@Id long id, String bio, @OneToOne Ref<User> user) { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("corner.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static void ok(boolean b,String m) { if(!b) throw new AssertionError(m); } "
+            + "public static void run(Session s) { s.createTables(); s.beginTransaction(); "
+            + "User mentor=s.merge(UserBuilder.create().name(\"m\").build()); "
+            + "User draft=UserBuilder.create().name(\"u\").born(new Date(86400000L*3)).code(new Code(\"C7\")).spot(new Pin(1.5,2.5)).mentor(Ref.of(mentor)).buddy(Optional.of(mentor)).build(); "
+            + "s.persist(draft); s.flush(); "
+            + "ok(draft.id()==0 && !s.contains(draft),\"persist leaves the caller's record alone\"); "
+            + "List<User> named=s.query(User.class).eq(\"name\",\"u\").list(); ok(named.size()==1 && named.get(0).id()!=0 && s.contains(named.get(0)),\"persist manages the keyed copy \"+named); "
+            + "User u=named.get(0); s.merge(ProfileBuilder.create().bio(\"b\").user(Ref.of(u)).build()); "
+            + "s.commitTransaction(); s.clear(); "
+            + "User back=s.find(User.class,u.id()); "
+            + "ok(\"u\".equals(back.name()) && \"C7\".equals(back.code().text()) && back.born().getTime()==86400000L*3 && back.spot().lng()==2.5,\"component annotations \"+back); "
+            + "ok(!back.profile().isLoaded(),\"the inverse side is unread \"+back.profile()); "
+            + "ok(back.profile().isPresent() && back.profile().isLoaded() && \"b\".equals(back.profile().get().bio()),\"the inverse side reads on first use\"); "
+            + "ok(s.createNativeQuery(\"SELECT handle FROM people WHERE spot_lat = 1.5 AND spot_lng = 2.5\",String.class).list().size()==1,\"columns named by @Column and by path\"); "
+            + "s.clear(); User cold=s.find(User.class,u.id()); s.clear(); boolean refused=false; "
+            + "try { cold.profile().id(); } catch(LazyInitializationException expected) { refused=true; } ok(refused,\"a detached unread inverse side refuses\"); "
+            + "s.beginTransaction(); User current=s.find(User.class,u.id()); "
+            + "s.merge(UserBuilder.of(current).mentor(Ref.empty()).buddy(Optional.empty()).build()); s.commitTransaction(); s.clear(); "
+            + "User cleared=s.find(User.class,u.id()); "
+            + "ok(!cleared.mentor().isPresent() && cleared.mentor().id()==null && !cleared.buddy().isPresent(),\"empty holders clear the keys \"+cleared); "
+            + "User lone=s.find(User.class,mentor.id()); ok(!lone.profile().isPresent() && lone.profile().get()==null,\"an inverse side with no row is empty\"); "
+            + "}}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("corner.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
     /// Adopts tables that existed before the application: explicit names, a key the
     /// database generates, native timestamp and date columns, a legacy epoch column and
     /// a tag set keyed by value. Runs on SQLite on both runtimes, and on the backend

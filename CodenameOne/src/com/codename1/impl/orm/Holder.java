@@ -58,8 +58,17 @@ public abstract class Holder {
         return link.loaded;
     }
 
-    /// The identifier of the target, read or not, or null without one.
+    /// The identifier of the target, read or not, or null without one. The
+    /// inverse side of a to-one stores no key, so it reads the target first.
     protected final Object identifier() {
+        if (!link.loaded && link.keyless) {
+            link.load();
+        }
+        return storedIdentifier();
+    }
+
+    /// The identifier as far as it is known, without reading anything.
+    protected final Object storedIdentifier() {
         return link.loaded ? Models.identifierOf(value) : id;
     }
 

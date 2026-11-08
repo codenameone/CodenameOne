@@ -88,7 +88,8 @@ The existing scalar `Dao` API keeps its immediate-write behavior. Entities
 using relationships, `@Version`, composite IDs, generated strategies,
 inheritance, converters, indexes, or embedded values use sessions; asking for a
 legacy DAO for these mappings throws an error rather than dropping
-managed behavior.
+managed behavior. That holds for record entities too: a record works with the
+`Dao` only while it has none of these.
 
 A managed session maintains one instance per entity identity, detects changes
 at flush time, and flushes before commit and before queries in a transaction.
@@ -522,7 +523,8 @@ are rejected before pending changes are flushed.
 ==== Supported boundary
 
 This API provides managed persistence through CN1 annotations; it's not a JPA
-provider or a Hibernate binary replacement. Entity access is by field, whether the field is public or private.
+provider or a Hibernate binary replacement. Entity access is by field, whether the field is public or private;
+a record entity is read through its accessors and built through its canonical constructor.
 Getter/setter access mappings aren't supported: a private field already keeps the
 entity encapsulated, and reading a field directly is what lets the build generate
 the access code without reflection. Property-backed associations, joined/table-per-class
@@ -608,8 +610,9 @@ any entity; `refresh` replaces the managed record with a copy that holds the
 row's current values, so read the result through `find` afterwards.
 
 The plain `Dao` API answers the copy too: `dao.save(draft)` returns the record
-with its generated key. Like any versioned mapping, a record with a `@Version`
-needs a session.
+with its generated key. Like any other entity, a record works with the `Dao`
+only while it has no `@Version`, relationship, embedded value or other
+mapping that needs a session; `Note` above needs one.
 
 ==== Relationships
 
@@ -673,6 +676,10 @@ String name = p.customer().get().name();         // reads the customer now
 String reviewer = p.reviewer().map(Customer::name).orElse("nobody");
 int lines = p.lines().size();                    // reads the lines now
 ----
+
+The inverse side of a one-to-one, `@OneToOne(mappedBy = "user") Ref<Profile>
+profile`, is the exception: the record's own row stores no key for it, so its
+`id()` and `isPresent()` read the target too.
 
 `isLoaded()` says whether a `Ref` was read already. A `Ref` or a collection
 that was never read can't be read once its session is closed or the record is
@@ -844,8 +851,7 @@ Derived methods support the following bounded grammar:
   entity, `Optional<Entity>` or `List<Entity>`. A single result means the first row,
   not a uniqueness assertion; an entity return answers null when there is no row,
   and an `Optional` answers `Optional.empty()`. A declared `@Query` select can
-  return `Optional` of its scalar the same way. `Optional` is part of the backend's
-  class library, not the client's, so it's for repositories the server uses.
+  return `Optional` of its scalar the same way.
 * `countBy` returns `long`; `existsBy` returns `boolean`; `deleteBy` returns `int`
   (affected rows) or `void`.
 * Direct scalar property names combine with `And` and `Or`; AND has higher precedence than OR.

@@ -1763,6 +1763,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         return collation.regionMatches(true, 0, "utf8mb4", 0, 7);
     }
+    /// The inverse side of a to-one, which the owner's row holds no key for.
+    private static boolean keyless(Relationship relation) {
+        return !relation.many && relation.mappedBy.length() > 0;
+    }
+
     private static boolean uniqueIndexed(EntityModel model, Attribute attr) {
         for (Index definition : model.indexes()) {
             if (definition.unique) {
@@ -2606,7 +2611,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (record) {
                 // The holder in the component carries the lazy state from here.
                 Object holder = entry.model.holder(entry.entity, i);
-                Refs.bind(holder, state, i, relations[i].target, state.keys[i]);
+                Refs.bind(holder, state, i, relations[i].target, state.keys[i], keyless(relations[i]));
                 if (!state.loaded[i] && holder instanceof Holder && Refs.loaded(holder)) {
                     // A to-one with no key is read already: there is nothing.
                     state.loaded[i] = true;
@@ -3625,7 +3630,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (sameInstance(holder, model.holder(previous, i))) {
                 continue;
             }
-            Refs.bind(holder, state, i, relations[i].target, Refs.storedKey(holder));
+            Refs.bind(holder, state, i, relations[i].target, Refs.storedKey(holder), keyless(relations[i]));
             state.loaded[i] = Refs.loaded(holder);
             if (!state.loaded[i] && relations[i].column >= 0) {
                 state.keys[i] = Refs.storedKey(holder);

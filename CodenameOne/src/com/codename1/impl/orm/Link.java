@@ -37,6 +37,9 @@ final class Link {
     boolean loaded = true;
     /// The relationship's target type, known once the session binds the holder.
     Class type;
+    /// The inverse side of a to-one: the owner's row stores no key for it, so
+    /// even the target's identifier is known only once the target is read.
+    boolean keyless;
 
     void load() {
         if (loaded) {

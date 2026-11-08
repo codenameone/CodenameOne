@@ -40,8 +40,10 @@ import com.codename1.impl.orm.Holder;
 ///
 /// A `Ref` loaded by a session reads its target through that session, and only
 /// while it is open: `get()` on a `Ref` that was never read, once the session is
-/// closed, throws `LazyInitializationException`. `id()` and `isPresent()` never
-/// read anything.
+/// closed, throws `LazyInitializationException`. `id()` and `isPresent()` read
+/// nothing either, with one exception: on the inverse side of a one-to-one,
+/// `@OneToOne(mappedBy = ...)`, the record's own row stores no key, so they read
+/// the target, and throw the same way once the session is gone.
 ///
 /// To point a record at another entity, build it with `Ref.of(target)`, or
 /// `Ref.empty()` for none. Two refs are equal when they point at the same
@@ -81,8 +83,9 @@ public final class Ref<T> extends Holder {
         return loaded() ? current() != null : identifier() != null;
     }
 
-    /// The target's identifier, without reading it; null for an empty ref, or a
-    /// target that has not been saved yet.
+    /// The target's identifier, without reading it unless the ref is the inverse
+    /// side of a one-to-one; null for an empty ref, or a target that has not
+    /// been saved yet.
     public Object id() {
         return identifier();
     }
@@ -126,7 +129,7 @@ public final class Ref<T> extends Holder {
 
     @Override
     public String toString() {
-        Object id = identifier();
-        return "Ref[" + (id != null ? id : loaded() && current() != null ? current() : "empty") + "]";
+        Object id = storedIdentifier();
+        return "Ref[" + (id != null ? id : !loaded() ? "unread" : current() != null ? current() : "empty") + "]";
     }
 }
