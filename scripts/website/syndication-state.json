@@ -3252,6 +3252,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-08T01:01:12+00:00"
+      },
+      "devto": {
+        "id": 4998870,
+        "url": "https://dev.to/codenameone/your-swing-and-javafx-code-on-iphone-android-and-the-web-24c8",
+        "syndicated_at": "2026-11-08T14:01:01+00:00"
       }
     }
   }
