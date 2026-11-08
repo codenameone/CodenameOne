@@ -427,7 +427,7 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
-    /// A record entity with a relationship, an embedded value or a Property is
+    /// A record entity with a relationship it cannot hold is
     /// refused by name rather than generated into code that cannot compile.
     @Test
     public void recordEntitiesRefuseWhatTheyCannotHoldYet() throws Exception {
@@ -515,6 +515,73 @@ public class OrmAnnotationProcessorTest {
         }
         catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// A value embedded in a record is a record too, read with its columns and
+    /// changed with the entity's copy. A value whose columns are all null reads
+    /// back as null, nested ones included, and an embedded value that is not a
+    /// record is refused by name, as is a record embedded in a class.
+    @Test
+    public void recordEmbeddedValuesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordEmbedded(false);
+        recordEmbedded(true);
+    }
+    private void recordEmbedded(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package place; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("place.Geo",imports+"@Embeddable public record Geo(double lat, double lng) { }");
+        sources.put("place.Address",imports+"@Embeddable public record Address(String street, String city, @Embedded Geo geo) { }");
+        sources.put("place.Venue",imports+"@Entity public record Venue(@Id long id, String name, @Embedded Address home, @Embedded Address billing, @Version long version) { }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("place.Check","package place; import com.codename1.orm.session.*; public class Check { "
+            + "static void ok(boolean b,String m) { if(!b) throw new AssertionError(m); } "
+            + "public static void run(Session s) { s.createTables(); s.beginTransaction(); "
+            + "Address home=new Address(\"1 Main\",\"Springfield\",new Geo(1.5,2.5)); "
+            + "Venue v=s.merge(VenueBuilder.create().name(\"hall\").home(home).build()); "
+            + "ok(v.id()!=0 && home.equals(v.home()) && v.billing()==null,\"saved copy \"+v); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Venue back=s.find(Venue.class,v.id()); "
+            + "ok(home.equals(back.home()),\"embedded read back \"+back); ok(back.billing()==null,\"all-null columns read as null \"+back); "
+            + "s.beginTransaction(); Venue moved=s.merge(VenueBuilder.of(back).billing(new Address(\"PO 7\",null,null)).home(new Address(\"2 Elm\",\"Springfield\",new Geo(1.5,2.5))).build()); "
+            + "ok(moved.version()==back.version()+1,\"changing an embedded value is an update\"); "
+            + "ok(\"1 Main\".equals(back.home().street()),\"the old copy keeps its value\"); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Venue last=s.find(Venue.class,v.id()); "
+            + "ok(\"2 Elm\".equals(last.home().street()) && last.home().geo().lng()==2.5,\"new value stored \"+last); "
+            + "ok(\"PO 7\".equals(last.billing().street()) && last.billing().city()==null && last.billing().geo()==null,\"nested null \"+last.billing()); "
+            + "ok(s.query(Venue.class).eq(\"home.city\",\"Springfield\").list().size()==1,\"query by an embedded path\"); "
+            + "s.beginTransaction(); s.merge(VenueBuilder.of(last).home(null).build()); s.commitTransaction(); s.clear(); "
+            + "ok(s.find(Venue.class,v.id()).home()==null,\"an embedded value set to null\"); "
+            + "s.beginTransaction(); boolean stale=false; try { s.merge(back); } catch(OptimisticLockException expected) { stale=true; } s.rollbackTransaction(); "
+            + "ok(stale,\"a stale copy fails on its version\"); "
+            + "}}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("place.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+        if (backend) return;
+        File refused=tmp.newFolder();
+        Map<String,String> wrong=new java.util.LinkedHashMap<String,String>();
+        wrong.put("wrong.Mutable",imports.replace("place","wrong")+"@Embeddable public class Mutable { public String a; public Mutable() {} }");
+        wrong.put("wrong.Fixed",imports.replace("place","wrong")+"@Embeddable public record Fixed(String b) { }");
+        wrong.put("wrong.Rec",imports.replace("place","wrong")+"@Entity public record Rec(@Id long id, @Embedded Mutable m) { }");
+        wrong.put("wrong.Cls",imports.replace("place","wrong")+"@Entity public class Cls { @Id public long id; @Embedded public Fixed f; public Cls() {} }");
+        JavaSourceCompiler.compile(wrong,refused,Arrays.asList(testClassesDir()),"17");
+        String errors=runProcessor(refused).getErrors().toString();
+        assertTrue(errors,errors.contains("An embedded value in a record entity is an @Embeddable record: m"));
+        assertTrue(errors,errors.contains("An @Embeddable record is held by a record entity: f"));
     }
 
     /// Adopts tables that existed before the application: explicit names, a key the
