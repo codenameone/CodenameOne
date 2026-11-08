@@ -1,8 +1,13 @@
-#include <jni.h>
+/*
+ * Implementation of cn1_whisper.h over whisper.cpp. Compiled into the same
+ * artifact as the whisper.cpp revision it was written for; see cn1_whisper.h.
+ */
+#include "cn1_whisper.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <thread>
@@ -12,29 +17,7 @@
 
 namespace {
 
-class JStringUtf {
-public:
-    JStringUtf(JNIEnv* env, jstring value) : env_(env), value_(value), chars_(nullptr) {
-        if (value_ != nullptr) {
-            chars_ = env_->GetStringUTFChars(value_, nullptr);
-        }
-    }
 
-    ~JStringUtf() {
-        if (chars_ != nullptr) {
-            env_->ReleaseStringUTFChars(value_, chars_);
-        }
-    }
-
-    const char* c_str() const {
-        return chars_;
-    }
-
-private:
-    JNIEnv* env_;
-    jstring value_;
-    const char* chars_;
-};
 
 uint16_t u16le(const uint8_t* p) {
     return static_cast<uint16_t>(p[0]) | static_cast<uint16_t>(p[1] << 8);
@@ -189,56 +172,44 @@ whisper_context* runWhisper(const char* modelPath, const char* audioPath) {
     return ctx;
 }
 
-jstring newString(JNIEnv* env, const std::string& value) {
-    return env->NewStringUTF(value.c_str());
+std::string transcribe(const char* modelPath, const char* audioPath, bool segments) {
+    whisper_context* ctx = runWhisper(modelPath, audioPath);
+    if (ctx == nullptr) {
+        return std::string();
+    }
+    std::string out;
+    int n = whisper_full_n_segments(ctx);
+    for (int i = 0; i < n; i++) {
+        const char* text = whisper_full_get_segment_text(ctx, i);
+        if (!segments) {
+            if (text != nullptr) {
+                out += text;
+            }
+            continue;
+        }
+        out += std::to_string(static_cast<long long>(whisper_full_get_segment_t0(ctx, i)) * 10LL);
+        out += '\t';
+        out += std::to_string(static_cast<long long>(whisper_full_get_segment_t1(ctx, i)) * 10LL);
+        out += '\t';
+        out += escapePayloadText(text);
+        out += '\n';
+    }
+    whisper_free(ctx);
+    return out;
 }
 
 } // namespace
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_codename1_ai_whisper_NativeWhisperRecognizerImpl_nativeTranscribe(
-        JNIEnv* env, jobject, jstring modelPath, jstring audioPath) {
-    JStringUtf model(env, modelPath);
-    JStringUtf audio(env, audioPath);
-    whisper_context* ctx = runWhisper(model.c_str(), audio.c_str());
-    if (ctx == nullptr) {
-        return newString(env, "");
+extern "C" char* cn1whisper_transcribe(const char* model_path, const char* wav_path,
+                                       int segments) {
+    std::string out = transcribe(model_path, wav_path, segments != 0);
+    char* copy = static_cast<char*>(std::malloc(out.size() + 1));
+    if (copy != nullptr) {
+        std::memcpy(copy, out.c_str(), out.size() + 1);
     }
-
-    std::string out;
-    int segments = whisper_full_n_segments(ctx);
-    for (int i = 0; i < segments; i++) {
-        const char* text = whisper_full_get_segment_text(ctx, i);
-        if (text != nullptr) {
-            out += text;
-        }
-    }
-    whisper_free(ctx);
-    return newString(env, out);
+    return copy;
 }
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_codename1_ai_whisper_NativeWhisperRecognizerImpl_nativeTranscribeSegments(
-        JNIEnv* env, jobject, jstring modelPath, jstring audioPath) {
-    JStringUtf model(env, modelPath);
-    JStringUtf audio(env, audioPath);
-    whisper_context* ctx = runWhisper(model.c_str(), audio.c_str());
-    if (ctx == nullptr) {
-        return newString(env, "");
-    }
-
-    std::string out;
-    int segments = whisper_full_n_segments(ctx);
-    for (int i = 0; i < segments; i++) {
-        int64_t startMs = whisper_full_get_segment_t0(ctx, i) * 10LL;
-        int64_t endMs = whisper_full_get_segment_t1(ctx, i) * 10LL;
-        out += std::to_string(startMs);
-        out += '\t';
-        out += std::to_string(endMs);
-        out += '\t';
-        out += escapePayloadText(whisper_full_get_segment_text(ctx, i));
-        out += '\n';
-    }
-    whisper_free(ctx);
-    return newString(env, out);
+extern "C" void cn1whisper_free(char* text) {
+    std::free(text);
 }

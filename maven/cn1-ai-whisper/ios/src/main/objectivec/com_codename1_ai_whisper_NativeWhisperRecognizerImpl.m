@@ -1,104 +1,52 @@
 #import "com_codename1_ai_whisper_NativeWhisperRecognizerImpl.h"
-#import <UIKit/UIKit.h>
-#import <stdint.h>
+#include "cn1_globals.h"
+#include <stdlib.h>
 
-// whisper.cpp's C API. The cn1lib bundles the prebuilt static
-// library; linking against `libwhisper.a` is handled by the build
-// server (see codenameone_library_required.properties).
-struct whisper_context;
-
-struct whisper_full_params {
-    int strategy;
-    int n_threads;
-    int n_max_text_ctx;
-    int offset_ms;
-    int duration_ms;
-    int translate;
-    int no_context;
-    int single_segment;
-    int print_special;
-    int print_progress;
-    int print_realtime;
-    int print_timestamps;
-};
-
-extern struct whisper_context *whisper_init_from_file(const char *path);
-extern int whisper_full(struct whisper_context *ctx,
-                        struct whisper_full_params params,
-                        const float *samples, int n_samples);
-extern int whisper_full_n_segments(struct whisper_context *ctx);
-extern const char *whisper_full_get_segment_text(struct whisper_context *ctx, int i);
-extern int64_t whisper_full_get_segment_t0(struct whisper_context *ctx, int i);
-extern int64_t whisper_full_get_segment_t1(struct whisper_context *ctx, int i);
-extern void whisper_free(struct whisper_context *ctx);
+// whisper.cpp comes from the cn1-whisper-ios xcframework, which the build
+// links for every app that depends on this cn1lib (PlatformFeatureCatalog).
+// It exports Codename One's own C API over whisper.cpp,
+// scripts/ai-natives/whisper/src/cn1_whisper.h, and nothing else -- these
+// prototypes are that header's. Never declare whisper.h's structs here: a
+// hand-written whisper_full_params is how this file once handed whisper_full
+// a struct a fraction of the real size.
+extern char *cn1whisper_transcribe(const char *model_path, const char *wav_path, int segments);
+extern void cn1whisper_free(char *text);
 
 @implementation com_codename1_ai_whisper_NativeWhisperRecognizerImpl
 
--(NSString*)transcribe:(NSString*)param param1:(NSString*)param1 {
-    // Decode 16kHz mono PCM samples from a WAV file.
-    NSData *wav = [NSData dataWithContentsOfFile:param1];
-    if (wav.length < 44) return @"";
-    const uint8_t *bytes = wav.bytes;
-    const int16_t *samples16 = (const int16_t *)(bytes + 44);
-    NSInteger nSamples = (wav.length - 44) / 2;
-    float *samples = (float *)malloc(sizeof(float) * nSamples);
-    for (NSInteger i = 0; i < nSamples; i++) samples[i] = samples16[i] / 32768.0f;
-    struct whisper_context *ctx = whisper_init_from_file([param UTF8String]);
-    if (!ctx) { free(samples); return @""; }
-    struct whisper_full_params p = {0};
-    p.n_threads = 4;
-    whisper_full(ctx, p, samples, (int)nSamples);
-    NSMutableString *out = [NSMutableString string];
-    int n = whisper_full_n_segments(ctx);
-    for (int i = 0; i < n; i++) {
-        [out appendString:[NSString stringWithUTF8String:
-                            whisper_full_get_segment_text(ctx, i)]];
+// A transcription takes seconds, and ParparVM's collector can stop a thread
+// only at a safepoint, so the call runs between CN1_YIELD_THREAD and
+// CN1_RESUME_THREAD. Only C strings are touched in between: the arguments
+// are already NSStrings and the result becomes one after the resume.
+-(NSString*)run:(NSString*)model audio:(NSString*)audio segments:(int)segments {
+    if (model == nil || audio == nil) {
+        return @"";
     }
-    whisper_free(ctx);
-    free(samples);
-    return out;
+    char *m = strdup([model UTF8String]);
+    char *a = strdup([audio UTF8String]);
+    CN1_YIELD_THREAD;
+    char *text = cn1whisper_transcribe(m, a, segments);
+    CN1_RESUME_THREAD;
+    free(m);
+    free(a);
+    if (text == NULL) {
+        return @"";
+    }
+    NSString *out = [[NSString alloc] initWithBytes:text length:strlen(text)
+                                           encoding:NSUTF8StringEncoding];
+    cn1whisper_free(text);
+#if !__has_feature(objc_arc)
+    [out autorelease];
+#endif
+    return out == nil ? @"" : out;
+}
+
+-(NSString*)transcribe:(NSString*)param param1:(NSString*)param1 {
+    return [self run:param audio:param1 segments:0];
 }
 
 -(NSString*)transcribeSegments:(NSString*)param param1:(NSString*)param1 {
-    NSData *wav = [NSData dataWithContentsOfFile:param1];
-    if (wav.length < 44) return @"";
-    const uint8_t *bytes = wav.bytes;
-    const int16_t *samples16 = (const int16_t *)(bytes + 44);
-    NSInteger nSamples = (wav.length - 44) / 2;
-    float *samples = (float *)malloc(sizeof(float) * nSamples);
-    for (NSInteger i = 0; i < nSamples; i++) samples[i] = samples16[i] / 32768.0f;
-    struct whisper_context *ctx = whisper_init_from_file([param UTF8String]);
-    if (!ctx) { free(samples); return @""; }
-    struct whisper_full_params p = {0};
-    p.n_threads = 4;
-    whisper_full(ctx, p, samples, (int)nSamples);
-    NSMutableString *out = [NSMutableString string];
-    int n = whisper_full_n_segments(ctx);
-    for (int i = 0; i < n; i++) {
-        const char *text = whisper_full_get_segment_text(ctx, i);
-        NSString *s = text ? [NSString stringWithUTF8String:text] : @"";
-        long long startMs = (long long)whisper_full_get_segment_t0(ctx, i) * 10LL;
-        long long endMs = (long long)whisper_full_get_segment_t1(ctx, i) * 10LL;
-        [out appendFormat:@"%lld\t%lld\t%@\n", startMs, endMs, [self escapeSegmentText:s]];
-    }
-    whisper_free(ctx);
-    free(samples);
-    return out;
-}
-
--(NSString*)escapeSegmentText:(NSString*)text {
-    NSMutableString *out = [NSMutableString string];
-    for (NSUInteger i = 0; i < text.length; i++) {
-        unichar ch = [text characterAtIndex:i];
-        switch (ch) {
-            case '\\': [out appendString:@"\\\\"]; break;
-            case '\t': [out appendString:@"\\t"]; break;
-            case '\n': [out appendString:@"\\n"]; break;
-            case '\r': [out appendString:@"\\r"]; break;
-            default: [out appendFormat:@"%C", ch]; break;
-        }
-    }
-    return out;
+    return [self run:param audio:param1 segments:1];
 }
 
 -(BOOL)isSupported{

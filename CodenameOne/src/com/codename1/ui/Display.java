@@ -8663,6 +8663,14 @@ public final class Display extends CN1Constants {
         return impl.createVisionImpl();
     }
 
+    /// Returns the llama.cpp backend behind `com.codename1.ai.LocalLlmClient`,
+    /// or `null` where none is linked.
+    ///
+    /// @hidden
+    public com.codename1.impl.LocalLlmImpl getLocalLlmBackend() {
+        return impl.createLocalLlmImpl();
+    }
+
     /// Creates a fresh backend for `com.codename1.ai.inference`.
     ///
     /// @hidden

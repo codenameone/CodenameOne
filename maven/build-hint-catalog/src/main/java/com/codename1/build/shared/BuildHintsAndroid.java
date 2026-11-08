@@ -1244,6 +1244,13 @@ final class BuildHintsAndroid {
                         + "wear module. Kept out of `android.gradleDependencies` because that hint feeds the "
                         + "phone module too, and these libraries declare minSdk 26."));
 
+        h.add(new Hint("android.cn1NativesRepository")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("https://repo.codenameone.com/maven2")
+                .platform("android")
+                .doc("Maven repository the builder fetches the on-device AI natives (`com.codenameone.natives`, whisper.cpp and llama.cpp) from, when the app uses them. Defaults to the Codename One repository; a `file:` URL tests a local `scripts/ai-natives/build.sh` output."));
+
         h.add(new Hint("android.wear.guavaVersion")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)

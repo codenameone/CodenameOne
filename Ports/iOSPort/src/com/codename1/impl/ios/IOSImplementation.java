@@ -6357,6 +6357,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                 ? new IOSLanguageImpl() : null;
     }
 
+    private com.codename1.impl.LocalLlmImpl localLlm;
+
+    @Override
+    public com.codename1.impl.LocalLlmImpl createLocalLlmImpl() {
+        if (localLlm == null && nativeInstance.cn1LlamaIsSupported()) {
+            localLlm = new IOSLocalLlmImpl();
+        }
+        return localLlm;
+    }
+
     @Override
     public com.codename1.impl.InferenceImpl createInferenceImpl() {
         return nativeInstance.cn1InferenceIsSupported()
