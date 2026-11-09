@@ -26,6 +26,7 @@ package com.codename1.python.runtime;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
+import com.codename1.db.SqlFunction;
 import java.io.IOException;
 
 /// SQLite through Codename One's `Database`: the platform's own engine on
@@ -46,6 +47,10 @@ public final class Cn1Sql extends PySql {
     @Override
     public Connection open(String name) throws IOException {
         boolean memory = ":memory:".equals(name) || name.length() == 0;
+        if (memory && Database.isInMemorySupported()) {
+            return new Conn(Database.openInMemory(), null);
+        }
+        // A platform without in-memory databases gets a file of its own, deleted on close.
         String dbName = memory ? "cn1py-memory-" + System.currentTimeMillis() + "-" + MEMORY_COUNT.getAndIncrement() + ".db"
                 : localName(name);
         if (memory && Database.exists(dbName)) {
@@ -73,8 +78,62 @@ public final class Cn1Sql extends PySql {
         }
 
         @Override
+        public boolean createFunction(String name, int nargs, SqlFunction body) throws IOException {
+            if (!db.supportsFunctions()) {
+                return false;
+            }
+            db.createFunction(name, nargs, body);
+            return true;
+        }
+
+        /// One result per nesting depth, reused: a caller reads its result
+        /// before it runs anything else, and Python runs one thread at a time.
+        /// A SQL function that executes a statement while one is stepping is
+        /// the only nesting, and it gets the next depth's. The depth is the
+        /// function wrapper's to count, so a run takes no handler to undo it.
+        private static final Result[] RESULTS = new Result[8];
+
+        /// What [Database#executeStatus(String, Object[], long[])] writes the changes and the
+        /// last row id into; read straight after, so one serves every depth.
+        private static final long[] COUNTS = new long[2];
+
+        @Override
         public Result run(String sql, Object[] params, boolean query) throws IOException {
-            Result r = new Result();
+            return fill(slot(), sql, params, query);
+        }
+
+        @Override
+        public Result runStatus(String sql, Object[] params, boolean query) {
+            if (query) {
+                return super.runStatus(sql, params, query);
+            }
+            Result r = slot();
+            if (db.executeStatus(sql, params, COUNTS) != 0) {
+                return failStatus(db.getStatusMessage());
+            }
+            if (isChange(sql)) {
+                r.changes = COUNTS[0];
+                r.lastRowId = COUNTS[1];
+            }
+            return r;
+        }
+
+        private static Result slot() {
+            int depth = nesting;
+            if (depth >= RESULTS.length) {
+                return new Result();
+            }
+            Result r = RESULTS[depth];
+            if (r == null) {
+                r = new Result();
+                RESULTS[depth] = r;
+            } else {
+                r.clear();
+            }
+            return r;
+        }
+
+        private Result fill(Result r, String sql, Object[] params, boolean query) throws IOException {
             if (query) {
                 Cursor c = params.length == 0 ? db.executeQuery(sql) : db.executeQuery(sql, params);
                 try {
@@ -86,8 +145,10 @@ public final class Cn1Sql extends PySql {
                     while (c.next()) {
                         Row row = c.getRow();
                         Object[] values = new Object[n];
-                        for (int i = 0; i < n; i++) {
-                            values[i] = value(row, i);
+                        if (!Database.getValues(row, values)) {
+                            for (int i = 0; i < n; i++) {
+                                values[i] = value(row, i);
+                            }
                         }
                         r.rows.add(values);
                     }
@@ -102,35 +163,18 @@ public final class Cn1Sql extends PySql {
                 db.execute(sql, params);
             }
             if (isChange(sql)) {
-                Cursor c = db.executeQuery("SELECT changes(), last_insert_rowid()");
-                try {
-                    if (c.next()) {
-                        Row row = c.getRow();
-                        r.changes = row.getLong(0);
-                        r.lastRowId = row.getLong(1);
-                    }
-                } finally {
-                    c.close();
-                }
+                r.changes = db.changes();
+                r.lastRowId = db.lastInsertRowId();
             }
             return r;
         }
 
         private static Object value(Row row, int i) throws IOException {
-            switch (row.getColumnType(i)) {
-                case Database.COLUMN_NULL:
-                    return null;
-                case Database.COLUMN_INTEGER:
-                    return Long.valueOf(row.getLong(i));
-                case Database.COLUMN_FLOAT:
-                    return Double.valueOf(row.getDouble(i));
-                case Database.COLUMN_TEXT:
-                    return row.getString(i);
-                case Database.COLUMN_BLOB:
-                    return row.getBlob(i);
-                default:
-                    return inferred(row.getString(i));
+            if (row.getColumnType(i) == Database.COLUMN_UNKNOWN) {
+                return inferred(row.getString(i));
             }
+            // The type is cached by the cursor, so this reads only the value.
+            return Database.getValue(row, i);
         }
 
         @Override
@@ -158,13 +202,25 @@ public final class Cn1Sql extends PySql {
     }
 
     /// Whether a statement is one whose changes and row id are reported.
+    /// Whether the statement's first word is INSERT, UPDATE, DELETE or REPLACE, compared in place:
+    /// this runs on every statement, and a copy of the word would be garbage each time.
     static boolean isChange(String sql) {
-        String w = firstWord(sql);
-        return "INSERT".equalsIgnoreCase(w) || "UPDATE".equalsIgnoreCase(w) || "DELETE".equalsIgnoreCase(w)
-                || "REPLACE".equalsIgnoreCase(w);
+        int s = wordStart(sql);
+        int e = s;
+        int n = sql.length();
+        while (e < n && isAsciiLetter(sql.charAt(e))) {
+            e++;
+        }
+        return isWord(sql, s, e, "INSERT") || isWord(sql, s, e, "UPDATE") || isWord(sql, s, e, "DELETE")
+                || isWord(sql, s, e, "REPLACE");
     }
 
-    static String firstWord(String sql) {
+    private static boolean isWord(String sql, int s, int e, String word) {
+        return e - s == word.length() && sql.regionMatches(true, s, word, 0, word.length());
+    }
+
+    /// Where the first word starts, past spaces, comments and opening parentheses.
+    private static int wordStart(String sql) {
         int i = 0;
         int n = sql.length();
         while (i < n) {
@@ -182,11 +238,7 @@ public final class Cn1Sql extends PySql {
                 break;
             }
         }
-        int s = i;
-        while (i < n && isAsciiLetter(sql.charAt(i))) {
-            i++;
-        }
-        return sql.substring(s, i);
+        return i;
     }
 
     private static boolean isAsciiLetter(char c) {

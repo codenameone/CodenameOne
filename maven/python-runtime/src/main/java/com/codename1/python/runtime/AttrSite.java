@@ -49,6 +49,9 @@ public final class AttrSite {
     private static final int NONE = 0;
     private static final int SLOT = 1;
     private static final int CLASS_ATTR = 2;
+    /// A compiled field (`PyInstance.fieldIndex`), read by index; an unset
+    /// one still takes the generic read, which finds the class's value.
+    private static final int FIELD = 3;
     private static final int BUILTIN = 3;
 
     private final String name;
@@ -66,6 +69,12 @@ public final class AttrSite {
     private static final int I_CLEAR = 7;
     private static final int I_STARTSWITH = 8;
     private static final int I_ENDSWITH = 9;
+    private static final int I_STRIP = 10;
+    private static final int I_LSTRIP = 11;
+    private static final int I_RSTRIP = 12;
+    private static final int I_FIND = 13;
+    private static final int I_RFIND = 14;
+    private static final int I_REPLACE = 15;
 
     // Reads and calls. An entry with a null shape is a non-instance receiver
     // type (BUILTIN or NONE). All entries are valid only while getVersion is
@@ -156,6 +165,18 @@ public final class AttrSite {
                 return I_STARTSWITH;
             case "endswith":
                 return I_ENDSWITH;
+            case "strip":
+                return I_STRIP;
+            case "lstrip":
+                return I_LSTRIP;
+            case "rstrip":
+                return I_RSTRIP;
+            case "find":
+                return I_FIND;
+            case "rfind":
+                return I_RFIND;
+            case "replace":
+                return I_REPLACE;
             default:
                 return I_NONE;
         }
@@ -191,7 +212,7 @@ public final class AttrSite {
         getKinds[k] = kind;
         getSlots[k] = slot;
         getValues[k] = value;
-        int fast = kind == SLOT ? SLOT : NONE;
+        int fast = kind == SLOT || kind == FIELD ? kind : NONE;
         Object f = kind == CLASS_ATTR && value instanceof PyFunction ? value : null;
         if (k == 0) {
             gt0 = t; gs0 = shape; gk0 = fast; gi0 = slot; gf0 = f;
@@ -213,17 +234,49 @@ public final class AttrSite {
             if (getVersion == PyType.version) {
                 PyType t = i.cls;
                 Shape s = i.shape;
-                if (gs0 == s && gt0 == t && gk0 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi0];
+                if (gs0 == s && gt0 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk0 == SLOT) {
+                        return i.slots[gi0];
+                    }
+                    if (gk0 == FIELD) {
+                        Object v = i.getField(gi0);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
                 }
-                if (gs1 == s && gt1 == t && gk1 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi1];
+                if (gs1 == s && gt1 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk1 == SLOT) {
+                        return i.slots[gi1];
+                    }
+                    if (gk1 == FIELD) {
+                        Object v = i.getField(gi1);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
                 }
-                if (gs2 == s && gt2 == t && gk2 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi2];
+                if (gs2 == s && gt2 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk2 == SLOT) {
+                        return i.slots[gi2];
+                    }
+                    if (gk2 == FIELD) {
+                        Object v = i.getField(gi2);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
                 }
-                if (gs3 == s && gt3 == t && gk3 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi3];
+                if (gs3 == s && gt3 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk3 == SLOT) {
+                        return i.slots[gi3];
+                    }
+                    if (gk3 == FIELD) {
+                        Object v = i.getField(gi3);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
                 }
             }
             return getSlow(i);
@@ -240,6 +293,12 @@ public final class AttrSite {
             }
             if (kind == CLASS_ATTR) {
                 return Py.bindAttr(getValues[k], i);
+            }
+            if (kind == FIELD) {
+                Object v = i.getField(getSlots[k]);
+                if (v != null) {
+                    return v;
+                }
             }
             return i.getAttr(name);
         }
@@ -259,9 +318,15 @@ public final class AttrSite {
         int slot = 0;
         Object value = null;
         Object clsAttr = cls.lookup(name);
-        // A compiled field is read by the generated code itself; this site
-        // only sees it unset, and must not remember that.
-        if (!(clsAttr instanceof PyProperty) && !cls.hasCustomGetattribute() && i.fieldIndex(name) < 0) {
+        // A compiled field is remembered by its index, not its value: a read
+        // from code that cannot name the Java class -- another module -- finds
+        // it set, and one that finds it unset takes the generic read.
+        int field = i.fieldIndex(name);
+        if (field >= 0 && !(clsAttr instanceof PyProperty) && !readsThroughGet(clsAttr) && !cls.hasCustomGetattribute()) {
+            kind = FIELD;
+            slot = field;
+        } else if (!(clsAttr instanceof PyProperty) && !readsThroughGet(clsAttr) && !cls.hasCustomGetattribute()
+                && field < 0) {
             slot = shape == null ? -1 : shape.indexOf(name);
             if (slot >= 0) {
                 kind = SLOT;
@@ -272,6 +337,24 @@ public final class AttrSite {
         }
         addGet(cls, shape, kind, slot, value);
         return result;
+    }
+
+    /// A class attribute that is an instance of a class with `__get__` -- a
+    /// descriptor written in Python -- answers every read by calling it, so
+    /// neither the instance's own value nor the attribute itself may be
+    /// remembered in its place.
+    private static boolean readsThroughGet(Object clsAttr) {
+        return clsAttr instanceof PyInstance && ((PyInstance) clsAttr).cls.lookup("__get__") != null;
+    }
+
+    /// A data descriptor written in Python: every store goes through its
+    /// `__set__` (or `__delete__`), never straight into the instance.
+    private static boolean storesThroughSet(Object clsAttr) {
+        if (!(clsAttr instanceof PyInstance)) {
+            return false;
+        }
+        PyType t = ((PyInstance) clsAttr).cls;
+        return t.lookup("__set__") != null || t.lookup("__delete__") != null;
     }
 
     // ---- stores --------------------------------------------------------------
@@ -299,11 +382,23 @@ public final class AttrSite {
                     return;
                 }
             }
+            if (fieldSetType == i.cls && fieldSetVersion == PyType.version //NOPMD CompareObjectsWithEquals - identity is meant
+                    && (!i.extra || i.getField(fieldSetIndex) != null)) {
+                i.setField(fieldSetIndex, v);
+                return;
+            }
             setSlow(i, v);
             return;
         }
         Py.obj(o).setAttr(name, v);
     }
+
+    /// The one class whose compiled field this site last stored, as
+    /// `PyInstance.store` would store it: no property, descriptor or
+    /// `__setattr__` in the way, and the field not displaced into the shape.
+    private PyType fieldSetType;
+    private int fieldSetIndex;
+    private int fieldSetVersion = -1;
 
     private void setSlow(PyInstance i, Object v) {
         if (setVersion == PyType.version) {
@@ -356,10 +451,20 @@ public final class AttrSite {
         PyType cls = i.cls;
         Object clsAttr = cls.lookup(name);
         Object sa = cls.lookup("__setattr__");
-        boolean plain = !(clsAttr instanceof PyProperty) && (sa == null || sa instanceof PyBuiltin)
-                && i.fieldIndex(name) < 0;
+        int field = i.fieldIndex(name);
+        boolean plain = !(clsAttr instanceof PyProperty) && !storesThroughSet(clsAttr)
+                && (sa == null || sa instanceof PyBuiltin)
+                && field < 0;
         Shape before = i.shape;
+        int version = PyType.version;
         i.setAttr(name, v);
+        if (field >= 0 && !(clsAttr instanceof PyProperty) && !storesThroughSet(clsAttr)
+                && (sa == null || sa instanceof PyBuiltin) && version == PyType.version) {
+            fieldSetType = cls;
+            fieldSetIndex = field;
+            fieldSetVersion = version;
+            return;
+        }
         if (!plain || setVersion != PyType.version) {
             return;
         }
@@ -400,6 +505,9 @@ public final class AttrSite {
             if (intrinsic == I_SPLIT) {
                 return TypeMethods.split(v, null, -1);
             }
+            if (intrinsic == I_STRIP || intrinsic == I_LSTRIP || intrinsic == I_RSTRIP) {
+                return Py.str(TypeMethods.strip(v, null, intrinsic != I_RSTRIP, intrinsic != I_LSTRIP));
+            }
         }
         Object f = method(o);
         return f != null ? Py.obj(f).call1(o) : Py.obj(Py.obj(o).getAttr(name)).call0();
@@ -426,6 +534,9 @@ public final class AttrSite {
                 if (intrinsic == I_ENDSWITH && a instanceof String) {
                     return Py.bool(((String) o).endsWith((String) a));
                 }
+                if ((intrinsic == I_FIND || intrinsic == I_RFIND) && a instanceof String) {
+                    return PyInt.of(TypeMethods.findWhole((String) o, (String) a, intrinsic == I_RFIND));
+                }
             }
             if (intrinsic == I_GET && o instanceof PyDict && o.getClass() == PyDict.class) {
                 Object v = ((PyDict) o).getOrNull(a);
@@ -437,6 +548,10 @@ public final class AttrSite {
     }
 
     public Object call2(Object o, Object a, Object b) {
+        if (intrinsic == I_REPLACE && o instanceof String && a instanceof String && b instanceof String
+                && ((String) a).length() > 0) {
+            return Py.str(((String) o).replace((String) a, (String) b));
+        }
         if (intrinsic == I_GET && o != null && o.getClass() == PyDict.class) {
             Object v = ((PyDict) o).getOrNull(a);
             return v != null ? v : b;
@@ -512,7 +627,8 @@ public final class AttrSite {
                 return getKinds[k] == CLASS_ATTR && getValues[k] instanceof PyFunction ? getValues[k] : null;
             }
             Object clsAttr = i.cls.lookup(name);
-            if (i.cls.hasCustomGetattribute() || clsAttr instanceof PyProperty || i.fieldIndex(name) >= 0) {
+            if (i.cls.hasCustomGetattribute() || clsAttr instanceof PyProperty || readsThroughGet(clsAttr)
+                    || i.fieldIndex(name) >= 0) {
                 addGet(i.cls, i.shape, NONE, 0, null);
                 return null;
             }

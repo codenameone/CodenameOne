@@ -132,6 +132,42 @@ final class Layouts {
         for (Cls k : l.classes.values()) {
             bodyNames.addAll(k.bodyNames);
         }
+        // `tag = None` in a class body is a default, not a descriptor: a
+        // constant has no `__set__` or `__get__`, so a store to the name on an
+        // instance binds the instance's own attribute, which a field holds,
+        // and an unset field falls back to the generic read, which finds the
+        // class's value. Only a name that every class binds that way and
+        // nothing else rebinds is freed.
+        Set<String> constants = new HashSet<String>();
+        Set<String> otherwise = new HashSet<String>();
+        for (Cls k : l.classes.values()) {
+            for (Stmt s : k.def.body) {
+                if (s instanceof Assign && ((Assign) s).targets.size() == 1 && ((Assign) s).targets.get(0) instanceof Name
+                        && ((Assign) s).value instanceof Constant) {
+                    constants.add(((Name) ((Assign) s).targets.get(0)).id);
+                } else {
+                    Set<String> b = new HashSet<String>();
+                    if (s instanceof FunctionDef) {
+                        b.add(((FunctionDef) s).name);
+                    } else if (s instanceof ClassDef) {
+                        b.add(((ClassDef) s).name);
+                    } else if (s instanceof Assign) {
+                        for (Expr t : ((Assign) s).targets) {
+                            names(t, b);
+                        }
+                    } else if (s instanceof AugAssign) {
+                        names(((AugAssign) s).target, b);
+                    } else if (s instanceof AnnAssign) {
+                        names(((AnnAssign) s).target, b);
+                    } else if (!(s instanceof ExprStmt) && !(s instanceof Pass)) {
+                        b.addAll(k.bodyNames);
+                    }
+                    otherwise.addAll(b);
+                }
+            }
+        }
+        constants.removeAll(otherwise);
+        bodyNames.removeAll(constants);
         boolean noFields = false;
         for (String st : attrStores) {
             int dot = st.indexOf('.');
@@ -171,6 +207,17 @@ final class Layouts {
             }
             Set<String> stored = new LinkedHashSet<String>();
             for (Stmt s : k.def.body) {
+                if (s instanceof FunctionDef && !((FunctionDef) s).args.names().isEmpty()) {
+                    selfStores(((FunctionDef) s).body, ((FunctionDef) s).args.names().get(0), stored);
+                }
+            }
+            // A method the instance may shadow (`self.default = default`)
+            // is looked up per call, here and in every class above.
+            for (Cls a = k.parent; a != null; a = a.parent) {
+                a.typable.keySet().removeAll(stored);
+                a.methods.keySet().removeAll(stored);
+            }
+            for (Stmt s : k.def.body) {
                 if (!(s instanceof FunctionDef)) {
                     continue;
                 }
@@ -179,8 +226,7 @@ final class Layouts {
                 if (names.isEmpty()) {
                     continue;
                 }
-                selfStores(f.body, names.get(0), stored);
-                boolean plain = f.decorators.isEmpty() && !f.isAsync && !f.scope.hasYield && f.args.vararg == null
+                boolean plain = !stored.contains(f.name) && f.decorators.isEmpty() && !f.isAsync && !f.scope.hasYield && f.args.vararg == null
                         && f.args.kwarg == null && f.args.kwonly.isEmpty() && defined.get(f.name) == 1
                         && !rebound.contains(f.name) && !hasFree(f);
                 if (plain && names.size() <= 8) {

@@ -44,10 +44,10 @@ def kernels():
                   if f.endswith(".py") and not f.startswith("_"))
 
 
-def timed(cmd, cwd=None):
+def timed(cmd, cwd=None, env=None):
     """Runs cmd and answers (stdout, wall seconds)."""
     start = time.perf_counter()
-    proc = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
     wall = time.perf_counter() - start
     if proc.returncode != 0:
@@ -55,14 +55,14 @@ def timed(cmd, cwd=None):
     return out.decode("utf-8"), wall
 
 
-def peak_rss(cmd, cwd=None):
+def peak_rss(cmd, cwd=None, env=None):
     """Peak resident set of one run of cmd, measured in a child of its own so
     that RUSAGE_CHILDREN holds that run and nothing else."""
     probe = ("import resource,subprocess,sys;"
              "subprocess.run(sys.argv[1:],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True);"
              "r=resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss;"
              "print(r if sys.platform=='darwin' else r*1024)")
-    out = subprocess.run([sys.executable, "-c", probe] + cmd, cwd=cwd, check=True,
+    out = subprocess.run([sys.executable, "-c", probe] + cmd, cwd=cwd, env=env, check=True,
                          stdout=subprocess.PIPE).stdout
     return int(out.strip())
 

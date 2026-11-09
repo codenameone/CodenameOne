@@ -111,19 +111,11 @@ public final class Typed {
     /// `len(s)`: code points, which Java's UTF-16 length overcounts by one
     /// per surrogate pair.
     public static long slen(String s) {
-        int n = s.length();
-        long r = n;
-        for (int i = 0; i < n; i++) {
-            char c = s.charAt(i);
-            if (c >= 0xD800 && c < 0xDC00 && i + 1 < n) {
-                char d = s.charAt(i + 1);
-                if (d >= 0xDC00 && d < 0xE000) {
-                    r--;
-                    i++;
-                }
-            }
-        }
-        return r;
+        // codePointCount counts a lone surrogate as one, as Python does, and
+        // on ParparVM answers a Latin-1 string without reading it; a wide
+        // string a decoder made has its count in PyStr's cache.
+        int pairs = PyStr.cachedSurrogates(s);
+        return pairs >= 0 ? s.length() - pairs : s.codePointCount(0, s.length());
     }
 
     /// Int `o` modulo 2^64: its low 64 bits, as two's complement keeps them.
@@ -147,15 +139,34 @@ public final class Typed {
         int size;
     }
 
+    /// Each thread's own stack, looked up only when the GIL changes hands.
     private static final ThreadLocal<Returned> RETURNED = new ThreadLocal<Returned>();
 
-    private static Returned returned() {
+    /// The stack of the thread that holds the GIL. One thread runs Python at
+    /// a time, so the stack is a static that [Gil] points at the new owner's
+    /// as it takes the lock: a `try` and a big-int return were each a
+    /// ThreadLocal lookup, which was a tenth of a loop that catches. Code that
+    /// runs Python without ever taking the lock shares the first stack, which
+    /// is right for the one thread such a program has.
+    private static Returned current = new Returned();
+
+    /// Points [#current] at the calling thread's stack: [Gil] calls it on
+    /// every acquisition, while it holds the lock.
+    static void adoptThread() {
         Returned r = RETURNED.get();
         if (r == null) {
-            r = new Returned();
+            r = current.size == 0 && !adopted ? current : new Returned();
+            adopted = true;
             RETURNED.set(r);
         }
-        return r;
+        current = r;
+    }
+
+    /// Whether some thread has claimed the initial stack as its own.
+    private static boolean adopted;
+
+    private static Returned returned() {
+        return current;
     }
 
     /// Returns int `o` from a typed function whose result is a `long`: the
@@ -193,17 +204,13 @@ public final class Typed {
     /// How many results are waiting to be taken: kept at the start of a
     /// `try`, for `untake`.
     public static int taken() {
-        Returned r = RETURNED.get();
-        return r == null ? 0 : r.size;
+        return current.size;
     }
 
     /// Drops the results an exception left untaken, back to `mark`: one
     /// raised between a call returning a marker and its caller taking it.
     public static void untake(int mark) {
-        Returned r = RETURNED.get();
-        if (r == null) {
-            return;
-        }
+        Returned r = current;
         while (r.size > mark) {
             r.items[--r.size] = null;
         }
@@ -285,6 +292,17 @@ public final class Typed {
             return ((Long) a).longValue() >= ((Long) b).longValue();
         }
         return Py.isTrue(Py.ge(a, b));
+    }
+
+    /// `x in c`, without the view a str container would otherwise allocate.
+    public static boolean in(Object x, Object c) {
+        if (c instanceof String && x instanceof String) {
+            return ((String) c).indexOf((String) x) >= 0;
+        }
+        if (c instanceof PyDict) {
+            return ((PyDict) c).contains(x);
+        }
+        return Py.obj(c).contains(x);
     }
 
     public static boolean eq(Object a, Object b) {
@@ -533,5 +551,67 @@ public final class Typed {
 
     /// An expression statement whose value is dropped.
     public static void drop(Object ignored) {
+    }
+
+    /// `s.strip()`, `lstrip()` and `rstrip()` with no argument, on a str
+    /// the transpiler knows is one.
+    public static String strip(String s, boolean left, boolean right) {
+        return TypeMethods.strip(s, null, left, right);
+    }
+
+    /// `s.strip(chars)` and its one-sided forms.
+    public static String strip(String s, String chars, boolean left, boolean right) {
+        return TypeMethods.strip(s, chars, left, right);
+    }
+
+    /// `s.find(sub)` and `s.rfind(sub)` over the whole string.
+    public static long find(String s, String sub, boolean last) {
+        return TypeMethods.findWhole(s, sub, last);
+    }
+
+    /// `s.replace(old, new)` with no count.
+    public static String replace(String v, String old, String nw) {
+        if (old.length() == 0) {
+            StringBuilder sb = new StringBuilder(nw);
+            for (int i = 0; i < v.length(); i++) {
+                sb.append(v.charAt(i)).append(nw);
+            }
+            return sb.toString();
+        }
+        return v.replace(old, nw);
+    }
+
+    /// `s.count(sub)` over the whole string.
+    public static long count(String v, String sub) {
+        if (sub.length() == 0) {
+            return PyStr.codePoints(v) + 1;
+        }
+        long n = 0;
+        for (int i = v.indexOf(sub); i >= 0; i = v.indexOf(sub, i + sub.length())) {
+            n++;
+        }
+        return n;
+    }
+
+    /// `s.lower()` (mode 0) and `s.upper()` (mode 1).
+    public static String mapCase(String s, int mode) {
+        return TypeMethods.mapCase(s, mode);
+    }
+
+    /// `sep.join(items)`.
+    public static String join(String sep, Object items) {
+        return TypeMethods.join(sep, items);
+    }
+
+    /// `s[a:b:c]` on a str the transpiler knows is one.
+    public static String slice(String s, Object a, Object b, Object c) {
+        Object r = Py.getslice(s, a, b, c);
+        return r instanceof String ? (String) r : String.valueOf(r);
+    }
+
+    /// `fmt % args` for a str format and a tuple of values.
+    public static String format(String fmt, Object args) {
+        Object r = Py.mod(fmt, args);
+        return r instanceof String ? (String) r : Py.toStr(r);
     }
 }

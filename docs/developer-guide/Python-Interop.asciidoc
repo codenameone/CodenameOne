@@ -13,10 +13,14 @@ runs at the speed of the equivalent Java.
 
 Two things follow from compiling ahead of time rather than interpreting:
 
-* The program is known in full at build time. A module imported by a
-  name computed while the program runs, `exec`, `eval` and `compile` of a
-  string, and frame introspection are build errors that name the file and the
-  line. None of them reaches a device as a hidden failure.
+* The program is known in full at build time. In your own sources, a module
+  imported by a name computed while the program runs, `exec`, `eval` and
+  `compile` of a string, and the tracing hooks (`sys.settrace`,
+  `sys.setprofile`) are build errors that name the file and the line. In a
+  package installed from PyPI the build reports each one as a warning
+  instead, and the line raises `NotImplementedError` if it's reached:
+  libraries keep such calls in code an application seldom runs, such as a
+  command line option. `sys._getframe` works, answered from the call stack.
 * Packages with C extensions are supported. The package's Python is
   translated like your own code, and each compiled module is replaced by a
   Java class with the same functions; see <<python-c-extensions,C extensions>>.
@@ -220,6 +224,26 @@ the real package:
   native font. Those results are drawn by the platform, so they look right
   but aren't Pillow's exact pixels.
 | `flask`, `fastapi`, `uvicorn` | See <<python-backends,Python backends>>.
+| `lxml` | `lxml.etree` in Python: lxml's tree model (parents, tails,
+  `nsmap`), custom element classes, `XMLParser` and `iterparse`, XPath 1.0,
+  and `tostring` byte for byte as libxml2 writes it. That's what
+  `python-pptx` and `mammoth` use. XSLT, schemas, `lxml.objectify` and
+  `lxml.html` aren't provided.
+| `magika` | Magika's API and result shape, answered from file signatures and
+  the contents of ZIP and OLE containers rather than from Google's neural
+  model, which needs `onnxruntime`. A content it can't place is `unknown`.
+| `cryptography` | AES in CBC and ECB modes from
+  `hazmat.primitives.ciphers`, over `com.codename1.security.Cipher`: what
+  `pdfminer.six` needs to read encrypted PDFs.
+| `jiter`, `pydantic_core` | The parts the `openai` SDK imports: `jiter`'s
+  JSON parser with its partial mode, and ``pydantic_core``'s sentinel and
+  error types.
+| `pypdfium2`, `cobble` | `pypdfium2` imports and reports every document
+  as one it can't render, as `pdfplumber` expects from a PDF it can't draw.
+  `cobble` generates its data class methods as closures instead of with
+  `exec`.
+| `pytest-httpx` | The `httpx_mock` and `httpx2_mock` fixtures, for testing
+  code that uses `httpx`.
 | `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
 |===
 
@@ -305,6 +329,12 @@ does.
 storage class SQLite recorded for it. The Linux, Windows and JavaScript ports
 don't report storage classes, so a value comes back as an `int` or a `float`
 when its text is a number, and as a `str` otherwise.
+
+`create_function` registers a Python function for use in SQL where the
+platform's SQLite accepts one, which is on the JVM. iOS, Android and the
+other ports expose no way to register one, so there it raises
+`NotSupportedError`; compute the value in Python before the query, or after
+it.
 
 [[python-backends]]
 === Python backends

@@ -326,6 +326,15 @@ Text = str
 AnyStr = None
 
 
+def _lazy_re():
+    import re
+    return re
+
+
+Pattern = _SpecialGenericAlias(_lazy_re().Pattern, "Pattern", 1)
+Match = _SpecialGenericAlias(_lazy_re().Match, "Match", 1)
+
+
 class TypeVar(_Final):
     def __init__(self, name, *constraints, bound=None, covariant=False, contravariant=False,
                  infer_variance=False, default=None):
@@ -658,7 +667,20 @@ def get_type_hints(obj, globalns=None, localns=None, include_extras=False):
             for k, v in base.__dict__.get("__annotations__", {}).items():
                 hints[k] = _resolve_hint(v, ns)
     else:
-        ns = dict(globalns) if globalns is not None else dict(getattr(obj, "__globals__", {}))
+        # As CPython does: a bound method or a decorated function is read
+        # through to the function it wraps, whose module the names are in.
+        while True:
+            inner = getattr(obj, "__wrapped__", None) or getattr(obj, "__func__", None)
+            if inner is None or inner is obj:
+                break
+            obj = inner
+        if globalns is not None:
+            ns = dict(globalns)
+        else:
+            g = getattr(obj, "__globals__", None)
+            if g is None:
+                g = getattr(sys.modules.get(getattr(obj, "__module__", None)), "__dict__", {})
+            ns = dict(g)
         if localns:
             ns.update(localns)
         for k, v in getattr(obj, "__annotations__", {}).items():
@@ -745,14 +767,31 @@ NamedTuple.__mro_entries__ = _namedtuple_mro_entries
 class _TypedDictMeta(type):
     def __new__(cls, name, bases, ns, total=True):
         annotations = {}
+        required = set()
+        optional = set()
         for base in bases:
             annotations.update(base.__dict__.get("__annotations__", {}))
-        annotations.update(ns.get("__annotations__", {}))
+            required.update(base.__dict__.get("__required_keys__", ()))
+            optional.update(base.__dict__.get("__optional_keys__", ()))
+        own = ns.get("__annotations__", {})
+        annotations.update(own)
+        # Each key takes its class's totality, unless Required[...] or
+        # NotRequired[...] (possibly inside Annotated) says otherwise.
+        for key, hint in own.items():
+            form = get_origin(hint)
+            if form is Annotated:
+                form = get_origin(get_args(hint)[0])
+            if form is Required or (form is not NotRequired and total):
+                required.add(key)
+                optional.discard(key)
+            else:
+                optional.add(key)
+                required.discard(key)
         tp_dict = type.__new__(_TypedDictMeta, name, (dict,), ns)
         tp_dict.__annotations__ = annotations
         tp_dict.__total__ = total
-        tp_dict.__required_keys__ = frozenset(annotations) if total else frozenset()
-        tp_dict.__optional_keys__ = frozenset() if total else frozenset(annotations)
+        tp_dict.__required_keys__ = frozenset(required)
+        tp_dict.__optional_keys__ = frozenset(optional)
         return tp_dict
 
     def __call__(cls, *args, **kwargs):
@@ -812,3 +851,18 @@ runtime_checkable(SupportsFloat)
 runtime_checkable(SupportsIndex)
 runtime_checkable(SupportsAbs)
 runtime_checkable(SupportsRound)
+
+
+class IO(Generic[AnyStr]):
+    """The type of a file object, for annotations; the runtime's files are
+    not subclasses of it, as CPython's are not either."""
+    __slots__ = ()
+
+
+class BinaryIO(IO[bytes]):
+    __slots__ = ()
+
+
+class TextIO(IO[str]):
+    __slots__ = ()
+

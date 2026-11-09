@@ -185,7 +185,14 @@ final class PyZlib {
                     break;
                 }
                 if (err == JZlib.Z_BUF_ERROR) {
-                    break;
+                    // With Z_FINISH, zlib answers Z_BUF_ERROR whenever the
+                    // output buffer fills before the stream ends, so it only
+                    // means "stuck" when this pass produced nothing. Stopping
+                    // on the first one truncated any output above CHUNK bytes.
+                    if (produced == 0) {
+                        break;
+                    }
+                    continue;
                 }
                 if (err != JZlib.Z_OK) {
                     throw Py.error(Py.OS_ERROR, "Error " + err + " while decompressing data" + detail(z));

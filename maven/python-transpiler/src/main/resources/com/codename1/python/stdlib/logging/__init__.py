@@ -1,6 +1,24 @@
-# Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
-# Licensed under the GNU General Public License version 2 with the Classpath
-# exception, as the rest of the Codename One Python runtime.
+# Copyright (c) 2001 Python Software Foundation; All Rights Reserved
+# Licensed under the Python Software Foundation License Version 2; the full
+# text is in maven/python-transpiler/third-party/cpython/LICENSE.txt.
+#
+# Derived from CPython's Lib/logging/__init__.py. Changes: rewritten for the Codename One Python runtime: no locks (single threaded
+# EDT), no frames in tracebacks, trimmed to what the transpiler supports.
+#
+# Copyright 2001-2022 by Vinay Sajip. All Rights Reserved.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted,
+# provided that the above copyright notice appear in all copies and that
+# both that copyright notice and this permission notice appear in
+# supporting documentation, and that the name of Vinay Sajip
+# not be used in advertising or publicity pertaining to distribution
+# of the software without specific, written prior permission.
+# VINAY SAJIP DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING
+# ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
+# VINAY SAJIP BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR
+# ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
+# IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 """Logging, with the API and output formats of CPython's logging package.
 
 Every application is single threaded on the EDT, so handlers take no

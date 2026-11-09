@@ -68,6 +68,37 @@ final class Unicode {
         return (FLAGS[c] & mask) != 0;
     }
 
+    /// `str.isprintable()` of one code point, on every plane. A holder class,
+    /// so a program that never calls repr() on non-Latin-1 text never decodes
+    /// the table.
+    static boolean printable(int cp) {
+        int[] e = Printable.EDGES;
+        int lo = 0;
+        int hi = e.length;
+        // The number of edges at or below cp: odd means inside a printable run.
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (e[mid] <= cp) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return (lo & 1) != 0;
+    }
+
+    private static final class Printable {
+        static final int[] EDGES;
+
+        static {
+            String s = join(UnicodeTables.PRINTABLE);
+            EDGES = new int[s.length() / 2];
+            for (int i = 0; i < EDGES.length; i++) {
+                EDGES[i] = s.charAt(2 * i) << 16 | s.charAt(2 * i + 1);
+            }
+        }
+    }
+
     private static String join(String[] parts) {
         StringBuilder sb = new StringBuilder();
         for (String p : parts) {

@@ -508,6 +508,111 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         return cachedColumnType(index);
     }
 
+    /// Every value of the current row into `out`, each as `#getValue(int)`
+    /// reads it, in one step where the engine can (`#readRow(Object[])`).
+    /// Answers false, with `out` unspecified, where a column's storage class
+    /// cannot be told (`Database#COLUMN_UNKNOWN`), for the caller to read
+    /// those its own way.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the cursor is closed, not on a row, or `out` is
+    ///   shorter than the row
+    public boolean getValues(Object[] out) throws IOException {
+        checkOpen();
+        if (!onRow) {
+            throw new IOException("The cursor is not on a row");
+        }
+        if (knownColumnCount < 0) {
+            knownColumnCount = columnCount();
+        }
+        int n = knownColumnCount;
+        if (out.length < n) {
+            throw new IOException("The array holds " + out.length + " values and the row has " + n);
+        }
+        anythingRead = true;
+        if (!readByGetter() && readRow(out)) {
+            lastReadWasNull = n > 0 && out[n - 1] == null;
+            return true;
+        }
+        for (int i = 0; i < n; i++) {
+            if (cachedColumnType(i) == Database.COLUMN_UNKNOWN) {
+                return false;
+            }
+            out[i] = getValue(i);
+        }
+        return true;
+    }
+
+    /// Whether a getter has already read a value of this row; a type taken
+    /// after that may describe the converted value, not the stored one.
+    private boolean readByGetter() {
+        if (typeStamps != null) {
+            for (int stamp : typeStamps) {
+                if (stamp == rowStamp) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// Reads the whole current row into `out` -- null, `Long`, `Double`,
+    /// `String` or `byte[]` by storage class -- for `#getValues(Object[])`.
+    /// Answers false where the engine has no such read, the default; the
+    /// caller has checked the cursor and the length.
+    protected boolean readRow(Object[] out) throws IOException {
+        return false;
+    }
+
+    /// The value of a column on the current row in its storage class: null, a `Long`, a
+    /// `Double`, a `String` or a `byte[]`, with one engine call for the type and one for the
+    /// value. A cursor whose engine cannot report types answers the text, as `getString` would.
+    ///
+    /// Behind [com.codename1.db.Database#getValue(com.codename1.db.Row, int)], which is the
+    /// public way to reach it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the column, from 0
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null for SQL NULL
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the cursor is closed, not on a row, or the index is out of range
+    public Object getValue(int index) throws IOException {
+        checkOpen();
+        if (!onRow) {
+            throw new IOException("The cursor is not on a row");
+        }
+        checkColumn(index);
+        anythingRead = true;
+        int type = cachedColumnType(index);
+        switch (type) {
+            case Database.COLUMN_NULL:
+                lastReadWasNull = true;
+                return null;
+            case Database.COLUMN_INTEGER:
+                lastReadWasNull = false;
+                return Long.valueOf(readLong(index));
+            case Database.COLUMN_FLOAT:
+                lastReadWasNull = false;
+                return Double.valueOf(readDouble(index));
+            case Database.COLUMN_TEXT:
+                lastReadWasNull = false;
+                return readString(index);
+            case Database.COLUMN_BLOB:
+                lastReadWasNull = false;
+                return readBlob(index);
+            default:
+                lastReadWasNull = isNullAt(index);
+                return lastReadWasNull ? null : readString(index);
+        }
+    }
+
     /// Guards a value read and updates the null latch.
     private void beginRead(int index) throws IOException {
         checkOpen();

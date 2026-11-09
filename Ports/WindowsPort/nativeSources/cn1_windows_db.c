@@ -29,6 +29,7 @@
 #include "cn1_db_sqlite_impl.h"
 
 CN1_DB_DEFINE_NATIVES(cn1DbWindowsEngine)
+CN1_DB_DEFINE_FUNCTION_NATIVES(cn1DbWindowsEngine, com_codename1_impl_windows_WindowsDatabase_sqlFunctionCall___long_int_int_long)
 
 /*
  * The entry points, spelled out rather than pasted together.
@@ -156,4 +157,100 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlStmtFinalize___long(CODENA
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlStmtReset___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
     cn1DbWindowsEngine_sqlStmtReset___long(threadStateData, __cn1Arg1);
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_sqlDbCreateFunction___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4) {
+    return cn1DbWindowsEngine_sqlDbCreateFunction___long_byte_1ARRAY_int_int_R_int(threadStateData, __cn1Arg1, __cn1Arg2, __cn1Arg3, __cn1Arg4);
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_sqlValueType___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlValueType___long_int_R_int(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_LONG com_codename1_impl_windows_WindowsNative_sqlValueLong___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlValueLong___long_int_R_long(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_DOUBLE com_codename1_impl_windows_WindowsNative_sqlValueDouble___long_int_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlValueDouble___long_int_R_double(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_sqlValueText___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlValueText___long_int_R_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_sqlValueBlob___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlValueBlob___long_int_R_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlResultNull___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    cn1DbWindowsEngine_sqlResultNull___long(threadStateData, __cn1Arg1);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlResultLong___long_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_LONG __cn1Arg2) {
+    cn1DbWindowsEngine_sqlResultLong___long_long(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlResultDouble___long_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_DOUBLE __cn1Arg2) {
+    cn1DbWindowsEngine_sqlResultDouble___long_double(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlResultText___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    cn1DbWindowsEngine_sqlResultText___long_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlResultBlob___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    cn1DbWindowsEngine_sqlResultBlob___long_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlResultError___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    cn1DbWindowsEngine_sqlResultError___long_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_LONG com_codename1_impl_windows_WindowsNative_sqlDbChanges___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbWindowsEngine_sqlDbChanges___long_R_long(threadStateData, __cn1Arg1);
+}
+
+JAVA_LONG com_codename1_impl_windows_WindowsNative_sqlDbLastInsertRowid___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbWindowsEngine_sqlDbLastInsertRowid___long_R_long(threadStateData, __cn1Arg1);
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_sqlColType___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlColType___long_int_R_int(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sqlStmtBindString___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_OBJECT __cn1Arg3) {
+    cn1DbWindowsEngine_sqlStmtBindString___long_int_java_lang_String(threadStateData, __cn1Arg1, __cn1Arg2, __cn1Arg3);
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_sqlColString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlColString___long_int_R_java_lang_String(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_sqlColNameString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlColNameString___long_int_R_java_lang_String(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_sqlRowValues___long_java_lang_Object_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlRowValues___long_java_lang_Object_1ARRAY_R_boolean(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_sqlStmtStepStatus___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbWindowsEngine_sqlStmtStepStatus___long_R_int(threadStateData, __cn1Arg1);
+}
+
+JAVA_LONG com_codename1_impl_windows_WindowsNative_sqlStmtPrepareStatus___long_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    return cn1DbWindowsEngine_sqlStmtPrepareStatus___long_java_lang_String_R_long(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_sqlDbErrorText___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbWindowsEngine_sqlDbErrorText___long_R_java_lang_String(threadStateData, __cn1Arg1);
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_sqlStmtRunStatus___long_java_lang_Object_1ARRAY_long_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_OBJECT __cn1Arg3) {
+    return cn1DbWindowsEngine_sqlStmtRunStatus___long_java_lang_Object_1ARRAY_long_1ARRAY_R_int(threadStateData, __cn1Arg1, __cn1Arg2, __cn1Arg3);
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_sqlStmtFinalizeStatus___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbWindowsEngine_sqlStmtFinalizeStatus___long_R_int(threadStateData, __cn1Arg1);
 }

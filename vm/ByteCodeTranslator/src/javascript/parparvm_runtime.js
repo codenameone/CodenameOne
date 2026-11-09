@@ -6659,6 +6659,9 @@ bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return nu
 // string concatenation is the correct result. null maps to "null" like makeConcat.
 // The Java substring constructor is the portable fallback for this optional C fusion.
 bindNative(["cn1_java_lang_String_cn1SubstringFused_int_int_R_java_lang_String"], function() { return null; });
+// The C VM's bulk compare and search; -2 sends String.java to its own loop.
+bindNative(["cn1_java_lang_String_cn1RegionMatch_int_java_lang_String_int_int_R_int"], function() { return -2; });
+bindNative(["cn1_java_lang_String_cn1IndexOfString_java_lang_String_int_R_int"], function() { return -2; });
 function cn1FusedConcatArg(x) { return x == null ? "null" : jvm.toNativeString(x); }
 // Reached only for Latin-1 byte[]-backed Strings (see cn1FusedConcatN): unreachable here, bound for reachability.
 bindNative(["cn1_java_lang_String_cn1FusedJoin_java_lang_String_java_lang_Object_1ARRAY_int_int_R_java_lang_String"], function(sep, parts, n) {
@@ -6703,6 +6706,15 @@ bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java
   // String.bytesToChars body doesn't tip ``yield*`` into a
   // ``not iterable`` TypeError.
   return yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding));
+});
+bindNative(["cn1_java_lang_String_surrogatePairs_char_1ARRAY_int_int_R_int"], function(chars, from, to) {
+  let n = 0;
+  for (let i = from | 0; i + 1 < (to | 0); i++) {
+    if ((chars[i] & 0xFC00) === 0xD800 && (chars[i + 1] & 0xFC00) === 0xDC00) {
+      n++;
+    }
+  }
+  return n;
 });
 bindNative(["cn1_java_lang_String_compactBytes_java_lang_String_R_byte_1ARRAY"], function() {
   return null; // Java fallback uses this runtime's string encoder.

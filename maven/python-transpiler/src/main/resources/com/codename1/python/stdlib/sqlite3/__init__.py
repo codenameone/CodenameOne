@@ -12,8 +12,10 @@ one table), the legacy and the `autocommit` transaction control,
 `executescript`, `iterdump` and the exception hierarchy behave as in
 CPython.
 
-Not provided, raising `NotSupportedError`: user-defined SQL functions,
-aggregates and collations, `backup`, `blobopen`, loading extensions.
+`create_function` works where the platform's SQLite lets one be
+registered (the JVM); elsewhere it raises `NotSupportedError`. Not provided,
+raising `NotSupportedError`: aggregates and collations, `backup`,
+`blobopen`, loading extensions.
 """
 
 import datetime as _datetime
@@ -85,11 +87,16 @@ class PrepareProtocol:
 Binary = memoryview
 
 adapters = {}
+# Whether no adapter is registered for a storage type, by the size of `adapters`
+# it was worked out for; register_adapter clears it. Asked on every execute, and
+# building the five keys each time was most of a short INSERT.
+_plain_state = [False, -1]
 converters = {}
 
 
 def register_adapter(type_, adapter):
     adapters[(type_, PrepareProtocol)] = adapter
+    _plain_state[1] = -1
 
 
 def register_converter(name, converter):
@@ -153,6 +160,12 @@ def _engine_error(e):
             i -= 1
         if i > 0:
             msg = msg[i + 1:-1]
+    elif msg.startswith("Failed to "):
+        # The native ports (iOS, Linux, Windows) write "<what failed>:
+        # <SQLite's message>"; the context ends at the first ": ".
+        sep = msg.find(": ")
+        if sep > 0:
+            msg = msg[sep + 2:]
     low = msg.lower()
     if "constraint failed" in low or "constraint violation" in low or "not unique" in low:
         return IntegrityError(msg)
@@ -189,6 +202,56 @@ def _first_word(sql):
 
 _QUERY_WORDS = ("SELECT", "PRAGMA", "WITH", "VALUES", "EXPLAIN")
 _DML_WORDS = ("INSERT", "UPDATE", "DELETE", "REPLACE")
+_PLAIN = (int, float, str, bytes)
+
+# What _run needs to know about a scanned statement, by its text: the first
+# word, whether it returns rows, and whether a ROLLBACK names a savepoint.
+# Computed once per text for the reason _SCANNED is.
+_KINDS = {}
+
+# A cursor's rows when it has none. Never changed in place (the rows are only
+# read), so every cursor shares this one.
+_NO_ROWS = ()
+
+
+
+def _plain_free():
+    n = len(adapters)
+    if _plain_state[1] != n:
+        _plain_state[0] = all((t, PrepareProtocol) not in adapters for t in (int, str, float, bytes, type(None)))
+        _plain_state[1] = n
+    return _plain_state[0]
+
+
+def _kind(stmt):
+    k = _KINDS.get(stmt)
+    if k is None:
+        if len(_KINDS) >= _SCANNED_MAX:
+            _KINDS.clear()
+        word = _first_word(stmt)
+        upper = stmt.upper()
+        query = word in _QUERY_WORDS or " RETURNING " in (" " + upper.replace("\n", " ") + " ")
+        if word == "BEGIN":
+            control = 1
+        elif word == "COMMIT" or word == "END":
+            control = 2
+        elif word == "ROLLBACK" and "TO" not in upper.split():
+            control = 3
+        else:
+            control = 0
+        # (returns rows, transaction control 0-3, DML, DDL, INSERT/REPLACE, a query word)
+        k = (query, control, word in _DML_WORDS, word in ("CREATE", "DROP", "ALTER"),
+             word in ("INSERT", "REPLACE"), word in _QUERY_WORDS)
+        _KINDS[stmt] = k
+    return k
+
+
+# _scan's answers by SQL text. An application runs the same few statements
+# over and over, and CPython keeps a cache of prepared statements for the same
+# reason (``cached_statements``); scanning character by character in Python
+# was most of what a short statement cost. Callers only read the answer.
+_SCANNED = {}
+_SCANNED_MAX = 256
 
 
 def _scan(sql):
@@ -199,6 +262,16 @@ def _scan(sql):
     name for ``:name``, ``@name`` and ``$name`` -- the rest after the
     statement's ``;``, and whether the statement creates a trigger).
     """
+    r = _SCANNED.get(sql)
+    if r is None:
+        if len(_SCANNED) >= _SCANNED_MAX:
+            _SCANNED.clear()
+        r = _scan_text(sql)
+        _SCANNED[sql] = r
+    return r
+
+
+def _scan_text(sql):
     out = []
     params = []
     n = len(sql)
@@ -206,7 +279,6 @@ def _scan(sql):
     start = 0
     trigger = _first_word(sql) == "CREATE" and _is_trigger(sql)
     depth_begin = 0
-    word = ""
     while i < n:
         c = sql[i]
         if c == "'" or c == '"' or c == "`" or c == "[":
@@ -233,8 +305,8 @@ def _scan(sql):
             j = i
             while j < n and (sql[j].isalnum() or sql[j] == "_"):
                 j += 1
-            word = sql[i:j].upper()
             if trigger:
+                word = sql[i:j].upper()
                 if word == "BEGIN" or word == "CASE":
                     depth_begin += 1
                 elif word == "END":
@@ -290,13 +362,17 @@ def _is_blank(sql):
 
 
 def complete_statement(statement):
+    # Complete when every statement ends at a top-level ";". The "x" after
+    # the text tells a terminated last statement (its rest is "x") from one
+    # that runs to the end -- a trigger whose BEGIN has no END yet ends with
+    # a ";" that is not its terminator.
     rest = statement
     while not _is_blank(rest):
-        stmt, params, after, trig = _scan(rest)
-        if after == "" and not rest.rstrip().endswith(";"):
+        stmt, params, after, trig = _scan(rest + "\nx")
+        if after == "":
             return False
-        rest = after
-    return statement.rstrip().endswith(";") or _is_blank(statement)
+        rest = after[:-2]
+    return not _is_blank(statement)
 
 
 class Row:
@@ -350,7 +426,7 @@ class Cursor:
         self.description = None
         self.rowcount = -1
         self.lastrowid = None
-        self._rows = []
+        self._rows = _NO_ROWS
         self._pos = 0
         self._closed = False
         self._inited = True
@@ -362,7 +438,7 @@ class Cursor:
 
     def close(self):
         self._closed = True
-        self._rows = []
+        self._rows = _NO_ROWS
 
     def setinputsizes(self, sizes):
         pass
@@ -371,6 +447,16 @@ class Cursor:
         pass
 
     def execute(self, sql, parameters=()):
+        # The common call (a statement seen before, plain values) runs whole in
+        # _cn1sql.execute; it answers None for anything it does not handle,
+        # before changing anything, and the code below does the rest. A failure
+        # comes back as the engine's message rather than raised, so this method
+        # sets up no handler: a frame with one pays for it on every call.
+        done = _cn1sql.execute(self, sql, parameters)
+        if done is self:
+            return self
+        if done is not None:
+            raise _engine_error(done) from None
         self._check()
         if not isinstance(sql, str):
             raise TypeError("execute() argument 1 must be str, not " + type(sql).__name__)
@@ -378,6 +464,10 @@ class Cursor:
         if not _is_blank(rest):
             raise ProgrammingError("You can only execute one statement at a time.")
         self._run(stmt, names, parameters, False)
+        if names.count(None) == len(names):
+            query, control, dml, ddl, inserts, query_word = _kind(stmt)
+            if not control and not ddl:
+                _cn1sql.plan(sql, stmt, len(names), query, dml, inserts, query_word)
         return self
 
     def executemany(self, sql, seq_of_parameters):
@@ -397,7 +487,7 @@ class Cursor:
                 total += self.rowcount
         self.rowcount = total if any_run else 0
         self.description = None
-        self._rows = []
+        self._rows = _NO_ROWS
         self._pos = 0
         return self
 
@@ -415,10 +505,18 @@ class Cursor:
                 continue
             self._run(stmt, [], (), False, script=True)
         self.description = None
-        self._rows = []
+        self._rows = _NO_ROWS
         return self
 
     def _bind(self, names, parameters):
+        t = type(parameters)
+        if (t is list or t is tuple) and names and names.count(None) == len(names):
+            # Only bare ? placeholders and a plain sequence, the common call: no names to look
+            # up and nothing to renumber.
+            if len(parameters) != len(names):
+                raise ProgrammingError("Incorrect number of bindings supplied. The current statement uses %d, "
+                                       "and there are %d supplied." % (len(names), len(parameters)))
+            return parameters
         if not names:
             if parameters is None:
                 return []
@@ -497,53 +595,54 @@ class Cursor:
     def _run(self, stmt, names, parameters, many, script=False):
         conn = self.connection
         values = self._bind(names, parameters)
-        bound = []
-        for i, v in enumerate(values):
-            try:
-                bound.append(self._adapt(v))
-            except ProgrammingError:
-                raise ProgrammingError("Error binding parameter %d: type '%s' is not supported"
-                                       % (i + 1, type(v).__name__)) from None
-        word = _first_word(stmt)
-        self._rows = []
+        bound = None
+        if _plain_free():
+            # No adapter for a storage type (the default ones are for dates), and every value
+            # is one: binds as it is.
+            bound = _cn1sql.plain(values)
+        if bound is None:
+            bound = []
+            for i, v in enumerate(values):
+                try:
+                    bound.append(self._adapt(v))
+                except ProgrammingError:
+                    raise ProgrammingError("Error binding parameter %d: type '%s' is not supported"
+                                           % (i + 1, type(v).__name__)) from None
+            bound = tuple(bound)
+        query, control, dml, ddl, inserts, query_word = _kind(stmt)
+        self._rows = _NO_ROWS
         self._pos = 0
-        if word == "BEGIN":
-            conn._begin()
+        if control:
+            if control == 1:
+                conn._begin()
+            elif control == 2:
+                conn._commit_raw()
+            else:
+                conn._rollback_raw()
             self.description = None
             self.rowcount = -1
             return
-        if word == "COMMIT" or word == "END":
-            conn._commit_raw()
-            self.description = None
-            self.rowcount = -1
-            return
-        if word == "ROLLBACK" and "TO" not in stmt.upper().split():
-            conn._rollback_raw()
-            self.description = None
-            self.rowcount = -1
-            return
-        if word in _DML_WORDS and conn._autocommit == LEGACY_TRANSACTION_CONTROL \
+        # A script's statements run as written: CPython's executescript never
+        # opens an implicit transaction, so an INSERT in one autocommits.
+        if not script and dml and conn._autocommit == LEGACY_TRANSACTION_CONTROL \
                 and conn._isolation_level is not None and not conn.in_transaction:
             conn._begin()
-        query = word in _QUERY_WORDS or " RETURNING " in (" " + stmt.upper().replace("\n", " ") + " ")
         try:
-            cols, rows, changes, rowid = _cn1sql.run(conn._handle, stmt, tuple(bound), query)
+            cols, rows, changes, rowid = _cn1sql.run(conn._handle, stmt, bound, query)
         except OSError as e:
             raise _engine_error(e) from None
-        if word in ("CREATE", "DROP", "ALTER"):
+        if ddl:
             conn._decltypes = {}
-        if word in _DML_WORDS:
+        if dml:
             conn.total_changes += max(changes, 0)
         if cols:
             self.description = tuple((self._colname(c), None, None, None, None, None, None) for c in cols)
             self._rows = self._convert(stmt, cols, rows)
-            self.rowcount = -1 if word in _QUERY_WORDS else len(rows)
+            self.rowcount = -1 if query_word else len(rows)
         else:
             self.description = None
-            self.rowcount = changes if word in _DML_WORDS else -1
-        if word in ("INSERT", "REPLACE") and not many:
-            self.lastrowid = rowid
-        elif word in ("INSERT", "REPLACE") and many:
+            self.rowcount = changes if dml else -1
+        if inserts:
             self.lastrowid = rowid
 
     def _colname(self, name):
@@ -570,6 +669,9 @@ class Cursor:
                     kind = kind.split("(")[0].strip().split(" ")[0]
                     convs[i] = converters.get(kind.upper())
         tf = conn.text_factory
+        if tf is str and not any(convs):
+            # The rows already are tuples of the storage values: nothing to do.
+            return rows
         out = []
         for row in rows:
             vals = list(row)
@@ -596,6 +698,9 @@ class Cursor:
         return rf(self, values)
 
     def fetchone(self):
+        r = _cn1sql.fetchone(self)
+        if r is not None:
+            return r
         self._check()
         if self._pos >= len(self._rows):
             return None
@@ -615,17 +720,26 @@ class Cursor:
         return out
 
     def fetchall(self):
-        out = []
-        while True:
-            r = self.fetchone()
-            if r is None:
-                return out
-            out.append(r)
+        # fetchone's checks once for the whole rest, not once per row.
+        self._check()
+        rows = self._rows
+        pos = self._pos
+        self._pos = len(rows)
+        rest = rows[pos:]
+        rf = self.row_factory
+        if rf is None:
+            rf = self.connection.row_factory
+        if rf is None:
+            return rest
+        return [rf(self, r) for r in rest]
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        r = _cn1sql.fetchone(self)
+        if r is not None:
+            return r
         r = self.fetchone()
         if r is None:
             raise StopIteration
@@ -841,7 +955,13 @@ class Connection:
         yield "COMMIT;"
 
     def create_function(self, name, narg, func, *, deterministic=False):
-        raise NotSupportedError("user-defined SQL functions are not supported on this platform")
+        self._check()
+        if func is None:
+            # Removing a function needs the engine's own hook; none of the
+            # platforms offers it, so a removed name stays callable.
+            return
+        if not _cn1sql.create_function(self._handle, name, narg, func):
+            raise NotSupportedError("user-defined SQL functions are not supported on this platform")
 
     def create_aggregate(self, name, n_arg, aggregate_class):
         raise NotSupportedError("user-defined aggregates are not supported on this platform")
@@ -900,3 +1020,8 @@ def connect(database, timeout=5.0, detect_types=0, isolation_level="", check_sam
             factory=Connection, cached_statements=128, uri=False, *, autocommit=LEGACY_TRANSACTION_CONTROL):
     return factory(database, timeout, detect_types, isolation_level, check_same_thread, None,
                    cached_statements, uri, autocommit=autocommit)
+
+# What _cn1sql.execute needs to decide, as _plain_free does, that no adapter
+# applies, and to recognize the default text factory and transaction mode.
+_cn1sql.setup(adapters, tuple((t, PrepareProtocol) for t in (int, str, float, bytes, type(None))), str,
+              LEGACY_TRANSACTION_CONTROL)

@@ -109,7 +109,52 @@
     <Match>
         <Class name="com.codename1.python.runtime.PySql$Result"/>
         <Field name="types"/>
-        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+        <Or>
+            <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+            <!-- Result.clear() resets it when a Result is reused. -->
+            <Bug pattern="UWF_NULL_FIELD"/>
+        </Or>
+    </Match>
+    <!-- PyStr.cachedSurrogates and XmlScan.Builder.startTag are identity
+         caches: the cached answer belongs to that very string object, and
+         a string merely equal to it is looked up the slow way. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.python.runtime.PyStr"/>
+                <Method name="cachedSurrogates"/>
+            </And>
+            <And>
+                <Class name="com.codename1.python.runtime.XmlScan$Builder"/>
+                <Method name="startTag"/>
+            </And>
+        </Or>
+        <Or>
+            <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+            <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ"/>
+        </Or>
+    </Match>
+    <!-- Null is a distinct answer from an empty array in each: the JSON
+         encoder's sortedStringKeys means "not every key is a str" (Python
+         then sorts and raises), Regex.firstOps means "the first characters
+         cannot be worked out", where an empty set would mean "matches
+         nothing", and Regex.table means "this op kind is matched directly,
+         without a table". -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.python.runtime.PyJson$Encoder"/>
+                <Method name="sortedStringKeys"/>
+            </And>
+            <And>
+                <Class name="com.codename1.python.runtime.Regex"/>
+                <Or>
+                    <Method name="firstOps"/>
+                    <Method name="table"/>
+                </Or>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
     </Match>
     <!-- gc.collect() is a program asking for a collection: the System.gc()
          call is the whole of what it does. -->

@@ -965,6 +965,8 @@ public class IOSNative {
     native void sqlDbExec(long dbPeer, String sql, String[] args);
     /** Whether the engine reports a transaction in progress, which is sqlite3_get_autocommit. */
     native boolean sqlDbInTransaction(long dbPeer);
+    native long sqlDbChanges(long dbPeer);
+    native long sqlDbLastInsertRowid(long dbPeer);
 
     /** Runs an entire script through sqlite3_exec, which handles multiple statements. */
     native void sqlDbExecScript(long dbPeer, String sql);
@@ -973,6 +975,19 @@ public class IOSNative {
 
     /** Compiles a statement, returning the sqlite3_stmt peer. */
     native long sqlStmtPrepare(long dbPeer, String sql);
+    // SQL functions written in Java; see DatabaseImpl.sqlFunctionCall.
+    native int sqlDbCreateFunction(long dbPeer, byte[] nameUtf8, int argCount, int id);
+    native int sqlValueType(long argv, int index);
+    native long sqlValueLong(long argv, int index);
+    native double sqlValueDouble(long argv, int index);
+    native byte[] sqlValueText(long argv, int index);
+    native byte[] sqlValueBlob(long argv, int index);
+    native void sqlResultNull(long ctx);
+    native void sqlResultLong(long ctx, long value);
+    native void sqlResultDouble(long ctx, double value);
+    native void sqlResultText(long ctx, byte[] utf8);
+    native void sqlResultBlob(long ctx, byte[] value);
+    native void sqlResultError(long ctx, byte[] utf8);
     native int sqlStmtParameterCount(long statementPeer);
     native void sqlStmtBindNull(long statementPeer, int index);
     /** Binds SQL text as UTF-8 bytes; see com.codename1.impl.SQLText for why not a String. */

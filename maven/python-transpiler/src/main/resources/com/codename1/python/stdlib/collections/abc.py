@@ -5,6 +5,10 @@
 
 from abc import ABCMeta, abstractmethod
 
+# Iterable[int], Callable[[str], int]: each generic ABC is subscripted
+# through types.GenericAlias, as in CPython.
+_GenericAlias = type(list[int])
+
 
 def _has(c, *methods):
     for m in methods:
@@ -29,6 +33,8 @@ class Hashable(metaclass=ABCMeta):
 
 
 class Awaitable(metaclass=ABCMeta):
+    __class_getitem__ = classmethod(_GenericAlias)
+
     @abstractmethod
     def __await__(self):
         yield
@@ -39,10 +45,14 @@ class Awaitable(metaclass=ABCMeta):
 
 
 class Coroutine(Awaitable):
-    pass
+    @classmethod
+    def __subclasshook__(cls, c):
+        return _has(c, "__await__", "send", "throw", "close") if cls is Coroutine else NotImplemented
 
 
 class AsyncIterable(metaclass=ABCMeta):
+    __class_getitem__ = classmethod(_GenericAlias)
+
     @abstractmethod
     def __aiter__(self):
         return None
@@ -70,6 +80,8 @@ class AsyncGenerator(AsyncIterator):
 
 
 class Iterable(metaclass=ABCMeta):
+    __class_getitem__ = classmethod(_GenericAlias)
+
     @abstractmethod
     def __iter__(self):
         while False:
@@ -121,6 +133,8 @@ class Sized(metaclass=ABCMeta):
 
 
 class Container(metaclass=ABCMeta):
+    __class_getitem__ = classmethod(_GenericAlias)
+
     @abstractmethod
     def __contains__(self, x):
         return False
@@ -137,6 +151,8 @@ class Collection(Sized, Iterable, Container):
 
 
 class Callable(metaclass=ABCMeta):
+    __class_getitem__ = classmethod(_GenericAlias)
+
     @abstractmethod
     def __call__(self, *args, **kwds):
         return False
@@ -268,6 +284,8 @@ class Mapping(Collection):
 
 
 class MappingView(Sized):
+    __class_getitem__ = classmethod(_GenericAlias)
+
     def __init__(self, mapping):
         self._mapping = mapping
 

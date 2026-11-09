@@ -25,6 +25,7 @@ package com.codename1.impl.javase;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
+import com.codename1.db.SqlFunction;
 import com.codename1.impl.SQLStatementSplitter;
 
 import java.io.File;
@@ -681,6 +682,70 @@ public class SEDatabase extends Database {
             throw new IOException("This method takes a single SQL statement, but the string "
                     + "contains " + SQLStatementSplitter.countStatements(sql)
                     + ". Use execute(String) to run a script.");
+        }
+    }
+
+    @Override
+    public boolean supportsFunctions() {
+        return true;
+    }
+
+    @Override
+    public void createFunction(String name, int argCount, final SqlFunction function) throws IOException {
+        checkOpen();
+        try {
+            if (function == null) {
+                org.sqlite.Function.destroy(conn, name, argCount);
+                return;
+            }
+            org.sqlite.Function.create(conn, name, new org.sqlite.Function() {
+                @Override
+                protected void xFunc() throws SQLException {
+                    Object[] args = new Object[args()];
+                    for (int i = 0; i < args.length; i++) {
+                        switch (value_type(i)) {
+                            case org.sqlite.core.Codes.SQLITE_INTEGER:
+                                args[i] = Long.valueOf(value_long(i));
+                                break;
+                            case org.sqlite.core.Codes.SQLITE_FLOAT:
+                                args[i] = Double.valueOf(value_double(i));
+                                break;
+                            case org.sqlite.core.Codes.SQLITE_BLOB:
+                                args[i] = value_blob(i);
+                                break;
+                            case org.sqlite.core.Codes.SQLITE_TEXT:
+                                args[i] = value_text(i);
+                                break;
+                            default:
+                                args[i] = null;
+                        }
+                    }
+                    Object v;
+                    try {
+                        v = function.call(args);
+                    } catch (RuntimeException e) {
+                        // error() makes the message the statement's; a thrown SQLException
+                        // would reach SQLite as its toString().
+                        error(e.getMessage() == null ? e.toString() : e.getMessage());
+                        return;
+                    }
+                    if (v == null) {
+                        result();
+                    } else if (v instanceof Boolean) {
+                        result(((Boolean) v).booleanValue() ? 1 : 0);
+                    } else if (v instanceof Double || v instanceof Float) {
+                        result(((Number) v).doubleValue());
+                    } else if (v instanceof Number) {
+                        result(((Number) v).longValue());
+                    } else if (v instanceof byte[]) {
+                        result((byte[]) v);
+                    } else {
+                        result(v.toString());
+                    }
+                }
+            }, argCount, 0);
+        } catch (SQLException e) {
+            throw new IOException(e.getMessage(), e);
         }
     }
 

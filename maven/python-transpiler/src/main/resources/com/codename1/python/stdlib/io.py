@@ -228,10 +228,27 @@ class _Buffer:
 
 
 class StringIO(TextIOBase):
+    """newline works as CPython's: None translates \\r\\n and \\r to \\n on
+    write, '' keeps every ending and reads a line up to any of them, and
+    '\\r' or '\\r\\n' write \\n as that ending and read lines ending in it."""
+
     def __init__(self, initial_value="", newline="\n"):
         if initial_value is not None and not isinstance(initial_value, str):
             raise TypeError("initial_value must be str or None, not " + type(initial_value).__name__)
-        self._b = _Buffer(initial_value or "", "")
+        if newline is not None and not isinstance(newline, str):
+            raise TypeError("newline must be str or None, not " + type(newline).__name__)
+        if newline not in (None, "", "\n", "\r", "\r\n"):
+            raise ValueError("illegal newline value: %r" % (newline,))
+        self._newline = newline
+        self._b = _Buffer(self._translate(initial_value or ""), "")
+
+    def _translate(self, s):
+        nl = self._newline
+        if nl is None:
+            return s.replace("\r\n", "\n").replace("\r", "\n")
+        if nl in ("\r", "\r\n"):
+            return s.replace("\n", nl)
+        return s
 
     def readable(self):
         self._check()
@@ -253,7 +270,8 @@ class StringIO(TextIOBase):
         self._check()
         if not isinstance(s, str):
             raise TypeError("string argument expected, got '" + type(s).__name__ + "'")
-        return self._b.write(s, lambda n: "\0" * n)
+        self._b.write(self._translate(s), lambda n: "\0" * n)
+        return len(s)
 
     def read(self, size=-1):
         self._check()
@@ -261,7 +279,25 @@ class StringIO(TextIOBase):
 
     def readline(self, size=-1):
         self._check()
-        return self._b.readline(size, "\n")
+        nl = self._newline
+        if nl == "":
+            return self._readline_any(size)
+        return self._b.readline(size, "\n" if nl is None else nl)
+
+    def _readline_any(self, size):
+        b = self._b
+        buf = b._flat()
+        start = b._pos
+        n = len(buf)
+        lf = buf.find("\n", start)
+        cr = buf.find("\r", start)
+        i = n if lf < 0 and cr < 0 else lf if cr < 0 else cr if lf < 0 else min(lf, cr)
+        if i < n:
+            i += 2 if buf[i] == "\r" and i + 1 < n and buf[i + 1] == "\n" else 1
+        if size is not None and size >= 0:
+            i = min(i, start + size)
+        b._pos = max(i, start)
+        return buf[start:i]
 
     def seek(self, pos, whence=0):
         self._check()

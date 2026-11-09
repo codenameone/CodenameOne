@@ -278,6 +278,294 @@ static void cn1_utf8_widen_ascii_neon(const uint8_t* src, JAVA_ARRAY_CHAR* dst, 
 }
 #endif
 
+// The UTF-16 length of well-formed UTF-8: one char per byte that is not a
+// continuation byte, plus one per four-byte lead (it becomes a surrogate
+// pair). On malformed input the answer is meaningless, which is fine: the
+// caller only trusts it after cn1_utf8_decode_valid has accepted the input.
+static size_t cn1_utf8_valid_char_count(const uint8_t* src, size_t len) {
+    size_t i = 0;
+    size_t cont = 0;
+    size_t four = 0;
+#if defined(__ARM_NEON)
+    while (i + 16 <= len) {
+        // At most 255 rounds per accumulator, so no u8 lane can wrap.
+        uint8x16_t accCont = vdupq_n_u8(0);
+        uint8x16_t accFour = vdupq_n_u8(0);
+        size_t stop = i + 16 * 255;
+        if (stop > len) {
+            stop = len;
+        }
+        while (i + 16 <= stop) {
+            uint8x16_t v = vld1q_u8(src + i);
+            accCont = vsubq_u8(accCont, vceqq_u8(vandq_u8(v, vdupq_n_u8(0xC0)), vdupq_n_u8(0x80)));
+            accFour = vsubq_u8(accFour, vcgeq_u8(v, vdupq_n_u8(0xF0)));
+            i += 16;
+        }
+        cont += (size_t)vaddlvq_u8(accCont);
+        four += (size_t)vaddlvq_u8(accFour);
+    }
+#endif
+    for (; i < len; i++) {
+        cont += (src[i] & 0xC0) == 0x80;
+        four += src[i] >= 0xF0;
+    }
+    return len - cont + four;
+}
+
+// One UTF-8 sequence at src[*pi], strictly: JAVA_FALSE on a malformed,
+// overlong, surrogate or out-of-range one.
+static inline JAVA_BOOLEAN cn1_utf8_step(const uint8_t* src, size_t len, size_t* pi, JAVA_ARRAY_CHAR* out, size_t* po) {
+    size_t i = *pi;
+    size_t o = *po;
+    uint32_t c = src[i];
+    if (c < 0x80) {
+        out[o++] = (JAVA_ARRAY_CHAR)c;
+        i++;
+    } else if (c < 0xE0) {
+        if (c < 0xC2 || i + 1 >= len || (src[i + 1] & 0xC0) != 0x80) {
+            return JAVA_FALSE;
+        }
+        out[o++] = (JAVA_ARRAY_CHAR)(((c & 0x1F) << 6) | (src[i + 1] & 0x3F));
+        i += 2;
+    } else if (c < 0xF0) {
+        if (i + 2 >= len) {
+            return JAVA_FALSE;
+        }
+        uint32_t c1 = src[i + 1];
+        uint32_t c2 = src[i + 2];
+        uint32_t lo = c == 0xE0 ? 0xA0 : 0x80;
+        uint32_t hi = c == 0xED ? 0x9F : 0xBF;
+        if (c1 < lo || c1 > hi || (c2 & 0xC0) != 0x80) {
+            return JAVA_FALSE;
+        }
+        out[o++] = (JAVA_ARRAY_CHAR)(((c & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F));
+        i += 3;
+    } else {
+        if (c > 0xF4 || i + 3 >= len) {
+            return JAVA_FALSE;
+        }
+        uint32_t c1 = src[i + 1];
+        uint32_t lo = c == 0xF0 ? 0x90 : 0x80;
+        uint32_t hi = c == 0xF4 ? 0x8F : 0xBF;
+        if (c1 < lo || c1 > hi || (src[i + 2] & 0xC0) != 0x80 || (src[i + 3] & 0xC0) != 0x80) {
+            return JAVA_FALSE;
+        }
+        uint32_t cp = ((c & 0x07) << 18) | ((c1 & 0x3F) << 12)
+                | ((uint32_t)(src[i + 2] & 0x3F) << 6) | (src[i + 3] & 0x3F);
+        cp -= CN1_MIN_SUPPLEMENTARY_CODEPOINT;
+        out[o++] = (JAVA_ARRAY_CHAR)(CN1_MIN_HIGH_SURROGATE + (cp >> 10));
+        out[o++] = (JAVA_ARRAY_CHAR)(CN1_MIN_LOW_SURROGATE + (cp & 0x3FF));
+        i += 4;
+    }
+    *pi = i;
+    *po = o;
+    return JAVA_TRUE;
+}
+
+#if defined(__ARM_NEON)
+// Lane-compaction tables for vqtbl1q_u8, built once at load. Entry m lists,
+// in order, the bytes of a 16-byte vector to keep; 0xFF lanes read as zero.
+//  - cn1Utf8EncKeep: lane i of eight u16 holds a lead (or ASCII) byte low and
+//    a trail byte high; bit i of m set means lane i is two bytes long.
+//  - cn1Utf8DecKeep: eight u16 chars, bit i of m set drops char i (it was a
+//    continuation byte, folded into the lead before it).
+static uint8_t cn1Utf8EncKeep[256][16];
+static uint8_t cn1Utf8EncLen[256];
+static uint8_t cn1Utf8DecKeep[256][16];
+
+__attribute__((constructor)) static void cn1Utf8BuildTables(void) {
+    for (int m = 0; m < 256; m++) {
+        int k = 0;
+        for (int i = 0; i < 8; i++) {
+            cn1Utf8EncKeep[m][k++] = (uint8_t)(2 * i);
+            if (m & (1 << i)) {
+                cn1Utf8EncKeep[m][k++] = (uint8_t)(2 * i + 1);
+            }
+        }
+        cn1Utf8EncLen[m] = (uint8_t)k;
+        for (; k < 16; k++) {
+            cn1Utf8EncKeep[m][k] = 0xFF;
+        }
+        k = 0;
+        for (int i = 0; i < 8; i++) {
+            if (!(m & (1 << i))) {
+                cn1Utf8DecKeep[m][k++] = (uint8_t)(2 * i);
+                cn1Utf8DecKeep[m][k++] = (uint8_t)(2 * i + 1);
+            }
+        }
+        for (; k < 16; k++) {
+            cn1Utf8DecKeep[m][k] = 0xFF;
+        }
+    }
+}
+
+static inline unsigned cn1_utf8_mask8(uint8x8_t m) {
+    static const uint8_t bits[8] = {1, 2, 4, 8, 16, 32, 64, 128};
+    return vaddv_u8(vand_u8(m, vld1_u8(bits)));
+}
+
+static inline unsigned cn1_utf8_mask16(uint16x8_t m) {
+    static const uint16_t bits[8] = {1, 2, 4, 8, 16, 32, 64, 128};
+    return vaddvq_u16(vandq_u16(m, vld1q_u16(bits)));
+}
+#endif
+
+// Strict UTF-8 -> UTF-16 decode into `out`, which holds `cap` chars.
+// Returns JAVA_FALSE at the first malformed sequence, leaving `out` partly
+// written; the caller then decodes again with the replacing DFA, whose output
+// for valid input is identical. On NEON an eight-byte window of ASCII is one
+// widen, and a window of ASCII and two-byte sequences (accented Latin,
+// Greek, Cyrillic, Hebrew, Arabic) is validated, combined and compacted as a
+// vector; anything else in a window goes one sequence at a time. A window
+// never splits a sequence: one ending in a lead takes its trail with it.
+static JAVA_BOOLEAN cn1_utf8_decode_valid(const uint8_t* src, size_t len, JAVA_ARRAY_CHAR* out, size_t cap) {
+    size_t i = 0;
+    size_t o = 0;
+#if defined(__ARM_NEON)
+    while (i + 16 <= len && o + 8 <= cap) {
+        uint8x16_t w = vld1q_u8(src + i);
+        uint8x8_t b = vget_low_u8(w);
+        unsigned top = vmaxv_u8(b);
+        if (top < 0x80) {
+            vst1q_u16((uint16_t*)(out + o), vmovl_u8(b));
+            i += 8;
+            o += 8;
+            continue;
+        }
+        if (top < 0xE0) {
+            uint8x8_t next = vget_low_u8(vextq_u8(w, w, 1));
+            uint8x8_t isCont = vceq_u8(vand_u8(b, vdup_n_u8(0xC0)), vdup_n_u8(0x80));
+            uint8x8_t isLead = vcge_u8(b, vdup_n_u8(0xC0));
+            uint8x8_t nextCont = vceq_u8(vand_u8(next, vdup_n_u8(0xC0)), vdup_n_u8(0x80));
+            uint8x8_t prevLead = vext_u8(vdup_n_u8(0), isLead, 7);
+            // Every lead has a trail after it, every trail a lead before it,
+            // and no lead is C0 or C1 (overlong).
+            uint8x8_t bad = vorr_u8(veor_u8(isLead, nextCont), veor_u8(isCont, prevLead));
+            bad = vorr_u8(bad, vcle_u8(vsub_u8(b, vdup_n_u8(0xC0)), vdup_n_u8(1)));
+            if (vmaxv_u8(bad) == 0) {
+                unsigned drop = cn1_utf8_mask8(isCont);
+                uint16x8_t lo = vmovl_u8(b);
+                uint16x8_t pair = vorrq_u16(vshlq_n_u16(vandq_u16(lo, vdupq_n_u16(0x1F)), 6),
+                        vandq_u16(vmovl_u8(next), vdupq_n_u16(0x3F)));
+                uint16x8_t leadLanes = vreinterpretq_u16_s16(vmovl_s8(vreinterpret_s8_u8(isLead)));
+                uint16x8_t chars = vbslq_u16(leadLanes, pair, lo);
+                vst1q_u8((uint8_t*)(out + o),
+                        vqtbl1q_u8(vreinterpretq_u8_u16(chars), vld1q_u8(cn1Utf8DecKeep[drop])));
+                o += 8 - (size_t)__builtin_popcount(drop);
+                i += 8 + (vget_lane_u8(isLead, 7) != 0);
+                continue;
+            }
+        }
+        size_t end = i + 8;
+        while (i < end) {
+            if (!cn1_utf8_step(src, len, &i, out, &o)) {
+                return JAVA_FALSE;
+            }
+        }
+    }
+#endif
+    while (i < len) {
+        if (!cn1_utf8_step(src, len, &i, out, &o)) {
+            return JAVA_FALSE;
+        }
+    }
+    return JAVA_TRUE;
+}
+
+// The UTF-8 length of `src` when it holds no surrogate at all, which the
+// caller learns from *sawSurrogate: one byte a char, one more from U+0080 and
+// one more again from U+0800. Eight chars a step on NEON (clang does not
+// vectorize the scalar form on its own: it measured 4.5x slower). Surrogates,
+// paired or not, need the exact encoder.
+static size_t cn1_utf8_plain_length(const JAVA_ARRAY_CHAR* src, size_t len, int* sawSurrogate) {
+    size_t i = 0;
+    size_t extra = 0;
+    unsigned int sur = 0;
+#if defined(__ARM_NEON)
+    uint16x8_t surLanes = vdupq_n_u16(0);
+    while (i + 8 <= len) {
+        // At most 4096 rounds per accumulator: two per lane each round stays
+        // far below the u16 limit.
+        uint16x8_t acc = vdupq_n_u16(0);
+        size_t stop = i + 8 * 4096;
+        if (stop > len) {
+            stop = len;
+        }
+        while (i + 8 <= stop) {
+            uint16x8_t v = vld1q_u16((const uint16_t*)(src + i));
+            acc = vsubq_u16(acc, vcgeq_u16(v, vdupq_n_u16(0x80)));
+            acc = vsubq_u16(acc, vcgeq_u16(v, vdupq_n_u16(0x800)));
+            surLanes = vorrq_u16(surLanes,
+                    vceqq_u16(vandq_u16(v, vdupq_n_u16(0xF800)), vdupq_n_u16(0xD800)));
+            i += 8;
+        }
+        extra += (size_t)vaddlvq_u16(acc);
+    }
+    sur = vmaxvq_u16(surLanes) != 0;
+#endif
+    for (; i < len; i++) {
+        unsigned int c = src[i];
+        extra += (c >= 0x80) + (c >= 0x800);
+        sur |= (c & 0xF800) == 0xD800;
+    }
+    *sawSurrogate = (int)sur;
+    return len + extra;
+}
+
+static inline size_t cn1_utf8_put_plain(unsigned int c, JAVA_ARRAY_BYTE* out, size_t o) {
+    if (c < 0x80) {
+        out[o] = (JAVA_ARRAY_BYTE)c;
+        return o + 1;
+    }
+    if (c < 0x800) {
+        out[o] = (JAVA_ARRAY_BYTE)(0xC0 | (c >> 6));
+        out[o + 1] = (JAVA_ARRAY_BYTE)(0x80 | (c & 0x3F));
+        return o + 2;
+    }
+    out[o] = (JAVA_ARRAY_BYTE)(0xE0 | (c >> 12));
+    out[o + 1] = (JAVA_ARRAY_BYTE)(0x80 | ((c >> 6) & 0x3F));
+    out[o + 2] = (JAVA_ARRAY_BYTE)(0x80 | (c & 0x3F));
+    return o + 3;
+}
+
+// UTF-16 -> UTF-8 for input with no surrogate, into `out` of `cap` bytes.
+// On NEON eight chars below U+0800 are one step: each lane is split into
+// its lead and trail bytes and the vector is compacted by table, so mixed
+// Latin text is not a branch per char.
+static void cn1_utf8_encode_plain(const JAVA_ARRAY_CHAR* src, size_t len, JAVA_ARRAY_BYTE* out, size_t cap) {
+    size_t i = 0;
+    size_t o = 0;
+#if defined(__ARM_NEON)
+    while (i + 8 <= len && o + 16 <= cap) {
+        uint16x8_t v = vld1q_u16((const uint16_t*)(src + i));
+        if (vmaxvq_u16(v) >= 0x800) {
+            for (size_t end = i + 8; i < end; i++) {
+                o = cn1_utf8_put_plain(src[i], out, o);
+            }
+            continue;
+        }
+        uint16x8_t two = vcgeq_u16(v, vdupq_n_u16(0x80));
+        unsigned m = cn1_utf8_mask16(two);
+        if (m == 0) {
+            vst1_u8((uint8_t*)(out + o), vmovn_u16(v));
+            i += 8;
+            o += 8;
+            continue;
+        }
+        uint16x8_t lead = vbslq_u16(two, vorrq_u16(vshrq_n_u16(v, 6), vdupq_n_u16(0xC0)), v);
+        uint16x8_t trail = vorrq_u16(vandq_u16(v, vdupq_n_u16(0x3F)), vdupq_n_u16(0x80));
+        uint16x8_t both = vorrq_u16(lead, vshlq_n_u16(trail, 8));
+        vst1q_u8((uint8_t*)(out + o),
+                vqtbl1q_u8(vreinterpretq_u8_u16(both), vld1q_u8(cn1Utf8EncKeep[m])));
+        o += cn1Utf8EncLen[m];
+        i += 8;
+    }
+#endif
+    for (; i < len; i++) {
+        o = cn1_utf8_put_plain(src[i], out, o);
+    }
+}
+
 // JDK-compatible UTF-16 -> UTF-8 encode. Reads JAVA_ARRAY_CHAR units, joins
 // well-formed surrogate pairs, and emits the canonical 1/2/3/4-byte UTF-8
 // sequence. Unpaired surrogates are encoded as U+FFFD (matching the JDK
@@ -731,7 +1019,23 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
             return destArr;
         }
 
-        // Mixed: count the tail with the DFA, allocate exactly, then decode.
+        // Mixed: count the chars of valid UTF-8 with a vector pass, allocate
+        // exactly and decode in one strict pass. Only malformed input pays
+        // for the DFA's count and replace passes.
+        {
+            const uint8_t* tail = src + asciiPrefix;
+            size_t tailBytes = srcLen - asciiPrefix;
+            size_t total = asciiPrefix + cn1_utf8_valid_char_count(tail, tailBytes);
+            JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, (JAVA_INT)total);
+            JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
+            if (cn1_utf8_decode_valid(tail, tailBytes, dest + asciiPrefix, total - asciiPrefix)) {
+                for (size_t k = 0; k < asciiPrefix; k++) {
+                    dest[k] = (JAVA_ARRAY_CHAR)src[k];
+                }
+                finishedNativeAllocations();
+                return destArr;
+            }
+        }
         size_t tailLen = cn1_utf8_decode_replace(src + asciiPrefix, srcLen - asciiPrefix, NULL);
         size_t total = asciiPrefix + tailLen;
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, (JAVA_INT)total);
@@ -809,6 +1113,38 @@ JAVA_OBJECT java_io_InputStreamReader_bytesToChars___byte_1ARRAY_int_int_java_la
     return java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(threadStateData, b, off, len, encoding);
 }
 
+JAVA_INT java_lang_String_surrogatePairs___char_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr, JAVA_INT from, JAVA_INT to) {
+    const JAVA_ARRAY_CHAR* a = (const JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
+    // A pair is a high surrogate whose next char is a low one, and two pairs
+    // can never share a char, so every such position counts.
+    JAVA_INT n = 0;
+    JAVA_INT i = from;
+#if defined(__ARM_NEON)
+    // Eight positions a step: len() of every non-Latin-1 str comes here.
+    // Each u16 lane gains one (0xFFFF subtracted) per pair; 4096 steps
+    // cannot wrap it.
+    while (i + 9 <= to) {
+        uint16x8_t acc = vdupq_n_u16(0);
+        JAVA_INT stop = i + 8 * 4096;
+        if (stop > to) {
+            stop = to;
+        }
+        for (; i + 9 <= stop; i += 8) {
+            uint16x8_t v = vld1q_u16((const uint16_t*)(a + i));
+            uint16x8_t w = vld1q_u16((const uint16_t*)(a + i + 1));
+            uint16x8_t hi = vceqq_u16(vandq_u16(v, vdupq_n_u16(0xFC00)), vdupq_n_u16(0xD800));
+            uint16x8_t lo = vceqq_u16(vandq_u16(w, vdupq_n_u16(0xFC00)), vdupq_n_u16(0xDC00));
+            acc = vsubq_u16(acc, vandq_u16(hi, lo));
+        }
+        n += (JAVA_INT)vaddlvq_u16(acc);
+    }
+#endif
+    for (; i + 1 < to; i++) {
+        n += ((a[i] & 0xFC00) == 0xD800) & ((a[i + 1] & 0xFC00) == 0xDC00);
+    }
+    return n;
+}
+
 JAVA_BOOLEAN isAsciiArray(JAVA_ARRAY sourceArr) {
     JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)sourceArr);
     for(int iter = 0 ; iter < sourceArr->length ; iter++) {
@@ -872,6 +1208,19 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
         encLen = ((JAVA_ARRAY)encoding)->length;
     }
     cn1_encoding_t enc = cn1_resolve_encoding_from_chars(encChars, encLen);
+
+    // UTF-8 without surrogates (nearly all text): one vectorized length pass,
+    // then one write. A pure-ASCII input comes out of the same two loops.
+    if (enc == CN1_ENC_UTF8 || enc == CN1_ENC_UNKNOWN) {
+        int sawSurrogate = 0;
+        size_t outLen = cn1_utf8_plain_length(src, (size_t)srcLen, &sawSurrogate);
+        if (!sawSurrogate) {
+            JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, (JAVA_INT)outLen);
+            JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)destArr);
+            cn1_utf8_encode_plain(src, (size_t)srcLen, dest, outLen);
+            return destArr;
+        }
+    }
 
     // ASCII fast path: every char < 0x80 maps to itself as a single byte. Both
     // UTF-8 and ISO-8859-1 agree on this byte sequence, so we can take this
@@ -939,11 +1288,39 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
 #endif
 }
 
+// Records the frames only; getStack renders them when the text is read. A throw
+// used to build the whole trace as a String through a StringBuilder, which was
+// most of what throwing cost, for exceptions that are nearly always caught and
+// dropped unread.
 JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
-    if (get_field_java_lang_Throwable_stack(__cn1ThisObject) == JAVA_NULL) {
-        set_field_java_lang_Throwable_stack(java_lang_Throwable_getStack___R_java_lang_String(threadStateData, __cn1ThisObject), __cn1ThisObject);
+    if (get_field_java_lang_Throwable_stack(__cn1ThisObject) != JAVA_NULL
+            || get_field_java_lang_Throwable_frames(__cn1ThisObject) != JAVA_NULL) {
+        return;
     }
-    
+    int off = threadStateData->callStackOffset;
+    if(off < 0 || off > CN1_MAX_STACK_CALL_DEPTH) {
+        off = off < 0 ? 0 : CN1_MAX_STACK_CALL_DEPTH;
+    }
+    JAVA_OBJECT arr = __NEW_ARRAY_JAVA_INT(threadStateData, off * 3);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
+    for(int iter = off - 1, k = 0 ; iter >= 0 ; iter--, k += 3) {
+        d[k] = threadStateData->callStackClass[iter];
+        d[k + 1] = threadStateData->callStackMethod[iter];
+        d[k + 2] = threadStateData->callStackLine[iter];
+    }
+    set_field_java_lang_Throwable_frames(arr, __cn1ThisObject);
+}
+
+// The rendered trace of `th`, made from its recorded frames the first time.
+JAVA_OBJECT cn1ThrowableStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
+    if(get_field_java_lang_Throwable_stack(th) == JAVA_NULL) {
+        if(get_field_java_lang_Throwable_frames(th) == JAVA_NULL) {
+            java_lang_Throwable_fillInStack__(threadStateData, th);
+        }
+        set_field_java_lang_Throwable_stack(java_lang_Throwable_getStack___R_java_lang_String(threadStateData, th), th);
+        set_field_java_lang_Throwable_frames(JAVA_NULL, th);
+    }
+    return get_field_java_lang_Throwable_stack(th);
 }
 
 JAVA_OBJECT newline = JAVA_NULL;
@@ -1656,7 +2033,70 @@ JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE,
 // two significand digits because the specification requires at least one digit after the
 // decimal point: Double.toString(Double.MIN_VALUE) is "4.9E-324", not a zero-padded
 // "5.0E-324", even though a single digit round trips.
+/* Exact fast path for cn1ShortestDouble. Every decimal of at most 15
+ * significant digits is the only one of that length naming its double (DBL_DIG
+ * is 15), so a double that equals such a decimal prints as it, trailing zeros
+ * dropped. The test is exact: m < 10^15 and 10^p (p <= 22) are both exactly
+ * representable, so m / 10^p is the correctly rounded value of the decimal
+ * m * 10^-p, and it equals d only if that decimal reads back as d. Values in
+ * JSON, prices, coordinates and counters are nearly all of this shape; each
+ * answered here skips the binary search below, which costs several snprintf
+ * and strtod calls per value. Writes the "%.*e" form the search writes. */
+static int cn1ShortDecimal(char* buffer, int bufferSize, JAVA_DOUBLE d) {
+    static const double pow10[] = {1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11,
+        1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
+    double a = d < 0 ? -d : d;
+    if (!(a >= 1e-7 && a < 1e15) || bufferSize < 32) {
+        return 0;
+    }
+    for (int p = 0; p <= 22; p++) {
+        double scaled = a * pow10[p];
+        if (scaled >= 1e15) {
+            return 0;
+        }
+        double m = (double)(long long)(scaled + 0.5);
+        if (m / pow10[p] != a) {
+            continue;
+        }
+        long long digitsValue = (long long)m;
+        char digits[24];
+        int n = 0;
+        while (digitsValue > 0) {
+            digits[n++] = (char)('0' + digitsValue % 10);
+            digitsValue /= 10;
+        }
+        /* digits[] is least significant first; drop trailing zeros. */
+        int low = 0;
+        while (low < n - 1 && digits[low] == '0') {
+            low++;
+        }
+        int exp10 = n - 1 - p;
+        int o = 0;
+        if (d < 0) {
+            buffer[o++] = '-';
+        }
+        buffer[o++] = digits[n - 1];
+        if (n - 1 > low) {
+            buffer[o++] = '.';
+            for (int i = n - 2; i >= low; i--) {
+                buffer[o++] = digits[i];
+            }
+        }
+        int e = exp10 < 0 ? -exp10 : exp10;
+        buffer[o++] = 'e';
+        buffer[o++] = exp10 < 0 ? '-' : '+';
+        buffer[o++] = (char)('0' + e / 10);
+        buffer[o++] = (char)('0' + e % 10);
+        buffer[o] = 0;
+        return 1;
+    }
+    return 0;
+}
+
 static void cn1ShortestDouble(char* buffer, int bufferSize, JAVA_DOUBLE d) {
+    if (cn1ShortDecimal(buffer, bufferSize, d)) {
+        return;
+    }
     int low = 2;
     int high = 17;
     while (low < high) {
@@ -3062,7 +3502,8 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
         threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;
         threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess;
-        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __gcTryJmp, sizeof(jmp_buf));
+        threadStateData->blocks[threadStateData->tryBlockOffset].destination = &__gcTryJmp;
+        threadStateData->blocks[threadStateData->tryBlockOffset].handler = 1;
         threadStateData->tryBlockOffset++;
 #ifdef CN1_GC_INSTRUMENT
     extern long long cn1_instr_allocCount; extern int currentSizeOfAllObjectsInHeap;
@@ -3377,7 +3818,8 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
  * calls it 6M times per rep, for a value type that is supposed to be free.
  * Hoisting the flag to file scope removes the obstacle; the semantics are
  * identical (one flag per class, acquire on read, release on publish). */
-#define CN1_DECLARE_BOX_CLINIT_FLAG(cls) static int cn1__clinit_##cls = 0;
+// Not static: cn1_intrinsics.h reads the Integer, Long and Double flags to box inline.
+#define CN1_DECLARE_BOX_CLINIT_FLAG(cls) int cn1__clinit_##cls = 0;
 #define CN1_FORCE_BOX_CLINIT(cls) \
     do { \
         if(__builtin_expect(!__atomic_load_n(&cn1__clinit_##cls, __ATOMIC_ACQUIRE), 0)) { \
@@ -5463,19 +5905,33 @@ JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAV
     int off = 0;
     int count = encString->java_lang_String_count;
     if(cn1StrIsLatin1(__cn1ThisObject)) {
-        // Latin-1: (b & 0xff) IS the char value; matches char[] scan bit-identically.
-        JAVA_ARRAY_BYTE* encArr = (JAVA_ARRAY_BYTE*)cn1StrChars(__cn1ThisObject);
-        int endOff = off+count;
-        for (int i=off+fromIndex; i<endOff; i++) {
-            if ((encArr[i] & 0xff) == ch) {
-                return i-off;
-            }
+        // Latin-1: (b & 0xff) IS the char value, so a larger one is absent.
+        if (ch < 0 || ch > 0xff || fromIndex >= count) {
+            return -1;
         }
+        const unsigned char* encArr = (const unsigned char*)cn1StrChars(__cn1ThisObject);
+        const unsigned char* hit = (const unsigned char*)memchr(encArr + fromIndex, ch, (size_t)(count - fromIndex));
+        return hit == NULL ? -1 : (int)(hit - encArr);
+    }
+    if (ch < 0 || ch > 0xffff) {
+        // A supplementary code point is a pair here; this native never
+        // matched one, and the Java caller handles them.
         return -1;
     }
     JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)cn1StrChars(__cn1ThisObject);
     int endOff = off+count;
-    for (int i=off+fromIndex; i<endOff; i++) {
+    int i = off+fromIndex;
+#if defined(__ARM_NEON)
+    // Eight chars a step: decoding checks every result for U+FFFD, so this
+    // scan runs over all decoded text, and nearly always to the end.
+    uint16x8_t needle = vdupq_n_u16((uint16_t)ch);
+    for (; i + 8 <= endOff; i += 8) {
+        if (vmaxvq_u16(vceqq_u16(vld1q_u16((const uint16_t*)(encArr + i)), needle)) != 0) {
+            break;
+        }
+    }
+#endif
+    for (; i<endOff; i++) {
         if (encArr[i] == ch) {
             return i-off;
         }
@@ -5870,6 +6326,68 @@ JAVA_CHAR java_lang_String_cn1InlineCharAt___int_R_char(CODENAME_ONE_THREAD_STAT
     return cn1StrCharAtRaw(__cn1ThisObject, index);
 }
 
+/* Bulk compare and search for String.regionMatches, startsWith and indexOf(String).
+ *
+ * Java has checked every bound before calling, so these index without checks. Both
+ * read either storage through cn1StrChars and the coder through cn1StrIsLatin1,
+ * so an inline string is compared in place instead of a native call per char.
+ * Two Latin-1 strings are memcmp/memchr; two UTF-16 ones compare units; a mixed
+ * pair compares unit by unit. -2 ("take the Java loop") is never answered here
+ * but is the JavaScript port's answer, and String.java accepts it.
+ */
+static JAVA_INT cn1StrUnit(const void* chars, int latin1, JAVA_INT i) {
+    return latin1 ? ((const uint8_t*)chars)[i] : ((const JAVA_ARRAY_CHAR*)chars)[i];
+}
+
+static int cn1StrRegionEq(const void* a, int al, JAVA_INT as, const void* b, int bl, JAVA_INT bs, JAVA_INT n) {
+    if(al == bl) {
+        size_t w = al ? 1 : sizeof(JAVA_ARRAY_CHAR);
+        return memcmp((const char*)a + (size_t)as * w, (const char*)b + (size_t)bs * w, (size_t)n * w) == 0;
+    }
+    for(JAVA_INT i = 0; i < n; i++) {
+        if(cn1StrUnit(a, al, as + i) != cn1StrUnit(b, bl, bs + i)) return 0;
+    }
+    return 1;
+}
+
+JAVA_INT java_lang_String_cn1RegionMatch___int_java_lang_String_int_int_R_int(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT __cn1ThisObject, JAVA_INT thisStart, JAVA_OBJECT other, JAVA_INT start, JAVA_INT length) {
+    return cn1StrRegionEq(cn1StrChars(__cn1ThisObject), cn1StrIsLatin1(__cn1ThisObject), thisStart,
+            cn1StrChars(other), cn1StrIsLatin1(other), start, length);
+}
+
+JAVA_INT java_lang_String_cn1IndexOfString___java_lang_String_int_R_int(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT sub, JAVA_INT from) {
+    JAVA_INT n = ((struct obj__java_lang_String*)__cn1ThisObject)->java_lang_String_count;
+    JAVA_INT m = ((struct obj__java_lang_String*)sub)->java_lang_String_count;
+    const void* h = cn1StrChars(__cn1ThisObject);
+    const void* nd = cn1StrChars(sub);
+    int hl = cn1StrIsLatin1(__cn1ThisObject);
+    int nl = cn1StrIsLatin1(sub);
+    JAVA_INT last = n - m;
+    if(m <= 0 || from > last) return m <= 0 ? (from < n ? from : n) : -1;
+    if(hl && nl) {
+        const uint8_t* hp = (const uint8_t*)h;
+        const uint8_t* np = (const uint8_t*)nd;
+        uint8_t first = np[0];
+        JAVA_INT i = from;
+        while(i <= last) {
+            const uint8_t* f = (const uint8_t*)memchr(hp + i, first, (size_t)(last - i + 1));
+            if(f == NULL) return -1;
+            i = (JAVA_INT)(f - hp);
+            if(m == 1 || memcmp(hp + i + 1, np + 1, (size_t)(m - 1)) == 0) return i;
+            i++;
+        }
+        return -1;
+    }
+    JAVA_INT first = cn1StrUnit(nd, nl, 0);
+    if(hl && first > 255) return -1;
+    for(JAVA_INT i = from; i <= last; i++) {
+        if(cn1StrUnit(h, hl, i) == first && cn1StrRegionEq(h, hl, i + 1, nd, nl, 1, m - 1)) return i;
+    }
+    return -1;
+}
+
 JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT off, JAVA_INT n) {
     struct obj__java_lang_String* me = (struct obj__java_lang_String*)__cn1ThisObject;
     // A length that cannot fit a fused block is refused BEFORE any size arithmetic: n is
@@ -6114,6 +6632,32 @@ JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREA
 // `this` -- silently wrong on every non-ObjC target (Linux, clean builds).
 #if !(defined(__APPLE__) && defined(__OBJC__))
 #include <wctype.h>
+#if defined(__APPLE__)
+#include <xlocale.h>
+static locale_t cn1CaseLocaleCache = (locale_t)0;
+// macOS's default "C" locale maps ASCII ONLY in towupper/towlower: "\u00c0".toLowerCase()
+// came back unchanged and compareToIgnoreCase disagreed with a real JDK on 32 BMP
+// characters (StrQueryT). glibc's C locale and the Windows CRT carry the full simple
+// mapping, so only here a UTF-8 locale is asked for explicitly -- per call, never
+// through setlocale, which would change the process for the application's own C code.
+// Created once; a racing second creator frees its copy.
+static locale_t cn1CaseLocale(void) {
+    locale_t loc = __atomic_load_n(&cn1CaseLocaleCache, __ATOMIC_ACQUIRE);
+    if(loc != (locale_t)0) return loc;
+    locale_t made = newlocale(LC_CTYPE_MASK, "UTF-8", (locale_t)0);
+    if(made == (locale_t)0) made = newlocale(LC_CTYPE_MASK, "en_US.UTF-8", (locale_t)0);
+    if(made == (locale_t)0) return LC_GLOBAL_LOCALE;
+    locale_t expected = (locale_t)0;
+    if(!__atomic_compare_exchange_n(&cn1CaseLocaleCache, &expected, made, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+        freelocale(made);
+        return expected;
+    }
+    return made;
+}
+#define CN1_CASE_MAP(c, up) ((up) ? towupper_l((c), cn1CaseLocale()) : towlower_l((c), cn1CaseLocale()))
+#else
+#define CN1_CASE_MAP(c, up) ((up) ? towupper(c) : towlower(c))
+#endif
 static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, int toUpper) {
     struct obj__java_lang_String* s = (struct obj__java_lang_String*)me;
     int count = s->java_lang_String_count;
@@ -6135,7 +6679,7 @@ static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT m
         JAVA_BOOLEAN fits = JAVA_TRUE;
         for(int i = 0 ; i < count ; i++) {
             JAVA_ARRAY_CHAR c = cn1StrCharAtRaw(me, i);
-            JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)(toUpper ? towupper(c) : towlower(c));
+            JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)CN1_CASE_MAP(c, toUpper);
             if(m > 0xFF) { fits = JAVA_FALSE; break; }
             if(m != c) changed = JAVA_TRUE;
             bd[i] = (JAVA_ARRAY_BYTE)m;
@@ -6160,7 +6704,7 @@ static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT m
     JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
     for(int i = 0 ; i < count ; i++) {
         JAVA_ARRAY_CHAR c = cn1StrCharAtRaw(me, i);
-        JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)(toUpper ? towupper(c) : towlower(c));
+        JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)CN1_CASE_MAP(c, toUpper);
         if(m != c) changed = JAVA_TRUE;
         dst[i] = m;
     }

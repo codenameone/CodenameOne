@@ -75,6 +75,22 @@ public class GraceAudit {
             }
             // Quiet phase: no Node allocation at all across the next cycle, so
             // the Node page is never re-queued; filler drives the byte trigger.
+            // Grace now covers only pages retired DURING a cycle: a page retired before one
+            // began is swept without it, so a dead node there dies with its child and the
+            // grace pass has nothing to rescue. So start a cycle while the page holding the
+            // dead nodes above is still owned -- their keep[] slots were cleared before it,
+            // so the deletion barrier never sees those children -- and fill the node size
+            // class until that page retires mid-cycle, graced. Without this the nograce
+            // self-test cannot fail. Every other round only: the early-free self-test needs
+            // the original shape, full pages of survivors aging one cycle behind, and a
+            // fill every round leaves it nothing to free early (0 slots, against 1,244).
+            if ((round & 1) == 1) {
+                System.gc();
+                Thread.sleep(1);
+                for (int z = 0; z < 2500; z++) {
+                    tmp[1] = new Node();
+                }
+            }
             for (int i = 0; i < 120000; i++) {
                 Filler f = new Filler();
                 f.b = i;

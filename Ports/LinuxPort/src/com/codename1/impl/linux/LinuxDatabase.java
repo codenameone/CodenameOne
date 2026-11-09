@@ -26,9 +26,10 @@ import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
 import com.codename1.db.DatabaseEncryptionException;
+import com.codename1.db.SqlFunction;
 import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
-import com.codename1.impl.SQLText;
+import com.codename1.impl.SqlFunctionBridge;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,6 +45,70 @@ class LinuxDatabase extends Database {
 
     private long peer;
 
+    /// The functions every connection of this process has registered; SQLite holds only the id.
+    private static final SqlFunctionBridge FUNCTIONS = new SqlFunctionBridge() {
+        @Override
+        protected int valueType(long argv, int i) {
+            return LinuxNative.sqlValueType(argv, i);
+        }
+
+        @Override
+        protected long valueLong(long argv, int i) {
+            return LinuxNative.sqlValueLong(argv, i);
+        }
+
+        @Override
+        protected double valueDouble(long argv, int i) {
+            return LinuxNative.sqlValueDouble(argv, i);
+        }
+
+        @Override
+        protected byte[] valueText(long argv, int i) {
+            return LinuxNative.sqlValueText(argv, i);
+        }
+
+        @Override
+        protected byte[] valueBlob(long argv, int i) {
+            return LinuxNative.sqlValueBlob(argv, i);
+        }
+
+        @Override
+        protected void resultNull(long ctx) {
+            LinuxNative.sqlResultNull(ctx);
+        }
+
+        @Override
+        protected void resultLong(long ctx, long v) {
+            LinuxNative.sqlResultLong(ctx, v);
+        }
+
+        @Override
+        protected void resultDouble(long ctx, double v) {
+            LinuxNative.sqlResultDouble(ctx, v);
+        }
+
+        @Override
+        protected void resultText(long ctx, byte[] utf8) {
+            LinuxNative.sqlResultText(ctx, utf8);
+        }
+
+        @Override
+        protected void resultBlob(long ctx, byte[] v) {
+            LinuxNative.sqlResultBlob(ctx, v);
+        }
+
+        @Override
+        protected void resultError(long ctx, byte[] utf8) {
+            LinuxNative.sqlResultError(ctx, utf8);
+        }
+    };
+
+    /// Called by the engine (cn1_linux_db.c) while a statement calls a Java function.
+    static void sqlFunctionCall(long ctx, int id, int argc, long argv) {
+        FUNCTIONS.call(ctx, id, argc, argv);
+    }
+
+
     /**
      * The name this database was opened under. Retained because a managed key resolves its
      * keystore alias from the database name, and changeKey() would otherwise have nothing to
@@ -52,6 +117,7 @@ class LinuxDatabase extends Database {
     private final String databaseName;
 
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
+    private final com.codename1.impl.SQLStatementCache statements = new com.codename1.impl.SQLStatementCache();
 
     /// SQLite's success code.
     private static final int SQLITE_OK = 0;
@@ -172,7 +238,7 @@ class LinuxDatabase extends Database {
         if (isLegacyBehavior()) {
             return;
         }
-        if (SQLStatementSplitter.isMultiStatement(sql)) {
+        if (!isPlainStatement(sql) && SQLStatementSplitter.isMultiStatement(sql)) {
             throw new IOException("This method takes a single SQL statement, but the string "
                     + "contains " + SQLStatementSplitter.countStatements(sql)
                     + ". Use execute(String) to run a script.");
@@ -241,6 +307,11 @@ class LinuxDatabase extends Database {
         for (int iter = 0; iter < cursors.length; iter++) {
             cursors[iter].databaseClosed();
         }
+        // SQLite will not close a connection whose statements are still alive.
+        long[] cached = statements.drain();
+        for (int iter = 0; iter < cached.length; iter++) {
+            LinuxNative.sqlStmtFinalize(cached[iter]);
+        }
         long closing = peer;
         peer = 0;
         try {
@@ -254,6 +325,32 @@ class LinuxDatabase extends Database {
             // connection closes, so the registrations taken for them have to go at the same moment.
             noteConnectionClosed();
             releaseOpenDatabase(openKey);
+        }
+    }
+
+    @Override
+    public long changes() throws IOException {
+        checkOpen();
+        return LinuxNative.sqlDbChanges(peer);
+    }
+
+    @Override
+    public long lastInsertRowId() throws IOException {
+        checkOpen();
+        return LinuxNative.sqlDbLastInsertRowid(peer);
+    }
+
+    @Override
+    public boolean supportsFunctions() {
+        return true;
+    }
+
+    @Override
+    public void createFunction(String name, int argCount, SqlFunction function) throws IOException {
+        checkOpen();
+        int id = function == null ? -1 : FUNCTIONS.register(function);
+        if (LinuxNative.sqlDbCreateFunction(peer, com.codename1.util.StringUtil.getBytes(name), argCount, id) != 0) {
+            throw new IOException("Could not create the SQL function " + name);
         }
     }
 
@@ -337,9 +434,23 @@ class LinuxDatabase extends Database {
         reserveAttachments(sql, params);
         requireSingleStatement(sql);
         try {
-            long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
+            long stmt = statements.take(sql);
+            if (stmt == 0) {
+                stmt = LinuxNative.sqlStmtPrepare(peer, sql);
+            }
+            // bind finalizes the statement itself when it throws.
             bind(stmt, params);
-            LinuxNative.sqlStmtExecuteAndFinalize(stmt);
+            try {
+                while (LinuxNative.sqlStmtStep(stmt)) {
+                    // Rows of a statement run for its effect are discarded, as before.
+                }
+            } catch (IOException err) {
+                LinuxNative.sqlStmtFinalize(stmt);
+                throw err;
+            }
+            // Reset releases what the run holds, so a cached statement keeps no lock.
+            LinuxNative.sqlStmtReset(stmt);
+            LinuxNative.sqlStmtFinalize(statements.put(sql, stmt));
             // The names on success only -- a statement that failed opened no savepoint.
             noteScriptTransactionControl(sql);
         } finally {
@@ -350,12 +461,56 @@ class LinuxDatabase extends Database {
         }
     }
 
+    /// The status form of [#execute(String, Object...)], with no handler on the way for the
+    /// statement nearly every call runs: one plain statement on an open connection, its
+    /// parameters ones the engine binds directly. Anything else -- and the bookkeeping after a
+    /// failure -- takes the inherited path, which wraps the throwing method.
+    @Override
+    public int executeStatus(String sql, Object[] params, long[] counts) {
+        if (peer == 0 || params == null || !isPlainStatement(sql)) {
+            return super.executeStatus(sql, params, counts);
+        }
+        long stmt = statements.take(sql);
+        if (stmt == 0) {
+            stmt = LinuxNative.sqlStmtPrepareStatus(peer, sql);
+            if (stmt == 0) {
+                return failStatus(LinuxNative.sqlDbErrorText(peer), 1);
+            }
+        }
+        int rc = LinuxNative.sqlStmtRunStatus(stmt, params, counts);
+        if (rc == 0) {
+            // A plain statement that ran changed no transaction state.
+            LinuxNative.sqlStmtFinalizeStatus(statements.put(sql, stmt));
+            return 0;
+        }
+        return statementFailed(sql, params, counts, stmt, rc);
+    }
+
+    /// The cold half of [#executeStatus(String, Object[], long[])], kept apart so that its handler is
+    /// set up only when a statement did not run.
+    private int statementFailed(String sql, Object[] params, long[] counts, long stmt, int rc) {
+        if (rc == -2 || rc == -3) {
+            // Nothing ran: a parameter only Java binds, or a count the throwing path words.
+            LinuxNative.sqlStmtFinalizeStatus(statements.put(sql, stmt));
+            return super.executeStatus(sql, params, counts);
+        }
+        String message = LinuxNative.sqlDbErrorText(peer);
+        LinuxNative.sqlStmtFinalizeStatus(stmt);
+        try {
+            // As execute does after any run: ON CONFLICT ROLLBACK ends the transaction as it fails.
+            noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
+        } catch (IOException err) {
+            return failStatus(err.getMessage(), rc);
+        }
+        return failStatus(message, rc);
+    }
+
     @Override
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
         requireQueryStatement(sql);
-        long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         // A statement with placeholders and no arguments would otherwise run with every slot left
         // as NULL rather than reporting the missing parameters. The check is a no-op in legacy
         // mode, where running it unbound is the behaviour applications were written against.
@@ -375,7 +530,7 @@ class LinuxDatabase extends Database {
         checkOpen();
         requireSingleStatement(sql);
         requireQueryStatement(sql);
-        long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         bindText(stmt, params);
         return register(new CursorImpl(stmt), sql);
     }
@@ -392,13 +547,29 @@ class LinuxDatabase extends Database {
         checkOpen();
         requireSingleStatement(sql);
         requireQueryStatement(sql);
-        long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         bind(stmt, params);
         return register(new CursorImpl(stmt), sql);
     }
 
+    private long prepareCached(String sql) throws IOException {
+        long stmt = statements.take(sql);
+        return stmt != 0 ? stmt : LinuxNative.sqlStmtPrepare(peer, sql);
+    }
+
+    /// Takes back a closed cursor's statement, reset, for the next query with the same SQL.
+    void recycle(String sql, long stmt) throws IOException {
+        if (peer == 0 || sql == null) {
+            LinuxNative.sqlStmtFinalize(stmt);
+            return;
+        }
+        LinuxNative.sqlStmtReset(stmt);
+        LinuxNative.sqlStmtFinalize(statements.put(sql, stmt));
+    }
+
     private Cursor register(CursorImpl cursor, String sql) {
         cursor.owner = this;
+        cursor.cacheKey = sql;
         // A statement that writes must never be re-executed to move backwards: this cursor is
         // stepped to run it, so a getCount() or last() would write again. The cursor refuses
         // rather than doing it twice.
@@ -451,7 +622,7 @@ class LinuxDatabase extends Database {
                 if (params[iter] == null) {
                     LinuxNative.sqlStmtBindNull(stmt, iter + 1);
                 } else {
-                    LinuxNative.sqlStmtBindText(stmt, iter + 1, SQLText.toUTF8(params[iter]));
+                    LinuxNative.sqlStmtBindString(stmt, iter + 1, params[iter]);
                 }
             }
         } catch (IOException err) {
@@ -492,7 +663,7 @@ class LinuxDatabase extends Database {
             } else if (p instanceof byte[]) {
                 LinuxNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
             } else if (p instanceof String) {
-                LinuxNative.sqlStmtBindText(stmt, index, SQLText.toUTF8((String) p));
+                LinuxNative.sqlStmtBindString(stmt, index, (String) p);
             } else if (p instanceof Double || p instanceof Float) {
                 LinuxNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
             } else if (p instanceof Long || p instanceof Integer || p instanceof Short
@@ -501,7 +672,7 @@ class LinuxDatabase extends Database {
             } else if (p instanceof Boolean) {
                 LinuxNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
             } else {
-                LinuxNative.sqlStmtBindText(stmt, index, SQLText.toUTF8(p.toString()));
+                LinuxNative.sqlStmtBindString(stmt, index, p.toString());
             }
         }
     }
@@ -509,6 +680,7 @@ class LinuxDatabase extends Database {
     /** Cursor over a compiled statement; seeks by resetting and stepping again. */
     static class CursorImpl extends AbstractDBCursor {
         private long stmt;
+        String cacheKey;
         LinuxDatabase owner;
 
         CursorImpl(long stmt) {
@@ -568,7 +740,11 @@ class LinuxDatabase extends Database {
             if (stmt != 0) {
                 long closing = stmt;
                 stmt = 0;
-                LinuxNative.sqlStmtFinalize(closing);
+                if (owner != null) {
+                    owner.recycle(cacheKey, closing);
+                } else {
+                    LinuxNative.sqlStmtFinalize(closing);
+                }
             }
         }
 
@@ -579,7 +755,23 @@ class LinuxDatabase extends Database {
 
         @Override
         protected String columnLabel(int columnIndex) throws IOException {
-            return SQLText.fromUTF8(LinuxNative.sqlColName(stmt, columnIndex));
+            return LinuxNative.sqlColNameString(stmt, columnIndex);
+        }
+
+        @Override
+        protected boolean capturesColumnTypeBeforeRead() {
+            // sqlite3_column_type is undefined once a getter has converted the value.
+            return true;
+        }
+
+        @Override
+        protected int columnType(int index) throws IOException {
+            return LinuxNative.sqlColType(stmt, index);
+        }
+
+        @Override
+        protected boolean readRow(Object[] out) throws IOException {
+            return LinuxNative.sqlRowValues(stmt, out);
         }
 
         @Override
@@ -589,7 +781,7 @@ class LinuxDatabase extends Database {
 
         @Override
         protected String readString(int index) throws IOException {
-            return SQLText.fromUTF8(LinuxNative.sqlColText(stmt, index));
+            return LinuxNative.sqlColString(stmt, index);
         }
 
         @Override

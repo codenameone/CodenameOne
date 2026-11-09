@@ -335,6 +335,17 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_fileLength___java_lang_String_R_l
     return (p && stat(p, &st) == 0) ? (JAVA_LONG) st.st_size : 0;
 }
 
+// Milliseconds since the epoch, or -1 when the file cannot be stat'ed (the
+// value CodenameOneImplementation answers for a port without the call).
+JAVA_LONG com_codename1_impl_linux_LinuxNative_fileLastModified___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
+    const char* p = cn1JStr(threadStateData, path);
+    struct stat st;
+    if (!p || stat(p, &st) != 0) {
+        return -1;
+    }
+    return (JAVA_LONG) st.st_mtim.tv_sec * 1000 + st.st_mtim.tv_nsec / 1000000;
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_fileDelete___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
     const char* p = cn1JStr(threadStateData, path);
     if (p) {

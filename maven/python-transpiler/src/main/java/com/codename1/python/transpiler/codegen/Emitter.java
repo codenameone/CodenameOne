@@ -144,6 +144,10 @@ public final class Emitter {
         this.className = className;
     }
 
+    /// The absolute path every module's `__file__` sits under. Must match
+    /// `PyPackageData.ROOT`.
+    public static final String PACKAGE_DATA_ROOT = "/cn1python/";
+
     PythonSyntaxError unsupported(Node n, String what) {
         return new PythonSyntaxError(file, n.line, n.col, what + " is not supported yet");
     }
@@ -155,14 +159,78 @@ public final class Emitter {
     private static final Set<String> DYNAMIC_CODE = new HashSet<String>(Arrays.asList("eval", "exec", "compile",
             "__import__"));
 
-    /// `sys` members that reach the interpreter's frames, which a
-    /// translated program does not have.
+    /// `sys` members that trace the interpreter's frames, which a
+    /// translated program does not have. `sys._getframe` is not one: the
+    /// runtime answers it from the Java stack (`StdModules.frame`).
     private static final Set<String> FRAME_HOOKS = new HashSet<String>(Arrays.asList("settrace", "setprofile",
-            "_getframe", "gettrace", "getprofile"));
+            "gettrace", "getprofile"));
 
     private PythonSyntaxError dynamicCode(Node n, String what) {
         return new PythonSyntaxError(file, n.line, n.col, what
                 + " is not supported: a translated program cannot run or inspect code that was not compiled with it");
+    }
+
+    /// Whether dynamic code in this module is deferred to run time (see
+    /// [#deferDynamic(List)]), and where each deferral is reported.
+    private List<String> deferredNotes;
+
+    /// Makes `eval`, `exec`, `compile`, `__import__` and the `sys` frame
+    /// hooks raise `NotImplementedError` where they run, instead of failing
+    /// the build. Only for a package installed from PyPI: real libraries keep
+    /// such calls in helpers an application never reaches (a CLI's
+    /// `--convert` option, a warning that names its caller), and the port
+    /// should not have to edit them. The application's own sources keep the
+    /// build error. Each deferral is added to `notes` as `file:line:col: what`.
+    public Emitter deferDynamic(List<String> notes) {
+        this.deferredNotes = notes;
+        return this;
+    }
+
+    /// The expression that stands for a dynamic-code use, or throws the build
+    /// error when this module does not defer it.
+    private String dynamicCodeAtRuntime(Node n, String what) {
+        if (deferredNotes == null) {
+            throw dynamicCode(n, what);
+        }
+        deferredNotes.add(file + ":" + n.line + ":" + n.col + ": " + what);
+        return "Py.dynamicCode(" + javaString(what + " is not supported in a translated program (" + file + ":"
+                + n.line + ")") + ")";
+    }
+
+    /// Whether a class body annotates a name anywhere it runs as the body --
+    /// `if`, `try`, `with`, loops and `match` included, nested functions and
+    /// classes not -- which is when CPython gives the class `__annotations__`.
+    private static boolean annotatesName(List<? extends Stmt> body) {
+        for (Stmt s : body) {
+            if (s instanceof AnnAssign && ((AnnAssign) s).target instanceof Name) {
+                return true;
+            }
+            if (s instanceof If && (annotatesName(((If) s).body) || annotatesName(((If) s).orelse))
+                    || s instanceof While && (annotatesName(((While) s).body) || annotatesName(((While) s).orelse))
+                    || s instanceof For && (annotatesName(((For) s).body) || annotatesName(((For) s).orelse))
+                    || s instanceof With && annotatesName(((With) s).body)) {
+                return true;
+            }
+            if (s instanceof Try) {
+                Try t = (Try) s;
+                if (annotatesName(t.body) || annotatesName(t.orelse) || annotatesName(t.finalbody)) {
+                    return true;
+                }
+                for (ExceptHandler h : t.handlers) {
+                    if (annotatesName(h.body)) {
+                        return true;
+                    }
+                }
+            }
+            if (s instanceof Match) {
+                for (MatchCase mc : ((Match) s).cases) {
+                    if (annotatesName(mc.body)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private int id(Scope s) {
@@ -184,6 +252,8 @@ public final class Emitter {
         Scope ms = moduleScope;
         slot("__name__");
         slot("__doc__");
+        slot("__file__");
+        slot("__package__");
         for (String n : ms.assigned) {
             slot(n);
         }
@@ -194,6 +264,7 @@ public final class Emitter {
         if (!stmts.isEmpty() && isDocstring(stmts.get(0))) {
             body.append("        G[1] = ").append(constant((Constant) ((ExprStmt) stmts.get(0)).value)).append(";\n");
         }
+        uncell(ms);
         findDirectLong(stmts);
         layouts = Layouts.plan(stmts, "", ms.attrStores);
         Infer infer = closed ? Infer.run(stmts, layouts, ms) : null;
@@ -237,6 +308,17 @@ public final class Emitter {
         out.append("});\n");
         out.append("        G = M.slots;\n");
         out.append("        G[0] = Py.str(runName);\n");
+        // __file__ names the source under the read-only package data root,
+        // so a library that opens a data file beside its module
+        // (os.path.dirname(__file__)) reads it from the application's
+        // package data (PyPackageData).
+        out.append("        G[2] = Py.str(").append(javaString(PACKAGE_DATA_ROOT + file.replace('\\', '/')))
+                .append(");\n");
+        // __package__ is what relative imports resolve against: the module
+        // itself for a package, its parent otherwise ("" at the top level).
+        int dot = moduleName.lastIndexOf('.');
+        String pkg = isPackage ? moduleName : dot < 0 ? "" : moduleName.substring(0, dot);
+        out.append("        G[3] = Py.str(").append(javaString(pkg)).append(");\n");
         if ((frame.temps > 0 || frame.ltemps > 0)) {
             out.append("        ").append(tempDecls()).append("\n");
         }
@@ -265,7 +347,7 @@ public final class Emitter {
             + "        return v != null ? v : dyn(n);\n"
             + "    }\n\n"
             + "    private static Object dyn(String n) {\n"
-            + "        Object v = M.getAttrOrNull(n);\n"
+            + "        Object v = M.getGlobal(n);\n"
             + "        if (v == null) {\n"
             + "            v = Builtins.lookup(n);\n"
             + "        }\n"
@@ -338,7 +420,14 @@ public final class Emitter {
     private String load(Name nm) {
         String n = nm.id;
         if (DYNAMIC_CODE.contains(n) && sc.resolve(n) == Scope.Binding.BUILTIN) {
-            throw dynamicCode(nm, n + "()");
+            if ("compile".equals(n) && deferredNotes != null) {
+                // Compiling is harmless; running what it made is eval or
+                // exec, which raise. A library that compiles a snippet up
+                // front (anyio's subinterpreter worker) still imports.
+                deferredNotes.add(file + ":" + nm.line + ":" + nm.col + ": compile()");
+                return "Py.UNCOMPILED";
+            }
+            return dynamicCodeAtRuntime(nm, n + "()");
         }
         if (inRegionFast && lazyIndex != null && lazyIndex[0].equals(n)) {
             return "(" + lazyIndex[1] + " == null ? Long.valueOf(" + lazyIndex[2] + ") : " + localVar(sc, n) + ")";
@@ -376,6 +465,10 @@ public final class Emitter {
             case CELL:
                 return "l(" + cellVar(sc, n) + "[0], " + javaString(n) + ")";
             case FREE: {
+                String p = compParams == null ? null : compParams.get(n);
+                if (p != null) {
+                    return "l(" + p + ", " + javaString(n) + ")";
+                }
                 Scope o = sc.owner(n);
                 return "l(" + cellVar(o, n) + "[0], " + javaString(n) + ")";
             }
@@ -584,9 +677,14 @@ public final class Emitter {
         } else if (s instanceof AnnAssign) {
             AnnAssign a = (AnnAssign) s;
             if (sc.kind == Scope.Kind.CLASS && a.target instanceof Name) {
+                String v = fresh("an");
+                indent(out, ind);
+                out.append("Object ").append(v).append(";\n");
+                indent(out, ind);
+                out.append(annotationStore(v, a.annotation)).append('\n');
                 indent(out, ind);
                 out.append("Py.setitem(").append(annotations()).append(", Py.str(")
-                        .append(javaString(((Name) a.target).id)).append("), ").append(annotationExpr(a.annotation))
+                        .append(javaString(((Name) a.target).id)).append("), ").append(v)
                         .append(");\n");
             }
             if (a.value != null) {
@@ -728,31 +826,57 @@ public final class Emitter {
         if (f.args.kwarg != null) {
             all.add(f.args.kwarg);
         }
-        StringBuilder ann = new StringBuilder();
+        List<String> keys = new ArrayList<String>();
+        List<Expr> values = new ArrayList<Expr>();
         for (Arg a : all) {
             if (a.annotation != null) {
-                ann.append(ann.length() == 0 ? "" : ", ").append(javaString(a.name)).append(", ")
-                        .append(annotationExpr(a.annotation));
+                keys.add(javaString(a.name));
+                values.add(a.annotation);
             }
         }
         if (f.returns != null) {
-            ann.append(ann.length() == 0 ? "" : ", ").append("\"return\", ").append(annotationExpr(f.returns));
+            keys.add("\"return\"");
+            values.add(f.returns);
         }
-        if ("null".equals(doc) && ann.length() == 0) {
+        if ("null".equals(doc) && keys.isEmpty()) {
             return fn;
         }
-        String thunk = ann.length() == 0 ? "null" : "() -> new Object[] {" + ann + "}";
+        // ONE lambda per function, filling the array statement by statement. Each
+        // annotation used to be a lambda of its own, only so that a raising one could
+        // fall back to its source form; on ParparVM every lambda is a class, and those
+        // thunks were a third of the classes of a large application.
+        String thunk = "null";
+        if (!keys.isEmpty()) {
+            String r = fresh("ann");
+            StringBuilder body = new StringBuilder("() -> { final Object[] ").append(r)
+                    .append(" = new Object[").append(keys.size() * 2).append("]; ");
+            for (int i = 0; i < keys.size(); i++) {
+                body.append(r).append('[').append(i * 2).append("] = ").append(keys.get(i)).append("; ");
+                body.append(annotationStore(r + "[" + (i * 2 + 1) + "]", values.get(i))).append(' ');
+            }
+            body.append("return ").append(r).append("; }");
+            thunk = body.toString();
+        }
         return "PyFunction.meta(" + fn + ", " + doc + ", " + thunk + ")";
     }
 
     /// An annotation's value: the evaluated expression when it only names
     /// module globals and builtins (falling back to the source-ish form if
     /// evaluating it raises), otherwise [#annotationValue].
-    private String annotationExpr(Expr a) {
-        if (!evaluable(a)) {
-            return annotationValue(a);
+    /// Statements assigning an annotation's value to `target`: the evaluated
+    /// expression when it only names module globals and builtins (falling back to
+    /// the source-ish form if evaluating it raises), otherwise [#annotationValue].
+    /// The fallback is a catch, not a lambda: on ParparVM every lambda is a class.
+    private String annotationStore(String target, Expr a) {
+        if (a instanceof Constant) {
+            return target + " = " + expr(a) + ";";
         }
-        return "PyFunction.annotation(() -> " + expr(a) + ", " + annotationValue(a) + ")";
+        if (!evaluable(a)) {
+            return target + " = " + annotationValue(a) + ";";
+        }
+        String e = fresh("ae");
+        return "try { " + target + " = " + expr(a) + "; } catch (PyException " + e + ") { "
+                + target + " = " + annotationValue(a) + "; }";
     }
 
     private boolean evaluable(Expr a) {
@@ -981,7 +1105,7 @@ public final class Emitter {
 
     /// Whether an unpacking target is made of plain names only, so storing
     /// into it cannot change the sequence being unpacked.
-    private static boolean onlyNames(Expr t) {
+    static boolean onlyNames(Expr t) {
         if (t instanceof Name) {
             return true;
         }
@@ -1301,11 +1425,14 @@ public final class Emitter {
                 vsig = new String[] {it, ri, re, rs, Integer.toString(ind)};
             }
             indent(out, ind);
-            out.append(label).append(": for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
-                    .append(" != null ? ").append(it).append(".next() : (").append(rs).append(" > 0 ? ").append(ri)
-                    .append(" < ").append(re).append(" : ").append(ri).append(" > ").append(re)
-                    .append(") ? ").append(lazy != null ? "Py.NONE" : "Long.valueOf(" + ri + ")")
-                    .append(" : null) != null; ").append(ri).append(" += ").append(rs).append(") {\n");
+            // One handler for the whole loop, outside the label so that
+            // `continue label` still names a loop (TypedEmit.loopNext).
+            out.append("try {\n");
+            indent(out, ind);
+            String next = it + " != null ? " + TypedEmit.loopNext(it) + " : (" + rs + " > 0 ? " + ri
+                    + " < " + re + " : " + ri + " > " + re + ") ? "
+                    + (lazy != null ? "Py.NONE" : "Long.valueOf(" + ri + ")") + " : null";
+            out.append(label).append(": ").append(TypedEmit.loopHead(x, next, ri + " += " + rs));
         } else {
             // A list is walked by index (re-reading its length every step, as
             // its own iterator does), so the loop allocates no iterator.
@@ -1332,9 +1459,11 @@ public final class Emitter {
             indent(out, ind);
             out.append("int ").append(li).append(" = 0;\n");
             indent(out, ind);
-            out.append(label).append(": for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
-                    .append(" != null ? ").append(it).append(".next() : ").append(li).append(" < ").append(ls)
-                    .append(".size() ? ").append(ls).append(".get(").append(li).append("++) : null) != null;) {\n");
+            out.append("try {\n");
+            indent(out, ind);
+            String next = it + " != null ? " + TypedEmit.loopNext(it) + " : " + li + " < " + ls
+                    + ".size() ? " + ls + ".get(" + li + "++) : null";
+            out.append(label).append(": ").append(TypedEmit.loopHead(x, next, null));
         }
         if (lazy != null) {
             indent(out, ind + 1);
@@ -1366,6 +1495,8 @@ public final class Emitter {
         loops.remove(loops.size() - 1);
         indent(out, ind);
         out.append("}\n");
+        indent(out, ind);
+        out.append(TypedEmit.loopHandler(it));
         if (lazy != null) {
             indent(out, ind);
             out.append("if (").append(it).append(" == null && ").append(lazy[2]).append(" != ").append(lazy[4])
@@ -1612,13 +1743,7 @@ public final class Emitter {
         out.append(k).append(".define(\"__module__\", G[0]);\n");
         indent(out, ind);
         out.append(k).append(".define(\"__qualname__\", Py.str(").append(javaString(c.name)).append("));\n");
-        boolean anns = false;
-        for (Stmt s : c.body) {
-            if (s instanceof AnnAssign && ((AnnAssign) s).target instanceof Name) {
-                anns = true;
-            }
-        }
-        if (anns) {
+        if (annotatesName(c.body)) {
             indent(out, ind);
             out.append(k).append(".define(\"__annotations__\", new PyDict());\n");
         }
@@ -1771,6 +1896,7 @@ public final class Emitter {
         } else if (generator) {
             gen = new GenLowering(this, file, fs);
             gen.asyncGen = async && fs.yields;
+            gen.plain = !async;
             b.append(resolveRegions(gen.step(body)));
         } else {
             block(body, b, ind);
@@ -1784,7 +1910,9 @@ public final class Emitter {
                 // Enter the typed version (TypedEmit) when the arguments fit.
                 List<String> locals = new ArrayList<String>();
                 for (String n : names) {
-                    locals.add(localVar(fs, n));
+                    // A parameter only comprehensions capture is a cell here
+                    // and a plain local in the typed version.
+                    locals.add(fs.cells.contains(n) ? cellVar(fs, n) + "[0]" : localVar(fs, n));
                 }
                 StringBuilder g = new StringBuilder();
                 for (String line : typedEmit.entry(tf, locals).split("\n")) {
@@ -1899,18 +2027,23 @@ public final class Emitter {
             plist.append("Object[] ").append(a);
             alist.append(a);
         }
-        r.append(plist);
         if (asStatic != null && direct) {
             // A compiled method: the body is a static method the class
             // layout's dispatch calls directly (see Layouts).
             fields.append("    static Object ").append(asStatic).append("(").append(plist).append(") {\n")
                     .append(pro).append(b).append("    }\n");
+            r.append(plist);
             r.append(") -> ").append(asStatic).append("(").append(alist).append("))");
         } else {
+            r.append(plist);
             r.append(") -> {\n").append(pro).append(b);
             indent(r, ind - 1);
             r.append("})");
         }
+        // The field a module-level fused function is kept in. The assignment
+        // is wrapped around the finished expression: its type is Object, so
+        // nothing can be chained after it.
+        String defField = null;
         Expr ret = generator ? null : pureReturn(args, names, body, exprBody);
         if (ret != null) {
             String pure = pureVariant(names, ret);
@@ -1932,7 +2065,7 @@ public final class Emitter {
                             .append(") -> ").append(method).append("(").append(lcall).append("))");
                     if (module) {
                         fields.append("    private static Object DEF_").append(mangle(name)).append(";\n");
-                        r.insert(0, "(DEF_" + mangle(name) + " = ").append(")");
+                        defField = "DEF_" + mangle(name);
                     }
                 }
             }
@@ -1941,10 +2074,17 @@ public final class Emitter {
         if (!q.equals(name)) {
             r.append(".qual(").append(javaString(q)).append(")");
         }
+        r.append(".inModule(G[0])");
+        if (args.positionalOnly > 0) {
+            r.append(".positionalOnly(").append(args.positionalOnly).append(")");
+        }
         if (generator) {
             // co_flags' CO_GENERATOR, CO_COROUTINE or CO_ASYNC_GENERATOR,
             // which inspect reads.
             r.append(".kind(").append(async && fs.yields ? 0x200 : async ? 0x80 : 0x20).append(")");
+        }
+        if (defField != null) {
+            r.insert(0, "(" + defField + " = ").append(")");
         }
         return r.toString();
     }
@@ -1956,6 +2096,76 @@ public final class Emitter {
     }
 
     // ---- expressions -----------------------------------------------------
+
+    /// `"a %s b %d" % (x, y)`: a literal format of bare `%s`, `%d`, `%i`
+    /// and `%%`, and a literal tuple of one to four values with as many
+    /// conversions, is split here and formatted by `Py.pct` without
+    /// a tuple or a parse. Anything else -- a width, a mapping key, a
+    /// starred value, a count that does not match -- keeps `Py.mod`. Answers
+    /// the call up to its first value: the caller appends ", value" for each
+    /// element of the tuple and the closing parenthesis.
+    private String percentLiteral(BinOp b) {
+        if (!"%".equals(b.op) || !(b.left instanceof Constant) || !(b.right instanceof TupleExpr)) {
+            return null;
+        }
+        List<Expr> vals = ((TupleExpr) b.right).elts;
+        for (Expr v : vals) {
+            if (v instanceof Starred) {
+                return null;
+            }
+        }
+        return percentHead((Constant) b.left, vals.size());
+    }
+
+    /// [#percentLiteral] of format `f` and `count` values, for a caller that
+    /// knows how many values there are: TypedEmit, for `"<%s>" % x` with `x`
+    /// typed as a str or a number, which is one value and never a tuple to
+    /// spread. Null when the format is not one `Py.pct` takes.
+    String percentHead(Constant f, int count) {
+        if (f.kind != Constant.Kind.STR || count < 1 || count > 4) {
+            return null;
+        }
+        List<String> lits = new ArrayList<>();
+        StringBuilder convs = new StringBuilder();
+        StringBuilder lit = new StringBuilder();
+        String t = f.text;
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (c != '%') {
+                lit.append(c);
+                continue;
+            }
+            i++;
+            if (i >= t.length()) {
+                return null;
+            }
+            char k = t.charAt(i);
+            if (k == '%') {
+                lit.append('%');
+            } else if (k == 's' || k == 'd' || k == 'i') {
+                convs.append(k);
+                lits.add(lit.toString());
+                lit.setLength(0);
+            } else {
+                return null;
+            }
+        }
+        lits.add(lit.toString());
+        if (convs.length() != count) {
+            return null;
+        }
+        StringBuilder arr = new StringBuilder("new String[] {");
+        for (int i = 0; i < lits.size(); i++) {
+            arr.append(i == 0 ? "" : ", ").append(javaString(lits.get(i)));
+        }
+        String l = hoist("String[]", arr.append("}").toString());
+        return "Py.pct(" + l + ", " + javaString(convs.toString());
+    }
+
+    /// [#percentLiteral] for TypedEmit, which appends the values itself.
+    String percentHead(BinOp b) {
+        return percentLiteral(b);
+    }
 
     private String temp() {
         return "t" + frame.id + "_" + (frame.temps++);
@@ -1997,13 +2207,36 @@ public final class Emitter {
 
     private String longOf(String v, String t) {
         Long c = constLongs.get(v);
-        return c != null ? c.longValue() + "L" : "((Long) " + t + ").longValue()";
+        // Through Object: a reused name (operandTemps) may be declared as some
+        // other type, a PyBytes constant say, and javac rejects that cast.
+        return c != null ? c.longValue() + "L" : "((Long) (Object) " + t + ").longValue()";
     }
 
     /// `(t = v) instanceof Long`, or true for an int constant (still
     /// assigned, for the slow path).
     private String isLong(String v, String t) {
+        if (t.equals(v)) {
+            // No temporary (see operandTemps): the name is read where it is used.
+            return constLongs.containsKey(v) ? "true" : "((Object) " + v + ") instanceof Long";
+        }
         return constLongs.containsKey(v) ? "(" + t + " = " + v + ") != null" : "(" + t + " = " + v + ") instanceof Long";
+    }
+
+    private static final java.util.regex.Pattern PLAIN_NAME = java.util.regex.Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*");
+
+    /// The operands themselves when BOTH are plain Java names (a local, a field
+    /// of the generator, a hoisted constant), else two fresh temporaries. A
+    /// temporary exists so each operand is evaluated once and in order; a name
+    /// has no effect to repeat and nothing can change it between the two reads
+    /// when the other operand is a name too. Without one the int fast path is
+    /// `v instanceof Long` rather than `(t = v) instanceof Long`, which the
+    /// ParparVM translator compiles to C expressions instead of operand-stack
+    /// DUP/ASTORE traffic -- that was a third of a generator's step().
+    private String[] operandTemps(String l, String r) {
+        if (PLAIN_NAME.matcher(l).matches() && PLAIN_NAME.matcher(r).matches()) {
+            return new String[] {l, r};
+        }
+        return new String[] {temp(), temp()};
     }
 
     private String ltemp() {
@@ -2050,8 +2283,9 @@ public final class Emitter {
             default:
                 return null;
         }
-        String t = temp();
-        String u = temp();
+        String[] tu = operandTemps(l, r);
+        String t = tu[0];
+        String u = tu[1];
         String close = slow.startsWith("Py.isTrue") ? "))" : ")";
         return "((" + isLong(l, t) + " & " + isLong(r, u) + ") ? " + longOf(l, t) + " " + jop + " " + longOf(r, u) + " : "
                 + slow + t + ", " + u + close + ")";
@@ -2063,8 +2297,9 @@ public final class Emitter {
         if (!"+".equals(op) && !"-".equals(op)) {
             return null;
         }
-        String t = temp();
-        String u = temp();
+        String[] tu = operandTemps(l, r);
+        String t = tu[0];
+        String u = tu[1];
         String x = ltemp();
         String y = ltemp();
         String z = ltemp();
@@ -2157,6 +2392,14 @@ public final class Emitter {
         }
         if (e instanceof BinOp) {
             BinOp b = (BinOp) e;
+            String pf = percentLiteral(b);
+            if (pf != null) {
+                StringBuilder sb = new StringBuilder(pf);
+                for (Expr v : ((TupleExpr) b.right).elts) {
+                    sb.append(", ").append(expr(v));
+                }
+                return sb.append(')').toString();
+            }
             String f = fused(e);
             if (f != null) {
                 return f;
@@ -2251,7 +2494,7 @@ public final class Emitter {
         if (e instanceof Attribute) {
             Attribute a = (Attribute) e;
             if (FRAME_HOOKS.contains(a.attr) && a.value instanceof Name && "sys".equals(((Name) a.value).id)) {
-                throw dynamicCode(a, "sys." + a.attr);
+                return dynamicCodeAtRuntime(a, "sys." + a.attr);
             }
             if (layouts.fieldOwners.containsKey(a.attr)) {
                 return fieldGet(a.attr, expr(a.value), site(a.attr));
@@ -2301,7 +2544,18 @@ public final class Emitter {
             for (Expr k : d.keys) {
                 spread |= k == null;
             }
-            StringBuilder sb = new StringBuilder(spread ? "Py.dictSpread(" : "Py.dict(");
+            if (!spread && d.keys.size() * 2 > BIG_LITERAL && allConstant(d.keys) && allConstant(d.values)) {
+                List<Expr> flat = new ArrayList<Expr>(d.keys.size() * 2);
+                for (int i = 0; i < d.keys.size(); i++) {
+                    flat.add(d.keys.get(i));
+                    flat.add(d.values.get(i));
+                }
+                return "Py.dict(" + bigLiteral(flat) + ")";
+            }
+            if (!spread) {
+                return dictLiteral(d.keys, d.values);
+            }
+            StringBuilder sb = new StringBuilder("Py.dictSpread(");
             for (int i = 0; i < d.keys.size(); i++) {
                 Expr k = d.keys.get(i);
                 sb.append(i == 0 ? "" : ", ").append(k == null ? "null" : expr(k)).append(", ")
@@ -2341,10 +2595,45 @@ public final class Emitter {
     }
 
     /// A list/tuple/set display; one with `*x` items goes through Py.spread.
+    /// A literal of more constants than this is filled by helper methods of
+    /// its own: written inline, a table such as pdfminer's 4,500-entry glyph
+    /// list would exceed the JVM's 64 KB limit on one method's bytecode.
+    private static final int BIG_LITERAL = 512;
+    private static final int BIG_LITERAL_CHUNK = 256;
+    private int bigLiterals;
+
+    /// Emits static methods that build the array of `elts` in chunks and
+    /// answers a call to the one that returns it. Only constants qualify,
+    /// so evaluating them outside the current scope changes nothing.
+    private String bigLiteral(List<Expr> elts) {
+        String name = "BIG" + bigLiterals++;
+        int chunks = (elts.size() + BIG_LITERAL_CHUNK - 1) / BIG_LITERAL_CHUNK;
+        StringBuilder m = new StringBuilder();
+        m.append("    private static Object[] ").append(name).append("() {\n        Object[] a = new Object[")
+                .append(elts.size()).append("];\n");
+        for (int c = 0; c < chunks; c++) {
+            m.append("        ").append(name).append('_').append(c).append("(a);\n");
+        }
+        m.append("        return a;\n    }\n");
+        for (int c = 0; c < chunks; c++) {
+            m.append("    private static void ").append(name).append('_').append(c).append("(Object[] a) {\n");
+            int end = Math.min(elts.size(), (c + 1) * BIG_LITERAL_CHUNK);
+            for (int i = c * BIG_LITERAL_CHUNK; i < end; i++) {
+                m.append("        a[").append(i).append("] = ").append(expr(elts.get(i))).append(";\n");
+            }
+            m.append("    }\n");
+        }
+        fields.append(m);
+        return name + "()";
+    }
+
     private String display(String open, List<Expr> elts, String close, String varargsOpen) {
         boolean star = false;
         for (Expr x : elts) {
             star |= x instanceof Starred;
+        }
+        if (!star && elts.size() > BIG_LITERAL && allConstant(elts)) {
+            return varargsOpen + bigLiteral(elts) + ")";
         }
         if (!star) {
             StringBuilder sb = new StringBuilder(varargsOpen);
@@ -2422,6 +2711,10 @@ public final class Emitter {
     }
 
     private String call(Call c) {
+        Comp eager = eagerArgument(c);
+        if (eager != null) {
+            eagerGenerators.add(eager);
+        }
         if (!inTypeCall && c.func instanceof Name && "type".equals(((Name) c.func).id) && c.args.size() == 3
                 && c.keywords.isEmpty() && sc.resolve("type") == Scope.Binding.BUILTIN) {
             // `type(name, bases, ns)` takes __module__ from the caller's
@@ -2452,7 +2745,7 @@ public final class Emitter {
                     // namespace to hand out.
                     throw unsupported(c, "locals() inside a function or class");
                 }
-                // A snapshot: the module's globals are fields, not a dict.
+                // The module's globals are fields; the dict writes through.
                 return "M.globals()";
             }
         }
@@ -2466,6 +2759,16 @@ public final class Emitter {
             // Still the global's value that is called, so a module that
             // rebinds `len` later gets its own function.
             return "Py.len(" + expr(c.func) + ", " + expr(c.args.get(0)) + ")";
+        }
+        if (c.func instanceof Name && c.keywords.isEmpty() && !Infer.hasStarred(c.args)) {
+            String fn = ((Name) c.func).id;
+            boolean builtin = sc.resolve(fn) == Scope.Binding.BUILTIN;
+            if (builtin && "isinstance".equals(fn) && c.args.size() == 2) {
+                return "Py.isinstance(" + expr(c.func) + ", " + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + ")";
+            }
+            if (builtin && "dict".equals(fn) && c.args.size() == 1) {
+                return "Py.dict1(" + expr(c.func) + ", " + expr(c.args.get(0)) + ")";
+            }
         }
         boolean spread = false;
         for (Expr a : c.args) {
@@ -2492,7 +2795,10 @@ public final class Emitter {
                 names.append(i == 0 ? "" : ", ").append(k.arg == null ? "null" : javaString(k.arg));
                 i++;
             }
-            return "Py.callSpread(" + expr(c.func) + ", " + parts + "}, " + kinds + "}, " + names + "})";
+            // The kinds and names never change, so they are one static per site.
+            return "Py.callSpread(" + expr(c.func) + ", " + parts + "}, "
+                    + hoist("int[]", kinds.append("}").toString()) + ", "
+                    + hoist("String[]", names.append("}").toString()) + ")";
         }
         StringBuilder args = new StringBuilder();
         for (Expr a : c.args) {
@@ -2512,7 +2818,7 @@ public final class Emitter {
         if (c.func instanceof Attribute) {
             Attribute fa = (Attribute) c.func;
             if (FRAME_HOOKS.contains(fa.attr) && fa.value instanceof Name && "sys".equals(((Name) fa.value).id)) {
-                throw dynamicCode(fa, "sys." + fa.attr);
+                return dynamicCodeAtRuntime(fa, "sys." + fa.attr);
             }
             Attribute a = (Attribute) c.func;
             int n = c.args.size();
@@ -2546,9 +2852,54 @@ public final class Emitter {
         return "new PySuper(" + f.enclosingClass.classVar + ", " + load(n) + ")";
     }
 
+    /// Generator expressions whose only consumer drains them at once (see `eagerArgument`), so
+    /// they are built as a list instead of a suspended generator. Keyed by identity.
+    private final Set<Comp> eagerGenerators =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Comp, Boolean>());
+
+    /// The generator expression a call drains completely before it returns, or null.
+    ///
+    /// `"sep".join(g)`, and `list`, `tuple`, `sorted`, `set` and `frozenset` while they are the
+    /// builtins: each materializes its argument before using any of it (CPython's join turns a
+    /// generator into a list first), so building that list directly yields the same values in
+    /// the same order, with the same exceptions, and skips a suspend and resume per item. Not
+    /// `sum`, `min`, `max`, `any` or `all`: those run in constant space, or stop early.
+    private Comp eagerArgument(Call c) {
+        if (c.args.size() != 1 || !c.keywords.isEmpty() || !(c.args.get(0) instanceof Comp)) {
+            return null;
+        }
+        Comp g = (Comp) c.args.get(0);
+        if (g.kind != Comp.Kind.GENERATOR || Linearize.isAsync(g) || Linearize.awaited(g)) {
+            return null;
+        }
+        for (Comprehension q : g.generators) {
+            if (q.isAsync) {
+                return null;
+            }
+        }
+        if (c.func instanceof Attribute) {
+            Attribute f = (Attribute) c.func;
+            return "join".equals(f.attr) && f.value instanceof Constant
+                    && ((Constant) f.value).kind == Constant.Kind.STR ? g : null;
+        }
+        if (c.func instanceof Name) {
+            String fn = ((Name) c.func).id;
+            boolean drains = "list".equals(fn) || "tuple".equals(fn) || "sorted".equals(fn)
+                    || "set".equals(fn) || "frozenset".equals(fn);
+            return drains && sc.resolve(fn) == Scope.Binding.BUILTIN ? g : null;
+        }
+        return null;
+    }
+
     private String comprehension(Comp c) {
-        if (c.kind == Comp.Kind.GENERATOR || Linearize.awaited(c)) {
+        if ((c.kind == Comp.Kind.GENERATOR && !eagerGenerators.contains(c)) || Linearize.awaited(c)) {
             return generatorExpression(c);
+        }
+        if (helperShape(c.scope)) {
+            // An eager generator expression too: it is drained into a list
+            // here. What it reads stays a cell ([#uncell] does not count it),
+            // and the method takes the cell.
+            return helperComprehension(c);
         }
         Frame savedFrame = frame;
         Scope savedScope = sc;
@@ -2635,12 +2986,223 @@ public final class Emitter {
         StringBuilder out = new StringBuilder();
         out.append("((PyFunction.Body) (Object[] ").append(a).append(") -> {\n").append(pro).append(b);
         indent(out, ind);
-        // Generator expressions are evaluated eagerly for now: an iterator
-        // over the materialised list.
-        out.append("return ").append(c.kind == Comp.Kind.GENERATOR ? "Py.iter(" + r + ")" : r).append(";\n");
+        // A generator expression gets here only for a consumer that drains it (eagerArgument),
+        // which is handed the list itself.
+        out.append("return ").append(r).append(";\n");
         indent(out, ind - 1);
         out.append("}).run(new Object[] {").append(first).append("})");
         return out.toString();
+    }
+
+    /// What a comprehension emitted as a method reads for each name it
+    /// takes from enclosing scopes: the parameter, or its cell's slot.
+    private Map<String, String> compParams;
+    /// The [#helperComprehension] methods written so far.
+    private final Set<String> emittedComps = new HashSet<String>();
+
+    /// Whether comprehension scope `cs` is emitted as a static method of the
+    /// module class, as CPython inlines it (PEP 709): an eager list, set or
+    /// dict comprehension with no scope inside it and no walrus. Such a
+    /// call makes no function object and no argument array, and the locals
+    /// it reads are passed by value, so they need no cells ([#uncell]).
+    static boolean helperComp(Scope cs) {
+        return helperShape(cs) && cs.comp.kind != Comp.Kind.GENERATOR;
+    }
+
+    /// [#helperComp] without the kind: true of a generator expression too.
+    private static boolean helperShape(Scope cs) {
+        Comp c = cs == null ? null : cs.comp;
+        if (c == null || !cs.children.isEmpty() || !cs.nonlocals.isEmpty()
+                || !cs.globals.isEmpty() || Linearize.awaited(c)) {
+            return false;
+        }
+        for (Comprehension g : c.generators) {
+            if (g.isAsync) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Drops from each function's cells the names only [#helperComp]
+    /// comprehensions capture: those read the value they are handed.
+    static void uncell(Scope s) {
+        for (Scope c : s.children) {
+            uncell(c);
+        }
+        if (s.kind != Scope.Kind.FUNCTION || s.cells.isEmpty()) {
+            return;
+        }
+        for (String n : new ArrayList<String>(s.cells)) {
+            boolean onlyHelpers = true;
+            for (Scope c : s.children) {
+                if (captures(c, s, n) && !helperComp(c)) {
+                    onlyHelpers = false;
+                    break;
+                }
+            }
+            if (onlyHelpers) {
+                s.cells.remove(n);
+            }
+        }
+    }
+
+    private static boolean captures(Scope s, Scope owner, String n) {
+        if ((s.used.contains(n) || s.nonlocals.contains(n)) && s.resolve(n) == Scope.Binding.FREE
+                && s.owner(n) == owner) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return true;
+        }
+        for (Scope c : s.children) {
+            if (captures(c, owner, n)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// A [#helperComp] comprehension: its loops become a static method of
+    /// the module class, called with the first iterable and the value (or,
+    /// for a name that is a cell anyway, the cell) of every name it reads
+    /// from enclosing functions.
+    private String helperComprehension(Comp c) {
+        String first = expr(c.generators.get(0).iter);
+        Scope cs = c.scope;
+        StringBuilder call = new StringBuilder();
+        StringBuilder sig = new StringBuilder();
+        Map<String, String> params = new HashMap<String, String>();
+        String it0 = "a" + id(cs) + "_0";
+        sig.append("Object ").append(it0);
+        call.append(first);
+        int k = 0;
+        for (String n : cs.used) {
+            if (cs.resolve(n) != Scope.Binding.FREE) {
+                continue;
+            }
+            Scope o = cs.owner(n);
+            String p = "f" + id(cs) + "_" + k++;
+            if (o != null && !o.cells.contains(n)) {
+                sig.append(", Object ").append(p);
+                call.append(", ").append(localVar(o, n));
+                params.put(n, p);
+            } else {
+                sig.append(", Object[] ").append(p);
+                call.append(", ").append(cellVar(o, n));
+                params.put(n, p + "[0]");
+            }
+        }
+        Frame savedFrame = frame;
+        Scope savedScope = sc;
+        Map<String, String> savedParams = compParams;
+        GenLowering savedGen = gen;
+        String savedSelfLocal = selfLocal;
+        Layouts.Cls savedSelfCls = selfCls;
+        String savedSelfTyped = selfTyped;
+        Map<String, String> savedShadowVar = shadowVar;
+        Map<String, Layouts.Cls> savedShadowCls = shadowCls;
+        Set<String> savedRecycled = recycled;
+        Map<String, String[]> savedCarried = carried;
+        String[] savedLazy = lazyIndex;
+        boolean savedFast = inRegionFast;
+        Map<String, String> savedHoist = hoist;
+        frame = new Frame(id(cs), cs);
+        sc = cs;
+        compParams = params;
+        gen = null;
+        selfLocal = null;
+        selfCls = null;
+        selfTyped = null;
+        shadowVar = new HashMap<String, String>();
+        shadowCls = new HashMap<String, Layouts.Cls>();
+        recycled = java.util.Collections.<String>emptySet();
+        carried = null;
+        lazyIndex = null;
+        inRegionFast = false;
+        hoist = null;
+        String r = fresh("r");
+        StringBuilder b = new StringBuilder();
+        int ind = 2;
+        int depth = ind;
+        for (int i = 0; i < c.generators.size(); i++) {
+            Comprehension g = c.generators.get(i);
+            String it = fresh("i");
+            String x = fresh("x");
+            indent(b, depth);
+            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? it0 : expr(g.iter))
+                    .append(");\n");
+            indent(b, depth);
+            b.append("for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
+                    .append(".next()) != null;) {\n");
+            depth++;
+            store(g.target, x, b, depth);
+            for (Expr cond : g.ifs) {
+                indent(b, depth);
+                b.append("if (").append(cond(cond)).append(") {\n");
+                depth++;
+            }
+        }
+        indent(b, depth);
+        String type;
+        switch (c.kind) {
+            case DICT:
+                type = "PyDict";
+                b.append(r).append(".setItem(").append(expr(c.elt)).append(", ").append(expr(c.value))
+                        .append(");\n");
+                break;
+            case SET:
+                type = "PySet";
+                b.append(r).append(".addItem(").append(expr(c.elt)).append(");\n");
+                break;
+            default:
+                type = "PyList";
+                b.append(r).append(".append(").append(expr(c.elt)).append(");\n");
+                break;
+        }
+        while (depth > ind) {
+            depth--;
+            indent(b, depth);
+            b.append("}\n");
+        }
+        String name = "comp" + id(cs);
+        if (!emittedComps.add(name)) {
+            // Emitted already: some expressions are emitted more than once.
+            b.setLength(0);
+        }
+        StringBuilder m = new StringBuilder();
+        m.append("\n    private static ").append(type).append(' ').append(name).append('(').append(sig).append(") {\n");
+        for (String n : cs.assigned) {
+            if (!cs.isLocal(n)) {
+                continue;
+            }
+            indent(m, ind);
+            m.append("Object ").append(localVar(cs, n)).append(" = null;\n");
+        }
+        if (frame.temps > 0 || frame.ltemps > 0) {
+            indent(m, ind);
+            m.append(tempDecls()).append("\n");
+        }
+        indent(m, ind);
+        m.append("final ").append(type).append(' ').append(r).append(" = new ").append(type).append("();\n");
+        m.append(b);
+        indent(m, ind);
+        m.append("return ").append(r).append(";\n    }\n");
+        if (b.length() > 0) {
+            fields.append(m);
+        }
+        frame = savedFrame;
+        sc = savedScope;
+        compParams = savedParams;
+        gen = savedGen;
+        selfLocal = savedSelfLocal;
+        selfCls = savedSelfCls;
+        selfTyped = savedSelfTyped;
+        shadowVar = savedShadowVar;
+        shadowCls = savedShadowCls;
+        recycled = savedRecycled;
+        carried = savedCarried;
+        lazyIndex = savedLazy;
+        inRegionFast = savedFast;
+        hoist = savedHoist;
+        return name + "(" + call + ")";
     }
 
     /// A generator expression: a generator whose body is the loops of the
@@ -2689,6 +3251,7 @@ public final class Emitter {
         }
         gen = new GenLowering(this, file, cs);
         gen.asyncGen = async && genexp;
+        gen.plain = !async;
         String step = resolveRegions(gen.step(body));
         String a = "a" + frame.id;
         StringBuilder r = new StringBuilder();
@@ -5015,4 +5578,16 @@ public final class Emitter {
         return false;
     }
 
+
+    /// A dict display as `new PyDict(n).put(k, v)...`: made at its final size, with no
+    /// array of its pairs built for the call, as CPython's BUILD_MAP builds it.
+    private String dictLiteral(List<Expr> keys, List<Expr> values) {
+        StringBuilder sb = new StringBuilder("new PyDict(").append(keys.size()).append(')');
+        for (int i = 0; i < keys.size(); i++) {
+            String k = expr(keys.get(i));
+            String v = expr(values.get(i));
+            sb.append(".put(").append(k).append(", ").append(v).append(')');
+        }
+        return sb.toString();
+    }
 }

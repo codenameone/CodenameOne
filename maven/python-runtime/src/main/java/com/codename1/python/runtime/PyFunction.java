@@ -422,6 +422,18 @@ public final class PyFunction extends PyObject {
 
     int kindFlags;
 
+    /// `__module__`: the module the `def` ran in, null for a function made
+    /// by the runtime itself.
+    private Object module;
+
+    /// Sets `__module__`, which pickle-free code still reads: `repr` of a
+    /// class built by a decorator, `functools.wraps`, registries keyed by
+    /// `f"{f.__module__}.{f.__qualname__}"`. Not `mod`: that is `%`.
+    public PyFunction inModule(Object m) {
+        module = m;
+        return this;
+    }
+
     /// Sets `__qualname__` where it is not just the name.
     public PyFunction qual(String q) {
         qualname = q;
@@ -432,6 +444,16 @@ public final class PyFunction extends PyObject {
     /// `co_flags` bit CPython gives it (0x20, 0x80, 0x200).
     public PyFunction kind(int flags) {
         kindFlags = flags;
+        return this;
+    }
+
+    /// How many leading parameters are positional-only (before a `/`).
+    int positionalOnly;
+
+    /// Marks the first `n` parameters positional-only: a keyword argument
+    /// with one of their names is refused, or goes to `**kwargs`.
+    public PyFunction positionalOnly(int n) {
+        positionalOnly = n;
         return this;
     }
 
@@ -455,7 +477,7 @@ public final class PyFunction extends PyObject {
             case "__doc__":
                 return doc != null ? doc : Py.NONE;
             case "__module__":
-                return Py.NONE;
+                return module != null ? module : Py.NONE;
             case "__dict__":
                 if (attrs == null) {
                     attrs = new PyDict();
@@ -499,6 +521,16 @@ public final class PyFunction extends PyObject {
         attrs.setItem(attr, value);
     }
 
+    /// `del f.name` of an attribute set on the function, as click does with
+    /// the `__click_params__` its decorators collect.
+    @Override
+    public void delAttr(String attr) {
+        if (attrs == null || !attrs.contains(attr)) {
+            throw Py.attributeError("'function' object has no attribute '" + attr + "'");
+        }
+        attrs.delItem(attr);
+    }
+
     @Override
     public Object call(Object[] args, String[] kwNames) {
         if (kwNames.length == 0 && !varArgs && kwOnly == 0 && !varKw && args.length == positional) {
@@ -510,7 +542,28 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return body.run(bindArgs(args, kwNames));
+        // One slot array per function, reused: every generated body copies
+        // its slots into locals on entry (a generator into its fields when
+        // it is made), so the array is free once run returns. A nested call
+        // finds the spare taken and allocates its own; a throw just leaves
+        // it taken. Python code here runs on one thread at a time.
+        Object[] slots = spareSlots;
+        spareSlots = null;
+        if (slots == null) {
+            slots = new Object[positional + (varArgs ? 1 : 0) + kwOnly + (varKw ? 1 : 0)];
+        }
+        Object r = body.run(bindArgs(slots, args, kwNames));
+        spareSlots = clear(slots);
+        return r;
+    }
+
+    private Object[] spareSlots;
+
+    private static Object[] clear(Object[] a) {
+        for (int i = 0; i < a.length; i++) {
+            a[i] = null;
+        }
+        return a;
     }
 
     /// A call to a function of at most six plain parameters, keywords
@@ -610,14 +663,24 @@ public final class PyFunction extends PyObject {
         return i >= first ? defaults[i - first] : null;
     }
 
-    /// The positional parameter named `k`, or -1.
+    /// The positional parameter named `k`, or -1. A positional-only one
+    /// cannot be named, so [#bindArgs] reports or collects that keyword.
     private int slotOf(String k) {
-        for (int p = 0; p < positional; p++) {
+        for (int p = positionalOnly; p < positional; p++) {
             if (params[p].equals(k)) {
                 return p;
             }
         }
         return -1;
+    }
+
+    private boolean isPositionalOnly(String k) {
+        for (int p = 0; p < positionalOnly; p++) {
+            if (params[p].equals(k)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<String> add(List<String> l, String n) {
@@ -640,8 +703,13 @@ public final class PyFunction extends PyObject {
     }
 
     Object[] bindArgs(Object[] args, String[] kwNames) {
+        return bindArgs(null, args, kwNames);
+    }
+
+    /// Binds into `reuse` when given (all null), or into a new array.
+    private Object[] bindArgs(Object[] reuse, Object[] args, String[] kwNames) {
         int slots = positional + (varArgs ? 1 : 0) + kwOnly + (varKw ? 1 : 0);
-        Object[] out = new Object[slots];
+        Object[] out = reuse != null ? reuse : new Object[slots];
         int nPos = args.length - kwNames.length;
         int copy = Math.min(nPos, positional);
         System.arraycopy(args, 0, out, 0, copy);
@@ -661,11 +729,12 @@ public final class PyFunction extends PyObject {
         }
         PyDict kw = varKw ? new PyDict() : null;
         int kwBase = positional + (varArgs ? 1 : 0);
+        List<String> byKeyword = null;
         for (int i = 0; i < kwNames.length; i++) {
             String k = kwNames[i];
             Object v = args[nPos + i];
             int slot = -1;
-            for (int p = 0; p < positional; p++) {
+            for (int p = positionalOnly; p < positional; p++) {
                 if (params[p].equals(k)) {
                     slot = p;
                     break;
@@ -681,6 +750,10 @@ public final class PyFunction extends PyObject {
             }
             if (slot < 0) {
                 if (kw == null) {
+                    if (isPositionalOnly(k)) {
+                        byKeyword = add(byKeyword, k);
+                        continue;
+                    }
                     throw Py.typeError(qn() + "() got an unexpected keyword argument '" + k + "'");
                 }
                 kw.setItem(k, v);
@@ -690,6 +763,14 @@ public final class PyFunction extends PyObject {
                 throw Py.typeError(qn() + "() got multiple values for argument '" + k + "'");
             }
             out[slot] = v;
+        }
+        if (byKeyword != null) {
+            StringBuilder sb = new StringBuilder();
+            for (String n : byKeyword) {
+                sb.append(sb.length() == 0 ? "" : ", ").append(n);
+            }
+            throw Py.typeError(qn() + "() got some positional-only arguments passed as keyword arguments: '"
+                    + sb + "'");
         }
         int firstDefault = positional - defaults.length;
         List<String> missing = null;

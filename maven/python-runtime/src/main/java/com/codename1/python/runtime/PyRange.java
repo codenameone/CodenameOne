@@ -112,18 +112,43 @@ public final class PyRange extends PyObject {
 
     @Override
     public Object iter() {
-        final long n = length();
-        return new PyJavaIter(new PyJavaIter.Source() {
-            long i;
+        return new Iter(start, step, length());
+    }
 
-            @Override
-            public Object next() {
-                if (i >= n) {
-                    return null;
-                }
-                return PyInt.of(start + step * i++);
+    /// The range's own iterator: one final class whose next() is the counter itself.
+    /// It was a PyJavaIter over an anonymous Source -- two virtual calls and a done
+    /// flag per value, in the most common loop a Python program writes.
+    static final class Iter extends PyObject {
+        private long cur;
+        private final long step;
+        private long left;
+
+        Iter(long start, long step, long n) {
+            this.cur = start;
+            this.step = step;
+            this.left = n;
+        }
+
+        @Override
+        public PyType type() {
+            return Py.ITERATOR_TYPE;
+        }
+
+        @Override
+        public Object iter() {
+            return this;
+        }
+
+        @Override
+        public Object next() {
+            if (left <= 0) {
+                return null;
             }
-        });
+            left--;
+            long v = cur;
+            cur = v + step;
+            return PyInt.of(v);
+        }
     }
 
     @Override
@@ -145,10 +170,12 @@ public final class PyRange extends PyObject {
 
     @Override
     public boolean contains(Object x) {
-        if (!(Py.isInt(x)) || Py.intView(x).isBig()) {
+        // A Long is read directly (intView allocates above its cache); a bool, a
+        // big int or anything else takes the general path.
+        if (!(x instanceof Long)) {
             return super.contains(x);
         }
-        long v = Py.intView(x).value;
+        long v = ((Long) x).longValue();
         if (step > 0 ? v < start || v >= stop : v > start || v <= stop) {
             return false;
         }

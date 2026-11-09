@@ -8260,6 +8260,20 @@ public final class Display extends CN1Constants {
         return impl.openOrCreateDB(databaseName);
     }
 
+    /// Whether `#openInMemoryDatabase()` is supported on this platform.
+    public boolean isInMemoryDatabaseSupported() {
+        return impl.isInMemoryDatabaseSupported();
+    }
+
+    /// Opens a new private database held in memory, gone once closed.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: where the platform has no in-memory databases
+    public Database openInMemoryDatabase() throws IOException {
+        return impl.openInMemoryDB();
+    }
+
     /// Opens an encrypted database or creates one if it does not exist.
     ///
     /// Prefer `com.codename1.db.Database#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)`,

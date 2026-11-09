@@ -99,9 +99,14 @@ done
 # GraceAudit's Node fields were write-only, so the translated Node had no fields: the fresh
 # node held no reference to its older child, the grace pass had nothing to rescue, and
 # skipping it lost nothing. #5940's stop-the-world cycles do not remove the need either --
-# they grace nothing on pre-cycle pages, but concurrent cycles (the default outside a
-# generational phase) still keep every fresh object by grace and trace it only through this
-# pass. GraceAudit now reads its fields, and the fault is caught again (5 of 5 runs).
+# they grace nothing on pre-cycle pages. GraceAudit now reads its fields, and the fault is
+# caught again (5 of 5 runs).
+#
+# Concurrent cycles now grace nothing on pre-cycle pages either -- only pages retired DURING
+# the cycle keep the rule -- and that took the fault out of reach a second time: GraceAudit's
+# dead nodes sat on a page retired before the next cycle, died with their children, and the
+# skipped pass lost nothing (0 of 5). So the driver now starts a cycle while that page is
+# still owned and fills the size class until it retires mid-cycle, graced (5 of 5 again).
 printf '%-16s ' "self-test"
 # The faulted run is EXPECTED to abort. Capture it in a command substitution so
 # the shell does not print its own job-control notice for the SIGABRT -- a line
@@ -296,7 +301,15 @@ else
     flFired=0
     for flI in $(seq 1 $flAttempts); do
         flRc=0
-        flOut="$(CN1_GC_FAULT=freelive CN1_GC_FAULT_EVERY=3000 CN1_GC_VERIFY_SOFT=1 \
+        # CN1_GC_TRIGGER_MB=1, as self-test4 runs the same driver: a freed victim is seen
+        # only if its holder still references it at the NEXT verify pass, and that pass
+        # comes one collection later. Once a concurrent cycle stopped graceing every fresh
+        # object the heap no longer tripled, this driver ran far fewer collections at the
+        # default trigger (2 verify passes), and the map had replaced the victims' holders
+        # by then: 2 of 20 runs went quiet with all 8 slots quarantined (classify=2) and
+        # nothing referencing them, against 0 of 20 before. At 1MB both collectors measure
+        # 0 of 20.
+        flOut="$(CN1_GC_TRIGGER_MB=1 CN1_GC_FAULT=freelive CN1_GC_FAULT_EVERY=3000 CN1_GC_VERIFY_SOFT=1 \
                  ./target/bin/MapTorture2-verify 2>&1)" || flRc=$?
         flV="$(printf '%s' "$flOut" | grep -oE 'violations=[0-9]+' | tail -1 | cut -d= -f2)"
         # "the fault fired" and "the fault was caught" are separate claims; a run where

@@ -73,6 +73,22 @@ public final class PyType extends PyObject {
             return Py.OBJECT_TYPE;
         }
     };
+    private boolean plainException;
+    private int plainExceptionVersion = -1;
+
+    /// Whether constructing this exception type from a message only makes an
+    /// instance and sets `args`: BaseException's `__new__` and `__init__`
+    /// both apply. `Py.error` builds those without the call protocol.
+    boolean plainException() {
+        if (plainExceptionVersion != version) {
+            plainException = factory == null && isSubtype(Py.BASE_EXCEPTION)
+                    && lookup("__new__") == Builtins.BASE_EXCEPTION_NEW //NOPMD CompareObjectsWithEquals - identity is meant
+                    && lookup("__init__") == Builtins.BASE_EXCEPTION_INIT; //NOPMD CompareObjectsWithEquals - identity is meant
+            plainExceptionVersion = version;
+        }
+        return plainException;
+    }
+
     private Map<String, Object> lookupCache;
     private int lookupVersion = -1;
     Factory factory;
@@ -862,7 +878,7 @@ public final class PyType extends PyObject {
 
     /// The `__init__` of a plain class (no `__new__`, no builtin base), the
     /// case a positional constructor call takes without an argument array.
-    private Object plainInit() {
+    Object plainInit() {
         if (factory != null || this == Py.TYPE_TYPE || customMeta()) { //NOPMD CompareObjectsWithEquals - identity is meant
             return null;
         }
@@ -933,13 +949,19 @@ public final class PyType extends PyObject {
         if (m != null) {
             return Py.strValue(Py.obj(m).call(new Object[] {this}, Py.NO_KW), "__repr__");
         }
+        return "<class '" + fullName() + "'>";
+    }
+
+    /// `module.qualname` as `repr` shows a class and its instances; a
+    /// builtin type's module is left out.
+    String fullName() {
         Object q = dict.get("__qualname__");
         String qual = q instanceof String ? (String) q : name;
         Object mod = dict.get("__module__");
         if (mod instanceof String && !"builtins".equals(mod)) {
-            return "<class '" + mod + "." + qual + "'>";
+            return mod + "." + qual;
         }
-        return "<class '" + qual + "'>";
+        return qual;
     }
 
     @Override

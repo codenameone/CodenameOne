@@ -1,0 +1,23 @@
+['a', 'b', 'c', 'd', 'c', 'c', 'e']
+['c', 'c', 'c']
+['a', 'b', 'c', 'd', 'c', 'c', 'e']
+['a']
+0
+True a b
+['a', 'b', 'c', 'd', 'c', 'late', 'c', 'e']
+['solo'] []
+[('{urn:n}i', '1'), ('{urn:n}i', '2')]
+True {'a': '1'}
+12
+-7
+0
+7
+5
+1000
+3
+123456789012345678
+1234567890123456789012
+ValueError invalid literal for int() with base 10: '-'
+ValueError invalid literal for int() with base 10: ''
+ValueError invalid literal for int() with base 10: '1a'
+ValueError invalid literal for int() with base 10: '--1'

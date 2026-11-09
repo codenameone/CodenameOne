@@ -13481,6 +13481,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbInTransaction___long(CN1_THRE
     return sqlite3_get_autocommit((sqlite3*)dbPeer) ? JAVA_FALSE : JAVA_TRUE;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbChanges___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer) {
+    return (JAVA_LONG)sqlite3_changes((sqlite3*)dbPeer);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbLastInsertRowid___long_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer) {
+    return (JAVA_LONG)sqlite3_last_insert_rowid((sqlite3*)dbPeer);
+}
+
 void com_codename1_impl_ios_IOSNative_sqlDbExecScript___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql) {
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
@@ -13597,6 +13605,83 @@ void com_codename1_impl_ios_IOSNative_sqlStmtFinalize___long(CN1_THREAD_STATE_MU
     if (statementPeer != 0) {
         sqlite3_finalize((sqlite3_stmt*)statementPeer);
     }
+}
+
+// SQL functions written in Java (Database.createFunction). SQLite calls cn1JavaSqlFunction on the
+// thread stepping the statement; DatabaseImpl.sqlFunctionCall reads the arguments and sets the
+// result back through the natives below. The engine holds only the function's id.
+extern void com_codename1_impl_ios_DatabaseImpl_sqlFunctionCall___long_int_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_INT fid, JAVA_INT argc, JAVA_LONG argv);
+
+static void cn1JavaSqlFunction(sqlite3_context* c, int argc, sqlite3_value** v) {
+    com_codename1_impl_ios_DatabaseImpl_sqlFunctionCall___long_int_int_long(getThreadLocalData(),
+            (JAVA_LONG)(intptr_t)c, (JAVA_INT)(intptr_t)sqlite3_user_data(c), argc, (JAVA_LONG)(intptr_t)v);
+}
+
+static JAVA_OBJECT cn1SqlBytes(const void* bytes, int length) {
+    return nsDataToByteArr([NSData dataWithBytes:(bytes == NULL ? "" : bytes) length:(NSUInteger)(length < 0 ? 0 : length)]);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlDbCreateFunction___long_byte_1ARRAY_int_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT name, JAVA_INT argc, JAVA_INT fid) {
+    JAVA_ARRAY arr = (JAVA_ARRAY)name;
+    char buf[256];
+    int n = arr->length < 255 ? arr->length : 255;
+    memcpy(buf, CN1_ARRAY_DATA(arr), n);
+    buf[n] = 0;
+    return sqlite3_create_function_v2((sqlite3*)(intptr_t)dbPeer, buf, argc, SQLITE_UTF8,
+            (void*)(intptr_t)fid, fid < 0 ? NULL : cn1JavaSqlFunction, NULL, NULL, NULL);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlValueType___long_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG argv, JAVA_INT i) {
+    return sqlite3_value_type(((sqlite3_value**)(intptr_t)argv)[i]);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlValueLong___long_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG argv, JAVA_INT i) {
+    return (JAVA_LONG)sqlite3_value_int64(((sqlite3_value**)(intptr_t)argv)[i]);
+}
+
+JAVA_DOUBLE com_codename1_impl_ios_IOSNative_sqlValueDouble___long_int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG argv, JAVA_INT i) {
+    return sqlite3_value_double(((sqlite3_value**)(intptr_t)argv)[i]);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlValueText___long_int_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG argv, JAVA_INT i) {
+    sqlite3_value* v = ((sqlite3_value**)(intptr_t)argv)[i];
+    const unsigned char* t = sqlite3_value_text(v);
+    return cn1SqlBytes(t, t == NULL ? 0 : sqlite3_value_bytes(v));
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlValueBlob___long_int_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG argv, JAVA_INT i) {
+    sqlite3_value* v = ((sqlite3_value**)(intptr_t)argv)[i];
+    const void* b = sqlite3_value_blob(v);
+    return cn1SqlBytes(b, b == NULL ? 0 : sqlite3_value_bytes(v));
+}
+
+void com_codename1_impl_ios_IOSNative_sqlResultNull___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ctx) {
+    sqlite3_result_null((sqlite3_context*)(intptr_t)ctx);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlResultLong___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ctx, JAVA_LONG v) {
+    sqlite3_result_int64((sqlite3_context*)(intptr_t)ctx, (sqlite3_int64)v);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlResultDouble___long_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ctx, JAVA_DOUBLE v) {
+    sqlite3_result_double((sqlite3_context*)(intptr_t)ctx, v);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlResultText___long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ctx, JAVA_OBJECT v) {
+    JAVA_ARRAY arr = (JAVA_ARRAY)v;
+    sqlite3_result_text((sqlite3_context*)(intptr_t)ctx, arr->length > 0 ? (const char*)CN1_ARRAY_DATA(arr) : "",
+            arr->length, SQLITE_TRANSIENT);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlResultBlob___long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ctx, JAVA_OBJECT v) {
+    JAVA_ARRAY arr = (JAVA_ARRAY)v;
+    sqlite3_result_blob((sqlite3_context*)(intptr_t)ctx, arr->length > 0 ? CN1_ARRAY_DATA(arr) : (const void*)"",
+            arr->length, SQLITE_TRANSIENT);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlResultError___long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ctx, JAVA_OBJECT v) {
+    JAVA_ARRAY arr = (JAVA_ARRAY)v;
+    sqlite3_result_error((sqlite3_context*)(intptr_t)ctx, (const char*)CN1_ARRAY_DATA(arr), arr->length);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtExecuteAndFinalize___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
@@ -17804,11 +17889,8 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode___R_boolean(CN1_TH
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  thisObj, JAVA_OBJECT exception, JAVA_OBJECT writer) {
-    struct obj__java_lang_Throwable* th = (struct obj__java_lang_Throwable*)exception;
-    if(th->java_lang_Throwable_stack == JAVA_NULL) {
-        java_lang_Throwable_fillInStack__(threadStateData, exception);
-    }
-    virtual_java_io_Writer_write___java_lang_String(threadStateData, writer, th->java_lang_Throwable_stack);
+    // A throw records frames only; cn1ThrowableStack renders them.
+    virtual_java_io_Writer_write___java_lang_String(threadStateData, writer, cn1ThrowableStack(threadStateData, exception));
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {

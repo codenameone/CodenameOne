@@ -38,11 +38,39 @@ AsyncGeneratorType = type(_ag())
 MethodType = type(_C()._m)
 BuiltinFunctionType = type(len)
 BuiltinMethodType = type([].append)
+WrapperDescriptorType = type(object.__init__)
+MethodWrapperType = type(object().__str__)
+MethodDescriptorType = type(str.join)
+ClassMethodDescriptorType = type(dict.fromkeys)
+
+
+class MemberDescriptorType:
+    """The type of a __slots__ member descriptor. A slot here is stored
+    with the instance and has no descriptor on the class, so nothing is an
+    instance of this type: an isinstance check against it answers False, as
+    it does in CPython for anything that is not a slot."""
+
+
+class GetSetDescriptorType:
+    """The type of a built-in getset descriptor; as MemberDescriptorType,
+    there are none to be instances of it."""
 NoneType = type(None)
 NotImplementedType = type(NotImplemented)
 EllipsisType = type(...)
 GenericAlias = type(list[int])
 UnionType = type(int | str)
+import sys as _sys
+ModuleType = type(_sys)
+
+
+def _traceback_type():
+    try:
+        raise ValueError
+    except ValueError as e:
+        return type(e.__traceback__)
+
+
+TracebackType = _traceback_type()
 
 
 class SimpleNamespace:

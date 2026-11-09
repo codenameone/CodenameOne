@@ -130,3 +130,23 @@ con4.execute("ROLLBACK")
 print(con4.execute("SELECT * FROM a").fetchall())
 print(sqlite3.paramstyle, sqlite3.apilevel)
 con.close()
+
+# User-defined functions, as sqlite-utils and llm register them.
+fconn = sqlite3.connect(":memory:")
+fconn.create_function("plus_one", 1, lambda v: None if v is None else v + 1)
+fconn.create_function("joined", -1, lambda *a: "|".join(str(x) for x in a))
+fconn.create_function("blob_len", 1, lambda b: len(b))
+print(fconn.execute("SELECT plus_one(41), plus_one(NULL), plus_one(1.5)").fetchone())
+print(fconn.execute("SELECT joined(1, 'two', 3.0)").fetchone())
+print(fconn.execute("SELECT blob_len(?)", (b"abcd",)).fetchone())
+fconn.execute("CREATE TABLE t (v INTEGER)")
+fconn.executemany("INSERT INTO t VALUES (?)", [(1,), (2,), (3,)])
+print(fconn.execute("SELECT sum(plus_one(v)) FROM t").fetchone())
+def boom(v):
+    raise ValueError("no")
+fconn.create_function("boom", 1, boom)
+try:
+    fconn.execute("SELECT boom(1)").fetchone()
+except sqlite3.OperationalError as e:
+    print("error:", e)
+fconn.close()

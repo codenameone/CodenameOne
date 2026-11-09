@@ -153,6 +153,38 @@ public class ByteCodeClass {
         return false;
     }
 
+    /// Maps each plain reference setter onto cn1InlSetRefField (cn1_globals.h), so a
+    /// store is inlined at the call site instead of being a call: with both barrier
+    /// macros in its body a setter is far over clang's -inline-threshold=50, and every
+    /// reference store in the program was a call. Volatile fields, a Reference's
+    /// referent and builds with field null checks keep the out-of-line setter, whose
+    /// stores are atomic or checked. Emitted after the struct, for offsetof.
+    private void appendInlineRefSetters(StringBuilder b) {
+        if (Util.getProperty("fieldNullChecks", "false").equals("true")) {
+            return;
+        }
+        for (ByteCodeField fld : fullFieldList) {
+            if (!fld.isObjectType() || fld.isVolatile() || isReferenceReferent(clsName, fld)) {
+                continue;
+            }
+            String declGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_').replace('-', '_'),
+                    fld.getFieldName());
+            if (declGuard == null) {
+                declGuard = targetGuardFor(clsName, fld.getFieldName());
+            }
+            if (declGuard != null) {
+                b.append("#if ").append(declGuard).append("\n");
+            }
+            b.append("#define set_field_").append(clsName).append("_").append(fld.getFieldName())
+                    .append("(cn1__v, cn1__t) cn1InlSetRefField((cn1__t), offsetof(struct obj__")
+                    .append(clsName).append(", ").append(fld.getClsName()).append("_")
+                    .append(fld.getFieldName()).append("), (cn1__v))\n");
+            if (declGuard != null) {
+                b.append("#endif\n");
+            }
+        }
+    }
+
     private static boolean isReferenceReferent(String owningClass, ByteCodeField fld) {
         return REFERENCE_CLASS.equals(owningClass)
                 && REFERENCE_REFERENT_FIELD.equals(fld.getFieldName())
@@ -732,6 +764,13 @@ public class ByteCodeClass {
             ByteCodeClass depClass = Parser.getClassObject(dep);
             if (depClass != null && depClass.getConcreteClass() != null) {
                 String concrete = depClass.getConcreteClass().replace('/', '_').replace('$', '_').replace('-', '_');
+                // A concrete class that is not part of this translation (a program
+                // built without a port) is no dependency: Invoke resolves nothing
+                // against it and the call stays virtual, so naming it here only
+                // emitted an #include of a header no translation writes.
+                if (Parser.getClassObject(concrete) == null) {
+                    continue;
+                }
                 if (!dependsClassesInterfaces.contains(concrete) && !concreteExtras.contains(concrete)) {
                     concreteExtras.add(concrete);
                 }
@@ -1215,7 +1254,8 @@ public class ByteCodeClass {
 
         // Accessors below test completion before fetching thread context. The
         // recursion flag in class__X is set before <clinit> and cannot publish it.
-        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
+        // Not static: the header's inline static getters (see the header emitter) read it.
+        b.append("int __").append(clsName).append("_LOADED__=0;\n");
         staticFieldList = new ArrayList<ByteCodeField>();
         buildStaticFieldList(staticFieldList);
         String enumValuesField = null;
@@ -1310,12 +1350,14 @@ public class ByteCodeClass {
                         b.append(" = 0;\n");
                     }
 
-                    // static getter
+                    // static getter. Parenthesized: the header maps the name onto an
+                    // inline fast path with a function-like macro.
                     b.append(bf.getCDefinition());
-                    b.append(" get_static_");
+                    b.append(" (get_static_");
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_').replace('-', '_'));
+                    b.append(")");
                     // Match the initializer's acquire/release completion check.
                     // TLS lookup and initialization are cold after the first access.
                     // No guard at all for an eagerly initialized class: it was
@@ -1476,11 +1518,14 @@ public class ByteCodeClass {
 
             // Instance field setters don't use thread context directly.
             // CN1_SETTER_INLINE: see its definition in cn1_globals.h.
-            b.append("CN1_SETTER_INLINE void set_field_");
+            // Parenthesized: the header may map this name onto cn1InlSetRefField with a
+            // function-like macro (appendInlineRefSetters), which must not rewrite the
+            // definition itself.
+            b.append("CN1_SETTER_INLINE void (set_field_");
             b.append(clsName);
             b.append("_");
             b.append(fld.getFieldName());
-            b.append("(");
+            b.append(")(");
             b.append(fld.getCDefinition());
             if(fld.isObjectType()) {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   ");
@@ -2854,6 +2899,25 @@ public class ByteCodeClass {
                     }
                     b.append(bf.getCDefinition());
                     b.append(" v);\n");
+                    if (!bf.isVolatile()) {
+                        // Inline fast path: a read of an initialized class's static is a
+                        // flag test and a load. The getter was a call per read -- a Python
+                        // constant (None, a small int) is a static field, and 6% of a
+                        // generator drain was spent calling two of these. The out-of-line
+                        // getter still runs the initializer the first time. Inside its own
+                        // expansion the macro's name is not expanded again.
+                        String getter = "get_static_" + clsName + "_" + bf.getFieldName().replace('$', '_').replace('-', '_');
+                        String storage = "STATIC_FIELD_" + clsName + "_" + bf.getFieldName();
+                        b.append("#define ").append(getter).append("() ");
+                        if (eagerInit(clsName)) {
+                            b.append("(").append(storage).append(")\n");
+                        } else {
+                            b.append("(__atomic_load_n(&__").append(clsName)
+                                    .append("_LOADED__, __ATOMIC_ACQUIRE) ? ").append(storage)
+                                    .append(" : ").append(getter).append("())\n");
+                            b.append("extern int __").append(clsName).append("_LOADED__;\n");
+                        }
+                    }
                     }
                 } else {
                     b.append("#define get_static_");
@@ -2938,6 +3002,7 @@ public class ByteCodeClass {
             b.append("    unsigned char __cn1InlineStorage[16] __attribute__((aligned(16)));\n");
         }
         b.append("};\n\n");
+        appendInlineRefSetters(b);
                      
         
         b.append("\n\n#endif //__");

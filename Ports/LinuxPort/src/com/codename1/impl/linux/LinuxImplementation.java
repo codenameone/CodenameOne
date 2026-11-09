@@ -3689,6 +3689,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public long getFileLastModified(String file) {
+        return LinuxNative.fileLastModified(stripFileUrl(file));
+    }
+
+    @Override
     public boolean isDirectory(String file) {
         return LinuxNative.fileIsDirectory(stripFileUrl(file));
     }
@@ -4436,6 +4441,18 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public com.codename1.db.Database openOrCreateDB(String databaseName) throws java.io.IOException {
         return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public boolean isInMemoryDatabaseSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.db.Database openInMemoryDB() throws java.io.IOException {
+        // SQLite's own name for a private in-memory database. The open registry files every
+        // such connection under the one key, which no real file has: a count, never a refusal.
+        return new LinuxDatabase(":memory:", ":memory:", null);
     }
 
     @Override

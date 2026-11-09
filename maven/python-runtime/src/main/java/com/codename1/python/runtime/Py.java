@@ -333,6 +333,26 @@ public final class Py {
         return call(f, o);
     }
 
+    /// `isinstance(o, t)` where the name may still be rebound: the builtin's
+    /// answer without its argument array when `f` is the builtin.
+    public static Object isinstance(Object f, Object o, Object t) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, t));
+        }
+        return call(f, o, t);
+    }
+
+    /// `dict(o)`, as [#isinstance(Object, Object, Object)]: a copy of a dict
+    /// made straight from it.
+    public static Object dict1(Object f, Object o) {
+        if (f == DICT_TYPE && o instanceof PyDict) { //NOPMD CompareObjectsWithEquals - identity is meant
+            PyDict d = new PyDict();
+            d.update(o);
+            return d;
+        }
+        return call(f, o);
+    }
+
     public static int len(Object o) {
         if (o instanceof PyObject) {
             return ((PyObject) o).len();
@@ -421,8 +441,52 @@ public final class Py {
 
     /// Instantiates exception type `t` with `msg` and wraps it for `throw`.
     public static PyException error(PyType t, String msg) {
+        if (t.plainException()) {
+            // What BaseException's __new__ and __init__ would do, without
+            // two lookups, two argument copies and two calls a raise.
+            PyInstance e = t.newInstance();
+            e.setAttrDirect("args", new PyTuple(new Object[] {msg}));
+            return new PyException(e);
+        }
         return new PyException(t.call(new Object[] {str(msg)}, NO_KW));
     }
+
+    /// A UnicodeDecodeError with its parts, as a codec raises it.
+    static PyException decodeError(String encoding, byte[] object, int start, int end, String reason) {
+        return new PyException(UNICODE_DECODE_ERROR.call(new Object[] {str(encoding), new PyBytes(object),
+            Long.valueOf(start), Long.valueOf(end), str(reason)}, NO_KW));
+    }
+
+    /// A UnicodeEncodeError with its parts; `start`/`end` count code points.
+    static PyException encodeError(String encoding, String object, int start, int end, String reason) {
+        return new PyException(UNICODE_ENCODE_ERROR.call(new Object[] {str(encoding), str(object),
+            Long.valueOf(start), Long.valueOf(end), str(reason)}, NO_KW));
+    }
+
+    /// What a translated library's `eval`, `exec`, `__import__` or
+    /// `sys._getframe` evaluates to: the build let it through because the
+    /// library is a PyPI package whose call may never run, so reaching it
+    /// raises `NotImplementedError` here.
+    public static Object dynamicCode(String msg) {
+        throw error(NOT_IMPLEMENTED_ERROR, msg);
+    }
+
+    /// What a translated library's `compile` is: it answers a code object
+    /// that names its file and mode and holds nothing to run, since running
+    /// one is `eval` or `exec`, which raise ([#dynamicCode(String)]).
+    public static final PyBuiltin UNCOMPILED = new PyBuiltin("compile", (args, kwNames) -> {
+        if (args.length < 3) {
+            throw typeError("compile() missing required argument 'mode'");
+        }
+        String mode = toStr(args[2]);
+        if (!"exec".equals(mode) && !"eval".equals(mode) && !"single".equals(mode)) {
+            throw valueError("compile() mode must be 'exec', 'eval' or 'single'");
+        }
+        PyModule code = new PyModule("code", new String[0]);
+        code.setAttr("co_filename", args[1]);
+        code.setAttr("co_name", str("<module>"));
+        return code;
+    });
 
     public static PyException typeError(String m) {
         return error(TYPE_ERROR, m);
@@ -554,6 +618,9 @@ public final class Py {
         }
         if (o instanceof String) {
             return ((String) o).length() != 0;
+        }
+        if (o instanceof PyList) {
+            return ((PyList) o).size != 0;
         }
         return obj(o).isTrue();
     }
@@ -887,6 +954,10 @@ public final class Py {
         if (r == null) {
             r = Py.obj(b).radd(a);
             if (r == null) {
+                if (a instanceof String && b instanceof PyInstance && ((PyInstance) b).base instanceof String) {
+                    // a str subclass without __radd__ concatenates as the str it carries
+                    return ((String) a).concat((String) ((PyInstance) b).base);
+                }
                 if (a instanceof String && !(b instanceof String)) {
                     throw typeError("can only concatenate str (not \"" + Py.typeOf(b).name + "\") to str");
                 }
@@ -1388,10 +1459,61 @@ public final class Py {
 
     /// `o[a:b:c]`, with NONE for a missing part.
     public static Object getslice(Object o, Object a, Object b, Object c) {
+        if (o instanceof String && c == NONE && (a instanceof Long || a == NONE) //NOPMD CompareObjectsWithEquals - identity is meant
+                && (b instanceof Long || b == NONE)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            // s[a:b] of int bounds on a string without surrogate pairs, where a
+            // code point is a char: clamped as CPython clamps, and no PySlice.
+            String s = (String) o;
+            int n = s.length();
+            if (PyStr.surrogates(s) == 0) {
+                int lo = a == NONE ? 0 : clampSlice(((Long) a).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+                int hi = b == NONE ? n : clampSlice(((Long) b).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+                return hi <= lo ? "" : lo == 0 && hi == n ? s : s.substring(lo, hi);
+            }
+        }
         if (o instanceof PyList) {
             return ((PyList) o).getSlice(a, b, c);
         }
+        if (o instanceof PyBytes && c == NONE //NOPMD CompareObjectsWithEquals - identity is meant
+                && (a instanceof Long || a == NONE) && (b instanceof Long || b == NONE)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            // b[a:b] of int bounds: one block copy, without a PySlice or its index array.
+            byte[] v = ((PyBytes) o).value;
+            int n = v.length;
+            int lo = a == NONE ? 0 : clampSlice(((Long) a).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+            int hi = b == NONE ? n : clampSlice(((Long) b).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+            if (lo == 0 && hi == n) {
+                return o; // bytes are immutable: CPython hands back the same object
+            }
+            byte[] out = new byte[hi <= lo ? 0 : hi - lo];
+            System.arraycopy(v, lo, out, 0, out.length);
+            return new PyBytes(out);
+        }
         return Py.obj(o).getItem(new PySlice(a, b, c));
+    }
+
+    /// The transpiler's lowering of `"lit %s" % (a,)`; see `Formatting.pct`.
+    public static String pct(String[] lits, String convs, Object a) {
+        return Formatting.pct(lits, convs, a);
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b) {
+        return Formatting.pct(lits, convs, a, b);
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c) {
+        return Formatting.pct(lits, convs, a, b, c);
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c, Object d) {
+        return Formatting.pct(lits, convs, a, b, c, d);
+    }
+
+    private static int clampSlice(long v, int n) {
+        if (v < 0) {
+            v += n;
+            return v < 0 ? 0 : (int) v;
+        }
+        return v > n ? n : (int) v;
     }
 
     /// `o[a:b:c]` for a local whose previous list `old` nothing else can
@@ -1903,6 +2025,11 @@ public final class Py {
         return PyTuple.of(items);
     }
 
+    /// `{}`, without the empty varargs array or a sized table.
+    public static PyDict dict() {
+        return new PyDict();
+    }
+
     /// `{k0: v0, k1: v1, ...}` from alternating keys and values.
     public static PyDict dict(Object... kv) {
         PyDict d = new PyDict(kv.length / 2);
@@ -2067,7 +2194,13 @@ public final class Py {
             return ((PyUnion) t).instanceCheck(o);
         }
         if (!(t instanceof PyType)) {
-            throw typeError("isinstance() arg 2 must be a type, a tuple of types, or a union");
+            // Any object whose type defines __instancecheck__ may stand on
+            // the right (typing.Mapping and the other generic aliases).
+            Object check = typeOf(t).lookup("__instancecheck__");
+            if (check == null) {
+                throw typeError("isinstance() arg 2 must be a type, a tuple of types, or a union");
+            }
+            return isTrue(call(check, t, o));
         }
         return ((PyType) t).instanceCheck(o);
     }

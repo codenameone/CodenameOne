@@ -12,6 +12,7 @@ __all__ = ["ChainMap", "Counter", "OrderedDict", "UserDict", "UserList", "UserSt
 
 
 class deque:
+    __class_getitem__ = classmethod(type(list[int]))
     """A double-ended queue over a circular buffer."""
 
     def __init__(self, iterable=(), maxlen=None):
@@ -221,6 +222,7 @@ class deque:
 
 
 class defaultdict(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, default_factory=None, *args, **kwargs):
         if default_factory is not None and not callable(default_factory):
             raise TypeError("first argument must be callable or None")
@@ -255,6 +257,7 @@ class defaultdict(dict):
 
 
 class OrderedDict(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     def move_to_end(self, key, last=True):
         value = self.pop(key)
         if last:
@@ -302,6 +305,7 @@ class OrderedDict(dict):
 
 
 class Counter(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, iterable=None, /, **kwds):
         super().__init__()
         self.update(iterable, **kwds)
@@ -531,6 +535,7 @@ def namedtuple(typename, field_names, *, rename=False, defaults=None, module=Non
 
 
 class ChainMap(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     """A view of several mappings searched in order; writes go to the first."""
 
     def __init__(self, *maps):
@@ -613,6 +618,7 @@ class ChainMap(dict):
 
 
 class UserDict(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, dict=None, /, **kwargs):
         super().__init__()
         self.data = self
@@ -623,6 +629,7 @@ class UserDict(dict):
 
 
 class UserList(list):
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, initlist=None):
         super().__init__()
         self.data = self

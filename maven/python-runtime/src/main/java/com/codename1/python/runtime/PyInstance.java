@@ -118,6 +118,38 @@ public class PyInstance extends PyObject {
         return i < 0 ? null : slots[i];
     }
 
+    /// The field index of each of `names` in this instance's class, -1 for
+    /// one it keeps elsewhere: for a caller that reads the same attributes of
+    /// many instances, through [#ownAt] and [#storeAt], without matching a
+    /// name each time.
+    int[] fieldIndexes(String[] names) {
+        int[] out = new int[names.length];
+        for (int i = 0; i < names.length; i++) {
+            out[i] = fieldIndex(names[i]);
+        }
+        return out;
+    }
+
+    /// [#own] with the field index already known (see [#fieldIndexes]).
+    Object ownAt(int f, String name) {
+        if (f >= 0) {
+            Object v = getField(f);
+            if (v != null || !extra) {
+                return v;
+            }
+        }
+        return own(name);
+    }
+
+    /// [#store] with the field index already known (see [#fieldIndexes]).
+    void storeAt(int f, String name, Object value) {
+        if (f >= 0 && (!extra || getField(f) != null)) {
+            setField(f, value);
+            return;
+        }
+        store(name, value);
+    }
+
     /// Stores `name`, adding it to the shape if the instance lacks it.
     void store(String name, Object value) {
         int f = fieldIndex(name);
@@ -272,6 +304,23 @@ public class PyInstance extends PyObject {
     /// `object.__setattr__(self, name, value)`: data descriptors, then the
     /// plain store, never an overriding `__setattr__`.
     public void setAttrObject(String name, Object value) {
+        if ("__dict__".equals(name) && value instanceof PyDict && cls.slotNames() == null
+                && cls.lookup("__dict__") == null) {
+            // Replacing the dict (pydantic's construct does): the attributes
+            // become the dict's. They are copied, not aliased, so a later
+            // store into the old dict object no longer reaches the instance.
+            for (String n : attributeNames()) {
+                delAttrDirect(n);
+            }
+            PyDict d = (PyDict) value;
+            for (Object k : d.keyArray()) {
+                if (!(k instanceof String)) {
+                    throw Py.typeError("attribute name must be string");
+                }
+                store((String) k, d.getItem(k));
+            }
+            return;
+        }
         Object clsAttr = cls.lookup(name);
         if (clsAttr instanceof PyProperty) {
             ((PyProperty) clsAttr).set(this, value);
@@ -359,7 +408,7 @@ public class PyInstance extends PyObject {
         if (r != null) {
             return Py.strValue(r, "__repr__");
         }
-        return "<" + cls.name + " object at 0x" + Integer.toHexString(System.identityHashCode(this)) + ">";
+        return "<" + cls.fullName() + " object at 0x" + Integer.toHexString(System.identityHashCode(this)) + ">";
     }
 
     @Override

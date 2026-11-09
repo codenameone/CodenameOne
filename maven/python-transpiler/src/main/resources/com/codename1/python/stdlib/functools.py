@@ -23,6 +23,7 @@ def reduce(function, iterable, initial=_MISSING):
 
 
 class partial:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, func, *args, **keywords):
         if not callable(func):
             raise TypeError("the first argument must be callable")
@@ -212,6 +213,7 @@ def cache(user_function):
 
 
 class cached_property:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, func):
         self.func = func
         self.attrname = None

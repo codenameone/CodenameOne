@@ -24,7 +24,7 @@
 package com.codename1.python.runtime;
 
 /// Python's `tuple`.
-public final class PyTuple extends PyObject {
+public class PyTuple extends PyObject {
     public static final PyTuple EMPTY = new PyTuple(new Object[0]);
 
     final Object[] items;
@@ -144,6 +144,11 @@ public final class PyTuple extends PyObject {
             int[] r = ((PySlice) key).indices(items.length);
             int n = PySlice.length(r);
             Object[] out = new Object[n];
+            if (r[2] == 1) {
+                // A plain slice is one block copy, not a checked store per element.
+                System.arraycopy(items, r[0], out, 0, n);
+                return new PyTuple(out);
+            }
             for (int i = 0, j = r[0]; i < n; i++, j += r[2]) {
                 out[i] = items[j];
             }

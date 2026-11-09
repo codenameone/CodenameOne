@@ -35,6 +35,9 @@ abstract class MessageDigestImpl {
     abstract byte[] digest();
     abstract int digestLength();
     abstract void reset();
+    /// An independent digest in the same state, so a common prefix is hashed
+    /// once and finished several ways.
+    abstract MessageDigestImpl copy();
 
     static MessageDigestImpl create(String algorithm) {
         if (algorithm == null) {
@@ -95,6 +98,14 @@ abstract class MessageDigestImpl {
 
         abstract void processBlock(byte[] block, int offset);
         abstract void writeStateBigEndian(byte[] out);
+
+        /// Copies the block buffer and the byte count into `to`.
+        final <T extends Block64> T copyBlockTo(T to) {
+            System.arraycopy(buffer, 0, to.buffer, 0, bufferLen);
+            to.bufferLen = bufferLen;
+            to.byteCount = byteCount;
+            return to;
+        }
 
         @Override
         void update(byte[] data, int offset, int length) {
@@ -177,6 +188,16 @@ abstract class MessageDigestImpl {
     // ===============================================================
     // MD5 -- RFC 1321 (little-endian length, little-endian word loads)
     static final class Md5 extends Block64 {
+        @Override
+        MessageDigestImpl copy() {
+            Md5 c = copyBlockTo(new Md5());
+            c.a = a;
+            c.b = b;
+            c.c = this.c;
+            c.d = d;
+            return c;
+        }
+
         int a;
         int b;
         int c;
@@ -340,6 +361,17 @@ abstract class MessageDigestImpl {
     // ===============================================================
     // SHA-1 -- RFC 3174
     static final class Sha1 extends Block64 {
+        @Override
+        MessageDigestImpl copy() {
+            Sha1 c = copyBlockTo(new Sha1());
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            return c;
+        }
+
         int h0;
         int h1;
         int h2;
@@ -466,6 +498,20 @@ abstract class MessageDigestImpl {
         Sha256Family(boolean truncated) {
             this.truncated = truncated;
             reset();
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Sha256Family c = copyBlockTo(new Sha256Family(truncated));
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            c.h5 = h5;
+            c.h6 = h6;
+            c.h7 = h7;
+            return c;
         }
 
         @Override
@@ -601,6 +647,23 @@ abstract class MessageDigestImpl {
         Sha512Family(boolean truncated) {
             this.truncated = truncated;
             reset();
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Sha512Family c = new Sha512Family(truncated);
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            c.h5 = h5;
+            c.h6 = h6;
+            c.h7 = h7;
+            System.arraycopy(buffer, 0, c.buffer, 0, bufferLen);
+            c.bufferLen = bufferLen;
+            c.byteCount = byteCount;
+            return c;
         }
 
         @Override
@@ -801,6 +864,15 @@ abstract class MessageDigestImpl {
             this.rate = 200 - 2 * outLen;
             this.domain = domain;
             this.buffer = new byte[rate];
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Keccak c = new Keccak(outLen, domain);
+            System.arraycopy(state, 0, c.state, 0, 25);
+            System.arraycopy(buffer, 0, c.buffer, 0, bufferLen);
+            c.bufferLen = bufferLen;
+            return c;
         }
 
         @Override
@@ -1051,6 +1123,17 @@ abstract class MessageDigestImpl {
     // RIPEMD-160 (Dobbertin, Bosselaers, Preneel), unrolled: both lines of
     // 80 steps run on locals, and the sixteen message words are read once.
     static final class Ripemd160 extends Block64 {
+        @Override
+        MessageDigestImpl copy() {
+            Ripemd160 c = copyBlockTo(new Ripemd160());
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            return c;
+        }
+
         int h0;
         int h1;
         int h2;
@@ -1303,6 +1386,246 @@ abstract class MessageDigestImpl {
             out[2] = rc;
             out[3] = rd;
             out[4] = re;
+        }
+    }
+
+    /// BLAKE2b and BLAKE2s, sequential mode. BLAKE2s keeps its 32-bit words
+    /// in the low half of each long, so one compression function serves
+    /// both.
+    static final class Blake2 extends MessageDigestImpl {
+        private static final long[] IV_B = {0x6a09e667f3bcc908L, 0xbb67ae8584caa73bL, 0x3c6ef372fe94f82bL,
+            0xa54ff53a5f1d36f1L, 0x510e527fade682d1L, 0x9b05688c2b3e6c1fL, 0x1f83d9abfb41bd6bL,
+            0x5be0cd19137e2179L};
+        private static final int[] IV_S = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f,
+            0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+        private static final byte[][] SIGMA = {
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+            {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3},
+            {11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4},
+            {7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8},
+            {9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13},
+            {2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9},
+            {12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11},
+            {13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10},
+            {6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5},
+            {10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0}};
+
+        final boolean big;
+        final int digestSize;
+        private final byte[] key;
+        private final byte[] salt;
+        private final byte[] person;
+        final long[] h = new long[8];
+        final byte[] buf;
+        int bufLen;
+        long t0;
+        long t1;
+        private final long[] v = new long[16];
+        private final long[] m = new long[16];
+
+        Blake2(boolean big, int digestSize, byte[] key, byte[] salt, byte[] person) {
+            this.big = big;
+            this.digestSize = digestSize;
+            this.key = key;
+            this.salt = salt;
+            this.person = person;
+            buf = new byte[big ? 128 : 64];
+            reset();
+        }
+
+        @Override
+        void reset() {
+            bufLen = 0;
+            t0 = 0;
+            t1 = 0;
+            for (int i = 0; i < buf.length; i++) {
+                buf[i] = 0;
+            }
+            if (big) {
+                h[0] = IV_B[0] ^ (0x01010000L | (long) key.length << 8 | digestSize);
+                for (int i = 1; i < 8; i++) {
+                    h[i] = IV_B[i];
+                }
+                h[4] ^= word(salt, 0, 8);
+                h[5] ^= word(salt, 8, 8);
+                h[6] ^= word(person, 0, 8);
+                h[7] ^= word(person, 8, 8);
+            } else {
+                h[0] = (IV_S[0] ^ (0x01010000 | key.length << 8 | digestSize)) & 0xffffffffL;
+                for (int i = 1; i < 8; i++) {
+                    h[i] = IV_S[i] & 0xffffffffL;
+                }
+                h[4] ^= word(salt, 0, 4);
+                h[5] ^= word(salt, 4, 4);
+                h[6] ^= word(person, 0, 4);
+                h[7] ^= word(person, 4, 4);
+            }
+            if (key.length > 0) {
+                System.arraycopy(key, 0, buf, 0, key.length);
+                bufLen = buf.length;
+            }
+        }
+
+        /// The little-endian word of `w` bytes at `off`, zero padded.
+        private static long word(byte[] b, int off, int w) {
+            long r = 0;
+            for (int i = w - 1; i >= 0; i--) {
+                r = r << 8 | (off + i < b.length ? b[off + i] & 0xff : 0);
+            }
+            return r;
+        }
+
+        @Override
+        void update(byte b) {
+            update(new byte[] {b}, 0, 1);
+        }
+
+        @Override
+        int digestLength() {
+            return digestSize;
+        }
+
+        @Override
+        void update(byte[] b, int off, int len) {
+            int bs = buf.length;
+            while (len > 0) {
+                // The last block is compressed in finish(), flagged final, so
+                // a full buffer is held back until more input arrives.
+                if (bufLen == bs) {
+                    count(bs);
+                    compress(buf, 0, false);
+                    bufLen = 0;
+                }
+                int n = Math.min(bs - bufLen, len);
+                System.arraycopy(b, off, buf, bufLen, n);
+                bufLen += n;
+                off += n;
+                len -= n;
+            }
+        }
+
+        private void count(int n) {
+            if (big) {
+                t0 += n;
+                if (Long.compareUnsigned(t0, n) < 0) {
+                    t1++;
+                }
+            } else {
+                t0 += n;
+            }
+        }
+
+        private void compress(byte[] b, int off, boolean last) {
+            for (int i = 0; i < 16; i++) {
+                m[i] = big ? le64(b, off + 8 * i) : le32(b, off + 4 * i) & 0xffffffffL;
+            }
+            for (int i = 0; i < 8; i++) {
+                v[i] = h[i];
+                v[i + 8] = big ? IV_B[i] : IV_S[i] & 0xffffffffL;
+            }
+            if (big) {
+                v[12] ^= t0;
+                v[13] ^= t1;
+                if (last) {
+                    v[14] = ~v[14];
+                }
+                for (int r = 0; r < 12; r++) {
+                    byte[] s = SIGMA[r % 10];
+                    gb(0, 4, 8, 12, m[s[0]], m[s[1]]);
+                    gb(1, 5, 9, 13, m[s[2]], m[s[3]]);
+                    gb(2, 6, 10, 14, m[s[4]], m[s[5]]);
+                    gb(3, 7, 11, 15, m[s[6]], m[s[7]]);
+                    gb(0, 5, 10, 15, m[s[8]], m[s[9]]);
+                    gb(1, 6, 11, 12, m[s[10]], m[s[11]]);
+                    gb(2, 7, 8, 13, m[s[12]], m[s[13]]);
+                    gb(3, 4, 9, 14, m[s[14]], m[s[15]]);
+                }
+            } else {
+                v[12] ^= t0 & 0xffffffffL;
+                v[13] ^= t0 >>> 32;
+                if (last) {
+                    v[14] ^= 0xffffffffL;
+                }
+                for (int r = 0; r < 10; r++) {
+                    byte[] s = SIGMA[r];
+                    gs(0, 4, 8, 12, m[s[0]], m[s[1]]);
+                    gs(1, 5, 9, 13, m[s[2]], m[s[3]]);
+                    gs(2, 6, 10, 14, m[s[4]], m[s[5]]);
+                    gs(3, 7, 11, 15, m[s[6]], m[s[7]]);
+                    gs(0, 5, 10, 15, m[s[8]], m[s[9]]);
+                    gs(1, 6, 11, 12, m[s[10]], m[s[11]]);
+                    gs(2, 7, 8, 13, m[s[12]], m[s[13]]);
+                    gs(3, 4, 9, 14, m[s[14]], m[s[15]]);
+                }
+            }
+            for (int i = 0; i < 8; i++) {
+                h[i] ^= v[i] ^ v[i + 8];
+            }
+        }
+
+        private void gb(int a, int b, int c, int d, long x, long y) {
+            v[a] = v[a] + v[b] + x;
+            v[d] = Long.rotateRight(v[d] ^ v[a], 32);
+            v[c] = v[c] + v[d];
+            v[b] = Long.rotateRight(v[b] ^ v[c], 24);
+            v[a] = v[a] + v[b] + y;
+            v[d] = Long.rotateRight(v[d] ^ v[a], 16);
+            v[c] = v[c] + v[d];
+            v[b] = Long.rotateRight(v[b] ^ v[c], 63);
+        }
+
+        private void gs(int a, int b, int c, int d, long x, long y) {
+            int va = (int) v[a];
+            int vb = (int) v[b];
+            int vc = (int) v[c];
+            int vd = (int) v[d];
+            va = va + vb + (int) x;
+            vd = Integer.rotateRight(vd ^ va, 16);
+            vc = vc + vd;
+            vb = Integer.rotateRight(vb ^ vc, 12);
+            va = va + vb + (int) y;
+            vd = Integer.rotateRight(vd ^ va, 8);
+            vc = vc + vd;
+            vb = Integer.rotateRight(vb ^ vc, 7);
+            v[a] = va & 0xffffffffL;
+            v[b] = vb & 0xffffffffL;
+            v[c] = vc & 0xffffffffL;
+            v[d] = vd & 0xffffffffL;
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Blake2 c = new Blake2(big, digestSize, key, salt, person);
+            System.arraycopy(h, 0, c.h, 0, 8);
+            System.arraycopy(buf, 0, c.buf, 0, buf.length);
+            c.bufLen = bufLen;
+            c.t0 = t0;
+            c.t1 = t1;
+            return c;
+        }
+
+        @Override
+        byte[] digest() {
+            count(bufLen);
+            for (int i = bufLen; i < buf.length; i++) {
+                buf[i] = 0;
+            }
+            compress(buf, 0, true);
+            int w = big ? 8 : 4;
+            byte[] out = new byte[digestSize];
+            for (int i = 0; i < digestSize; i++) {
+                out[i] = (byte) (h[i / w] >>> (8 * (i % w)));
+            }
+            reset();
+            return out;
+        }
+
+        private static int le32(byte[] b, int i) {
+            return b[i] & 0xff | (b[i + 1] & 0xff) << 8 | (b[i + 2] & 0xff) << 16 | (b[i + 3] & 0xff) << 24;
+        }
+
+        private static long le64(byte[] b, int i) {
+            return le32(b, i) & 0xffffffffL | (long) le32(b, i + 4) << 32;
         }
     }
 }

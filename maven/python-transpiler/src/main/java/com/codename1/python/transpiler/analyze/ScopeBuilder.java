@@ -434,6 +434,7 @@ public final class ScopeBuilder {
             // The first iterable is evaluated in the enclosing scope.
             expr(c.generators.get(0).iter);
             c.scope = push(Scope.Kind.COMPREHENSION, "<comp>");
+            c.scope.comp = c;
             for (int i = 0; i < c.generators.size(); i++) {
                 Comprehension g = c.generators.get(i);
                 if (i > 0) {

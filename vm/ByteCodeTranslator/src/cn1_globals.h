@@ -1794,7 +1794,17 @@ struct CN1BuilderAccess {
 
 // indicates a try/catch block currently in frame
 struct TryBlock {
-    jmp_buf destination;
+    // The jmp_buf a throw resumes at, in the frame that set it up -- never a copy.
+    // A generated method shares ONE jmp_buf among all of its handlers and tells
+    // them apart by `handler`, which the longjmp delivers as setjmp's result:
+    // a setjmp per handler at every method entry, and a memcpy of the whole
+    // jmp_buf (~200 bytes on arm64) at every try entry, were what a try cost.
+    jmp_buf* destination;
+    // Which of the method's handlers this block is (a DEFINE_CATCH_BLOCK constant,
+    // never 0); 1 for a block whose jmp_buf is its own (the runtime's C call sites).
+    // Read back after the jump from the block the throw stopped at: every throw
+    // path leaves tryBlockOffset on the block that caught.
+    JAVA_INT handler;
     struct CN1StackBuffer* nativeBuffers;
     struct CN1BuilderAccess* builderAccess;
     
@@ -1864,11 +1874,20 @@ struct TryBlock {
 #define CN1_SATB_FRESH_INLINE(o) 0
 #else
 // The filter is only sound while the sweep grants EVERY fresh object a cycle of grace.
-// Single-core mode (see cn1GcSingleCore in cn1_globals.m) reclaims fresh objects that
-// were allocated before the cycle began, so there a fresh reference is logged like any
-// other; cn1GcFreshFilter is set once, at the first collection, and never changes.
+// Every BiBOP cycle reclaims the unmarked fresh objects on PRE-CYCLE pages -- pages retired
+// before it began (cn1GcHybridBeginConcurrent in cn1_globals.m) -- so a fresh reference to
+// an object on one of those is logged like any other. Every other fresh object keeps its
+// grace and stays filtered, which is what keeps a concurrent mark's log sized by the live
+// set rather than by the allocation rate (issue 5537: 2.7M fresh references logged in one
+// cycle when all of them were). A stop-the-world cycle parks the mutators while the barrier
+// is armed, so it turns the filter off outright (cn1GcFreshFilter) and also frees fresh
+// legacy objects.
 extern JAVA_BOOLEAN cn1GcFreshFilter;
-#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_IS_FRESH((o), __ATOMIC_RELAXED))
+#define CN1_SATB_ON_PRE_CYCLE_PAGE(o) (CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS \
+        && __atomic_load_n(&((CN1BibopPage*)((uintptr_t)(o) \
+               & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle, __ATOMIC_RELAXED))
+#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_IS_FRESH((o), __ATOMIC_RELAXED) \
+        && !CN1_SATB_ON_PRE_CYCLE_PAGE(o))
 #endif
 // Two halves share the gate. The SATB half runs only while a mark is in progress. The
 // GENERATIONAL half (single-core mode only, see cn1GcSingleCore) runs always: a young
@@ -1991,6 +2010,27 @@ extern void cn1SatbBulkQuiesce(void);
                  cn1SatbEnqueue(cn1__old); \
          } } while(0)
 #endif
+
+// A reference field store at the call site. set_field_X used to be a function per field
+// holding both barrier macros, and at clang's -inline-threshold=50 every one of them stayed
+// a call: three of them were 16% of a Python generator's resume. The header now maps a
+// plain reference setter onto this (see ByteCodeClass): off-mark, with no generational
+// barrier, a store is a flag test and a store. Anything else takes cn1SetRefFieldSlow,
+// which runs the same two macros the setter ran, in the same order, so barrier semantics
+// are unchanged -- only where the code lives moved.
+extern void cn1SetRefFieldSlow(JAVA_OBJECT target, JAVA_OBJECT* addr, JAVA_OBJECT value);
+static inline void cn1InlSetRefField(JAVA_OBJECT target, size_t offset, JAVA_OBJECT value) {
+    JAVA_OBJECT* addr = (JAVA_OBJECT*)((char*)target + offset);
+#if defined(CN1_DISABLE_SATB)
+    if(__builtin_expect(cn1GcGenBarrier, 0)) {
+#else
+    if(__builtin_expect(gcSatbActive | cn1GcGenBarrier, 0)) {
+#endif
+        cn1SetRefFieldSlow(target, addr, value);
+        return;
+    }
+    *addr = value;
+}
 
 // ---- java.lang.ref support -------------------------------------------------
 // A WeakReference's referent is NOT traced by the generated mark function. That
@@ -3379,7 +3419,20 @@ extern struct ThreadLocalData* getThreadLocalData();
         threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers; \
         threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess; \
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = classId; \
-        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, destinationJump, sizeof(jmp_buf)); \
+        threadStateData->blocks[threadStateData->tryBlockOffset].destination = &(destinationJump); \
+        threadStateData->blocks[threadStateData->tryBlockOffset].handler = 1; \
+        threadStateData->tryBlockOffset++; \
+    }
+
+// A generated try entry: `handlerId` is the handler's DEFINE_CATCH_BLOCK constant,
+// and the jmp_buf is the method's one, set up by CN1_TRY_ENTRY.
+#define BEGIN_TRY_H(classId, handlerId) {\
+        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = classId; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].destination = &cn1TryJmp; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].handler = handlerId; \
         threadStateData->tryBlockOffset++; \
     }
 
@@ -3414,10 +3467,21 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 
 #define END_TRY(offset) threadStateData->tryBlockOffset = methodBlockOffset + offset - 1
 
-#define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) jmp_buf destinationJump; \
+// The one setjmp of a method with handlers, ahead of its DEFINE_CATCH_BLOCKs. A
+// throw resumes here with the catching handler's constant, and control falls
+// through the DEFINE_CATCH_BLOCKs to the one that owns it. Every handler used to
+// take a setjmp of its own here, at method entry, so a method with four handlers
+// paid four on every call whether or not its try was ever reached.
+#define CN1_TRY_ENTRY() jmp_buf cn1TryJmp; \
+    int cn1TryCaught = 0; \
+    if(CN1_TRY_SETJMP(cn1TryJmp)) { \
+        cn1TryCaught = threadStateData->blocks[threadStateData->tryBlockOffset].handler; \
+    }
+
+#define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) \
+    enum { destinationJump = __COUNTER__ + 2 }; \
 { \
-    int currentOffset CN1_UNUSED = threadStateData->tryBlockOffset; \
-    if(CN1_TRY_SETJMP(destinationJump)) { \
+    if(cn1TryCaught == destinationJump) { \
         threadStateData->callStackOffset = currentCodenameOneCallStackOffset; \
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
         SP = &stack[1]; \
@@ -3428,6 +3492,7 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 }
 
 extern JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex);
+extern JAVA_OBJECT cn1ThrowableStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex);
 
 
 /*

@@ -49,3 +49,8 @@ isolation None in_tx False
 explicit True
 [(1,)]
 qmark 2.0
+(42, None, 2.5)
+('1|two|3.0',)
+(4,)
+(9,)
+error: user-defined function raised exception

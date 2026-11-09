@@ -14,6 +14,8 @@ UnsupportedOperation = _io.UnsupportedOperation
 
 class PurePath:
     __slots__ = ("_raw", "_str", "_parts_cache")
+    # The flavour module (posixpath in CPython): the path functions.
+    parser = _p
 
     def __new__(cls, *args):
         if cls is PurePath:
@@ -69,7 +71,9 @@ class PurePath:
     def as_uri(self):
         if not self.is_absolute():
             raise ValueError("relative path can't be expressed as a file URI")
-        return "file://" + str(self)
+        # Quoted as CPython's pathname2url quotes: UTF-8, with '/' kept.
+        from urllib.parse import quote
+        return "file://" + quote(str(self), safe="/")
 
     def __hash__(self):
         return hash(str(self))
@@ -276,6 +280,23 @@ class Path(PurePath):
         if cls is Path:
             cls = PosixPath
         return object.__new__(cls)
+
+    @classmethod
+    def from_uri(cls, uri):
+        if not uri.startswith("file:"):
+            raise ValueError("URI does not start with 'file:': %r" % (uri,))
+        from urllib.parse import unquote
+        rest = uri[5:]
+        if rest.startswith("//"):
+            rest = rest[2:]
+            if rest.startswith("localhost/"):
+                rest = rest[9:]
+            elif not rest.startswith("/"):
+                raise ValueError("URI is not local: %r" % (uri,))
+        path = cls(unquote(rest))
+        if not path.is_absolute():
+            raise ValueError("URI is not absolute: %r" % (uri,))
+        return path
 
     @classmethod
     def cwd(cls):

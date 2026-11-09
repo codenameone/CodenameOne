@@ -257,6 +257,118 @@ Pillow's notice:
   Licensed under the MIT-CMU (HPND) license; the full text is in the file.
 
 ================================================================================
+CPython standard library
+================================================================================
+
+Some modules of the Python runtime's standard library, in
+maven/python-transpiler (src/main/resources/com/codename1/python/stdlib), are
+derived from the modules of the same name in CPython's Lib directory and retain
+the Python Software Foundation's notice: _markupbase, asyncio.subprocess,
+calendar, difflib, encodings, fractions, gettext, html.parser, importlib.util,
+ipaddress, locale, logging, mimetypes, ntpath, pickle, platform, pprint, selectors, shutil, stringprep, subprocess,
+tempfile, xml.dom, xml.dom.NodeFilter, xml.dom.domreg, xml.dom.expatbuilder,
+xml.dom.minicompat, xml.dom.minidom, xml.dom.pulldom, xml.dom.xmlbuilder,
+xml.etree.ElementPath, xml.etree.ElementTree, xml.sax, xml.sax._exceptions,
+xml.sax.expatreader, xml.sax.handler, xml.sax.saxutils, xml.sax.xmlreader. Each
+file names its origin and summarises the changes.
+
+  Copyright (c) 2001 Python Software Foundation; All Rights Reserved
+  Licensed under the Python Software Foundation License Version 2; the full
+  text is in maven/python-transpiler/third-party/cpython/LICENSE.txt.
+
+================================================================================
+PyYAML
+================================================================================
+
+The yaml package of the Python runtime (maven/python-transpiler, src/main/resources/com/codename1/python/site/yaml) is derived from PyYAML's lib/yaml (https://pyyaml.org), combined into one module and rewritten for the Codename One Python runtime. PyYAML is distributed under the MIT license:
+
+  Copyright (c) 2017-2021 Ingy döt Net
+  Copyright (c) 2006-2016 Kirill Simonov
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of
+  this software and associated documentation files (the "Software"), to deal in
+  the Software without restriction, including without limitation the rights to
+  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+  of the Software, and to permit persons to whom the Software is furnished to do
+  so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+================================================================================
+ElementTree (Fredrik Lundh)
+================================================================================
+
+xml.etree.ElementTree and xml.etree.ElementPath are derived from CPython's modules of the same name, which carry Fredrik Lundh's notice (retained in each file):
+
+  Copyright (c) 1999-2008 by Fredrik Lundh
+
+  By obtaining, using, and/or copying this software and/or its associated
+  documentation, you agree that you have read, understood, and will comply with
+  the following terms and conditions: permission to use, copy, modify, and
+  distribute this software and its associated documentation for any purpose and
+  without fee is hereby granted, provided that the above copyright notice
+  appears in all copies, and that both that copyright notice and this permission
+  notice appear in supporting documentation, and that the name of Secret Labs AB
+  or the author not be used in advertising or publicity pertaining to
+  distribution of the software without specific, written prior permission. SECRET
+  LABS AB AND THE AUTHOR DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE.
+
+================================================================================
+subprocess (Peter Astrand)
+================================================================================
+
+subprocess is derived from CPython's Lib/subprocess.py, which carries (retained in the file):
+
+  Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
+
+  Licensed to PSF under a Contributor Agreement.
+
+================================================================================
+platform (Marc-Andre Lemburg, eGenix.com)
+================================================================================
+
+platform is derived from CPython's Lib/platform.py, which carries (retained in the file):
+
+  Copyright (c) 1999-2000, Marc-Andre Lemburg; mailto:mal@lemburg.com
+  Copyright (c) 2000-2010, eGenix.com Software GmbH; mailto:info@egenix.com
+
+  Permission to use, copy, modify, and distribute this software and its
+  documentation for any purpose and without fee or royalty is hereby granted,
+  provided that the above copyright notice appear in all copies and that both
+  that copyright notice and this permission notice appear in supporting
+  documentation or portions thereof, including modifications, that you make.
+
+================================================================================
+logging (Vinay Sajip)
+================================================================================
+
+logging is derived from CPython's Lib/logging/__init__.py, which carries (retained in the file):
+
+  Copyright 2001-2022 by Vinay Sajip. All Rights Reserved.
+
+  Permission to use, copy, modify, and distribute this software and its
+  documentation for any purpose and without fee is hereby granted, provided that
+  the above copyright notice appear in all copies and that both that copyright
+  notice and this permission notice appear in supporting documentation, and that
+  the name of Vinay Sajip not be used in advertising or publicity pertaining to
+  distribution of the software without specific, written prior permission.
+
+================================================================================
+Unicode Character Database
+================================================================================
+
+The character property and case mapping tables of the Python runtime (maven/python-runtime, UnicodeTables.java) are generated from the Unicode Character Database, Copyright (c) 1991-2026 Unicode, Inc., licensed under the Unicode License v3. The full text is in maven/python-runtime/third-party/unicode/LICENSE.txt.
+
+================================================================================
 Aileron (font)
 ================================================================================
 

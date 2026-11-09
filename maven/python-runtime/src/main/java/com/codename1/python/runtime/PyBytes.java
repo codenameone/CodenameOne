@@ -263,6 +263,11 @@ public final class PyBytes extends PyObject {
             int[] r = ((PySlice) key).indices(value.length);
             int n = PySlice.length(r);
             byte[] out = new byte[n];
+            if (r[2] == 1) {
+                // A plain slice is one block copy, not a checked store per element.
+                System.arraycopy(value, r[0], out, 0, n);
+                return new PyBytes(out);
+            }
             for (int i = 0, j = r[0]; i < n; i++, j += r[2]) {
                 out[i] = value[j];
             }
@@ -289,11 +294,24 @@ public final class PyBytes extends PyObject {
     }
 
     static void install() {
-        Py.BYTES_TYPE.define("decode", PyBuiltin.methodKw(Py.BYTES_TYPE, "decode", (a, kw) -> {
+        final PyBuiltin decode = PyBuiltin.methodKw(Py.BYTES_TYPE, "decode", (a, kw) -> {
+            // `b.decode()` and `b.decode("utf-8")`, bound without Args.
+            if ((kw == null || kw.length == 0) && a.length <= 2 && a[0] instanceof PyBytes
+                    && (a.length == 1 || a[1] instanceof String)) {
+                return Codecs.decode(((PyBytes) a[0]).value, a.length == 1 ? "utf-8" : (String) a[1], "strict");
+            }
             Object[] p = Args.bind("decode", a, kw, new String[] {"self", "encoding", "errors"},
                     new Object[] {null, Py.str("utf-8"), Py.str("strict")});
             return Py.str(Codecs.decode(((PyBytes) p[0]).value, Py.toStr(p[1]), Py.toStr(p[2])));
-        }));
+        });
+        // `b.decode()` and `b.decode("utf-8")` once more, without an argument array: the
+        // method-call site hands a builtin its receiver and argument directly.
+        decode.with1(b -> b instanceof PyBytes ? Codecs.decode(((PyBytes) b).value, "utf-8", "strict")
+                : decode.impl.call(new Object[] {b}, Py.NO_KW));
+        decode.with2((b, e) -> b instanceof PyBytes && e instanceof String
+                ? Codecs.decode(((PyBytes) b).value, (String) e, "strict")
+                : decode.impl.call(new Object[] {b, e}, Py.NO_KW));
+        Py.BYTES_TYPE.define("decode", decode);
         Py.BYTES_TYPE.define("hex", PyBuiltin.methodKw(Py.BYTES_TYPE, "hex", (args, kw) -> {
             Object[] p = Args.bind("hex", args, kw, new String[] {"self", "sep", "bytes_per_sep"},
                     new Object[] {null, Py.NONE, PyInt.of(1)});

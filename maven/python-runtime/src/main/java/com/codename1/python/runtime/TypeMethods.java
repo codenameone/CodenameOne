@@ -87,26 +87,24 @@ final class TypeMethods {
     static String mapCase(String s, int mode) {
         if (mode <= 1) {
             // ASCII: one array, and the string itself when nothing changes.
+            // The chars are read out once; charAt per char is a call each.
             int n = s.length();
-            char[] out = null;
+            char[] out = new char[n];
+            s.getChars(0, n, out, 0);
+            boolean changed = false;
             int i = 0;
             for (; i < n; i++) {
-                char c = s.charAt(i);
+                char c = out[i];
                 if (c >= 128) {
                     break;
                 }
-                char r = mode == 1 ? (c >= 'a' && c <= 'z' ? (char) (c - 32) : c)
-                        : (c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
-                if (r != c && out == null) {
-                    out = new char[n];
-                    s.getChars(0, i, out, 0);
-                }
-                if (out != null) {
-                    out[i] = r;
+                if (mode == 1 ? c >= 'a' && c <= 'z' : c >= 'A' && c <= 'Z') {
+                    out[i] = (char) (mode == 1 ? c - 32 : c + 32);
+                    changed = true;
                 }
             }
             if (i == n) {
-                return out == null ? s : new String(out);
+                return changed ? new String(out) : s;
             }
         }
         StringBuilder sb = new StringBuilder(s.length());
@@ -240,7 +238,7 @@ final class TypeMethods {
                 || Unicode.is(c, Unicode.SPACE);
     }
 
-    private static String strip(String v, Object chars, boolean left, boolean right) {
+    static String strip(String v, Object chars, boolean left, boolean right) {
         int a = 0;
         int b = v.length();
         String cs = chars == null || chars == Py.NONE ? null : strArg(chars, "strip"); //NOPMD CompareObjectsWithEquals - identity is meant
@@ -355,25 +353,106 @@ final class TypeMethods {
 
     /// Resolves the optional `start, end` arguments of find/count/startswith
     /// to UTF-16 offsets.
-    private static int[] range(String self, Object[] a, int from) {
+    ///
+    /// Packed as `lo << 32 | hi` so that a call allocates nothing: a tokenizer
+    /// calls `find(c, pos, end)` once per token. Bounds that are ints (or
+    /// absent) on a string without surrogate pairs -- nearly every call -- are
+    /// clamped here as slice indices clamp; anything else goes through
+    /// [PySlice], which also raises for a bound that is not an index.
+    private static long range(String self, Object[] a, int from) {
+        Object b0 = a.length > from ? a[from] : Py.NONE;
+        Object b1 = a.length > from + 1 ? a[from + 1] : Py.NONE;
+        if ((b0 == Py.NONE || b0 instanceof Long) //NOPMD CompareObjectsWithEquals - identity is meant
+                && (b1 == Py.NONE || b1 instanceof Long) //NOPMD CompareObjectsWithEquals - identity is meant
+                && PyStr.surrogates(self) == 0) {
+            int n = self.length();
+            int lo = b0 == Py.NONE ? 0 : clampIndex(((Long) b0).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+            int hi = b1 == Py.NONE ? n : clampIndex(((Long) b1).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+            return pack(lo, Math.max(lo, hi));
+        }
         int n = PyStr.codePoints(self);
-        int[] r = new PySlice(a.length > from ? a[from] : Py.NONE, a.length > from + 1 ? a[from + 1] : Py.NONE,
-                Py.NONE).indices(n);
-        return new int[] {PyStr.offset(self, r[0]), PyStr.offset(self, Math.max(r[0], r[1]))};
+        int[] r = new PySlice(b0, b1, Py.NONE).indices(n);
+        return pack(PyStr.offset(self, r[0]), PyStr.offset(self, Math.max(r[0], r[1])));
+    }
+
+    /// A slice bound clamped into `[0, n]`, a negative one counted from the end.
+    private static int clampIndex(long v, int n) {
+        if (v < 0) {
+            v += n;
+            return v < 0 ? 0 : (int) v;
+        }
+        return v > n ? n : (int) v;
+    }
+
+    private static long pack(int lo, int hi) {
+        return ((long) lo << 32) | (hi & 0xFFFFFFFFL);
+    }
+
+    private static int lo(long r) {
+        return (int) (r >>> 32);
+    }
+
+    private static int hi(long r) {
+        return (int) r;
+    }
+
+    /// `find`/`rfind` over the whole string, as a code point index.
+    static int findWhole(String v, String sub, boolean last) {
+        int i = last ? v.lastIndexOf(sub) : v.indexOf(sub);
+        return i < 0 ? -1 : PyStr.cpIndex(v, i);
     }
 
     private static int find(String self, Object[] a, boolean last) {
         String sub = strArg(a[1], "find");
-        int[] r = range(self, a, 2);
+        long r = range(self, a, 2);
         String v = self;
-        if (r[1] - r[0] < sub.length()) {
+        if (hi(r) - lo(r) < sub.length()) {
             return -1;
         }
-        int i = last ? v.lastIndexOf(sub, r[1] - sub.length()) : v.indexOf(sub, r[0]);
-        if (i < r[0] || i + sub.length() > r[1]) {
-            return -1;
+        int i = last ? lastIndexIn(v, sub, lo(r), hi(r)) : indexIn(v, sub, lo(r), hi(r));
+        return i < 0 ? -1 : PyStr.cpIndex(self, i);
+    }
+
+    /// `sub` in `v[lo:hi]` (UTF-16 offsets), searching only that window as
+    /// CPython does. `indexOf(sub, lo)` runs on to the end of `v` when the
+    /// window has no hit, so a tokenizer calling `find(c, pos, end)` once per
+    /// token over one large buffer was quadratic.
+    static int indexIn(String v, String sub, int lo, int hi) {
+        int m = sub.length();
+        int last = hi - m;
+        if (m == 0) {
+            return lo <= hi ? lo : -1;
         }
-        return PyStr.cpIndex(self, i);
+        if (hi == v.length()) {
+            // The window runs to the end: the native search is the same answer.
+            return v.indexOf(sub, lo);
+        }
+        char first = sub.charAt(0);
+        for (int i = lo; i <= last; i++) {
+            if (v.charAt(i) == first && (m == 1 || v.regionMatches(i + 1, sub, 1, m - 1))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// The last `sub` in `v[lo:hi]`; never looks before `lo`.
+    static int lastIndexIn(String v, String sub, int lo, int hi) {
+        int m = sub.length();
+        if (m == 0) {
+            return lo <= hi ? hi : -1;
+        }
+        if (lo == 0) {
+            // The window starts at 0: the native search is the same answer.
+            return v.lastIndexOf(sub, hi - m);
+        }
+        char first = sub.charAt(0);
+        for (int i = hi - m; i >= lo; i--) {
+            if (v.charAt(i) == first && (m == 1 || v.regionMatches(i + 1, sub, 1, m - 1))) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static boolean affix(String self, Object[] a, boolean start) {
@@ -382,9 +461,9 @@ final class TypeMethods {
         int lo = 0;
         int hi = self.length();
         if (a.length > 2) {
-            int[] r = range(self, a, 2);
-            lo = r[0];
-            hi = r[1];
+            long r = range(self, a, 2);
+            lo = lo(r);
+            hi = hi(r);
         }
         if (!(a[1] instanceof PyTuple)) {
             return affixAt(self, lo, hi, strArg(a[1], start ? "startswith" : "endswith"), start);
@@ -477,42 +556,55 @@ final class TypeMethods {
         return seen;
     }
 
+    /// An instance of a str subclass joins as the str it carries, as in CPython
+    /// (bs4's NavigableString is one).
+    private static Object joinItem(Object v) {
+        if (v instanceof PyInstance && ((PyInstance) v).base instanceof String) {
+            return ((PyInstance) v).base;
+        }
+        return v;
+    }
+
     /// `sep.join(items)`; a list is read in place, without an iterator.
-    static Object join(String sep, Object items) {
+    static String join(String sep, Object items) {
         if (items instanceof PyList) {
             PyList l = (PyList) items;
             int n = l.size;
-            if (n == 1 && l.get(0) instanceof String) {
-                return l.get(0);
+            Object only = n == 1 ? l.get(0) : null;
+            if (only instanceof String) {
+                return (String) only;
             }
-            // String.join, which ParparVM builds in one allocation that the
-            // parts' bytes are copied straight into.
-            String[] parts = new String[n];
+            StringBuilder sb = new StringBuilder();
             for (int i = 0; i < n; i++) {
-                Object v = l.get(i);
+                Object v = joinItem(l.get(i));
                 if (!(v instanceof String)) {
                     throw Py.typeError("sequence item " + i + ": expected str instance, " + Py.typeOf(v).name + " found");
                 }
-                parts[i] = (String) v;
+                if (i > 0) {
+                    sb.append(sep);
+                }
+                sb.append((String) v);
             }
-            return String.join(sep, parts);
+            return sb.toString();
         }
         Object it = Py.iter(items);
         StringBuilder sb = new StringBuilder();
-        boolean first = true;
         int i = 0;
         for (Object v = Py.next(it); v != null; v = Py.next(it), i++) {
+            v = joinItem(v);
             if (!(v instanceof String)) {
                 throw Py.typeError("sequence item " + i + ": expected str instance, " + Py.typeOf(v).name + " found");
             }
-            if (!first) {
+            if (i > 0) {
                 sb.append(sep);
             }
-            first = false;
-            sb.append(((String) v));
+            sb.append((String) v);
         }
-        return Py.str(sb.toString());
+        return sb.toString();
     }
+
+    // A local builder on purpose: ParparVM keeps one that does not escape
+    // on the stack, unlocked; a shared static one is locked on every append.
 
     private static void installStr() {
         PyType t = Py.STR_TYPE;
@@ -612,8 +704,8 @@ final class TypeMethods {
         def(t, "count", a -> {
             String self = s(a[0]);
             String sub = strArg(a[1], "count");
-            int[] r = range(self, a, 2);
-            String v = self.substring(r[0], r[1]);
+            long r = range(self, a, 2);
+            String v = self.substring(lo(r), hi(r));
             if (sub.length() == 0) {
                 return PyInt.of(PyStr.codePoints(v) + 1);
             }
@@ -647,6 +739,17 @@ final class TypeMethods {
         def(t, "isupper", a -> Py.bool(cased(s(a[0]), Unicode.UPPER, Unicode.LOWER)));
         def(t, "islower", a -> Py.bool(cased(s(a[0]), Unicode.LOWER, Unicode.UPPER)));
         def(t, "istitle", a -> Py.bool(isTitle(s(a[0]))));
+        def(t, "isprintable", a -> {
+            String v = s(a[0]);
+            for (int i = 0; i < v.length(); ) {
+                int cp = v.codePointAt(i);
+                if (!PyStr.isPrintable(cp)) {
+                    return Py.FALSE;
+                }
+                i += Character.charCount(cp);
+            }
+            return Py.TRUE;
+        });
         def(t, "isascii", a -> {
             String v = s(a[0]);
             for (int i = 0; i < v.length(); i++) {
@@ -742,11 +845,21 @@ final class TypeMethods {
             return Py.str(StrFormat.format(s(args[0]), pos, named));
         });
         def(t, "format_map", a -> Py.str(StrFormat.format(s(a[0]), Py.NO_ARGS, a[1])));
-        defKw(t, "encode", (a, kw) -> {
+        final PyBuiltin encode = PyBuiltin.methodKw(t, "encode", (a, kw) -> {
+            // `s.encode()` and `s.encode("utf-8")`, bound without Args.
+            if ((kw == null || kw.length == 0) && a.length <= 2 && a[0] instanceof String
+                    && (a.length == 1 || a[1] instanceof String)) {
+                return new PyBytes(Codecs.encode((String) a[0], a.length == 1 ? "utf-8" : (String) a[1], "strict"));
+            }
             Object[] p = Args.bind("encode", a, kw, new String[] {"self", "encoding", "errors"},
                     new Object[] {null, Py.str("utf-8"), Py.str("strict")});
             return new PyBytes(Codecs.encode(s(p[0]), Py.toStr(p[1]), Py.toStr(p[2])));
         });
+        // The same two calls without an argument array, for the method-call site.
+        encode.with1(o -> new PyBytes(Codecs.encode(s(o), "utf-8", "strict")));
+        encode.with2((o, e) -> e instanceof String ? new PyBytes(Codecs.encode(s(o), (String) e, "strict"))
+                : encode.impl.call(new Object[] {o, e}, Py.NO_KW));
+        t.define("encode", encode);
         def(t, "__len__", a -> PyInt.of(Py.len(a[0])));
         def(t, "__contains__", a -> Py.bool(Py.obj(a[0]).contains(a[1])));
         def(t, "__getitem__", a -> Py.obj(a[0]).getItem(a[1]));

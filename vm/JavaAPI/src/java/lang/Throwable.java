@@ -36,6 +36,11 @@ public class Throwable{
     private String message;
     private Throwable cause;
     private String stack;
+    /// The frames of the throw, as the native fillInStack records them: class,
+    /// method and line constants, three ints a frame, innermost first. Rendered
+    /// into `stack` only when something reads it -- most exceptions are caught
+    /// and dropped, and building the text was most of what a throw cost.
+    private int[] frames;
     private java.util.List<Throwable> suppressed;
     private StackTraceElement[] parsedStack;
     private boolean stackParsed;
@@ -92,6 +97,15 @@ public class Throwable{
      */
     private native void fillInStack();
     private native String getStack();
+
+    /// The rendered trace: the native text, made from `frames` the first time.
+    private String stack() {
+        if(stack == null && frames != null) {
+            stack = getStack();
+            frames = null;
+        }
+        return stack;
+    }
     
     /**
      * Prints this Throwable and its backtrace to the standard error stream. This method prints a stack trace for this Throwable object on the error output stream that is the value of the field System.err. The first line of output contains the result of the
@@ -195,7 +209,7 @@ public class Throwable{
      */
     private String renderedStack() {
         if(!stackReplaced) {
-            return stack;
+            return stack();
         }
         StringBuilder sb = new StringBuilder();
         sb.append(toString());
@@ -212,7 +226,7 @@ public class Throwable{
     
     public StackTraceElement[] getStackTrace() {
         if(!stackParsed) {
-            parsedStack = parseStackString(stack);
+            parsedStack = parseStackString(stack());
             stackParsed = true;
         }
         if(parsedStack == null || parsedStack.length == 0) {

@@ -24,3 +24,4 @@ encode error UnicodeEncodeError
 a
 b
 1 3 3 41
+['0xfeff', '0xa', '0xa0', '0x200d']

@@ -132,6 +132,79 @@ static inline JAVA_BOOLEAN cn1InlListAdd(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 }
 #endif
 
+// Boxing at the call site. valueOf and xxxValue on Integer, Long and Double were plain
+// calls into nativeMethods.m, and the generated files compile at -inline-threshold=50, so a
+// tagged box -- a shift and an OR -- still cost a call per value: 5% of a Python generator
+// drain was Long.valueOf alone. The tag work is done here; everything else (the clinit a
+// first box must force, a value outside the tag range, a heap box, null) goes through the
+// out-of-line function exactly as before. The prototypes are declared here rather than
+// included because a class the program never boxes may have none, and an unused inline
+// naming an undeclared function is still a compile error.
+#if CN1_TAGGED_ACTIVE
+extern int cn1__clinit_java_lang_Integer;
+extern int cn1__clinit_java_lang_Long;
+extern int cn1__clinit_java_lang_Double;
+#endif
+JAVA_OBJECT java_lang_Integer_valueOf___int_R_java_lang_Integer(CODENAME_ONE_THREAD_STATE, JAVA_INT i);
+JAVA_OBJECT java_lang_Long_valueOf___long_R_java_lang_Long(CODENAME_ONE_THREAD_STATE, JAVA_LONG i);
+JAVA_OBJECT java_lang_Double_valueOf___double_R_java_lang_Double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d);
+JAVA_INT java_lang_Integer_intValue___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+JAVA_LONG java_lang_Long_longValue___R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+JAVA_DOUBLE java_lang_Double_doubleValue___R_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+
+static inline JAVA_OBJECT cn1InlBoxInt(CODENAME_ONE_THREAD_STATE, JAVA_INT v) {
+#if CN1_TAGGED_ACTIVE
+    if(__builtin_expect(__atomic_load_n(&cn1__clinit_java_lang_Integer, __ATOMIC_ACQUIRE) != 0, 1)) {
+        return CN1_TAG_INT(v);
+    }
+#endif
+    return java_lang_Integer_valueOf___int_R_java_lang_Integer(threadStateData, v);
+}
+static inline JAVA_OBJECT cn1InlBoxLong(CODENAME_ONE_THREAD_STATE, JAVA_LONG v) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    if(__builtin_expect(CN1_LONG_TAGGABLE(v) && __atomic_load_n(&cn1__clinit_java_lang_Long, __ATOMIC_ACQUIRE) != 0, 1)) {
+        return CN1_TAG_LONG_VAL(v);
+    }
+#endif
+    return java_lang_Long_valueOf___long_R_java_lang_Long(threadStateData, v);
+}
+static inline JAVA_OBJECT cn1InlBoxDouble(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    union { JAVA_DOUBLE d; uint64_t b; } u;
+    u.d = d;
+    if(__builtin_expect(CN1_DOUBLE_TAGGABLE_BITS(u.b) && __atomic_load_n(&cn1__clinit_java_lang_Double, __ATOMIC_ACQUIRE) != 0, 1)) {
+        return CN1_TAG_DOUBLE_BITS(u.b);
+    }
+#endif
+    return java_lang_Double_valueOf___double_R_java_lang_Double(threadStateData, d);
+}
+static inline JAVA_INT cn1InlUnboxInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+#if CN1_TAGGED_ACTIVE
+    if(__builtin_expect(CN1_TAG_CODE(o) == CN1_TAG_INTEGER, 1)) {
+        return CN1_UNTAG_INT(o);
+    }
+#endif
+    return java_lang_Integer_intValue___R_int(threadStateData, o);
+}
+static inline JAVA_LONG cn1InlUnboxLong(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    if(__builtin_expect(CN1_TAG_CODE(o) == CN1_TAG_LONG, 1)) {
+        return CN1_UNTAG_LONG(o);
+    }
+#endif
+    return java_lang_Long_longValue___R_long(threadStateData, o);
+}
+static inline JAVA_DOUBLE cn1InlUnboxDouble(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    if(__builtin_expect(CN1_TAG_CODE(o) == CN1_TAG_DOUBLE, 1)) {
+        union { JAVA_DOUBLE d; uint64_t b; } u;
+        u.b = CN1_UNTAG_DOUBLE_BITS(o);
+        return u.d;
+    }
+#endif
+    return java_lang_Double_doubleValue___R_double(threadStateData, o);
+}
+
 #if defined(__has_include)
 #if __has_include("java_lang_StringBuilder.h") && __has_include("java_lang_String.h")
 #include "java_lang_StringBuilder.h"

@@ -626,6 +626,9 @@ public class BytecodeMethod implements SignatureSet {
     /** Set while emitting: this method is frameless AND contains a try/catch, so its
      *  frame needs the two extra names CN1_FRAMELESS_TRY_FRAME defines. */
     private boolean framelessHasTryCatch;
+    /// The local slots a handler can read, from handlerLiveSlots on the raw
+    /// bytecode; null when it could not tell, and then every local is volatile.
+    private Set<Integer> handlerLiveSlots;
 
     /** @return true if a return in this method must unwind the try-block stack itself. */
     public boolean isFramelessWithTryCatch() {
@@ -1838,6 +1841,8 @@ public class BytecodeMethod implements SignatureSet {
         // optimize()'s return fast-paths (plain return, no frame release) so it must
         // be set first.
         frameless = isFramelessEligible();
+        // Before optimize(), which fuses the loads and stores this has to see.
+        handlerLiveSlots = computeHandlerLiveSlots();
         // Phase 1 of frame-exit retirement shares the raw-bytecode requirement, and
         // more strictly: it reads OTHER methods' bodies too, so it cannot run here at
         // all. See freezeRetireCandidates, which Parser calls before any rewrite.
@@ -1924,7 +1929,15 @@ public class BytecodeMethod implements SignatureSet {
                 if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
                     b.append("    ");
-                    if (volatileLocals) {
+                    // A slot no handler can read needs no volatile even here: what
+                    // longjmp leaves in it is indeterminate, but it is written again
+                    // before anything reads it. Most of a loop that catches -- every
+                    // temporary -- is like that, and volatile put each of them in
+                    // memory on every access.
+                    // A slot past maxLocals is one optimize() made up, which the
+                    // bytecode pass never saw: it stays volatile.
+                    if (volatileLocals && (handlerLiveSlots == null || lv.getIndex() >= maxLocals
+                            || handlerLiveSlots.contains(lv.getIndex()))) {
                         b.append("volatile ");
                     }
                     switch (lv.getQualifier()) {
@@ -2741,6 +2754,142 @@ public class BytecodeMethod implements SignatureSet {
         addInstruction(new MultiArray(desc, dims));
     }
     
+    /// The local slots live on entry to any exception handler, by a backward
+    /// liveness pass over the raw bytecode, where every handler is also a
+    /// successor of each instruction its range covers. Answers null -- "all of
+    /// them" -- for anything it does not model: JSR/RET, or an instruction kind
+    /// that is not plain bytecode and might touch a local.
+    private Set<Integer> computeHandlerLiveSlots() {
+        int n = instructions.size();
+        Map<Label, Integer> labelAt = new HashMap<Label, Integer>();
+        List<TryCatch> tries = new ArrayList<TryCatch>();
+        for (int i = 0; i < n; i++) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction) {
+                labelAt.put(((LabelInstruction) ins).getLabel(), i);
+            } else if (ins instanceof TryCatch) {
+                tries.add((TryCatch) ins);
+            }
+        }
+        if (tries.isEmpty()) {
+            return new HashSet<Integer>();
+        }
+        int[] handlerOf = new int[tries.size()];
+        int[] fromOf = new int[tries.size()];
+        int[] toOf = new int[tries.size()];
+        for (int t = 0; t < tries.size(); t++) {
+            Integer h = labelAt.get(tries.get(t).getHandler());
+            Integer a = labelAt.get(tries.get(t).getStart());
+            Integer z = labelAt.get(tries.get(t).getEnd());
+            if (h == null || a == null || z == null) {
+                return null;
+            }
+            handlerOf[t] = h;
+            fromOf[t] = a;
+            toOf[t] = z;
+        }
+        int[][] succ = new int[n][];
+        int[] use = new int[n];
+        int[] def = new int[n];
+        for (int i = 0; i < n; i++) {
+            Instruction ins = instructions.get(i);
+            use[i] = -1;
+            def[i] = -1;
+            int[] next = i + 1 < n ? new int[] {i + 1} : new int[0];
+            if (ins instanceof VarOp) {
+                int op = ins.getOpcode();
+                int v = ((VarOp) ins).getIndex();
+                if (op == Opcodes.RET) {
+                    return null;
+                }
+                if (op >= Opcodes.ILOAD && op <= Opcodes.ALOAD) {
+                    use[i] = v;
+                } else if (op >= Opcodes.ISTORE && op <= Opcodes.ASTORE) {
+                    def[i] = v;
+                } else {
+                    return null;
+                }
+            } else if (ins instanceof IInc) {
+                use[i] = ((IInc) ins).getVar();
+            } else if (ins instanceof Jump) {
+                int op = ins.getOpcode();
+                if (op == Opcodes.JSR) {
+                    return null;
+                }
+                Integer target = labelAt.get(((Jump) ins).getLabel());
+                if (target == null) {
+                    return null;
+                }
+                next = op == Opcodes.GOTO ? new int[] {target}
+                        : (i + 1 < n ? new int[] {i + 1, target} : new int[] {target});
+            } else if (ins instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) ins;
+                Label[] ls = sw.getLabels();
+                next = new int[ls.length + 1];
+                Integer d = labelAt.get(sw.getDefaultLabel());
+                if (d == null) {
+                    return null;
+                }
+                next[0] = d;
+                for (int k = 0; k < ls.length; k++) {
+                    Integer target = labelAt.get(ls[k]);
+                    if (target == null) {
+                        return null;
+                    }
+                    next[k + 1] = target;
+                }
+            } else if (ins instanceof BasicInstruction) {
+                int op = ins.getOpcode();
+                if ((op >= Opcodes.IRETURN && op <= Opcodes.RETURN) || op == Opcodes.ATHROW) {
+                    next = new int[0];
+                }
+            } else if (!(ins instanceof LabelInstruction || ins instanceof TryCatch
+                    || ins instanceof LineNumber || ins instanceof Invoke
+                    || ins instanceof Field || ins instanceof TypeInstruction
+                    || ins instanceof Ldc || ins instanceof MultiArray)) {
+                return null;
+            }
+            succ[i] = next;
+        }
+        // live[i]: slots live on entry to instruction i. A slot read in a handler
+        // must survive anywhere that handler can be entered from, which is the
+        // handler's own live-in set joined unkilled into each covered instruction.
+        List<Set<Integer>> live = new ArrayList<Set<Integer>>(n);
+        for (int i = 0; i < n; i++) {
+            live.add(new HashSet<Integer>());
+        }
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (int i = n - 1; i >= 0; i--) {
+                Set<Integer> in = new HashSet<Integer>();
+                for (int s : succ[i]) {
+                    in.addAll(live.get(s));
+                }
+                if (def[i] >= 0) {
+                    in.remove(def[i]);
+                }
+                if (use[i] >= 0) {
+                    in.add(use[i]);
+                }
+                for (int t = 0; t < handlerOf.length; t++) {
+                    if (i >= fromOf[t] && i < toOf[t]) {
+                        in.addAll(live.get(handlerOf[t]));
+                    }
+                }
+                if (!in.equals(live.get(i))) {
+                    live.set(i, in);
+                    changed = true;
+                }
+            }
+        }
+        Set<Integer> out = new HashSet<Integer>();
+        for (int h : handlerOf) {
+            out.addAll(live.get(h));
+        }
+        return out;
+    }
+
     public void addTryCatchBlock(Label start, Label end, Label handler, String type) {
         addInstruction(new TryCatch(start, end, handler, type));
     }
@@ -3667,6 +3816,11 @@ public class BytecodeMethod implements SignatureSet {
         this.maxStack = maxStack;
     }
     
+    /** Appends a synthesized instruction (see {@link LambdaCarriers}). */
+    public void addRawInstruction(Instruction i) {
+        addInstruction(i);
+    }
+
     private void addInstruction(Instruction i) {
         instructions.add(i);
         i.setMethod(this);
@@ -3804,7 +3958,8 @@ public class BytecodeMethod implements SignatureSet {
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0;\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess;\n");
-        b.append("        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __tryJmp, sizeof(jmp_buf));\n");
+        b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].destination = &__tryJmp;\n");
+        b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].handler = 1;\n");
         b.append("        threadStateData->tryBlockOffset++;\n");
         // Emit the actual call
         b.append("        ");

@@ -326,7 +326,7 @@ public final class Builtins {
             }
             return Py.NONE;
         }));
-        o.define("__repr__", PyBuiltin.positional("__repr__", a -> Py.str("<" + Py.typeOf(a[0]).name
+        o.define("__repr__", PyBuiltin.positional("__repr__", a -> Py.str("<" + Py.typeOf(a[0]).fullName()
                 + " object at 0x" + Integer.toHexString(System.identityHashCode(a[0])) + ">")));
         o.define("__str__", PyBuiltin.positional("__str__", a -> Py.str(Py.toRepr(a[0]))));
         installExceptions();
@@ -342,19 +342,25 @@ public final class Builtins {
         names();
     }
 
+    /// BaseException's own `__init__` and `__new__`: a type that has both
+    /// builds an instance from a message directly (`PyType.plainException`).
+    static Object BASE_EXCEPTION_INIT; //NOPMD MutableStaticState - set once, at install
+    static Object BASE_EXCEPTION_NEW; //NOPMD MutableStaticState - set once, at install
+
     private static void installExceptions() {
         PyType b = Py.BASE_EXCEPTION;
-        b.define("__init__", PyBuiltin.method(b, "__init__", a -> {
+        BASE_EXCEPTION_INIT = PyBuiltin.method(b, "__init__", a -> {
             Object[] rest = new Object[a.length - 1];
             System.arraycopy(a, 1, rest, 0, rest.length);
             if (a[0] instanceof PyInstance) {
                 ((PyInstance) a[0]).setAttrDirect("args", new PyTuple(rest));
             }
             return Py.NONE;
-        }));
+        });
+        b.define("__init__", BASE_EXCEPTION_INIT);
         // Keyword arguments are accepted and ignored, as CPython's are: they
         // are for a subclass's __init__, and args holds the positional ones.
-        b.define("__new__", new PyStaticMethod(new PyBuiltin("__new__", (all, kw) -> {
+        BASE_EXCEPTION_NEW = new PyStaticMethod(new PyBuiltin("__new__", (all, kw) -> {
             Object[] a = all;
             if (kw.length > 0) {
                 a = new Object[all.length - kw.length];
@@ -373,7 +379,8 @@ public final class Builtins {
             System.arraycopy(a, 1, rest, 0, rest.length);
             e.setAttrDirect("args", new PyTuple(rest));
             return e;
-        })));
+        }));
+        b.define("__new__", BASE_EXCEPTION_NEW);
         b.define("__str__", PyBuiltin.positional("__str__", a -> {
             Object[] args = exceptionArgs(a[0]);
             if (args.length == 0) {
@@ -393,6 +400,8 @@ public final class Builtins {
             return Py.str(Py.typeOf(a[0]).name + "(" + inner + ")");
         }));
         installOsError();
+        installUnicodeError(Py.UNICODE_DECODE_ERROR, "decode");
+        installUnicodeError(Py.UNICODE_ENCODE_ERROR, "encode");
         b.define("with_traceback", PyBuiltin.positional("with_traceback", a -> a[0]));
         b.define("__cause__", Py.NONE);
         b.define("__context__", Py.NONE);
@@ -483,6 +492,56 @@ public final class Builtins {
                 if (errno != Py.NONE && strerror != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
                     return Py.str(head);
                 }
+            }
+            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a[0]);
+        }));
+    }
+
+    /// UnicodeDecodeError(encoding, object, start, end, reason) and its
+    /// encode twin keep their parts as attributes, which a decoder that
+    /// retries past the bad bytes reads (`e.start`), and format the message
+    /// from them.
+    private static void installUnicodeError(PyType t, String verb) {
+        t.define("__init__", PyBuiltin.method(t, "__init__", a -> {
+            if (!(a[0] instanceof PyInstance)) {
+                return Py.NONE;
+            }
+            PyInstance e = (PyInstance) a[0];
+            int n = a.length - 1;
+            Object[] args = new Object[n];
+            System.arraycopy(a, 1, args, 0, n);
+            if (n == 5) {
+                e.setAttrDirect("encoding", a[1]);
+                e.setAttrDirect("object", a[2]);
+                e.setAttrDirect("start", a[3]);
+                e.setAttrDirect("end", a[4]);
+                e.setAttrDirect("reason", a[5]);
+            }
+            e.setAttrDirect("args", new PyTuple(args));
+            return Py.NONE;
+        }));
+        t.define("__str__", PyBuiltin.positional("__str__", a -> {
+            if (a[0] instanceof PyInstance && ((PyInstance) a[0]).own("reason") != null) {
+                PyInstance e = (PyInstance) a[0];
+                long start = Py.asLong(e.own("start"));
+                long end = Py.asLong(e.own("end"));
+                String head = "'" + Py.toStr(e.own("encoding")) + "' codec can't " + verb + " ";
+                Object obj = e.own("object");
+                if (end == start + 1) {
+                    byte[] raw = PyBytes.like(obj);
+                    if (raw == null) {
+                        String text = Py.toStr(obj);
+                        int cp = text.codePointAt(Character.offsetByCodePoints(text, 0, (int) start));
+                        head += "character '" + Codecs.escape(cp) + "'";
+                    } else {
+                        String h = Integer.toHexString(raw[(int) start] & 0xff);
+                        head += "byte 0x" + (h.length() < 2 ? "0" + h : h);
+                    }
+                    head += " in position " + start;
+                } else {
+                    head += (PyBytes.like(obj) == null ? "characters" : "bytes") + " in position " + start + "-" + (end - 1);
+                }
+                return Py.str(head + ": " + Py.toStr(e.own("reason")));
             }
             return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a[0]);
         }));
@@ -733,6 +792,8 @@ public final class Builtins {
         NAMES.put("False", Py.FALSE);
         NAMES.put("NotImplemented", Py.NOT_IMPLEMENTED);
         NAMES.put("Ellipsis", Py.ELLIPSIS);
+        // True, as under CPython without -O: assert statements run.
+        NAMES.put("__debug__", Py.TRUE);
         Object[] fns = {PRINT, LEN, REPR, ASCII, HASH, ID, ABS, CALLABLE, ITER, NEXT, ORD, CHR, HEX, OCT, BIN,
             FORMAT, DIVMOD, POW, ROUND, ISINSTANCE, ISSUBCLASS, GETATTR, SETATTR, HASATTR, DELATTR, VARS, DIR,
             SUM, MIN, MAX, ANY, ALL, SORTED, REVERSED, ENUMERATE, ZIP, MAP, FILTER, SUPER, INPUT, AITER, ANEXT};
@@ -782,12 +843,31 @@ public final class Builtins {
         if (m != null) {
             return Py.obj(m).call(new Object[] {x}, Py.NO_KW);
         }
+        Object text = textBase(x);
+        if (text != null) {
+            return toInt(text);
+        }
         throw Py.typeError("int() argument must be a string, a bytes-like object or a real number, not '"
                 + Py.typeOf(x).name + "'");
     }
 
+    /// The str, bytes or bytearray an instance of a subclass of one of them
+    /// holds, which int(), float() and complex() parse as they parse the
+    /// base value; null for anything else.
+    static Object textBase(Object x) {
+        if (x instanceof PyInstance) {
+            Object b = ((PyInstance) x).base;
+            if (b instanceof String || b instanceof PyStr || b instanceof PyBytes || b instanceof PyByteArray) {
+                return b;
+            }
+        }
+        return null;
+    }
+
     /// The text `int()` parses: a str, or the ASCII of a bytes-like value.
-    private static String intText(Object x, boolean explicitBase) {
+    private static String intText(Object value, boolean explicitBase) {
+        Object text = textBase(value);
+        Object x = text != null ? text : value;
         if (x instanceof String) {
             return (String) x;
         }
@@ -815,6 +895,10 @@ public final class Builtins {
         }
         if (Py.isInt(x)) {
             return Py.ofFloat(Py.asDouble(x));
+        }
+        Object text = textBase(x);
+        if (text != null && Py.typeOf(x).lookup("__float__") == null) {
+            return toFloat(text);
         }
         if (x instanceof String) {
             String raw = ((String) x).trim();
@@ -1064,7 +1148,11 @@ public final class Builtins {
             return false;
         }
         if (!(t instanceof PyType)) {
-            throw Py.typeError("issubclass() arg 2 must be a class, a tuple of classes, or a union");
+            Object check = Py.typeOf(t).lookup("__subclasscheck__");
+            if (check == null) {
+                throw Py.typeError("issubclass() arg 2 must be a class, a tuple of classes, or a union");
+            }
+            return Py.isTrue(Py.call(check, t, c));
         }
         return ((PyType) t).subclassCheck((PyType) c);
     }
@@ -1115,7 +1203,30 @@ public final class Builtins {
     }
 
     private static Object sum(Args a) {
-        Object it = Py.iter(a.required(0, "iterable"));
+        Object src = a.required(0, "iterable");
+        if (src instanceof PyRange && a.get(1, "start", null) == null) {
+            // The values of a range are known: add them as longs, no iterator and
+            // no box per value. An overflow is left to the general loop below,
+            // which promotes to a big int from a fresh iterator.
+            PyRange r = (PyRange) src;
+            long n = r.length();
+            long acc = 0;
+            long v = r.start;
+            boolean ok = true;
+            for (long i = 0; i < n; i++) {
+                long t = acc + v;
+                if (((acc ^ t) & (v ^ t)) < 0) {
+                    ok = false;
+                    break;
+                }
+                acc = t;
+                v += r.step;
+            }
+            if (ok) {
+                return PyInt.of(acc);
+            }
+        }
+        Object it = Py.iter(src);
         Object acc = a.get(1, "start", PyInt.of(0));
         if (acc instanceof String) {
             throw Py.typeError("sum() can't sum strings [use ''.join(seq) instead]");
@@ -1131,8 +1242,10 @@ public final class Builtins {
         boolean floatMode = false;
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             if (intMode) {
-                if (Py.isInt(v) && !Py.intView(v).isBig()) {
-                    long b = Py.intView(v).value;
+                // A small int is a Long; read it as one. intView builds a PyInt per
+                // value above the cache, which was most of what sum(range(n)) did.
+                if (v instanceof Long) {
+                    long b = ((Long) v).longValue();
                     long r = ia + b;
                     if (((ia ^ r) & (b ^ r)) >= 0) {
                         ia = r;

@@ -7,8 +7,10 @@ The loop runs callbacks, timers and tasks in the thread that called run().
 There is no selector: a loop with nothing ready sleeps until its next
 timer, or until another thread hands it work through
 ``call_soon_threadsafe`` / ``run_coroutine_threadsafe``. Each thread has its
-own running loop. Networking, subprocesses and executors are not part of
-this module.
+own running loop. ``to_thread`` and
+``loop.run_in_executor`` run a function on another thread and resume the
+awaiting coroutine on the loop when it returns. Networking and subprocesses
+are not part of this module.
 """
 
 import _thread
@@ -21,8 +23,20 @@ __all__ = [
     "Task", "TimeoutError", "all_tasks", "as_completed", "create_task", "current_task", "ensure_future",
     "gather", "get_event_loop", "get_running_loop", "iscoroutine", "iscoroutinefunction", "new_event_loop",
     "run", "set_event_loop", "shield", "sleep", "wait", "wait_for", "FIRST_COMPLETED", "FIRST_EXCEPTION",
-    "ALL_COMPLETED", "timeout", "run_coroutine_threadsafe",
+    "ALL_COMPLETED", "timeout", "run_coroutine_threadsafe", "to_thread", "Runner",
+    "AbstractEventLoopPolicy", "DefaultEventLoopPolicy", "get_event_loop_policy", "set_event_loop_policy",
+    "eager_task_factory", "create_eager_task_factory", "future_add_to_awaited_by",
+    "future_discard_from_awaited_by", "BaseProtocol", "BaseTransport", "BufferedProtocol",
+    "DatagramProtocol", "DatagramTransport", "IncompleteReadError", "LimitOverrunError", "Protocol",
+    "ReadTransport", "StreamReader", "StreamWriter", "SubprocessProtocol", "SubprocessTransport",
+    "Transport", "WriteTransport", "create_subprocess_exec", "create_subprocess_shell",
 ]
+
+from asyncio._transports import (  # noqa: E402
+    BaseProtocol, BaseTransport, BufferedProtocol, DatagramProtocol, DatagramTransport,
+    IncompleteReadError, LimitOverrunError, Protocol, ReadTransport, StreamReader, StreamWriter,
+    SubprocessProtocol, SubprocessTransport, Transport, WriteTransport,
+)
 
 FIRST_COMPLETED = "FIRST_COMPLETED"
 FIRST_EXCEPTION = "FIRST_EXCEPTION"
@@ -65,6 +79,7 @@ def iscoroutinefunction(func):
 # ---- futures --------------------------------------------------------------
 
 class Future:
+    __class_getitem__ = classmethod(type(list[int]))
     _asyncio_future_blocking = False
 
     def __init__(self, *, loop=None):
@@ -125,13 +140,15 @@ class Future:
         self._schedule_callbacks()
 
     def add_done_callback(self, fn, *, context=None):
+        # (callback, context) pairs, as CPython keeps them: anyio reads
+        # _callbacks to find the task run_until_complete is waiting for.
         if self._state != _PENDING:
-            self._loop.call_soon(fn, self)
+            self._loop.call_soon(fn, self, context=context)
         else:
-            self._callbacks.append(fn)
+            self._callbacks.append((fn, context))
 
     def remove_done_callback(self, fn):
-        kept = [f for f in self._callbacks if f != fn]
+        kept = [f for f in self._callbacks if f[0] != fn]
         removed = len(self._callbacks) - len(kept)
         self._callbacks = kept
         return removed
@@ -139,8 +156,8 @@ class Future:
     def _schedule_callbacks(self):
         callbacks = self._callbacks
         self._callbacks = []
-        for fn in callbacks:
-            self._loop.call_soon(fn, self)
+        for fn, context in callbacks:
+            self._loop.call_soon(fn, self, context=context)
 
     def _make_cancelled_error(self):
         if self._cancel_message is None:
@@ -173,6 +190,7 @@ _all_tasks = []
 
 
 class Task(Future):
+    __class_getitem__ = classmethod(type(list[int]))
     _counter = 0
 
     def __init__(self, coro, *, loop=None, name=None, context=None):
@@ -182,6 +200,7 @@ class Task(Future):
         self._coro = coro
         self._fut_waiter = None
         self._must_cancel = False
+        self._num_cancels_requested = 0
         Task._counter += 1
         self._name = name if name is not None else "Task-" + str(Task._counter)
         self._loop.call_soon(self._step)
@@ -196,9 +215,23 @@ class Task(Future):
     def get_coro(self):
         return self._coro
 
+    def cancelling(self):
+        """The cancellations requested and not yet uncancelled (3.11)."""
+        return self._num_cancels_requested
+
+    def uncancel(self):
+        """Withdraws one cancellation request, as a structured-concurrency
+        scope does when the cancellation it caused is handled (3.11)."""
+        if self._num_cancels_requested > 0:
+            self._num_cancels_requested -= 1
+            if self._num_cancels_requested == 0:
+                self._must_cancel = False
+        return self._num_cancels_requested
+
     def cancel(self, msg=None):
         if self.done():
             return False
+        self._num_cancels_requested += 1
         if self._fut_waiter is not None:
             if self._fut_waiter.cancel(msg):
                 return True
@@ -267,10 +300,11 @@ class Task(Future):
 # ---- the loop -------------------------------------------------------------
 
 class Handle:
-    def __init__(self, callback, args, loop):
+    def __init__(self, callback, args, loop, context=None):
         self._callback = callback
         self._args = args
         self._loop = loop
+        self._context = context
         self._cancelled = False
 
     def cancel(self):
@@ -280,12 +314,15 @@ class Handle:
         return self._cancelled
 
     def _run(self):
-        self._callback(*self._args)
+        if self._context is None:
+            self._callback(*self._args)
+        else:
+            self._context.run(self._callback, *self._args)
 
 
 class TimerHandle(Handle):
-    def __init__(self, when, callback, args, loop):
-        Handle.__init__(self, callback, args, loop)
+    def __init__(self, when, callback, args, loop, context=None):
+        Handle.__init__(self, callback, args, loop, context)
         self._when = when
 
     def when(self):
@@ -294,6 +331,16 @@ class TimerHandle(Handle):
 
 class AbstractEventLoop:
     pass
+
+
+def _run_until_complete_cb(fut):
+    """The callback run_until_complete adds, as CPython names it in
+    asyncio.base_events: anyio recognises a loop's own future by it."""
+    if not fut.cancelled():
+        exc = fut.exception()
+        if isinstance(exc, (SystemExit, KeyboardInterrupt)):
+            return
+    fut.get_loop().stop()
 
 
 class BaseEventLoop(AbstractEventLoop):
@@ -312,12 +359,12 @@ class BaseEventLoop(AbstractEventLoop):
         return _time.monotonic()
 
     def call_soon(self, callback, *args, context=None):
-        h = Handle(callback, args, self)
+        h = Handle(callback, args, self, context)
         self._ready.append(h)
         return h
 
     def call_soon_threadsafe(self, callback, *args, context=None):
-        h = Handle(callback, args, self)
+        h = Handle(callback, args, self, context)
         self._inbox().put(h)
         return h
 
@@ -330,19 +377,63 @@ class BaseEventLoop(AbstractEventLoop):
         return q
 
     def call_later(self, delay, callback, *args, context=None):
-        return self.call_at(self.time() + delay, callback, *args)
+        return self.call_at(self.time() + delay, callback, *args, context=context)
 
     def call_at(self, when, callback, *args, context=None):
-        h = TimerHandle(when, callback, args, self)
+        h = TimerHandle(when, callback, args, self, context)
         self._seq += 1
         _heappush(self._scheduled, (when, self._seq, h))
         return h
 
+    def run_in_executor(self, executor, func, *args):
+        """Runs func(*args) on another thread -- the executor's, when one is
+        given, otherwise a new thread -- and answers a future of the loop
+        that completes with its result."""
+        fut = self.create_future()
+        # The inbox is made here, on the loop's thread, before the work can
+        # post to it: made lazily by the worker, it raced the loop, which
+        # read no inbox, had nothing to wait on and spun, and two threads
+        # could each make one and lose the result in the other.
+        self._inbox()
+
+        def settle(ok, value):
+            if fut.cancelled():
+                return
+            if ok:
+                fut.set_result(value)
+            else:
+                fut.set_exception(value)
+
+        def work():
+            try:
+                value = func(*args)
+            except BaseException as e:
+                self.call_soon_threadsafe(settle, False, e)
+                return
+            self.call_soon_threadsafe(settle, True, value)
+        if executor is not None:
+            executor.submit(work)
+        else:
+            _thread.start_new_thread(work, ())
+        return fut
+
     def create_future(self):
         return Future(loop=self)
 
+    _task_factory = None
+
     def create_task(self, coro, *, name=None, context=None):
+        if self._task_factory is not None:
+            return self._task_factory(self, coro, name=name, context=context)
         return Task(coro, loop=self, name=name)
+
+    def set_task_factory(self, factory):
+        if factory is not None and not callable(factory):
+            raise TypeError("task factory must be a callable or None")
+        self._task_factory = factory
+
+    def get_task_factory(self):
+        return self._task_factory
 
     def is_running(self):
         return self._running
@@ -386,11 +477,7 @@ class BaseEventLoop(AbstractEventLoop):
 
     def run_until_complete(self, future):
         future = ensure_future(future, loop=self)
-
-        def done(f):
-            self.stop()
-
-        future.add_done_callback(done)
+        future.add_done_callback(_run_until_complete_cb)
         self.run_forever()
         if not future.done():
             raise RuntimeError("Event loop stopped before Future completed.")
@@ -403,6 +490,11 @@ class BaseEventLoop(AbstractEventLoop):
         q = self._threadsafe
         if q is not None:
             self._drain(q, False, None)
+        if q is None and not self._ready and not scheduled and not self._stopping:
+            # Nothing to run and nothing to wait for but another thread:
+            # block on the inbox, as CPython blocks in select(), rather than
+            # spinning until call_soon_threadsafe posts.
+            q = self._inbox()
         if not self._ready and not self._stopping:
             if q is not None:
                 if scheduled:
@@ -468,7 +560,59 @@ def get_event_loop():
 
 
 def new_event_loop():
-    return BaseEventLoop()
+    return _policy.new_event_loop()
+
+
+class AbstractEventLoopPolicy:
+    pass
+
+
+class DefaultEventLoopPolicy(AbstractEventLoopPolicy):
+    """The one policy there is: a BaseEventLoop, and get_event_loop's."""
+
+    def get_event_loop(self):
+        return get_event_loop()
+
+    def set_event_loop(self, loop):
+        set_event_loop(loop)
+
+    def new_event_loop(self):
+        return BaseEventLoop()
+
+
+_policy = DefaultEventLoopPolicy()
+
+
+def get_event_loop_policy():
+    return _policy
+
+
+def set_event_loop_policy(policy):
+    global _policy
+    _policy = policy if policy is not None else DefaultEventLoopPolicy()
+
+
+def eager_task_factory(loop, coro, *, name=None, context=None):
+    """Python 3.12's factory for tasks that start running before create_task
+    returns. Here the task starts on the loop's next turn, as every task
+    does: the result and the order of completion are the same, only the
+    first step runs later."""
+    return Task(coro, loop=loop, name=name)
+
+
+def create_eager_task_factory(custom_task_constructor):
+    def factory(loop, coro, *, name=None, context=None):
+        return custom_task_constructor(coro, loop=loop, name=name)
+    return factory
+
+
+def future_add_to_awaited_by(fut, waiter):
+    """Python 3.14's record of which task awaits which, read only by
+    asyncio's call-graph introspection, which this runtime does not have."""
+
+
+def future_discard_from_awaited_by(fut, waiter):
+    """See future_add_to_awaited_by."""
 
 
 def set_event_loop(loop):
@@ -513,20 +657,76 @@ def run(main, *, debug=None):
         raise RuntimeError("asyncio.run() cannot be called from a running event loop")
     if not iscoroutine(main):
         raise ValueError("a coroutine was expected, got " + repr(main))
-    loop = new_event_loop()
-    set_event_loop(loop)
-    try:
-        return loop.run_until_complete(main)
-    finally:
+    with Runner(debug=debug) as runner:
+        return runner.run(main)
+
+
+def _cancel_pending(loop):
+    pending = [t for t in _all_tasks if t._loop is loop and not t.done()]
+    for t in pending:
+        t.cancel()
+    if pending:
+        loop.run_until_complete(gather(*pending, return_exceptions=True))
+
+
+class Runner:
+    """A loop kept across several run() calls, closed on leaving the
+    with block, as Python 3.11's asyncio.Runner: asyncio.run is one
+    Runner's single run. A context is accepted and not used: tasks here
+    run in the caller's context."""
+
+    def __init__(self, *, debug=None, loop_factory=None):
+        self._debug = debug
+        self._loop_factory = loop_factory
+        self._loop = None
+        self._closed = False
+
+    def __enter__(self):
+        self._lazy_init()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+
+    def close(self):
+        if self._loop is None or self._closed:
+            self._closed = True
+            return
+        loop = self._loop
         try:
-            pending = [t for t in _all_tasks if t._loop is loop and not t.done()]
-            for t in pending:
-                t.cancel()
-            if pending:
-                loop.run_until_complete(gather(*pending, return_exceptions=True))
+            _cancel_pending(loop)
         finally:
-            set_event_loop(None)
+            if self._loop_factory is None:
+                set_event_loop(None)
             loop.close()
+            self._loop = None
+            self._closed = True
+
+    def get_loop(self):
+        self._lazy_init()
+        return self._loop
+
+    def run(self, coro, *, context=None):
+        if _get_running() is not None:
+            raise RuntimeError("Runner.run() cannot be called from a running event loop")
+        self._lazy_init()
+        if not iscoroutine(coro):
+            if isinstance(coro, Future) or hasattr(coro, "__await__"):
+                coro = _wrap_awaitable(coro)
+            else:
+                raise TypeError("a coroutine was expected, got " + repr(coro))
+        return self._loop.run_until_complete(coro)
+
+    def _lazy_init(self):
+        if self._closed:
+            raise RuntimeError("Runner is closed")
+        if self._loop is not None:
+            return
+        if self._loop_factory is None:
+            self._loop = new_event_loop()
+            set_event_loop(self._loop)
+        else:
+            self._loop = self._loop_factory()
 
 
 async def sleep(delay, result=None):
@@ -889,6 +1089,7 @@ class BoundedSemaphore(Semaphore):
 
 
 class Queue:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, maxsize=0):
         self._maxsize = maxsize
         self._items = []
@@ -979,6 +1180,12 @@ class Queue:
             await self._finished.wait()
 
 
+async def to_thread(func, /, *args, **kwargs):
+    """Runs func(*args, **kwargs) on a separate thread and awaits its result."""
+    loop = get_running_loop()
+    return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+
+
 def run_coroutine_threadsafe(coro, loop):
     """Runs ``coro`` on ``loop`` from another thread; answers a concurrent future."""
     if not iscoroutine(coro):
@@ -1002,3 +1209,9 @@ def run_coroutine_threadsafe(coro, loop):
 
     loop.call_soon_threadsafe(start)
     return result
+
+
+# Submodules imported as attributes of the package, as CPython's asyncio
+# does: libraries write asyncio.subprocess.Process and asyncio.futures.Future.
+from asyncio import base_events, futures, subprocess  # noqa: E402,F401
+from asyncio.subprocess import create_subprocess_exec, create_subprocess_shell  # noqa: E402,F401

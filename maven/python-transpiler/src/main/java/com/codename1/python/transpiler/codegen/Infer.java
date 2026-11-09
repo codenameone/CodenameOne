@@ -161,6 +161,7 @@ final class Infer {
                 fields.get(k).put(f, Ty.BOT);
             }
             for (FunctionDef f : k.typable.values()) {
+                compCells.put(f.scope, compOnlyCells(f));
                 Fn fn = new Fn(f, k);
                 fn.params[0] = Ty.inst(k, false);
                 fns.put(f, fn);
@@ -169,9 +170,11 @@ final class Infer {
         for (Stmt s : body) {
             if (s instanceof FunctionDef) {
                 FunctionDef f = (FunctionDef) s;
+                Set<String> cc = compOnlyCells(f);
                 if (stable(f.name) && f.decorators.isEmpty() && !f.isAsync && !f.scope.hasYield
                         && f.args.vararg == null && f.args.kwarg == null && f.args.kwonly.isEmpty()
-                        && f.scope.cells.isEmpty() && f.args.names().size() <= 8) {
+                        && cc.size() == f.scope.cells.size() && f.args.names().size() <= 8) {
+                    compCells.put(f.scope, cc);
                     Fn fn = new Fn(f, null);
                     fns.put(f, fn);
                     globalFns.put(f.name, fn);
@@ -883,6 +886,10 @@ final class Infer {
                 type(d, fn, sc);
             }
             walkBlock(c.body, null, c.scope);
+            if (sc.kind == Scope.Kind.MODULE && !globalClasses.containsKey(c.name)) {
+                // A class without a layout is a value like any other.
+                storeName(c.name, Ty.DYN, fn, sc);
+            }
         } else if (s instanceof Try) {
             Try t = (Try) s;
             walkBlock(t.body, fn, sc);
@@ -1075,7 +1082,11 @@ final class Infer {
     }
 
     private void storeName(String n, Ty v, Fn fn, Scope sc) {
-        switch (sc.resolve(n)) {
+        Scope.Binding b = sc.resolve(n);
+        if (b == Scope.Binding.CELL && compOnlyCell(sc, n)) {
+            b = Scope.Binding.LOCAL;
+        }
+        switch (b) {
             case LOCAL:
                 if (fn != null && sc == fn.def.scope) { //NOPMD CompareObjectsWithEquals - identity is meant
                     fn.locals.put(n, joinInto(fn.locals.get(n), v));
@@ -1175,13 +1186,33 @@ final class Infer {
     // ---- expressions -----------------------------------------------------
 
     Ty nameType(String n, Fn fn, Scope sc) {
-        switch (sc.resolve(n)) {
+        Scope.Binding b = sc.resolve(n);
+        if (b == Scope.Binding.CELL && compOnlyCell(sc, n)) {
+            b = Scope.Binding.LOCAL;
+        }
+        switch (b) {
             case LOCAL:
                 if (fn != null && sc == fn.def.scope) { //NOPMD CompareObjectsWithEquals - identity is meant
                     Ty t = fn.locals.get(n);
                     return t == null ? Ty.BOT : t;
                 }
                 return Ty.DYN;
+            case FREE:
+            case CELL: {
+                // A local of the function a comprehension (or one nested in
+                // it) runs in: read where it stands, as its own type. Anything
+                // may happen to it there, so it escapes.
+                Fn o = compOuter;
+                if (o != null && sc.kind == Scope.Kind.COMPREHENSION && sc.owner(n) == o.def.scope) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    Ty t = o.locals.get(n);
+                    if (t == null) {
+                        return Ty.BOT;
+                    }
+                    escape(t);
+                    return t;
+                }
+                return Ty.DYN;
+            }
             case GLOBAL: {
                 Fn f = globalFns.get(n);
                 if (f != null) {
@@ -1323,6 +1354,11 @@ final class Infer {
                 if (r.k == Ty.K.LIST && !r.opt) {
                     return Ty.list(r.sites, false);
                 }
+                if (r.k == Ty.K.STR && !r.opt) {
+                    // A str's slice is a str, whatever the bounds (a bad
+                    // bound raises).
+                    return Ty.STR;
+                }
                 escape(r);
                 return Ty.DYN;
             }
@@ -1367,6 +1403,57 @@ final class Infer {
         }
         if (e instanceof Comp) {
             Comp c = (Comp) e;
+            Fn savedOuter = compOuter;
+            if (fn != null) {
+                compOuter = fn;
+            }
+            try {
+                return comp(c, fn, sc);
+            } finally {
+                compOuter = savedOuter;
+            }
+        }
+        anyChildren(e, fn, sc);
+        return Ty.DYN;
+    }
+
+    /// The function the comprehension being typed runs in, or null.
+    private Fn compOuter;
+
+    private final Map<Scope, Set<String>> compCells = new IdentityHashMap<Scope, Set<String>>();
+
+    /// Whether `n`, a cell of function scope `sc`, is captured only by
+    /// comprehensions: those run where they stand and cannot rebind it, so
+    /// it is a plain local as far as types go.
+    boolean compOnlyCell(Scope sc, String n) {
+        Set<String> s = compCells.get(sc);
+        return s != null && s.contains(n);
+    }
+
+    /// The cells of `d` that only comprehensions capture: every cell but
+    /// those a name inside a nested function, lambda or class mentions.
+    static Set<String> compOnlyCells(FunctionDef d) {
+        Set<String> out = new java.util.LinkedHashSet<String>(d.scope.cells);
+        for (Stmt s : d.body) {
+            dropCaptured(s, out, false);
+        }
+        return out;
+    }
+
+    private static void dropCaptured(Object o, Set<String> out, boolean inside) {
+        if (o instanceof Name && inside) {
+            out.remove(((Name) o).id);
+        }
+        if (o instanceof NamedExpr && !inside) {
+            // A walrus in a comprehension binds in the function.
+            out.remove(((NamedExpr) o).target.id);
+        }
+        boolean in = inside || o instanceof Lambda || o instanceof FunctionDef || o instanceof ClassDef;
+        children(o, x -> dropCaptured(x, out, in));
+    }
+
+    private Ty comp(Comp c, Fn fn, Scope sc) {
+        {
             boolean first = true;
             for (Comprehension g : c.generators) {
                 // The first iterable is evaluated in the enclosing scope.
@@ -1385,8 +1472,6 @@ final class Infer {
             }
             return Ty.DYN;
         }
-        anyChildren(e, fn, sc);
-        return Ty.DYN;
     }
 
     /// Kinds whose comparisons always answer a bool: no user `__eq__`.
@@ -1497,6 +1582,10 @@ final class Infer {
             }
         }
         if (l.k == Ty.K.STR && r.k == Ty.K.STR && "+".equals(op)) {
+            return Ty.STR;
+        }
+        if (l.k == Ty.K.STR && "%".equals(op) && right instanceof TupleExpr) {
+            // str % tuple formats, or raises: a tuple has no __rmod__.
             return Ty.STR;
         }
         return Ty.DYN;
@@ -1622,6 +1711,15 @@ final class Infer {
             if (r.k == Ty.K.LIST && !r.opt) {
                 return listMethod(r, a.attr, args);
             }
+            if (r.k == Ty.K.STR && !r.opt && c.keywords.isEmpty() && !hasStarred(c.args)) {
+                Ty t = strMethod(a.attr, args);
+                if (t != null) {
+                    for (Ty x : args) {
+                        escape(x);
+                    }
+                    return t;
+                }
+            }
             escape(r);
             for (Ty t : args) {
                 escape(t);
@@ -1739,6 +1837,48 @@ final class Infer {
             escape(t);
         }
         return Ty.DYN;
+    }
+
+    static boolean hasStarred(List<Expr> args) {
+        for (Expr x : args) {
+            if (x instanceof Starred) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The type of a str method TypedEmit calls directly (see its
+    /// `strMethod`, which must accept exactly these), or null.
+    static Ty strMethod(String m, List<Ty> args) {
+        int n = args.size();
+        for (int i = 0; i < n; i++) {
+            if (!"join".equals(m) && (args.get(i).k != Ty.K.STR || args.get(i).opt)) {
+                return null;
+            }
+        }
+        switch (m) {
+            case "strip":
+            case "lstrip":
+            case "rstrip":
+                return n <= 1 ? Ty.STR : null;
+            case "lower":
+            case "upper":
+                return n == 0 ? Ty.STR : null;
+            case "replace":
+                return n == 2 ? Ty.STR : null;
+            case "find":
+            case "rfind":
+            case "count":
+                return n == 1 ? Ty.INT : null;
+            case "startswith":
+            case "endswith":
+                return n == 1 ? Ty.BOOL : null;
+            case "join":
+                return n == 1 ? Ty.STR : null;
+            default:
+                return null;
+        }
     }
 
     /// Joins a call's arguments into `f`'s parameters, from `from` on.

@@ -53,10 +53,22 @@ public abstract class PyGenerator extends PyObject {
     private Object sent = Py.NONE;
     private PyException thrown;
     private Object returned = Py.NONE;
+    /// The generator this body is resuming through [#nextFlat] or
+    /// [#delegateStepFlat], which run it without a handler of its own; null
+    /// between such calls. When the resumed body raises, the exception passes
+    /// that generator by, and the [#resume] that catches it finishes every
+    /// generator along this chain, as each would have finished itself.
+    private PyGenerator flat;
+
+    /// [#flatResumable]'s answer, fixed at construction: the class and the
+    /// coroutine flag never change, and the question is asked once per value at
+    /// every level of a `yield from` chain.
+    private final boolean flatOk;
 
     protected PyGenerator(String name, boolean coroutine) {
         this.name = name;
         this.coroutine = coroutine;
+        this.flatOk = !coroutine && !(this instanceof Async) && !(this instanceof Awaiter) && !(this instanceof ASend);
     }
 
     /// Runs the body from `pc` to its next suspension or its end.
@@ -67,10 +79,18 @@ public abstract class PyGenerator extends PyObject {
     protected final Object resumed() {
         PyException t = thrown;
         Object s = sent;
-        thrown = null;
-        sent = Py.NONE;
+        // Stores only when something was sent or thrown in. A plain next() leaves
+        // both at their resting values, and each store is a barriered reference
+        // write -- two of them per value yielded, for nothing.
         if (t != null) {
+            thrown = null;
+            if (s != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                sent = Py.NONE;
+            }
             throw t;
+        }
+        if (s != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            sent = Py.NONE;
         }
         return s;
     }
@@ -101,38 +121,170 @@ public abstract class PyGenerator extends PyObject {
                         + (coroutine ? "coroutine" : "generator"));
             }
         }
-        sent = v;
-        thrown = t;
+        // The same as storing both unconditionally, minus the stores that would
+        // not change anything: resumed() puts both back to NONE/null, so a plain
+        // next() finds them there already.
+        if (sent != v) { //NOPMD CompareObjectsWithEquals - identity is meant
+            sent = v;
+        }
+        if (thrown != t) { //NOPMD CompareObjectsWithEquals - identity is meant
+            thrown = t;
+        }
         running = true;
+        // ONE handler and no finally: each catch clause, and the copy of the
+        // range a finally makes, is a try entry pushed on every resumption,
+        // and a generator resumes once per value.
+        Object r;
         try {
-            Object r = step();
-            if (pc == -1) {
-                returned = r;
-                return null;
-            }
-            return r;
-        } catch (PyException e) {
-            pc = -1;
-            if (e.matches(Py.STOP_ITERATION)) {
-                // PEP 479: a StopIteration escaping the body would end the
-                // caller's loop silently.
-                Object err = Py.runtimeError((coroutine ? "coroutine" : "generator") + " raised StopIteration").value;
-                PyException re = Py.raise(err, e.value);
-                if (err instanceof PyInstance) {
-                    ((PyInstance) err).setAttrDirect("__context__", e.value);
-                }
+            r = step();
+        } catch (Throwable e) {
+            PyException re = escaped(e);
+            if (re != null) {
                 throw re; //NOPMD PreserveStackTrace - the Python cause is chained
             }
             throw e;
-        } catch (RuntimeException e) {
-            pc = -1;
-            throw e;
-        } catch (Error e) {
-            pc = -1;
-            throw e;
-        } finally {
-            running = false;
         }
+        running = false;
+        if (pc == -1) {
+            returned = r;
+            return null;
+        }
+        return r;
+    }
+
+    /// What the body raising `e` does to this generator: it is finished, with
+    /// every generator it was resuming flat, and the exception to raise in its
+    /// place is returned -- PEP 479's RuntimeError for a StopIteration, else
+    /// null for `e` itself.
+    private PyException escaped(Throwable e) {
+        running = false;
+        pc = -1;
+        finishFlat();
+        if (e instanceof PyException && ((PyException) e).matches(Py.STOP_ITERATION)) {
+            // PEP 479: a StopIteration escaping the body would end the
+            // caller's loop silently.
+            Object err = Py.runtimeError((coroutine ? "coroutine" : "generator") + " raised StopIteration").value;
+            PyException re = Py.raise(err, ((PyException) e).value);
+            if (err instanceof PyInstance) {
+                ((PyInstance) err).setAttrDirect("__context__", ((PyException) e).value);
+            }
+            return re;
+        }
+        return null;
+    }
+
+    /// The next value of a `for` loop's iterator, for a loop the transpiler
+    /// has wrapped in ONE handler that calls [#loopEscape]. A plain generator
+    /// is stepped with no handler of its own -- the try [#resume] enters is a
+    /// setjmp on ParparVM, and measured at 5.5ns of the 17ns a value cost --
+    /// and anything else is asked for next() as before.
+    public static Object loopNext(PyObject it) {
+        if (it instanceof PyGenerator) {
+            PyGenerator g = (PyGenerator) it;
+            if (g.flatOk) {
+                return g.resumeFlat();
+            }
+        }
+        return it.next();
+    }
+
+    /// The loop handler of [#loopNext]: when the exception came out of the
+    /// generator's own body (it is still marked running) the generator is
+    /// finished exactly as [#resume]'s handler would have; an exception from
+    /// the loop body leaves it alone. Always throws; declared to return so a
+    /// call site can be written `throw loopEscape(...)`.
+    public static RuntimeException loopEscape(Object it, Throwable e) {
+        if (it instanceof PyGenerator && ((PyGenerator) it).running) {
+            PyException re = ((PyGenerator) it).escaped(e);
+            if (re != null) {
+                throw re; //NOPMD PreserveStackTrace - the Python cause is chained
+            }
+        }
+        throw PyGenerator.<RuntimeException>sneaky(e);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> T sneaky(Throwable e) throws T {
+        throw (T) e;
+    }
+
+    /// Finishes the generators [#flat] left running when an exception
+    /// passed them by.
+    private void finishFlat() {
+        PyGenerator d = flat;
+        flat = null;
+        while (d != null && d.running) {
+            PyGenerator n = d.flat;
+            d.running = false;
+            d.pc = -1;
+            d.flat = null;
+            d = n;
+        }
+    }
+
+    /// Whether [#resumeFlat] may drive `g`: a plain generator, not a
+    /// coroutine or one of the async adapters, which resume differently.
+    private static boolean flatResumable(PyGenerator g) {
+        return g.flatOk;
+    }
+
+    /// `next()` without the handler [#resume] enters: a try costs a setjmp on
+    /// ParparVM, paid at every level of a pipeline for every value. Only
+    /// [#nextFlat] and [#delegateStepFlat] call this, and only from a body
+    /// with no except, finally or with around the call, so an exception
+    /// reaches the caller's own `resume`, whose handler finishes this one
+    /// (see [#flat]) and applies PEP 479 as this one's would have.
+    private Object resumeFlat() {
+        if (running || pc == -1) {
+            return resume(Py.NONE, null);
+        }
+        // As in resume: only the stores that change something.
+        if (sent != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            sent = Py.NONE;
+        }
+        if (thrown != null) {
+            thrown = null;
+        }
+        running = true;
+        Object r = step();
+        running = false;
+        if (pc == -1) {
+            returned = r;
+            return null;
+        }
+        return r;
+    }
+
+    /// `it.next()` for a `for` loop in a generator body, outside any handler
+    /// (the transpiler emits it only there).
+    protected final Object nextFlat(PyObject it) {
+        if (it instanceof PyGenerator && flatResumable((PyGenerator) it)) {
+            PyGenerator g = (PyGenerator) it;
+            flat = g;
+            Object r = g.resumeFlat();
+            flat = null;
+            return r;
+        }
+        return it.next();
+    }
+
+    /// [#delegateStep] for a `yield from` outside any handler: a plain
+    /// generator with nothing sent or thrown in is resumed flat.
+    protected final Object delegateStepFlat() {
+        PyObject d = delegate;
+        if (thrown == null && sent == Py.NONE && d instanceof PyGenerator //NOPMD CompareObjectsWithEquals - identity is meant
+                && flatResumable((PyGenerator) d)) {
+            PyGenerator g = (PyGenerator) d;
+            flat = g;
+            Object r = g.resumeFlat();
+            flat = null;
+            if (r == null) {
+                delegate = null;
+                delegateResult = g.returned;
+            }
+            return r;
+        }
+        return delegateStep();
     }
 
     /// The finished body's return value.

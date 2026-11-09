@@ -255,6 +255,10 @@ public final class PyComplex extends PyObject {
             Args p = new Args("complex", args, kw).check(2, "real", "imag");
             Object re = p.get(0, "real", null);
             Object im = p.get(1, "imag", null);
+            Object text = Builtins.textBase(re);
+            if (text instanceof String && Py.typeOf(re).lookup("__complex__") == null) {
+                re = text;
+            }
             if (re instanceof String || re instanceof PyStr) {
                 if (im != null) {
                     throw Py.typeError("complex() argument 'real' must be a real number, not str");

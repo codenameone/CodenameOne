@@ -1,0 +1,26 @@
+{
+  "python": "Python 3.14.5",
+  "ratios": {
+    "llm_session": {
+      "bench_us": 5.657,
+      "cold_us": 9.816,
+      "import_us": 3.436,
+      "peak_rss": 18.076,
+      "wall_ms": 6.555
+    },
+    "markitdown_convert": {
+      "bench_us": 2.005,
+      "cold_us": 3.822,
+      "import_us": 1.846,
+      "peak_rss": 4.297,
+      "wall_ms": 2.854
+    }
+  },
+  "tolerance": {
+    "bench_us": 0.3,
+    "cold_us": 0.3,
+    "import_us": 0.3,
+    "peak_rss": 0.15,
+    "wall_ms": 0.3
+  }
+}

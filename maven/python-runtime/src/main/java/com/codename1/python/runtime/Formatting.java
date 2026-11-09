@@ -136,6 +136,19 @@ final class Formatting {
         }
         Spec p = Spec.parse(spec);
         if (Py.isInt(v) && !(v instanceof PyBool && p.type == 0)) {
+            if ((p.type == 0 || p.type == 'd' || p.type == 'x') && v instanceof Long
+                    && ((Long) v).longValue() != Long.MIN_VALUE) {
+                // A machine int: its digits straight from the long, where
+                // formatInt would build a BigInteger for each one.
+                long l = ((Long) v).longValue();
+                boolean neg = l < 0;
+                long a = neg ? -l : l;
+                String digits = p.type == 'x' ? Long.toHexString(a) : Long.toString(a);
+                if (p.grouping != 0) {
+                    digits = group(digits, p.grouping, p.type == 'x' ? 4 : 3);
+                }
+                return pad(signOf(neg, p) + (p.type == 'x' && p.alt ? "0x" : ""), digits, p, '>');
+            }
             if (p.type == 0 || "dboxXcn".indexOf(p.type) >= 0) {
                 return formatInt(Py.intView(v), p);
             }
@@ -487,7 +500,124 @@ final class Formatting {
 
     // ---- printf style ----------------------------------------------------
 
+    /// `"lit %s lit %d" % (a, b)` with a literal format and a literal tuple,
+    /// lowered by the transpiler: `lits` holds the text between the
+    /// conversions (one more than there are values), `convs` one of `s`,
+    /// `d` or `i` per value. The values arrive already evaluated, so the
+    /// order matches CPython, and nothing parses the format at run time.
+    public static String pct(String[] lits, String convs, Object a) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1];
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1] + conv(convs.charAt(1), b) + lits[2];
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1] + conv(convs.charAt(1), b) + lits[2]
+                + conv(convs.charAt(2), c) + lits[3];
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c, Object d) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1] + conv(convs.charAt(1), b) + lits[2]
+                + conv(convs.charAt(2), c) + lits[3] + conv(convs.charAt(3), d) + lits[4];
+    }
+
+    private static String conv(char c, Object v) {
+        if (c == 's') {
+            return v instanceof String ? (String) v : Py.toStr(v);
+        }
+        if (v instanceof Long) {
+            return Long.toString(((Long) v).longValue());
+        }
+        // Anything else -- a bool, a big int, a float, a subclass -- as the
+        // general path formats it, with its errors.
+        return percent(c == 'd' ? "%d" : "%i", Py.tuple(v));
+    }
+
+    /// Appends `v` right-aligned in `width` columns, padded with zeros after the sign when
+    /// `zero` is set and with spaces before it otherwise, as `%0Nd` and `%Nd` do.
+    private static void padInt(StringBuilder sb, long v, int width, boolean zero) {
+        String digits = v < 0 ? Long.toString(v).substring(1) : Long.toString(v);
+        int len = digits.length() + (v < 0 ? 1 : 0);
+        if (!zero) {
+            for (int k = len; k < width; k++) {
+                sb.append(' ');
+            }
+        }
+        if (v < 0) {
+            sb.append('-');
+        }
+        if (zero) {
+            for (int k = len; k < width; k++) {
+                sb.append('0');
+            }
+        }
+        sb.append(digits);
+    }
+
+    /// `fmt % args` when every conversion is a bare `%s`, `%d`, `%i` or `%%` of a str or an
+    /// int, as nearly every one is: formatted with nothing allocated but the result, which is
+    /// what CPython allocates. Null for anything else, which the general path then formats --
+    /// or reports, with the message Python gives.
+    private static String percentSimple(String fmt, Object args) {
+        Object[] items = null;
+        int count;
+        if (args instanceof PyTuple) {
+            items = ((PyTuple) args).items;
+            count = items.length;
+        } else if (args instanceof Long || args instanceof String) {
+            count = 1;
+        } else {
+            return null;
+        }
+        // Local on purpose: ParparVM keeps a builder that does not escape on the stack,
+        // unlocked, where a shared static one is locked on every append.
+        StringBuilder sb = new StringBuilder();
+        int n = fmt.length();
+        int ai = 0;
+        int i = 0;
+        while (i < n) {
+            int pct = fmt.indexOf('%', i);
+            if (pct < 0) {
+                sb.append(fmt, i, n);
+                break;
+            }
+            sb.append(fmt, i, pct);
+            if (pct + 1 >= n) {
+                return null;
+            }
+            char c = fmt.charAt(pct + 1);
+            i = pct + 2;
+            if (c == '%') {
+                sb.append('%');
+                continue;
+            }
+            if (c != 's' && c != 'd' && c != 'i' || ai >= count) {
+                return null;
+            }
+            Object v = items == null ? args : items[ai];
+            ai++;
+            if (v instanceof Long) {
+                // %s of an int is its str(), the same digits %d writes.
+                sb.append(((Long) v).longValue());
+            } else if (c == 's' && v instanceof String) {
+                sb.append((String) v);
+            } else {
+                return null;
+            }
+        }
+        if (ai != count) {
+            return null;
+        }
+        return sb.toString();
+    }
+
     static String percent(String fmt, Object args) {
+        String simple = percentSimple(fmt, args);
+        if (simple != null) {
+            return simple;
+        }
         Object[] items;
         PyDict mapping = null;
         if (args instanceof PyTuple) {
@@ -498,18 +628,59 @@ final class Formatting {
                 mapping = (PyDict) args;
             }
         }
-        StringBuilder sb = new StringBuilder();
-        int ai = 0;
         int n = fmt.length();
+        StringBuilder sb = new StringBuilder(n + 16 * items.length);
+        int ai = 0;
         for (int i = 0; i < n; i++) {
             char c = fmt.charAt(i);
             if (c != '%') {
-                sb.append(c);
+                // The literal run up to the next %, in one append: each append
+                // takes the builder's lock.
+                int pct = fmt.indexOf('%', i);
+                int stop = pct < 0 ? n : pct;
+                sb.append(fmt, i, stop);
+                i = stop - 1;
                 continue;
             }
             i++;
             if (i >= n) {
                 throw Py.valueError("incomplete format");
+            }
+            // A bare %s, %d or %i of a str or an int, as nearly every one is:
+            // appended directly. The general path below builds a spec string
+            // for format() to parse again, and took ints through BigInteger.
+            char quick = fmt.charAt(i);
+            if ((quick == 's' || quick == 'd' || quick == 'i') && mapping == null && ai < items.length) {
+                Object v = items[ai];
+                if (v instanceof Long) {
+                    sb.append(((Long) v).longValue());
+                    ai++;
+                    continue;
+                }
+                if (quick == 's' && v instanceof String) {
+                    sb.append((String) v);
+                    ai++;
+                    continue;
+                }
+            }
+            // %Nd and %0Nd of an int, the other common spelling (dates, ids): padded here
+            // rather than through a spec string format() would parse again.
+            if (mapping == null && ai < items.length && items[ai] instanceof Long) {
+                int j = i;
+                boolean zero = j < n && fmt.charAt(j) == '0';
+                if (zero) {
+                    j++;
+                }
+                int width = 0;
+                while (j < n && j - i < 4 && fmt.charAt(j) >= '0' && fmt.charAt(j) <= '9') {
+                    width = width * 10 + fmt.charAt(j++) - '0';
+                }
+                if (j < n && (fmt.charAt(j) == 'd' || fmt.charAt(j) == 'i')) {
+                    padInt(sb, ((Long) items[ai]).longValue(), width, zero);
+                    ai++;
+                    i = j;
+                    continue;
+                }
             }
             Object value = null;
             if (fmt.charAt(i) == '(') {

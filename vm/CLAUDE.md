@@ -1099,6 +1099,15 @@ subsequent trace. The pass treats the entire fresh generation as roots, because 
 one-cycle grace rule keeps every fresh object whether or not it is reachable, and an OLD
 object reachable only through one of them would otherwise be swept under it.
 
+That was measured when every cycle graced the whole fresh generation. Concurrent cycles now
+detach the pages retired before the cycle (`cn1BibopDetachPreCycle`), as STW cycles always
+did: their unmarked fresh slots predate the cycle, so they are swept rather than graced, and
+grace covers only pages retired DURING the cycle. The SATB fresh filter stays on but logs a
+fresh object on a pre-cycle page (`CN1_SATB_ON_PRE_CYCLE_PAGE`), so issue 5537's flood does
+not return. On the Python `generators` kernel this took grace-traced objects from 3.65M to
+74k, the occupied heap from ~3 triggers (75MB) to ~1.1 (26-29MB), and RSS from 96MB to 48MB.
+`GraceAudit` forces a mid-cycle retirement on odd rounds, or the `nograce` self-test is vacuous.
+
 Skipping the non-fresh slots it walks would save ~5ms of ~30ms and needs a new per-page
 invariant (fresh slots are contiguous only on pages that have not allocated from their free
 list). Not worth it.

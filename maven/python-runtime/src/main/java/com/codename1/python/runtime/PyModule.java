@@ -46,11 +46,79 @@ public final class PyModule extends PyObject {
     /// `sys.modules`: every module as it starts loading. A program may read
     /// and change it, but importing goes by the loaded table alone.
     static final PyDict SYS_MODULES = new PyDict();
+    /// The modules whose bodies are running, innermost last; the main module
+    /// is not on it, since `load` never runs it.
+    private static final java.util.ArrayList<String> EXECUTING = new java.util.ArrayList<String>();
 
     public final String name;
     public final Object[] slots;
     private final String[] slotNames;
     private Map<String, Object> extra;
+
+    /// The loaded module whose translated class is `javaClass` or encloses
+    /// it (a function body may be a nested or a lambda class), or null. The
+    /// longest matching module class wins, so `a.b` is never taken for `a`.
+    static PyModule ofClass(String javaClass) {
+        int dot = javaClass.lastIndexOf('.');
+        String simple = javaClass.substring(dot + 1);
+        PyModule best = null;
+        int bestLength = -1;
+        for (PyModule m : LOADED.values()) {
+            String c = className(m.name);
+            if (c.length() > bestLength && (simple.equals(c) || simple.startsWith(c + "$"))) {
+                best = m;
+                bestLength = c.length();
+            }
+        }
+        return best;
+    }
+
+    /// The module whose body is running innermost -- the main module when no
+    /// import is under way -- or null.
+    static PyModule executing() {
+        String n = EXECUTING.isEmpty() ? "__main__" : EXECUTING.get(EXECUTING.size() - 1);
+        return LOADED.get(n);
+    }
+
+    /// The loaded module whose class, or a class nested in it, a native
+    /// ParparVM stack frame names. Such a frame carries the translated C name,
+    /// in which every `.` and `$` of the Java name is a `_`
+    /// (`com_..._py_anyio_2e_core` for `py_anyio$2ecore`), so the module
+    /// classes are compared in that form, the longest match winning.
+    static PyModule ofNativeClass(String cName) {
+        PyModule best = null;
+        int bestLength = -1;
+        for (PyModule m : LOADED.values()) {
+            String c = "_" + className(m.name).replace('$', '_');
+            int at = cName.lastIndexOf(c);
+            while (at >= 0) {
+                int end = at + c.length();
+                if (end == cName.length() || cName.charAt(end) == '_') {
+                    if (c.length() > bestLength) {
+                        best = m;
+                        bestLength = c.length();
+                    }
+                    break;
+                }
+                at = cName.lastIndexOf(c, at - 1);
+            }
+        }
+        return best;
+    }
+
+    /// `PythonTranspiler.className`, which names a module's class.
+    private static String className(String module) {
+        StringBuilder sb = new StringBuilder("py_");
+        for (int i = 0; i < module.length(); i++) {
+            char c = module.charAt(i);
+            if (c < 128 && (Character.isLetterOrDigit(c) || c == '_')) {
+                sb.append(c);
+            } else {
+                sb.append('$').append(Integer.toHexString(c));
+            }
+        }
+        return sb.toString();
+    }
 
     public PyModule(String name, String[] slotNames) {
         this.name = name;
@@ -77,6 +145,15 @@ public final class PyModule extends PyObject {
         return m;
     }
 
+    /// Whether `name` can be imported: compiled into the program, already
+    /// loaded, or provided by the runtime itself.
+    public static boolean available(String name) {
+        if (LOADED.containsKey(name) || LOADERS.containsKey(name)) {
+            return true;
+        }
+        return StdModules.provide(name) && LOADED.containsKey(name);
+    }
+
     /// `import name`: runs the module body once, parents first.
     public static PyModule load(String name) {
         PyModule m = LOADED.get(name);
@@ -101,7 +178,12 @@ public final class PyModule extends PyObject {
             }
             throw Py.error(Py.MODULE_NOT_FOUND_ERROR, "No module named '" + name + "'");
         }
-        l.exec(null);
+        EXECUTING.add(name);
+        try {
+            l.exec(null);
+        } finally {
+            EXECUTING.remove(EXECUTING.size() - 1);
+        }
         m = LOADED.get(name);
         if (m == null) {
             throw Py.error(Py.IMPORT_ERROR, "module '" + name + "' did not initialise");
@@ -152,6 +234,14 @@ public final class PyModule extends PyObject {
 
     @Override
     public Object getAttrOrNull(String n) {
+        Object v = getGlobal(n);
+        return v != null ? v : moduleGetattr(n);
+    }
+
+    /// A name the module defines, as its own code reads a global: never
+    /// through the module's `__getattr__`, which serves only attribute
+    /// access from outside.
+    public Object getGlobal(String n) {
         int s = slotOf(n);
         if (s >= 0 && slots[s] != null) {
             return slots[s];
@@ -166,11 +256,32 @@ public final class PyModule extends PyObject {
             return Py.str(name);
         }
         if ("__dict__".equals(n)) {
-            // A snapshot, as globals() is: reading names through it works,
-            // writing through it does not reach the module.
+            // As globals(): writes through it reach the module.
             return globals();
         }
         return null;
+    }
+
+    /// PEP 562: a name the module does not define goes to the module's own
+    /// `__getattr__`, when it has one -- how packages load submodules and
+    /// exports lazily. Its AttributeError means "no such name".
+    private Object moduleGetattr(String n) {
+        if ("__getattr__".equals(n)) {
+            return null;
+        }
+        int s = slotOf("__getattr__");
+        Object hook = s >= 0 ? slots[s] : extra == null ? null : extra.get("__getattr__");
+        if (hook == null) {
+            return null;
+        }
+        try {
+            return Py.call(hook, Py.str(n));
+        } catch (PyException e) {
+            if (e.matches(Py.ATTRIBUTE_ERROR)) {
+                return null;
+            }
+            throw e;
+        }
     }
 
     @Override
@@ -199,8 +310,13 @@ public final class PyModule extends PyObject {
     }
 
     /// `globals()`: a snapshot, since the slots are not a dict.
+    /// `globals()` (and a module's `__dict__`, and `locals()` at module
+    /// level): a dict of the module's names whose writes reach the module,
+    /// so `globals()[name] = value` defines `name` -- the idiom libraries
+    /// export generated names with. Reads see the names as they were when
+    /// it was made, plus what was written through it.
     public PyDict globals() {
-        PyDict d = new PyDict();
+        PyDict d = new Globals(this);
         d.setItem(Py.str("__name__"), Py.str(name));
         for (int i = 0; i < slots.length; i++) {
             if (slots[i] != null) {
@@ -212,13 +328,41 @@ public final class PyModule extends PyObject {
                 d.setItem(Py.str(e.getKey()), e.getValue());
             }
         }
+        ((Globals) d).filled = true;
         return d;
+    }
+
+    /// A module's globals dict, writing through to the module.
+    private static final class Globals extends PyDict {
+        private final PyModule module;
+        private boolean filled;
+
+        Globals(PyModule module) {
+            this.module = module;
+        }
+
+        @Override
+        public void setItem(Object key, Object value) {
+            super.setItem(key, value);
+            if (filled && key instanceof String) {
+                module.setAttr(Py.toStr(key), value);
+            }
+        }
+
+        @Override
+        public Object remove(Object key) {
+            Object v = super.remove(key);
+            if (v != null && key instanceof String && module.getAttrOrNull(Py.toStr(key)) != null) {
+                module.delAttr(Py.toStr(key));
+            }
+            return v;
+        }
     }
 
     /// The names `from m import *` copies: `__all__` when defined, else every
     /// public global.
     public String[] exportedNames() {
-        Object all = getAttrOrNull("__all__");
+        Object all = getGlobal("__all__");
         if (all != null) {
             Object[] items = Py.toArray(all);
             String[] r = new String[items.length];

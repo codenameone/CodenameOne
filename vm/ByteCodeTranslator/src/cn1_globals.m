@@ -1213,6 +1213,9 @@ static inline int cn1GcIsOld(JAVA_OBJECT o, int m) {
 // Because grace no longer covers every fresh object, the barriers stop filtering fresh
 // references (cn1GcFreshFilter): a released thread moving a pre-cycle fresh object from
 // an unscanned container into a scanned one must be logged, exactly as an old object is.
+// Concurrent cycles take the pre-cycle pages the same way (cn1GcHybridBeginConcurrent) but
+// keep the filter, narrowed: it no longer skips a fresh object on a pre-cycle page
+// (CN1_SATB_ON_PRE_CYCLE_PAGE), and every other fresh object still has its grace.
 //
 // "One core" is the online CPU count, or the core count the scaling matrix emulates with
 // CN1_GC_MARK_THREADS=1. Evaluated once; the mode cannot change within a process.
@@ -1363,9 +1366,8 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
 // once the thread filled and retired that page or once a stop-the-world cycle held it
 // (cn1BibopRetireHeldThreadPages), on 1 and 4 markers, on master and before #5940 alike.
 // The root is the allocation page, not a stack word. It is not avoidable in a concurrent
-// cycle: the owner bumps that page while the cycle runs, and the barriers filter fresh
-// references there (cn1GcFreshFilter) on the strength of grace, so freeing an unmarked
-// fresh slot on it would be unsound -- and the clear must match what the sweep frees. It
+// cycle: the owner bumps that page while the cycle runs, so an unmarked fresh slot on it
+// may have been allocated after the roots were scanned and freeing it would be unsound -- and the clear must match what the sweep frees. It
 // is bounded: one page per size class per thread, released at the next page fill or the
 // next stop-the-world hold. A test that asserts a weak referent clears must therefore
 // retire the page first (or use a referent off the page heap), never just wait.
@@ -1381,8 +1383,7 @@ static inline int cn1GcSweepReclaimsObj(JAVA_OBJECT o, int mark) {
         return 1;
     }
 #ifndef CN1_DISABLE_BIBOP
-    if(cn1GcStwCycle && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS
-       && CN1_OBJ_CLASS(o) != 0) {
+    if(CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS && CN1_OBJ_CLASS(o) != 0) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)o & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         return pg->gcPreCycle;
     }
@@ -2108,7 +2109,8 @@ void cn1InvokeFinalizer(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, void (*ptr)(
             threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
             threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;
             threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess;
-            memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __finTryJmp, sizeof(jmp_buf));
+            threadStateData->blocks[threadStateData->tryBlockOffset].destination = &__finTryJmp;
+            threadStateData->blocks[threadStateData->tryBlockOffset].handler = 1;
             threadStateData->tryBlockOffset++;
             ptr(threadStateData, obj);
             threadStateData->tryBlockOffset = __savedTryBlock;
@@ -4111,7 +4113,7 @@ static inline int cn1SatbNeedsEnqueue(JAVA_OBJECT object) {
     int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_acquire);
     int mark = CN1_OBJ_MARK_LOAD(object, __ATOMIC_ACQUIRE);
 #ifndef CN1_SATB_LOG_FRESH
-    if(mark == -1 && cn1GcFreshFilter) return 0;
+    if(mark == -1 && cn1GcFreshFilter && !CN1_SATB_ON_PRE_CYCLE_PAGE(object)) return 0;
 #endif
     if(mark == epoch && epoch == atomic_load_explicit(&bibopGcEpoch, memory_order_acquire)) {
 #ifdef CN1_GC_CONFORM
@@ -5584,7 +5586,7 @@ static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE) {
             continue;   // another marker claimed this page
         }
         }
-        // Single-core mode: a pre-cycle page's fresh slots get no grace, so they are not
+        // A pre-cycle page's fresh slots get no grace, so they are not
         // roots either; the reachable ones were marked by the root drain.
         if(gp->gcPreCycle) {
             continue;
@@ -9159,14 +9161,30 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     return cn1GcHybridGen ? JAVA_TRUE : JAVA_FALSE;
 }
 
-// A CONCURRENT cycle in a process that runs stop-the-world cycles too (outside a
-// generational phase). Two things a stop-the-world cycle changed are restored: the
-// fresh-reference filter, sound only while every fresh object gets grace, and any pages
-// still flagged pre-cycle because a stop-the-world sweep was skipped -- they go back on the
-// sweep stack with their grace. Being a full trace, it also discards the remembered set.
-// A stop-the-world cycle turned concurrent before it began marking (the virtual-thread
-// handshake). The concurrent restore below undoes what the stop-the-world start did: the
-// fresh filter, the pre-cycle pages, and a set taken for a major (discarded with the rest).
+// A CONCURRENT cycle. It takes the pre-cycle pages exactly as a stop-the-world cycle does:
+// every page retired before the cycle began (the whole sweep stack) loses grace, and the
+// barriers log a fresh reference to an object on one of those pages like any other
+// (CN1_SATB_ON_PRE_CYCLE_PAGE). The filter itself stays on for every other fresh object,
+// which keeps its grace: logging those is issue 5537's runaway log.
+//
+// WHY A CONCURRENT CYCLE CAN DO THIS. Grace exists for objects the mark may not have seen
+// because they were allocated WHILE it ran. A retired page takes no allocation until a
+// sweep hands it back, so every fresh slot on a page retired before this cycle began
+// predates the cycle: reachable, it is reached from the roots or through the snapshot the
+// barrier keeps -- the same two guarantees every old object already lives on -- and
+// unreachable, it is garbage now. Objects allocated during the cycle land on pages their
+// threads own, which no sweep touches, or on pages retired during it, which go onto the
+// NEW sweep stack unflagged and keep the ordinary grace.
+//
+// What the old rule cost, measured on a 600k-element generator pipeline with ~5MB live:
+// grace kept every object allocated since the previous sweep, so each trigger's worth of
+// garbage survived one whole extra cycle and was traced as a root in it. The first two
+// cycles reclaimed 0KB and 1.2MB, the heap settled at about three triggers (75MB of pages
+// for 5MB live), and the grace pass traced 3.65M dead objects over six cycles.
+//
+// Being a full trace, it also discards the remembered set. A stop-the-world cycle turned
+// concurrent before it began marking (the virtual-thread handshake) comes through here
+// too, and keeps the pages that start already detached: nothing has been scanned yet.
 static void cn1GcHybridAbandonStw(void) {
     cn1GcHybridGen = 0;
     cn1GcHybridBeginConcurrent();
@@ -9176,16 +9194,7 @@ static void cn1GcHybridBeginConcurrent(void) {
     cn1GcHybridLastWasMinor = JAVA_FALSE;
     cn1GcHybridLastWasMajor = JAVA_FALSE;
     cn1GcFreshFilter = JAVA_TRUE;
-    while(cn1GcPreCycleList != 0) {
-        CN1BibopPage* l = cn1GcPreCycleList;
-        cn1GcPreCycleList = l->nextPool;
-        l->gcPreCycle = JAVA_FALSE;
-        CN1BibopPage* sh = atomic_load_explicit(&bibopSweepStack, memory_order_relaxed);
-        do {
-            l->nextPool = sh;
-        } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, l,
-                    memory_order_release, memory_order_relaxed));
-    }
+    cn1BibopDetachPreCycle();
     // The barrier stays armed once a phase has run (it records into a set this discards
     // every concurrent cycle, a full trace). The next phase still opens with a major.
     if(cn1GcGenBarrier) {
@@ -13435,7 +13444,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             } else if(m == -1 && !(preCycle && CN1_OBJ_CLASS(o) != 0
                                    )) {
                 // fresh, never marked -> one cycle of grace (legacy parity). Not on a
-                // pre-cycle page in single-core mode: allocated before every root scan
+                // pre-cycle page: allocated before the cycle began
                 // and still unmarked, it is garbage and falls to the reclaim below.
                 // (parentCls == 0 is a mid-construction object; it always keeps grace.)
                 CN1_OBJ_MARK_STORE(o, V, __ATOMIC_RELAXED);
@@ -17456,14 +17465,14 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // grace pass traces at all (an old object reachable ONLY through a fresh one).
     // Embedded primitives returned above, so nothing reference-bearing is lost.
     //
-    // Not for a child on a PRE-CYCLE page in single-core mode: that page is neither
+    // Not for a child on a PRE-CYCLE page: that page is neither
     // walked nor graced (its unmarked fresh slots are freed), so the skip's premise --
     // "kept and traced on its own account anyway" -- is false there, and skipping left a
     // kept object pointing at a freed child. The verifier caught it on the first cycle.
     if(cn1GcGraceTraceFresh && !force && markSnapshot == -1
        && CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS
-       && !(cn1GcStwCycle && ((CN1BibopPage*)((uintptr_t)obj
-                & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle)) {
+       && !((CN1BibopPage*)((uintptr_t)obj
+                & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle) {
 #ifdef CN1_GC_CONFORM
         atomic_fetch_add_explicit(&cn1GraceFreshSkipped, 1, memory_order_relaxed);
 #endif
@@ -18647,6 +18656,15 @@ static _Atomic long long cn1AllocSiteOverflow = 0;
 static pthread_once_t cn1AllocSiteOnce = PTHREAD_ONCE_INIT;
 static int cn1AllocSiteEnabled = 0;
 
+/* How many frames above the allocation call a site is named by. 0 is the caller of
+ * allocArray; when every site comes out as one shared helper (a generated array store,
+ * the varargs path), build with -DCN1_ALLOC_SITE_DEPTH=1 and -fno-omit-frame-pointer to
+ * name the helper's callers instead. A constant, because __builtin_return_address needs
+ * one. */
+#ifndef CN1_ALLOC_SITE_DEPTH
+#define CN1_ALLOC_SITE_DEPTH 0
+#endif
+
 static void cn1ResolveAllocSiteFlag(void) {
     cn1AllocSiteEnabled = getenv("CN1_ALLOC_SITES") != 0;
 }
@@ -18722,9 +18740,16 @@ static void cn1ReportAllocSites(void) {
 #if !defined(_WIN32)
         {
             Dl_info info;
-            if(dladdr(snapPc[best], &info) != 0 && info.dli_sname != 0) {
-                sym = info.dli_sname;
-                off = (long)((char*)snapPc[best] - (char*)info.dli_saddr);
+            if(dladdr(snapPc[best], &info) != 0) {
+                if(info.dli_sname != 0) {
+                    sym = info.dli_sname;
+                    off = (long)((char*)snapPc[best] - (char*)info.dli_saddr);
+                } else if(info.dli_fbase != 0) {
+                    /* No dynamic symbol (a static function, or a stripped binary): the
+                     * offset into the file, which addr2line -e <debug file> resolves. */
+                    sym = "file";
+                    off = (long)((char*)snapPc[best] - (char*)info.dli_fbase);
+                }
             }
         }
 #endif
@@ -18753,7 +18778,7 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     // Size and address both come from CN1_ARRAY_* so they cannot drift apart; the
     // eight bytes this used to add on top were dead (see cn1_globals.h).
 #ifdef CN1_ALLOC_CENSUS
-    cn1RecordAllocSite(__builtin_return_address(0), type, CN1_ARRAY_ALLOC_BYTES(actualSize));
+    cn1RecordAllocSite(__builtin_return_address(CN1_ALLOC_SITE_DEPTH), type, CN1_ARRAY_ALLOC_BYTES(actualSize));
 #endif
     JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, (int)CN1_ARRAY_ALLOC_BYTES(actualSize), type);
     (*array).length = length;
@@ -19503,7 +19528,7 @@ JAVA_OBJECT xmlvm_create_java_string(CODENAME_ONE_THREAD_STATE, const char *chr)
 // fillInStack's null-check skips trace building entirely: throwing it
 // allocates nothing and calls nothing.
 JAVA_OBJECT cn1PreallocSOE = JAVA_NULL;
-extern void set_field_java_lang_Throwable_stack(JAVA_OBJECT __cn1Val, JAVA_OBJECT __cn1T);
+extern void (set_field_java_lang_Throwable_stack)(JAVA_OBJECT __cn1Val, JAVA_OBJECT __cn1T);
 
 void cn1ThrowStackOverflow(CODENAME_ONE_THREAD_STATE) {
     JAVA_OBJECT soe = cn1PreallocSOE;
@@ -20184,11 +20209,41 @@ static int cn1SlotClassFor(int size, int allow16) {
     return 0;
 }
 
+#ifdef CN1_ALLOC_CENSUS
+/* CN1_ALLOC_SITES_SCALAR=<n>: object allocations join the CN1_ALLOC_SITES table too, each
+ * named by the return address n frames above this function, found by walking frame
+ * pointers -- the allocator's fast path is inlined into callers at different depths, so no
+ * one fixed __builtin_return_address names the code that wrote `new`. Needs a build with
+ * -fno-omit-frame-pointer; a chain that ends early stops the walk. */
+static int cn1AllocScalarDepth = -1;
+static void cn1RecordScalarSite(struct clazz* parent, int size) {
+    void** fp;
+    int d;
+    if(cn1AllocScalarDepth < 0) {
+        const char* v = getenv("CN1_ALLOC_SITES_SCALAR");
+        cn1AllocScalarDepth = v != 0 ? atoi(v) : 0;
+    }
+    if(cn1AllocScalarDepth <= 0) {
+        return;
+    }
+    fp = (void**)__builtin_frame_address(0);
+    for(d = 1; d < cn1AllocScalarDepth && fp != 0; d++) {
+        fp = (void**)fp[0];
+    }
+    if(fp != 0 && fp[1] != 0) {
+        cn1RecordAllocSite(fp[1], parent, size);
+    }
+}
+#endif
+
 void cn1RecordAllocation(struct clazz* parent, int size) {
     int id;
     if(parent == 0) {
         return;
     }
+#ifdef CN1_ALLOC_CENSUS
+    cn1RecordScalarSite(parent, size);
+#endif
     // Before the id range check, so a class past the table still contributes its
     // sizes -- the out-of-range row says a class is missing, this says what size
     // it was.
@@ -21275,7 +21330,7 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
             int off = threadStateData->tryBlockOffset;
             cn1BuilderAccessUnwind(threadStateData, threadStateData->blocks[off].builderAccess);
             cn1StackBufferUnwind(threadStateData, threadStateData->blocks[off].nativeBuffers);
-            CN1_TRY_LONGJMP(threadStateData->blocks[off].destination, 1);
+            CN1_TRY_LONGJMP(*threadStateData->blocks[off].destination, 1);
             return;
         } 
         threadStateData->tryBlockOffset--; 
@@ -21920,4 +21975,12 @@ static void cn1RtAccount(int size) {
 
 JAVA_LONG cn1RtThreadAllocViolations(CODENAME_ONE_THREAD_STATE) {
     return threadStateData->rtAllocViolations;
+}
+
+// The barrier half of cn1InlSetRefField (cn1_globals.h): exactly what a generated
+// reference setter runs, insertion barrier then deletion barrier then the store.
+void cn1SetRefFieldSlow(JAVA_OBJECT target, JAVA_OBJECT* addr, JAVA_OBJECT value) {
+    CN1_WRITE_BARRIER(target, value);
+    CN1_SATB_DELETE(addr);
+    *addr = value;
 }

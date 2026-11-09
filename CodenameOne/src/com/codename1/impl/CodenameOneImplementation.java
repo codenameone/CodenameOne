@@ -11069,6 +11069,20 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Whether `#openInMemoryDB()` is supported on this platform.
+    public boolean isInMemoryDatabaseSupported() {
+        return false;
+    }
+
+    /// Opens a new private database held in memory, gone once closed.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: where the platform has no in-memory databases
+    public Database openInMemoryDB() throws IOException {
+        throw new IOException("In-memory databases are not supported on this platform");
+    }
+
     /// Opens or creates an encrypted database.
     ///
     /// Ports that support encryption override this. The default implementation handles the

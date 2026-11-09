@@ -49,6 +49,18 @@ public final class StdModules {
             PyModule.registerModule(atexit());
             return true;
         }
+        if ("_cn1imp".equals(name)) {
+            PyModule.registerModule(imp());
+            return true;
+        }
+        if ("_cn1xml".equals(name)) {
+            PyModule.registerModule(XmlScan.module());
+            return true;
+        }
+        if ("_cn1json".equals(name)) {
+            PyModule.registerModule(PyJson.module());
+            return true;
+        }
         if ("_cn1re".equals(name)) {
             PyModule.registerModule(Regex.module());
             return true;
@@ -98,8 +110,16 @@ public final class StdModules {
             PyModule.registerModule(thread());
             return true;
         }
+        if ("_cn1hash".equals(name)) {
+            PyModule.registerModule(PyHashlib.module());
+            return true;
+        }
         if ("_cn1zlib".equals(name)) {
             PyModule.registerModule(PyZlib.module());
+            return true;
+        }
+        if ("_cn1aes".equals(name)) {
+            PyModule.registerModule(PyAes.module());
             return true;
         }
         if ("_cn1image".equals(name)) {
@@ -199,6 +219,115 @@ public final class StdModules {
         return b.toString();
     }
 
+    /// `sys._getframe(depth)`: the Python frame `depth` calls above the one
+    /// that asked, found on the Java stack as a traceback is. It holds what
+    /// libraries read of a frame -- `f_globals` (a snapshot of its module's
+    /// globals, as `globals()` is), `f_lineno`, `f_code.co_filename`,
+    /// `co_name` and `f_back` -- and no locals: a translated function keeps
+    /// them in Java variables. Without the build's line mapping there are no
+    /// Python frames, and every depth raises ValueError as one past the
+    /// outermost does in CPython.
+    static Object frame(int depth) {
+        StackTraceElement[] st = new Throwable().getStackTrace();
+        java.util.List<StackTraceElement> frames = new java.util.ArrayList<StackTraceElement>();
+        StackTraceElement previous = null;
+        for (StackTraceElement f : st) {
+            StackTraceElement callee = previous;
+            previous = f;
+            if (!pythonFrame(f)) {
+                continue;
+            }
+            String mn = f.getMethodName();
+            if (mn != null && mn.startsWith("lambda$") && callee != null
+                    && f.getClassName().equals(callee.getClassName())
+                    && !String.valueOf(callee.getMethodName()).startsWith("lambda$")) {
+                continue;
+            }
+            frames.add(f);
+        }
+        if (frames.isEmpty() && depth >= 0) {
+            PyModule running = PyModule.executing();
+            if (running != null) {
+                return moduleFrame(running);
+            }
+        }
+        if (depth < 0 || depth >= frames.size()) {
+            throw Py.valueError("call stack is not deep enough");
+        }
+        return frameObject(frames, depth);
+    }
+
+    /// The frame `_getframe` answers where the trace has no Python frames at
+    /// all: a native ParparVM build records no frames for most methods, so
+    /// nothing says which function is running. Libraries read
+    /// `sys._getframe(n).f_globals` while a module body is running -- anyio's
+    /// lazy importer and `namedtuple`'s module lookup do -- to find the module
+    /// that called them, so the frame is that body's: the innermost module
+    /// being imported, at every depth. A call made later, from a function,
+    /// therefore sees the globals of whatever is importing (usually the main
+    /// module) and not its caller's; there is no line and no `f_back`.
+    private static Object moduleFrame(PyModule m) {
+        PyModule frame = new PyModule("frame", new String[0]);
+        PyModule code = new PyModule("code", new String[0]);
+        Object file = m.getAttrOrNull("__file__");
+        code.setAttr("co_filename", file != null ? file : Py.str(m.name));
+        code.setAttr("co_name", Py.str("<module>"));
+        frame.setAttr("f_code", code);
+        frame.setAttr("f_lineno", PyInt.of(0));
+        frame.setAttr("f_globals", m.getAttrOrNull("__dict__"));
+        frame.setAttr("f_locals", new PyDict());
+        frame.setAttr("f_back", Py.NONE);
+        return frame;
+    }
+
+    /// Whether `f` runs a module's Python code. On the JVM the build's line
+    /// mapping names the `.py` source; a native ParparVM trace carries no
+    /// source files (it names each frame `<simple class>.java`), so there the
+    /// frame is Python when its class is a loaded module's class or one nested
+    /// in it (`PyModule.ofNativeClass`) -- which is what `f_globals`, the
+    /// attribute libraries read, needs.
+    private static boolean pythonFrame(StackTraceElement f) {
+        String file = f.getFileName();
+        if (file != null && file.endsWith(".py")) {
+            return f.getLineNumber() > 0;
+        }
+        return file != null && file.endsWith(".java") && owner(f) != null;
+    }
+
+    /// The module whose code `f` runs, on either kind of trace.
+    private static PyModule owner(StackTraceElement f) {
+        String cls = f.getClassName();
+        if (cls == null) {
+            return null;
+        }
+        String file = f.getFileName();
+        if (file != null && file.endsWith(".py")) {
+            return PyModule.ofClass(cls);
+        }
+        return cls.indexOf('.') < 0 ? PyModule.ofNativeClass(cls) : null;
+    }
+
+    private static Object frameObject(java.util.List<StackTraceElement> frames, int i) {
+        if (i >= frames.size()) {
+            return Py.NONE;
+        }
+        StackTraceElement f = frames.get(i);
+        PyModule owner = owner(f);
+        PyModule frame = new PyModule("frame", new String[0]);
+        PyModule code = new PyModule("code", new String[0]);
+        String file = f.getFileName();
+        Object moduleFile = owner == null || file == null || file.endsWith(".py") ? null : owner.getAttrOrNull("__file__");
+        code.setAttr("co_filename", moduleFile != null ? moduleFile : Py.str(file));
+        String mn = f.getMethodName();
+        code.setAttr("co_name", Py.str(mn == null || mn.startsWith("lambda$") || "exec".equals(mn) ? "<module>" : mn));
+        frame.setAttr("f_code", code);
+        frame.setAttr("f_lineno", PyInt.of(f.getLineNumber()));
+        frame.setAttr("f_globals", owner == null ? new PyDict() : owner.getAttrOrNull("__dict__"));
+        frame.setAttr("f_locals", new PyDict());
+        frame.setAttr("f_back", i + 1 < frames.size() ? frameObject(frames, i + 1) : Py.NONE);
+        return frame;
+    }
+
     public static void runExitHandlers() {
         while (!EXIT_CALLS.isEmpty()) {
             int last = EXIT_CALLS.size() - 1;
@@ -245,6 +374,18 @@ public final class StdModules {
         m.setAttr("unfreeze", PyBuiltin.positional("unfreeze", a -> Py.NONE));
         m.setAttr("garbage", new PyList(new Object[0]));
         m.setAttr("callbacks", new PyList(new Object[0]));
+        return m;
+    }
+
+    /// `importlib`'s hooks into the module registry. Every module of a
+    /// translated program is compiled in and registered by name before
+    /// `__main__` runs, so importing by a name computed at run time is a
+    /// lookup, not a search of a path.
+    private static PyModule imp() {
+        PyModule m = new PyModule("_cn1imp", new String[0]);
+        m.setAttr("load", PyBuiltin.positional("load", a -> PyModule.load(Py.toStr(a[0]))));
+        m.setAttr("available", PyBuiltin.positional("available",
+                a -> PyModule.available(Py.toStr(a[0])) ? Py.TRUE : Py.FALSE));
         return m;
     }
 
@@ -353,6 +494,64 @@ public final class StdModules {
         }));
     }
 
+    /// Puts the read-only package data tree (`PyPackageData`) in front of the
+    /// file system's primitives: a path under `/cn1python/` is answered from
+    /// the application's bundled package data, and writing there fails as on
+    /// a read-only file system.
+    private static void packageData(PyModule m) {
+        final String[] reads = {"read", "exists", "isdir", "listdir", "size", "mtime"};
+        final String[] writes = {"write", "mkdir", "remove", "rename"};
+        for (final String name : reads) {
+            final Object next = m.getAttrOrNull(name);
+            m.setAttr(name, PyBuiltin.positional(name, a -> {
+                String path = Py.toStr(a[0]);
+                if (!PyPackageData.covers(path)) {
+                    return Py.obj(next).call(a, Py.NO_KW);
+                }
+                if ("exists".equals(name)) {
+                    return Py.bool(PyPackageData.exists(path));
+                }
+                if ("isdir".equals(name)) {
+                    return Py.bool(PyPackageData.isDirectory(path));
+                }
+                if ("listdir".equals(name)) {
+                    String[] names = PyPackageData.list(path);
+                    if (names == null) {
+                        throw Py.error(Py.OS_ERROR, "Not a directory: " + path);
+                    }
+                    Object[] r = new Object[names.length];
+                    for (int i = 0; i < names.length; i++) {
+                        r[i] = Py.str(names[i]);
+                    }
+                    return new PyList(r);
+                }
+                if ("mtime".equals(name)) {
+                    // The bundle records no times. The Unix epoch made
+                    // zipfile refuse to archive a bundled file at all (ZIP
+                    // headers start in 1980), so every entry is dated
+                    // 1980-01-02 UTC: still 1980 in local time in every
+                    // time zone, where 1980-01-01 is 1979 west of Greenwich.
+                    return Py.ofFloat(315619200);
+                }
+                byte[] b = PyPackageData.read(path);
+                if (b == null) {
+                    throw Py.error(Py.OS_ERROR, "No such file or directory: " + path);
+                }
+                return "size".equals(name) ? PyInt.of(b.length) : new PyBytes(b);
+            }));
+        }
+        for (final String name : writes) {
+            final Object next = m.getAttrOrNull(name);
+            m.setAttr(name, PyBuiltin.positional(name, a -> {
+                if (PyPackageData.covers(Py.toStr(a[0]))
+                        || "rename".equals(name) && PyPackageData.covers(Py.toStr(a[1]))) {
+                    throw Py.error(Py.OS_ERROR, "Read-only file system: " + Py.toStr(a[0]));
+                }
+                return Py.obj(next).call(a, Py.NO_KW);
+            }));
+        }
+    }
+
     /// `_cn1fs`: the primitives `io` and `os` are written over. Paths are
     /// absolute; the Python side resolves them against the working
     /// directory and turns a missing file into the right exception.
@@ -405,6 +604,7 @@ public final class StdModules {
         });
         fs(m, "size", (fs, a) -> PyInt.of(fs.size(Py.toStr(a[0]))));
         fs(m, "mtime", (fs, a) -> Py.ofFloat(fs.lastModified(Py.toStr(a[0])) / 1000.0));
+        packageData(m);
         // The process environment, for os.environ. ParparVM's System.getenv()
         // map is empty (it cannot enumerate the environment), so `getenv` reads
         // one variable by name as well; the JVM answers both.
@@ -472,6 +672,19 @@ public final class StdModules {
                 throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
             }
         }));
+        // plain(values): the values as a tuple when every one is None or an exact int, float,
+        // str or bytes -- what binds with no adapter -- else None. One call for the check
+        // sqlite3's execute makes on each value.
+        m.setAttr("plain", PyBuiltin.positional("plain", a -> {
+            Object[] vs = Py.toArray(a[0]);
+            for (Object v : vs) {
+                if (!(v == Py.NONE || v instanceof Long || v instanceof Double || v instanceof String //NOPMD CompareObjectsWithEquals - None is a singleton
+                        || v instanceof PyBytes)) {
+                    return Py.NONE;
+                }
+            }
+            return a[0] instanceof PyTuple ? a[0] : new PyTuple(vs);
+        }));
         m.setAttr("run", PyBuiltin.positional("run", a -> {
             PySql.Connection c = sqlConnection(a[0]);
             Object[] ps = Py.toArray(a[2]);
@@ -488,19 +701,8 @@ public final class StdModules {
             } catch (java.io.IOException e) {
                 throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
             }
-            Object[] cols = new Object[r.columns.length];
-            for (int i = 0; i < cols.length; i++) {
-                cols[i] = Py.str(r.columns[i]);
-            }
-            Object[] rows = new Object[r.rows.size()];
-            for (int i = 0; i < rows.length; i++) {
-                Object[] values = r.rows.get(i);
-                Object[] t = new Object[values.length];
-                for (int k = 0; k < values.length; k++) {
-                    t[k] = sqlValue(values[k]);
-                }
-                rows[i] = new PyTuple(t);
-            }
+            Object[] cols = sqlColumns(r);
+            Object[] rows = sqlRows(r);
             if (!server) {
                 // sqlite3 (_cn1sql): SQLite reports no column types.
                 return new PyTuple(new Object[] {new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
@@ -515,11 +717,381 @@ public final class StdModules {
             return new PyTuple(new Object[] {new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
                 PyInt.of(r.lastRowId), new PyTuple(kinds)});
         }));
+        m.setAttr("create_function", PyBuiltin.positional("create_function", a -> {
+            PySql.Connection c = sqlConnection(a[0]);
+            Object body = a[3];
+            boolean made;
+            try {
+                made = c.createFunction(Py.toStr(a[1]), (int) Py.asLong(a[2]), args -> {
+                    Object[] values = new Object[args.length];
+                    for (int i = 0; i < args.length; i++) {
+                        values[i] = sqlValue(args[i]);
+                    }
+                    // A statement the function runs is one level down: it gets results of its own.
+                    PySql.Connection.nesting++;
+                    try {
+                        return sqlParam(Py.callKw(body, values, new String[0]), 0);
+                    } catch (RuntimeException e) {
+                        // CPython's words for it, whatever the port's engine would say.
+                        throw new IllegalStateException("user-defined function raised exception"); //NOPMD PreserveStackTrace - only the message reaches SQLite
+                    } finally {
+                        PySql.Connection.nesting--;
+                    }
+                });
+            } catch (java.io.IOException e) {
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
+            }
+            return Py.bool(made);
+        }));
+        if (!server) {
+            sqliteFastPath(m);
+        }
         sqlControl(m, "begin", 0);
         sqlControl(m, "commit", 1);
         sqlControl(m, "rollback", 2);
         sqlControl(m, "close", 3);
         return m;
+    }
+
+    private static Object[] sqlColumns(PySql.Result r) {
+        Object[] cols = new Object[r.columns.length];
+        for (int i = 0; i < cols.length; i++) {
+            cols[i] = Py.str(r.columns[i]);
+        }
+        return cols;
+    }
+
+    private static Object[] sqlRows(PySql.Result r) {
+        Object[] rows = new Object[r.rows.size()];
+        for (int i = 0; i < rows.length; i++) {
+            // Converted in place: the result is this call's own, and nothing else reads it.
+            Object[] values = r.rows.get(i);
+            for (int k = 0; k < values.length; k++) {
+                values[k] = sqlValue(values[k]);
+            }
+            rows[i] = new PyTuple(values);
+        }
+        return rows;
+    }
+
+    /// What `sqlite3`'s `Cursor.execute` worked out about one SQL text, for
+    /// `_cn1sql.execute`: the scanned statement, how many `?` it binds, and the
+    /// flags `_run` reads. Only a text that is one statement with bare `?`
+    /// placeholders, no transaction control and no DDL gets one.
+    private static final class SqlitePlan {
+        final String stmt;
+        final int params;
+        final boolean query;
+        final boolean dml;
+        final boolean inserts;
+        final boolean queryWord;
+        /// The last description built, and the column names it was built
+        /// from: a statement answers the same columns every time.
+        Object[] columns;
+        PyTuple description;
+
+        SqlitePlan(String stmt, int params, boolean query, boolean dml, boolean inserts, boolean queryWord) {
+            this.stmt = stmt;
+            this.params = params;
+            this.query = query;
+            this.dml = dml;
+            this.inserts = inserts;
+            this.queryWord = queryWord;
+        }
+    }
+
+    private static final java.util.Map<String, SqlitePlan> SQLITE_PLANS = new java.util.HashMap<String, SqlitePlan>();
+    private static final int SQLITE_PLANS_MAX = 256;
+    /// Set by `_cn1sql.setup`: the `adapters` dict, the five keys whose
+    /// presence means a storage value is adapted, `str`, and the legacy
+    /// transaction-control value.
+    private static PyDict sqliteAdapters;
+    private static Object[] sqliteAdapterKeys;
+    private static Object sqliteStr;
+    private static long sqliteLegacy;
+    private static int sqliteAdaptersSize = -1;
+    private static boolean sqlitePlainFree;
+
+    /// `Cursor.execute` for the call nearly every application makes, in one
+    /// builtin: a planned statement, a list or tuple of plain values, no
+    /// conversion. It applies the legacy implicit `BEGIN`, runs the statement
+    /// and sets what `_run` sets. Anything else answers None, before touching
+    /// anything, and the Python path handles it with every check and error.
+    private static void sqliteFastPath(PyModule m) {
+        m.setAttr("setup", PyBuiltin.positional("setup", a -> {
+            sqliteAdapters = (PyDict) a[0];
+            sqliteAdapterKeys = Py.toArray(a[1]);
+            sqliteStr = a[2];
+            sqliteLegacy = Py.asLong(a[3]);
+            sqliteAdaptersSize = -1;
+            return Py.NONE;
+        }));
+        m.setAttr("plan", PyBuiltin.positional("plan", a -> {
+            if (SQLITE_PLANS.size() >= SQLITE_PLANS_MAX) {
+                SQLITE_PLANS.clear();
+            }
+            SQLITE_PLANS.put(Py.toStr(a[0]), new SqlitePlan(Py.toStr(a[1]), (int) Py.asLong(a[2]), Py.isTrue(a[3]),
+                    Py.isTrue(a[4]), Py.isTrue(a[5]), Py.isTrue(a[6])));
+            return Py.NONE;
+        }));
+        // fetchone(cursor): the next row of an open cursor with no row factory, or None for
+        // anything else -- the end included -- which the Python fetchone then answers.
+        // Fixed arity, so the call from the sqlite3 module builds no argument array.
+        m.setAttr("fetchone", PyBuiltin.unary("fetchone", StdModules::sqliteFetchOneOrNone));
+        m.setAttr("execute", PyBuiltin.positional("execute", a -> {
+            if (a.length != 3) {
+                throw Py.typeError("execute() takes exactly 3 arguments (" + a.length + " given)");
+            }
+            return sqliteExecuteOrNone(a[0], a[1], a[2]);
+        }).with3(StdModules::sqliteExecuteOrNone));
+    }
+
+    /// The parameter arrays the fast path binds from, one per count. Python
+    /// runs one thread at a time and the engine reads the values while binding,
+    /// before any SQL function could call back into another execute, so one
+    /// array per count is all that is ever in use.
+    private static Object[][] sqliteBoundArrays = new Object[8][];
+
+    private static Object[] sqliteBound(int count) {
+        if (count >= sqliteBoundArrays.length) {
+            Object[][] grown = new Object[count + 8][];
+            System.arraycopy(sqliteBoundArrays, 0, grown, 0, sqliteBoundArrays.length);
+            sqliteBoundArrays = grown;
+        }
+        Object[] a = sqliteBoundArrays[count];
+        if (a == null) {
+            a = new Object[count];
+            sqliteBoundArrays[count] = a;
+        }
+        return a;
+    }
+
+    /// The attributes the fast path reads and writes, and their field indexes
+    /// in the last cursor and connection classes seen: resolved once per
+    /// class rather than matched by name on every call.
+    private static final String[] CURSOR_ATTRS = {"_closed", "connection", "_rows", "_pos", "description", "rowcount", "lastrowid", "row_factory"};
+    private static final String[] CONN_ATTRS = {"detect_types", "_autocommit", "in_transaction", "_isolation_level", "_handle", "_closed", "text_factory", "total_changes", "row_factory"};
+    private static final int C_CLOSED = 0;
+    private static final int C_CONNECTION = 1;
+    private static final int C_ROWS = 2;
+    private static final int C_POS = 3;
+    private static final int C_DESCRIPTION = 4;
+    private static final int C_ROWCOUNT = 5;
+    private static final int C_LASTROWID = 6;
+    private static final int C_ROW_FACTORY = 7;
+    private static final int K_DETECT_TYPES = 0;
+    private static final int K_AUTOCOMMIT = 1;
+    private static final int K_IN_TRANSACTION = 2;
+    private static final int K_ISOLATION_LEVEL = 3;
+    private static final int K_HANDLE = 4;
+    private static final int K_CLOSED = 5;
+    private static final int K_TEXT_FACTORY = 6;
+    private static final int K_TOTAL_CHANGES = 7;
+    private static final int K_ROW_FACTORY = 8;
+
+    private static Class<?> cursorClass;
+    private static int[] cursorFields;
+    private static Class<?> connClass;
+    private static int[] connFields;
+
+    private static int[] cursorFields(PyInstance cursor) {
+        if (cursor.getClass() != cursorClass) {
+            cursorFields = cursor.fieldIndexes(CURSOR_ATTRS);
+            cursorClass = cursor.getClass();
+        }
+        return cursorFields;
+    }
+
+    private static int[] connFields(PyInstance conn) {
+        if (conn.getClass() != connClass) {
+            connFields = conn.fieldIndexes(CONN_ATTRS);
+            connClass = conn.getClass();
+        }
+        return connFields;
+    }
+
+    private static boolean sqlitePlainFree() {
+        PyDict d = sqliteAdapters;
+        if (d == null) {
+            return false;
+        }
+        int n = d.size();
+        if (n != sqliteAdaptersSize) {
+            boolean free = true;
+            for (Object k : sqliteAdapterKeys) {
+                if (d.getOrNull(k) != null) {
+                    free = false;
+                    break;
+                }
+            }
+            sqlitePlainFree = free;
+            sqliteAdaptersSize = n;
+        }
+        return sqlitePlainFree;
+    }
+
+    private static boolean isFalse(Object v) {
+        return v == Py.FALSE; //NOPMD CompareObjectsWithEquals - False is a singleton
+    }
+
+    /// The implicit BEGIN, once per transaction: null, or why it failed.
+    private static String sqliteBegin(PySql.Connection c) {
+        try {
+            c.begin();
+            return null;
+        } catch (java.io.IOException e) {
+            return String.valueOf(e.getMessage());
+        }
+    }
+
+    private static Object sqliteFetchOneOrNone(Object cursor) {
+        Object answer = sqliteFetchOne(cursor);
+        return answer == null ? Py.NONE : answer;
+    }
+
+    private static Object sqliteExecuteOrNone(Object cursor, Object sql, Object parameters) {
+        Object answer = sqliteExecute(cursor, sql, parameters);
+        return answer == null ? Py.NONE : answer;
+    }
+
+    private static Object sqliteExecute(Object cursorObj, Object sqlObj, Object parameters) {
+        if (!(cursorObj instanceof PyInstance) || !(sqlObj instanceof String)
+                || !(parameters instanceof PyTuple || parameters instanceof PyList)) {
+            return null;
+        }
+        SqlitePlan plan = SQLITE_PLANS.get(sqlObj);
+        if (plan == null || !sqlitePlainFree()) {
+            return null;
+        }
+        PyInstance cursor = (PyInstance) cursorObj;
+        int[] cf = cursorFields(cursor);
+        if (!isFalse(cursor.ownAt(cf[C_CLOSED], "_closed")) || !(cursor.ownAt(cf[C_CONNECTION], "connection") instanceof PyInstance)) {
+            return null;
+        }
+        PyInstance conn = (PyInstance) cursor.ownAt(cf[C_CONNECTION], "connection");
+        int[] kf = connFields(conn);
+        Object detect = conn.ownAt(kf[K_DETECT_TYPES], "detect_types");
+        Object autocommit = conn.ownAt(kf[K_AUTOCOMMIT], "_autocommit");
+        Object inTransaction = conn.ownAt(kf[K_IN_TRANSACTION], "in_transaction");
+        Object isolation = conn.ownAt(kf[K_ISOLATION_LEVEL], "_isolation_level");
+        Object handle = conn.ownAt(kf[K_HANDLE], "_handle");
+        if (!isFalse(conn.ownAt(kf[K_CLOSED], "_closed")) || !(detect instanceof Long) || ((Long) detect).longValue() != 0
+                || conn.ownAt(kf[K_TEXT_FACTORY], "text_factory") != sqliteStr || inTransaction == null || isolation == null //NOPMD CompareObjectsWithEquals - the str type itself
+                || !(handle instanceof Long)) {
+            return null;
+        }
+        // Read in place, a list's storage included: nothing here keeps or changes it.
+        Object[] values;
+        int count;
+        if (parameters instanceof PyTuple) {
+            values = ((PyTuple) parameters).items;
+            count = values.length;
+        } else {
+            PyList list = (PyList) parameters;
+            // A list of only ints or only floats keeps them unboxed, and `items` is unused.
+            values = list.ints == null && list.floats == null ? list.items : list.toArray();
+            count = list.size;
+        }
+        if (count != plan.params) {
+            return null;
+        }
+        Object[] bound = sqliteBound(count);
+        for (int i = 0; i < count; i++) {
+            Object v = values[i];
+            if (v == Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
+                bound[i] = null;
+            } else if (v instanceof Long || v instanceof Double || v instanceof String) {
+                bound[i] = v;
+            } else if (v instanceof PyBytes) {
+                bound[i] = sqlParam(v, i);
+            } else {
+                return null;
+            }
+        }
+        PySql.Connection c = SQL.get((Long) handle);
+        if (c == null) {
+            return null;
+        }
+        // Everything checked: from here on the call is this one's to finish.
+        cursor.storeAt(cf[C_POS], "_pos", PyInt.of(0));
+        // No handler from here down: a failure comes back as the engine's message, which the
+        // caller raises. A frame with a handler pays for it on every call, thrown or not.
+        if (plan.dml && autocommit instanceof Long && ((Long) autocommit).longValue() == sqliteLegacy
+                && isolation != Py.NONE && isFalse(inTransaction)) { //NOPMD CompareObjectsWithEquals - None is a singleton
+            String failed = sqliteBegin(c);
+            if (failed != null) {
+                cursor.storeAt(cf[C_ROWS], "_rows", PyTuple.EMPTY);
+                return failed;
+            }
+            conn.storeAt(kf[K_IN_TRANSACTION], "in_transaction", Py.TRUE);
+        }
+        PySql.Result r = c.runStatus(plan.stmt, bound, plan.query);
+        if (r == null) {
+            cursor.storeAt(cf[C_ROWS], "_rows", PyTuple.EMPTY);
+            return c.statusMessage();
+        }
+        if (plan.dml) {
+            Object total = conn.ownAt(kf[K_TOTAL_CHANGES], "total_changes");
+            conn.storeAt(kf[K_TOTAL_CHANGES], "total_changes", Py.add(total, PyInt.of(Math.max(r.changes, 0))));
+        }
+        if (r.columns.length > 0) {
+            Object[] rows = sqlRows(r);
+            cursor.storeAt(cf[C_DESCRIPTION], "description", sqliteDescription(plan, r.columns));
+            cursor.storeAt(cf[C_ROWS], "_rows", new PyList(rows));
+            cursor.storeAt(cf[C_ROWCOUNT], "rowcount", PyInt.of(plan.queryWord ? -1 : rows.length));
+        } else {
+            // Only ever read, by the sqlite3 module as well: one shared empty tuple.
+            cursor.storeAt(cf[C_ROWS], "_rows", PyTuple.EMPTY);
+            cursor.storeAt(cf[C_DESCRIPTION], "description", Py.NONE);
+            cursor.storeAt(cf[C_ROWCOUNT], "rowcount", PyInt.of(plan.dml ? r.changes : -1));
+        }
+        if (plan.inserts) {
+            cursor.storeAt(cf[C_LASTROWID], "lastrowid", PyInt.of(r.lastRowId));
+        }
+        return cursor;
+    }
+
+    private static Object sqliteFetchOne(Object cursorObj) {
+        if (!(cursorObj instanceof PyInstance)) {
+            return null;
+        }
+        PyInstance cursor = (PyInstance) cursorObj;
+        int[] cf = cursorFields(cursor);
+        Object rows = cursor.ownAt(cf[C_ROWS], "_rows");
+        Object pos = cursor.ownAt(cf[C_POS], "_pos");
+        if (!(rows instanceof PyList) || !(pos instanceof Long) || !isFalse(cursor.ownAt(cf[C_CLOSED], "_closed"))
+                || cursor.ownAt(cf[C_ROW_FACTORY], "row_factory") != Py.NONE //NOPMD CompareObjectsWithEquals - None is a singleton
+                || !(cursor.ownAt(cf[C_CONNECTION], "connection") instanceof PyInstance)) {
+            return null;
+        }
+        PyList list = (PyList) rows;
+        if (list.ints != null || list.floats != null) {
+            return null;
+        }
+        long p = ((Long) pos).longValue();
+        PyInstance conn = (PyInstance) cursor.ownAt(cf[C_CONNECTION], "connection");
+        int[] kf = connFields(conn);
+        if (p < 0 || p >= list.size || !isFalse(conn.ownAt(kf[K_CLOSED], "_closed"))
+                || conn.ownAt(kf[K_ROW_FACTORY], "row_factory") != Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
+            return null;
+        }
+        cursor.storeAt(cf[C_POS], "_pos", PyInt.of(p + 1));
+        return list.items[(int) p];
+    }
+
+    private static PyTuple sqliteDescription(SqlitePlan plan, String[] columns) {
+        if (plan.description != null && java.util.Arrays.equals(plan.columns, columns)) {
+            return plan.description;
+        }
+        Object[] items = new Object[columns.length];
+        for (int i = 0; i < items.length; i++) {
+            items[i] = new PyTuple(new Object[] {Py.str(columns[i]), Py.NONE, Py.NONE, Py.NONE, Py.NONE, Py.NONE,
+                Py.NONE});
+        }
+        PyTuple d = new PyTuple(items);
+        plan.columns = columns.clone();
+        plan.description = d;
+        return d;
     }
 
     private static void sqlControl(PyModule m, String name, int op) {
@@ -879,7 +1451,19 @@ public final class StdModules {
         m.setAttr("platform", Py.str("codenameone"));
         m.setAttr("byteorder", Py.str("little"));
         m.setAttr("version", Py.str("3.13.0 (Codename One)"));
-        m.setAttr("version_info", PyTuple.of(PyInt.of(3), PyInt.of(13), PyInt.of(0), Py.str("final"), PyInt.of(0)));
+        m.setAttr("version_info", new PyStructSeq(new String[] {"major", "minor", "micro", "releaselevel", "serial"},
+                PyInt.of(3), PyInt.of(13), PyInt.of(0), Py.str("final"), PyInt.of(0)));
+        // sys.implementation: libraries read its name and cache_tag (None
+        // means "no bytecode cache"). A namespace with attributes is all they
+        // need, so an unregistered module object carries them.
+        PyModule impl = new PyModule("sys.implementation", new String[0]);
+        impl.setAttr("name", Py.str("codenameone"));
+        impl.setAttr("cache_tag", Py.NONE);
+        impl.setAttr("version", m.getAttrOrNull("version_info"));
+        impl.setAttr("hexversion", PyInt.of(0x030D00F0L));
+        m.setAttr("implementation", impl);
+        m.setAttr("_getframe", PyBuiltin.positional("_getframe",
+                a -> frame(a.length == 0 ? 0 : (int) Py.asLong(a[0]))));
         Object[] argv = new Object[Py.argv.length];
         for (int i = 0; i < argv.length; i++) {
             argv[i] = Py.argv[i];
@@ -895,8 +1479,18 @@ public final class StdModules {
         m.setAttr("float_info", PyTuple.of(Py.ofFloat(Double.MAX_VALUE), PyInt.of(1024), PyInt.of(308),
                 Py.ofFloat(Double.MIN_NORMAL), PyInt.of(-1021), PyInt.of(-307), PyInt.of(15), PyInt.of(53),
                 Py.ofFloat(Math.ulp(1.0)), PyInt.of(2), PyInt.of(1)));
-        m.setAttr("getrecursionlimit", PyBuiltin.positional("getrecursionlimit", a -> PyInt.of(1000)));
-        m.setAttr("setrecursionlimit", PyBuiltin.positional("setrecursionlimit", a -> Py.NONE));
+        // The limit is recorded and reported but never enforced: Python calls
+        // are Java calls, the thread's stack is the real limit, and running
+        // out of it raises RecursionError. Counting depth on every call would
+        // tax every program for the sake of the few that lower the limit on
+        // purpose -- a test that sets it to 200 to provoke a fallback sees
+        // the deep input processed in full instead.
+        final Object[] limit = {PyInt.of(1000)};
+        m.setAttr("getrecursionlimit", PyBuiltin.positional("getrecursionlimit", a -> limit[0]));
+        m.setAttr("setrecursionlimit", PyBuiltin.positional("setrecursionlimit", a -> {
+            limit[0] = a[0];
+            return Py.NONE;
+        }));
         m.setAttr("exception", PyBuiltin.positional("exception", a -> Py.handling()));
         m.setAttr("exc_info", PyBuiltin.positional("exc_info", a -> {
             Object e = Py.handling();

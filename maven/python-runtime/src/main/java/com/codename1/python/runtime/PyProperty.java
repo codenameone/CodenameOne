@@ -52,7 +52,7 @@ public final class PyProperty extends PyObject {
         if (fget == null || fget == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
             throw Py.attributeError("property has no getter");
         }
-        return Py.obj(fget).call(new Object[] {self}, Py.NO_KW);
+        return Py.obj(fget).call1(self);
     }
 
     void delete(Object self) {

@@ -202,31 +202,6 @@ public final class JSONWriter {
     }
 
     private static void writeString(String s, StringBuilder sb) {
-        sb.append('"');
-        int n = s.length();
-        for (int i = 0; i < n; i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':  sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                case '\b': sb.append("\\b"); break;
-                case '\f': sb.append("\\f"); break;
-                default:
-                    if (c < 0x20) {
-                        sb.append("\\u");
-                        String hex = Integer.toHexString(c);
-                        for (int p = hex.length(); p < 4; p++) {
-                            sb.append('0');
-                        }
-                        sb.append(hex);
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        sb.append('"');
+        JSONParser.appendQuoted(sb, s, false);
     }
 }

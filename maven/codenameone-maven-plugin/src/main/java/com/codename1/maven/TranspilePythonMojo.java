@@ -70,6 +70,7 @@ public class TranspilePythonMojo extends AbstractCN1Mojo {
         }
         PythonProjectBuilder builder = new PythonProjectBuilder(pythonSourceDir, pythonOutputDir, entry,
                 MavenLog.of(getLog())).classPath(compileClassPath())
+                .packageData(new File(project.getBuild().getOutputDirectory()))
                 .javaSources(new File(project.getBuild().getSourceDirectory()),
                         new File(project.getBuild().getDirectory(), "python-java-imports"))
                 .virtualThreadStack(properties == null ? null

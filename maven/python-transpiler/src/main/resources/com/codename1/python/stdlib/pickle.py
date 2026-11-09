@@ -1,6 +1,9 @@
-# Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
-# Licensed under the GNU General Public License version 2 with the Classpath
-# exception, as the rest of the Codename One Python runtime.
+# Copyright (c) 2001 Python Software Foundation; All Rights Reserved
+# Licensed under the Python Software Foundation License Version 2; the full
+# text is in maven/python-transpiler/third-party/cpython/LICENSE.txt.
+#
+# Derived from CPython's Lib/pickle.py. Changes: rewritten for the Codename One Python runtime in pure Python, with no C
+# accelerator; the stream format is CPython's.
 """Create portable serialized representations of Python objects.
 
 The stream is the one CPython writes: `dumps` produces the same bytes for

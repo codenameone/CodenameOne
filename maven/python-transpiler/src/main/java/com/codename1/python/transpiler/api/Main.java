@@ -74,29 +74,45 @@ public final class Main {
             System.arraycopy(args, 2, rest, 0, rest.length);
             args = rest;
         }
+        // -packages: a second source root holding PyPI packages, translated
+        // with the application and treated as libraries (their unreachable
+        // dynamic code raises at run time rather than failing the build).
+        Path packages = null;
+        if (args.length >= 2 && "-packages".equals(args[0])) {
+            packages = Paths.get(args[1]);
+            String[] rest = new String[args.length - 2];
+            System.arraycopy(args, 2, rest, 0, rest.length);
+            args = rest;
+        }
         if (args.length < 2 || args.length > 3) {
-            System.err.println("usage: Main [-cp <class path>] [-vtstack <size>] <source root> <output root> [main module]");
+            System.err.println("usage: Main [-cp <class path>] [-vtstack <size>] [-packages <root>] <source root>"
+                    + " <output root> [main module]");
             System.exit(2);
             return;
         }
-        Path root = Paths.get(args[0]);
         Map<String, String> sources = new TreeMap<String, String>();
-        List<Path> files;
-        try (Stream<Path> s = Files.walk(root)) {
-            files = s.filter(p -> p.toString().endsWith(".py")).collect(Collectors.toCollection(ArrayList::new));
-        }
-        for (Path p : files) {
-            sources.put(root.relativize(p).toString().replace(File.separatorChar, '/'),
-                    new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
+        readSources(Paths.get(args[0]), sources);
+        java.util.Set<String> libraries = new java.util.TreeSet<String>();
+        if (packages != null) {
+            Map<String, String> vendored = new TreeMap<String, String>();
+            readSources(packages, vendored);
+            libraries.addAll(vendored.keySet());
+            libraries.removeAll(sources.keySet());
+            vendored.putAll(sources);
+            sources = vendored;
         }
         Map<String, String> out;
+        List<String> deferred = new ArrayList<String>();
         try {
             out = PythonTranspiler.transpile(sources, args.length == 3 ? args[2] : null, classPath,
-                    java.util.Collections.<String, String>emptyMap(), stack);
+                    java.util.Collections.<String, String>emptyMap(), stack, libraries, deferred);
         } catch (PythonSyntaxError e) {
             System.err.println(e.getMessage());
             System.exit(1);
             return;
+        }
+        for (String d : deferred) {
+            System.err.println("warning: " + d + " raises NotImplementedError if it is reached");
         }
         for (Map.Entry<String, String> e : out.entrySet()) {
             Path f = Paths.get(args[1], e.getKey()).toAbsolutePath();
@@ -105,6 +121,17 @@ public final class Main {
                 Files.createDirectories(dir);
             }
             Files.write(f, e.getValue().getBytes(StandardCharsets.US_ASCII));
+        }
+    }
+
+    private static void readSources(Path root, Map<String, String> sources) throws IOException {
+        List<Path> files;
+        try (Stream<Path> s = Files.walk(root)) {
+            files = s.filter(p -> p.toString().endsWith(".py")).collect(Collectors.toCollection(ArrayList::new));
+        }
+        for (Path p : files) {
+            sources.put(root.relativize(p).toString().replace(File.separatorChar, '/'),
+                    new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
         }
     }
 }

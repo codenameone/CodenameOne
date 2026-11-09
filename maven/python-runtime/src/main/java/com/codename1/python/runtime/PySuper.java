@@ -44,6 +44,16 @@ public final class PySuper extends PyObject {
     @Override
     public Object getAttrOrNull(String name) {
         PyType start = self instanceof PyType && ((PyType) self).isSubtype(cls) ? (PyType) self : Py.typeOf(self);
+        switch (name) {
+            case "__thisclass__":
+                return cls;
+            case "__self__":
+                return self;
+            case "__self_class__":
+                return start;
+            default:
+                break;
+        }
         PyType[] mro = start.mro;
         int i = 0;
         while (i < mro.length && mro[i] != cls) { //NOPMD CompareObjectsWithEquals - identity is meant

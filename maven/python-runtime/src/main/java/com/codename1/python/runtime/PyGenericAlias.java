@@ -27,7 +27,17 @@ package com.codename1.python.runtime;
 /// origin and the arguments where `typing.get_origin`/`get_args` read them,
 /// and calling it builds the origin.
 final class PyGenericAlias extends PyObject {
-    static final PyType TYPE = new PyType("types.GenericAlias", new PyType[] {Py.OBJECT_TYPE}, null);
+    /// `types.GenericAlias(origin, args)`, which `__class_getitem__ =
+    /// classmethod(GenericAlias)` relies on, as `collections.abc` does.
+    static final PyType TYPE = new PyType("types.GenericAlias", new PyType[] {Py.OBJECT_TYPE}, (t, a, kw) -> {
+        if (kw.length != 0 || a.length != 2) {
+            throw Py.typeError("GenericAlias expected 2 arguments, got " + (a.length - kw.length));
+        }
+        if (!(a[0] instanceof PyType)) {
+            throw Py.typeError("GenericAlias() argument 1 must be a type");
+        }
+        return new PyGenericAlias((PyType) a[0], a[1]);
+    });
 
     final PyType origin;
     final PyTuple args;
@@ -52,6 +62,11 @@ final class PyGenericAlias extends PyObject {
         }
         if ("__parameters__".equals(attr)) {
             return new PyTuple(new Object[0]);
+        }
+        if ("__mro_entries__".equals(attr)) {
+            // class C(Iterator[int]): the alias stands for its origin, as
+            // CPython's GenericAlias answers.
+            return PyBuiltin.positional("__mro_entries__", a -> PyTuple.of(origin));
         }
         return origin.getAttrOrNull(attr);
     }

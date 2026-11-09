@@ -50,6 +50,10 @@ MARK="@@CN1CONF@@"
     echo "    }"
     echo
     echo "    public static void main(String[] args) {"
+    # The file system, sqlite and images are the Linux port's (build_parparvm.sh
+    # links it); without a Display there is no implementation behind
+    # FileSystemStorage and os.getcwd() is a NullPointerException.
+    echo "        com.codename1.ui.Display.init(null);"
     echo "        com.codename1.generated.python.PythonModules.registerAll();"
     for p in $progs; do
         echo "        com.codename1.python.runtime.Py.setArgv(\"$p\", args);"
@@ -62,15 +66,14 @@ MARK="@@CN1CONF@@"
 } > "$STAGE/PyBench.java"
 extra=""
 for p in $progs; do extra="$extra $CONF/$p.py"; done
-if ! PY_SOURCES="$STAGE" PY_EXTRA_FILES="$extra" PY_DRIVER="$STAGE/PyBench.java" PY_OPT=-O1 \
-        CN1_COMPILE_JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" \
+if ! PY_SOURCES="$STAGE" PY_EXTRA_FILES="$extra" PY_DRIVER="$STAGE/PyBench.java" PY_OPT="${PY_OPT:--O1}" \
         "$HERE/build_parparvm.sh" "$K" > "$STAGE/build.log" 2>&1; then
     tail -40 "$STAGE/build.log"
     echo "BUILD FAILED"
     exit 1
 fi
 got="$HERE/target/$K/output.txt"
-(cd "$HERE/target/$K/src" && "../$K" > "$got" 2>&1) || true
+(cd "$HERE/target/$K/src" && CN1_DISPLAY=headless "../$K" > "$got" 2>&1) || true
 python3 - "$CONF" "$got" "$MARK" $progs <<'PY'
 import difflib, sys
 conf, got, mark, progs = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]

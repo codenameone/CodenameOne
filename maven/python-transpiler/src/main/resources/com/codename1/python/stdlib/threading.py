@@ -369,7 +369,10 @@ def excepthook(args):
 
 
 class Thread:
-    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
+    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None, context=None):
+        # Python 3.14: the contextvars.Context run() runs in; None is a new,
+        # empty one, which is what 3.14 does unless told to inherit.
+        self._context = context
         self._target = target
         self._args = args
         self._kwargs = kwargs if kwargs is not None else {}
@@ -432,11 +435,16 @@ class Thread:
         _active[self._ident] = self
         self._started.set()
         try:
-            self.run()
+            if self._context is None:
+                import contextvars
+                self._context = contextvars.Context()
+            self._context.run(self.run)
         except BaseException as e:
             excepthook(ExceptHookArgs(type(e), e, None, self))
         finally:
             _active.pop(self._ident, None)
+            import contextvars
+            contextvars._forget(self._ident)
             self._done.set()
 
     def run(self):

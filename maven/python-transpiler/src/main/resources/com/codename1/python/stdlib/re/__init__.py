@@ -71,6 +71,7 @@ class Pattern:
         self.flags = flags
         self.groups = code.groups
         self.groupindex = dict(code.groupindex)
+        self._templates = {}
 
     def __repr__(self):
         p = repr(self.pattern)
@@ -144,6 +145,14 @@ class Pattern:
             at = e
 
     def findall(self, string, pos=0, endpos=None):
+        if isinstance(string, str) and isinstance(self.pattern, str):
+            # The loop in Java, without a Match per hit.
+            n = len(string)
+            if endpos is None or endpos > n:
+                endpos = n
+            if pos < 0:
+                pos = 0
+            return _engine.findall(self._code, string, pos, endpos)
         out = []
         for m in self.finditer(string, pos, endpos):
             if self.groups == 0:
@@ -170,6 +179,15 @@ class Pattern:
         return out
 
     def subn(self, repl, string, count=0):
+        if isinstance(repl, str) and isinstance(string, str) and isinstance(self.pattern, str):
+            # A template on a str: compiled once per pattern, as sre caches it,
+            # and the loop in Java, without a Match per hit.
+            template = self._templates.get(repl)
+            if template is None:
+                template = _compile_template(self, repl)
+                if len(self._templates) < 64:
+                    self._templates[repl] = template
+            return _engine.subn(self._code, string, template, count)
         if callable(repl):
             fn = repl
         else:

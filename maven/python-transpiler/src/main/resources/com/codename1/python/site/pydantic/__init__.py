@@ -502,9 +502,44 @@ def _v(tp, val, loc, c):
         return _vgeneric(org, _typing.get_args(tp), val, loc, c)
     if isinstance(tp, ModelMetaclass):
         return _vmodel(tp, val, loc, c)
+    if _typing.is_typeddict(tp):
+        return _vtypeddict(tp, val, loc, c)
     if isinstance(tp, type):
         return _vplain(tp, val, loc, c)
     return val
+
+
+def _vtypeddict(tp, val, loc, c):
+    """A TypedDict: a dict holding every required key, each declared key's
+    value validated against its annotation. Undeclared keys are dropped,
+    as pydantic's default extra='ignore' drops them."""
+    if not isinstance(val, dict):
+        return _E(c, loc, "dict_type", val, None, "Input should be an object" if c.json else None)
+    saved = c.cls
+    c.cls = tp
+    try:
+        out = {}
+        bad = False
+        required = getattr(tp, "__required_keys__", frozenset())
+        for key, hint in tp.__annotations__.items():
+            if isinstance(hint, str) or hasattr(hint, "__forward_arg__"):
+                hint = _resolve_forward(hint, c)
+            form = _typing.get_origin(hint)
+            if form is _typing.Required or form is _typing.NotRequired:
+                hint = _typing.get_args(hint)[0]
+            if key not in val:
+                if key in required:
+                    _E(c, loc + (key,), "missing", val, None, "Field required")
+                    bad = True
+                continue
+            r = _v(hint, val[key], loc + (key,), c)
+            if r is _BAD:
+                bad = True
+            else:
+                out[key] = r
+        return _BAD if bad else out
+    finally:
+        c.cls = saved
 
 
 def _join_or(items):
@@ -1045,6 +1080,31 @@ def _complete(cls):
     return True
 
 
+def _core_schema(tp):
+    org = _typing.get_origin(tp)
+    if org is Annotated:
+        return _core_schema(_typing.get_args(tp)[0])
+    if org is Literal:
+        return {"type": "literal", "expected": list(_typing.get_args(tp))}
+    if org is Union:
+        args = [a for a in _typing.get_args(tp) if a is not type(None)]
+        if len(args) < len(_typing.get_args(tp)):
+            inner = _core_schema(args[0]) if len(args) == 1 else \
+                {"type": "union", "choices": [_core_schema(a) for a in args]}
+            return {"type": "nullable", "schema": inner}
+        return {"type": "union", "choices": [_core_schema(a) for a in args]}
+    if org in (list, tuple, set, frozenset):
+        return {"type": org.__name__ if org is not frozenset else "frozenset"}
+    if org is dict:
+        return {"type": "dict"}
+    names = {str: "str", int: "int", float: "float", bool: "bool", bytes: "bytes"}
+    if tp in names:
+        return {"type": names[tp]}
+    if isinstance(tp, type) and isinstance(tp, ModelMetaclass):
+        return {"type": "model", "cls": tp}
+    return {"type": "any"}
+
+
 def _ensure(cls):
     if not cls.__dict__.get("__pydantic_complete__"):
         if not _complete(cls):
@@ -1149,6 +1209,23 @@ class ModelMetaclass(type):
 
     def __init__(cls, name, bases, ns, **kwargs):
         type.__init__(cls, name, bases, ns)
+
+    @property
+    def __pydantic_core_schema__(cls):
+        # The shape pydantic-core gives a model, enough for code that walks
+        # it (the openai SDK reads field types and aliases from it). Nothing
+        # here validates through it; validation is this module's own.
+        _ensure(cls)
+        fields = {}
+        for name, fi in cls.model_fields.items():
+            f = {"type": "model-field", "schema": _core_schema(fi.annotation)}
+            alias = fi.serialization_alias or fi.alias
+            if alias is not None:
+                f["serialization_alias"] = alias
+            fields[name] = f
+        return {"type": "model", "cls": cls, "schema": {
+            "type": "model-fields", "fields": fields, "model_name": cls.__name__,
+            "computed_fields": []}}
 
 
 class _Opts:
@@ -2173,3 +2250,38 @@ class SecretStr:
 class SecretBytes(SecretStr):
     def __repr__(self):
         return "SecretBytes(b'" + ("**********" if self._secret_value else "") + "')"
+
+
+def create_model(model_name, /, *, __config__=None, __doc__=None, __base__=None, __module__="pydantic.main",
+                 __validators__=None, __cls_kwargs__=None, **field_definitions):
+    """A model class built at run time from field definitions: each one a
+    type, a ``(type, default)`` pair (``...`` for a required field) or a
+    ``(type, Field(...))`` pair."""
+    if __base__ is None:
+        bases = (BaseModel,)
+    elif isinstance(__base__, tuple):
+        bases = __base__
+    else:
+        bases = (__base__,)
+    annotations = {}
+    ns = {"__annotations__": annotations, "__module__": __module__, "__qualname__": model_name}
+    if __doc__:
+        ns["__doc__"] = __doc__
+    if __config__ is not None:
+        ns["model_config"] = __config__
+    if __validators__:
+        ns.update(__validators__)
+    for name, definition in field_definitions.items():
+        if isinstance(definition, tuple):
+            if len(definition) != 2:
+                raise PydanticUserError(
+                    f"Field definition for {name!r} should a single element representing the type or a two-tuple, "
+                    "the first element being the type and the second element the assigned value "
+                    "(either a default or the `Field()` function).")
+            tp, default = definition
+            annotations[name] = tp
+            if default is not ...:
+                ns[name] = default
+        else:
+            annotations[name] = definition
+    return ModelMetaclass(model_name, bases, ns, **(__cls_kwargs__ or {}))

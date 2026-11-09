@@ -496,6 +496,11 @@ public final class PyList extends PyObject {
             int[] r = ((PySlice) key).indices(size);
             int n = PySlice.length(r);
             Object[] out = new Object[n];
+            if (r[2] == 1) {
+                // A plain slice is one block copy, not a checked store per element.
+                System.arraycopy(items, r[0], out, 0, n);
+                return new PyList(out);
+            }
             for (int i = 0, j = r[0]; i < n; i++, j += r[2]) {
                 out[i] = items[j];
             }

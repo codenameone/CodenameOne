@@ -101,6 +101,10 @@ final class Regex {
         /// LOOK, ATOMIC, BACKREF: the sub-program, or the case flag.
         Op[] sub;
         boolean icase;
+        /// SET: the whole answer for each ASCII char, categories, ranges and
+        /// negation included, filled on first use; a `\s` or `\w` otherwise
+        /// asks the category table per char.
+        boolean[] full;
 
         Op() {
             chars = NO_INTS;
@@ -124,13 +128,20 @@ final class Regex {
         int marks;
         String prefix;
         boolean anchored;
+        /// The ops one of which must match the first character of any match,
+        /// or null when a match can begin some other way (an assertion, an
+        /// optional item, a backreference). A search skips every position
+        /// none of them matches instead of running the program there, as
+        /// sre's charset prefix does; MarkItDown's HTML and Markdown
+        /// patterns spent most of their time failing at every offset.
+        Op[] first;
         /// The text view, registers and backtracking stacks of the last run,
         /// handed back for the next one: a route table or a tokenizer runs
         /// one pattern per request, and these were most of what a run
-        /// allocated. Taken with `getAndSet(null)`, so two threads running
-        /// one pattern at once never share them; the loser builds its own.
-        final java.util.concurrent.atomic.AtomicReference<Scratch> scratch =
-                new java.util.concurrent.atomic.AtomicReference<Scratch>();
+        /// allocated. A plain field: Python runs under the [Gil], one thread
+        /// at a time, and a run never releases it. Taken (left null) for the
+        /// run, so a run nested in another builds its own.
+        Scratch scratch;
 
         @Override
         public PyType type() {
@@ -154,10 +165,69 @@ final class Regex {
             p.marks = (int) Py.index(a[2]);
             p.prefix = Py.isTrue(a[3]) ? Py.toStr(a[3]) : null;
             p.anchored = Py.isTrue(a[4]);
+            p.first = firstOps(p.ops);
             return p;
         }));
         m.setAttr("run", new RunFn());
+        m.setAttr("subn", PyBuiltin.positional("subn", a -> subn(prog(a[0]), Py.toStr(a[1]),
+                (PyList) a[2], (int) Py.index(a[3]))));
+        m.setAttr("findall", PyBuiltin.positional("findall", a -> findall(prog(a[0]), Py.toStr(a[1]),
+                (int) Py.index(a[2]), (int) Py.index(a[3]))));
         return m;
+    }
+
+    /// See `Prog.first`.
+    private static Op[] firstOps(Op[] ops) {
+        java.util.ArrayList<Op> out = new java.util.ArrayList<Op>();
+        boolean[] seen = new boolean[ops.length];
+        int[] work = new int[ops.length + 1];
+        int n = 0;
+        work[n++] = 0;
+        while (n > 0) {
+            int pc = work[--n];
+            while (true) {
+                if (pc < 0 || pc >= ops.length) {
+                    return null;
+                }
+                if (seen[pc]) {
+                    break;
+                }
+                seen[pc] = true;
+                Op op = ops[pc];
+                if (op.k == CHAR || op.k == CHARI || op.k == ANY || op.k == ANYALL || op.k == SET) {
+                    out.add(op);
+                    break;
+                }
+                if (op.k == REPEAT_ONE || op.k == MIN_REPEAT_ONE) {
+                    if (op.lo < 1) {
+                        return null;
+                    }
+                    out.add(op.one);
+                    break;
+                }
+                if (op.k == SAVE) {
+                    pc++;
+                } else if (op.k == JMP) {
+                    pc = op.a;
+                } else if (op.k == SPLIT) {
+                    if (n == work.length) {
+                        return null;
+                    }
+                    work[n++] = op.b;
+                    pc = op.a;
+                } else {
+                    return null;
+                }
+            }
+        }
+        for (Op op : out) {
+            if (op.k == ANY || op.k == ANYALL) {
+                // Nearly every character qualifies; the filter costs more
+                // than it skips.
+                return null;
+            }
+        }
+        return out.isEmpty() ? null : out.toArray(new Op[0]);
     }
 
     private static Op[] program(Object prog) {
@@ -310,11 +380,14 @@ final class Regex {
 
         void reset(String s) {
             this.s = s;
-            int n = s.codePointCount(0, s.length());
-            if (n == s.length()) {
+            // PyStr keeps the count for the last long string, so a pattern
+            // run again and again over one text (a scanner's match(text,
+            // pos)) does not count it on every call.
+            int pairs = PyStr.surrogates(s);
+            if (pairs == 0) {
                 cps = null;
             } else {
-                cps = new int[n];
+                cps = new int[s.length() - pairs];
                 int i = 0;
                 int j = 0;
                 while (i < s.length()) {
@@ -384,6 +457,59 @@ final class Regex {
             default:
                 break;
         }
+        if (c < 128) {
+            return table(op)[c];
+        }
+        return set(op, c);
+    }
+
+    /// The ASCII answers of a SET-like op (see [Op#full]), or null for one
+    /// of the kinds [#one] answers directly.
+    private static boolean[] table(Op op) {
+        switch (op.k) {
+            case CHAR:
+            case CHARI:
+            case ANY:
+            case ANYALL:
+                return null;
+            default:
+                break;
+        }
+        boolean[] f = op.full;
+        if (f == null) {
+            f = new boolean[128];
+            for (int i = 0; i < 128; i++) {
+                f[i] = set(op, i);
+            }
+            op.full = f;
+        }
+        return f;
+    }
+
+    /// How far from `pos` (up to `limit`) the chars all match `op`.
+    private static int span(Op op, Text t, int pos, int limit) {
+        int j = pos;
+        boolean[] f = t.cps == null ? table(op) : null;
+        if (f != null) {
+            // The common case, a \s+ or [^<]*: the string read directly, an
+            // ASCII char answered by one load.
+            String s = t.s;
+            while (j < limit) {
+                char c = s.charAt(j);
+                if (c < 128 ? !f[c] : !set(op, c)) {
+                    break;
+                }
+                j++;
+            }
+            return j;
+        }
+        while (j < limit && one(op, t.at(j))) {
+            j++;
+        }
+        return j;
+    }
+
+    private static boolean set(Op op, int c) {
         boolean r = c < 128 ? op.ascii[c] : java.util.Arrays.binarySearch(op.chars, c) >= 0;
         if (!r && op.ranges.length > 0) {
             r = inRanges(op.ranges, c);
@@ -439,6 +565,13 @@ final class Regex {
     /// `_cn1re.run(prog, text, pos, endpos, mode, forbid)`. Called once per
     /// match attempt with all six arguments, so it takes them directly
     /// rather than as the argument array a [PyBuiltin] would build.
+    private static Prog prog(Object o) {
+        if (!(o instanceof Prog)) {
+            throw Py.typeError("_cn1re needs a compiled program");
+        }
+        return (Prog) o;
+    }
+
     private static final class RunFn extends PyObject {
         @Override
         public PyType type() {
@@ -563,10 +696,7 @@ final class Regex {
                 }
                 case REPEAT_ONE: {
                     int limit = op.hi < 0 ? endpos : Math.min(endpos, pos + op.hi);
-                    int j = pos;
-                    while (j < limit && one(op.one, t.at(j))) {
-                        j++;
-                    }
+                    int j = span(op.one, t, pos, limit);
                     if (j - pos < op.lo) {
                         ok = false;
                         break;
@@ -808,10 +938,37 @@ final class Regex {
         return -1;
     }
 
+    /// The first position at or after `start` whose character one of
+    /// `first` matches, or -1: every match consumes a character first.
+    private static int skip(Op[] first, Text t, int start, int endpos) {
+        boolean[] f = first.length == 1 && t.cps == null ? table(first[0]) : null;
+        if (f != null) {
+            Op op = first[0];
+            String s = t.s;
+            for (int i = start; i < endpos; i++) {
+                char c = s.charAt(i);
+                if (c < 128 ? f[c] : set(op, c)) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+        for (int i = start; i < endpos; i++) {
+            int c = t.at(i);
+            for (Op op : first) {
+                if (op.k == CHAR ? c == op.c : one(op, c)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
     /// `_engine.run`: mode 0 matches, 1 fully matches, 2 searches. The
     /// group registers then `lastindex`, or `NO_MATCH`.
     static int[] run(Prog p, String text, int pos, int endpos, int mode, int forbid) {
-        Scratch sc = p.scratch.getAndSet(null);
+        Scratch sc = p.scratch;
+        p.scratch = null;
         if (sc == null) {
             sc = new Scratch();
         }
@@ -820,8 +977,92 @@ final class Regex {
         } finally {
             sc.text.s = null;
             sc.text.cps = null;
-            p.scratch.set(sc);
+            p.scratch = sc;
         }
+    }
+
+    /// `pattern.subn(template, text, count)` with the loop in Java: `template`
+    /// is a list of literal strings and group numbers, as re's
+    /// `_compile_template` makes it. No Match object is made per match --
+    /// the Python loop made one, and a generator step, for each.
+    static Object subn(Prog p, String text, PyList template, int count) {
+        int n = PyStr.codePoints(text);
+        StringBuilder out = null;
+        int last = 0;
+        int at = 0;
+        int forbid = -1;
+        int done = 0;
+        int parts = template.size();
+        while (at <= n && (count == 0 || done < count)) {
+            int[] regs = run(p, text, at, n, 2, forbid);
+            if (regs.length == 0) {
+                break;
+            }
+            int s = regs[0];
+            int e = regs[1];
+            if (out == null) {
+                out = new StringBuilder(text.length() + 16);
+            }
+            out.append(PyStr.substr(text, last, s));
+            for (int k = 0; k < parts; k++) {
+                Object part = template.get(k);
+                if (part instanceof String) {
+                    out.append((String) part);
+                } else {
+                    int g = (int) Py.index(part);
+                    int gs = regs[2 * g];
+                    int ge = regs[2 * g + 1];
+                    if (gs >= 0 && ge >= 0) {
+                        out.append(PyStr.substr(text, gs, ge));
+                    }
+                }
+            }
+            last = e;
+            done++;
+            forbid = s == e ? e : -1;
+            at = e;
+        }
+        if (out == null) {
+            return Py.tuple(text, Long.valueOf(0));
+        }
+        out.append(PyStr.substr(text, last, n));
+        return Py.tuple(out.toString(), Long.valueOf(done));
+    }
+
+    /// `pattern.findall(text, pos, endpos)` with the loop in Java: the whole
+    /// match, the one group, or a tuple of groups, an unmatched group as "".
+    static Object findall(Prog p, String text, int pos, int endpos) {
+        PyList out = Py.list();
+        int at = pos;
+        int forbid = -1;
+        while (at <= endpos) {
+            int[] regs = run(p, text, at, endpos, 2, forbid);
+            if (regs.length == 0) {
+                break;
+            }
+            if (p.groups == 0) {
+                out.append(PyStr.substr(text, regs[0], regs[1]));
+            } else if (p.groups == 1) {
+                out.append(group(text, regs, 1));
+            } else {
+                Object[] g = new Object[p.groups];
+                for (int k = 0; k < g.length; k++) {
+                    g[k] = group(text, regs, k + 1);
+                }
+                out.append(Py.tuple(g));
+            }
+            int s = regs[0];
+            int e = regs[1];
+            forbid = s == e ? e : -1;
+            at = e;
+        }
+        return out;
+    }
+
+    private static String group(String text, int[] regs, int g) {
+        int s = regs[2 * g];
+        int e = regs[2 * g + 1];
+        return s < 0 || e < 0 ? "" : PyStr.substr(text, s, e);
     }
 
     private static int[] run(Prog p, Scratch sc, String text, int pos, int endpos, int mode, int forbid) {
@@ -844,6 +1085,11 @@ final class Regex {
                     return NO_MATCH;
                 }
                 start = found;
+            } else if (mode == 2 && p.first != null) {
+                start = skip(p.first, t, start, endpos);
+                if (start < 0) {
+                    return NO_MATCH;
+                }
             }
             java.util.Arrays.fill(regs, -1);
             int end = exec(p.ops, t, start, endpos, regs, full, forbid, size, stack, trail);

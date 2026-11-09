@@ -204,6 +204,24 @@ public abstract class Database {
         return Display.getInstance().openOrCreate(databaseName);
     }
 
+    /// Whether `#openInMemory()` is supported on this platform.
+    public static boolean isInMemorySupported() {
+        return Display.getInstance().isInMemoryDatabaseSupported();
+    }
+
+    /// Opens a new private database held entirely in memory: nothing is
+    /// written to storage, and the data is gone once it is closed. Each call
+    /// opens a database of its own. Faster than a file for scratch data, since
+    /// no transaction touches the disk.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: where the platform has no in-memory databases (see
+    ///   `#isInMemorySupported()`)
+    public static Database openInMemory() throws IOException {
+        return Display.getInstance().openInMemoryDatabase();
+    }
+
     /// Indicates weather a database exists
     ///
     /// **NOTE:** Not supported in the  Javascript port.  Will always return false.
@@ -819,6 +837,118 @@ public abstract class Database {
                 "Changing the database key is not supported on this platform");
     }
 
+    /// A column of `row` in its storage class: null, a `Long`, a `Double`, a `String` or a
+    /// `byte[]`, as [Row#getColumnType(int)] reports it.
+    ///
+    /// Reading the type and then calling the matching getter does the same, but a cursor of the
+    /// SQLite ports answers this with one engine call per type and value instead of three, and
+    /// checks the cursor once instead of twice. A row whose engine reports no type
+    /// (`COLUMN_UNKNOWN`) answers the text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the current row of a cursor
+    /// - `index`: the column, from 0
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null for SQL NULL
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the value cannot be read
+    /// Every value of `row` into `out`, each as `#getValue(Row, int)` reads
+    /// it, in one step where the engine allows. Answers false where a
+    /// column's storage class cannot be told (`#COLUMN_UNKNOWN`) or the row is
+    /// not one of a database cursor, leaving `out` for the caller to fill its
+    /// own way.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the row cannot be read
+    public static boolean getValues(Row row, Object[] out) throws IOException {
+        if (row instanceof com.codename1.impl.AbstractDBCursor) {
+            return ((com.codename1.impl.AbstractDBCursor) row).getValues(out);
+        }
+        return false;
+    }
+
+    public static Object getValue(Row row, int index) throws IOException {
+        if (row instanceof com.codename1.impl.AbstractDBCursor) {
+            return ((com.codename1.impl.AbstractDBCursor) row).getValue(index);
+        }
+        switch (row.getColumnType(index)) {
+            case COLUMN_NULL:
+                return null;
+            case COLUMN_INTEGER:
+                return Long.valueOf(row.getLong(index));
+            case COLUMN_FLOAT:
+                return Double.valueOf(row.getDouble(index));
+            case COLUMN_BLOB:
+                return row.getBlob(index);
+            default:
+                return row.getString(index);
+        }
+    }
+
+    /// The number of rows the most recent INSERT, UPDATE or DELETE on this
+    /// connection changed, as SQLite's `changes()` reports it.
+    ///
+    /// The default implementation asks the engine with a query; ports whose
+    /// engine they call directly answer without one.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the engine cannot be asked
+    public long changes() throws IOException {
+        return queryLong("SELECT changes()");
+    }
+
+    /// The rowid of the most recent successful INSERT on this connection, as
+    /// SQLite's `last_insert_rowid()` reports it, or 0 when there was none.
+    ///
+    /// The default implementation asks the engine with a query; ports whose
+    /// engine they call directly answer without one.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the engine cannot be asked
+    public long lastInsertRowId() throws IOException {
+        return queryLong("SELECT last_insert_rowid()");
+    }
+
+    private long queryLong(String sql) throws IOException {
+        Cursor c = executeQuery(sql);
+        try {
+            return c.next() ? c.getRow().getLong(0) : 0;
+        } finally {
+            c.close();
+        }
+    }
+
+    /// True when [#createFunction(String, int, SqlFunction)] works on this
+    /// database. Android's framework SQLite has no API for it, and the
+    /// browser's database is not SQLite.
+    public boolean supportsFunctions() {
+        return false;
+    }
+
+    /// Makes a Java function callable from SQL on this connection, under
+    /// `name` with `argCount` arguments (-1 for any number), replacing a
+    /// function of the same name and arity. A `null` function removes it.
+    ///
+    /// The default implementation reports that the platform cannot do it; it
+    /// is concrete rather than abstract because `Database` is subclassed
+    /// outside this repository.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the platform has no SQL functions, or the engine
+    ///   refuses the definition
+    public void createFunction(String name, int argCount, SqlFunction function) throws IOException {
+        throw new IOException("SQL functions are not supported on this platform");
+    }
+
     /// `Row#getColumnType(int)`: the value is SQL NULL.
     public static final int COLUMN_NULL = 0;
     /// `Row#getColumnType(int)`: the value is stored as a signed integer.
@@ -966,6 +1096,15 @@ public abstract class Database {
         if (sql == null) {
             return;
         }
+        if (isPlainStatement(sql)) {
+            return;
+        }
+        if (sql.indexOf(';') < 0 && !mayControlTransaction(sql)) {
+            if (mentionsAttachment(sql)) {
+                reconcileAttachments();
+            }
+            return;
+        }
         String[] statements = SQLStatementSplitter.split(sql);
         for (String statement : statements) {
             String keyword = transactionControlKeyword(statement);
@@ -1005,11 +1144,76 @@ public abstract class Database {
 
     /// Whether a script could have changed what is attached, cheaply enough to ask every time.
     private static boolean mentionsAttachment(String sql) {
-        String upper = sql.toUpperCase();
         // Both words, because one is not a substring of the other: a standalone DETACH left the
         // reservation in place until the connection closed, and every delete, conversion and key
-        // change on that database was refused in the meantime.
-        return upper.indexOf("ATTACH") >= 0 || upper.indexOf("DETACH") >= 0;
+        // change on that database was refused in the meantime. Compared in place rather than
+        // through toUpperCase(), which allocates on every statement and folds by locale.
+        int last = sql.length() - 6;
+        for (int iter = 0; iter <= last; iter++) {
+            char c = sql.charAt(iter);
+            if ((c == 'A' || c == 'a') && sql.regionMatches(true, iter + 1, "TTACH", 0, 5)) {
+                return true;
+            }
+            if ((c == 'D' || c == 'd') && sql.regionMatches(true, iter + 1, "ETACH", 0, 5)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// SQL strings already found plain by [#isPlainStatement(String)], by identity.
+    private final String[] plainStatements = new String[8];
+    private int plainNext;
+
+    /// Whether `sql` is one statement that neither attaches nor detaches a database and
+    /// neither opens nor ends a transaction or savepoint: the statement nearly every call runs,
+    /// for which the attachment and transaction bookkeeping has nothing to do.
+    ///
+    /// Remembered by identity for the last few strings, so a statement an application keeps in a
+    /// constant (or a binding layer keeps in its statement cache) is read once rather than on
+    /// every execution. A string that is not plain is never remembered and is read each time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the SQL about to run
+    ///
+    /// #### Returns
+    ///
+    /// true when the bookkeeping may be skipped for it
+    protected final boolean isPlainStatement(String sql) {
+        if (sql == null) {
+            return false;
+        }
+        for (String known : plainStatements) {
+            if (known == sql) { //NOPMD CompareObjectsWithEquals - identity is the point
+                return true;
+            }
+        }
+        boolean plain = (sql.indexOf(';') < 0 || !SQLStatementSplitter.isMultiStatement(sql))
+                && !mentionsAttachment(sql) && !mayControlTransaction(sql);
+        if (plain) {
+            plainStatements[plainNext] = sql;
+            plainNext = (plainNext + 1) % plainStatements.length;
+        }
+        return plain;
+    }
+
+    /// Whether a single statement's leading keyword is `keyword`, an upper-case ASCII word,
+    /// compared in place.
+    private static boolean leadingKeywordIs(String statement, String keyword) {
+        int start = skipLeadingTrivia(statement, 0);
+        int end = start + keyword.length();
+        return statement.regionMatches(true, start, keyword, 0, keyword.length())
+                && (end >= statement.length() || !isKeywordChar(statement.charAt(end)));
+    }
+
+    /// Whether a statement with no `;` in it could change the transaction or savepoint state,
+    /// read without splitting it or copying its keyword: nearly every statement an application
+    /// runs answers no, and this runs after each of them.
+    private static boolean mayControlTransaction(String statement) {
+        return leadingKeywordIs(statement, "BEGIN") || leadingKeywordIs(statement, "COMMIT")
+                || leadingKeywordIs(statement, "END") || leadingKeywordIs(statement, "ROLLBACK")
+                || leadingKeywordIs(statement, "SAVEPOINT") || leadingKeywordIs(statement, "RELEASE");
     }
 
     /// The databases this connection has attached, by the schema name they were attached as.
@@ -1082,7 +1286,8 @@ public abstract class Database {
         // Every execute path on every port passes through here, which makes it the first place a
         // refusal from the previous statement's reconciliation can be thrown from.
         requireAttachmentsHeld();
-        if (sql == null) {
+        if (sql == null || isPlainStatement(sql) || !mentionsAttachment(sql)) {
+            // No ATTACH anywhere in the text, so no statement of it can lead with one.
             return;
         }
         for (String statement : SQLStatementSplitter.split(sql)) {
@@ -1181,7 +1386,8 @@ public abstract class Database {
     /// - `IOException`: if a database it may attach is being deleted or converted
     protected void reserveAttachments(String sql, Object[] params) throws IOException {
         reserveAttachments(sql);
-        if (params == null || params.length == 0 || sql == null || !mentionsAttachment(sql)) {
+        if (params == null || params.length == 0 || sql == null || isPlainStatement(sql)
+                || !mentionsAttachment(sql)) {
             return;
         }
         if ("ATTACH".equals(leadingKeyword(sql))) {
@@ -1566,7 +1772,7 @@ public abstract class Database {
         String[] words = splitWords(statement.substring(leadingKeywordEnd(statement)));
         java.util.Vector target = new java.util.Vector();
         for (String word : words) {
-            String upper = word.toUpperCase();
+            String upper = upperAscii(word);
             if (target.isEmpty() && "DATABASE".equals(upper)) {
                 // The optional keyword, which is not part of the filename.
                 continue;
@@ -2159,7 +2365,7 @@ public abstract class Database {
         // that only ever reads would otherwise never be told its ATTACH was undone, and would
         // read "no such table" as a database that has lost its contents.
         requireAttachmentsHeld();
-        if (isLegacyBehavior() || sql == null) {
+        if (isLegacyBehavior() || sql == null || isPlainStatement(sql)) {
             return;
         }
         String keyword = leadingKeyword(sql);
@@ -2760,6 +2966,69 @@ public abstract class Database {
         } else {
             execute(sql, coerceToText(params, "execute"));
         }
+    }
+
+    /// The message of the last failure [#executeStatus(String, Object[], long[])] reported.
+    private String statusMessage;
+
+    /// Runs an update statement and answers whether it succeeded, rather than throwing.
+    ///
+    /// The same statement and parameters as [#execute(String, Object...)], for a caller that runs
+    /// many statements in a loop. An exception unwinds through every frame that has a handler, and
+    /// on a native runtime each such frame pays for setting the handler up on every call, whether
+    /// or not anything throws; a port whose engine reports a status overrides this to check that
+    /// code instead, with no handler anywhere on the way. This implementation wraps the throwing
+    /// method, so every port answers the same thing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the sql to execute
+    ///
+    /// - `params`: the values to bind, as for [#execute(String, Object...)]; null for none
+    ///
+    /// - `counts`: null, or an array of at least two that receives, when the statement ran, what
+    ///   [#changes()] and [#lastInsertRowId()] would answer next
+    ///
+    /// #### Returns
+    ///
+    /// 0 when the statement ran, otherwise a non-zero code; [#getStatusMessage()] then says why
+    public int executeStatus(String sql, Object[] params, long[] counts) {
+        try {
+            execute(sql, params);
+            if (counts != null) {
+                counts[0] = changes();
+                counts[1] = lastInsertRowId();
+            }
+            return 0;
+        } catch (IOException err) {
+            return failStatus(err.getMessage(), 1);
+        }
+    }
+
+    /// The message of the last failure [#executeStatus(String, Object[], long[])] reported.
+    ///
+    /// #### Returns
+    ///
+    /// the message, or null if no failure was reported yet
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    /// Records a failure for [#getStatusMessage()] and answers its code, for a port's
+    /// [#executeStatus(String, Object[], long[])].
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: why the statement failed
+    ///
+    /// - `code`: the non-zero code to report
+    ///
+    /// #### Returns
+    ///
+    /// `code`
+    protected final int failStatus(String message, int code) {
+        statusMessage = message;
+        return code;
     }
 
     /// Renders parameters as text for ports that have not implemented typed binding.

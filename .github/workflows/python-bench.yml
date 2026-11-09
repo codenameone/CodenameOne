@@ -24,7 +24,9 @@ on:
       # The ParparVM arm translates and compiles with these.
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
-      - 'vm/selfhost/compile-dist.sh'
+      # The native arm is a Linux port application (embedded, headless).
+      - 'Ports/LinuxPort/**'
+      - 'maven/linux/**'
       # Transpiled Python runs on the core's classes (collections, io/gzip).
       - 'CodenameOne/src/**'
       - 'maven/core/**'
@@ -65,7 +67,7 @@ jobs:
           JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
               -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
-              -pl core,python-transpiler,compat-testing,backend -am
+              -pl core,linux,python-transpiler,compat-testing,backend -am
 
       # Without -am: core was installed above, and re-resolving it here would
       # rebuild it on the wrong JDK.
@@ -148,13 +150,16 @@ jobs:
     timeout-minutes: 60
     env:
       PYBENCH_M2: ${{ github.workspace }}/m2
+      CN1_DISPLAY: headless
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install clang
+      # clang, cmake and the libraries the embedded Linux port links.
+      - name: Install the native toolchain
         run: |
           bash scripts/ci/apt-get-update.sh
-          sudo apt-get install -y clang time
+          sudo apt-get install -y clang time cmake ninja-build pkg-config \
+              libfreetype-dev libpng-dev libjpeg-dev zlib1g-dev libssl-dev libcurl4-openssl-dev
 
       # The translator runs on JDK 8, the generated Java compiles on JDK 17.
       - name: Set up JDK 8
@@ -192,11 +197,7 @@ jobs:
         run: scripts/python-bench/conformance_parparvm.sh
 
       - name: Measure and gate
-        # Each kernel's clang pass compiled one file at a time, six minutes
-        # a kernel. In parallel, with -flto=thin on the compile and the link,
-        # the binary is the one a single clang invocation makes.
         run: |
-          export CN1_COMPILE_JOBS="$(nproc)"
           python3 scripts/python-bench/parparvm_table.py --json python-bench-parparvm.json --check \
               | tee -a "$GITHUB_STEP_SUMMARY"
 

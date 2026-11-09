@@ -164,6 +164,21 @@ public final class PythonTranspiler {
     ///        size, so `CN1_HTTP_VT_STACK` can still ask for more at start-up
     public static Map<String, String> transpile(Map<String, String> sources, String mainModule,
             List<java.io.File> classPath, Map<String, String> nativeModules, int virtualThreadStack) {
+        return transpile(sources, mainModule, classPath, nativeModules, virtualThreadStack,
+                java.util.Collections.<String>emptySet(), null);
+    }
+
+    /// @param libraries the source paths that came from PyPI rather than the
+    ///        application. In those, `eval`, `exec`, `compile`, `__import__`
+    ///        and the `sys` frame hooks raise `NotImplementedError` where they
+    ///        run instead of failing the build: libraries keep them in helpers
+    ///        an application never calls, and a port should not edit them
+    /// @param deferred receives `file:line:col: what` for each such use, for
+    ///        the build to report; may be null
+    public static Map<String, String> transpile(Map<String, String> sources, String mainModule,
+            List<java.io.File> classPath, Map<String, String> nativeModules, int virtualThreadStack,
+            Set<String> libraries, List<String> deferred) {
+        List<String> notes = deferred == null ? new ArrayList<String>() : deferred;
         if (virtualThreadStack <= 0) {
             throw new IllegalArgumentException("virtual thread stack must be positive: " + virtualThreadStack);
         }
@@ -231,6 +246,7 @@ public final class PythonTranspiler {
                 throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
             }
         }
+        Set<String> reached = closed ? Closed.reachedInto(moduleBodies(trees)) : null;
         for (Map.Entry<String, String> e : sources.entrySet()) {
             String path = e.getKey().replace('\\', '/');
             if (!path.endsWith(".py")) {
@@ -248,10 +264,16 @@ public final class PythonTranspiler {
             String cls = className(module);
             Node.Module tree = trees.get(path);
             Scope scope = ScopeBuilder.build(tree, path);
-            // The standard library is written to be correct without the
-            // whole-program types, and is left out of the closed-world check.
-            String java = new Emitter(path, module, isPackage, PACKAGE, cls, scope)
-                    .closed(closed && !stdlib.contains(path)).emit(tree);
+            // The standard library is left out of the program's closed-world
+            // check: a module of it that is not closed would open every
+            // program importing it. Each is typed on its own instead.
+            Emitter emitter = new Emitter(path, module, isPackage, PACKAGE, cls, scope)
+                    .closed(closed && !reached.contains(module)
+                            && (!stdlib.contains(path) || typedLibrary(module, tree, reached)));
+            if (libraries.contains(path)) {
+                emitter.deferDynamic(notes);
+            }
+            String java = emitter.emit(tree);
             java = withLineMap(java, path.replace('\\', '/'));
             out.put(PACKAGE.replace('.', '/') + "/" + cls + ".java", java);
             classes.put(module, cls);
@@ -273,6 +295,27 @@ public final class PythonTranspiler {
         }
         out.put(PACKAGE.replace('.', '/') + "/PythonModules.java", registry(classes, mainModule, interop != null, server, db,
                 image, serverImage, nativeModules));
+        return out;
+    }
+
+    /// Whether the standard library module `module` gets whole-program types
+    /// in a closed program: when it is closed by itself, and no other module
+    /// of the program subclasses its classes or stores onto it.
+    private static boolean typedLibrary(String module, Node.Module tree, Set<String> reached) {
+        String why = Closed.reason(java.util.Collections.singletonList(tree.body), true);
+        return why == null && !reached.contains(module) && !reached.contains("*");
+    }
+
+    /// Each module's dotted name to its body.
+    private static Map<String, List<Node.Stmt>> moduleBodies(Map<String, Node.Module> trees) {
+        Map<String, List<Node.Stmt>> out = new LinkedHashMap<String, List<Node.Stmt>>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            String stem = e.getKey().substring(0, e.getKey().length() - 3);
+            if ("__init__".equals(stem) || stem.endsWith("/__init__")) {
+                stem = "__init__".equals(stem) ? "" : stem.substring(0, stem.length() - "/__init__".length());
+            }
+            out.put(stem.replace('/', '.'), e.getValue().body);
+        }
         return out;
     }
 

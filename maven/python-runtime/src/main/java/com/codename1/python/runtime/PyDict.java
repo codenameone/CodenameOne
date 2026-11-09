@@ -62,15 +62,22 @@ public class PyDict extends PyObject {
     /// its arrays are allocated once at that size rather than at the first
     /// growth's.
     public PyDict(int n) {
-        if (n > 0 && n <= LINEAR) {
-            keys = new Object[n];
-            values = new Object[n];
-            hashes = new long[n];
-        } else {
-            // A larger literal grows as it is filled, index table included.
+        if (n <= 0) {
             keys = NO_OBJECTS;
             values = NO_OBJECTS;
             hashes = NO_HASHES;
+            return;
+        }
+        keys = new Object[n];
+        values = new Object[n];
+        hashes = new long[n];
+        if (n > LINEAR) {
+            // The index table at the size grow() would reach for n entries, once.
+            int t = 16;
+            while (n * 3 >= t * 2) {
+                t *= 2;
+            }
+            index = newIndex(t);
         }
     }
 
@@ -325,6 +332,13 @@ public class PyDict extends PyObject {
         return v;
     }
 
+    /// [#setItem] answering the dict: what a literal compiles to, one call per pair on a dict
+    /// made at its final size, so building one allocates no array of its pairs.
+    public PyDict put(Object key, Object value) {
+        setItem(key, value);
+        return this;
+    }
+
     @Override
     public void setItem(Object key, Object value) {
         long h = Py.keyHash(key, "a dict key");
@@ -493,6 +507,34 @@ public class PyDict extends PyObject {
         }
         if (other instanceof PyDict) {
             PyDict d = (PyDict) other;
+            if (size == 0 && used == 0 && d.size == 0) {
+                return;
+            }
+            if (size == 0 && used == 0 && d.size <= LINEAR && getClass() == PyDict.class) {
+                // `dict(small)`, as every `self.attrib = dict(attrib)` is: the
+                // entries and their hashes copied once into arrays of the right
+                // size, rather than hashed again and grown on the way.
+                int cap = Math.max(4, d.size);
+                Object[] nk = new Object[cap];
+                Object[] nv = new Object[cap];
+                long[] nh = new long[cap];
+                int w = 0;
+                for (int i = 0; i < d.used; i++) {
+                    if (d.keys[i] != null) {
+                        nk[w] = d.keys[i];
+                        nv[w] = d.values[i];
+                        nh[w] = d.hashes[i];
+                        w++;
+                    }
+                }
+                keys = nk;
+                values = nv;
+                hashes = nh;
+                used = w;
+                size = w;
+                index = null;
+                return;
+            }
             for (int i = 0; i < d.used; i++) {
                 if (d.keys[i] != null) {
                     setItem(d.keys[i], d.values[i]);
@@ -500,7 +542,17 @@ public class PyDict extends PyObject {
             }
             return;
         }
-        Object keysFn = Py.obj(other).getAttrOrNull("keys");
+        Object keysFn;
+        try {
+            keysFn = Py.obj(other).getAttrOrNull("keys");
+        } catch (PyException e) {
+            // A __getattr__ that raises AttributeError means "no keys", and
+            // the argument is read as pairs (dict(pydantic_model)).
+            if (!e.matches(Py.ATTRIBUTE_ERROR)) {
+                throw e;
+            }
+            keysFn = null;
+        }
         if (keysFn != null) {
             Object it = Py.iter(Py.obj(keysFn).call(Py.NO_ARGS, Py.NO_KW));
             for (Object k = Py.next(it); k != null; k = Py.next(it)) {

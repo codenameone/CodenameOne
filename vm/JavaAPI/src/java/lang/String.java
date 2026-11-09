@@ -93,6 +93,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     private native boolean cn1InlineLatin1();
     private native char cn1InlineCharAt(int index);
 
+    // Bulk compare and search over either storage, so a search does not read
+    // both strings a char at a time through charInternal -- a native call per
+    // char on the inline store. Callers check bounds first. Each answers -2 for
+    // "not here, take the Java loop", which the JavaScript port always does.
+    private native int cn1RegionMatch(int thisStart, String other, int start, int length);
+    private native int cn1IndexOfString(String sub, int from);
+
     /** Latin-1 storage: one byte per character, the character IS the byte. */
     private boolean isLatin1() {
         return value == null ? cn1InlineLatin1() : value instanceof byte[];
@@ -236,7 +243,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len){
-        this(bytesToChars(checkRange(bytes, off, len), off, len, "UTF-8"));
+        this(checkRange(bytes, off, len), off, len, "UTF-8", true);
     }
 
     /**
@@ -246,13 +253,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, int off, int len, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(bytesToChars(checkRange(bytes, off, len), off, len, knownEncoding(enc)));
+        this(checkRange(bytes, off, len), off, len, knownEncoding(enc), true);
     }
     
     /// Decodes `bytes` with `charset`. Unlike the constructor taking a
     /// charset name, this throws no checked exception, as in the JDK.
     public String(byte[] bytes, java.nio.charset.Charset charset) {
-        this(bytesToChars(bytes, 0, bytes.length, charset.name()));
+        this(bytes, 0, bytes.length, charset.name(), true);
     }
 
     /**
@@ -262,7 +269,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * JDK1.1
      */
     public String(byte[] bytes, java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        this(bytesToChars(bytes, 0, bytes.length, knownEncoding(enc)));
+        this(bytes, 0, bytes.length, knownEncoding(enc), true);
     }
 
     // The native reads len bytes from b + off with no bounds check of its own.
@@ -272,6 +279,61 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
                     + ", array length " + b.length);
         }
         return b;
+    }
+
+    /**
+     * Every byte-decoding constructor lands here, with the range checked and the
+     * encoding resolved. Latin-1 storage is tried FIRST: a Latin-1 decode, and a
+     * UTF-8 or ASCII decode of bytes below 0x80 (almost all of the text a program
+     * decodes -- markup, numbers, identifiers), IS a copy of the bytes, so the
+     * String is one allocation and one pass, as CPython's ASCII fast path is. Only
+     * input with a multi-byte sequence goes through the native decoder and a
+     * char[], and even then the result is packed back to Latin-1 when it fits.
+     *
+     * The unconditional {@code this.value = new byte[len]} is the shape
+     * FusedConstructor packs inside the String (see String(char[],int,int)).
+     */
+    private String(byte[] bytes, int off, int len, String encoding, boolean resolved) {
+        this.value = new byte[len];
+        byte[] out = latin1Value();
+        boolean latin1 = "ISO-8859-1".equals(encoding);
+        boolean ascii = latin1 || "UTF-8".equals(encoding) || "US-ASCII".equals(encoding);
+        int i = 0;
+        if (ascii) {
+            if (latin1) {
+                System.arraycopy(bytes, off, out, 0, len);
+                i = len;
+            } else {
+                while (i < len) {
+                    byte b = bytes[off + i];
+                    if (b < 0) {
+                        break;
+                    }
+                    out[i] = b;
+                    i++;
+                }
+            }
+        }
+        if (i == len) {
+            this.count = len;
+            return;
+        }
+        char[] chars = bytesToChars(bytes, off, len, encoding);
+        this.count = chars.length;
+        // Scan before packing: text that needs UTF-16 (a dash, a quote, any CJK)
+        // keeps the decoder's array, and a Latin-1 array is allocated only when
+        // it will be kept.
+        int n = chars.length;
+        int k = 0;
+        while (k < n && chars[k] <= 0xFF) {
+            k++;
+        }
+        if (k < n) {
+            this.value = chars;
+        } else {
+            this.value = new byte[n];
+            packLatin1(chars, 0, n);
+        }
     }
 
     private static native char[] bytesToChars(byte[] b, int off, int len, String encoding); 
@@ -539,7 +601,11 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
                 }
                 continue;
             }
-            return toLowerCase().compareTo(anotherString.toLowerCase());
+            // Upper THEN lower, the order the JDK folds each character in: MICRO
+            // SIGN (U+00B5) upper-cases to GREEK CAPITAL MU, which lower-cases to
+            // GREEK SMALL MU (U+03BC), so lower-casing alone answered that the
+            // micro sign differs from its own upper case (StrQueryT).
+            return toUpperCase().toLowerCase().compareTo(anotherString.toUpperCase().toLowerCase());
         }
         return n1 - n2;
     }
@@ -672,6 +738,15 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
 
     private static native byte[] charsToBytes(char[] arr, char[] encoding);
+
+    /// The encoding name in the form charsToBytes reads, which only reads it. The
+    /// name is stored as Latin-1, so asking it for chars is a copy; UTF-8, which
+    /// nearly every caller names, shares one array instead.
+    private static final char[] UTF8_NAME = {'U', 'T', 'F', '-', '8'};
+
+    private static char[] encodingChars(String enc) {
+        return "UTF-8".equals(enc) ? UTF8_NAME : enc.toCharNoCopy();
+    }
     private native byte[] compactBytes(String encoding);
     
     /**
@@ -687,12 +762,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             if(enc == null) {
                 return charsToBytes(toCharNoCopy(), null);
             }
-            return charsToBytes(toCharNoCopy(), enc.toCharNoCopy()); 
+            return charsToBytes(toCharNoCopy(), encodingChars(enc)); 
         } 
         if(enc == null) {
             return charsToBytes(toCharArray(), null); 
         }
-        return charsToBytes(toCharArray(), enc.toCharNoCopy()); 
+        return charsToBytes(toCharArray(), encodingChars(enc)); 
     }
     
     /// The name the encoding natives know `enc` by: the canonical name of a
@@ -712,7 +787,9 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (enc == null) {
             throw new NullPointerException("charsetName");
         }
-        if ("UTF-8".equals(enc)) {
+        // The canonical spellings, as nearly every caller passes them: no
+        // case folding and no Charset lookup.
+        if ("UTF-8".equals(enc) || "ISO-8859-1".equals(enc) || "US-ASCII".equals(enc)) {
             return enc;
         }
         if (enc.equalsIgnoreCase("UTF-16") || enc.equalsIgnoreCase("UTF16")) {
@@ -798,6 +875,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             if (subCount > _count) {
                 return -1;
             }
+            int fast = cn1IndexOfString(string, 0);
+            if (fast != -2) {
+                return fast;
+            }
             char firstChar = string.charInternal(0);
             while (true) {
                 int i = indexOf(firstChar, start);
@@ -834,6 +915,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (subCount > 0) {
             if (subCount + start > _count) {
                 return -1;
+            }
+            int fast = cn1IndexOfString(subString, start);
+            if (fast != -2) {
+                return fast;
             }
             char firstChar = subString.charInternal(0);
             while (true) {
@@ -1011,6 +1096,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (length <= 0) {
             return true;
         }
+        int fast = cn1RegionMatch(thisStart, string, start, length);
+        if (fast >= 0) {
+            return fast == 1;
+        }
         for (int i = 0; i < length; ++i) {
             if (charInternal(thisStart + i) != string.charInternal(start + i)) {
                 return false;
@@ -1121,6 +1210,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         // its bytes when it is Latin-1 -- purely to feed append(char[],int,int),
         // when append(CharSequence,int,int) reads the ranges straight out of this
         // string and keeps the builder's own compact representation.
+        int next = idx + targetLen <= count - targetLen ? indexOf(targetStr, idx + targetLen) : -1;
+        if (next < 0) {
+            // One match, the usual case: a fused concat of the three pieces is
+            // one allocation, where a builder takes its lock per append, grows
+            // and is copied again by toString.
+            return cn1Concat3(substring(0, idx), replacementStr, substring(idx + targetLen));
+        }
         StringBuilder sb = new StringBuilder(count);
         int prev = 0;
         while (idx >= 0) {
@@ -1144,8 +1240,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Tests if this string starts with the specified prefix beginning at the specified index.
      */
     public boolean startsWith(java.lang.String prefix, int toffset){
-        if(toffset + prefix.count > count) {
+        if(toffset < 0 || toffset + prefix.count > count) {
             return false;
+        }
+        if (prefix.count > 0) {
+            int fast = cn1RegionMatch(toffset, prefix, 0, prefix.count);
+            if (fast >= 0) {
+                return fast == 1;
+            }
         }
         for(int iter = 0 ; iter < prefix.count ; iter++) {
             if(prefix.charInternal(iter) != charInternal(iter + toffset)) {
@@ -1405,7 +1507,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     /// Decodes `length` bytes of `bytes` from `offset` with `charset`.
     public String(byte[] bytes, int offset, int length, Charset charset) {
-        this(bytesToChars(checkRange(bytes, offset, length), offset, length, charset.name()));
+        this(checkRange(bytes, offset, length), offset, length, charset.name(), true);
     }
 
     private static char[] codePointsToChars(int[] codePoints, int offset, int count) {
@@ -1455,8 +1557,32 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             // No Latin-1 character is a surrogate.
             return endIndex - beginIndex;
         }
-        return Character.codePointCount(this, beginIndex, endIndex);
+        // Counted over the storage itself: Character.codePointCount reads a
+        // CharSequence through a virtual charAt per char.
+        int n = endIndex - beginIndex;
+        Object v = value;
+        if (v instanceof char[]) {
+            // len() of every non-Latin-1 str comes here, so the count is a
+            // native vector loop rather than a bounds-checked one per char.
+            return n - surrogatePairs((char[]) v, beginIndex, endIndex);
+        }
+        for (int i = beginIndex; i < endIndex - 1; i++) {
+            char c = charInternal(i);
+            if (c >= '\uD800' && c <= '\uDBFF') {
+                char d = charInternal(i + 1);
+                if (d >= '\uDC00' && d <= '\uDFFF') {
+                    n--;
+                    i++;
+                }
+            }
+        }
+        return n;
     }
+
+    /// The well-formed surrogate pairs in `a[from, to)`: a high surrogate
+    /// directly followed by a low one. Pairs never overlap, so every such
+    /// position counts.
+    private static native int surrogatePairs(char[] a, int from, int to);
 
     /// The index `codePointOffset` code points away from `index`.
     public int offsetByCodePoints(int index, int codePointOffset) {
