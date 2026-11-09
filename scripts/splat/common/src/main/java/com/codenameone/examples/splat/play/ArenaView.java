@@ -27,8 +27,10 @@ import com.codename1.gaming.ParticleEmitter;
 import com.codename1.gaming.TouchControls;
 import com.codename1.gaming.VirtualButton;
 import com.codename1.gaming.VirtualJoystick;
+import com.codename1.gpu.GltfScene;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Material;
+import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.Primitives;
@@ -87,8 +89,25 @@ public class ArenaView extends GameView {
     /// spent on the first metre, and at 3 cm paint on the floor fought the
     /// floor for every pixel past twenty metres.
     private static final float NEAR = 0.07f;
+    private static final float FP_NEAR = 0.2f;
+    /// Your eyes, from your operator's head bone, in metres.
+    private static final float EYE_ABOVE_HEAD = 0.07f;
+    private static final float EYE_AHEAD_OF_HEAD = 0.07f;
     private static final float OPERATOR_HEIGHT = 1.8f;
-    private static final float MARKER_LENGTH = 0.28f;
+    /// From the grip to the end of a held marker's barrel, in metres.
+    private static final float MUZZLE_REACH = 0.36f;
+    private static final float CHEER_HEIGHT = 0.3f;
+    /// Where the gun hand rests in the gun-up poses, in the rig's own units
+    /// (measured from Idle_Gun_Shoot and Run_Shoot): right, up, ahead.
+    private static final float CARRY_X = -0.16f;
+    private static final float CARRY_Y = 1.33f;
+    private static final float CARRY_Z = 0.49f;
+    /// How far apart the winners stand to cheer, in metres.
+    private static final float CHEER_ROOM = 1.1f;
+    /// From the wrist joint to the middle of the palm, along the marker and
+    /// below it, in metres.
+    private static final float GRIP_REACH = 0.07f;
+    private static final float GRIP_DROP = 0.02f;
     /// A marker in another operator's hands, in metres. Real ones are about
     /// this long; at the viewmodel's size they vanished into a fist, and
     /// half the field looked unarmed.
@@ -188,6 +207,11 @@ public class ArenaView extends GameView {
     private final ParticleEmitter[] goo = new ParticleEmitter[2];
     private ParticleEmitter dust;
     private ParticleEmitter flash;
+    /// The gas a marker vents with each shot, hanging at the muzzle.
+    private ParticleEmitter puff;
+    /// A streak behind every ball in flight, per team, so a shot reads as a
+    /// shot from across the yard.
+    private final ParticleEmitter[] trail = new ParticleEmitter[2];
     private ParticleEmitter motes;
     private float moteClock;
     private int moteSeed = 0x2545f491;
@@ -198,9 +222,18 @@ public class ArenaView extends GameView {
     private final Model[] flagCloth = new Model[2];
     private final Model[] flagBase = new Model[2];
     private float flagWave;
-    private AnimatedModel viewModel;
-    private float viewScale;
     private final float[] hand = new float[16];
+    private final float[] gunTurn = new float[16];
+    private final float[] bodyTurn = new float[16];
+    private final float[] aimTurn = new float[16];
+    private final float[] pitchTurn = new float[16];
+    /// Per operator, the mesh node of its head, hidden in your own view.
+    private String[] headNodes = new String[0];
+    /// The operator whose head is hidden because you are looking out of it.
+    private int headless = -1;
+    /// Per operator, the end of the barrel in the world, for the flash.
+    private float[][] muzzle = new float[0][];
+    private final float[] gunTurnB = new float[16];
     private float recoil;
     private float viewMuzzleX;
     private float viewMuzzleY;
@@ -353,6 +386,7 @@ public class ArenaView extends GameView {
         int n = match.playerCount();
         operators = new AnimatedModel[n];
         held = new AnimatedModel[n];
+        muzzle = new float[n][3];
         opScale = new float[n];
         heldScale = new float[n];
         clips = new String[n];
@@ -392,12 +426,13 @@ public class ArenaView extends GameView {
             addModel(decals[i]);
         }
         effects(d);
-        if (driver.interactive()) {
-            // The marker in your hands, added last so it draws over the field.
-            Player me = match.player(Math.min(driver.me(), n - 1));
-            viewModel = Models.create(d, Models.marker(me.marker.id));
-            viewScale = length(viewModel, MARKER_LENGTH);
-            viewModel.addTo(this);
+        // There is no separate marker for your own view: you see your own
+        // operator, head hidden, and the marker in its hands (`firstPerson`).
+        // A marker drawn on its own, with no arms, read as a gun floating in
+        // front of the camera.
+        headNodes = new String[n];
+        for (int i = 0; i < n; i++) {
+            headNodes[i] = headNode(operators[i]);
         }
         remember();
         touchControls();
@@ -453,6 +488,33 @@ public class ArenaView extends GameView {
         float s = height / Math.max(0.01f, b[4] - b[1]);
         m.setScale(s);
         return s;
+    }
+
+    /// Sets the model's Euler angles from a column-major rotation, in the
+    /// order `Model` composes them (Rz * Ry * Rx).
+    private static void setEuler(AnimatedModel m, float[] r) {
+        float r20 = r[2];
+        float r21 = r[6];
+        float r22 = r[10];
+        float r10 = r[1];
+        float r00 = r[0];
+        if (r20 > 1f) {
+            r20 = 1f;
+        } else if (r20 < -1f) {
+            r20 = -1f;
+        }
+        double ry = MathUtil.asin(-r20);
+        double rx;
+        double rz;
+        if (Math.abs(r20) < 0.9999f) {
+            rx = MathUtil.atan2(r21, r22);
+            rz = MathUtil.atan2(r10, r00);
+        } else {
+            // gimbal lock: fold the whole turn into x
+            rx = MathUtil.atan2(-r[9], r[5]);
+            rz = 0;
+        }
+        m.setRotation((float) Math.toDegrees(rx), (float) Math.toDegrees(ry), (float) Math.toDegrees(rz));
     }
 
     /// Scales `m` so its longest side is `len` and returns the scale.
@@ -1126,11 +1188,18 @@ public class ArenaView extends GameView {
                     recoil = 1f;
                     Sfx.fire();
                     // your own flash sits at the marker you hold, not the ball
-                    flash.burst(viewMuzzleX, viewMuzzleY, viewMuzzleZ, 3);
+                    flash.burst(viewMuzzleX, viewMuzzleY, viewMuzzleZ, 6);
+                    puff.burst(viewMuzzleX, viewMuzzleY, viewMuzzleZ, 4);
                 } else {
                     Sfx.fireAt(place(e.x, e.z, 35), pan);
                     if (near(e.x, e.z)) {
-                        flash.burst(-e.x * MM, e.y * MM, e.z * MM, 3);
+                        // at the end of the shooter's barrel, where it is drawn
+                        boolean held = e.a >= 0 && e.a < muzzle.length && operators[e.a].isVisible();
+                        float fx = held ? muzzle[e.a][0] : -e.x * MM;
+                        float fy = held ? muzzle[e.a][1] : e.y * MM;
+                        float fz = held ? muzzle[e.a][2] : e.z * MM;
+                        flash.burst(fx, fy, fz, 6);
+                        puff.burst(fx, fy, fz, 4);
                     }
                 }
             } else if (e.kind == Event.WIPE_OK && e.a == me) {
@@ -1267,9 +1336,17 @@ public class ArenaView extends GameView {
         dust = new ParticleEmitter(d, 200).setColor(0x509a8f80).setSpeed(0.4f, 1.6f).setLifetime(0.9f, 1.8f)
                 .setSize(0.2f, 1.0f).setGravity(-0.25f).setDrag(2f).setDirection(0f, 1f, 0f, 70f);
         dust.addTo(this);
-        flash = new ParticleEmitter(d, 48).setColor(0xffffc778).setAdditive(true).setSpeed(0f, 0.6f)
-                .setLifetime(0.04f, 0.08f).setSize(0.22f, 0.05f);
+        flash = new ParticleEmitter(d, 96).setColor(0xffffd28a).setAdditive(true).setSpeed(0.2f, 1.4f)
+                .setLifetime(0.06f, 0.11f).setSize(0.34f, 0.06f);
         flash.addTo(this);
+        puff = new ParticleEmitter(d, 120).setColor(0x70e8e8e8).setSpeed(0.3f, 1.1f).setLifetime(0.3f, 0.6f)
+                .setSize(0.06f, 0.32f).setGravity(-0.2f).setDrag(3f);
+        puff.addTo(this);
+        for (int t = 0; t < 2; t++) {
+            trail[t] = new ParticleEmitter(d, 900).setColor(0xc0000000 | (TEAM_COLORS[t] & 0xffffff))
+                    .setSpeed(0f, 0.05f).setLifetime(0.12f, 0.2f).setSize(0.05f, 0.012f);
+            trail[t].addTo(this);
+        }
         // dust caught in the sun: a few faint specks drifting around the eye
         motes = new ParticleEmitter(d, 90).setColor(0x55fff1d6).setAdditive(true).setSpeed(0.02f, 0.12f)
                 .setLifetime(3f, 6f).setSize(0.012f, 0.02f).setGravity(-0.01f);
@@ -1328,6 +1405,9 @@ public class ArenaView extends GameView {
         }
         dust.update(dt, c);
         flash.update(dt, c);
+        puff.update(dt, c);
+        trail[0].update(dt, c);
+        trail[1].update(dt, c);
         drift(dt);
         motes.update(dt, c);
     }
@@ -1454,8 +1534,16 @@ public class ArenaView extends GameView {
         overheadNow = !replaying && (overheadChosen || driver.interactive() && !self.alive()
                 && System.currentTimeMillis() > replayStartAt + 600 && !m.over());
         boolean firstPerson = driver.interactive() && !replaying && !overheadNow && !m.over();
+        Player eye = m.player(me);
         for (int i = 0; i < operators.length && i < m.playerCount(); i++) {
             operator(m, i, i == me && firstPerson, dt);
+            // Someone standing inside you -- a teammate on the same spawn --
+            // would fill the view from the inside out; a shooter hides them.
+            if (firstPerson && i != me && Math.abs(m.player(i).x() - eye.x()) < Match.RADIUS * 2
+                    && Math.abs(m.player(i).z() - eye.z()) < Match.RADIUS * 2) {
+                operators[i].setVisible(false);
+                held[i].setVisible(false);
+            }
         }
         List<Ball> live = m.balls();
         for (int i = 0; i < MAX_BALLS; i++) {
@@ -1469,6 +1557,9 @@ public class ArenaView extends GameView {
                 balls[i].setScale(b.grenade() ? 0.2f : 0.07f);
                 balls[i].setPosition(-bx, by, bz);
                 balls[i].setVisible(true);
+                if (!b.grenade()) {
+                    trail[b.team() & 1].burst(-bx, by, bz, 2);
+                }
             } else {
                 balls[i].setVisible(false);
             }
@@ -1529,14 +1620,42 @@ public class ArenaView extends GameView {
         wasAlive[i] = p.alive();
         AnimatedModel op = operators[i];
         AnimatedModel gun = held[i];
-        op.setVisible(!first);
-        gun.setVisible(!first && p.alive() && !m.over());
-        if (first) {
-            return;
+        op.setVisible(!first || p.alive());
+        gun.setVisible(p.alive() && !m.over());
+        if (first != (headless == i) && headNodes[i] != null) {
+            op.setNodeVisible(headNodes[i], !first);
+            headless = first ? i : -1;
         }
         float x = -lerp(prevX[i], p.x() * MM);
-        float y = lerp(prevY[i], p.y() * MM);
+        float y = lerp(prevY[i], p.y() * MM) + cheerHop(m, i);
         float z = lerp(prevZ[i], p.z() * MM);
+        if (m.over()) {
+            // The team often finishes in a heap on the flag; spread out to
+            // cheer, rather than waving through each other.
+            float sx = 0f;
+            float sz = 0f;
+            for (int j = 0; j < m.playerCount(); j++) {
+                Player q = m.player(j);
+                if (j == i || !q.alive()) {
+                    continue;
+                }
+                float ddx = x + q.x() * MM;
+                float ddz = z - q.z() * MM;
+                float d = (float) Math.sqrt(ddx * ddx + ddz * ddz);
+                if (d < CHEER_ROOM) {
+                    if (d < 0.01f) {
+                        // standing on the same spot: split by index
+                        ddx = j < i ? 1f : -1f;
+                        ddz = 0f;
+                        d = 1f;
+                    }
+                    sx += ddx / d * (CHEER_ROOM - d) * 0.5f;
+                    sz += ddz / d * (CHEER_ROOM - d) * 0.5f;
+                }
+            }
+            x += sx;
+            z += sz;
+        }
         // The body turns smoothly toward the look; the rules turn in steps.
         float target = (float) -(p.yaw() * 360.0 / Trig.FULL);
         float turn = target - bodyYaw[i];
@@ -1559,8 +1678,6 @@ public class ArenaView extends GameView {
         float fwd = moveF[i];
         float side = moveS[i];
         float speed = (float) Math.sqrt(fwd * fwd + side * side);
-        boolean firing = p.input().has(Input.FIRE);
-        boolean slow = p.crouched() || p.input().has(Input.AIM);
         String want;
         float clipSpeed = 1f;
         if (m.over()) {
@@ -1573,14 +1690,18 @@ public class ArenaView extends GameView {
                 want = performance(i, p.paintedAt(), since);
                 clipSpeed = drama(i, p.paintedAt()) == DRAMA_SLOW ? 0.45f : 1f;
             }
+        } else if (first) {
+            // your own arms: the marker up and forward whether you walk or not
+            want = Models.IDLE_SHOOT;
         } else if (speed < 0.6f) {
-            want = firing ? Models.IDLE_SHOOT : Models.IDLE;
-        } else if (slow || speed < 2.6f) {
-            want = Models.WALK;
-        } else if (Math.abs(fwd) >= Math.abs(side) * 0.8f) {
-            want = fwd < 0 ? Models.RUN_BACK : firing ? Models.RUN_SHOOT : Models.RUN;
+            // marker up and ready, as players carry one; the relaxed idle
+            // held it down at the hip, where it read as unarmed
+            want = Models.IDLE_SHOOT;
         } else {
-            want = side > 0 ? Models.RUN_RIGHT : Models.RUN_LEFT;
+            // Armed and moving, in any direction: the gun-up run, slowed to a
+            // walk when they walk. The walk and the strafes swing the gun arm
+            // up to half a metre a stride, and a marker in that hand bounced.
+            want = Models.RUN_SHOOT;
         }
         // A new clip has to be wanted for a moment before it plays, except
         // being painted, which is never late.
@@ -1606,17 +1727,66 @@ public class ArenaView extends GameView {
             op.setSpeed(clipSpeed);
         }
         op.update(replayVictim >= 0 && replaying(m) ? dt * replaySpeed : dt);
+        if (first) {
+            // placed by the camera, which knows where the eye is this frame
+            return;
+        }
         op.setPosition(x, y, z);
         op.setRotation(0f, yawDeg, 0f);
-        if (p.alive() && op.getNodeMatrix(Models.HAND, hand)) {
-            float s = opScale[i];
-            float c = (float) Math.cos(Math.toRadians(yawDeg));
-            float sn = (float) Math.sin(Math.toRadians(yawDeg));
-            float hx = hand[12] * s;
-            float hz = hand[14] * s;
-            gun.setPosition(x + hx * c + hz * sn, op.getY() + hand[13] * s, z - hx * sn + hz * c);
-            gun.setRotation(0f, yawDeg + 180f, 0f);
+        System.arraycopy(Matrix4.rotation((float) Math.toRadians(yawDeg), 0f, 1f, 0f), 0, bodyTurn, 0, 16);
+        float pitchDeg = -p.pitch() * 360f / Trig.FULL;
+        Matrix4.multiply(bodyTurn, Matrix4.rotation((float) Math.toRadians(pitchDeg), 1f, 0f, 0f), aimTurn);
+        attach(i, bodyTurn, aimTurn, x, y, z);
+    }
+
+    /// Puts operator `i`'s marker in its hand. `turn` is the body's rotation
+    /// and `ox, oy, oz` its origin, as the model is placed this frame; `aim`
+    /// is the look the marker points along.
+    ///
+    /// The marker goes where the character's own (hidden) pistol is and turns
+    /// with it, so it stays in the hand through every clip. It used to take
+    /// only the wrist's position and the body's yaw: the hand swung, dropped
+    /// and turned in walk, idle and the performances while the marker stayed
+    /// level and pointing ahead, next to the hand rather than in it.
+    private void attach(int i, float[] turn, float[] aim, float ox, float oy, float oz) {
+        // A fixed carry point on the body, where the gun-up poses hold the
+        // hand, not the hand itself: even those poses move the wrist a hand's
+        // width a stride, and the marker bounced with it.
+        float s = opScale[i];
+        float hx = CARRY_X * s;
+        float hy = CARRY_Y * s;
+        float hz = CARRY_Z * s;
+        float gx = ox + turn[0] * hx + turn[4] * hy + turn[8] * hz;
+        float gy = oy + turn[1] * hx + turn[5] * hy + turn[9] * hz;
+        float gz = oz + turn[2] * hx + turn[6] * hy + turn[10] * hz;
+        AnimatedModel gun = held[i];
+        // The marker takes its place from the hand and its aim from the look.
+        // Taking the wrist's turn as well made it flap: a walking stride turns
+        // the wrist 47 degrees, a run 30.
+        Matrix4.multiply(aim, Matrix4.rotation((float) Math.PI, 0f, 1f, 0f), gunTurnB);
+        setEuler(gun, gunTurnB);
+        // the grip sits in the palm, a hand's width past the wrist joint
+        gx += -gunTurnB[4] * GRIP_DROP - gunTurnB[8] * GRIP_REACH;
+        gy += -gunTurnB[5] * GRIP_DROP - gunTurnB[9] * GRIP_REACH;
+        gz += -gunTurnB[6] * GRIP_DROP - gunTurnB[10] * GRIP_REACH;
+        gun.setPosition(gx, gy, gz);
+        // the marker's barrel runs along its own -z, from the grip
+        muzzle[i][0] = gx - gunTurnB[8] * MUZZLE_REACH;
+        muzzle[i][1] = gy - gunTurnB[9] * MUZZLE_REACH;
+        muzzle[i][2] = gz - gunTurnB[10] * MUZZLE_REACH;
+    }
+
+    /// The mesh node holding the operator's head: the one whose name ends in
+    /// `_Head` (the skeleton's own bone is plain `Head`). Null if there is none.
+    private static String headNode(AnimatedModel op) {
+        GltfScene sc = op.getScene();
+        for (int k = 0; k < sc.getNodeCount(); k++) {
+            String name = sc.getNode(k).getName();
+            if (name != null && name.endsWith("_Head")) {
+                return name;
+            }
         }
+        return null;
     }
 
     /// Over the shooter's right shoulder, looking where they look.
@@ -1663,9 +1833,6 @@ public class ArenaView extends GameView {
         getCamera().setTarget(x + fx * 9f, y + 1.2f, z + fz * 9f);
         sky.setPosition(cx, cy, cz);
         getLight().setShadowCenter(x + fx * SHADOW_AHEAD * 0.6f, 0f, z + fz * SHADOW_AHEAD * 0.6f);
-        if (viewModel != null) {
-            viewModel.setVisible(false);
-        }
     }
 
     static final int DRAMA_PLAIN = 0;
@@ -1721,8 +1888,9 @@ public class ArenaView extends GameView {
         if (m.player(i).team() != w) {
             return Models.IDLE;
         }
-        int beat = (m.tick() / (Match.TICK_HZ / 2) + i) % 6;
-        return (i & 1) == 0 ? beat < 3 ? Models.PUNCH_R : Models.WAVE : beat < 3 ? Models.PUNCH_L : Models.KICK;
+        // waving and jumping (see `cheerHop`). Punches and kicks threw a fist
+        // or a boot straight through the teammate standing next to them.
+        return Models.WAVE;
     }
 
     private boolean replaying(Match m) {
@@ -1730,10 +1898,24 @@ public class ArenaView extends GameView {
     }
 
     private float orbit;
+    private float orbitRise = 2.2f;
+    /// Seconds since the final whistle, for the winners' jumping.
+    private float cheer;
+
+    /// How high a winner is off the ground this frame: everyone on the
+    /// winning team (everyone, on a draw) jumps for joy, each to their own
+    /// beat. The rig has no cheer of its own, so the jump is drawn here.
+    private float cheerHop(Match m, int i) {
+        if (!m.over() || m.winner() >= 0 && m.player(i).team() != m.winner()) {
+            return 0f;
+        }
+        return CHEER_HEIGHT * (float) Math.abs(Math.sin(cheer * 5.5f + i * 1.3f));
+    }
 
     /// Game over: a slow orbit around the winning team, close enough to see
     /// them cheer -- or around everyone, on a draw.
     private void celebrate(Match m, int team, float dt) {
+        cheer += dt;
         float cx = 0f;
         float cz = 0f;
         float cy = 0f;
@@ -1757,14 +1939,19 @@ public class ArenaView extends GameView {
         orbit += dt * 0.35f;
         float ex = cx + (float) Math.sin(orbit) * 5.5f;
         float ez = cz + (float) Math.cos(orbit) * 5.5f;
-        getCamera().setPerspective(HIP_FOV - 10f, NEAR, 400f);
-        getCamera().setPosition(ex, cy + 2.2f, ez);
-        getCamera().setTarget(cx, cy + 1.0f, cz);
-        sky.setPosition(ex, cy + 2.2f, ez);
-        getLight().setShadowCenter(cx, 0f, cz);
-        if (viewModel != null) {
-            viewModel.setVisible(false);
+        // The orbit passes behind cars and containers: rise over whatever is
+        // between the camera and the team, instead of flying through it.
+        float want = 2.2f;
+        while (want < 6f && !m.arena().clear((int) (-ex * 1000f), (int) ((cy + want) * 1000f), (int) (ez * 1000f),
+                (int) (-cx * 1000f), (int) ((cy + 1.0f) * 1000f), (int) (cz * 1000f))) {
+            want += 0.6f;
         }
+        orbitRise += (want - orbitRise) * Math.min(1f, dt * 3f);
+        getCamera().setPerspective(HIP_FOV - 10f, NEAR, 400f);
+        getCamera().setPosition(ex, cy + orbitRise, ez);
+        getCamera().setTarget(cx, cy + 1.0f, cz);
+        sky.setPosition(ex, cy + orbitRise, ez);
+        getLight().setShadowCenter(cx, 0f, cz);
     }
 
     /// The replay's later angles: a fixed camera, as a broadcast would cut to.
@@ -1840,9 +2027,6 @@ public class ArenaView extends GameView {
         getCamera().setTarget(tx, by + 1.1f, tz);
         sky.setPosition(cx, cy, cz);
         getLight().setShadowCenter(bx, 0f, bz);
-        if (viewModel != null) {
-            viewModel.setVisible(false);
-        }
     }
 
     /// High above the field, north up, drifting after the player: the whole
@@ -1864,9 +2048,6 @@ public class ArenaView extends GameView {
         getCamera().setTarget(overX, 0f, overZ + 1.5f);
         sky.setPosition(overX, 25f, overZ - 15f);
         getLight().setShadowCenter(overX, 0f, overZ + 2f);
-        if (viewModel != null) {
-            viewModel.setVisible(false);
-        }
     }
 
     private void camera(Match m, int me, float dt) {
@@ -1893,15 +2074,16 @@ public class ArenaView extends GameView {
         float dz = (float) (Math.cos(yr) * Math.cos(pr));
         boolean aiming = p.alive() && p.input().has(Input.AIM);
         ads += ((aiming ? 1f : 0f) - ads) * Math.min(1f, dt * 14f);
-        getCamera().setPerspective(HIP_FOV + (ADS_FOV - HIP_FOV) * ads + knock * knock * 14f, NEAR, 400f);
+        float fov = HIP_FOV + (ADS_FOV - HIP_FOV) * ads + knock * knock * 14f;
+        // Your own shoulder and upper arm sit at the eye; clipping what is
+        // nearer than FP_NEAR leaves the forearm, hand and marker. Nothing in
+        // the yard gets that close: the rules keep you RADIUS from cover.
+        getCamera().setPerspective(fov, p.alive() ? FP_NEAR : NEAR, 400f);
         getCamera().setPosition(x, eye, z);
         sky.setPosition(x, eye, z);
         getCamera().setTarget(x + dx, eye + dy, z + dz);
         // the shadow map covers what is in front of the eye, not behind it
         getLight().setShadowCenter(x + dx * SHADOW_AHEAD, 0f, z + dz * SHADOW_AHEAD);
-        if (viewModel == null) {
-            return;
-        }
         recoil = Math.max(0f, recoil - dt * 9f);
         // Sway lags the look; bob follows the feet.
         float turn = Trig.wrap(yaw - lastYaw + Trig.FULL / 2) - Trig.FULL / 2;
@@ -1909,6 +2091,10 @@ public class ArenaView extends GameView {
         swayY += ((pitch - lastPitch) * 0.0004f - swayY) * Math.min(1f, dt * 10f);
         lastYaw = yaw;
         lastPitch = pitch;
+        AnimatedModel op = operators[me];
+        if (!p.alive() || !op.isVisible()) {
+            return;
+        }
         Input in = p.input();
         boolean moving = in.forward != 0 || in.strafe != 0;
         if (moving && p.grounded()) {
@@ -1917,26 +2103,42 @@ public class ArenaView extends GameView {
         float hip = 1f - ads;
         float bobX = (float) Math.sin(bob) * 0.012f * hip;
         float bobY = (float) Math.abs(Math.cos(bob)) * 0.014f * hip;
-        // The eye's own frame: right, up and forward.
-        float rx = (float) -Math.cos(yr);
-        float rz = (float) -Math.sin(yr);
-        float ux = (float) (Math.sin(yr) * Math.sin(pr));
-        float uy = (float) Math.cos(pr);
-        float uz = (float) (-Math.cos(yr) * Math.sin(pr));
-        float right = 0.15f * hip + bobX + swayX;
-        float up = -0.13f * hip - 0.06f * ads + bobY + swayY - 0.02f * recoil;
-        float ahead = 0.42f - 0.06f * ads - 0.07f * recoil;
-        viewModel.setPosition(x + dx * ahead + rx * right + ux * up, eye + dy * ahead + uy * up,
-                z + dz * ahead + rz * right + uz * up);
-        // the barrel's end, where the flash goes
-        viewMuzzleX = x + dx * (ahead + MARKER_LENGTH) + rx * right + ux * up;
-        viewMuzzleY = eye + dy * (ahead + MARKER_LENGTH) + uy * up;
-        viewMuzzleZ = z + dz * (ahead + MARKER_LENGTH) + rz * right + uz * up;
+        // Your own operator is the viewmodel: the body turns with the look
+        // (yaw, then pitch) about its own eye, which sits where yours is. In
+        // the shooting pose the right arm reaches out from the shoulder, so
+        // you see a forearm, a hand and the marker in it, low and right,
+        // exactly as the others see you hold it. Pinning the hand to a spot
+        // instead put the shoulders above the eye, and both arms rose up
+        // through the view.
         float yawDeg = -yaw * 360f / Trig.FULL;
-        float pitchDeg = -pitch * 360f / Trig.FULL - recoil * 6f;
-        viewModel.setRotation(pitchDeg, yawDeg + 180f, 0f);
-        viewModel.setScale(viewScale);
-        viewModel.setVisible(p.alive());
+        // the body faces +z, so looking up is a negative turn about x
+        float pitchDeg = -pitch * 360f / Trig.FULL - recoil * 4f;
+        System.arraycopy(Matrix4.rotation((float) Math.toRadians(yawDeg), 0f, 1f, 0f), 0, bodyTurn, 0, 16);
+        System.arraycopy(Matrix4.rotation((float) Math.toRadians(pitchDeg), 1f, 0f, 0f), 0, pitchTurn, 0, 16);
+        Matrix4.multiply(bodyTurn, pitchTurn, gunTurn);
+        System.arraycopy(gunTurn, 0, bodyTurn, 0, 16);
+        if (!op.getNodeMatrix(Models.HEAD, hand)) {
+            return;
+        }
+        float s = opScale[me];
+        // from the head bone to the eyes, then the bob, sway and kick
+        // A portrait phone sees about 18 degrees either side of ahead, and the
+        // gun hand is 22 degrees right of the eye: there the body moves right
+        // (its own -x) so the hand comes into the view.
+        float aspect = (float) getWidth() / Math.max(1, getHeight());
+        float narrow = 0.15f * Math.max(0f, 1f - aspect);
+        float hx = hand[12] * s - (bobX + swayX) * 0.5f - narrow;
+        float hy = hand[13] * s + EYE_ABOVE_HEAD - (bobY + swayY) * 0.5f;
+        float hz = hand[14] * s + EYE_AHEAD_OF_HEAD - 0.04f * ads + 0.05f * recoil;
+        float ox = x - (bodyTurn[0] * hx + bodyTurn[4] * hy + bodyTurn[8] * hz);
+        float oy = eye - (bodyTurn[1] * hx + bodyTurn[5] * hy + bodyTurn[9] * hz);
+        float oz = z - (bodyTurn[2] * hx + bodyTurn[6] * hy + bodyTurn[10] * hz);
+        op.setPosition(ox, oy, oz);
+        op.setRotation(pitchDeg, yawDeg, 0f);
+        attach(me, bodyTurn, bodyTurn, ox, oy, oz);
+        viewMuzzleX = muzzle[me][0];
+        viewMuzzleY = muzzle[me][1];
+        viewMuzzleZ = muzzle[me][2];
     }
 
     private float lerp(float a, float b) {

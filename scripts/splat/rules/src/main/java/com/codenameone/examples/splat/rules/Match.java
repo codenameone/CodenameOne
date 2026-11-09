@@ -39,6 +39,9 @@ public final class Match {
     public static final int HEIGHT = 1750;
     public static final int CROUCH_HEIGHT = 1150;
     public static final int RADIUS = 400;
+    /// Half the closest two players may stand, in mm: shoulders, not the
+    /// whole cover margin.
+    public static final int PERSONAL_SPACE = 300;
     public static final int STEP_UP = 450;
     public static final int GRAVITY = 11;
     public static final int JUMP_SPEED = 140;
@@ -231,6 +234,7 @@ public final class Match {
             }
             p.lastButtons = in.buttons;
         }
+        separate();
         for (int i = 0; i < balls.size(); i++) {
             Ball b = balls.get(i);
             if (!fly(b, t)) {
@@ -241,6 +245,50 @@ public final class Match {
         objectives(t);
         tick = t + 1;
         finishIfDone(t);
+    }
+
+    /// Players are solid to each other: any two standing closer than two
+    /// radii are pushed apart along the line between them, half each, unless
+    /// the push would put one inside cover. Without it teammates ran through
+    /// each other and stood inside one another on a spawn or the flag.
+    private void separate() {
+        long min = 2L * PERSONAL_SPACE;
+        for (int i = 0; i < players.length; i++) {
+            Player a = players[i];
+            if (!a.alive) {
+                continue;
+            }
+            for (int j = i + 1; j < players.length; j++) {
+                Player b = players[j];
+                if (!b.alive || Math.abs(b.y - a.y) > HEIGHT) {
+                    continue;
+                }
+                long dx = (long) b.x - a.x;
+                long dz = (long) b.z - a.z;
+                long d2 = dx * dx + dz * dz;
+                if (d2 >= min * min) {
+                    continue;
+                }
+                long d = FixedMath.isqrt(d2);
+                if (d == 0) {
+                    // the same spot: apart along x, the lower index to -x
+                    dx = 1;
+                    dz = 0;
+                    d = 1;
+                }
+                long half = (min - d + 1) / 2;
+                int px = (int) (dx * half / d);
+                int pz = (int) (dz * half / d);
+                if (!arena.blocked(a.x - px, a.z - pz, RADIUS, a.y, STEP_UP)) {
+                    a.x -= px;
+                    a.z -= pz;
+                }
+                if (!arena.blocked(b.x + px, b.z + pz, RADIUS, b.y, STEP_UP)) {
+                    b.x += px;
+                    b.z += pz;
+                }
+            }
+        }
     }
 
     private void act(Player p, Input in, int pressed, int t) {

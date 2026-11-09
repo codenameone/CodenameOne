@@ -12,9 +12,14 @@ Splat is a first-person team paintball shooter that takes itself exactly as seri
 Under the jokes it's a real-time shooter of the kind that usually needs an engine, a networking product and a separate server. The server referees every match while each phone predicts its own player, so the marker fires with no wait. A shot from a slow connection still lands where it was aimed, and bots, practice matches and replays all run the same rules. In Splat all of it is ordinary Codename One code in one project: the 3D field, its server, the voice chat and the admin console.
 
 {{< guide-block >}}
-<video controls playsinline preload="metadata" poster="/splat/splat-promo-poster.jpg" style="width:100%;max-width:720px;height:auto;display:block;margin:0 auto" aria-label="A tour of Splat: the marker loadout, a mission briefing, a capture-the-flag match against bots, a player painted and shown again in a slow-motion replay from three angles, the bird's-eye view and the winners celebrating">
+<video controls playsinline preload="metadata" poster="/splat/splat-promo-poster.jpg" style="width:100%;max-width:960px;height:auto;display:block;margin:0 auto" aria-label="A tour of Splat on a desktop: the marker loadout, a mission briefing, a capture-the-flag match against bots, a player painted and shown again in a slow-motion replay from three angles, the bird's-eye view and the winners celebrating">
 <source src="/splat/splat-promo.mp4" type="video/mp4">
 <a href="/splat/splat-promo.mp4">Download the Splat tour video</a>.
+</video>
+
+<video controls playsinline preload="metadata" poster="/splat/splat-mobile-poster.jpg" style="width:100%;max-width:360px;height:auto;display:block;margin:1.5rem auto 0" aria-label="The same match on a phone: touch controls, first person with the marker in hand, the instant replay, the bird's-eye view and the winners celebrating">
+<source src="/splat/splat-mobile.mp4" type="video/mp4">
+<a href="/splat/splat-mobile.mp4">Download the Splat phone video</a>.
 </video>
 {{< /guide-block >}}
 
