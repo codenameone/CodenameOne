@@ -21,8 +21,14 @@
  * need additional information or have any questions.
  */
 #import "com_codename1_ai_whisper_NativeWhisperRecognizerImpl.h"
+// The port headers exist in an application build, which is where the
+// builder switches INCLUDE_CN1_WHISPER on. Compiled alone (the cn1lib probe in
+// scripts/ci/check-ios-cn1lib.py) there are none, the define is absent and
+// the file builds as the unsupported fallback.
+#if __has_include("cn1_globals.h") && __has_include("CodenameOne_GLViewController.h")
 #include "cn1_globals.h"
 #import "CodenameOne_GLViewController.h"
+#endif
 #include <stdlib.h>
 
 // whisper.cpp comes from the cn1-whisper-ios xcframework, which the build
