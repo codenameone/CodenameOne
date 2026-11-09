@@ -199,7 +199,8 @@ jobs:
           # and keep seeing it. A Cache Rule sets Status Code TTL 400-599 to no-store, but
           # this keeps the release green even if that rule is ever removed.
           set -e
-          for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
+          for artifact in codenameone-core codenameone-maven-plugin codenameone-annotation-processor \
+                          codenameone-platform-feature-catalog \
                           codenameone-build-hint-catalog codenameone-build-hint-tools \
                           codenameone-cil-translator codenameone-unity-compat \
                           cn1app-archetype cn1lib-archetype \

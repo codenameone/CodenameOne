@@ -802,7 +802,9 @@ public class OrmAnnotationProcessorTest {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         String imports="package sh; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
-        sources.put("sh.Buyer",imports+"@Entity(table=\"sh_buyer\") public record Buyer(@Id long id, String name) { }");
+        // A type-use annotation, which javac 17 prints in front of a qualified name.
+        sources.put("sh.N","package sh; @java.lang.annotation.Target(java.lang.annotation.ElementType.TYPE_USE) public @interface N { }");
+        sources.put("sh.Buyer",imports+"@Entity(table=\"sh_buyer\") public record Buyer(@Id long id, java.lang.@N String name) { }");
         sources.put("sh.Spot",imports+"@Embeddable public record Spot(double lat, String of) { }");
         sources.put("sh.Place",imports+"@Embeddable public record Place(String city, @Embedded Spot build) { }");
         sources.put("sh.Order",imports+"@Entity(table=\"sh_order\") public record Order(@Id long id, String note, @ManyToOne Ref<Buyer> buyer, @Embedded Place build, @OneToOne(mappedBy=\"order\") Ref<Memo> memo) { }");

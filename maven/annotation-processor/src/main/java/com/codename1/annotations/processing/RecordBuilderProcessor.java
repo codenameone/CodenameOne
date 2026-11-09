@@ -37,7 +37,12 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.WildcardType;
 import javax.tools.Diagnostic;
 
 /// Writes the builder of every record `@Entity` while the application
@@ -100,7 +105,7 @@ public class RecordBuilderProcessor extends AbstractProcessor {
                 if (erase) {
                     t = processingEnv.getTypeUtils().erasure(t);
                 }
-                components.add(new String[] {member.getSimpleName().toString(), t.toString()});
+                components.add(new String[] {member.getSimpleName().toString(), source(t)});
             }
         }
         String visibility = publicType(record) ? "public " : "";
@@ -150,6 +155,44 @@ public class RecordBuilderProcessor extends AbstractProcessor {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                     "Could not write " + name + ": " + e.getMessage(), record);
         }
+    }
+
+    /// `type` as source names it, without its type-use annotations. `toString()`
+    /// would keep them, and on some JDKs puts one in front of a qualified name,
+    /// `@N java.util.List`, which is not source at all.
+    private static String source(TypeMirror type) {
+        TypeKind kind = type.getKind();
+        if (kind.isPrimitive()) {
+            return kind.name().toLowerCase(java.util.Locale.ROOT);
+        }
+        if (kind == TypeKind.ARRAY) {
+            return source(((ArrayType) type).getComponentType()) + "[]";
+        }
+        if (kind == TypeKind.TYPEVAR) {
+            return ((TypeVariable) type).asElement().getSimpleName().toString();
+        }
+        if (kind == TypeKind.WILDCARD) {
+            WildcardType w = (WildcardType) type;
+            return w.getExtendsBound() != null ? "? extends " + source(w.getExtendsBound())
+                    : w.getSuperBound() != null ? "? super " + source(w.getSuperBound()) : "?";
+        }
+        if (kind == TypeKind.DECLARED) {
+            DeclaredType declared = (DeclaredType) type;
+            StringBuilder sb = new StringBuilder(((TypeElement) declared.asElement()).getQualifiedName());
+            List<? extends TypeMirror> arguments = declared.getTypeArguments();
+            if (!arguments.isEmpty()) {
+                sb.append('<');
+                for (int i = 0; i < arguments.size(); i++) {
+                    if (i > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(source(arguments.get(i)));
+                }
+                sb.append('>');
+            }
+            return sb.toString();
+        }
+        return type.toString();
     }
 
     /// Whether the record and every type enclosing it are public.

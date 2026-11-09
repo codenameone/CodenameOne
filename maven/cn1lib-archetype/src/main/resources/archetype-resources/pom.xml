@@ -123,7 +123,10 @@
                 <version>${maven-compiler-plugin.version}</version>
                 <configuration>
                     <!-- Writes the source library code compiles against, such as
-                         the builder of each record entity. -->
+                         the builder of each record entity. 
+                         Listing processors here turns off javac's search of the
+                         class path, so add any other processor (Lombok, Dagger)
+                         as a <path> beside this one. -->
                     <annotationProcessorPaths>
                         <path>
                             <groupId>com.codenameone</groupId>

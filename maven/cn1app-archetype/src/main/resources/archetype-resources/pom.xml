@@ -141,7 +141,10 @@
                              such as the builder of each record entity. Named here
                              because javac no longer finds processors on the class
                              path by itself. It follows the plugin's version: it
-                             depends on nothing in the framework. -->
+                             depends on nothing in the framework.
+                             Listing processors here turns off javac's search of the
+                             class path, so add any other processor (Lombok, Dagger)
+                             as a <path> beside this one. -->
                         <annotationProcessorPaths>
                             <path>
                                 <groupId>com.codenameone</groupId>
