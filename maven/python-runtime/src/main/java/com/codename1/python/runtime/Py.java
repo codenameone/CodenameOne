@@ -1281,6 +1281,12 @@ public final class Py {
     }
 
     /// `a += b`: the in-place method when the type has one, else `a + b`.
+    /// Answers `r`; `a` was evaluated first. A lambda the transpiler expands in
+    /// place stores its arguments this way, ahead of its body.
+    public static Object seq(Object a, Object r) {
+        return r;
+    }
+
     public static Object iadd(Object a, Object b) {
         Object r = a instanceof PyObject ? ((PyObject) a).iadd(b) : null;
         return r != null ? r : add(a, b);

@@ -419,6 +419,9 @@ public final class Emitter {
 
     private String load(Name nm) {
         String n = nm.id;
+        if (inlineParams != null && sc == inlineScope && inlineParams.containsKey(n)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return inlineParams.get(n);
+        }
         if (DYNAMIC_CODE.contains(n) && sc.resolve(n) == Scope.Binding.BUILTIN) {
             if ("compile".equals(n) && deferredNotes != null) {
                 // Compiling is harmless; running what it made is eval or
@@ -1794,7 +1797,77 @@ public final class Emitter {
     }
 
     /// A `new PyFunction(...)` expression. `exprBody` is set for a lambda.
+    /// The parameters of a lambda being expanded in place, each to the temporary
+    /// that holds its argument; read by load() while `sc` is that lambda's scope.
+    private Map<String, String> inlineParams;
+    private Scope inlineScope;
+
+    /// `(lambda x, y: body)(a, b)` as `body` itself, in the caller: the arguments
+    /// go to temporaries of the caller's frame, and Py.seq orders those stores
+    /// before the body (Java evaluates arguments left to right). Null when the
+    /// body could see the difference: a parameter a nested scope captures, a
+    /// nested scope at all, or a walrus, which binds in the caller.
+    private String inlineLambda(Lambda l, Call c) {
+        if (gen != null || inlineParams != null) {
+            return null;
+        }
+        for (Arg a : l.args.positional) {
+            if (l.scope.cells.contains(a.name)) {
+                return null;
+            }
+        }
+        boolean[] plain = {true};
+        Infer.Visit[] v = new Infer.Visit[1];
+        v[0] = x -> {
+            if (x instanceof Lambda || x instanceof Comp || x instanceof NamedExpr || x instanceof Yield
+                    || x instanceof Await) {
+                plain[0] = false;
+            } else if (plain[0]) {
+                Infer.children(x, v[0]);
+            }
+        };
+        v[0].on(l.body);
+        if (!plain[0]) {
+            return null;
+        }
+        List<String> stores = new ArrayList<String>();
+        Map<String, String> map = new HashMap<String, String>();
+        for (int i = 0; i < c.args.size(); i++) {
+            String t = temp();
+            stores.add(t + " = " + expr(c.args.get(i)));
+            map.put(l.args.positional.get(i).name, t);
+        }
+        Scope saved = sc;
+        sc = l.scope;
+        inlineParams = map;
+        inlineScope = l.scope;
+        String body;
+        try {
+            body = expr(l.body);
+        } finally {
+            sc = saved;
+            inlineParams = null;
+            inlineScope = null;
+        }
+        StringBuilder r = new StringBuilder();
+        for (String st : stores) {
+            r.append("Py.seq(").append(st).append(", ");
+        }
+        r.append(body);
+        for (int k = stores.size(); k > 0; k--) {
+            r.append(')');
+        }
+        return r.toString();
+    }
+
+    /// Set by call() for a lambda it calls in place: function() then answers the
+    /// bare body lambda, with no PyFunction around it.
+    private boolean inlineCalled;
+    private int paramNames;
+
     private String function(String name, Arguments args, Scope fs, List<Stmt> body, Expr exprBody) {
+        boolean bodyOnly = inlineCalled;
+        inlineCalled = false;
         boolean async = nextAsync;
         nextAsync = false;
         boolean generator = body != null && (async || fs.hasYield);
@@ -1819,11 +1892,15 @@ public final class Emitter {
         selfTyped = null;
         StringBuilder sig = new StringBuilder();
         List<String> names = args.names();
-        sig.append("new PyFunction(").append(javaString(name)).append(", new String[] {");
+        // The parameter names are a constant: a nested def or lambda is a new PyFunction
+        // every time it is evaluated, and the table was a new array each time with it.
+        String pn = "PN" + paramNames++;
+        fields.append("    private static final String[] ").append(pn).append(" = {");
         for (int i = 0; i < names.size(); i++) {
-            sig.append(i == 0 ? "" : ", ").append(javaString(names.get(i)));
+            fields.append(i == 0 ? "" : ", ").append(javaString(names.get(i)));
         }
-        sig.append("}, ").append(args.positional.size()).append(", ").append(args.vararg != null).append(", ")
+        fields.append("};\n");
+        sig.append("new PyFunction(").append(javaString(name)).append(", ").append(pn).append(", ").append(args.positional.size()).append(", ").append(args.vararg != null).append(", ")
                 .append(args.kwonly.size()).append(", ").append(args.kwarg != null).append(", ");
         if (args.defaults.isEmpty()) {
             sig.append("Py.NO_ARGS, ");
@@ -2014,7 +2091,7 @@ public final class Emitter {
         handlers.clear();
         handlers.addAll(savedHandlers);
 
-        StringBuilder r = new StringBuilder(sig);
+        StringBuilder r = new StringBuilder(bodyOnly ? "" : sig);
         r.append('(');
         StringBuilder plist = new StringBuilder();
         StringBuilder alist = new StringBuilder();
@@ -2039,6 +2116,10 @@ public final class Emitter {
             r.append(") -> {\n").append(pro).append(b);
             indent(r, ind - 1);
             r.append("})");
+        }
+        if (bodyOnly) {
+            // Without the PyFunction( this opened, its closing parenthesis goes too.
+            return r.substring(0, r.length() - 1);
         }
         // The field a module-level fused function is kept in. The assignment
         // is wrapped around the finished expression: its type is Object, so
@@ -2711,6 +2792,33 @@ public final class Emitter {
     }
 
     private String call(Call c) {
+        if (c.func instanceof Lambda && c.keywords.isEmpty()) {
+            Lambda l = (Lambda) c.func;
+            Arguments la = l.args;
+            boolean starred = false;
+            for (Expr x : c.args) {
+                starred |= x instanceof Starred;
+            }
+            if (!starred && !l.scope.hasYield && la.vararg == null && la.kwarg == null && la.kwonly.isEmpty()
+                    && la.defaults.isEmpty() && la.positional.size() == c.args.size() && c.args.size() <= 6) {
+                String inl = inlineLambda(l, c);
+                if (inl != null) {
+                    return inl;
+                }
+                // `(lambda x, y: ...)(a, b)`: the function object is never seen, so the
+                // body runs as a bare PyFunction.BodyN. A PyFunction a call (its name,
+                // parameter table, qualname and module) cost three times what CPython
+                // spends on the whole expression.
+                StringBuilder r = new StringBuilder("((PyFunction.Body").append(c.args.size()).append(") ");
+                inlineCalled = true;
+                r.append(function("<lambda>", la, l.scope, null, l.body));
+                r.append(").run(");
+                for (int i = 0; i < c.args.size(); i++) {
+                    r.append(i == 0 ? "" : ", ").append(expr(c.args.get(i)));
+                }
+                return r.append(')').toString();
+            }
+        }
         Comp eager = eagerArgument(c);
         if (eager != null) {
             eagerGenerators.add(eager);

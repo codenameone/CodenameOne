@@ -85,8 +85,9 @@ public class GcVerifyApp {
             // half of the gate then reported that the verifier could not detect a defect the
             // workload had never created.
             // Exactly the 40 slices of 8 this workload has always done -- the count is load
-            // bearing. It empties 320 of the 512 keep[] slots, and the 192 that survive are what
-            // a dropped fresh node can still be holding the only reference to. Allocating more
+            // bearing. It visits 320 of the 512 keep[] slots (half emptied, half handed to a
+            // fresh node), and the 192 never visited are what a dropped fresh node can still be
+            // holding the only reference to. Allocating more
             // than this empties the array outright, leaves no survivor, and the hazard stops
             // existing: an earlier attempt at this fix looped for as long as the mark lasted and
             // produced a run with three times the collections and nothing to find.
@@ -110,9 +111,19 @@ public class GcVerifyApp {
                     Node n = new Node();
                     int j = (slice * 8 + i) & (KEEP - 1);
                     n.a = keep[j];
-                    keep[j] = null;
+                    // Odd slots keep the fresh node in the scanned array instead of
+                    // dropping it: a store of a fresh reference is not logged (the
+                    // fresh filter), so once its page retires mid-cycle nothing but
+                    // grace keeps it. Pre-cycle objects no longer have grace at all --
+                    // the barrier logs them -- so the dropped-node shape alone stopped
+                    // exercising the grace pass.
+                    keep[j] = (i & 1) == 1 ? n : null;
                     sink[0] = n;
                     sink[0] = null;
+                }
+                // Fill and retire the page those nodes sit on while the mark runs.
+                for (int z = 0; z < 2048; z++) {
+                    sink[1 + (z & 7)] = new Node();
                 }
             }
             if (handshake) {

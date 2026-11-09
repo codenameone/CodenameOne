@@ -49,6 +49,14 @@ public final class Parser {
     private final List<Token> toks;
     private final String file;
     private int p;
+    /// Where each lambda's body starts in `toks`, and whether it was parsed
+    /// without a conditional (testNoCond); read by inlineLambda.
+    private final java.util.IdentityHashMap<Lambda, int[]> lambdaBodies = new java.util.IdentityHashMap<Lambda, int[]>();
+    /// While inlineLambda re-reads a body: each parameter's argument, and how
+    /// often the body named it. A name outside the map sets substFree.
+    private java.util.Map<String, Expr> subst;
+    private java.util.Map<String, int[]> substUses;
+    private boolean substFree;
 
     public Parser(List<Token> toks, String file) {
         this.toks = toks;
@@ -970,8 +978,11 @@ public final class Parser {
         Token t = expect("lambda");
         Arguments args = parameters(":", false);
         expect(":");
+        int bodyAt = p;
         Expr body = noCond ? testNoCond() : test();
-        return new Lambda(args, body).at(t.line, t.col);
+        Lambda l = new Lambda(args, body).at(t.line, t.col);
+        lambdaBodies.put(l, new int[] {bodyAt, noCond ? 1 : 0, p});
+        return l;
     }
 
     private Expr orTest() {
@@ -1139,6 +1150,114 @@ public final class Parser {
         return primary();
     }
 
+    /// `(lambda x, y: x * y)(a, b)` is `a * b`: the function object is never seen,
+    /// so the call is replaced by the body, re-read from its tokens with each
+    /// parameter standing for its argument. Every later pass then sees ordinary
+    /// code -- the typed lowering, which a lambda anywhere in a function turned off,
+    /// included. Only where nothing can tell: plain positional parameters, side
+    /// effect free arguments, each parameter named exactly once (so an argument is
+    /// evaluated once), a body that names nothing but its parameters (so no
+    /// binding can resolve differently in the caller, a class body above all) and
+    /// opens no scope. Null otherwise, and the call stays a call.
+    private Expr inlineLambda(Lambda l, Call c) {
+        int[] at = lambdaBodies.get(l);
+        Arguments a = l.args;
+        if (at == null || subst != null || !c.keywords.isEmpty() || a.vararg != null || a.kwarg != null
+                || !a.kwonly.isEmpty() || !a.defaults.isEmpty() || a.positional.size() != c.args.size()) {
+            return null;
+        }
+        java.util.Map<String, Expr> map = new java.util.HashMap<String, Expr>();
+        java.util.Map<String, int[]> uses = new java.util.HashMap<String, int[]>();
+        for (int i = 0; i < c.args.size(); i++) {
+            if (!sideEffectFree(c.args.get(i))) {
+                return null;
+            }
+            map.put(a.positional.get(i).name, c.args.get(i));
+            uses.put(a.positional.get(i).name, new int[1]);
+        }
+        int resume = p;
+        subst = map;
+        substUses = uses;
+        substFree = false;
+        Expr body;
+        try {
+            p = at[0];
+            body = at[1] == 1 ? testNoCond() : test();
+            if (p != at[2]) {
+                return null;
+            }
+        } finally {
+            p = resume;
+            subst = null;
+            substUses = null;
+        }
+        if (substFree || !plainBody(body)) {
+            return null;
+        }
+        for (int[] u : uses.values()) {
+            if (u[0] != 1) {
+                return null;
+            }
+        }
+        return body;
+    }
+
+    private static boolean sideEffectFree(Expr e) {
+        if (e instanceof Name || e instanceof Constant) {
+            return true;
+        }
+        if (e instanceof BinOp) {
+            return sideEffectFree(((BinOp) e).left) && sideEffectFree(((BinOp) e).right);
+        }
+        return e instanceof UnaryOp && sideEffectFree(((UnaryOp) e).operand);
+    }
+
+    /// Only operators, comparisons, conditionals and the arguments themselves;
+    /// anything that opens a scope, binds, or yields is refused.
+    private boolean plainBody(Expr e) {
+        if (e instanceof Name || e instanceof Constant) {
+            return true;
+        }
+        if (e instanceof BinOp) {
+            return plainBody(((BinOp) e).left) && plainBody(((BinOp) e).right);
+        }
+        if (e instanceof UnaryOp) {
+            return plainBody(((UnaryOp) e).operand);
+        }
+        if (e instanceof Compare) {
+            boolean ok = plainBody(((Compare) e).left);
+            for (Expr x : ((Compare) e).comparators) {
+                ok &= plainBody(x);
+            }
+            return ok;
+        }
+        if (e instanceof BoolOp) {
+            boolean ok = true;
+            for (Expr x : ((BoolOp) e).values) {
+                ok &= plainBody(x);
+            }
+            return ok;
+        }
+        if (e instanceof IfExp) {
+            IfExp i = (IfExp) e;
+            return plainBody(i.test) && plainBody(i.body) && plainBody(i.orelse);
+        }
+        if (e instanceof Attribute) {
+            return plainBody(((Attribute) e).value);
+        }
+        if (e instanceof Subscript) {
+            return plainBody(((Subscript) e).value) && plainBody(((Subscript) e).index);
+        }
+        if (e instanceof TupleExpr) {
+            boolean ok = true;
+            for (Expr x : ((TupleExpr) e).elts) {
+                ok &= plainBody(x);
+            }
+            return ok;
+        }
+        return false;
+    }
+
     private Expr primary() {
         Expr e = atom();
         while (true) {
@@ -1149,7 +1268,8 @@ public final class Parser {
                 Call c = new Call(e).at(t.line, t.col);
                 callArgs(c);
                 expect(")");
-                e = c;
+                Expr inl = e instanceof Lambda ? inlineLambda((Lambda) e, c) : null;
+                e = inl != null ? inl : c;
             } else if (accept("[")) {
                 e = new Subscript(e, slices()).at(t.line, t.col);
                 expect("]");
@@ -1277,6 +1397,16 @@ public final class Parser {
                         p++;
                         return new Constant(Constant.Kind.FALSE, null).at(t.line, t.col);
                     default:
+                        if (subst != null) {
+                            String n = name();
+                            Expr a = subst.get(n);
+                            if (a == null) {
+                                substFree = true;
+                                return new Name(n).at(t.line, t.col);
+                            }
+                            substUses.get(n)[0]++;
+                            return a;
+                        }
                         return new Name(name()).at(t.line, t.col);
                 }
             }

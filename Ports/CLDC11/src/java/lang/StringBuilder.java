@@ -136,14 +136,6 @@ public final class StringBuilder implements CharSequence, Appendable, Comparable
     /// #### Returns
     ///
     /// Self for chaining.
-    /**
-     * Appends the characters of s from start (inclusive) to end (exclusive),
-     * as java.lang.StringBuilder does in the JDK.
-     */
-    public java.lang.StringBuilder append(java.lang.CharSequence s, int start, int end){
-        return null; //TODO codavaj!!
-    }
-
     public java.lang.StringBuilder append(java.lang.StringBuffer buf){
         return null; //TODO codavaj!!
     }
