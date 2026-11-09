@@ -96,6 +96,9 @@ public final class ThemeAudit {
     /// Every `var(` reference, nested fallbacks included; group 2 is set
     /// when a fallback follows.
     private static final Pattern VAR_REF = Pattern.compile("var\\(\\s*(--[A-Za-z0-9_-]+)\\s*(,)?");
+    private static final Pattern COLOR_LITERAL = Pattern.compile(
+            "#[0-9A-Fa-f]{8}\\b|#[0-9A-Fa-f]{6}\\b|#[0-9A-Fa-f]{3}\\b|rgba?\\([^)]*\\)");
+    private static final Pattern IDENT = Pattern.compile("^[A-Za-z_][A-Za-z0-9_-]*");
 
     private static final class Declaration {
         final String property;
