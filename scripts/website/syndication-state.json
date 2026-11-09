@@ -3269,6 +3269,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-09T01:01:07+00:00"
+      },
+      "devto": {
+        "id": 5004794,
+        "url": "https://dev.to/codenameone/bastion-a-hardened-bank-template-and-crypto-wallets-in-core-3i06",
+        "syndicated_at": "2026-11-09T14:01:15+00:00"
       }
     }
   }
