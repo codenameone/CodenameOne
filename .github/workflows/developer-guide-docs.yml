@@ -193,7 +193,7 @@ jobs:
           # here pulls in; they are
           # in the reactor because this job runs on JDK 17 (the flutter-modules profile).
           RETRY_ONLY_MATCHING=transient xvfb-run -a bash scripts/ci/retry.sh mvn -B -ntp -f maven/pom.xml \
-            -pl core,javase,android,css-compiler,codenameone-maven-plugin,backend,backend-test,dart-runtime,flutter-runtime,python-runtime \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin,annotation-processor,backend,backend-test,dart-runtime,flutter-runtime,python-runtime \
             -am install \
             -Plocal-dev-javase \
             -DskipTests \

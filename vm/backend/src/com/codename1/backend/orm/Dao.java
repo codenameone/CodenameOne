@@ -94,19 +94,45 @@ public final class Dao<T> {
     /// before this returns, on every engine. That is the operation the three
     /// disagree about most: PostgreSQL has no last-insert-id and answers through
     /// INSERT ... RETURNING instead. See [Database#insert].
+    ///
+    /// A record cannot have its key written into it, so for one the key is only
+    /// in the copy [#save] answers; call that instead.
     public void insert(final T entity) throws IOException {
+        insertAndGet(entity);
+    }
+
+    /// Stores `entity` and answers the instance that holds what the database
+    /// decided: inserts it when its key is still the database's to assign,
+    /// updates it otherwise, and inserts it when no row has that key.
+    ///
+    /// For a mutable entity the answer is `entity` itself. For a record it is
+    /// a copy carrying the generated key, which is the one to keep.
+    public T save(T entity) throws IOException {
+        require(entity);
+        if (table.unassigned(entity)) {
+            return insertAndGet(entity);
+        }
+        if (table.getUpdateSql() != null && update(entity)) {
+            return entity;
+        }
+        if (table.getUpdateSql() == null && findById(table.idOf(entity)) != null) {
+            return entity;
+        }
+        return insertAndGet(entity);
+    }
+
+    private T insertAndGet(final T entity) throws IOException {
         require(entity);
         final Object[] params = table.insertParams(entity);
         if (!table.columns[table.idIndex].isGenerated()) {
             execute(table.getInsertSql(), params);
-            return;
+            return entity;
         }
-        owner.run(new DataSource.Work() {
+        return (T) owner.run(new DataSource.Work() {
             @Override
             public Object run(Database db) throws Exception {
                 long key = db.insert(table.getInsertSql(), params, table.getIdColumn());
-                table.setId(entity, key);
-                return null;
+                return table.setId(entity, key);
             }
         });
     }

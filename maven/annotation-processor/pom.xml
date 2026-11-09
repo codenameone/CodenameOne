@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>codenameone-annotation-processor</artifactId>
+    <name>Codename One Annotation Processor</name>
+    <description>The javac annotation processor that writes the source an application compiles against, such as the builder of each record entity</description>
+
+    <!--
+        Runs inside the application's javac, on the annotationProcessorPaths the
+        archetypes and the Gradle plugin configure. It writes only source the
+        application's own code names; everything else the ORM generates is
+        written after compilation by cn1:process-annotations, from the classes.
+        No dependencies: it must load in any javac from JDK 8 up.
+    -->
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- The processor cannot run on its own compilation. -->
+                    <compilerArgument>-proc:none</compilerArgument>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

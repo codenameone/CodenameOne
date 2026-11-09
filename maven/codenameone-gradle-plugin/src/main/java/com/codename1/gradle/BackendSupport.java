@@ -101,6 +101,7 @@ final class BackendSupport {
     static void apply(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
                       final Provider<Map<String, String>> userProperties) {
         AppSupport.addFramework(project, "implementation", ext.getVersion(), "codenameone-backend");
+        AppSupport.addProcessor(project);
         project.getDependencies().add("runtimeOnly", SQLITE_JDBC);
 
         final SourceSet main = project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets()

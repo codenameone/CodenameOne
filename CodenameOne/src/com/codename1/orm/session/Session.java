@@ -143,6 +143,10 @@ public interface Session {
     /// Makes a new entity managed and schedules its insertion at flush.
     /// Traverses associations with PERSIST cascade. A to-one reference to an unsaved
     /// entity without that cascade is rejected at flush.
+    ///
+    /// A record entity cannot take its generated key or version, so the session
+    /// replaces it with a copy that holds them, and this method cannot return
+    /// that copy. Use [#merge] for a record, or [#find] it by its key afterwards.
     /// @param <T> entity type
     /// @param entity new mapped instance
     /// @throws PersistenceException if no transaction is active or the instance cannot be persisted
@@ -151,6 +155,11 @@ public interface Session {
     /// Copies state into a managed instance, cascading through MERGE associations.
     /// Continue working with the returned instance; the supplied detached instance
     /// does not become managed merely because it was passed to this method.
+    ///
+    /// For a record entity the result is a copy, built from `entity`, that holds
+    /// what the database assigned -- a generated key, the next version -- and is
+    /// the instance the session manages from then on; `entity` itself is never
+    /// changed.
     /// @param <T> entity type
     /// @param entity new or detached mapped instance
     /// @return the managed instance containing the merged state
