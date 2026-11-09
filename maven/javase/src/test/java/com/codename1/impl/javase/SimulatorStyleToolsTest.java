@@ -112,4 +112,12 @@ class SimulatorStyleToolsTest {
         assertEquals(css + "\r\nCard {\r\n    margin: 0;\r\n}\r\n",
                 SimulatorStyleTools.CssRule.set(css, "Card", "margin", "0"));
     }
+
+    @Test
+    void aTrailingCommentEndsNoDeclarationAndEscapedQuotesStayQuoted() {
+        assertEquals("A { color: red; /* note */\n    margin: 0; }",
+                SimulatorStyleTools.CssRule.set("A { color: red; /* note */ }", "A", "margin", "0"));
+        assertEquals("A { content: \"a\\\";b\"; color: blue; }",
+                SimulatorStyleTools.CssRule.set("A { content: \"a\\\";b\"; color: red; }", "A", "color", "blue"));
+    }
 }

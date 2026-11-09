@@ -166,4 +166,15 @@ class ThemeAuditTest {
                 new java.util.ArrayList<File>());
         assertEquals("literal-matches-variable@1", checks(f));
     }
+
+    @Test
+    void wholeVarReadsFallbacksAndRefusesSeveralValues() {
+        assertEquals("red", ThemeAudit.wholeVar("var(--x,red)")[1]);
+        assertEquals("var(--b, #fff)", ThemeAudit.wholeVar("var(--a, var(--b, #fff))")[1]);
+        assertEquals(null, ThemeAudit.wholeVar("var(--a, red) var(--b)"));
+        assertEquals(null, ThemeAudit.wholeVar("var(--a)")[1]);
+        String css = "X { color: var(--none,#ffffff); background-color: var(--nada,#fefefe); }";
+        // A fallback with no space after the comma keeps its first character.
+        assertEquals("low-contrast@1", checks(ThemeAudit.auditText(CSS, css)));
+    }
 }

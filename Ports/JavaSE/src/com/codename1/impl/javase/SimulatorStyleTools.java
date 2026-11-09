@@ -507,7 +507,11 @@ final class SimulatorStyleTools {
             for (int i = open + 1; i <= close; i++) {
                 char c = i < close ? plain.charAt(i) : ';';
                 if (quoted) {
-                    quoted = c != quote;
+                    if (c == '\\') {
+                        i++;
+                    } else {
+                        quoted = c != quote;
+                    }
                     continue;
                 }
                 if (c == '"' || c == '\'') {
@@ -588,7 +592,10 @@ final class SimulatorStyleTools {
                 insertAt--;
             }
             String before = text.substring(0, insertAt);
-            boolean needsSemicolon = !spans.isEmpty() && !before.endsWith(";") && !before.endsWith("{");
+            // Judged on the text without comments: "red; /* note */" ends a
+            // declaration already.
+            String plainBefore = blankComments(before).trim();
+            boolean needsSemicolon = !spans.isEmpty() && !plainBefore.endsWith(";") && !plainBefore.endsWith("{");
             return before + (needsSemicolon ? ";" : "") + nl + indent + property + ": " + value + ";"
                     + text.substring(insertAt);
         }

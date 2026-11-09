@@ -97,13 +97,6 @@ public final class ThemeAudit {
     /// when a fallback follows.
     private static final Pattern VAR_REF = Pattern.compile("var\\(\\s*(--[A-Za-z0-9_-]+)\\s*(,)?");
 
-    /// A value that is one `var()` as a whole; the greedy fallback takes a
-    /// nested `var()` with its parentheses.
-    private static final Pattern WHOLE_VAR = Pattern.compile("var\\(\\s*(--[A-Za-z0-9_-]+)\\s*(?:,(.*))?\\)");
-    private static final Pattern COLOR_LITERAL = Pattern.compile(
-            "#[0-9A-Fa-f]{8}\\b|#[0-9A-Fa-f]{6}\\b|#[0-9A-Fa-f]{3}\\b|rgba?\\([^)]*\\)");
-    private static final Pattern IDENT = Pattern.compile("^[A-Za-z_][A-Za-z0-9_-]*");
-
     private static final class Declaration {
         final String property;
         final String value;
@@ -573,21 +566,44 @@ public final class ThemeAudit {
     private String resolve(String value, Map<String, Variable> scope) {
         String v = value.trim();
         for (int guard = 0; guard < 16; guard++) {
-            Matcher m = WHOLE_VAR.matcher(v);
-            if (!m.matches()) {
+            String[] ref = wholeVar(v);
+            if (ref == null) {
                 return v;
             }
-            Variable var = scope != null && scope.containsKey(m.group(1)) ? scope.get(m.group(1))
-                    : variables.get(m.group(1));
+            Variable var = scope != null && scope.containsKey(ref[0]) ? scope.get(ref[0]) : variables.get(ref[0]);
             if (var != null) {
                 v = var.value.trim();
-            } else if (m.group(2) != null) {
-                v = m.group(2).substring(1).trim();
+            } else if (ref[1] != null) {
+                v = ref[1];
             } else {
                 return v;
             }
         }
         return v;
+    }
+
+    /// The name and fallback (null when absent) of a value that is one
+    /// `var()` as a whole, or null: `var(--a, red) var(--b)` is two values.
+    static String[] wholeVar(String v) {
+        if (!v.startsWith("var(") || !v.endsWith(")")) {
+            return null;
+        }
+        int depth = 0;
+        for (int i = 3; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')' && --depth == 0 && i != v.length() - 1) {
+                return null;
+            }
+        }
+        String inner = v.substring(4, v.length() - 1);
+        int comma = inner.indexOf(',');
+        String name = (comma < 0 ? inner : inner.substring(0, comma)).trim();
+        if (!name.startsWith("--")) {
+            return null;
+        }
+        return new String[] {name, comma < 0 ? null : inner.substring(comma + 1).trim()};
     }
 
     // ----------------------------------------------------------------- colour
