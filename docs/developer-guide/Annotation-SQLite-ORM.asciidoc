@@ -209,7 +209,9 @@ managed changes and bypass per-entity callbacks and cascades. As in JPA, they
 don't clear the session: an entity it already manages stays managed and keeps
 the values it had before the statement, and a change made to it afterward is
 still written. Call `refresh(entity)` to read what the statement wrote, or
-`clear()` and read again. An entity whose row a bulk DELETE removed fails with an
+`clear()` and read again. Bulk UPDATE doesn't increment `@Version` either;
+increment the version field in the statement when concurrent edits must still
+conflict with it. An entity whose row a bulk DELETE removed fails with an
 `OptimisticLockException` if it's changed or removed afterward. Bulk assignments to required subtype
 fields need a non-null literal or named parameter. Other assignment expressions
 are rejected for those fields. Literal and bound null assignments to primitive
@@ -676,11 +678,18 @@ transaction. Reads follow Session's automatic flush rules. Redeclare only
 `findById(Key)` with `@Lock` to request a lock; pessimistic locks need an active
 transaction and an engine supporting row locks. SQLite rejects them explicitly.
 
-Derived deletes and declared JPQL/native modifications flush pending changes,
-execute bulk SQL, then clear the entire persistence context. They bypass entity
-callbacks, cascades, and automatic optimistic-version updates. Previously held
-objects are detached and retain their old Java values; reload them before further
-work. There is no option to disable flush or clear. Validation failures remain
+Derived deletes and declared JPQL/native modifications flush pending changes and
+execute bulk SQL. They don't clear the session unless the method is annotated
+`@Modifying(clearAutomatically = true)`. Derived deletes can't take `@Modifying`,
+so call `clear()` yourself after one when you need it. Objects read before the call
+keep their old Java values: refresh them, or `clear()` and read again, to see what
+an UPDATE wrote, and don't change an entity whose row a DELETE removed. Bulk
+modifications bypass entity callbacks, cascades, and automatic optimistic-version
+updates. As in JPA, a bulk UPDATE doesn't increment `@Version`, so another session
+holding the old version can overwrite the bulk UPDATE's change without an
+`OptimisticLockException`. When that matters, increment the `@Version` field in
+the statement itself, for example `SET ..., e.version = e.version + 1` (in native
+SQL, the version column). Validation failures remain
 `IllegalArgumentException`; database failures remain `PersistenceException`, and
 optimistic conflicts remain `OptimisticLockException`. Repository code neither
 swallows nor retries them. Roll back after a failed database write; Session marks
