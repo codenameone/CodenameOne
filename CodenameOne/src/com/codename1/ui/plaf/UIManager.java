@@ -385,6 +385,10 @@ public class UIManager {
     private void rememberNativeValue(String key, Object value) {
         nativeOriginals.put(key, themeProps.get(key));
         nativeDerived.put(key, value);
+        if (!themeProps.containsKey(key)) {
+            // A new key changes what hasStyleDefinition answers; drop its sorted key snapshot.
+            styleDefinitionCache = null;
+        }
         themeProps.put(key, value);
     }
 
