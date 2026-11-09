@@ -589,8 +589,8 @@ the record it returns:
   `session.find(Note.class, saved.id())` answers `saved`, and after the second
   save it answers `changed`.
 * Saving a copy is an update of the components that differ from the managed
-  record's, and it increments the `@Version`. A copy built from a record that
-  another save has replaced since is stale: saving it again fails with
+  record's, and it increments the `@Version`. A copy built from a record that a
+  later save has replaced is stale: saving it again fails with
   `OptimisticLockException`, exactly like a stale detached object.
 * `@DbTransient` components travel with every copy the session builds, so the
   managed copy keeps the value you set; a record read from the database has
@@ -601,7 +601,7 @@ pass in until it inserts the row, and then replaces it with the copy that holds
 the key. Use `merge` or `save` when you need that copy, or find the record
 again by its key. `refresh`, `remove`, `detach` and queries work as they do for
 any entity; `refresh` replaces the managed record with a copy that holds the
-row's current values, so read the result through `find` afterwards.
+row's current values, so read the result through `find` afterward.
 
 The plain `Dao` API answers the copy too: `dao.save(draft)` returns the record
 with its generated key. Like any other entity, a record works with the `Dao`
