@@ -298,7 +298,14 @@ final class GenLowering {
         }
         if (s instanceof ExprStmt) {
             suspend(((ExprStmt) s).value);
-            line("noop(" + result(((ExprStmt) s).value) + ");");
+            Expr ev = ((ExprStmt) s).value;
+            if (ev instanceof Yield && !((Yield) ev).from) {
+                // A yield whose value is unused: resumed() only matters when
+                // something was sent or thrown in, so test that inline first.
+                line("if (thrown != null || sent != Py.NONE) noop(resumed());");
+            } else {
+                line("noop(" + result(ev) + ");");
+            }
         } else if (s instanceof Assign) {
             Assign a = (Assign) s;
             suspend(a.value);
