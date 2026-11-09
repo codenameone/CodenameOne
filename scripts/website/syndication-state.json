@@ -3258,6 +3258,18 @@
         "url": "https://dev.to/codenameone/your-swing-and-javafx-code-on-iphone-android-and-the-web-24c8",
         "syndicated_at": "2026-11-08T14:01:01+00:00"
       }
+    },
+    "bastion-hardened-bank-template": {
+      "hashnode": {
+        "url": "https://debugagent.com/bastion-a-hardened-bank-template-and-crypto-wallets-in-core",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af11b1c548f787d91e0ab3a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-09T01:01:07+00:00"
+      }
     }
   }
 }
