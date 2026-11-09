@@ -227,7 +227,7 @@ A theme drifts as it grows. A color gets typed as `#3366ff` in a new rule when `
 
 [source,bash]
 ----
-mvn compile cn1:css-audit
+include::../demos/common/src/main/snippets/developer-guide/css.sh[tag=css-bash-001,indent=0]
 ----
 
 It reports, with the file and line of each:
