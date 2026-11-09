@@ -221,6 +221,26 @@ include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-008,i
 
 See the https://developer.mozilla.org/en-You/docs/Web/CSS/var[MDN docs] for more details about the CSS variable spec.
 
+=== Auditing a theme
+
+A theme drifts as it grows. A color gets typed as `#3366ff` in a new rule when `--brand` already holds it, a variable outlives the last rule that read it, and a UIID stays styled long after the screen that used it is gone. The `css-audit` goal finds these without compiling anything:
+
+[source,bash]
+----
+mvn compile cn1:css-audit
+----
+
+It reports, with the file and line of each:
+
+* `literal-matches-variable`: a color literal whose value a variable already names, with the `var()` to use instead.
+* `undefined-variable`: a `var(--name)` with no definition and no fallback. This is the one error, and it fails the goal.
+* `unused-variable`: a variable that no rule reads.
+* `repeated-literal`: a color written in three or more rules that no variable names.
+* `low-contrast`: a rule whose `color` and background color fall below the 4.5:1 contrast ratio WCAG AA asks for body text. Variables are resolved first; translucent colors are skipped, because their contrast depends on what lies under them.
+* `unused-uiid`: a styled UIID that neither the framework nor the project names. Running `compile` first lets the audit search the compiled classes as well as the sources. A name built at run time, such as `"Tab" + state`, counts as a use of every UIID starting with `Tab`.
+
+The audit reads the stylesheet as written, so it runs in well under a second. `-Dcn1.cssAudit.strict=true` fails the goal on any warning, which suits a continuous integration step, and `-Dcn1.cssAudit.format=json` prints the findings as JSON for other tools.
+
 === CSS properties
 
 This section isn't as comprehensive as it should be due to the breadth of CSS.

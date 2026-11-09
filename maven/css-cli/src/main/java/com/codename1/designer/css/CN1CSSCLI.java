@@ -194,6 +194,13 @@ public class CN1CSSCLI {
         System.out.println(" -native-theme-units  Convert lengths the way the framework's own native themes are built:");
         System.out.println("                    a round border gets no default shadow spread. For those themes only;");
         System.out.println("                    an application theme compiled with it changes size.");
+        System.out.println("\nAudit (reports design-system drift; compiles nothing, -output not needed):");
+        System.out.println(" -audit             Report colour literals a variable already names, unused and undefined");
+        System.out.println("                    variables, repeated literals, low text contrast and unused UIIDs.");
+        System.out.println(" -sources           Directories (comma separated) of sources or classes to look for UIID names in.");
+        System.out.println("                    Without it the unused-UIID check is skipped.");
+        System.out.println(" -format            text (default) or json.");
+        System.out.println(" -strict            Exit 1 on any warning. Otherwise only an error (an undefined variable) fails.");
         System.out.println("\nSystem Properties:");
         System.out.println(" parent.port        A local port to connect to in watch mode. The compiler exits when the");
         System.out.println("                    connection closes, so it does not outlive the process that started it.");
@@ -275,6 +282,9 @@ public class CN1CSSCLI {
             printUsage();
             return 0;
         }
+        if (hasFlag(args, "audit")) {
+            return audit(args);
+        }
         Options options;
         try {
             options = Options.parse(args);
@@ -297,6 +307,66 @@ public class CN1CSSCLI {
             report(t);
             return EXIT_COMPILE_FAILED;
         }
+    }
+
+    /// `-audit`: reports design-system drift in the stylesheets instead of
+    /// compiling them. See [ThemeAudit].
+    static int audit(String[] args) {
+        String input = getArgByName(args, "i", "input");
+        if (input == null || "true".equals(input)) {
+            System.err.println("CSS audit failed: an input stylesheet is required. Use -input <file.css>");
+            return EXIT_USAGE;
+        }
+        List<File> sheets = new ArrayList<File>();
+        for (File f : getInputFiles(input)) {
+            if (!f.isFile()) {
+                System.err.println("CSS audit failed: the input stylesheet does not exist: " + f.getAbsolutePath());
+                return EXIT_USAGE;
+            }
+            sheets.add(f);
+        }
+        List<File> sources = new ArrayList<File>();
+        String src = getArgByName(args, "sources");
+        if ("true".equals(src)) {
+            System.err.println("CSS audit failed: -sources needs one or more directories, separated by commas");
+            return EXIT_USAGE;
+        }
+        if (src != null) {
+            for (String s : src.split(",")) {
+                if (s.trim().length() > 0) {
+                    sources.add(new File(s.trim()));
+                }
+            }
+        }
+        String format = getArgByName(args, "format");
+        boolean json = "json".equals(format);
+        if (format != null && !json && !"text".equals(format)) {
+            System.err.println("CSS audit failed: -format is text or json");
+            return EXIT_USAGE;
+        }
+        List<ThemeAudit.Finding> findings;
+        try {
+            findings = ThemeAudit.audit(sheets, sources);
+        } catch (IOException ex) {
+            System.err.println("CSS audit failed: " + ex.getMessage());
+            return EXIT_COMPILE_FAILED;
+        }
+        if (json) {
+            System.out.println(ThemeAudit.toJson(findings));
+        } else {
+            for (ThemeAudit.Finding f : findings) {
+                System.out.println(f);
+            }
+            System.out.println(findings.size() + " finding(s)" + (sources.isEmpty()
+                    ? "; pass -sources <dir> to also report UIIDs nothing uses" : ""));
+        }
+        boolean strict = hasFlag(args, "strict");
+        for (ThemeAudit.Finding f : findings) {
+            if (strict ? f.severity != ThemeAudit.Severity.INFO : f.severity == ThemeAudit.Severity.ERROR) {
+                return EXIT_COMPILE_FAILED;
+            }
+        }
+        return 0;
     }
 
     private static void report(Throwable t) {
