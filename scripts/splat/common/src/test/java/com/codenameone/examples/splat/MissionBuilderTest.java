@@ -156,6 +156,12 @@ public class MissionBuilderTest extends E2e {
         until(() -> findByName("missionCanvas") != null, 20000, "the editor field");
         Component c = findByName("missionCanvas");
         waitFor(500);
+        if (c.getWidth() > c.getHeight()) {
+            // a wide window lays the field on its side: your half on the left
+            float across = 1f - fy;
+            fy = fx;
+            fx = across;
+        }
         touch(c.getAbsoluteX() + (int) (c.getWidth() * fx), c.getAbsoluteY() + (int) (c.getHeight() * fy));
         waitFor(900);
     }

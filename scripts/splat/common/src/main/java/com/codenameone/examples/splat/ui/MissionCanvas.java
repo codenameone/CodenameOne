@@ -53,6 +53,7 @@ final class MissionCanvas extends Component {
     private float k = 1;
     private int ox;
     private int oy;
+    private boolean sideways;
 
     MissionCanvas(Mission mission, Listener listener) {
         this.mission = mission;
@@ -88,27 +89,33 @@ final class MissionCanvas extends Component {
 
     private void layoutField() {
         int pad = CN.convertToPixels(2);
-        k = Math.min((getWidth() - pad * 2) / (float) (Mission.WIDTH_M * 10),
-                (getHeight() - pad * 2) / (float) (Mission.DEPTH_M * 10));
-        ox = getX() + (getWidth() - (int) (Mission.WIDTH_M * 10 * k)) / 2;
-        oy = getY() + (getHeight() - (int) (Mission.DEPTH_M * 10 * k)) / 2;
+        // On a wide window the field lies on its side -- your half on the
+        // left, theirs on the right -- so it fills the screen instead of
+        // standing as a narrow strip in the middle of it.
+        sideways = getWidth() > getHeight();
+        int across = sideways ? Mission.DEPTH_M * 10 : Mission.WIDTH_M * 10;
+        int down = sideways ? Mission.WIDTH_M * 10 : Mission.DEPTH_M * 10;
+        k = Math.min((getWidth() - pad * 2) / (float) across, (getHeight() - pad * 2) / (float) down);
+        ox = getX() + (getWidth() - (int) (across * k)) / 2;
+        oy = getY() + (getHeight() - (int) (down * k)) / 2;
     }
 
-    /// Screen x of a field x: mirrored, as the game draws it.
-    private int sx(int x) {
-        return ox + (int) ((Mission.WIDTH_M * 10 - x) * k);
+    /// Screen x of a field point: mirrored, as the game draws it.
+    private int sx(int x, int z) {
+        return sideways ? ox + (int) (z * k) : ox + (int) ((Mission.WIDTH_M * 10 - x) * k);
     }
 
-    private int sy(int z) {
-        return oy + (int) ((Mission.DEPTH_M * 10 - z) * k);
+    private int sy(int x, int z) {
+        return sideways ? oy + (int) ((Mission.WIDTH_M * 10 - x) * k)
+                : oy + (int) ((Mission.DEPTH_M * 10 - z) * k);
     }
 
-    private int fx(int px) {
-        return Mission.WIDTH_M * 10 - (int) ((px - ox) / k);
+    private int fx(int px, int py) {
+        return Mission.WIDTH_M * 10 - (int) (((sideways ? py - oy : px - ox)) / k);
     }
 
-    private int fz(int py) {
-        return Mission.DEPTH_M * 10 - (int) ((py - oy) / k);
+    private int fz(int px, int py) {
+        return sideways ? (int) ((px - ox) / k) : Mission.DEPTH_M * 10 - (int) ((py - oy) / k);
     }
 
     private static int snap(int v) {
@@ -119,42 +126,40 @@ final class MissionCanvas extends Component {
     public void paint(Graphics g) {
         layoutField();
         g.setAntiAliased(true);
-        int fw = (int) (Mission.WIDTH_M * 10 * k);
-        int fh = (int) (Mission.DEPTH_M * 10 * k);
-        g.setColor(0x0e1216);
-        g.fillRect(getX(), getY(), getWidth(), getHeight());
-        g.setColor(0x232a31);
-        g.fillRect(ox, oy + fh / 2, fw, fh / 2);
-        g.setColor(0x171c21);
-        g.fillRect(ox, oy, fw, fh / 2);
-        g.setColor(0x2c343c);
-        for (int m = 0; m <= Mission.WIDTH_M; m += 4) {
-            g.drawLine(sx(m * 10), oy, sx(m * 10), oy + fh);
-        }
-        for (int m = 0; m <= Mission.DEPTH_M; m += 4) {
-            g.drawLine(ox, sy(m * 10), ox + fw, sy(m * 10));
-        }
-        g.setColor(Type.AMBER);
-        g.drawLine(ox, oy + fh / 2, ox + fw, oy + fh / 2);
-        g.drawLine(ox, oy + fh / 2 + 1, ox + fw, oy + fh / 2 + 1);
-        g.setColor(0x4f5862);
-        g.drawRect(ox, oy, fw, fh);
         int far = Mission.DEPTH_M * 10;
         int wide = Mission.WIDTH_M * 10;
+        g.setColor(0x0e1216);
+        g.fillRect(getX(), getY(), getWidth(), getHeight());
+        // the two halves, theirs darker
+        g.setColor(0x232a31);
+        rect(g, wide / 2, far / 4, wide, far / 2, true);
+        g.setColor(0x171c21);
+        rect(g, wide / 2, far * 3 / 4, wide, far / 2, true);
+        g.setColor(0x2c343c);
+        for (int m = 0; m <= Mission.WIDTH_M; m += 4) {
+            g.drawLine(sx(m * 10, 0), sy(m * 10, 0), sx(m * 10, far), sy(m * 10, far));
+        }
+        for (int m = 0; m <= Mission.DEPTH_M; m += 4) {
+            g.drawLine(sx(0, m * 10), sy(0, m * 10), sx(wide, m * 10), sy(wide, m * 10));
+        }
+        g.setColor(Type.AMBER);
+        g.drawLine(sx(0, far / 2), sy(0, far / 2), sx(wide, far / 2), sy(wide, far / 2));
+        g.drawLine(sx(0, far / 2) + (sideways ? 1 : 0), sy(0, far / 2) + (sideways ? 0 : 1),
+                sx(wide, far / 2) + (sideways ? 1 : 0), sy(wide, far / 2) + (sideways ? 0 : 1));
+        g.setColor(0x4f5862);
+        rect(g, wide / 2, far / 2, wide, far, false);
         for (int pass = 0; pass < 2; pass++) {
             boolean mirror = pass == 0;
             for (int i = 0; i < mission.props.size(); i++) {
                 Mission.Prop p = mission.props.get(i);
                 int cx = mirror ? wide - p.x : p.x;
                 int cz = mirror ? far - p.z : p.z;
-                int x0 = sx(cx + p.width() / 2);
-                int y0 = sy(cz + p.depth() / 2);
-                int w = Math.max(3, (int) (p.width() * k));
-                int h = Math.max(3, (int) (p.depth() * k));
+                int w = p.width();
+                int d = p.depth();
                 g.setColor(mirror ? 0x3a424a : (i == selected ? 0x7d6a3a : 0x5d6873));
-                g.fillRect(x0, y0, w, h);
+                rect(g, cx, cz, w, d, true);
                 g.setColor(mirror ? 0x4f5862 : (i == selected ? Type.AMBER : 0xa9b3bd));
-                g.drawRect(x0, y0, w, h);
+                rect(g, cx, cz, w, d, false);
             }
         }
         Font f = Type.bold(2.2f);
@@ -162,21 +167,49 @@ final class MissionCanvas extends Component {
         int r = Math.max(CN.convertToPixels(1.3f), (int) (8 * k));
         for (int i = 0; i < mission.spawns.size(); i++) {
             int[] s = mission.spawns.get(i);
-            dot(g, sx(s[0]), sy(s[1]), r, Type.FRIENDLY, String.valueOf(i + 1));
-            dot(g, sx(wide - s[0]), sy(far - s[1]), r, Type.HOSTILE, null);
+            dot(g, sx(s[0], s[1]), sy(s[0], s[1]), r, Type.FRIENDLY, String.valueOf(i + 1));
+            dot(g, sx(wide - s[0], far - s[1]), sy(wide - s[0], far - s[1]), r, Type.HOSTILE, null);
         }
         if (mission.mode == Mode.CAPTURE_THE_FLAG) {
-            flag(g, sx(mission.baseX), sy(mission.baseZ), r, Type.FRIENDLY);
-            flag(g, sx(wide - mission.baseX), sy(far - mission.baseZ), r, Type.HOSTILE);
+            flag(g, sx(mission.baseX, mission.baseZ), sy(mission.baseX, mission.baseZ), r, Type.FRIENDLY);
+            flag(g, sx(wide - mission.baseX, far - mission.baseZ), sy(wide - mission.baseX, far - mission.baseZ),
+                    r, Type.HOSTILE);
         } else if (mission.mode == Mode.SNACK_BAR) {
             int hr = (int) (40 * k);
             g.setColor(Type.AMBER);
-            g.drawArc(sx(wide / 2) - hr, sy(far / 2) - hr, hr * 2, hr * 2, 0, 360);
+            g.drawArc(sx(wide / 2, far / 2) - hr, sy(wide / 2, far / 2) - hr, hr * 2, hr * 2, 0, 360);
         }
+        int left = Math.min(sx(0, 0), sx(wide, far));
+        int top = Math.min(sy(0, 0), sy(wide, far));
+        int bottom = Math.max(sy(0, 0), sy(wide, far));
+        int right = Math.max(sx(0, 0), sx(wide, far));
         g.setColor(Type.STEEL);
-        g.drawString("ENEMY HALF (MIRRORED)", ox + 6, oy + 4);
+        String theirs = "ENEMY HALF (MIRRORED)";
+        if (sideways) {
+            g.drawString(theirs, right - f.stringWidth(theirs) - 6, top + 4);
+        } else {
+            g.drawString(theirs, left + 6, top + 4);
+        }
         g.setColor(Type.AMBER);
-        g.drawString("YOUR HALF", ox + 6, oy + fh - f.getHeight() - 4);
+        g.drawString("YOUR HALF", left + 6, bottom - f.getHeight() - 4);
+    }
+
+    /// Fills or outlines a field rectangle centred on `cx, cz`, `w` across
+    /// the field and `d` deep, in whichever way the field lies on screen.
+    private void rect(Graphics g, int cx, int cz, int w, int d, boolean fill) {
+        int x0 = sx(cx - w / 2, cz - d / 2);
+        int y0 = sy(cx - w / 2, cz - d / 2);
+        int x1 = sx(cx + w / 2, cz + d / 2);
+        int y1 = sy(cx + w / 2, cz + d / 2);
+        int x = Math.min(x0, x1);
+        int y = Math.min(y0, y1);
+        int rw = Math.max(3, Math.abs(x1 - x0));
+        int rh = Math.max(3, Math.abs(y1 - y0));
+        if (fill) {
+            g.fillRect(x, y, rw, rh);
+        } else {
+            g.drawRect(x, y, rw, rh);
+        }
     }
 
     private static void dot(Graphics g, int x, int y, int r, int color, String label) {
@@ -202,8 +235,8 @@ final class MissionCanvas extends Component {
         int px = ax - getAbsoluteX() + getX();
         int py = ay - getAbsoluteY() + getY();
         layoutField();
-        int x = fx(px);
-        int z = fz(py);
+        int x = fx(px, py);
+        int z = fz(px, py);
         held = -1;
         heldSpawn = -1;
         int grab = (int) (CN.convertToPixels(3) / k);
@@ -258,8 +291,8 @@ final class MissionCanvas extends Component {
         int px = ax - getAbsoluteX() + getX();
         int py = ay - getAbsoluteY() + getY();
         layoutField();
-        int x = snap(Math.max(0, Math.min(Mission.WIDTH_M * 10, fx(px))));
-        int z = snap(Math.max(0, Math.min(Mission.DEPTH_M * 5, fz(py))));
+        int x = snap(Math.max(0, Math.min(Mission.WIDTH_M * 10, fx(px, py))));
+        int z = snap(Math.max(0, Math.min(Mission.DEPTH_M * 5, fz(px, py))));
         if (held == -2) {
             mission.spawns.set(heldSpawn, new int[] {x, z});
         } else if (held == -3) {

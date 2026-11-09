@@ -96,18 +96,22 @@ public class ArenaView extends GameView {
     private static final float OPERATOR_HEIGHT = 1.8f;
     /// From the grip to the end of a held marker's barrel, in metres.
     private static final float MUZZLE_REACH = 0.36f;
-    private static final float CHEER_HEIGHT = 0.3f;
-    /// Where the gun hand rests in the gun-up poses, in the rig's own units
-    /// (measured from Idle_Gun_Shoot and Run_Shoot): right, up, ahead.
-    private static final float CARRY_X = -0.16f;
-    private static final float CARRY_Y = 1.33f;
-    private static final float CARRY_Z = 0.49f;
+    /// The right wrist's turn in the shooting pose (Idle_Gun_Shoot), column
+    /// major, measured from the rig.
+    private static final float[] REST_WRIST = {
+        -0.1762f, -0.9835f, -0.042f,
+        -0.0212f, -0.0389f, 0.999f,
+        -0.9841f, 0.1769f, -0.014f};
+    /// The marker's turn in the wrist's frame: in the shooting pose it
+    /// points straight ahead. Column major.
+    private static final float[] GUN_IN_WRIST = {
+        0.1762f, 0.0212f, 0.9841f,
+        -0.9835f, -0.0389f, 0.1769f,
+        0.042f, -0.999f, 0.014f};
+    /// The grip, in the wrist's frame: in the palm, a hand past the joint.
+    private static final float[] GRIP_LOCAL = {0.0278f, 0.0731f, -0.0073f};
     /// How far apart the winners stand to cheer, in metres.
     private static final float CHEER_ROOM = 1.1f;
-    /// From the wrist joint to the middle of the palm, along the marker and
-    /// below it, in metres.
-    private static final float GRIP_REACH = 0.07f;
-    private static final float GRIP_DROP = 0.02f;
     /// A marker in another operator's hands, in metres. Real ones are about
     /// this long; at the viewmodel's size they vanished into a fist, and
     /// half the field looked unarmed.
@@ -225,7 +229,8 @@ public class ArenaView extends GameView {
     private final float[] hand = new float[16];
     private final float[] gunTurn = new float[16];
     private final float[] bodyTurn = new float[16];
-    private final float[] aimTurn = new float[16];
+    private final float[] wrist = new float[16];
+    private final float[] handTurn = new float[9];
     private final float[] pitchTurn = new float[16];
     /// Per operator, the mesh node of its head, hidden in your own view.
     private String[] headNodes = new String[0];
@@ -1621,13 +1626,14 @@ public class ArenaView extends GameView {
         AnimatedModel op = operators[i];
         AnimatedModel gun = held[i];
         op.setVisible(!first || p.alive());
-        gun.setVisible(p.alive() && !m.over());
+        // the marker stays in the hand when painted, and goes down with it
+        gun.setVisible(!first || p.alive());
         if (first != (headless == i) && headNodes[i] != null) {
             op.setNodeVisible(headNodes[i], !first);
             headless = first ? i : -1;
         }
         float x = -lerp(prevX[i], p.x() * MM);
-        float y = lerp(prevY[i], p.y() * MM) + cheerHop(m, i);
+        float y = lerp(prevY[i], p.y() * MM);
         float z = lerp(prevZ[i], p.z() * MM);
         if (m.over()) {
             // The team often finishes in a heap on the flag; spread out to
@@ -1734,46 +1740,88 @@ public class ArenaView extends GameView {
         op.setPosition(x, y, z);
         op.setRotation(0f, yawDeg, 0f);
         System.arraycopy(Matrix4.rotation((float) Math.toRadians(yawDeg), 0f, 1f, 0f), 0, bodyTurn, 0, 16);
-        float pitchDeg = -p.pitch() * 360f / Trig.FULL;
-        Matrix4.multiply(bodyTurn, Matrix4.rotation((float) Math.toRadians(pitchDeg), 1f, 0f, 0f), aimTurn);
-        attach(i, bodyTurn, aimTurn, x, y, z);
+        attach(i, bodyTurn, x, y, z);
     }
 
     /// Puts operator `i`'s marker in its hand. `turn` is the body's rotation
-    /// and `ox, oy, oz` its origin, as the model is placed this frame; `aim`
-    /// is the look the marker points along.
+    /// and `ox, oy, oz` its origin, as the model is placed this frame.
     ///
-    /// The marker goes where the character's own (hidden) pistol is and turns
-    /// with it, so it stays in the hand through every clip. It used to take
-    /// only the wrist's position and the body's yaw: the hand swung, dropped
-    /// and turned in walk, idle and the performances while the marker stayed
-    /// level and pointing ahead, next to the hand rather than in it.
-    private void attach(int i, float[] turn, float[] aim, float ox, float oy, float oz) {
-        // A fixed carry point on the body, where the gun-up poses hold the
-        // hand, not the hand itself: even those poses move the wrist a hand's
-        // width a stride, and the marker bounced with it.
+    /// The marker is bolted to the right wrist bone, position and turn, the
+    /// way a game parents a weapon to a hand: the arm and the marker move as
+    /// one through every clip, and when a player is painted it goes down with
+    /// the hand instead of vanishing. Earlier versions kept the marker at a
+    /// fixed carry point aimed along the look, and the animated arm then ran
+    /// up and down through a gun glued in the air.
+    private void attach(int i, float[] turn, float ox, float oy, float oz) {
+        AnimatedModel op = operators[i];
+        AnimatedModel gun = held[i];
         float s = opScale[i];
-        float hx = CARRY_X * s;
-        float hy = CARRY_Y * s;
-        float hz = CARRY_Z * s;
+        float[] w = wrist;
+        float wx;
+        float wy;
+        float wz;
+        if (op.getNodeMatrix(Models.HAND, w)) {
+            // the bone's rotation, without whatever scale the rig carries
+            for (int c = 0; c < 3; c++) {
+                float n = (float) Math.sqrt(w[c * 4] * w[c * 4] + w[c * 4 + 1] * w[c * 4 + 1]
+                        + w[c * 4 + 2] * w[c * 4 + 2]);
+                if (n > 1e-6f) {
+                    w[c * 4] /= n;
+                    w[c * 4 + 1] /= n;
+                    w[c * 4 + 2] /= n;
+                }
+            }
+            wx = w[12];
+            wy = w[13];
+            wz = w[14];
+        } else {
+            // no hand bone: hold it where the shooting pose holds the wrist
+            System.arraycopy(Matrix4.identity(), 0, w, 0, 16);
+            wx = -0.1607f;
+            wy = 1.3415f;
+            wz = 0.488f;
+            for (int k = 0; k < 9; k++) {
+                w[(k / 3) * 4 + k % 3] = REST_WRIST[k];
+            }
+        }
+        // grip in model space: the wrist plus the palm offset, in the wrist's frame
+        float lx = w[0] * GRIP_LOCAL[0] + w[4] * GRIP_LOCAL[1] + w[8] * GRIP_LOCAL[2];
+        float ly = w[1] * GRIP_LOCAL[0] + w[5] * GRIP_LOCAL[1] + w[9] * GRIP_LOCAL[2];
+        float lz = w[2] * GRIP_LOCAL[0] + w[6] * GRIP_LOCAL[1] + w[10] * GRIP_LOCAL[2];
+        float hx = (wx + lx) * s;
+        float hy = (wy + ly) * s;
+        float hz = (wz + lz) * s;
         float gx = ox + turn[0] * hx + turn[4] * hy + turn[8] * hz;
         float gy = oy + turn[1] * hx + turn[5] * hy + turn[9] * hz;
         float gz = oz + turn[2] * hx + turn[6] * hy + turn[10] * hz;
-        AnimatedModel gun = held[i];
-        // The marker takes its place from the hand and its aim from the look.
-        // Taking the wrist's turn as well made it flap: a walking stride turns
-        // the wrist 47 degrees, a run 30.
-        Matrix4.multiply(aim, Matrix4.rotation((float) Math.PI, 0f, 1f, 0f), gunTurnB);
-        setEuler(gun, gunTurnB);
-        // the grip sits in the palm, a hand's width past the wrist joint
-        gx += -gunTurnB[4] * GRIP_DROP - gunTurnB[8] * GRIP_REACH;
-        gy += -gunTurnB[5] * GRIP_DROP - gunTurnB[9] * GRIP_REACH;
-        gz += -gunTurnB[6] * GRIP_DROP - gunTurnB[10] * GRIP_REACH;
+        // marker turn = body * wrist * (the wrist's shooting-pose turn undone)
+        float[] g = gunTurnB;
+        for (int c = 0; c < 3; c++) {
+            for (int r = 0; r < 3; r++) {
+                float v = 0f;
+                for (int k = 0; k < 3; k++) {
+                    v += w[k * 4 + r] * GUN_IN_WRIST[c * 3 + k];
+                }
+                handTurn[c * 3 + r] = v;
+            }
+        }
+        for (int c = 0; c < 3; c++) {
+            for (int r = 0; r < 3; r++) {
+                g[c * 4 + r] = turn[r] * handTurn[c * 3] + turn[4 + r] * handTurn[c * 3 + 1]
+                        + turn[8 + r] * handTurn[c * 3 + 2];
+            }
+            g[c * 4 + 3] = 0f;
+        }
+        g[12] = 0f;
+        g[13] = 0f;
+        g[14] = 0f;
+        g[15] = 1f;
+        setEuler(gun, g);
         gun.setPosition(gx, gy, gz);
         // the marker's barrel runs along its own -z, from the grip
-        muzzle[i][0] = gx - gunTurnB[8] * MUZZLE_REACH;
-        muzzle[i][1] = gy - gunTurnB[9] * MUZZLE_REACH;
-        muzzle[i][2] = gz - gunTurnB[10] * MUZZLE_REACH;
+        muzzle[i][0] = gx - g[8] * MUZZLE_REACH;
+        muzzle[i][1] = gy - g[9] * MUZZLE_REACH;
+        muzzle[i][2] = gz - g[10] * MUZZLE_REACH;
     }
 
     /// The mesh node holding the operator's head: the one whose name ends in
@@ -1824,6 +1872,12 @@ public class ArenaView extends GameView {
                 (int) (-(x - fx * (back + 0.4f) + rx * 0.7f) * 1000f), eye,
                 (int) ((z - fz * (back + 0.4f) + rz * 0.7f) * 1000f))) {
             back -= 0.2f;
+        }
+        if (back < 1.2f) {
+            // pulled in that close the camera is in the shooter's shoulder,
+            // and their fist and marker filled the screen
+            operators[s].setVisible(false);
+            held[s].setVisible(false);
         }
         float cx = x - fx * back + rx * 0.7f;
         float cy = y + 1.95f;
@@ -1888,8 +1942,9 @@ public class ArenaView extends GameView {
         if (m.player(i).team() != w) {
             return Models.IDLE;
         }
-        // waving and jumping (see `cheerHop`). Punches and kicks threw a fist
-        // or a boot straight through the teammate standing next to them.
+        // A wave, on the spot. A jump drawn by lifting the whole body, with no
+        // crouch or push in the legs, read as being hoisted on a wire; and
+        // punches and kicks went straight through the teammate beside them.
         return Models.WAVE;
     }
 
@@ -1899,23 +1954,10 @@ public class ArenaView extends GameView {
 
     private float orbit;
     private float orbitRise = 2.2f;
-    /// Seconds since the final whistle, for the winners' jumping.
-    private float cheer;
-
-    /// How high a winner is off the ground this frame: everyone on the
-    /// winning team (everyone, on a draw) jumps for joy, each to their own
-    /// beat. The rig has no cheer of its own, so the jump is drawn here.
-    private float cheerHop(Match m, int i) {
-        if (!m.over() || m.winner() >= 0 && m.player(i).team() != m.winner()) {
-            return 0f;
-        }
-        return CHEER_HEIGHT * (float) Math.abs(Math.sin(cheer * 5.5f + i * 1.3f));
-    }
 
     /// Game over: a slow orbit around the winning team, close enough to see
     /// them cheer -- or around everyone, on a draw.
     private void celebrate(Match m, int team, float dt) {
-        cheer += dt;
         float cx = 0f;
         float cz = 0f;
         float cy = 0f;
@@ -2126,7 +2168,7 @@ public class ArenaView extends GameView {
         // gun hand is 22 degrees right of the eye: there the body moves right
         // (its own -x) so the hand comes into the view.
         float aspect = (float) getWidth() / Math.max(1, getHeight());
-        float narrow = 0.15f * Math.max(0f, 1f - aspect);
+        float narrow = 0.3f * Math.max(0f, 1f - aspect);
         float hx = hand[12] * s - (bobX + swayX) * 0.5f - narrow;
         float hy = hand[13] * s + EYE_ABOVE_HEAD - (bobY + swayY) * 0.5f;
         float hz = hand[14] * s + EYE_AHEAD_OF_HEAD - 0.04f * ads + 0.05f * recoil;
@@ -2135,7 +2177,7 @@ public class ArenaView extends GameView {
         float oz = z - (bodyTurn[2] * hx + bodyTurn[6] * hy + bodyTurn[10] * hz);
         op.setPosition(ox, oy, oz);
         op.setRotation(pitchDeg, yawDeg, 0f);
-        attach(me, bodyTurn, bodyTurn, ox, oy, oz);
+        attach(me, bodyTurn, ox, oy, oz);
         viewMuzzleX = muzzle[me][0];
         viewMuzzleY = muzzle[me][1];
         viewMuzzleZ = muzzle[me][2];

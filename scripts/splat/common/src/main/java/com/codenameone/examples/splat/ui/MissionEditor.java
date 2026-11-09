@@ -128,18 +128,36 @@ public final class MissionEditor {
             saveDraft(mission);
         });
 
-        Container middle = new Container(BoxLayout.y());
-        middle.setScrollableY(true);
-        f.add(BorderLayout.NORTH, BoxLayout.encloseY(name, modes, strip));
-        middle.add(canvas[0]).add(status).add(edit).add(briefing);
-        f.add(BorderLayout.CENTER, middle);
-
         Container go = new Container(new GridLayout(1, 2));
         go.add(Ui.secondary("PLAY TEST", "playTest", e -> playTest(mission)));
         go.add(Ui.primary("PUBLISH", "publishMission", e -> MissionsForm.publish(mission)));
-        f.add(BorderLayout.SOUTH, go);
         if (CN.isDesktop()) {
-            Ui.desktopColumn(f);
+            // A desk has the room for an editor laid out like one: the field
+            // takes the whole window and the tools stand in a panel at the
+            // side. Squeezed into the reading column the other screens use,
+            // the field was a small square in the middle of a wide screen.
+            Container palette = new Container(new GridLayout(Math.max(1, (tools.length + 1) / 2), 2));
+            for (int i = 0; i < chips.length; i++) {
+                chips[i].remove();
+                palette.add(chips[i]);
+            }
+            Container side = BoxLayout.encloseY(name, modes, palette, edit, briefing);
+            side.setScrollableY(true);
+            Container panel = new Container(new BorderLayout());
+            panel.setUIID("EditorPanel");
+            panel.add(BorderLayout.CENTER, side).add(BorderLayout.SOUTH, go);
+            int w = Math.max(CN.convertToPixels(70), f.getWidth() > 0 ? f.getWidth() / 4 : CN.getDisplayWidth() / 4);
+            panel.setPreferredW(w);
+            Container field = new Container(new BorderLayout());
+            field.add(BorderLayout.CENTER, canvas[0]).add(BorderLayout.SOUTH, status);
+            f.add(BorderLayout.CENTER, field).add(BorderLayout.EAST, panel);
+        } else {
+            Container middle = new Container(BoxLayout.y());
+            middle.setScrollableY(true);
+            f.add(BorderLayout.NORTH, BoxLayout.encloseY(name, modes, strip));
+            middle.add(canvas[0]).add(status).add(edit).add(briefing);
+            f.add(BorderLayout.CENTER, middle);
+            f.add(BorderLayout.SOUTH, go);
         }
         f.show();
         String p = mission.problem();
