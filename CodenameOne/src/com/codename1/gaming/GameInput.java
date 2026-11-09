@@ -44,6 +44,11 @@ import java.util.Set;
 ///   frame in which the transition happened. Edges are cleared by the `GameView`
 ///   at the end of every frame, after `GameView#update(double)` has run.
 ///
+/// Game controllers (see `Gamepads`) are folded in: `#isGamepadButtonDown(int)`
+/// and `#wasGamepadButtonPressed(int)` answer for any connected controller, and
+/// `#getAxisX()` / `#getAxisY()` fall back to the first controller's left stick
+/// when no on-screen joystick is held.
+///
 /// All state is written and read on the Codename One EDT, so no synchronization is
 /// required.
 public class GameInput {
@@ -59,6 +64,10 @@ public class GameInput {
 
     private float axisX;
     private float axisY;
+
+    // Which gamepad buttons were down (on any controller) at the end of the
+    // previous frame, for the gamepad edge queries.
+    private final boolean[] padDownLastFrame = new boolean[Gamepad.BUTTON_COUNT];
 
     /// Package private -- only `GameView` constructs the input.
     GameInput() {
@@ -103,6 +112,38 @@ public class GameInput {
         releasedEdge.clear();
         pointerPressedEdge = false;
         pointerReleasedEdge = false;
+        for (int b = 0; b < padDownLastFrame.length; b++) {
+            padDownLastFrame[b] = isGamepadButtonDown(b);
+        }
+    }
+
+    /// Returns true while the button is held on any connected controller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: one of the `Gamepad.BUTTON_*` constants
+    public boolean isGamepadButtonDown(int button) {
+        Gamepad[] pads = Gamepads.getGamepads();
+        for (Gamepad pad : pads) {
+            if (pad.isButtonDown(button)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Returns true during the first frame in which the button is held on any
+    /// connected controller.
+    public boolean wasGamepadButtonPressed(int button) {
+        return button >= 0 && button < padDownLastFrame.length
+                && !padDownLastFrame[button] && isGamepadButtonDown(button);
+    }
+
+    /// Returns true during the first frame after the button was released on
+    /// every connected controller.
+    public boolean wasGamepadButtonReleased(int button) {
+        return button >= 0 && button < padDownLastFrame.length
+                && padDownLastFrame[button] && !isGamepadButtonDown(button);
     }
 
     /// Returns true while the given raw key code is held down.
@@ -173,14 +214,27 @@ public class GameInput {
     }
 
     /// The horizontal analog value, -1 (left) to 1 (right), from an on-screen
-    /// `VirtualJoystick`. 0 when there is no joystick or it is centered.
+    /// `VirtualJoystick`, or else the first controller's left stick. 0 when
+    /// neither is deflected.
     public float getAxisX() {
-        return axisX;
+        if (axisX != 0 || axisY != 0) {
+            return axisX;
+        }
+        return firstPadAxis(Gamepad.AXIS_LEFT_X);
     }
 
     /// The vertical analog value, -1 (up) to 1 (down the screen), from an on-screen
-    /// `VirtualJoystick`. 0 when there is no joystick or it is centered.
+    /// `VirtualJoystick`, or else the first controller's left stick. 0 when
+    /// neither is deflected.
     public float getAxisY() {
-        return axisY;
+        if (axisX != 0 || axisY != 0) {
+            return axisY;
+        }
+        return firstPadAxis(Gamepad.AXIS_LEFT_Y);
+    }
+
+    private static float firstPadAxis(int axis) {
+        Gamepad[] pads = Gamepads.getGamepads();
+        return pads.length == 0 ? 0 : pads[0].getAxis(axis);
     }
 }

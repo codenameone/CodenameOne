@@ -1,0 +1,175 @@
+[#steam]
+== Publishing to Steam
+
+Steam reaches Linux desktops, the Steam Deck and the Steam Machine, which all run
+the same binary. Codename One publishes to it with the
+<<_working_with_the_native_linux_port,native Linux port>>: one native executable
+with no JVM, packaged as a Steam *depot* and uploaded with SteamPipe. The same game
+code builds for iOS, Android and the other targets unchanged.
+
+On top of the build, Codename One adds what a Steam title needs:
+
+* *Controllers.* Every gamepad Steam knows about, the Steam Deck's own controls
+  included, arrives through `com.codename1.gaming.Gamepads`. Forms can be driven
+  with a controller with no code at all.
+* *Platform services.* Achievements, stats, cloud saves, rich presence, DLC
+  ownership and the Steam overlay are available through
+  `com.codename1.gaming.GameServices`. The same calls are no-ops on a platform
+  without game services, so the code stays portable.
+* *Gaming Mode.* The app starts full screen, and text fields open Steam's
+  on-screen keyboard when the Deck or a TV is in controller mode.
+
+=== Controllers
+
+`Gamepads` keeps one `Gamepad` per connected controller, laid out like an Xbox
+controller: *A*, *B*, *X* and *Y*, the bumpers and triggers, two sticks, the D-pad
+and the menu buttons.
+
+[source,java]
+----
+Gamepad pad = Gamepads.getGamepad(0);
+if (pad != null && pad.isConnected()) {
+    float x = pad.getAxis(Gamepad.AXIS_LEFT_X);   // -1..1, dead zone applied
+    if (pad.isButtonDown(Gamepad.BUTTON_A)) {
+        jump();
+    }
+}
+----
+
+`GameInput` reads the first controller too: `wasGamepadButtonPressed` gives the
+press of this frame, and `getAxisX`/`getAxisY` fall back to the left stick when the
+on-screen joystick is idle, so a game written for touch plays with a controller
+unchanged.
+
+For events rather than polling, add a `GamepadListener`. Return `true` from
+`gamepadButton` to consume the press.
+
+==== Navigating forms
+
+With no code, the D-pad and left stick move the focus between components, *A*
+presses the focused one and *B* runs the form's back command. A game that reads the
+controller itself calls `Gamepads.setFocusNavigation(false)`.
+
+On Linux the port reads controllers from the kernel's input devices, so nothing
+needs installing. Under Steam, Steam Input presents every controller as an Xbox
+pad, and the port skips the devices Steam hides so a controller never appears twice.
+`Gamepad.rumble()` drives the motors where the controller has them.
+
+=== Game services
+
+[source,java]
+----
+if (GameServices.isAvailable()) {             // true on Steam
+    GameServices.unlockAchievement("FIRST_WIN");
+    GameServices.setStat("wins", GameServices.getStatInt("wins", 0) + 1);
+    GameServices.commit();
+    GameServices.writeSave("slot1", saveBytes);
+}
+----
+
+* *Achievements and stats* use the API names defined on the Steamworks site.
+  `commit()` sends them to Steam.
+* *Cloud saves* use Steam Cloud. Turn on Steam Cloud for the app in Steamworks and
+  give it a byte quota.
+* *Presence:* `setPresence(key, value)` sets rich presence, such as
+  `"steam_display"`.
+* *Ownership:* `ownsContent("1234")` answers whether the player owns that DLC.
+* *Overlay:* `openPlatformUI("achievements")` opens the overlay on a page, and an
+  `http`/`https` target opens the overlay's browser. A `GameServicesListener` is
+  told when the overlay opens and closes, which is the moment to pause.
+* `isControllerFirst()` is true on the Deck and in Big Picture mode, where the UI
+  should assume a controller and a TV-distance screen.
+
+The Steamworks library is loaded when the app starts. If it's missing, or Steam
+isn't running, `isAvailable()` is false and every call does nothing.
+
+=== Setting up the app in Steamworks
+
+. Create the app on the https://partner.steamgames.com[Steamworks partner site]
+  and note its *App ID*. Steamworks creates a depot with the next number.
+. Under *Installation > General*, add a launch option with the executable
+  `launch.sh` and the operating system *Linux + SteamOS*.
+. Under *SteamPipe > Depots*, set the depot's operating system to Linux.
+. Download the Steamworks SDK. The build copies
+  `redistributable_bin/linux64/libsteam_api.so` from it into the depot. Steam
+  allows that library to be redistributed; nothing else from the SDK is used.
+
+=== Building
+
+Add the hints to `codenameone_settings.properties`:
+
+[source,properties]
+----
+codename1.arg.steam.appId=480
+codename1.arg.steam.sdkPath=/path/to/steamworks_sdk
+----
+
+and build:
+
+[source,bash]
+----
+mvn cn1:buildSteamLocal       # or ./gradlew buildSteamLocal
+----
+
+The SDK path can also come from the `STEAMWORKS_SDK` environment variable. Without
+an SDK the depot is still built, and `GameServices` reports itself unavailable.
+
+The result is in `linux/target/steam`:
+
+----
+content/                 the depot
+  MyGame                 the executable
+  launch.sh              the launch option
+  libsteam_api.so
+  steam_appid.txt        for running outside Steam; not uploaded
+scripts/
+  app_build_480.vdf
+  depot_build_481.vdf
+----
+
+`content/launch.sh` runs the game outside Steam too, which is the quickest way to
+test achievements against a running Steam client.
+
+[cols="1,1,3"]
+|===
+|Hint |Default |Meaning
+
+|`steam.appId` | |The App ID. Required.
+|`steam.depotId` |App ID + 1 |The Linux depot.
+|`steam.branch` |empty |A beta branch to set the upload live on.
+|`steam.buildDescription` |name and version |The description shown in Steamworks.
+|`steam.sdkPath` |`STEAMWORKS_SDK` |The Steamworks SDK directory.
+|`steam.fullscreen` |`true` |Start full screen.
+|===
+
+=== Uploading
+
+With SteamCMD installed:
+
+[source,bash]
+----
+mvn cn1:steamUpload -Dsteam.user=my_build_account
+----
+
+The first run asks for the password and the Steam Guard code; later runs reuse
+SteamCMD's saved login.
+
+A cloud build (`mvn cn1:buildSteam`) can be uploaded for you instead. Save the
+Steam builder account and its `config.vdf` under *Submissions* in the build
+console, then press *Submit to Steam* on the finished build, or turn on
+automatic submission for the Linux target to upload every build that produces a
+depot.
+
+Valve allows an upload to go live on a *beta branch* only. Set `steam.branch` to
+test a build on a branch, then make it live on the default branch, and submit it
+for review, from the Steamworks site.
+
+=== Runtime
+
+Steam runs Linux games inside the Steam Linux Runtime, a container with a fixed set
+of libraries. The native Linux port runs in it as is, with these exceptions:
+
+* `BrowserComponent` is unavailable: the runtime has no WebKitGTK.
+* Media playback through GStreamer is unavailable.
+* Secure storage is unavailable: the runtime has no libsecret.
+* Cryptography uses the runtime's OpenSSL 1.1 when OpenSSL 3 is absent.

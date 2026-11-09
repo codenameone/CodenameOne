@@ -1787,7 +1787,14 @@ public class ByteCodeTranslator {
         // build distro's CURL_OPENSSL_4 tags, absent on Alma/RHEL's libcurl.
         // Keep its headers/compiler flags, but do not link CN1CURL_LIBRARIES.
         writer.append("pkg_check_modules(CN1CURL REQUIRED libcurl)\n");
-        writer.append("pkg_check_modules(CN1GL REQUIRED epoxy egl glesv2)\n");
+        // GL goes through libepoxy, which dlopen()s libEGL and libGLESv2 itself at
+        // first use, so only epoxy is linked; egl/glesv2 are probed for their
+        // headers alone. Linking them made each a DT_NEEDED, and the Steam Linux
+        // Runtime (sniper) ships libEGL but no libGLESv2 -- the binary would not
+        // start there at all. On a system without GLES the GL surface reports
+        // unsupported instead and Cairo draws everything.
+        writer.append("pkg_check_modules(CN1GL REQUIRED epoxy)\n");
+        writer.append("pkg_check_modules(CN1GLHDR REQUIRED egl glesv2)\n");
         // Optional feature libs (browser/media/secure-storage/notifications/
         // location). The port dlopen()s these lazily at first use (see
         // cn1_linux_browser.c / cn1_linux_media.c / cn1_linux_services.c), so we
@@ -1798,7 +1805,7 @@ public class ByteCodeTranslator {
         writer.append("pkg_check_modules(CN1OPT REQUIRED\n");
         writer.append("    gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0\n");
         writer.append("    webkit2gtk-4.1 libsecret-1 libnotify libgeoclue-2.0)\n");
-        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CRYPTO_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
+        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CRYPTO_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1GLHDR_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
         writer.append("target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1CURL_CFLAGS_OTHER} ${CN1GL_CFLAGS_OTHER} ${CN1OPT_CFLAGS_OTHER})\n");
         // libm/pthread back the translated runtime + GC; dl is required for the
         // dlopen() of the optional libs above. Note: CN1OPT_LIBRARIES is

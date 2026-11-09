@@ -49,6 +49,7 @@ on:
       # it, the same way archetype-smoke, designer and pr.yml list them.
       - 'scripts/ci/apt-get-install.sh'
       - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/steam-runtime-smoke.sh'
       - 'scripts/test_gc_heap_removal.py'
       - 'vm/**'
       - 'Ports/LinuxPort/**'
@@ -86,6 +87,7 @@ on:
       - '.github/workflows/linux-build-run.yml'
       - 'scripts/ci/apt-get-install.sh'
       - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/steam-runtime-smoke.sh'
       - 'scripts/test_gc_heap_removal.py'
       - 'vm/**'
       - 'Ports/LinuxPort/**'
@@ -549,6 +551,20 @@ jobs:
       # A runnable, self-contained windowed demo binary for this arch (opens a
       # GTK window showing a Form -- not the headless suite). Download and run it
       # on a Linux desktop to smoke-test the native port on real hardware.
+      # Steam launches Linux games inside the Steam Linux Runtime ("sniper"), whose
+      # libraries are not the runner's. The demo is this suite's own objects linked
+      # as a windowed app, so a DT_NEEDED the runtime lacks, or a crash at start-up,
+      # fails here rather than on a player's Steam Deck.
+      - name: Run in the Steam Linux Runtime (x64)
+        if: ${{ !cancelled() && matrix.arch == 'x64' }}
+        run: |
+          elf="artifacts/linux-port/demo/codenameone-linux-demo-x64"
+          if [ ! -f "$elf" ]; then
+            echo "::warning::no windowed demo was linked; the Steam Linux Runtime smoke did not run"
+            exit 0
+          fi
+          bash scripts/ci/steam-runtime-smoke.sh "$elf" 15
+
       - name: Upload windowed demo binary (${{ matrix.arch }})
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

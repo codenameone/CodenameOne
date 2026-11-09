@@ -928,9 +928,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     dispatchPointerHover(windowId, x, y, key);
                     break;
                 case EVENT_KEY_PRESSED:
+                    reportGamepadKey(key, true);
                     windowKeyPressed(windowId, key);
                     break;
                 case EVENT_KEY_RELEASED:
+                    reportGamepadKey(key, false);
                     windowKeyReleased(windowId, key);
                     break;
                 case EVENT_SIZE_CHANGED:
@@ -2770,6 +2772,45 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int VK_GAMEPAD_LEFT_THUMBSTICK_DOWN = 0xD4;
     private static final int VK_GAMEPAD_LEFT_THUMBSTICK_RIGHT = 0xD5;
     private static final int VK_GAMEPAD_LEFT_THUMBSTICK_LEFT = 0xD6;
+
+    /// The Gamepad.BUTTON_* a gamepad virtual key stands for, or -1. The stick
+    /// directions are left out: they are a direction, not a button, and the
+    /// key events already navigate with them.
+    static int gamepadButtonOf(int vk) {
+        switch (vk) {
+            case VK_GAMEPAD_A: return com.codename1.gaming.Gamepad.BUTTON_A;
+            case VK_GAMEPAD_B: return com.codename1.gaming.Gamepad.BUTTON_B;
+            case 0xC5: return com.codename1.gaming.Gamepad.BUTTON_X;
+            case 0xC6: return com.codename1.gaming.Gamepad.BUTTON_Y;
+            case 0xC7: return com.codename1.gaming.Gamepad.BUTTON_RIGHT_SHOULDER;
+            case 0xC8: return com.codename1.gaming.Gamepad.BUTTON_LEFT_SHOULDER;
+            case 0xC9: return com.codename1.gaming.Gamepad.BUTTON_LEFT_TRIGGER;
+            case 0xCA: return com.codename1.gaming.Gamepad.BUTTON_RIGHT_TRIGGER;
+            case VK_GAMEPAD_DPAD_UP: return com.codename1.gaming.Gamepad.BUTTON_DPAD_UP;
+            case VK_GAMEPAD_DPAD_DOWN: return com.codename1.gaming.Gamepad.BUTTON_DPAD_DOWN;
+            case VK_GAMEPAD_DPAD_LEFT: return com.codename1.gaming.Gamepad.BUTTON_DPAD_LEFT;
+            case VK_GAMEPAD_DPAD_RIGHT: return com.codename1.gaming.Gamepad.BUTTON_DPAD_RIGHT;
+            case 0xCF: return com.codename1.gaming.Gamepad.BUTTON_START;
+            case 0xD0: return com.codename1.gaming.Gamepad.BUTTON_BACK;
+            case 0xD1: return com.codename1.gaming.Gamepad.BUTTON_LEFT_STICK;
+            case 0xD2: return com.codename1.gaming.Gamepad.BUTTON_RIGHT_STICK;
+            default: return -1;
+        }
+    }
+
+    /// The Xbox build gets the controller as keys and only as keys, so it is
+    /// reported to Gamepads from them, as one controller in slot 0. Navigation
+    /// stays with the key event itself, which is why `navigate` is false.
+    private static void reportGamepadKey(int vk, boolean down) {
+        int button = gamepadButtonOf(vk);
+        if (button < 0) {
+            return;
+        }
+        if (com.codename1.gaming.Gamepads.getGamepad(0) == null) {
+            com.codename1.gaming.Gamepads.reportConnected(0, "Gamepad");
+        }
+        com.codename1.gaming.Gamepads.reportButton(0, button, down, false);
+    }
 
     /// B on a controller, the console's universal "back". A Win32 window never
     /// receives it, so on the desktop this changes nothing.

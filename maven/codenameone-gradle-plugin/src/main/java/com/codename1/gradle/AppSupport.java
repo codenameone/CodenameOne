@@ -81,6 +81,7 @@ final class AppSupport {
 
     /// The local native Linux build, which `cn1RunOnDevice` deploys.
     static final String LINUX_LOCAL_BUILD_TASK = "buildLinuxLocal";
+    static final String STEAM_LOCAL_BUILD_TASK = "buildSteamLocal";
 
     /// The embedded board of a local Linux build (`-Pcn1.board=rpi5`).
     static final String BOARD_PROPERTY = "cn1.board";
@@ -541,6 +542,14 @@ final class AppSupport {
         registerBuild(project, "cn1Build", null, null,
                 "Runs the build given by -Pcodename1.platform and -Pcodename1.buildTarget",
                 layout, main, javase, framework, ext, userProperties, queue);
+        // The cloud Steam build: linux-device with the steam.package hint, as cn1:buildSteam sends it.
+        registerBuild(project, "buildSteam", "linux", "linux-device",
+                "Sends a Steam depot build to the build server",
+                layout, main, javase, framework, ext, userProperties.map(given -> {
+                    Map<String, String> out = new java.util.LinkedHashMap<String, String>(given);
+                    out.put("codename1.arg.steam.package", "true");
+                    return out;
+                }), queue);
 
         final File settingsFile = layout.settingsFile();
         final Provider<Map<String, String>> hosted = userProperties.map(
@@ -557,6 +566,10 @@ final class AppSupport {
         registerBuild(project, LINUX_LOCAL_BUILD_TASK, "linux", "local-linux-device",
                 "Builds the native Linux executable locally (-Pcn1.board=rpi5 for an embedded board)",
                 layout, main, javase, framework, ext, userProperties.zip(board, (given, b) -> boardProperties(given, b, settingsFile)), queue);
+        // The same build laid out as a Steam depot with its SteamPipe scripts.
+        registerBuild(project, STEAM_LOCAL_BUILD_TASK, "linux", "local-steam",
+                "Builds the native Linux executable locally as a Steam depot (needs steam.appId)",
+                layout, main, javase, framework, ext, userProperties, queue);
         // The bundle is found by looking in the build directory, so one an
         // earlier build left there must not be this build's answer.
         final Provider<File> bundle = project.getLayout().getBuildDirectory()

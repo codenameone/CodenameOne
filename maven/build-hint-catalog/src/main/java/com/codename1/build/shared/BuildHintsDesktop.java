@@ -266,6 +266,63 @@ final class BuildHintsDesktop {
                         + "bar above the app, the way the native desktop ports use the window title and "
                         + "the system menu bar."));
 
+        h.add(new Hint("steam.appId")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .valuePattern("[0-9]+")
+                .platform("linux")
+                .doc("The Steamworks app id. Required by the `steam` build target: it goes into the "
+                        + "generated SteamPipe build scripts and into `launch.sh`, which hands it to the "
+                        + "application so Steamworks connects even when the game is started outside Steam."));
+
+        h.add(new Hint("steam.depotId")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .valuePattern("[0-9]+")
+                .platform("linux")
+                .doc("The Linux depot to upload the build into. Defaults to `steam.appId` + 1, which is "
+                        + "the depot Steamworks creates with a new app."));
+
+        h.add(new Hint("steam.branch")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("A beta branch to set the uploaded build live on, such as `beta`. Empty (default) "
+                        + "uploads without setting it live. Valve does not allow setting the default branch "
+                        + "live from an upload: do that in the Steamworks partner site."));
+
+        h.add(new Hint("steam.buildDescription")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("The description shown for the build in the Steamworks build list. Defaults to the "
+                        + "application version."));
+
+        h.add(new Hint("steam.sdkPath")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("Local builds only: the unzipped Steamworks SDK, whose redistributable "
+                        + "`libsteam_api.so` is packaged with the game. Also read from the `STEAMWORKS_SDK` "
+                        + "environment variable; the cloud build supplies it itself. Without it the game is "
+                        + "packaged without Steamworks, and `GameServices` reports unavailable."));
+
+        h.add(new Hint("steam.package")
+                .group(HintGroup.STEAM)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("linux")
+                .doc("true/false (defaults to `false`). Lays a native Linux build out as a Steam depot "
+                        + "with its SteamPipe scripts. `cn1:buildSteam` and `cn1:buildSteamLocal` set it."));
+
+        h.add(new Hint("steam.fullscreen")
+                .group(HintGroup.STEAM)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("linux")
+                .doc("true/false (defaults to `true`). Starts the game fullscreen, as Steam Deck and "
+                        + "Steam Machine players expect."));
+
         h.add(new Hint("linux.arch")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)

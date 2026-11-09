@@ -101,8 +101,18 @@ typedef enum {
      * command runs on the EDT rather than on the GTK thread. Same number as the Windows
      * port's, so the two desktop wire protocols do not drift apart. */
     CN1_EVENT_MENU_COMMAND = 23,
-    CN1_EVENT_THEME_SETTINGS_CHANGED = 24
+    CN1_EVENT_THEME_SETTINGS_CHANGED = 24,
+    /* Game controllers (cn1_linux_gamepad.c). x is the controller slot. A button
+     * carries the Gamepad.BUTTON_* in y and 1/0 in keyCode; an axis carries the
+     * Gamepad.AXIS_* in y and the value times CN1_GAMEPAD_FIXED in keyCode. */
+    CN1_EVENT_GAMEPAD_CONNECTED = 25,
+    CN1_EVENT_GAMEPAD_DISCONNECTED = 26,
+    CN1_EVENT_GAMEPAD_BUTTON = 27,
+    CN1_EVENT_GAMEPAD_AXIS = 28
 } CN1EventType;
+
+/* Fixed-point scale of a CN1_EVENT_GAMEPAD_AXIS value. */
+#define CN1_GAMEPAD_FIXED 10000
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
 #define CN1_GESTURE_FIXED 10000
