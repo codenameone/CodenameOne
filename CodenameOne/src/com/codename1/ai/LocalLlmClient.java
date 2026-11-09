@@ -181,12 +181,19 @@ public final class LocalLlmClient extends LlmClient {
         submit(new Runnable() {
             @Override
             public void run() {
+                // Read outside the try: the generic get() is a cast, and a
+                // cast under a RuntimeException handler is one ParparVM never
+                // fails (scripts/check-cast-semantics.sh).
+                List<String> inputs = req.getInputs();
+                String[] texts = new String[inputs.size()];
+                for (int i = 0; i < texts.length; i++) {
+                    texts[i] = inputs.get(i);
+                }
                 try {
                     LocalLlmImpl llm = ensureOpen();
-                    List<String> inputs = req.getInputs();
-                    List<Embedding> data = new ArrayList<Embedding>(inputs.size());
-                    for (int i = 0; i < inputs.size(); i++) {
-                        float[] v = llm.embed(handle, inputs.get(i));
+                    List<Embedding> data = new ArrayList<Embedding>(texts.length);
+                    for (int i = 0; i < texts.length; i++) {
+                        float[] v = llm.embed(handle, texts[i]);
                         if (v == null) {
                             throw failure("Embedding failed");
                         }
