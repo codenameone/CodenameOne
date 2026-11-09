@@ -34,6 +34,7 @@ on:
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/test-javascript-weak-refs.mjs'
+      - 'scripts/test-javascript-dispatch-caches.mjs'
       - 'scripts/test-javascript-native-stub-bindings.mjs'
       - 'scripts/ci/tests/cn1ss-async-sink-test.sh'
       - 'scripts/ci/tests/Cn1ssAsyncSinkTest.java'
@@ -93,6 +94,7 @@ on:
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/test-javascript-weak-refs.mjs'
+      - 'scripts/test-javascript-dispatch-caches.mjs'
       - 'scripts/test-javascript-native-stub-bindings.mjs'
       - 'scripts/ci/tests/cn1ss-async-sink-test.sh'
       - 'scripts/ci/tests/Cn1ssAsyncSinkTest.java'
@@ -214,6 +216,13 @@ jobs:
       # strong edge and made every "weak" cache in the framework unreclaimable.
       - name: Weak reference guards
         run: node scripts/test-javascript-weak-refs.mjs
+
+      # node: builtins only, before the ParparVM build. Runs the real runtime
+      # against synthetic classes: the negative instanceof cache, the
+      # per-receiver virtual-dispatch cache and the iterator-returning cn1_iv*
+      # helpers each have an invalidation point or contract this holds.
+      - name: Dispatch cache guards
+        run: node scripts/test-javascript-dispatch-caches.mjs
 
       # A static interop factory (JSString.valueOf, Int32Array.create, ...) runs
       # its Java body -- `return null;` -- unless port.js binds it; an unbound

@@ -369,7 +369,12 @@ function emitCiFallbackMarker(symbol, markerType) {
 }
 function bindCiFallback(symbol, names, fn) {
   emitCiFallbackMarker(symbol, "ENABLED");
-  const wrappedFallback = function*() {
+  // Disabled diagnostics must not allocate a delegating generator per call.
+  // The implementation retains its native binding and suspension contract.
+  // The symbol is stamped on the function itself in that case, so a function
+  // already bound under another symbol still gets a wrapper of its own.
+  const direct = !__cn1PortDiagEnabled() && fn.__cn1CiFallbackSymbol === undefined;
+  const wrappedFallback = direct ? fn : function*() {
     emitCiFallbackMarker(symbol, "HIT");
     return yield* fn.apply(this, arguments);
   };
@@ -3935,6 +3940,9 @@ bindCiFallback("Style.setMarginUnitArrayCoerce", [
 bindCiFallback("Style.convertUnitArrayCoerce", [
   styleConvertUnitMethodId
 ], function*(__cn1ThisObject, arr, value, side) {
+  // Null denotes pixel units in Style.convertUnit. Preserve its Java float-to-int
+  // conversion without allocating a synthetic byte[4] on every padding lookup.
+  if (arr == null) return _d2i(value);
   const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleConvertUnitMethodId);
   if (typeof original !== "function") {
     // Null unit means PIXELS in CN1; for any other byte value the translator
