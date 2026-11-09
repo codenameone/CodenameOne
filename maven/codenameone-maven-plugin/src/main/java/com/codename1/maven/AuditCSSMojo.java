@@ -69,6 +69,22 @@ public class AuditCSSMojo extends CompileCSSMojo {
         appendSource(sources, new File(cssDirectory.getParentFile(), "guibuilder"));
         appendSource(sources, new File(project.getBuild().getOutputDirectory()));
 
+        // The cn1libs' stylesheets, extracted (if not already) the way the
+        // css goal does: a theme may read a variable a library defines.
+        File themeCss = new File(cssDirectory, "theme.css");
+        String inputs = new CssCompiler(MavenLog.of(getLog()), antProject, new CssCompiler.JavaFactory() {
+            @Override
+            public Java create() {
+                return createJava();
+            }
+        }).inputs(libraryCss(), "", themeCss);
+        StringBuilder libraries = new StringBuilder();
+        for (String input : inputs.split(",")) {
+            if (input.length() > 0 && !new File(input).getAbsoluteFile().equals(themeCss.getAbsoluteFile())) {
+                libraries.append(libraries.length() == 0 ? "" : ",").append(input);
+            }
+        }
+
         Java java = createJava();
         java.setDir(getCN1ProjectDir());
         java.setClasspath(new org.apache.tools.ant.types.Path(antProject, getCssCliClasspath()));
@@ -78,9 +94,13 @@ public class AuditCSSMojo extends CompileCSSMojo {
         java.createJvmarg().setValue("-Djava.awt.headless=true");
         java.createArg().setValue("-audit");
         java.createArg().setValue("-input");
-        java.createArg().setFile(new File(cssDirectory, "theme.css"));
+        java.createArg().setFile(themeCss);
         java.createArg().setValue("-format");
         java.createArg().setValue(format);
+        if (libraries.length() > 0) {
+            java.createArg().setValue("-library");
+            java.createArg().setValue(libraries.toString());
+        }
         if (sources.length() > 0) {
             java.createArg().setValue("-sources");
             java.createArg().setValue(sources.toString());

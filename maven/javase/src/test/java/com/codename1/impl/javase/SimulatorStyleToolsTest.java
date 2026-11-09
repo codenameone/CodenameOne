@@ -86,4 +86,30 @@ class SimulatorStyleToolsTest {
                 + " Button {\n-  color: #000;\n+  color: red;\n   padding: 1mm 2mm\n }\n \n", diff);
         assertEquals("", SimulatorStyleTools.unifiedDiff(CSS, CSS, "theme.css"));
     }
+
+    @Test
+    void aCommentBeforeTheDeclarationDoesNotHideIt() {
+        String css = "Button {\n    /* primary */\n    color: red;\n}\n";
+        assertEquals("Button {\n    /* primary */\n    color: blue;\n}\n",
+                SimulatorStyleTools.CssRule.set(css, "Button", "color", "blue"));
+        assertEquals("Button {\n    /* primary */\n}\n", SimulatorStyleTools.CssRule.set(css, "Button", "color", ""));
+        assertEquals("Button { /* x */  }", SimulatorStyleTools.CssRule.set("Button { /* x */ color: red; }",
+                "Button", "color", ""));
+    }
+
+    @Test
+    void aBraceInsideAStringClosesNothing() {
+        String css = "#Constants { title: \"a}b\"; }\nButton { color: red; }\n";
+        assertEquals(css.replace("red", "blue"), SimulatorStyleTools.CssRule.set(css, "Button", "color", "blue"));
+    }
+
+    @Test
+    void crlfFilesKeepCrlf() {
+        String css = "Button {\r\n    color: red;\r\n}\r\n";
+        assertEquals("Button {\r\n    color: red;\r\n    margin: 0;\r\n}\r\n",
+                SimulatorStyleTools.CssRule.set(css, "Button", "margin", "0"));
+        assertEquals("Button {\r\n}\r\n", SimulatorStyleTools.CssRule.set(css, "Button", "color", ""));
+        assertEquals(css + "\r\nCard {\r\n    margin: 0;\r\n}\r\n",
+                SimulatorStyleTools.CssRule.set(css, "Card", "margin", "0"));
+    }
 }

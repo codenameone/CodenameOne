@@ -237,7 +237,9 @@ It reports, with the file and line of each:
 * `unused-variable`: a variable that no rule reads.
 * `repeated-literal`: a color written in three or more rules that no variable names.
 * `low-contrast`: a rule whose `color` and background color fall below the 4.5:1 contrast ratio WCAG AA asks for body text. Variables are resolved first; translucent colors are skipped, because their contrast depends on what lies under them.
-* `unused-uiid`: a styled UIID that neither the framework nor the project names. Running `compile` first lets the audit search the compiled classes as well as the sources. A name built at run time, such as `"Tab" + state`, counts as a use of every UIID starting with `Tab`.
+* `unused-uiid`: a styled UIID that neither the framework nor the project names. Running `compile` first lets the audit search the compiled classes as well as the sources. A name built at run time, such as `"Tab" + state` in Java or `"Tab$state"` in Kotlin, counts as a use of every UIID starting with `Tab`, and a UIID another rule names in `cn1-derive` counts as used.
+
+Variables a media query redefines, such as dark mode colors, are resolved within that query, and a literal is never told to use a variable whose value changes with the mode. The stylesheets of installed cn1libs are read for the variables they define, so a theme that uses one isn't reported, but the audit reports nothing inside them.
 
 The audit reads the stylesheet as written, so it runs in well under a second. `-Dcn1.cssAudit.strict=true` fails the goal on any warning, which suits a continuous integration step, and `-Dcn1.cssAudit.format=json` prints the findings as JSON for other tools.
 

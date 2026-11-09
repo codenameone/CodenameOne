@@ -117,4 +117,53 @@ class ThemeAuditTest {
         assertTrue(json.contains("repeated-literal"), json);
         assertEquals(CN1CSSCLI.EXIT_COMPILE_FAILED, status);
     }
+
+    @Test
+    void aDarkModeRedefinitionDoesNotReplaceTheBaseValue() {
+        String css = ":root { --fg: #000000; --bg: #ffffff; }\n"
+                + "@media (prefers-color-scheme: dark) {\n :root { --fg: #ffffff; --bg: #000000; }\n"
+                + " Dark { color: var(--fg); background-color: var(--bg); }\n}\n"
+                + "Light { color: var(--fg); background-color: var(--bg); }\n"
+                + "Lit { color: #ffffff; border-color: #000000; }\n";
+        // Contrast is resolved in each rule's own mode, and a variable that
+        // changes with the mode is never offered for a literal.
+        assertEquals("", checks(ThemeAudit.auditText(CSS, css)));
+    }
+
+    @Test
+    void nestedFallbacksAreReadAndChecked() {
+        String css = ":root { --a: 1px; --b: 2px; }\nX { margin: var(--a, var(--b)); padding: var(--c, var(--d)); }";
+        assertEquals("undefined-variable@2", checks(ThemeAudit.auditText(CSS, css)));
+    }
+
+    @Test
+    void derivedUiidsAndKotlinTemplatesCountAsUses(@TempDir Path dir) throws Exception {
+        Path kt = dir.resolve("Main.kt");
+        Files.write(kt, "fun f(s: String) { setUIID(\"Tab$s\") }".getBytes(StandardCharsets.UTF_8));
+        java.util.Set<String> names = new HashSet<String>();
+        ThemeAudit.collectStrings(dir.toFile(), names);
+        String css = "Base { color: red; }\nChild { cn1-derive: Base; }\nTabOn { color: red; }\nNope { color: red; }";
+        names.add("Child");
+        assertEquals("unused-uiid@4", checks(ThemeAudit.auditText(CSS, css, names)));
+    }
+
+    @Test
+    void aTruncatedClassFileIsSkipped(@TempDir Path dir) throws Exception {
+        Files.write(dir.resolve("Bad.class"), new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE, 0, 0, 0, 52, 0, 9, 1});
+        java.util.Set<String> names = new HashSet<String>();
+        ThemeAudit.collectStrings(dir.toFile(), names);
+        assertTrue(names.isEmpty());
+    }
+
+    @Test
+    void libraryStylesheetsDefineButAreNeverReported(@TempDir Path dir) throws Exception {
+        Path lib = dir.resolve("lib.css");
+        Files.write(lib, ":root { --lib-accent: #123456; --lib-unused: 1px; }\nLibThing { color: #777; background-color: #888; }"
+                .getBytes(StandardCharsets.UTF_8));
+        Path app = dir.resolve("theme.css");
+        Files.write(app, "Button { color: var(--lib-accent); border-color: #123456; }".getBytes(StandardCharsets.UTF_8));
+        List<ThemeAudit.Finding> f = ThemeAudit.audit(Arrays.asList(lib.toFile()), Arrays.asList(app.toFile()),
+                new java.util.ArrayList<File>());
+        assertEquals("literal-matches-variable@1", checks(f));
+    }
 }

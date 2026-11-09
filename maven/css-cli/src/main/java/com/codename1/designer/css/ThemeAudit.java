@@ -93,7 +93,13 @@ public final class ThemeAudit {
     /// variable.
     static final int REPEAT_THRESHOLD = 3;
 
-    private static final Pattern VAR_REF = Pattern.compile("var\\(\\s*(--[A-Za-z0-9_-]+)\\s*(,[^)]*)?\\)");
+    /// Every `var(` reference, nested fallbacks included; group 2 is set
+    /// when a fallback follows.
+    private static final Pattern VAR_REF = Pattern.compile("var\\(\\s*(--[A-Za-z0-9_-]+)\\s*(,)?");
+
+    /// A value that is one `var()` as a whole; the greedy fallback takes a
+    /// nested `var()` with its parentheses.
+    private static final Pattern WHOLE_VAR = Pattern.compile("var\\(\\s*(--[A-Za-z0-9_-]+)\\s*(?:,(.*))?\\)");
     private static final Pattern COLOR_LITERAL = Pattern.compile(
             "#[0-9A-Fa-f]{8}\\b|#[0-9A-Fa-f]{6}\\b|#[0-9A-Fa-f]{3}\\b|rgba?\\([^)]*\\)");
     private static final Pattern IDENT = Pattern.compile("^[A-Za-z_][A-Za-z0-9_-]*");
@@ -115,11 +121,19 @@ public final class ThemeAudit {
         final String selector;
         final int line;
         final List<Declaration> declarations = new ArrayList<Declaration>();
+        /// Variables defined inside the same `@media` block, which override
+        /// the top-level ones for this rule; null at top level.
+        final Map<String, Variable> scope;
+        /// From a library stylesheet: read for what it defines and uses,
+        /// never reported on.
+        final boolean library;
 
-        Rule(File file, String selector, int line) {
+        Rule(File file, String selector, int line, Map<String, Variable> scope, boolean library) {
             this.file = file;
             this.selector = selector;
             this.line = line;
+            this.scope = scope;
+            this.library = library;
         }
     }
 
@@ -127,16 +141,26 @@ public final class ThemeAudit {
         final String value;
         final File file;
         final int line;
+        final boolean library;
 
-        Variable(String value, File file, int line) {
+        Variable(String value, File file, int line, boolean library) {
             this.value = value;
             this.file = file;
             this.line = line;
+            this.library = library;
         }
     }
 
     private final List<Rule> rules = new ArrayList<Rule>();
+    /// Top-level definitions: the values the theme has outside any media
+    /// query.
     private final Map<String, Variable> variables = new LinkedHashMap<String, Variable>();
+    /// Every variable defined anywhere, media blocks included, by name.
+    private final Map<String, Variable> definedAnywhere = new LinkedHashMap<String, Variable>();
+    /// Variables a media block gives another value; a literal equal to
+    /// the top-level value is not the same colour in every mode.
+    private final Set<String> redefinedInMedia = new HashSet<String>();
+    private boolean parsingLibrary;
     private final List<Finding> findings = new ArrayList<Finding>();
 
     private ThemeAudit() {
@@ -147,7 +171,20 @@ public final class ThemeAudit {
     /// them that check is skipped, because a theme alone cannot say what an
     /// application uses.
     public static List<Finding> audit(List<File> stylesheets, List<File> sources) throws IOException {
+        return audit(new ArrayList<File>(), stylesheets, sources);
+    }
+
+    /// As above, with `libraries` read first for the variables and UIIDs
+    /// they define and use -- the stylesheets of installed cn1libs, which the
+    /// build merges ahead of the application's -- but never reported on.
+    public static List<Finding> audit(List<File> libraries, List<File> stylesheets, List<File> sources)
+            throws IOException {
         ThemeAudit a = new ThemeAudit();
+        a.parsingLibrary = true;
+        for (File f : libraries) {
+            a.parse(f, new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));
+        }
+        a.parsingLibrary = false;
         for (File f : stylesheets) {
             a.parse(f, new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));
         }
@@ -217,10 +254,11 @@ public final class ThemeAudit {
     private void parse(File file, String css) {
         String text = blankComments(css);
         int[] lineStarts = lineStarts(text);
-        parseBlock(file, text, 0, text.length(), lineStarts);
+        parseBlock(file, text, 0, text.length(), lineStarts, null);
     }
 
-    private void parseBlock(File file, String text, int from, int to, int[] lineStarts) {
+    private void parseBlock(File file, String text, int from, int to, int[] lineStarts,
+            Map<String, Variable> scope) {
         int i = from;
         while (i < to) {
             int open = indexOf(text, '{', i, to);
@@ -237,9 +275,9 @@ public final class ThemeAudit {
             String prelude = text.substring(i, open).trim();
             int preludeAt = i + leadingSpace(text, i, open);
             if (prelude.startsWith("@media") || prelude.startsWith("@supports")) {
-                parseBlock(file, text, open + 1, close, lineStarts);
+                parseBlock(file, text, open + 1, close, lineStarts, new LinkedHashMap<String, Variable>());
             } else if (!prelude.startsWith("@") && prelude.length() > 0) {
-                Rule r = new Rule(file, prelude, lineOf(lineStarts, preludeAt));
+                Rule r = new Rule(file, prelude, lineOf(lineStarts, preludeAt), scope, parsingLibrary);
                 parseDeclarations(r, text, open + 1, close, lineStarts);
                 rules.add(r);
             }
@@ -288,7 +326,16 @@ public final class ThemeAudit {
         int line = lineOf(lineStarts, from + leadingSpace(text, from, to));
         r.declarations.add(new Declaration(property, value, line));
         if (property.startsWith("--")) {
-            variables.put(property, new Variable(value, r.file, line));
+            Variable v = new Variable(value, r.file, line, r.library);
+            if (!definedAnywhere.containsKey(property)) {
+                definedAnywhere.put(property, v);
+            }
+            if (r.scope == null) {
+                variables.put(property, v);
+            } else {
+                r.scope.put(property, v);
+                redefinedInMedia.add(property);
+            }
         }
     }
 
@@ -299,9 +346,18 @@ public final class ThemeAudit {
 
     private static int matchingBrace(String s, int open, int to) {
         int depth = 0;
+        char quote = 0;
         for (int i = open; i < to; i++) {
             char c = s.charAt(i);
-            if (c == '{') {
+            if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '{') {
                 depth++;
             } else if (c == '}') {
                 depth--;
@@ -364,16 +420,16 @@ public final class ThemeAudit {
                 while (m.find()) {
                     String name = m.group(1);
                     read.add(name);
-                    if (!variables.containsKey(name) && m.group(2) == null) {
+                    if (!r.library && !definedAnywhere.containsKey(name) && m.group(2) == null) {
                         add(Severity.ERROR, "undefined-variable", r.file, d.line,
                                 d.property + " reads " + name + ", which no stylesheet defines and which has no fallback");
                     }
                 }
             }
         }
-        for (Map.Entry<String, Variable> e : variables.entrySet()) {
-            if (!read.contains(e.getKey())) {
-                Variable v = e.getValue();
+        for (Map.Entry<String, Variable> e : definedAnywhere.entrySet()) {
+            Variable v = e.getValue();
+            if (!read.contains(e.getKey()) && !v.library) {
                 add(Severity.WARNING, "unused-variable", v.file, v.line, e.getKey() + " is defined and never read");
             }
         }
@@ -385,13 +441,16 @@ public final class ThemeAudit {
         Map<String, String> named = new LinkedHashMap<String, String>();
         for (Map.Entry<String, Variable> e : variables.entrySet()) {
             String c = normalizeColor(e.getValue().value);
-            if (c != null && !named.containsKey(c)) {
+            if (c != null && !named.containsKey(c) && !redefinedInMedia.contains(e.getKey())) {
                 named.put(c, e.getKey());
             }
         }
         Map<String, List<Declaration>> unnamed = new LinkedHashMap<String, List<Declaration>>();
         Map<Declaration, Rule> owner = new LinkedHashMap<Declaration, Rule>();
         for (Rule r : rules) {
+            if (r.library) {
+                continue;
+            }
             for (Declaration d : r.declarations) {
                 if (d.property.startsWith("--")) {
                     continue;
@@ -436,6 +495,9 @@ public final class ThemeAudit {
 
     private void checkContrast() {
         for (Rule r : rules) {
+            if (r.library) {
+                continue;
+            }
             Declaration fg = null;
             Declaration bg = null;
             for (Declaration d : r.declarations) {
@@ -448,8 +510,8 @@ public final class ThemeAudit {
             if (fg == null || bg == null) {
                 continue;
             }
-            int[] f = toRgb(resolve(fg.value));
-            int[] b = toRgb(resolve(bg.value));
+            int[] f = toRgb(resolve(fg.value, r.scope));
+            int[] b = toRgb(resolve(bg.value, r.scope));
             if (f == null || b == null || f[3] < 255 || b[3] < 255) {
                 // Translucent colours depend on what is under them.
                 continue;
@@ -464,9 +526,21 @@ public final class ThemeAudit {
         }
     }
 
-    private void checkUiids(Set<String> referenced) {
+    private void checkUiids(Set<String> referencedNames) {
+        // A UIID another rule derives from is used by that rule.
+        Set<String> referenced = new HashSet<String>(referencedNames);
+        for (Rule r : rules) {
+            for (Declaration d : r.declarations) {
+                if ("cn1-derive".equals(d.property)) {
+                    referenced.add(d.value.trim());
+                }
+            }
+        }
         Set<String> reported = new HashSet<String>();
         for (Rule r : rules) {
+            if (r.library) {
+                continue;
+            }
             for (String part : r.selector.split(",")) {
                 String uiid = uiidOf(part.trim());
                 if (uiid == null || referenced.contains(uiid) || builtOnPrefix(uiid, referenced)
@@ -496,14 +570,15 @@ public final class ThemeAudit {
         return m.find() ? m.group() : null;
     }
 
-    private String resolve(String value) {
+    private String resolve(String value, Map<String, Variable> scope) {
         String v = value.trim();
         for (int guard = 0; guard < 16; guard++) {
-            Matcher m = VAR_REF.matcher(v);
+            Matcher m = WHOLE_VAR.matcher(v);
             if (!m.matches()) {
                 return v;
             }
-            Variable var = variables.get(m.group(1));
+            Variable var = scope != null && scope.containsKey(m.group(1)) ? scope.get(m.group(1))
+                    : variables.get(m.group(1));
             if (var != null) {
                 v = var.value.trim();
             } else if (m.group(2) != null) {
@@ -600,7 +675,11 @@ public final class ThemeAudit {
     /// The string constants of the framework classes this tool runs with,
     /// which is where every built-in UIID is named.
     private static void collectFrameworkStrings(Set<String> out) throws IOException {
-        URL where = com.codename1.ui.Component.class.getProtectionDomain().getCodeSource().getLocation();
+        java.security.CodeSource source = com.codename1.ui.Component.class.getProtectionDomain().getCodeSource();
+        if (source == null || source.getLocation() == null) {
+            return;
+        }
+        URL where = source.getLocation();
         File f;
         try {
             f = new File(where.toURI());
@@ -616,7 +695,7 @@ public final class ThemeAudit {
             while ((e = zip.getNextEntry()) != null) {
                 String n = e.getName();
                 if (n.startsWith("com/codename1/") && !n.startsWith("com/codename1/designer/") && n.endsWith(".class")) {
-                    classStrings(readAll(zip), out);
+                    classStringsLenient(readAll(zip), out);
                 }
             }
         }
@@ -637,12 +716,18 @@ public final class ThemeAudit {
                     collectStrings(c, out);
                 }
             } else if (n.endsWith(".class")) {
-                classStrings(Files.readAllBytes(c.toPath()), out);
+                classStringsLenient(Files.readAllBytes(c.toPath()), out);
             } else if (n.endsWith(".java") || n.endsWith(".kt") || n.endsWith(".gui") || n.endsWith(".xml")
                     || n.endsWith(".json") || n.endsWith(".py")) {
                 Matcher m = STRING_LITERAL.matcher(new String(Files.readAllBytes(c.toPath()), StandardCharsets.UTF_8));
+                boolean kotlin = n.endsWith(".kt");
                 while (m.find()) {
                     out.add(m.group(1));
+                    int template = kotlin ? m.group(1).indexOf('$') : -1;
+                    if (template > 0) {
+                        // "Tab$state": a Kotlin template builds the name.
+                        out.add(m.group(1).substring(0, template) + PREFIX_MARK);
+                    }
                     // "SvDesk" + name: every UIID starting with the
                     // literal may be meant, recorded with a trailing '*',
                     // which no UIID can contain.
@@ -662,6 +747,19 @@ public final class ThemeAudit {
             bos.write(buf, 0, n);
         }
         return bos.toByteArray();
+    }
+
+    /// As [#classStrings], but a class that cannot be read (truncated by a
+    /// compile still writing it) contributes nothing instead of ending the
+    /// audit.
+    static void classStringsLenient(byte[] classFile, Set<String> out) {
+        try {
+            classStrings(classFile, out);
+        } catch (IOException ex) {
+            // Unreadable: skipped, see above.
+        } catch (RuntimeException ex) {
+            // A constant pool index out of range: skipped the same way.
+        }
     }
 
     /// The `CONSTANT_String` values of a class file: what the code passes as

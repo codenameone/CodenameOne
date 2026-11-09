@@ -102,7 +102,9 @@ final class SimulatorStyleTools {
         server.addTool(new Tool("sim_style_set",
                 "Stages one change to theme.css and lets live CSS reload show it: sets property to "
                         + "value in the rule for selector, adding the declaration, or the rule, when "
-                        + "missing. An empty value removes the declaration. Prefer var(--name) over a "
+                        + "missing. The selector must match a top-level rule's selector exactly; a selector that is "
+                        + "only part of a grouped rule (\"A, B\") gets a rule of its own appended. "
+                        + "An empty value removes the declaration. Prefer var(--name) over a "
                         + "literal when the theme already names the colour (see sim_style_audit). "
                         + "Answers the staged diff. Review with sim_style_diff; keep with "
                         + "sim_style_approve; undo everything with sim_style_reject.",
@@ -258,6 +260,13 @@ final class SimulatorStyleTools {
         cmd.add("json");
         cmd.add("-input");
         cmd.add(themeCss().getAbsolutePath());
+        String input = System.getProperty(CSSWatcher.CSS_INPUT_PROPERTY);
+        if (input != null && !input.contains("${") && input.indexOf(',') > 0) {
+            // The cn1libs' stylesheets, merged ahead of the application's:
+            // read for what they define, never reported on.
+            cmd.add("-library");
+            cmd.add(input.substring(0, input.lastIndexOf(',')));
+        }
         ProjectLayout layout = SimulatorProject.current();
         if (layout != null) {
             StringBuilder sources = new StringBuilder();
@@ -435,9 +444,21 @@ final class SimulatorStyleTools {
             int depth = 0;
             int start = 0;
             int ruleOpen = -1;
+            char quote = 0;
             for (int i = 0; i < plain.length(); i++) {
                 char c = plain.charAt(i);
-                if (c == '{') {
+                if (quote != 0) {
+                    if (c == '\\') {
+                        i++;
+                    } else if (c == quote) {
+                        quote = 0;
+                    }
+                    continue;
+                }
+                if (depth > 0 && (c == '"' || c == '\'')) {
+                    // A string value such as "a}b" closes nothing.
+                    quote = c;
+                } else if (c == '{') {
                     if (depth == 0) {
                         ruleOpen = i;
                     }
@@ -497,9 +518,15 @@ final class SimulatorStyleTools {
                 } else if (c == ')') {
                     depth--;
                 } else if (c == ';' && depth <= 0) {
-                    int colon = plain.indexOf(':', start);
-                    if (colon > start && colon < i && plain.substring(start, i).trim().length() > 0) {
-                        out.add(new int[] {start, i, colon});
+                    // From the property itself: a comment before it is part
+                    // of neither the name nor what a removal takes.
+                    int from = start;
+                    while (from < i && Character.isWhitespace(plain.charAt(from))) {
+                        from++;
+                    }
+                    int colon = plain.indexOf(':', from);
+                    if (colon > from && colon < i) {
+                        out.add(new int[] {from, i, colon});
                     }
                     start = i + 1;
                 }
@@ -515,9 +542,12 @@ final class SimulatorStyleTools {
                 if (value.length() == 0) {
                     return text;
                 }
-                String sep = text.length() == 0 || text.endsWith("\n") ? "" : "\n";
-                return text + sep + "\n" + selector + " {\n    " + property + ": " + value + ";\n}\n";
+                String sep = text.length() == 0 || text.endsWith("\n") ? ""
+                        : text.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+                String nl = text.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+                return text + sep + nl + selector + " {" + nl + "    " + property + ": " + value + ";" + nl + "}" + nl;
             }
+            String nl = text.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
             List<int[]> spans = rule.declarationSpans(text);
             for (int s = spans.size() - 1; s >= 0; s--) {
                 int[] d = spans.get(s);
@@ -559,7 +589,7 @@ final class SimulatorStyleTools {
             }
             String before = text.substring(0, insertAt);
             boolean needsSemicolon = !spans.isEmpty() && !before.endsWith(";") && !before.endsWith("{");
-            return before + (needsSemicolon ? ";" : "") + "\n" + indent + property + ": " + value + ";"
+            return before + (needsSemicolon ? ";" : "") + nl + indent + property + ": " + value + ";"
                     + text.substring(insertAt);
         }
 

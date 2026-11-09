@@ -199,6 +199,8 @@ public class CN1CSSCLI {
         System.out.println("                    variables, repeated literals, low text contrast and unused UIIDs.");
         System.out.println(" -sources           Directories (comma separated) of sources or classes to look for UIID names in.");
         System.out.println("                    Without it the unused-UIID check is skipped.");
+        System.out.println(" -library           Stylesheets (comma separated) of installed cn1libs: read for the variables");
+        System.out.println("                    and UIIDs they define, never reported on.");
         System.out.println(" -format            text (default) or json.");
         System.out.println(" -strict            Exit 1 on any warning. Otherwise only an error (an undefined variable) fails.");
         System.out.println("\nSystem Properties:");
@@ -325,6 +327,19 @@ public class CN1CSSCLI {
             }
             sheets.add(f);
         }
+        List<File> libraries = new ArrayList<File>();
+        String lib = getArgByName(args, "library");
+        if ("true".equals(lib)) {
+            System.err.println("CSS audit failed: -library needs one or more stylesheets, separated by commas");
+            return EXIT_USAGE;
+        }
+        if (lib != null) {
+            for (File f : getInputFiles(lib)) {
+                if (f.isFile()) {
+                    libraries.add(f);
+                }
+            }
+        }
         List<File> sources = new ArrayList<File>();
         String src = getArgByName(args, "sources");
         if ("true".equals(src)) {
@@ -346,7 +361,7 @@ public class CN1CSSCLI {
         }
         List<ThemeAudit.Finding> findings;
         try {
-            findings = ThemeAudit.audit(sheets, sources);
+            findings = ThemeAudit.audit(libraries, sheets, sources);
         } catch (IOException ex) {
             System.err.println("CSS audit failed: " + ex.getMessage());
             return EXIT_COMPILE_FAILED;
