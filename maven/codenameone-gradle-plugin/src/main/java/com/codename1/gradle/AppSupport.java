@@ -97,6 +97,9 @@ final class AppSupport {
         // The framework is `provided`: compiled against, supplied by the build server
         // or the simulator, never part of the upload.
         addFramework(project, "compileOnly", version, "codenameone-core", "java-runtime");
+        // Writes the source application code compiles against, such as the
+        // builder of each record entity.
+        addProcessor(project);
         final boolean androidProject = com.codename1.maven.AndroidResourceRunner.isAndroidProject(layout.androidSourceDir());
         if (androidProject) {
             // The android.* API the application compiles against; the remap
@@ -1192,6 +1195,15 @@ final class AppSupport {
                     t.getJavaImportsDirectory().set(new File(layout.buildDir(), "cn1-python-java-imports"));
                 });
         main.getJava().srcDir(python.flatMap(com.codename1.gradle.tasks.TranspilePythonTask::getOutputDirectory));
+    }
+
+    /// The javac annotation processor that writes the source a project compiles
+    /// against, such as the builder of each record entity. It is the plugin's
+    /// own version, not the framework's: it depends on nothing, and a project
+    /// may pin a framework released before the processor existed.
+    static void addProcessor(Project project) {
+        project.getDependencies().add("annotationProcessor",
+                PluginInfo.GROUP + ":codenameone-annotation-processor:" + PluginInfo.version());
     }
 
     static void addFramework(Project project, String configuration, Provider<String> version, String... artifactIds) {

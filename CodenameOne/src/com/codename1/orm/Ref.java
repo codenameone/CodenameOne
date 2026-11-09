@@ -30,13 +30,24 @@ import com.codename1.impl.orm.Holder;
 /// relationship the way an enhanced class does. It holds a `Ref` instead:
 ///
 /// ```java
-/// @Entity
-/// public record Order(@Id long id, @ManyToOne Ref<Customer> customer) {}
+/// import com.codename1.annotations.Entity;
+/// import com.codename1.annotations.Id;
+/// import com.codename1.annotations.db.ManyToOne;
+/// import com.codename1.orm.Ref;
 ///
-/// Order order = orders.find(7L);
-/// Object customerId = order.customer().id();   // no query
-/// Customer customer = order.customer().get();  // read now, once
+/// @Entity
+/// record Customer(@Id long id, String name) {}
+///
+/// @Entity
+/// record Order(@Id long id, @ManyToOne Ref<Customer> customer) {}
+///
+/// Order order = new Order(1, Ref.of(new Customer(7, "Ada")));
+/// String name = order.customer().get().name();
 /// ```
+///
+/// An order the session reads holds an unread `Ref`: `order.customer().id()`
+/// answers the stored key without a query, and `get()` reads the customer the
+/// first time it's called.
 ///
 /// A `Ref` loaded by a session reads its target through that session, and only
 /// while it is open: `get()` on a `Ref` that was never read, once the session is
@@ -115,7 +126,7 @@ public final class Ref<T> extends Holder {
         Object otherId = ref.identifier();
         if (id == null || otherId == null) {
             // Without identifiers only the same target, or nothing, is equal.
-            return id == null && otherId == null && loaded() && ref.loaded() && current() == ref.current();
+            return id == null && otherId == null && loaded() && ref.loaded() && current() == ref.current(); //NOPMD CompareObjectsWithEquals - identity is the point
         }
         Class type = targetType();
         Class otherType = ref.targetType();

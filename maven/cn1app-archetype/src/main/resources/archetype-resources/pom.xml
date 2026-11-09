@@ -136,6 +136,20 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <!-- Writes the source application code compiles against,
+                             such as the builder of each record entity. Named here
+                             because javac no longer finds processors on the class
+                             path by itself. It follows the plugin's version: it
+                             depends on nothing in the framework. -->
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>com.codenameone</groupId>
+                                <artifactId>codenameone-annotation-processor</artifactId>
+                                <version>${cn1.plugin.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>

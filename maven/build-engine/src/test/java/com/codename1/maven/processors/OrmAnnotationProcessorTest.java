@@ -354,7 +354,7 @@ public class OrmAnnotationProcessorTest {
         sources.put("records.Tag","package records; import com.codename1.annotations.*; @Entity public record Tag(@Id long id, String name, boolean pinned) { }");
         sources.put("records.Notes","package records; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
             + "List<Note> findByTitle(String title); }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         // Nothing is woven into a record.
         assertFalse(methodNames(new File(classes,"records/Note.class")).contains("__cn1OrmState"));
@@ -438,7 +438,7 @@ public class OrmAnnotationProcessorTest {
         sources.put("refused.Pet","package refused; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
             + "@Entity public record Pet(@Id long id, @ManyToOne Owner owner, @ManyToOne(fetch=FetchType.LAZY) java.util.Optional<Owner> vet, "
             + "@OneToMany(mappedBy=\"x\") java.util.Map<String,Owner> byName) { }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes);
         String errors=ctx.getErrors().toString();
         assertTrue(errors,errors.contains("A record's to-one relationship is a Ref<T>, read on first use, or an Optional<T>, read with the row: refused.Pet.owner"));
@@ -466,7 +466,7 @@ public class OrmAnnotationProcessorTest {
             + "@ManyToOne(cascade=CascadeType.PERSIST) Ref<Customer> customer, @ManyToOne Optional<Customer> reviewer, "
             + "@OneToMany(mappedBy=\"purchase\") List<Line> lines, @ElementCollection Set<String> tags, @Version long version) { }");
         sources.put("shop.Line",imports+"@Entity public record Line(@Id long id, String label, @ManyToOne Ref<Purchase> purchase) { }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         Map<String,String> check=new java.util.LinkedHashMap<String,String>();
         check.put("shop.Check","package shop; import com.codename1.orm.Ref; import com.codename1.orm.session.*; import java.util.*; public class Check { "
@@ -534,7 +534,7 @@ public class OrmAnnotationProcessorTest {
         sources.put("place.Geo",imports+"@Embeddable public record Geo(double lat, double lng) { }");
         sources.put("place.Address",imports+"@Embeddable public record Address(String street, String city, @Embedded Geo geo) { }");
         sources.put("place.Venue",imports+"@Entity public record Venue(@Id long id, String name, @Embedded Address home, @Embedded Address billing, @Version long version) { }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         Map<String,String> check=new java.util.LinkedHashMap<String,String>();
         check.put("place.Check","package place; import com.codename1.orm.session.*; public class Check { "
@@ -578,7 +578,7 @@ public class OrmAnnotationProcessorTest {
         wrong.put("wrong.Fixed",imports.replace("place","wrong")+"@Embeddable public record Fixed(String b) { }");
         wrong.put("wrong.Rec",imports.replace("place","wrong")+"@Entity public record Rec(@Id long id, @Embedded Mutable m) { }");
         wrong.put("wrong.Cls",imports.replace("place","wrong")+"@Entity public class Cls { @Id public long id; @Embedded public Fixed f; public Cls() {} }");
-        JavaSourceCompiler.compile(wrong,refused,Arrays.asList(testClassesDir()),"17");
+        compileEntities(wrong,refused);
         String errors=runProcessor(refused).getErrors().toString();
         assertTrue(errors,errors.contains("An embedded value in a record entity is an @Embeddable record: m"));
         assertTrue(errors,errors.contains("An @Embeddable record is held by a record entity: f"));
@@ -607,7 +607,7 @@ public class OrmAnnotationProcessorTest {
             + "@Temporal(TemporalType.DATE) java.util.Date born, @Convert(converter=CodeConverter.class, storageType=String.class) Code code, "
             + "@Embedded Pin spot, @OneToOne(mappedBy=\"user\") Ref<Profile> profile, @ManyToOne Ref<User> mentor, @ManyToOne Optional<User> buddy) { }");
         sources.put("corner.Profile",imports+"@Entity public record Profile(@Id long id, String bio, @OneToOne Ref<User> user) { }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         Map<String,String> check=new java.util.LinkedHashMap<String,String>();
         check.put("corner.Check",imports+"import com.codename1.orm.session.*; public class Check { "
@@ -670,7 +670,7 @@ public class OrmAnnotationProcessorTest {
         sources.put("rt.Badge",imports+"@Entity(table=\"rt_badge\") public record Badge(@Id long id, String label, @OneToOne Ref<User> user) { }");
         sources.put("rt.Note",imports+"@Entity(table=\"rt_note\") public class Note { @Id public long id; public String text; @OneToOne public User owner; }");
         sources.put("rt.Tag",imports+"@Entity(table=\"rt_tag\") public record Tag(@Id long id, String name, @Embedded Mid mid) { }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         Map<String,String> check=new java.util.LinkedHashMap<String,String>();
         check.put("rt.Check",imports+"import com.codename1.orm.session.*; public class Check { "
@@ -734,7 +734,7 @@ public class OrmAnnotationProcessorTest {
         sources.put("rt.Owner",imports+"@Entity(table=\"pc_owner\") public record Owner(@Id long id, String name, @OneToOne(mappedBy=\"owner\",orphanRemoval=true) Ref<Pet> pet) { }");
         sources.put("rt.Pet",imports+"@Entity(table=\"pc_pet\") public record Pet(@Id long id, String bio, @OneToOne Ref<Owner> owner) { }");
         sources.put("rt.Club",imports+"@Entity(table=\"pc_club\") public record Club(@Id long id, String name, @ManyToMany Set<Pet> members) { }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         Map<String,String> check=new java.util.LinkedHashMap<String,String>();
         check.put("rt.Check",imports+"import com.codename1.orm.session.*; public class Check { "
@@ -764,6 +764,30 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
+    /// Compiles entity sources the way an application's javac does, with the
+    /// Codename One annotation processor writing each record entity's builder.
+    private static void compileEntities(Map<String,String> sources,File out) throws Exception {
+        javax.tools.JavaCompiler javac=javax.tools.ToolProvider.getSystemJavaCompiler();
+        javax.tools.DiagnosticCollector<javax.tools.JavaFileObject> diags=new javax.tools.DiagnosticCollector<javax.tools.JavaFileObject>();
+        javax.tools.StandardJavaFileManager fm=javac.getStandardFileManager(diags,java.util.Locale.ROOT,java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            List<File> cp=new ArrayList<File>();
+            String surefire=System.getProperty("surefire.test.class.path");
+            for(String e:(surefire!=null && surefire.length()>0?surefire:System.getProperty("java.class.path")).split(File.pathSeparator)) cp.add(new File(e));
+            cp.add(testClassesDir());
+            fm.setLocation(javax.tools.StandardLocation.CLASS_PATH,cp);
+            fm.setLocation(javax.tools.StandardLocation.CLASS_OUTPUT,Collections.singletonList(out));
+            File generated=new File(out.getParentFile(),out.getName()+"-generated");generated.mkdirs();
+            fm.setLocation(javax.tools.StandardLocation.SOURCE_OUTPUT,Collections.singletonList(generated));
+            List<javax.tools.JavaFileObject> units=new ArrayList<javax.tools.JavaFileObject>();
+            for(final Map.Entry<String,String> e:sources.entrySet()) units.add(new javax.tools.SimpleJavaFileObject(java.net.URI.create("string:///"+e.getKey().replace('.','/')+".java"),javax.tools.JavaFileObject.Kind.SOURCE) {
+                @Override public CharSequence getCharContent(boolean ignore) { return e.getValue(); } });
+            javax.tools.JavaCompiler.CompilationTask task=javac.getTask(null,fm,diags,Arrays.asList("-Xlint:none","--release","17"),null,units);
+            task.setProcessors(Collections.singletonList(new com.codename1.annotations.processing.RecordBuilderProcessor()));
+            if(!task.call()) throw new java.io.IOException("Compilation failed: "+diags.getDiagnostics());
+        } finally { fm.close(); }
+    }
+
     /// A copy of a found record that keeps its unread `Ref` shares that holder
     /// with the original, and an embedded record component may be named like a
     /// method of the generated stand-ins.
@@ -783,7 +807,9 @@ public class OrmAnnotationProcessorTest {
         sources.put("sh.Place",imports+"@Embeddable public record Place(String city, @Embedded Spot build) { }");
         sources.put("sh.Order",imports+"@Entity(table=\"sh_order\") public record Order(@Id long id, String note, @ManyToOne Ref<Buyer> buyer, @Embedded Place build, @OneToOne(mappedBy=\"order\") Ref<Memo> memo) { }");
         sources.put("sh.Memo",imports+"@Entity(table=\"sh_memo\") public record Memo(@Id long id, String text, @OneToOne Ref<Order> order) { }");
-        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()),"17");
+        // Compiled in the same pass as the entities, as application code is.
+        sources.put("sh.Use",imports+"class Use { static Buyer named(String n) { return BuyerBuilder.create().name(n).build(); } }");
+        compileEntities(sources,classes);
         ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
         Map<String,String> check=new java.util.LinkedHashMap<String,String>();
         check.put("sh.Check",imports+"import com.codename1.orm.session.*; public class Check { "

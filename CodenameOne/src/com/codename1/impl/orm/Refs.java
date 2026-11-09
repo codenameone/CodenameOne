@@ -155,7 +155,7 @@ public final class Refs {
     /// not inserted yet, so for the new record it reads back empty.
     static void share(Object holder, EntityState state) {
         Link link = link(holder);
-        if (link == null || link.loaded || link.state == null || link.state == state
+        if (link == null || link.loaded || link.state == null || link.state == state //NOPMD CompareObjectsWithEquals - identity is the point
                 || holder instanceof Holder || !link.state.attached || link.state.session == null) {
             return;
         }

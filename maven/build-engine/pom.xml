@@ -31,6 +31,14 @@
     </properties>
 
     <dependencies>
+        <!-- The record tests compile entities the way an application does, with
+             the processor writing each record's builder. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-annotation-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- PWA metadata uses the same JSON API bundled in the cloud daemon. -->
         <dependency><groupId>org.json</groupId><artifactId>json</artifactId><version>20231013</version></dependency>
         <!-- Build-only HTML parsing; never linked into backend applications. -->

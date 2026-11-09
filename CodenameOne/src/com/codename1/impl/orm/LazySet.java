@@ -42,7 +42,7 @@ public final class LazySet<E> extends AbstractSet<E> {
     }
 
     void fill(Collection<? extends E> values) {
-        if (values != this) {
+        if (values != this) { //NOPMD CompareObjectsWithEquals - identity is the point
             Set<E> copy = values == null ? new LinkedHashSet<E>() : new LinkedHashSet<E>(values);
             items.clear();
             items.addAll(copy);

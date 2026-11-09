@@ -664,7 +664,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 continue;
             }
             Object replacing = entry.model.holder(incoming, i);
-            if (replacing != entry.model.holder(entry.entity, i)) {
+            if (replacing != entry.model.holder(entry.entity, i)) { //NOPMD CompareObjectsWithEquals - identity is the point
                 initialize(entry.entity, i);
             }
         }

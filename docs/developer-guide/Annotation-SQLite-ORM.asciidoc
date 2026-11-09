@@ -544,17 +544,9 @@ mappings work on the client and the backend, and nothing is woven into a
 record: the build reads it through its accessors and builds it through its
 canonical constructor.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
-@Entity
-public record Note(@Id long id, String title, int score,
-        @Version long version, @DbTransient String scratch) {
-    public Note {
-        if (score < 0) {
-            throw new IllegalArgumentException("score");
-        }
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/Note.java[tag=record-entity-note,indent=0]
 ----
 
 Every component is persistent unless it's `@DbTransient`, and `@Column`,
@@ -573,14 +565,16 @@ setter replaces one component, and `build()` calls the canonical constructor.
 The builder is plain Java over the record's public API, so you can also write
 your own `withScore`-style methods on the record and never use it.
 
-[source,java]
+Your own code calls the builder, so it has to exist while that code compiles.
+The `codenameone-annotation-processor` artifact writes it from inside javac.
+New projects run it already, and a Gradle build gets it from the Codename One
+plugin. A Maven project created before it existed needs it added to the
+compiler's `annotationProcessorPaths`, at the plugin's version:
+`com.codenameone:codenameone-annotation-processor:${cn1.plugin.version}`.
+
+[source,java,role=cn1-no-try]
 ----
-Notes notes = Repositories.create(Notes.class, session);
-session.beginTransaction();
-Note draft = NoteBuilder.create().title("Groceries").score(3).build();
-Note saved = notes.save(draft);       // saved.id() is the generated key
-Note changed = notes.save(NoteBuilder.of(saved).score(5).build());
-session.commitTransaction();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/RecordOrmSnippets.java[tag=record-save,indent=0]
 ----
 
 ==== Saving a record
@@ -640,22 +634,19 @@ relationship is a component whose type holds it:
 |The same, holding values.
 |===
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
-@Entity
-public record Customer(@Id long id, String name) {}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/Customer.java[tag=record-entity-customer,indent=0]
+----
 
-@Entity
-public record Purchase(@Id long id, String code,
-        @ManyToOne(cascade = CascadeType.PERSIST) Ref<Customer> customer,
-        @ManyToOne Optional<Customer> reviewer,
-        @OneToMany(mappedBy = "purchase") List<Line> lines,
-        @ElementCollection Set<String> tags,
-        @Version long version) {}
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/Purchase.java[tag=record-entity-purchase,indent=0]
+----
 
-@Entity
-public record Line(@Id long id, String label,
-        @ManyToOne Ref<Purchase> purchase) {}
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/Line.java[tag=record-entity-line,indent=0]
 ----
 
 A `Ref` is lazy unless the annotation says `fetch = FetchType.EAGER`, even
@@ -667,14 +658,9 @@ message naming the component.
 
 Reading:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
-Purchase p = session.find(Purchase.class, id);
-Object customerKey = p.customer().id();          // no query
-boolean hasOne = p.customer().isPresent();       // no query
-String name = p.customer().get().name();         // reads the customer now
-String reviewer = p.reviewer().map(Customer::name).orElse("nobody");
-int lines = p.lines().size();                    // reads the lines now
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/RecordOrmSnippets.java[tag=record-read,indent=0]
 ----
 
 The inverse side of a one-to-one, `@OneToOne(mappedBy = "user") Ref<Profile>
@@ -691,13 +677,9 @@ either.
 Changing a to-one relationship is a copy with another `Ref` or `Optional`, and
 saving it updates the foreign key and the version:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
-Customer ada = session.find(Customer.class, adaId);
-Purchase moved = session.merge(PurchaseBuilder.of(p)
-        .customer(Ref.of(ada))
-        .reviewer(Optional.empty())
-        .build());
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/RecordOrmSnippets.java[tag=record-move,indent=0]
 ----
 
 `Ref.empty()` and `Optional.empty()` hold no target. A to-many collection, or
@@ -724,18 +706,19 @@ A record entity embeds values that are records too, annotated
 `@Embeddable`. Their components become columns named after the path, as for
 class entities, and an embedded record can embed another one:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
-@Embeddable
-public record Geo(double lat, double lng) {}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/Geo.java[tag=record-embeddable-geo,indent=0]
+----
 
-@Embeddable
-public record Address(String street, String city, @Embedded Geo geo) {}
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/Address.java[tag=record-embeddable-address,indent=0]
+----
 
-@Entity
-public record Venue(@Id long id, String name,
-        @Embedded Address home, @Embedded Address billing,
-        @Version long version) {}
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/Venue.java[tag=record-entity-venue,indent=0]
 ----
 
 The `Venue` table has `home_street`, `home_city`, `home_geo_lat`,
@@ -744,14 +727,9 @@ are all null reads back as `null`, at any depth: a billing address saved as
 `new Address("PO 7", null, null)` reads back with a null `geo`. Query an
 embedded component by its path:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
-List<Venue> local = session.query(Venue.class)
-        .eq("home.city", "Springfield").list();
-
-Venue moved = session.merge(VenueBuilder.of(venue)
-        .home(new Address("2 Elm", "Springfield", new Geo(1.5, 2.5)))
-        .build());
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/records/RecordOrmSnippets.java[tag=record-venue,indent=0]
 ----
 
 Changing an embedded value is a copy with a new value, and it bumps the version

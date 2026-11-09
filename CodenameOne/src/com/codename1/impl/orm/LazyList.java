@@ -41,7 +41,7 @@ public final class LazyList<E> extends AbstractList<E> {
     }
 
     void fill(Collection<? extends E> values) {
-        if (values != this) {
+        if (values != this) { //NOPMD CompareObjectsWithEquals - identity is the point
             List<E> copy = values == null ? new ArrayList<E>() : new ArrayList<E>(values);
             items.clear();
             items.addAll(copy);
