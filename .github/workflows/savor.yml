@@ -402,7 +402,8 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-savor-${{ hashFiles('Ports/Android/build.gradle*') }}
+            ~/.codenameone/gradle8
+          key: ${{ runner.os }}-gradle-g8-savor-${{ hashFiles('Ports/Android/build.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-savor-
             ${{ runner.os }}-gradle-

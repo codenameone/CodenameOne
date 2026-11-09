@@ -762,10 +762,12 @@
                                              skipexisting="true"
                                              ignoreerrors="true"/>
 
+                                        <!-- Best effort, like the <java> below (no failonerror): a GitHub
+                                             outage must not fail the framework build. -->
                                         <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
                                              dest="${user.home}/UpdateCodenameOne.jar"
                                              skipexisting="true"
-                                             ignoreerrors="false"/>
+                                             ignoreerrors="true"/>
                                         <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
                                             <arg value="${project.build.directory}/generated-sources/project"/>
                                             <arg value="force" />

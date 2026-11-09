@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 LIBRARIES = ('cn1-admob', 'cn1-applovin', 'cn1-unity-levelplay',
@@ -77,7 +78,14 @@ def check(lib, work):
             "platform :ios, '15.0'\n"
             "project 'CN1Probe', 'DebugMRR' => :debug, 'DebugARC' => :debug\n"
             "target 'CN1Probe' do\n  use_frameworks!\n  pod '%s', '%s'\nend\n" % (name, version))
-        subprocess.run(['pod', 'install', '--repo-update'], cwd=work, check=True)
+        # The spec repo and the pod come from the CDN and GitHub; a 5xx there is
+        # an outage, not a broken cn1lib, so give it a few minutes to recover.
+        for attempt in range(1, 5):
+            if subprocess.run(['pod', 'install', '--repo-update'], cwd=work).returncode == 0:
+                break
+            if attempt == 4:
+                raise SystemExit('pod install failed after 4 attempts')
+            time.sleep(60 * attempt)
     project = ['-workspace', 'CN1Probe.xcworkspace'] if ad else ['-project', 'CN1Probe.xcodeproj']
     failed = False
     for config in ('DebugMRR', 'DebugARC'):

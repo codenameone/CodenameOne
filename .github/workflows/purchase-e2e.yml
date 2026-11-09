@@ -237,7 +237,8 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-purchase-${{ hashFiles('scripts/purchase-test-app/**/build.gradle*', 'Ports/Android/build.gradle*') }}
+            ~/.codenameone/gradle8
+          key: ${{ runner.os }}-gradle-g8-purchase-${{ hashFiles('scripts/purchase-test-app/**/build.gradle*', 'Ports/Android/build.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-purchase-
             ${{ runner.os }}-gradle-

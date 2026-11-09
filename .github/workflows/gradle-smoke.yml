@@ -92,6 +92,15 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      # The Gradle distributions the tests' wrappers download: a services.gradle.org
+      # outage (a 504) otherwise fails a test that has nothing to do with it.
+      - name: Cache Gradle distributions
+        uses: actions/cache@v5
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: ${{ runner.os }}-gradle-dists-${{ hashFiles('maven/build-engine/src/main/resources/com/codename1/project/templates/gradle/gradle/wrapper/gradle-wrapper.properties', 'maven/integration-tests/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-dists-
       # xvfb for the steps that run cn1Test in the simulator's runner or open
       # a desktop tool. Building a project, compiling its CSS included, needs
       # no display, so no build-only step below is wrapped in xvfb-run and
@@ -195,6 +204,15 @@ jobs:
           java-version: '8'
           distribution: 'zulu'
           cache: 'maven'
+      # The Gradle distributions the tests' wrappers download: a services.gradle.org
+      # outage (a 504) otherwise fails a test that has nothing to do with it.
+      - name: Cache Gradle distributions
+        uses: actions/cache@v5
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: ${{ runner.os }}-gradle-dists-${{ hashFiles('maven/build-engine/src/main/resources/com/codename1/project/templates/gradle/gradle/wrapper/gradle-wrapper.properties', 'maven/integration-tests/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-dists-
       - name: Build Codename One Maven artifacts (includes archetypes and the Gradle plugin)
         env:
           RETRY_ONLY_MATCHING: transient

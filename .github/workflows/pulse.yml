@@ -400,7 +400,8 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-pulse-${{ hashFiles('Ports/Android/build.gradle*') }}
+            ~/.codenameone/gradle8
+          key: ${{ runner.os }}-gradle-g8-pulse-${{ hashFiles('Ports/Android/build.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-pulse-
             ${{ runner.os }}-gradle-
