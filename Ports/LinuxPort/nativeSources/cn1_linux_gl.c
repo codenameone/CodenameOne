@@ -599,6 +599,12 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
             glDisableVertexAttribArray(1);
         }
         if (p->hasTexcoord) {
+            /* The texcoord is the last two floats of every VertexFormat, so its
+             * offset comes from the stride, not from what the shader declares:
+             * an unlit textured shader has no a_normal, yet its buffer may still
+             * carry normals (POSITION_NORMAL_TEXCOORD), and counting from the
+             * shader then sampled the normal as the texcoord. */
+            offset = strideBytes - 8;
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, strideBytes, (void*) (intptr_t) offset);
         } else {

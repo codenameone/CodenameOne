@@ -108,6 +108,34 @@ static GLuint cn1gBatchTexture = 0;
 static int cn1gBatchNearest = 0;
 
 static pthread_mutex_t cn1gDeadLock = PTHREAD_MUTEX_INITIALIZER;
+
+/* Every public entry point holds this (recursive: Sync reads through ReadRect,
+ * Shutdown hides the cursor). The process exits through atexit on whichever
+ * thread called exit(), while the EDT may still be inside a draw; without it
+ * cn1GpuShutdown freed the mask atlas under a running memcpy. */
+static pthread_mutex_t cn1gUseLock;
+static pthread_once_t cn1gUseOnce = PTHREAD_ONCE_INIT;
+
+static void cn1gUseInit(void) {
+    pthread_mutexattr_t a;
+    pthread_mutexattr_init(&a);
+    pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&cn1gUseLock, &a);
+    pthread_mutexattr_destroy(&a);
+}
+
+static void cn1gUse(void) {
+    pthread_once(&cn1gUseOnce, cn1gUseInit);
+    pthread_mutex_lock(&cn1gUseLock);
+}
+static int cn1GpuAttachWindowUnlocked(cairo_surface_t* window);
+static void cn1GpuDrawUnlocked(cairo_surface_t* target, int x0, int y0, int x1, int y1,
+        const CN1GpuSource* src, unsigned alpha, int op, const unsigned char* cov, int pitch);
+static int cn1GpuReadRectUnlocked(cairo_surface_t* target, int x, int y, int w, int h);
+static void cn1GpuSyncUnlocked(cairo_surface_t* target);
+static void cn1GpuPresentUnlocked(void);
+static int cn1GpuCursorUnlocked(int show, int px, int py);
+static void cn1GpuShutdownUnlocked(void);
 static GLuint* cn1gDead = 0;
 static int cn1gDeadCount = 0, cn1gDeadCapacity = 0;
 
@@ -493,7 +521,7 @@ int cn1GpuScansOut(void) {
     return cn1gScanout;
 }
 
-int cn1GpuAttachWindow(cairo_surface_t* window) {
+static int cn1GpuAttachWindowUnlocked(cairo_surface_t* window) {
     if (!cn1gActive || window == 0 || !cn1gMakeCurrent()) {
         return -1;
     }
@@ -780,7 +808,7 @@ static void cn1gQuad(float x0, float y0, float x1, float y1, const CN1GpuSource*
     cn1gQuads++;
 }
 
-void cn1GpuDraw(cairo_surface_t* target, int x0, int y0, int x1, int y1,
+static void cn1GpuDrawUnlocked(cairo_surface_t* target, int x0, int y0, int x1, int y1,
         const CN1GpuSource* src, unsigned alpha, int op, const unsigned char* cov, int pitch) {
     GLuint texture = 0;
     int nearest = 0;
@@ -879,7 +907,7 @@ static void cn1gSwizzle(uint32_t* p, size_t n) {
     }
 }
 
-int cn1GpuReadRect(cairo_surface_t* target, int x, int y, int w, int h) {
+static int cn1GpuReadRectUnlocked(cairo_surface_t* target, int x, int y, int w, int h) {
     /* A read from a thread that does not paint -- initDisplay's first present,
      * a capture -- leaves the context free for the one that does. */
     int borrowed = eglGetCurrentContext() != cn1gCtx;
@@ -917,7 +945,7 @@ static void cn1gReadRect(cairo_surface_t* target, int x, int y, int w, int h) {
     }
 }
 
-void cn1GpuSync(cairo_surface_t* target) {
+static void cn1GpuSyncUnlocked(cairo_surface_t* target) {
     if (target == 0 || target != cn1gWindow) {
         return;
     }
@@ -1000,7 +1028,7 @@ static void cn1gCorner(float px, float py, float* u, float* v) {
     *v = ly / (float) cn1gH;
 }
 
-void cn1GpuPresent(void) {
+static void cn1GpuPresentUnlocked(void) {
     float quad[16];
     float pxs[4], pys[4];
     struct gbm_bo* bo;
@@ -1118,7 +1146,7 @@ static int cn1gCursorBuffer(void) {
     return 0;
 }
 
-int cn1GpuCursor(int show, int px, int py) {
+static int cn1GpuCursorUnlocked(int show, int px, int py) {
     if (!cn1gScanout) {
         return 0;
     }
@@ -1141,7 +1169,7 @@ int cn1GpuCursor(int show, int px, int py) {
     return drmModeMoveCursor(cn1gDrmFd, cn1gCrtc, px - 32, py - 32) == 0;
 }
 
-void cn1GpuShutdown(void) {
+static void cn1GpuShutdownUnlocked(void) {
     if (!cn1gActive) {
         return;
     }
@@ -1153,6 +1181,57 @@ void cn1GpuShutdown(void) {
      * the GBM device and EGL context must go, and cn1GpuScansOut must answer
      * 0 so the cursor is drawn in software rather than on the cursor plane. */
     cn1gTearDown();
+}
+
+/* ---- locked entry points ---- */
+
+int cn1GpuAttachWindow(cairo_surface_t* window) {
+    int r;
+    cn1gUse();
+    r = cn1GpuAttachWindowUnlocked(window);
+    pthread_mutex_unlock(&cn1gUseLock);
+    return r;
+}
+
+void cn1GpuDraw(cairo_surface_t* target, int x0, int y0, int x1, int y1,
+        const CN1GpuSource* src, unsigned alpha, int op, const unsigned char* cov, int pitch) {
+    cn1gUse();
+    cn1GpuDrawUnlocked(target, x0, y0, x1, y1, src, alpha, op, cov, pitch);
+    pthread_mutex_unlock(&cn1gUseLock);
+}
+
+int cn1GpuReadRect(cairo_surface_t* target, int x, int y, int w, int h) {
+    int r;
+    cn1gUse();
+    r = cn1GpuReadRectUnlocked(target, x, y, w, h);
+    pthread_mutex_unlock(&cn1gUseLock);
+    return r;
+}
+
+void cn1GpuSync(cairo_surface_t* target) {
+    cn1gUse();
+    cn1GpuSyncUnlocked(target);
+    pthread_mutex_unlock(&cn1gUseLock);
+}
+
+void cn1GpuPresent(void) {
+    cn1gUse();
+    cn1GpuPresentUnlocked();
+    pthread_mutex_unlock(&cn1gUseLock);
+}
+
+int cn1GpuCursor(int show, int px, int py) {
+    int r;
+    cn1gUse();
+    r = cn1GpuCursorUnlocked(show, px, py);
+    pthread_mutex_unlock(&cn1gUseLock);
+    return r;
+}
+
+void cn1GpuShutdown(void) {
+    cn1gUse();
+    cn1GpuShutdownUnlocked();
+    pthread_mutex_unlock(&cn1gUseLock);
 }
 
 #endif /* CN1_LINUX_EMBEDDED && CN1_EMBEDDED_GPU */
