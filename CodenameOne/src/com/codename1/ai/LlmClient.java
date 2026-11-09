@@ -124,6 +124,18 @@ public abstract class LlmClient {
         return c;
     }
 
+    /// Runs a GGUF model on the device with llama.cpp. See [LocalLlmClient]
+    /// for what is supported and where.
+    ///
+    /// Calling this method is what makes the builders link llama.cpp into the
+    /// application; an application that never calls it ships none of it.
+    ///
+    /// @param modelPath file system path (or `file://` URL) of a `.gguf` model
+    /// @return a client that loads the model on its first request
+    public static LocalLlmClient local(String modelPath) {
+        return new LocalLlmClient(modelPath);
+    }
+
     /// Generic OpenAI-compatible endpoint (llama.cpp server, vLLM,
     /// LM Studio, a custom proxy). `apiKey` may be empty for local
     /// services that don't authenticate.

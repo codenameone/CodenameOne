@@ -144,10 +144,21 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 //#define INCLUDE_CN1_VISION
 //#define INCLUDE_CN1_LANGUAGE
 //#define INCLUDE_CN1_INFERENCE
+// INCLUDE_CN1_LLAMA compiles CN1Llama.m over the llama.cpp xcframework.
+// IPhoneBuilder enables it, and links the xcframework, only for an app that
+// calls LlmClient.local.
+//#define INCLUDE_CN1_LLAMA
+// INCLUDE_CN1_WHISPER compiles the cn1-ai-whisper cn1lib's native over the
+// whisper.cpp xcframework; enabled only when the build links it (never on a
+// Mac Catalyst build, which has no slice), so the glue never names a symbol
+// the link lacks.
+//#define INCLUDE_CN1_WHISPER
 #if TARGET_OS_WATCH || TARGET_OS_TV
 #undef INCLUDE_CN1_VISION
 #undef INCLUDE_CN1_LANGUAGE
 #undef INCLUDE_CN1_INFERENCE
+#undef INCLUDE_CN1_LLAMA
+#undef INCLUDE_CN1_WHISPER
 #endif
 
 // CN1_USE_CARPLAY gates the Apple CarPlay native bridge

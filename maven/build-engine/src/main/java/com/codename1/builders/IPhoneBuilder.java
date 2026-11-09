@@ -1344,6 +1344,9 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCn1Vision;
     private boolean usesCn1Language;
     private boolean usesCn1Inference;
+    /// The app calls `LlmClient.local`; enables INCLUDE_CN1_LLAMA, the port
+    /// glue over the llama.cpp xcframework the catalog links.
+    private boolean usesCn1LocalLlm;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
@@ -1785,6 +1788,29 @@ public class IPhoneBuilder extends Executor {
         return str + append;
     }
 
+    /// Downloads one catalog xcframework zip and extracts it into the port
+    /// natives directory.
+    private void installCatalogXcframework(File buildinRes, String repository,
+            String coordinates)
+            throws BuildException {
+        File zip;
+        try {
+            zip = CatalogNatives.fetchZip(repository, coordinates, tmpFile);
+        } catch (IOException ex) {
+            throw new BuildException("Could not fetch " + coordinates + " from "
+                    + repository + ": " + ex.getMessage(), ex);
+        }
+        log("Linking " + coordinates);
+        try {
+            if (!exec(buildinRes, "ditto", "-x", "-k", zip.getAbsolutePath(),
+                    buildinRes.getAbsolutePath())) {
+                throw new BuildException("Could not extract " + zip);
+            }
+        } catch (Exception ex) {
+            throw new BuildException("Could not extract " + zip, ex);
+        }
+    }
+
     private static String appendFrameworks(String libraries,
                                            String... frameworks) {
         String out = libraries == null ? "" : libraries;
@@ -2160,6 +2186,8 @@ public class IPhoneBuilder extends Executor {
         usesCn1Vision = false;
         usesCn1Language = false;
         usesCn1Inference = false;
+        usesCn1LocalLlm = false;
+        minDeploymentTargets = "12.0";
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         if (request.getArg("ios.deployment_target", null) == null) {
@@ -3123,6 +3151,9 @@ public class IPhoneBuilder extends Executor {
                     // entries for every feature, health included, and is
                     // indifferent to what follows.
                     aiAcc.consumeMethod(cls, method);
+                    if (PlatformFeatureCatalog.isLocalLlmCall(cls, method)) {
+                        usesCn1LocalLlm = true;
+                    }
                     // Display carries the contact picker too, and an app is
                     // free to call it there instead of through ContactPicker.
                     // The class reference cannot say so -- every app
@@ -6445,6 +6476,49 @@ public class IPhoneBuilder extends Executor {
             for (String framework : aiAcc.iosFrameworks()) {
                 addLibs = appendFrameworks(addLibs,
                         framework + ".framework");
+            }
+
+            // whisper.cpp / llama.cpp: static xcframeworks the catalog names
+            // by coordinates. Extracted beside the port natives, where the
+            // translator links an .xcframework like an .a and Xcode picks the
+            // device or simulator slice. They have no Mac Catalyst slice, so a
+            // macNative build links none and the glue stays compiled out.
+            boolean catalogNatives = !aiAcc.iosXcframeworks().isEmpty()
+                    && !macNativeBuilder.isEnabled();
+            if (catalogNatives) {
+                String repository = request.getArg("ios.cn1NativesRepository",
+                        CatalogNatives.DEFAULT_REPOSITORY);
+                for (String coordinates : aiAcc.iosXcframeworks()) {
+                    installCatalogXcframework(buildinRes, repository, coordinates);
+                }
+                // ggml is C++; the archives leave libc++ to the final link.
+                addLibs = appendFrameworks(addLibs, "libc++.tbd");
+                // scripts/ai-natives/build.sh compiles every slice for 13.0
+                // (IOS_MIN): the oldest target the current libc++ still builds.
+                addMinDeploymentTarget("13.0");
+            }
+            if (catalogNatives && aiAcc.iosXcframeworks().toString()
+                    .indexOf(":cn1-whisper-ios:") > 0) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_WHISPER",
+                            "#define INCLUDE_CN1_WHISPER");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_WHISPER", ex);
+                }
+            }
+            if (usesCn1LocalLlm && catalogNatives) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_LLAMA",
+                            "#define INCLUDE_CN1_LLAMA");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_LLAMA", ex);
+                }
             }
 
             if (usesCn1Vision) {

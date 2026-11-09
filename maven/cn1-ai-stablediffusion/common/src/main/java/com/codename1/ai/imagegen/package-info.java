@@ -33,8 +33,8 @@
 /// `NativeStableDiffusion` interface holds the platform contract; iOS Obj-C and
 /// Android Java implementations live in `nativeios.zip` / `nativeand.zip`
 /// inside the cn1lib bundle. References to `StableDiffusion.*` are recognised
-/// by the Codename One build server's `AiDependencyTable`, which
-/// auto-injects the matching CocoaPod / Swift Package / Android Gradle
-/// dep / `Info.plist` usage strings / Android permissions on every
+/// by the builders' `PlatformFeatureCatalog`, which adds the matching
+/// native libraries, Android Gradle dependencies, Apple frameworks,
+/// `Info.plist` usage strings and Android permissions on every
 /// build -- no manual build hints required.
 package com.codename1.ai.imagegen;

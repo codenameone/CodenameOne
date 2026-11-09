@@ -92,8 +92,12 @@ def read_groups(path):
 
 
 BUILD_SCRIPT = r"""
-// The builder adds Huawei's repository for the HMS push and map kits.
-repositories { google(); mavenCentral(); maven { url 'https://developer.huawei.com/repo/' } }
+// The builder adds Huawei's repository for the HMS push and map kits, and the
+// Codename One repository for the whisper.cpp / llama.cpp AARs we build.
+repositories {
+    google(); mavenCentral(); maven { url 'https://developer.huawei.com/repo/' }
+    maven { url 'https://repo.codenameone.com/maven2' }
+}
 
 def groups = new File(projectDir, "groups.txt").readLines().findAll { it.trim() }
 groups.eachWithIndex { line, index ->

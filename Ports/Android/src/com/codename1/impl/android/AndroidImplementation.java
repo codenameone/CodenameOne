@@ -16567,6 +16567,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 "com.codename1.impl.android.ai.AndroidInferenceImpl");
     }
 
+    private com.codename1.impl.LocalLlmImpl localLlm;
+    private boolean localLlmProbed;
+
+    @Override
+    public com.codename1.impl.LocalLlmImpl createLocalLlmImpl() {
+        // One instance: the library is process wide and its handles are too.
+        if (!localLlmProbed) {
+            localLlmProbed = true;
+            localLlm = (com.codename1.impl.LocalLlmImpl) createOptionalAiBackend(
+                    "com.codename1.impl.android.ai.AndroidLocalLlmImpl");
+        }
+        return localLlm;
+    }
+
     @Override
     public com.codename1.impl.LanguageImpl createLanguageImpl() {
         return (com.codename1.impl.LanguageImpl) createOptionalAiBackend(
