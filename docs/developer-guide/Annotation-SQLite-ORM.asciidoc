@@ -698,7 +698,7 @@ A cascade reaches through a `Ref` or an `Optional`. A purchase built with
 once, and the managed purchase's `Ref` holds the customer's managed copy, which
 carries its generated key. Point a `Ref` at a managed record, a `find` result
 or a `merge` result, unless a cascade is meant to save the target: a detached
-record without a cascade is rejected at flush, as it is for a class entity.
+record without a cascade is rejected at flush, the same as for a class entity.
 
 ==== Embedded values
 
