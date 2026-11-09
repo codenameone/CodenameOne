@@ -129,8 +129,16 @@ fi
 # backing-store allocation. LargeArrayLoad's old heap pressure is no longer a
 # reliable trigger now that Hashtable backing tables live in native buffers.
 # A run without observed early frees still FAILS this gate.
+# It runs EarlyFreeAudit, GraceAudit without the mid-cycle fill the first self-test
+# needs: with that fill the fault found nothing to free early in 9 runs of 10.
 printf '%-16s ' "self-test2"
-efOut="$(CN1_GC_FAULT=earlyfree ./target/bin/GraceAudit-verify 2>&1)" && efExit=0 || efExit=$?
+if ! ./translate-and-build.sh EarlyFreeAudit target/bin/EarlyFreeAudit-verify -DCN1_GC_VERIFY \
+        > target/bin/EarlyFreeAudit-build.log 2>&1; then
+    echo "BROKEN -- could not build EarlyFreeAudit for the early-free self-test"
+    tail -25 target/bin/EarlyFreeAudit-build.log
+    fail=1
+fi
+efOut="$(CN1_GC_FAULT=earlyfree ./target/bin/EarlyFreeAudit-verify 2>&1)" && efExit=0 || efExit=$?
 efCount="$(printf '%s' "$efOut" | sed -n 's/.*earlyFreed=\([0-9]*\).*/\1/p' | tail -1)"
 if [ "${efCount:-0}" -gt 0 ]; then
     echo "detected the injected early-free fault ($efCount slots)"
@@ -295,7 +303,22 @@ if [ ! -x ./target/bin/MapTorture2-verify ]; then
     echo "BROKEN -- self-test4 did not leave a MapTorture2-verify binary"
     fail=1
 else
+    # A run whose verify pass still found EVERY freed slot quarantined (classify=2), yet
+    # reported nothing, had no live holder left for any victim: the map replaced them before
+    # the pass, and a dangling slot nothing references is no defect to see. Like a run where
+    # the fault never fired, it is neither a pass nor a miss. Measured at 1 run in 20 on the
+    # branch where concurrent cycles stopped graceing fresh objects (1 or 2 verify passes a
+    # run). The blindness this test guards against reads differently: without the
+    # quarantine the slot has already been handed out again at that pass (classify=0).
+    cn1FlUnheld() {
+        local first n
+        n="$(printf '%s' "$1" | grep -oE 'slots freed while live: [0-9]+' | tail -1 | grep -oE '[0-9]+$')"
+        [ -n "$n" ] || return 1
+        first="$(printf '%s' "$1" | grep -E '\[GC-FAULT\] +freed slot [0-9]+ .* classify=' | head -"$n")"
+        [ -n "$first" ] && ! printf '%s\n' "$first" | grep -qv 'classify=2'
+    }
     flAttempts=4
+    flUnheld=0
     flMissed=0
     flVerifier=0
     flFired=0
@@ -327,21 +350,22 @@ else
         if [ "${flV:-0}" -gt 0 ] 2>/dev/null; then
             flVerifier=$((flVerifier + 1))
         elif [ "$flThis" -eq 1 ] && [ "$flRc" -eq 0 ] \
-             && ! printf '%s' "$flOut" | grep -qE 'LOST|CORRUPT'; then
+             && ! printf '%s' "$flOut" | grep -qE 'LOST|CORRUPT' \
+             && ! { cn1FlUnheld "$flOut" && flUnheld=$((flUnheld + 1)); }; then
             # A dangling slot that made the run die -- a crash, or the OutOfMemoryError
             # a clobbered StringBuilder length produces -- was noticed; only a run that
             # exits cleanly with nothing reported is a miss.
             flMissed=$((flMissed + 1))
         fi
     done
-    if [ "$flFired" -eq 0 ]; then
-        echo "BROKEN -- freelive never freed a live slot in $flAttempts runs"
+    if [ "$flFired" -le "$flUnheld" ]; then
+        echo "BROKEN -- freelive never freed a held live slot in $flAttempts runs"
         fail=1
     elif [ "$flMissed" -gt 0 ]; then
         echo "BROKEN -- $flMissed of $flAttempts runs freed live slots and NOTHING noticed"
         fail=1
     else
-        echo "caught the injected dangling reference $flAttempts/$flAttempts (verifier $flVerifier)"
+        echo "caught the injected dangling reference $((flFired - flUnheld))/$((flFired - flUnheld)) (verifier $flVerifier, $flUnheld unheld)"
     fi
 fi
 
