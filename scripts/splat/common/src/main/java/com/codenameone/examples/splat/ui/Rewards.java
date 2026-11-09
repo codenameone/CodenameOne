@@ -169,7 +169,7 @@ public final class Rewards {
         // A wrapping title packs to its narrowest, so an empty strut gives the
         // card its width.
         Label strut = new Label("", "Container");
-        strut.setPreferredW(Math.min(CN.convertToPixels(70), CN.getDisplayWidth() - CN.convertToPixels(16)));
+        strut.setPreferredW(Math.min(Ui.mm(70), CN.getDisplayWidth() - CN.convertToPixels(16)));
         strut.setPreferredH(1);
         d.add(strut);
         if (host != null) {

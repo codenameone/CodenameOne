@@ -83,6 +83,13 @@ public final class Bot {
                 }
                 strafe = weave;
                 forward = dist > 14 * Arena.UNIT ? 100 : (dist < 6 * Arena.UNIT ? -60 : 0);
+                if (forward > 0) {
+                    // advance along the arena's path to the enemy, not along the
+                    // line of fire: the aim is often straight into a prop
+                    int rel = steer(m, p, new int[] {target.x(), target.z()}) - yaw;
+                    strafe = FixedMath.clamp(strafe / 2 + forward * Trig.sin(rel) / Trig.ONE, -127, 127);
+                    forward = forward * Trig.cos(rel) / Trig.ONE;
+                }
                 if (forward < 0 && !open(m.arena(), p, Trig.wrap(yaw + Trig.HALF), 900)) {
                     forward = 0;
                 }
@@ -98,6 +105,15 @@ public final class Bot {
             // Good bots aim down the sights at range; bad ones hip-fire everything.
             if (dist > 12 * Arena.UNIT && skill > 40) {
                 buttons |= Input.AIM;
+            }
+            if (p.carrying() >= 0) {
+                // the flag carrier does not stop to trade shots: it runs for
+                // home, which is the whole point of the mode
+                int rel = steer(m, p, goal) - p.yaw();
+                yaw = turn(p.yaw(), steer(m, p, goal), maxTurn);
+                forward = 127 * Trig.cos(rel) / Trig.ONE;
+                strafe = 127 * Trig.sin(rel) / Trig.ONE;
+                buttons = (buttons & ~(Input.AIM | Input.CROUCH | Input.FIRE)) | Input.SPRINT;
             }
             if (p.marker.spread > 20 && dist > 10 * Arena.UNIT && m.mode() == Mode.TEAM_PAINT) {
                 buttons |= Input.CROUCH;

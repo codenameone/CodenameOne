@@ -118,6 +118,25 @@ public final class Ui {
     /// things, not one.
     static final int DESKTOP_PAGE_PX = 1000;
 
+    /// `mm` millimetres in pixels, with the same desktop floor `desktopFonts`
+    /// gives the type. A monitor reports so few pixels to the millimetre that
+    /// a panel sized for a phone came out as a phone-sized box in the middle
+    /// of a large window; sized through this it grows with its text.
+    public static int mm(float mm) {
+        int px = CN.convertToPixels(mm);
+        if (!CN.isDesktop()) {
+            return px;
+        }
+        float perMm = CN.convertToPixels(100f) / 100f;
+        return perMm > 0 && perMm < 5.5f ? (int) (mm * 5.5f) : px;
+    }
+
+    /// The column a desktop list screen keeps to: wide enough to fill a large
+    /// window with something, never so wide that a row splits in two.
+    static int desktopPage(int width) {
+        return Math.max(DESKTOP_PAGE_PX, width * 3 / 5);
+    }
+
     /// On a desktop, keeps a list screen to a column in the middle of the
     /// window, however wide the window is. Does nothing on a phone or tablet.
     public static void desktopColumn(final Form f) {
@@ -126,7 +145,7 @@ public final class Ui {
         }
         final Container c = f.getContentPane();
         final Runnable fit = () -> {
-            int side = Math.max(0, (f.getWidth() - DESKTOP_PAGE_PX) / 2);
+            int side = Math.max(0, (f.getWidth() - desktopPage(f.getWidth())) / 2);
             Style s = c.getUnselectedStyle();
             s.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
             s.setPaddingUnitRight(Style.UNIT_TYPE_PIXELS);

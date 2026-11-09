@@ -89,6 +89,10 @@ public class ArenaView extends GameView {
     private static final float NEAR = 0.07f;
     private static final float OPERATOR_HEIGHT = 1.8f;
     private static final float MARKER_LENGTH = 0.28f;
+    /// A marker in another operator's hands, in metres. Real ones are about
+    /// this long; at the viewmodel's size they vanished into a fist, and
+    /// half the field looked unarmed.
+    private static final float HELD_LENGTH = 0.55f;
 
     // Key codes the touch buttons press, read with the keyboard's.
     static final int KEY_FIRE = 'f';
@@ -107,9 +111,8 @@ public class ArenaView extends GameView {
     private Mesh sphere;
 
     /// Twelve seconds of the match, one snapshot a tick, for the instant
-    /// replay: it starts three seconds before the hit, a second after it, and
-    /// plays at half speed while the live match runs on, so five seconds was
-    /// overwritten under it before it reached the hit.
+    /// replay, which plays the hit back slowly while the live match runs on:
+    /// it reaches a second before the hit until well after it.
     private static final int HISTORY = 360;
     private final int[][] history = new int[HISTORY][];
     private int recordedTick = -1;
@@ -117,11 +120,33 @@ public class ArenaView extends GameView {
     /// match in play goes on underneath it.
     private Match ghost;
     private int replayShooter = -1;
+    private int replayVictim = -1;
+    private int replayHit;
+    /// The replay's shots, one row each: the angle, the first and last tick
+    /// relative to the hit, and the speed it plays at. Over the shooter's
+    /// shoulder at half speed, then side on at a quarter for the splash, then
+    /// in front of the victim for the performance. Together they last a little
+    /// under the time out (Match.RESPAWN), so the replay ends as you go back in.
+    static final int ANGLE_SHOOTER = 0;
+    static final int ANGLE_SIDE = 1;
+    static final int ANGLE_VICTIM = 2;
+    private static final float[][] SHOTS = {
+        {ANGLE_SHOOTER, -30, 0, 0.5f},
+        {ANGLE_SIDE, -9, 9, 0.25f},
+        {ANGLE_VICTIM, 3, 27, 0.6f},
+    };
+    private int shot;
+    /// When the current shot began, for the HUD's cut to it.
+    private long shotAt;
+    private boolean splashed;
     /// The replay camera's heading, in radians, eased toward the shooter's
     /// look; NaN until a replay's first frame sets it.
     private double chaseYaw = Double.NaN;
     private int replayTo;
     private float replayPos;
+    private float replaySpeed = 1f;
+    /// The match the last frame showed: the live one, or the replay's ghost.
+    private Match drawn;
     private long replayStartAt;
     private boolean overheadChosen;
     private boolean viewHeld;
@@ -147,6 +172,8 @@ public class ArenaView extends GameView {
     private float[] moveF = new float[0];
     private float[] moveS = new float[0];
     private float[] bodyYaw = new float[0];
+    /// Who was alive last frame, so a respawn can leave a puff behind.
+    private boolean[] wasAlive = new boolean[0];
     private float[] pending = new float[0];
     /// The ground speed, in m/s, each locomotion clip was authored at; the
     /// clip plays faster or slower so the feet keep pace with the ground.
@@ -158,12 +185,19 @@ public class ArenaView extends GameView {
     // Effects. Every one is a pool of soft billboards drawn in one call.
     private final ParticleEmitter[] spray = new ParticleEmitter[2];
     private final ParticleEmitter[] mist = new ParticleEmitter[2];
+    private final ParticleEmitter[] goo = new ParticleEmitter[2];
     private ParticleEmitter dust;
     private ParticleEmitter flash;
     private ParticleEmitter motes;
     private float moteClock;
     private int moteSeed = 0x2545f491;
-    private final AnimatedModel[] flags = new AnimatedModel[2];
+    /// A capture-the-flag flag: a steel pole, a team-coloured cloth that
+    /// waves, and a glowing ring on the ground at home so the base reads
+    /// from across the yard. Two plain boxes, because no art pack has one.
+    private final Model[] flagPole = new Model[2];
+    private final Model[] flagCloth = new Model[2];
+    private final Model[] flagBase = new Model[2];
+    private float flagWave;
     private AnimatedModel viewModel;
     private float viewScale;
     private final float[] hand = new float[16];
@@ -299,11 +333,20 @@ public class ArenaView extends GameView {
             addModel(hill);
         }
         if (match.mode() == Mode.CAPTURE_THE_FLAG) {
+            Mesh box = Primitives.cube(d, 1f);
+            Material steel = new Material(Material.Type.PBR).setColor(0xffb8bec6).setRoughness(0.35f);
             for (int t = 0; t < 2; t++) {
-                flags[t] = Models.create(d, "sign");
-                fit(flags[t], 2.4f);
-                flags[t].setTint(TEAM_COLORS[t]);
-                flags[t].addTo(this);
+                flagPole[t] = new Model(box, steel);
+                flagPole[t].setScale(0.05f, 2.6f, 0.05f);
+                addModel(flagPole[t]);
+                flagCloth[t] = new Model(box, new Material(Material.Type.PBR).setColor(TEAM_COLORS[t])
+                        .setRoughness(0.8f));
+                flagCloth[t].setScale(0.95f, 0.6f, 0.03f);
+                addModel(flagCloth[t]);
+                flagBase[t] = new Model(sphere, new Material(Material.Type.UNLIT).setColor(TEAM_COLORS[t]));
+                flagBase[t].setScale(2.4f, 0.01f, 2.4f);
+                flagBase[t].setPosition(-arena.baseX(t) * MM, 0.006f, arena.baseZ(t) * MM);
+                addModel(flagBase[t]);
             }
         }
 
@@ -316,6 +359,7 @@ public class ArenaView extends GameView {
         moveF = new float[n];
         moveS = new float[n];
         bodyYaw = new float[n];
+        wasAlive = new boolean[n];
         pending = new float[n];
         prevX = new float[n];
         prevY = new float[n];
@@ -332,7 +376,7 @@ public class ArenaView extends GameView {
             op.addTo(this);
             operators[i] = op;
             AnimatedModel m = Models.create(d, Models.marker(p.marker.id));
-            heldScale[i] = length(m, MARKER_LENGTH * 0.8f);
+            heldScale[i] = length(m, HELD_LENGTH);
             m.addTo(this);
             held[i] = m;
         }
@@ -436,10 +480,26 @@ public class ArenaView extends GameView {
         float md = b[5] - b[2];
         boolean turn = (bw > bd) != (mw > md) && Math.abs(bw - bd) > 0.05f;
         float s = box.height * MM / Math.max(0.01f, b[4] - b[1]);
+        // Fit the footprint to the box the rules collide against, so an operator
+        // stopped by the box is stopped by the prop and never inside it. A prop
+        // whose box is only its trunk (a tree) keeps at least 40% of its width.
+        float sx = Math.max(s * 0.4f, (turn ? bd : bw) / Math.max(0.01f, mw));
+        float sz = Math.max(s * 0.4f, (turn ? bw : bd) / Math.max(0.01f, md));
         float cx = -(box.x0 + box.x1) * MM / 2f;
         float cz = (box.z0 + box.z1) * MM / 2f;
         float deg = (turn ? 90f : 0f) + ((box.x0 + box.x1) / 2 > arena.width / 2 ? 180f : 0f);
-        place(m, s, deg, cx, cz, b);
+        double r = Math.toRadians(deg);
+        float c = (float) Math.cos(r);
+        float sn = (float) Math.sin(r);
+        float mx = (b[0] + b[3]) / 2f * sx;
+        float mz = (b[2] + b[5]) / 2f * sz;
+        m.setScale(s);
+        com.codename1.gaming.Model[] parts = m.getParts();
+        for (int i = 0; i < parts.length; i++) {
+            parts[i].setScale(sx, s, sz);
+        }
+        m.setRotation(0f, deg, 0f);
+        m.setPosition(cx - (mx * c + mz * sn), -b[1] * s, cz - (-mx * sn + mz * c));
         m.addTo(this);
     }
 
@@ -883,22 +943,53 @@ public class ArenaView extends GameView {
         }
     }
 
-    /// Plays back the seconds before you were painted, from over the
-    /// shooter's shoulder: it starts once the stamp has landed, runs at half
-    /// speed and ends at the hit, or when you are back in.
-    private void replayFrom(int shooter, int hitTick) {
-        int from = hitTick - 3 * Match.TICK_HZ;
-        while (from < hitTick && !recorded(from)) {
+    /// Plays back the moment you were painted, every time, in the [#SHOTS]:
+    /// it starts once the stamp has landed and ends when you are back in.
+    private void replayFrom(int shooter, int victim, int hitTick) {
+        replayShooter = shooter;
+        replayVictim = victim;
+        replayHit = hitTick;
+        replayStartAt = System.currentTimeMillis() + 800;
+        startShot(0);
+        shotAt = replayStartAt;
+    }
+
+    private void startShot(int s) {
+        shot = s;
+        shotAt = System.currentTimeMillis();
+        chaseYaw = Double.NaN;
+        splashed = false;
+        float[] row = SHOTS[s];
+        int from = replayHit + (int) row[1];
+        // the first shot starts no earlier than the history goes back
+        while (from < replayHit && !recorded(from)) {
             from++;
         }
-        if (from >= hitTick - Match.TICK_HZ / 2) {
-            return;
-        }
-        replayShooter = shooter;
-        chaseYaw = Double.NaN;
         replayPos = from;
-        replayTo = hitTick + Match.TICK_HZ / 3;
-        replayStartAt = System.currentTimeMillis() + 1100;
+        replayTo = replayHit + (int) row[2];
+        replaySpeed = row[3];
+    }
+
+    /// What the camera is looking at, for the HUD to put words over.
+    public Match drawnMatch() {
+        Match m = drawn;
+        return m == null ? driver.match() : m;
+    }
+
+    /// The angle of the replay shot on screen, one of the `ANGLE_` values,
+    /// or -1 when no replay is playing.
+    public int replayAngle() {
+        return replayingShooter() >= 0 ? (int) SHOTS[shot][0] : -1;
+    }
+
+    /// Milliseconds since the replay cut to its current shot.
+    public long sinceCut() {
+        return System.currentTimeMillis() - shotAt;
+    }
+
+    /// The player the replay is about: the one who was painted.
+    public int replayingVictim() {
+        return replayVictim;
     }
 
     /// The most ticks a replay blends across: a frame of four at a slow 8 fps.
@@ -949,8 +1040,15 @@ public class ArenaView extends GameView {
         while (b < t + 1 + GAP && !recorded(b)) {
             b++;
         }
+        if (t + 1 >= replayTo && shot + 1 < SHOTS.length && !live.player(driver.me()).alive()) {
+            // a cut to the next angle
+            startShot(shot + 1);
+            return shown(0f);
+        }
         if (t + 1 >= replayTo || live.player(driver.me()).alive() || !recorded(a) || !recorded(b)) {
             replayShooter = -1;
+            replayVictim = -1;
+            replaySpeed = 1f;
             remember();
             return live;
         }
@@ -968,7 +1066,14 @@ public class ArenaView extends GameView {
         }
         ghost.restore(history[b % HISTORY]);
         alpha = (replayPos - a) / (b - a);
-        replayPos += dt * Match.TICK_HZ * 0.5f;
+        replayPos += dt * Match.TICK_HZ * replaySpeed;
+        if (!splashed && replayPos >= replayHit && replayVictim >= 0) {
+            // the events are not replayed, so the splash is thrown again here
+            splashed = true;
+            Player v = ghost.player(replayVictim);
+            burstHit(ghost.player(replayShooter).team() & 1, v.x(), v.y() + 1200, v.z());
+            Sfx.splat(0.9f, 0f);
+        }
         return ghost;
     }
 
@@ -1001,13 +1106,13 @@ public class ArenaView extends GameView {
             } else if (e.kind == Event.PAINTED) {
                 Player shooter = m.player(e.a);
                 decal(shooter.team(), e.x, e.y, e.z, 0.7f);
-                burstImpact(shooter.team() & 1, e.x, e.y, e.z, false);
+                burstHit(shooter.team() & 1, e.x, e.y, e.z);
                 if (e.b == me) {
                     Sfx.painted();
                     Sfx.whistle(0.9f, 0);
                     knock = 1f;
                     if (driver.interactive() && e.a != me) {
-                        replayFrom(e.a, e.tick);
+                        replayFrom(e.a, e.b, e.tick);
                     }
                 } else {
                     Sfx.splat(place(e.x, e.z, 30), pan);
@@ -1153,6 +1258,11 @@ public class ArenaView extends GameView {
                     .setSpeed(0.3f, 1.0f).setLifetime(0.3f, 0.7f).setSize(0.12f, 0.45f).setGravity(-0.15f)
                     .setDrag(2.5f);
             mist[t].addTo(this);
+            // the gobs a hit on a player throws: big, slow, and falling
+            goo[t] = new ParticleEmitter(d, 120).setColor(TEAM_COLORS[t]).setSpeed(1.2f, 4.2f)
+                    .setLifetime(0.5f, 1.0f).setSize(0.09f, 0.05f).setGravity(9.8f).setDrag(0.6f)
+                    .setDirection(0f, 1f, 0f, 85f);
+            goo[t].addTo(this);
         }
         dust = new ParticleEmitter(d, 200).setColor(0x509a8f80).setSpeed(0.4f, 1.6f).setLifetime(0.9f, 1.8f)
                 .setSize(0.2f, 1.0f).setGravity(-0.25f).setDrag(2f).setDirection(0f, 1f, 0f, 70f);
@@ -1164,6 +1274,18 @@ public class ArenaView extends GameView {
         motes = new ParticleEmitter(d, 90).setColor(0x55fff1d6).setAdditive(true).setSpeed(0.02f, 0.12f)
                 .setLifetime(3f, 6f).setSize(0.012f, 0.02f).setGravity(-0.01f);
         motes.addTo(this);
+    }
+
+    /// A ball bursting on a player: far more than on a wall, since this is the
+    /// moment the whole game is about. Drops fly out, fat gobs arc and fall,
+    /// and a cloud of paint hangs where they stood.
+    private void burstHit(int team, int x, int y, int z) {
+        float px = -x * MM;
+        float py = Math.max(0.3f, y * MM);
+        float pz = z * MM;
+        spray[team].burst(px, py, pz, 70);
+        goo[team].burst(px, py, pz, 28);
+        mist[team].burst(px, py, pz, 22);
     }
 
     private void burstImpact(int team, int x, int y, int z, boolean grenade) {
@@ -1195,9 +1317,14 @@ public class ArenaView extends GameView {
 
     private void tick(float dt) {
         GameCamera c = getCamera();
+        // paint hangs in the air as slowly as the replay plays
+        if (replayVictim >= 0) {
+            dt *= replaySpeed;
+        }
         for (int t = 0; t < 2; t++) {
             spray[t].update(dt, c);
             mist[t].update(dt, c);
+            goo[t].update(dt, c);
         }
         dust.update(dt, c);
         flash.update(dt, c);
@@ -1318,6 +1445,7 @@ public class ArenaView extends GameView {
 
     private void draw(float dt) {
         Match m = shown(dt);
+        drawn = m;
         int me = driver.me();
         boolean replaying = m != driver.match();
         Player self = m.player(me);
@@ -1325,7 +1453,7 @@ public class ArenaView extends GameView {
         // once the replay has played: the floor was all there was to see.
         overheadNow = !replaying && (overheadChosen || driver.interactive() && !self.alive()
                 && System.currentTimeMillis() > replayStartAt + 600 && !m.over());
-        boolean firstPerson = driver.interactive() && !replaying && !overheadNow;
+        boolean firstPerson = driver.interactive() && !replaying && !overheadNow && !m.over();
         for (int i = 0; i < operators.length && i < m.playerCount(); i++) {
             operator(m, i, i == me && firstPerson, dt);
         }
@@ -1345,13 +1473,37 @@ public class ArenaView extends GameView {
                 balls[i].setVisible(false);
             }
         }
-        if (m.mode() == Mode.CAPTURE_THE_FLAG && flags[0] != null) {
+        if (m.mode() == Mode.CAPTURE_THE_FLAG && flagPole[0] != null) {
+            flagWave += dt;
             for (int t = 0; t < 2; t++) {
-                flags[t].setPosition(-m.flagX(t) * MM, m.flagY(t) * MM, m.flagZ(t) * MM);
+                float fx = -m.flagX(t) * MM;
+                float fy = m.flagY(t) * MM;
+                float fz = m.flagZ(t) * MM;
+                float yaw = flagWave * 40f + t * 90f;
+                int c = m.flagCarrier(t);
+                if (c >= 0 && c < bodyYaw.length) {
+                    // slung on the carrier's back, the cloth streaming behind,
+                    // so whoever has it is obvious from anywhere
+                    double r = Math.toRadians(-bodyYaw[c]);
+                    fx = -lerp(prevX[c], m.player(c).x() * MM) + (float) Math.sin(r) * 0.3f;
+                    fz = lerp(prevZ[c], m.player(c).z() * MM) - (float) Math.cos(r) * 0.3f;
+                    fy = lerp(prevY[c], m.player(c).y() * MM) + 0.6f;
+                    yaw = bodyYaw[c] + 90f;
+                }
+                double yr = Math.toRadians(yaw);
+                float flap = (float) Math.sin(flagWave * 7f + t) * 12f;
+                flagPole[t].setPosition(fx, fy + 1.3f, fz);
+                flagCloth[t].setPosition(fx + (float) Math.cos(yr) * 0.48f, fy + 2.25f,
+                        fz - (float) Math.sin(yr) * 0.48f);
+                flagCloth[t].setRotation(0f, yaw + flap, flap * 0.3f);
             }
         }
-        if (replaying) {
+        if (replaying && replayVictim >= 0 && shot > 0) {
+            angle(m, replayShooter, replayVictim, (int) SHOTS[shot][0]);
+        } else if (replaying) {
             chase(m, replayShooter, dt);
+        } else if (m.over()) {
+            celebrate(m, m.winner(), dt);
         } else if (overheadNow) {
             overhead(m, me, dt);
         } else {
@@ -1366,10 +1518,19 @@ public class ArenaView extends GameView {
     /// clip their motion asks for, the marker in the right hand.
     private void operator(Match m, int i, boolean first, float dt) {
         Player p = m.player(i);
+        if (p.alive() && !wasAlive[i] && m.tick() > 2) {
+            // back in: a puff of smoke where they went down, and one where
+            // they reappear, so the jump across the yard reads as a respawn
+            float ox = -prevX[i];
+            dust.burst(ox, 0.6f, prevZ[i], 30);
+            dust.burst(-p.x() * MM, 0.6f, p.z() * MM, 30);
+            flash.burst(-p.x() * MM, 1.0f, p.z() * MM, 3);
+        }
+        wasAlive[i] = p.alive();
         AnimatedModel op = operators[i];
         AnimatedModel gun = held[i];
         op.setVisible(!first);
-        gun.setVisible(!first && p.alive());
+        gun.setVisible(!first && p.alive() && !m.over());
         if (first) {
             return;
         }
@@ -1401,8 +1562,17 @@ public class ArenaView extends GameView {
         boolean firing = p.input().has(Input.FIRE);
         boolean slow = p.crouched() || p.input().has(Input.AIM);
         String want;
-        if (!p.alive()) {
-            want = p.input().has(Input.WIPE) ? Models.WAVE : Models.DEATH;
+        float clipSpeed = 1f;
+        if (m.over()) {
+            want = celebration(m, i);
+        } else if (!p.alive()) {
+            if (p.input().has(Input.WIPE)) {
+                want = Models.WAVE;
+            } else {
+                float since = (m.tick() - p.paintedAt()) / (float) Match.TICK_HZ;
+                want = performance(i, p.paintedAt(), since);
+                clipSpeed = drama(i, p.paintedAt()) == DRAMA_SLOW ? 0.45f : 1f;
+            }
         } else if (speed < 0.6f) {
             want = firing ? Models.IDLE_SHOOT : Models.IDLE;
         } else if (slow || speed < 2.6f) {
@@ -1414,13 +1584,15 @@ public class ArenaView extends GameView {
         }
         // A new clip has to be wanted for a moment before it plays, except
         // being painted, which is never late.
-        boolean urgent = !p.alive() || clips[i] == null;
+        boolean urgent = !p.alive() || m.over() || clips[i] == null;
         if (!want.equals(clips[i])) {
             pending[i] += dt;
             if (urgent || pending[i] > 0.15f) {
                 clips[i] = want;
                 pending[i] = 0;
-                op.crossFade(want, Models.DEATH.equals(want) ? 0.08f : 0.25f, !Models.DEATH.equals(want));
+                boolean once = Models.DEATH.equals(want) || Models.HIT.equals(want)
+                        || Models.HIT2.equals(want) || Models.ROLL.equals(want);
+                op.crossFade(want, once ? 0.08f : 0.25f, !once);
             }
         } else {
             pending[i] = 0;
@@ -1431,9 +1603,9 @@ public class ArenaView extends GameView {
         } else if (now != null && now.startsWith("Run")) {
             op.setSpeed(Math.max(0.6f, Math.min(1.5f, speed / RUN_PACE)));
         } else {
-            op.setSpeed(1f);
+            op.setSpeed(clipSpeed);
         }
-        op.update(dt);
+        op.update(replayVictim >= 0 && replaying(m) ? dt * replaySpeed : dt);
         op.setPosition(x, y, z);
         op.setRotation(0f, yawDeg, 0f);
         if (p.alive() && op.getNodeMatrix(Models.HAND, hand)) {
@@ -1491,6 +1663,183 @@ public class ArenaView extends GameView {
         getCamera().setTarget(x + fx * 9f, y + 1.2f, z + fz * 9f);
         sky.setPosition(cx, cy, cz);
         getLight().setShadowCenter(x + fx * SHADOW_AHEAD * 0.6f, 0f, z + fz * SHADOW_AHEAD * 0.6f);
+        if (viewModel != null) {
+            viewModel.setVisible(false);
+        }
+    }
+
+    static final int DRAMA_PLAIN = 0;
+    static final int DRAMA_STAGGER = 1;
+    static final int DRAMA_ROLL = 2;
+    static final int DRAMA_SLOW = 3;
+
+    /// How this operator takes being painted this time. Half the time it is
+    /// a plain fall; the rest make a scene. Chosen from who and when, so a
+    /// replay of the same hit plays the same performance.
+    static int drama(int who, int paintedAt) {
+        int r = (who * 7 + paintedAt * 13) & 7;
+        return r < 4 ? DRAMA_PLAIN : r < 6 ? DRAMA_STAGGER : r < 7 ? DRAMA_ROLL : DRAMA_SLOW;
+    }
+
+    /// The clip a painted operator plays, s seconds after the hit.
+    static String performance(int who, int paintedAt, float s) {
+        switch (drama(who, paintedAt)) {
+            case DRAMA_STAGGER:
+                // clutches the chest, staggers the other way, then goes down
+                return s < 0.7f ? Models.HIT : s < 1.5f ? Models.HIT2 : Models.DEATH;
+            case DRAMA_ROLL:
+                // a dive for cover that is a second too late
+                return s < 0.9f ? Models.ROLL : Models.DEATH;
+            default:
+                return Models.DEATH;
+        }
+    }
+
+    /// The line a drama queen delivers, or null for a quiet fall.
+    static String complaint(int who, int paintedAt) {
+        int d = drama(who, paintedAt);
+        if (d == DRAMA_PLAIN) {
+            return null;
+        }
+        String[] lines = d == DRAMA_STAGGER
+                ? new String[] {"TELL MY WIFE... I SPLATTED BRAVELY", "IT'S IN MY EYES! MY BEAUTIFUL EYES!",
+                    "I SEE A LIGHT... IT'S MAGENTA"}
+                : d == DRAMA_ROLL
+                ? new String[] {"I'D LIKE TO SEE THAT AGAIN, REF", "THAT WAS A BOUNCE. EVERYONE SAW IT.",
+                    "THE WIND TOOK IT!"}
+                : new String[] {"NOOOOOOOOOO", "WHY... ME...", "AVENGE... MY... HOODIE..."};
+        return lines[(who + paintedAt) % lines.length];
+    }
+
+    /// Game over: the winners cheer, the losers stand there.
+    private static String celebration(Match m, int i) {
+        int w = m.winner();
+        if (w < 0) {
+            // a draw: everyone waves at the ref, everyone claims it
+            return Models.WAVE;
+        }
+        if (m.player(i).team() != w) {
+            return Models.IDLE;
+        }
+        int beat = (m.tick() / (Match.TICK_HZ / 2) + i) % 6;
+        return (i & 1) == 0 ? beat < 3 ? Models.PUNCH_R : Models.WAVE : beat < 3 ? Models.PUNCH_L : Models.KICK;
+    }
+
+    private boolean replaying(Match m) {
+        return m != driver.match();
+    }
+
+    private float orbit;
+
+    /// Game over: a slow orbit around the winning team, close enough to see
+    /// them cheer -- or around everyone, on a draw.
+    private void celebrate(Match m, int team, float dt) {
+        float cx = 0f;
+        float cz = 0f;
+        float cy = 0f;
+        int n = 0;
+        for (int i = 0; i < m.playerCount(); i++) {
+            Player p = m.player(i);
+            if (team < 0 || p.team() == team) {
+                cx += -p.x() * MM;
+                cy += p.y() * MM;
+                cz += p.z() * MM;
+                n++;
+            }
+        }
+        if (n == 0) {
+            camera(m, driver.me(), dt);
+            return;
+        }
+        cx /= n;
+        cy /= n;
+        cz /= n;
+        orbit += dt * 0.35f;
+        float ex = cx + (float) Math.sin(orbit) * 5.5f;
+        float ez = cz + (float) Math.cos(orbit) * 5.5f;
+        getCamera().setPerspective(HIP_FOV - 10f, NEAR, 400f);
+        getCamera().setPosition(ex, cy + 2.2f, ez);
+        getCamera().setTarget(cx, cy + 1.0f, cz);
+        sky.setPosition(ex, cy + 2.2f, ez);
+        getLight().setShadowCenter(cx, 0f, cz);
+        if (viewModel != null) {
+            viewModel.setVisible(false);
+        }
+    }
+
+    /// The replay's later angles: a fixed camera, as a broadcast would cut to.
+    /// The side angle stands 4 m off the line from shooter to victim, so the
+    /// ball crosses the frame; the victim angle is 2.2 m in front of the
+    /// victim at chest height, for the performance.
+    private void angle(Match m, int s, int v, int which) {
+        Player a = m.player(s);
+        Player b = m.player(v);
+        float ax = -lerp(prevX[s], a.x() * MM);
+        float az = lerp(prevZ[s], a.z() * MM);
+        float bx = -lerp(prevX[v], b.x() * MM);
+        float by = lerp(prevY[v], b.y() * MM);
+        float bz = lerp(prevZ[v], b.z() * MM);
+        float dx = bx - ax;
+        float dz = bz - az;
+        float len = (float) Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.01f) {
+            dx = 0f;
+            dz = 1f;
+        } else {
+            dx /= len;
+            dz /= len;
+        }
+        float cx;
+        float cy;
+        float cz;
+        float tx;
+        float tz;
+        if (which == ANGLE_SIDE) {
+            cx = (ax + bx) * 0.5f - dz * 4f;
+            cz = (az + bz) * 0.5f + dx * 4f;
+            cy = by + 1.4f;
+            tx = bx - dx * 0.8f;
+            tz = bz - dz * 0.8f;
+        } else {
+            cx = bx - dx * 2.2f + dz * 0.4f;
+            cz = bz - dz * 2.2f - dx * 0.4f;
+            cy = by + 1.35f;
+            tx = bx;
+            tz = bz;
+        }
+        // A prop between the camera and the victim: try the other side of the
+        // line, then closer in, and take the first view that sees them. A
+        // broadcast never cuts to the inside of a container.
+        int vx = b.x();
+        int vy = b.y() + 1300;
+        int vz = b.z();
+        float ox = cx - bx;
+        float oz = cz - bz;
+        float[] tries = {1f, -1f, 0.6f, -0.6f, 0.35f, -0.35f};
+        for (int k = 0; k < tries.length; k++) {
+            float f = tries[k];
+            // a negative try mirrors the camera across the shooter-victim line
+            float px = ox;
+            float pz = oz;
+            if (f < 0) {
+                float along = ox * dx + oz * dz;
+                px = 2 * along * dx - ox;
+                pz = 2 * along * dz - oz;
+                f = -f;
+            }
+            float tx2 = bx + px * f;
+            float tz2 = bz + pz * f;
+            if (m.arena().clear(vx, vy, vz, (int) (-tx2 * 1000f), (int) (cy * 1000f), (int) (tz2 * 1000f))) {
+                cx = tx2;
+                cz = tz2;
+                break;
+            }
+        }
+        getCamera().setPerspective(which == ANGLE_VICTIM ? 42f : HIP_FOV - 14f, NEAR, 400f);
+        getCamera().setPosition(cx, cy, cz);
+        getCamera().setTarget(tx, by + 1.1f, tz);
+        sky.setPosition(cx, cy, cz);
+        getLight().setShadowCenter(bx, 0f, bz);
         if (viewModel != null) {
             viewModel.setVisible(false);
         }

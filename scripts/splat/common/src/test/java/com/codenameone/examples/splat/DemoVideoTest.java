@@ -93,40 +93,48 @@ public class DemoVideoTest extends E2e {
             // the briefing plays out in full with its beeps and the horn
             waitFor(5200);
 
-            caption("Left thumb moves, right thumb looks", 3200);
-            driveFor(view, 6000);
-            caption("Paintballs are slow -- lead your target", 3200);
-            held(view, Input.FIRE, 3500);
-            caption("Aim down the sights for a tighter group", 3200);
-            held(view, Input.AIM, 800);
-            held(view, Input.AIM | Input.FIRE, 3200);
-            caption("Splat grenade over the cover", 3000);
-            held(view, Input.THROW, 400);
+            caption("Left thumb moves, right thumb looks", 3800);
+            driveFor(view, 7000);
+            caption("Their flag flies over the glowing ring across the yard", 3800);
             driveFor(view, 4000);
+            caption("Paintballs are slow -- lead your target", 3800);
+            held(view, Input.FIRE, 4000);
+            caption("Aim down the sights for a tighter group", 3600);
+            held(view, Input.AIM, 900);
+            held(view, Input.AIM | Input.FIRE, 3600);
+            caption("Splat grenade over the cover", 3400);
+            held(view, Input.THROW, 400);
+            driveFor(view, 4500);
 
-            caption("Sooner or later, everyone gets painted...", 3200);
+            caption("Sooner or later, everyone gets painted...", 3600);
             if (untilPainted(view, 40000)) {
-                waitFor(1400);
-                caption("...and the instant replay shows exactly who did it", 3600);
-                waitFor(5200);
-                caption("Out? Try wiping it off -- if the ref is not looking", 3400);
-                held(view, Input.WIPE, 2200);
-                waitFor(2000);
+                // the wipe has to be tried in the first second, before the
+                // replay rolls
+                caption("Wipe it off! Maybe the ref did not see", 3000);
+                held(view, Input.WIPE, 900);
+                waitFor(600);
+                caption("Instant replay: who did it, in slow motion", 3000);
+                waitFor(2600);
+                caption("Again, slower, from the side", 2600);
+                waitFor(2600);
+                caption("And the performance. Every time.", 2800);
+                waitFor(3600);
             }
-            caption("Bird's-eye view: the whole yard at once", 3400);
+            caption("Bird's-eye view: the whole yard at once", 3600);
             onEdt(view::toggleOverhead);
             driveFor(view, 8000);
             onEdt(view::toggleOverhead);
-            caption("Back to the goggles. Grab their flag.", 3200);
+            caption("Carry their flag home on your back for a point", 3800);
             driveFor(view, 10000);
             finish(view, 10 * 60 * Match.TICK_HZ);
-            waitFor(3500);
+            caption("The winners celebrate. Loudly.", 4200);
+            waitFor(5600);
             collectAll();
-            caption("The scoreboard. Somebody is disputing every hit.", 3400);
-            waitFor(4000);
+            caption("The scoreboard. Somebody is disputing every hit.", 3800);
+            waitFor(4400);
             home();
-            caption("Next: build your own field in the Mission Builder", 3200);
-            waitFor(3600);
+            caption("Next: build your own field in the Mission Builder", 3600);
+            waitFor(4000);
 
             SimulatorRecorder.Result r = recorder.stop();
             recorder = null;

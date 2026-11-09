@@ -38,13 +38,16 @@ public final class Match {
     public static final int TIME_LIMIT = 6 * 60 * TICK_HZ;
     public static final int HEIGHT = 1750;
     public static final int CROUCH_HEIGHT = 1150;
-    public static final int RADIUS = 350;
+    public static final int RADIUS = 400;
     public static final int STEP_UP = 450;
     public static final int GRAVITY = 11;
     public static final int JUMP_SPEED = 140;
-    public static final int WALK = 150;
-    public static final int SPRINT = 215;
-    public static final int CROUCH_WALK = 70;
+    /// Ground speeds in mm a tick: a jog (3.6 m/s), a sprint (5.1 m/s) and a
+    /// crouch. Paintball is played at the pace of people who brought snacks, and
+    /// faster than this the field is hard to follow on a phone.
+    public static final int WALK = 120;
+    public static final int SPRINT = 170;
+    public static final int CROUCH_WALK = 60;
     /// How fast a player gets up to speed and stops, mm a tick per tick, on
     /// the ground and in the air: a tenth of a second to a run, a little
     /// less to a stop, and not much steering once your feet leave the ground.
@@ -56,7 +59,9 @@ public final class Match {
     public static final int PITCH_LIMIT = 900;
     public static final int BALL_GRAVITY = 6;
     public static final int BALL_LIFE = 90;
-    public static final int RESPAWN = 3 * TICK_HZ;
+    /// Time out after being painted: long enough for the victim's scene and the
+    /// slow-motion replay, which is the point of being painted at all.
+    public static final int RESPAWN = 7 * TICK_HZ;
     /// Ticks after being painted during which a player may try to wipe it off.
     public static final int WIPE_WINDOW = TICK_HZ;
     /// Extra time out for a wipe the referee caught.

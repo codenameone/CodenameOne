@@ -217,8 +217,9 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
         hud.frame(m, me, lookYaw, lookPitch);
         if (m.over() && !endShown && !(driver instanceof OnlineDriver)) {
             endShown = true;
-            // Two seconds for the stamp to land before the card covers it.
-            Ui.later(() -> com.codename1.ui.CN.setTimeout(2000, this::localEnd));
+            // Time for the winners to celebrate on camera before the card
+            // covers them.
+            Ui.later(() -> com.codename1.ui.CN.setTimeout(CELEBRATION_MILLIS, this::localEnd));
         }
     }
 
@@ -226,6 +227,9 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
     public void event(Event e) {
         hud.event(e);
     }
+
+    /// How long the end-of-match camera watches the winners cheer.
+    private static final int CELEBRATION_MILLIS = 5000;
 
     private void localEnd() {
         Match m = driver.match();
@@ -245,8 +249,13 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
         if (endShown) {
             return;
         }
-        view.stop();
         endShown = true;
+        com.codename1.ui.CN.setTimeout(CELEBRATION_MILLIS,
+                () -> showEnded(places, scores, trophies, coins, matchId));
+    }
+
+    private void showEnded(int[] places, int[] scores, int trophies, int coins, String matchId) {
+        view.stop();
         int mine = driver.me() < places.length ? places[driver.me()] : 1;
         Friends.raceFinished(mine == 0);
         Telemetry.runEnded("online", ((OnlineDriver) driver).level(), mine, driver.me() < scores.length
@@ -283,7 +292,7 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
         row.add(BorderLayout.CENTER, new Label(who, "ScoreCellName"));
         Container nums = new Container(new GridLayout(1, 3));
         nums.add(new Label(a, "ScoreCell")).add(new Label(b, "ScoreCell")).add(new Label(c, "ScoreCell"));
-        nums.setPreferredW(CN.convertToPixels(21));
+        nums.setPreferredW(Ui.mm(21));
         row.add(BorderLayout.EAST, nums);
         return row;
     }
@@ -363,6 +372,10 @@ public final class MatchForm implements ArenaView.Hud, OnlineDriver.Listener {
         }
         Container dim = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
         dim.setUIID("RunDim");
+        if (CN.isDesktop()) {
+            // a scoreboard, not a phone card floating in a monitor
+            card.setPreferredW(Math.max(card.getPreferredW(), CN.getDisplayWidth() * 9 / 20));
+        }
         Container scroll = BoxLayout.encloseY(card);
         scroll.setScrollableY(true);
         scroll.setScrollVisible(false);

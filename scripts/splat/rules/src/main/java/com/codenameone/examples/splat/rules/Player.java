@@ -129,6 +129,11 @@ public final class Player {
         return paintedBy;
     }
 
+    /// The tick this player was last painted on.
+    public int paintedAt() {
+        return wipeUntil - Match.WIPE_WINDOW;
+    }
+
     public boolean canWipe(int tick) {
         return !alive && !wiped && tick <= wipeUntil;
     }

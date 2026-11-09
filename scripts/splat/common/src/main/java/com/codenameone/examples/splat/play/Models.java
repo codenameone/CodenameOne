@@ -55,6 +55,12 @@ public final class Models {
     static final String WALK = "Walk";
     static final String DEATH = "Death";
     static final String WAVE = "Wave";
+    static final String HIT = "HitRecieve";
+    static final String HIT2 = "HitRecieve_2";
+    static final String ROLL = "Roll";
+    static final String PUNCH_L = "Punch_Left";
+    static final String PUNCH_R = "Punch_Right";
+    static final String KICK = "Kick_Right";
     /// The bone a marker is held by, and the rig's own pistol, which it replaces.
     static final String HAND = "Wrist.R";
     static final String PISTOL = "Pistol";

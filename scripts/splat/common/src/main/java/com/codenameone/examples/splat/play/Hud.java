@@ -322,6 +322,7 @@ public final class Hud extends Component implements ArenaView.Hud {
         if (now - bannerAt < 2200 && now - stampAt >= STAMP_MILLIS) {
             plate(g, banner, x0 + w / 2, y0 + h * 58 / 100, small, Type.WHITE);
         }
+        bubbles(g, x0, y0, w, h);
         replayBars(g, x0, y0, w, h);
         stamp(g, now, x0, y0, w, h);
     }
@@ -343,7 +344,18 @@ public final class Hud extends Component implements ArenaView.Hud {
         g.fillRect(x0, y0, w, bar);
         g.fillRect(x0, y0 + h - bar, w, bar);
         g.setAlpha(255);
-        plate(g, "INSTANT REPLAY", x0 + w / 2, y0 + bar + CN.convertToPixels(1.5f), medium, Type.AMBER);
+        int angle = view.replayAngle();
+        String title = angle == ArenaView.ANGLE_SIDE ? "ANGLE 2/3 -- SUPER SLOW-MO"
+                : angle == ArenaView.ANGLE_VICTIM ? "ANGLE 3/3 -- THE PERFORMANCE" : "INSTANT REPLAY -- ANGLE 1/3";
+        plate(g, title, x0 + w / 2, y0 + bar + CN.convertToPixels(1.5f), medium, Type.AMBER);
+        // a white flash on every cut, the way a broadcast marks a new angle
+        long cut = view.sinceCut();
+        if (cut >= 0 && cut < 220) {
+            g.setColor(0xffffff);
+            g.setAlpha((int) (200 * (220 - cut) / 220));
+            g.fillRect(x0, y0 + bar, w, h - bar * 2);
+            g.setAlpha(255);
+        }
         plate(g, "PAINTED BY " + Type.caps(driver.name(shooter)), x0 + w / 2,
                 y0 + h - bar - small.getHeight() - CN.convertToPixels(2), small, Type.WHITE);
     }
@@ -768,6 +780,72 @@ public final class Hud extends Component implements ArenaView.Hud {
             g.setColor(Type.FRIENDLY);
             g.drawString(n, sx - tiny.stringWidth(n) / 2, sy);
         }
+    }
+
+    /// Speech over whoever was just painted and is making a scene about it,
+    /// for three and a half seconds, live and in the replay alike.
+    private void bubbles(Graphics g, int x0, int y0, int w, int h) {
+        if (view == null) {
+            return;
+        }
+        Match m = view.drawnMatch();
+        float[] vp = viewProjection(w, h);
+        for (int i = 0; i < m.playerCount(); i++) {
+            Player q = m.player(i);
+            if (q.alive() || q.input().has(com.codenameone.examples.splat.rules.Input.WIPE)) {
+                continue;
+            }
+            int since = m.tick() - q.paintedAt();
+            if (since < Match.TICK_HZ / 2 || since > Match.TICK_HZ * 4) {
+                continue;
+            }
+            String line = ArenaView.complaint(i, q.paintedAt());
+            if (line == null) {
+                continue;
+            }
+            int[] at = project(vp, -q.x() * 0.001f, q.y() * 0.001f + 2.0f, q.z() * 0.001f, x0, y0, w, h);
+            if (at == null) {
+                continue;
+            }
+            Font f = compact ? tiny : small;
+            g.setFont(f);
+            int tw = f.stringWidth(line);
+            int pad = CN.convertToPixels(1.2f);
+            int bx = Math.max(x0 + pad, Math.min(x0 + w - tw - pad * 3, at[0] - tw / 2 - pad));
+            int by = at[1] - f.getHeight() - pad * 3;
+            g.setColor(0xffffff);
+            g.fillRoundRect(bx, by, tw + pad * 2, f.getHeight() + pad, pad * 2, pad * 2);
+            int[] tx = {at[0] - pad, at[0] + pad, at[0]};
+            int[] ty = {by + f.getHeight() + pad - 1, by + f.getHeight() + pad - 1, by + f.getHeight() + pad * 3};
+            g.fillPolygon(tx, ty, 3);
+            g.setColor(0x111111);
+            g.drawString(line, bx + pad, by + pad / 2);
+        }
+    }
+
+    private float[] viewProjection(int w, int h) {
+        com.codename1.gaming.GameCamera c = view.getCamera();
+        float[] look = com.codename1.gpu.Matrix4.lookAt(c.getEyeX(), c.getEyeY(), c.getEyeZ(),
+                c.getTargetX(), c.getTargetY(), c.getTargetZ(), 0f, 1f, 0f);
+        float[] proj = com.codename1.gpu.Matrix4.perspective((float) Math.toRadians(c.getFov()),
+                w / (float) Math.max(1, h), 0.03f, 400f);
+        float[] vp = new float[16];
+        com.codename1.gpu.Matrix4.multiply(proj, look, vp);
+        return vp;
+    }
+
+    /// A world point on the screen, or null when it is behind or off it.
+    private static int[] project(float[] vp, float wx, float wy, float wz, int x0, int y0, int w, int h) {
+        float cw = vp[3] * wx + vp[7] * wy + vp[11] * wz + vp[15];
+        if (cw <= 0.1f) {
+            return null;
+        }
+        float nx = (vp[0] * wx + vp[4] * wy + vp[8] * wz + vp[12]) / cw;
+        float ny = (vp[1] * wx + vp[5] * wy + vp[9] * wz + vp[13]) / cw;
+        if (nx < -1f || nx > 1f || ny < -1f || ny > 1f) {
+            return null;
+        }
+        return new int[] {x0 + (int) ((nx + 1f) * 0.5f * w), y0 + (int) ((1f - ny) * 0.5f * h)};
     }
 
     /// Text on a dark plate, centred on `cx`.

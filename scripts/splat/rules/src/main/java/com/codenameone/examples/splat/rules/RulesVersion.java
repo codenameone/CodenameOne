@@ -23,7 +23,7 @@ package com.codenameone.examples.splat.rules;
 /// number in [Catalog] or a line of [Match], then regenerate the golden replays
 /// (`-Dsplat.regolden=true`).
 public final class RulesVersion {
-    public static final int ID = 2;
+    public static final int ID = 4;
 
     private RulesVersion() {
     }

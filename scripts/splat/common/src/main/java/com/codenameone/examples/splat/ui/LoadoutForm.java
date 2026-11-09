@@ -138,7 +138,7 @@ public final class LoadoutForm {
         Container left = new Container(new BorderLayout());
         left.add(BorderLayout.NORTH, col);
         left.setScrollableY(true);
-        left.setPreferredW(Math.min(CN.getDisplayWidth() * 4 / 5, CN.convertToPixels(90)));
+        left.setPreferredW(Math.min(CN.getDisplayWidth() * 4 / 5, Ui.mm(90)));
         front.add(BorderLayout.WEST, left);
         f.revalidate();
     }
@@ -148,7 +148,7 @@ public final class LoadoutForm {
         Container c = new Container(new BorderLayout());
         c.setUIID("LoadoutStat");
         Label l = new Label(name, "LoadoutStatName");
-        l.setPreferredW(CN.convertToPixels(18));
+        l.setPreferredW(Ui.mm(18));
         c.add(BorderLayout.WEST, l);
         c.add(BorderLayout.CENTER, Ui.bar(value, Math.max(1, max), 0xf2b632));
         return c;

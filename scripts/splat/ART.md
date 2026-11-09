@@ -10,7 +10,8 @@ engine's sky shader, set with `Environment.setSky`).
 |---|---|---|---|
 | Operators (`model_op-*.glb`) | Ultimate Modular Men | Quaternius (quaternius.com) | CC0 1.0 |
 | Cover and yard props | Toon Shooter Game Kit | Quaternius (quaternius.com) | CC0 1.0 |
-| Markers (`model_mk-*.glb`) | Blaster Kit 2.1 | Kenney (kenney.nl) | CC0 1.0 |
+| Markers (`model_mk-semi`, `-pump`, `-ramp`) | Toon Shooter Game Kit (SMG, Shotgun, AK) | Quaternius (quaternius.com) | CC0 1.0 |
+| Scope, hopper and grenade (`model_mk-scope`, `-hopper`, `-grenade`) | Blaster Kit 2.1 | Kenney (kenney.nl) | CC0 1.0 |
 | Small props (crates, barrels, tents) | Survival Kit | Kenney (kenney.nl) | CC0 1.0 |
 | Trees, bushes, grass and rocks | Ultimate Nature | Quaternius (quaternius.com) | CC0 1.0 |
 | Photo-scanned props: covered car, concrete barriers, sofa, barrel, street lamp, cardboard boxes | covered_car, concrete_road_barrier(_02), sofa_02, barrel_03, street_lamp_01, cardboard_box_01 | Poly Haven (polyhaven.com) | CC0 1.0 |
