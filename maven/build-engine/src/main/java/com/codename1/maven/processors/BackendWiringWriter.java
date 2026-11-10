@@ -103,6 +103,16 @@ final class BackendWiringWriter {
         webSockets(sb, sockets);
         started(sb);
         sb.append("    public void stopping() {\n");
+        if (model.hasListeners()) {
+            // Listeners first: a message being handled may still need the
+            // beans, and nothing new should start while the server winds down.
+            sb.append("        java.util.List cn1Subscriptions;\n");
+            sb.append("        synchronized (this) {\n            cn1Subscriptions = subscriptions;\n")
+              .append("            subscriptions = new java.util.ArrayList();\n        }\n");
+            sb.append("        for (int i = cn1Subscriptions.size() - 1; i >= 0; i--) {\n")
+              .append("            ((com.codename1.backend.messaging.Subscription) "
+                      + "cn1Subscriptions.get(i)).close();\n        }\n");
+        }
         sb.append("        if (scheduler != null) {\n            scheduler.stop(0);\n        }\n");
         sb.append("    }\n\n");
         stopped(sb);
@@ -141,6 +151,9 @@ final class BackendWiringWriter {
         sb.append("    private com.codename1.backend.orm.EntityManager entities;\n");
         sb.append("    private com.codename1.impl.backend.TransactionSession transactionSession;\n");
         sb.append("    private com.codename1.impl.backend.Scheduler scheduler;\n");
+        if (model.hasListeners()) {
+            sb.append("    private java.util.List subscriptions = new java.util.ArrayList();\n");
+        }
         for (Map.Entry<String, String> r : model.repositories.entrySet()) {
             sb.append("    private ").append(r.getKey().replace('/', '.').replace('$', '.'))
               .append(' ').append(r.getValue()).append(";\n");
@@ -207,6 +220,20 @@ final class BackendWiringWriter {
         sb.append("        }\n");
         sb.append("        config = environment.getConfig();\n");
         sb.append("        dataSource = environment.getDataSource();\n");
+        if (model.usesMessaging()) {
+            // Before any bean is built: one may send from its constructor, and
+            // the transport it opens queues in -- or keeps its outbox in -- this.
+            sb.append("        com.codename1.backend.messaging.Messaging.bindDataSource(dataSource);\n");
+            // The brokers the configuration names, and no others: a protocol
+            // nothing registers is a class nothing references, and the native
+            // build leaves it out.
+            for (String t : model.transports()) {
+                int space = t.indexOf(' ');
+                sb.append("        com.codename1.backend.messaging.Messaging.register(")
+                  .append(BackendSources.quote(t.substring(0, space))).append(", new ")
+                  .append(t.substring(space + 1)).append("());\n");
+            }
+        }
         sb.append("        entities = environment.getEntityManager();\n");
         if (model.needsSession) {
             sb.append("        transactionSession = new com.codename1.impl.backend."
@@ -580,6 +607,9 @@ final class BackendWiringWriter {
             if ("session".equals(p.builtin)) {
                 return "transactionSession";
             }
+            if ("messageTemplate".equals(p.builtin)) {
+                return "new com.codename1.backend.messaging.MessageTemplate()";
+            }
             if ("keyValue".equals(p.builtin)) {
                 // The server's own store, opened on first use and closed when
                 // the server stops.
@@ -827,6 +857,9 @@ final class BackendWiringWriter {
             }
             sb.append("        scheduler.start();\n");
         }
+        if (model.hasListeners()) {
+            listeners(sb);
+        }
         // Then the runners, by @Order, and the ready listeners after them,
         // as Spring Boot runs them once the context is up.
         List<BackendBeans.Bean> ordered = new ArrayList<BackendBeans.Bean>(model.beans);
@@ -871,6 +904,67 @@ final class BackendWiringWriter {
             sb.append("        }\n");
         }
         sb.append("    }\n\n");
+    }
+
+    /// Subscribes every message listener, after the scheduler and before the
+    /// runners: a runner may send a message a listener is waiting for.
+    private void listeners(StringBuilder sb) {
+        sb.append("        final com.codename1.backend.messaging.MessageTransport cn1Transport = "
+                + "com.codename1.backend.messaging.Messaging.current();\n");
+        int index = 0;
+        for (BackendBeans.Bean b : model.beans) {
+            if (b.listeners.isEmpty()) {
+                continue;
+            }
+            String var = "consumer" + index++;
+            sb.append("        final ").append(typeOf(b)).append(' ').append(var).append(" = ")
+              .append(reference(b)).append(";\n");
+            sb.append("        if (").append(var).append(" != null) {\n");
+            for (BackendBeans.Listener l : b.listeners) {
+                for (String destination : l.destinations) {
+                    listener(sb, l, destination, var);
+                }
+            }
+            sb.append("        }\n");
+        }
+    }
+
+    private void listener(StringBuilder sb, BackendBeans.Listener l, String destination,
+                          String target) {
+        String where = BackendSources.quote(l.where);
+        sb.append("            {\n                com.codename1.backend.messaging.Subscription s = "
+                + "cn1Transport.subscribe(\n                        "
+                + "com.codename1.impl.backend.Wiring.value(config, ")
+          .append(BackendSources.quote(destination)).append(", ").append(where).append("),\n")
+          .append("                        com.codename1.backend.messaging.Messaging.group(config, "
+                  + "com.codename1.impl.backend.Wiring.value(config, ")
+          .append(BackendSources.quote(l.group)).append(", ").append(where).append(")), ")
+          .append(l.concurrency).append(",\n")
+          .append("                        new com.codename1.backend.messaging.MessageHandler() {\n")
+          .append("                    public void handle(com.codename1.backend.messaging.Message "
+                  + "cn1Message) throws Exception {\n");
+        String call = target + "." + callName(l.method) + "(";
+        String in = "                        ";
+        if ("message".equals(l.kind)) {
+            sb.append(in).append(call).append("cn1Message);\n");
+        } else if ("string".equals(l.kind)) {
+            sb.append(in).append(call).append("cn1Message.getText());\n");
+        } else if ("bytes".equals(l.kind)) {
+            sb.append(in).append(call).append("cn1Message.getPayload());\n");
+        } else {
+            String type = BackendJsonCodecs.source(l.type);
+            sb.append(in).append("Object j = com.codename1.backend.Json.parse("
+                    + "cn1Message.getText());\n");
+            sb.append(in).append(type).append(" target = ")
+              .append(BackendSources.defaultValue(type)).append(";\n");
+            for (String line : l.read.split("\n")) {
+                sb.append(in).append(line).append('\n');
+            }
+            sb.append(in).append(call).append("target);\n");
+        }
+        sb.append("                    }\n                });\n");
+        sb.append("                synchronized (this) {\n                    subscriptions.add(s);\n"
+                + "                }\n            }\n");
     }
 
     private void job(StringBuilder sb, BackendBeans.Job job, String target) {

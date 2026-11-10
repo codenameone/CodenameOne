@@ -290,4 +290,9 @@ public abstract class BackendAccess {
 
     /// The calling thread's server's configuration, or null outside any server.
     public abstract Config currentConfig();
+
+    /// `work`, made to run as part of the calling thread's server on whatever
+    /// thread later runs it -- a messaging consumer's own thread -- so its
+    /// resources, beans and configuration are that server's.
+    public abstract Runnable inServer(Runnable work);
 }

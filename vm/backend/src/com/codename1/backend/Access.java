@@ -366,4 +366,9 @@ final class Access extends BackendAccess {
     public Config currentConfig() {
         return Tasks.currentConfig();
     }
+
+    @Override
+    public Runnable inServer(Runnable work) {
+        return Tasks.inServer(work);
+    }
 }

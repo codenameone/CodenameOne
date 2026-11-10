@@ -44,6 +44,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.URL;
+import java.nio.file.Files;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1597,6 +1598,116 @@ public class BackendBeansTest {
                     http("GET", port, "/run"));
         } finally {
             backend.stop();
+        }
+    }
+
+    /// Listeners under all four annotation names, a retried message, a dead
+    /// letter and a send that rolls back, over `memory:` and `db:` -- the
+    /// database a SQLite file, or `CN1_TEST_DB_URL` (PostgreSQL, MySQL) when set.
+    @Test
+    public void messageListenersReceiveRetryAndDeadLetter() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Order", PKG + "public class Order {\n"
+                + "    public long id;\n"
+                + "    public String name;\n"
+                + "}\n");
+        s.put("com.example.Inbox", PKG + "@Component public class Inbox {\n"
+                + "    public final Map<String, String> got = new ConcurrentHashMap<String, String>();\n"
+                + "    public final AtomicInteger flaky = new AtomicInteger();\n"
+                + "    @MessageListener(value = \"orders\", concurrency = 2)\n"
+                + "    public void order(Order o) { got.put(\"order\", o.id + o.name); }\n"
+                + "    @KafkaListener(topics = \"raw\", groupId = \"g\")\n"
+                + "    public void raw(String text) { got.put(\"raw\", text); }\n"
+                + "    @RabbitListener(queues = \"${q.name}\", concurrency = \"1-3\")\n"
+                + "    public void flaky(com.codename1.backend.messaging.Message m) {\n"
+                + "        if (flaky.incrementAndGet() < 3) throw new IllegalStateException(\"again\");\n"
+                + "        got.put(\"flaky\", String.valueOf(m.getAttempt()));\n"
+                + "    }\n"
+                + "    @JmsListener(destination = \"poison\")\n"
+                + "    public void poison(byte[] b) { throw new IllegalArgumentException(\"boom\"); }\n"
+                + "    @MessageListener(\"poison.dlq\")\n"
+                + "    public void dead(com.codename1.backend.messaging.Message m) {\n"
+                + "        got.put(\"dead\", m.getHeader(\"cn1-origin\") + \":\"\n"
+                + "                + m.getHeader(\"cn1-error\").substring(m.getHeader(\"cn1-error\").indexOf(':') + 2));\n"
+                + "    }\n"
+                + "    @MessageListener(\"tx\")\n"
+                + "    public void tx(String text) { String was = got.get(\"tx\"); got.put(\"tx\", was == null ? text : was + text); }\n"
+                + "}\n");
+        s.put("com.example.Sender", PKG + "@Component public class Sender {\n"
+                + "    private final com.codename1.backend.messaging.MessageTemplate t;\n"
+                + "    public Sender(com.codename1.backend.messaging.MessageTemplate t) { this.t = t; }\n"
+                + "    @Transactional public void ok() throws Exception { t.send(\"tx\", \"c1\"); }\n"
+                + "    @Transactional public void bad() throws Exception {\n"
+                + "        t.send(\"tx\", \"r1\");\n"
+                + "        throw new IllegalStateException(\"no\");\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Inbox in; private final Sender sender;\n"
+                + "    private final com.codename1.backend.messaging.MessageTemplate t;\n"
+                + "    public Api(Inbox in, Sender sender, com.codename1.backend.messaging.MessageTemplate t) {\n"
+                + "        this.in = in; this.sender = sender; this.t = t;\n"
+                + "    }\n"
+                + "    private Order order() { Order o = new Order(); o.id = 7; o.name = \"x\"; return o; }\n"
+                + "    @GetMapping(\"/run\") public String run() throws Exception {\n"
+                + "        t.send(\"orders\", order());\n"
+                + "        t.send(\"raw\", \"hello\");\n"
+                + "        t.send(\"flaky\", \"f\");\n"
+                + "        t.send(\"poison\", new byte[] {1});\n"
+                + "        sender.ok();\n"
+                + "        try { sender.bad(); } catch (IllegalStateException expected) { }\n"
+                + "        long end = System.currentTimeMillis() + 20000;\n"
+                + "        while (in.got.size() < 5 && System.currentTimeMillis() < end) Thread.sleep(20);\n"
+                + "        Thread.sleep(300);\n"
+                + "        return in.got.get(\"order\") + \" \" + in.got.get(\"raw\") + \" \"\n"
+                + "            + in.got.get(\"flaky\") + \" \" + in.got.get(\"dead\") + \" \" + in.got.get(\"tx\")\n"
+                + "            + \" \" + t.getClass().getSimpleName();\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        List<String[]> runs = new ArrayList<String[]>();
+        File dir = Files.createTempDirectory("cn1-msg").toFile();
+        runs.add(new String[] {"memory:", new File(dir, "a.db").getAbsolutePath()});
+        runs.add(new String[] {"db:", new File(dir, "b.db").getAbsolutePath()});
+        String external = System.getenv("CN1_TEST_DB_URL");
+        if (external != null && external.length() > 0) {
+            runs.add(new String[] {"db:", external});
+        }
+        // The ORM's entity registries are process wide, and a server creates every
+        // registered table: entities an earlier test in this JVM registered
+        // (SQLite collations among them) would be created here too.
+        clearRegistry(com.codename1.impl.orm.Models.class);
+        clearRegistry(com.codename1.backend.orm.EntityManager.class);
+        for (String[] run : runs) {
+            int port = freePort();
+            URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                    getClass().getClassLoader());
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+            settings.setProperty("cn1.messaging.url", run[0]);
+            settings.setProperty(Config.DATASOURCE_URL, run[1]);
+            settings.setProperty("q.name", "flaky");
+            // The generated entry point installs the codecs; this test starts the
+            // wiring directly, so it does what that line does.
+            com.codename1.impl.backend.JsonCodec.install((com.codename1.impl.backend.JsonCodec.Registry)
+                    loader.loadClass("cn1app.JsonCodecs").newInstance());
+            settings.setProperty("cn1.messaging.retry.backoff", "50");
+            settings.setProperty("cn1.messaging.db.poll", "50");
+            Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(),
+                    (BackendApplication) loader.loadClass("com.example.BackendWiring")
+                            .newInstance()).start();
+            try {
+                if (run[1].indexOf("://") > 0) {
+                    backend.getDataSource().execute("DELETE FROM cn1_messages", new Object[0]);
+                }
+                assertEquals(run[0] + " " + run[1], "7x hello 3 poison:boom c1 MessageTemplate",
+                        http("GET", port, "/run"));
+            } finally {
+                backend.stop();
+                com.codename1.impl.backend.JsonCodec.install(null);
+            }
         }
     }
 
@@ -3847,6 +3958,14 @@ public class BackendBeansTest {
     private static List<File> backendClasspath() throws Exception {
         URL url = HttpServer.class.getProtectionDomain().getCodeSource().getLocation();
         return Arrays.asList(new File(url.toURI()));
+    }
+
+    private static void clearRegistry(Class<?> owner) throws Exception {
+        java.lang.reflect.Field registry = owner.getDeclaredField("REGISTRY");
+        registry.setAccessible(true);
+        synchronized (owner) {
+            ((Map<?, ?>) registry.get(null)).clear();
+        }
     }
 
     private static int freePort() throws Exception {

@@ -153,6 +153,22 @@ public final class Tasks {
         return previous;
     }
 
+    /// `work`, run under the calling thread's registry whatever thread runs it.
+    static Runnable inServer(final Runnable work) {
+        final Registry registry = current();
+        return new Runnable() {
+            @Override
+            public void run() {
+                Object previous = enter(registry);
+                try {
+                    work.run();
+                } finally {
+                    leave(previous);
+                }
+            }
+        };
+    }
+
     /// The calling thread's registry as it is, for restoring later; may be null.
     static Object peek() {
         return CURRENT.get();

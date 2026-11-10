@@ -3971,6 +3971,21 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return null;
     }
 
+    /// Every value `key` has across the module's `application.properties` and
+    /// its `application-<profile>.properties` files: one profile may name a
+    /// different broker than another, and the build must include each.
+    static List<String> applicationPropertyValues(ProcessorContext ctx, String key) {
+        List<String> out = new ArrayList<String>();
+        for (File f : applicationPropertyFiles(ctx)) {
+            java.util.Properties props = loadProperties(ctx, f);
+            String v = props == null ? null : props.getProperty(key);
+            if (v != null && !out.contains(v.trim())) {
+                out.add(v.trim());
+            }
+        }
+        return out;
+    }
+
     /// The module's base `application.properties`, loaded, or null when it has
     /// none or it can't be read.
     static java.util.Properties baseApplicationProperties(ProcessorContext ctx) {

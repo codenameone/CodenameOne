@@ -236,7 +236,7 @@ final class BackendSources {
         sb.append("        return result;\n");
     }
 
-    private static String defaultValue(String type) {
+    static String defaultValue(String type) {
         if ("boolean".equals(type)) {
             return "false";
         }

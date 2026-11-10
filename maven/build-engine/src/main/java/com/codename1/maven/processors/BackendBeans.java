@@ -97,6 +97,15 @@ final class BackendBeans {
     static final String MANAGED_OPERATION = PKG + "ManagedOperation;";
     static final String TIMED = PKG + "Timed;";
     static final String COUNTED = PKG + "Counted;";
+    static final String MESSAGE_LISTENER = PKG + "MessageListener;";
+    static final String KAFKA_LISTENER = PKG + "KafkaListener;";
+    static final String RABBIT_LISTENER = PKG + "RabbitListener;";
+    static final String JMS_LISTENER = PKG + "JmsListener;";
+    /// Every listener annotation: ours first, then Spring's names for it.
+    static final String[] LISTENERS = {MESSAGE_LISTENER, KAFKA_LISTENER, RABBIT_LISTENER,
+        JMS_LISTENER};
+    static final String MESSAGE_TEMPLATE_TYPE = "com/codename1/backend/messaging/MessageTemplate";
+    static final String MESSAGE_TYPE = "com/codename1/backend/messaging/Message";
     static final String CACHEABLE = PKG + "Cacheable;";
     static final String CACHE_PUT = PKG + "CachePut;";
     static final String CACHE_EVICT = PKG + "CacheEvict;";
@@ -134,7 +143,8 @@ final class BackendBeans {
                     PROFILE, ON_PROPERTY, ON_EXPRESSION, ON_MISSING,
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
-                    CACHEABLE, CACHE_PUT, CACHE_EVICT, ENABLE_CACHING, MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
+                    CACHEABLE, CACHE_PUT, CACHE_EVICT, ENABLE_CACHING, MESSAGE_LISTENER, KAFKA_LISTENER,
+                    RABBIT_LISTENER, JMS_LISTENER, MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
                     ROLES_ALLOWED, PERMIT_ALL, DENY_ALL,
                     BackendExceptionHandlers.CONTROLLER_ADVICE,
                     BackendExceptionHandlers.REST_CONTROLLER_ADVICE)));
@@ -265,6 +275,28 @@ final class BackendBeans {
         }
     }
 
+    /// One `@MessageListener` method (or one under a Spring name).
+    static final class Listener {
+        final MethodInfo method;
+        /// Destinations, each possibly a `${setting}`.
+        final List<String> destinations = new ArrayList<String>();
+        String group = "";
+        int concurrency = 1;
+        /// How the payload reaches the method: `message`, `string`, `bytes`
+        /// or `json`.
+        String kind;
+        /// The parameter's Java type, for `json`.
+        String type;
+        /// The codec statements filling `target` from the tree `j`, for `json`.
+        String read;
+        /// Where it is, for messages.
+        String where;
+
+        Listener(MethodInfo method) {
+            this.method = method;
+        }
+    }
+
     /// One `@McpTool` method.
     static final class Tool {
         final MethodInfo method;
@@ -353,6 +385,7 @@ final class BackendBeans {
         boolean controller;
         boolean webSocket;
         final List<Job> jobs = new ArrayList<Job>();
+        final List<Listener> listeners = new ArrayList<Listener>();
         /// `@EventListener` methods, each taking the ready event or nothing.
         final List<MethodInfo> readyListeners = new ArrayList<MethodInfo>();
         final List<Tool> tools = new ArrayList<Tool>();
@@ -482,6 +515,8 @@ final class BackendBeans {
     /// Eager singletons (and the prototypes they need) in construction order.
     final List<Bean> order = new ArrayList<Bean>();
     boolean needsDatabase;
+    /// Whether a bean injects the MessageTemplate.
+    boolean usesMessageTemplate;
     boolean needsEntities;
     boolean needsSession;
     /// The `@Repository` interfaces injected anywhere, by internal name, each
@@ -639,6 +674,7 @@ final class BackendBeans {
                         || m.getAnnotation(TIMED) != null || m.getAnnotation(COUNTED) != null
                         || caching(m) != null
                         || m.getAnnotation(SCHEDULED) != null
+                        || listenerAnnotation(m) != null
                         || methodSecurity(m.getAnnotations(), null, null) != null) {
                     ctx.error(cls, "@TestConfiguration " + cls.getSourceName() + "."
                             + m.getName() + " carries an annotation the build weaves; a test "
@@ -757,6 +793,26 @@ final class BackendBeans {
             }
         }
         return false;
+    }
+
+    boolean hasListeners() {
+        for (Bean b : beans) {
+            if (!b.listeners.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether anything sends or receives messages, so the server's data source
+    /// must be given to the messaging transport before any bean is built.
+    boolean usesMessaging() {
+        return usesMessageTemplate || hasListeners();
+    }
+
+    /// [#messagingTransports] of this module.
+    List<String> transports() {
+        return messagingTransports(ctx);
     }
 
     boolean hasManaged() {
@@ -1730,6 +1786,13 @@ final class BackendBeans {
                     bean.readyListeners.add(m);
                 }
             }
+            AnnotationValues l = listenerAnnotation(m);
+            if (l != null) {
+                Listener listener = listener(cls, m, l);
+                if (listener != null) {
+                    bean.listeners.add(listener);
+                }
+            }
             AnnotationValues s = m.getAnnotation(SCHEDULED);
             if (s == null) {
                 continue;
@@ -1812,6 +1875,168 @@ final class BackendBeans {
                 needsDatabase = true;
             }
             bean.jobs.add(job);
+        }
+    }
+
+    /// The broker transports the module's configuration names, as the factory
+    /// classes the wiring registers: only those are compiled into the
+    /// application. A URL the build cannot read -- a `${...}` -- includes
+    /// every one, since any could be meant.
+    static List<String> messagingTransports(ProcessorContext ctx) {
+        Set<String> schemes = new LinkedHashSet<String>();
+        for (String url : RestControllerAnnotationProcessor.applicationPropertyValues(ctx,
+                "cn1.messaging.url")) {
+            if (url.indexOf("${") >= 0) {
+                schemes.addAll(TRANSPORTS.keySet());
+                continue;
+            }
+            int colon = url.indexOf(':');
+            String scheme = colon < 0 ? url : url.substring(0, colon);
+            if (!TRANSPORTS.containsKey(scheme) && scheme.endsWith("s")) {
+                scheme = scheme.substring(0, scheme.length() - 1);
+            }
+            schemes.add(scheme);
+        }
+        if (RestControllerAnnotationProcessor.applicationPropertyKnown(ctx, "spring.rabbitmq.host")
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                "spring.rabbitmq.addresses")) {
+            schemes.add("amqp");
+        }
+        if (RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                "spring.kafka.bootstrap-servers")) {
+            schemes.add("kafka");
+        }
+        List<String> out = new ArrayList<String>();
+        for (String scheme : schemes) {
+            String factory = TRANSPORTS.get(scheme);
+            if (factory != null) {
+                out.add(scheme + " " + factory);
+            }
+        }
+        return out;
+    }
+
+    /// The broker transports by scheme. `memory:` and `db:` are part of the
+    /// messaging package itself.
+    static final Map<String, String> TRANSPORTS = new LinkedHashMap<String, String>();
+
+    static {
+        TRANSPORTS.put("redis",
+                "com.codename1.backend.messaging.redis.RedisStreamTransport.Factory");
+    }
+
+    /// The listener annotation on `m`, under any of its names, or null.
+    static AnnotationValues listenerAnnotation(MethodInfo m) {
+        for (String d : LISTENERS) {
+            AnnotationValues a = m.getAnnotation(d);
+            if (a != null) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    /// The listener `a` declares on `m`, or null after reporting why it cannot be one.
+    private Listener listener(AnnotatedClass cls, MethodInfo m, AnnotationValues a) {
+        String d = a.getDescriptor();
+        String shown = "@" + d.substring(d.lastIndexOf('/') + 1, d.length() - 1);
+        String where = cls.getSourceName() + "." + m.getName();
+        Listener l = new Listener(m);
+        l.where = shown + " " + where;
+        String concurrency;
+        if (MESSAGE_LISTENER.equals(d)) {
+            addAll(l.destinations, a.get("value"));
+            addAll(l.destinations, a.get("destinations"));
+            l.group = a.getStringOrDefault("group", "");
+            Object c = a.get("concurrency");
+            concurrency = c == null ? "1" : String.valueOf(c);
+        } else if (KAFKA_LISTENER.equals(d)) {
+            addAll(l.destinations, a.get("topics"));
+            l.group = a.getStringOrDefault("groupId", "");
+            concurrency = a.getStringOrDefault("concurrency", "");
+        } else if (RABBIT_LISTENER.equals(d)) {
+            addAll(l.destinations, a.get("queues"));
+            concurrency = a.getStringOrDefault("concurrency", "");
+        } else {
+            String one = a.getStringOrDefault("destination", "");
+            if (one.trim().length() > 0) {
+                l.destinations.add(one.trim());
+            }
+            concurrency = a.getStringOrDefault("concurrency", "");
+        }
+        if (l.destinations.isEmpty()) {
+            ctx.error(cls, shown + " on " + where + " names no destination.");
+            return null;
+        }
+        String c = concurrency.trim();
+        int dash = c.indexOf('-');
+        if (dash >= 0) {
+            // Spring's "min-max": the consumers here are a fixed number, so the
+            // most it would ever run.
+            c = c.substring(dash + 1).trim();
+        }
+        try {
+            l.concurrency = c.length() == 0 ? 1 : Integer.parseInt(c);
+        } catch (NumberFormatException err) {
+            l.concurrency = -1;
+        }
+        if (l.concurrency < 1 || l.concurrency > 256) {
+            ctx.error(cls, shown + " on " + where + " asks for concurrency \"" + concurrency
+                    + "\"; give a number of consumer threads from 1 to 256.");
+            return null;
+        }
+        Type[] args = Type.getArgumentTypes(m.getDescriptor());
+        if (m.isStatic() || args.length != 1) {
+            ctx.error(cls, shown + " method " + where + " must be an instance method taking "
+                    + "one parameter: the payload, or the Message.");
+            return null;
+        }
+        if (wovenAsync(cls, m)) {
+            // The consumer would acknowledge the message as soon as the stub
+            // queued the work, so a failure could never redeliver it.
+            ctx.error(cls, shown + " method " + where + " is also @Async. A listener "
+                    + "already runs on a consumer thread, and its message is acknowledged "
+                    + "when it returns; drop @Async and raise concurrency instead.");
+            return null;
+        }
+        String desc = args[0].getDescriptor();
+        if (("L" + MESSAGE_TYPE + ";").equals(desc)) {
+            l.kind = "message";
+        } else if ("Ljava/lang/String;".equals(desc)) {
+            l.kind = "string";
+        } else if ("[B".equals(desc)) {
+            l.kind = "bytes";
+        } else {
+            String sig = m.getSignature();
+            String[] generic = sig == null ? null
+                    : RestClientAnnotationProcessor.parseGenericParameterSignatures(sig, 1);
+            String type = RestClientAnnotationProcessor.javaTypeFor(args[0],
+                    generic == null || generic.length != 1 ? null : generic[0]);
+            BackendJsonCodecs codecs = BackendJsonCodecs.of(ctx);
+            String why = codecs.checkRead(type);
+            if (why != null) {
+                ctx.error(cls, shown + " method " + where + " takes " + type + ", which a "
+                        + "message cannot be read into as JSON: it holds " + why + ".");
+                return null;
+            }
+            l.kind = "json";
+            l.type = type;
+            l.read = codecs.readStatements(type, "j",
+                    "com.codename1.impl.backend.JsonCodec.Path.ROOT", "null", "-1", "0",
+                    "target", "");
+        }
+        return l;
+    }
+
+    private static void addAll(List<String> into, Object values) {
+        if (values instanceof List) {
+            for (Object v : (List) values) {
+                if (v != null && String.valueOf(v).trim().length() > 0) {
+                    into.add(String.valueOf(v).trim());
+                }
+            }
+        } else if (values instanceof String && ((String) values).trim().length() > 0) {
+            into.add(((String) values).trim());
         }
     }
 
@@ -2239,6 +2464,11 @@ final class BackendBeans {
                         + b.scope + "-scoped; an endpoint serves many connections for the "
                         + "life of the server, so it must be a singleton.");
             }
+            if (!b.listeners.isEmpty() && !SINGLETON.equals(b.scope)) {
+                ctx.error(b.cls, b.describe() + " has message listeners but is " + b.scope
+                        + "-scoped; a listener receives messages for the life of the server, "
+                        + "outside any request, so its bean must be a singleton.");
+            }
             if (!b.jobs.isEmpty() && (REQUEST.equals(b.scope) || SESSION.equals(b.scope))) {
                 ctx.error(b.cls, b.describe() + " has @Scheduled methods but is " + b.scope
                         + "-scoped; a job runs outside any request.");
@@ -2273,6 +2503,7 @@ final class BackendBeans {
             boolean async = hasAsync(b);
             String role = b.webSocket ? "Websocket endpoint"
                     : !b.jobs.isEmpty() ? "Bean with @Scheduled methods"
+                    : !b.listeners.isEmpty() ? "Bean with message listeners"
                     : b.managed != null ? "@ManagedResource bean"
                     : async ? "Bean with @Async methods" : null;
             if (role == null || b.cls == null) {
@@ -2289,6 +2520,7 @@ final class BackendBeans {
             }
             String outside = b.webSocket ? "A websocket callback runs"
                     : !b.jobs.isEmpty() ? "A scheduled job runs"
+                    : !b.listeners.isEmpty() ? "A message listener runs"
                     : b.managed != null ? "A managed attribute is read"
                     : "An @Async call runs on an executor, even one a request made,";
             ctx.getLog().warn("cn1: " + role + " " + b.describe() + " reaches " + d.describe()
@@ -2370,6 +2602,11 @@ final class BackendBeans {
         }
         if (KEY_VALUE_TYPE.equals(type)) {
             p.builtin = "keyValue";
+            return;
+        }
+        if (MESSAGE_TEMPLATE_TYPE.equals(type)) {
+            p.builtin = "messageTemplate";
+            usesMessageTemplate = true;
             return;
         }
         if (DATASOURCE_TYPE.equals(type)) {
@@ -3625,6 +3862,9 @@ final class BackendBeans {
             for (Tool t : b.tools) {
                 toolCodecs |= t.returnType != null || t.paramTypes.size()
                         > Collections.frequency(t.paramTypes, null);
+            }
+            for (Listener l : b.listeners) {
+                toolCodecs |= l.type != null;
             }
             if (b.managed != null) {
                 toolCodecs |= b.managed.operationWrites.size()
