@@ -58,6 +58,7 @@ final class SimulatorMcpTools {
 
     static void register(JavaSEPort port, MCPServer server) {
         new SimulatorMcpTools(port).addAll(server);
+        SimulatorStyleTools.register(server);
     }
 
     private void addAll(MCPServer server) {
