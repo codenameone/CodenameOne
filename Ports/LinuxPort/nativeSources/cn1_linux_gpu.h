@@ -103,10 +103,13 @@ int cn1GpuCursor(int show, int px, int py);
  * puts the console's CRTC back. */
 void cn1GpuShutdown(void);
 
-/* cn1GpuShutdown for the atexit path: hides the cursor plane and waits out a
- * pending flip, but releases nothing, because another thread may still be
- * drawing with the context. */
+/* cn1GpuShutdown for the atexit path: hides the cursor plane and releases
+ * nothing, because another thread may still be drawing with the context. */
 void cn1GpuShutdownAtExit(void);
+
+/* Nonzero once the process is exiting; the GPU stops page flipping then.
+ * Defined by the display unit, cn1_linux_embedded.c. */
+int cn1EmbeddedExiting(void);
 
 #ifdef __cplusplus
 }

@@ -80,6 +80,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -133,6 +134,17 @@ static int cn1Dpi = 0;
 static int cn1Initialized = 0;
 static int cn1HeadlessForced = 0;     /* enableHeadlessScreenshot was called */
 static volatile int cn1Running = 1;
+/* Set by the atexit hook before it puts the console's CRTC back. The EDT keeps
+ * running until the process ends and must not flip its own buffer back on top
+ * of the restored console; both present paths read this before a page flip.
+ * A flip the EDT already decided on can still land, so this narrows the
+ * window rather than closing it -- closing it would mean the exiting thread
+ * waiting on the EDT, which may be the thread that called exit. */
+static atomic_int cn1Exiting = 0;
+
+int cn1EmbeddedExiting(void) {
+    return atomic_load(&cn1Exiting);
+}
 static volatile int cn1CurrentModifiers = 0;
 static int cn1HasTouch = 0, cn1HasPointer = 0;
 
@@ -695,7 +707,7 @@ static void cn1Present(CN1EmbRect damage) {
         cn1DrawCursor(b, cn1CursorX, cn1CursorY);
     }
 #ifdef CN1_EMBEDDED_HAS_DRM
-    if (cn1Output == OUT_KMS) {
+    if (cn1Output == OUT_KMS && !cn1EmbeddedExiting()) {
         if (drmModePageFlip(cn1DrmFd, cn1DrmCrtc, b->fbId, DRM_MODE_PAGE_FLIP_EVENT, 0) == 0) {
             cn1FlipPending = 1;
             cn1Front = target;
@@ -1188,6 +1200,7 @@ static void cn1StartInput(void) {
 /* ------------------------------------------------------------- natives */
 
 static void cn1AtExit(void) {
+    atomic_store(&cn1Exiting, 1);
     cn1Running = 0;
     cn1RestoreScreen();
 }

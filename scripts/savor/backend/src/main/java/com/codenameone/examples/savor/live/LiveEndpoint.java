@@ -103,6 +103,15 @@ public class LiveEndpoint implements WebSocket {
         }
     }
 
+    @Override
+    public void onError(WebSocketSession session, Exception error) {
+        // A read failure, a protocol error or a callback that threw: the backend
+        // reports it here and then closes, and without this line the only trace
+        // of why a channel ended would be the 1006 that onClose prints.
+        System.err.println("[live] websocket " + session.getId() + " of "
+                + session.getAttachment() + " failed: " + error);
+    }
+
     /// The `ticket` parameter of a query string, or null. A ticket is hex, so
     /// there is nothing in it to decode.
     static String ticket(String query) {
