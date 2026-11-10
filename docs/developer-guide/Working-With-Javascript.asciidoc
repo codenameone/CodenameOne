@@ -346,7 +346,7 @@ To restore the names, save the profile from the *Performance* tab (the download 
 
 [source,bash]
 ----
-python3 deobfuscate-javascript-profile.py MyAppJavaScriptMain-js-symbols.txt Trace.json > Trace-named.json
+include::../demos/common/src/main/snippets/developer-guide/working-with-javascript.sh[tag=working-with-javascript-bash-001,indent=0]
 ----
 
 Load `Trace-named.json` back into the *Performance* tab. A few functions keep their full names in every build, such as constructors and static initializers, so a profile shows both forms. The same command works on a stack trace pasted into a text file. Use the map from the build you profiled: every build assigns the short names again, and the script warns when a name isn't in the map.
