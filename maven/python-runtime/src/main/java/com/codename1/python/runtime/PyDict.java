@@ -83,6 +83,17 @@ public class PyDict extends PyObject {
 
     /// The entry a slot from `find` names: without an index table the
     /// finders answer the entry itself.
+    /// The hash an index slot is taken from. A str's hash is Java's, whose
+    /// low bits are a poor mix (31 squared is 1 modulo 64, so in a table of
+    /// 64 slots a word's chars nearly cancel): words of one length collided
+    /// on most probes. A multiply carries every bit into the high ones, and
+    /// the fold brings them down to the slot bits. Hash values themselves,
+    /// which Python code sees, are unchanged.
+    static long spread(long h) {
+        long x = h * 0x9E3779B97F4A7C15L;
+        return x ^ (x >>> 29);
+    }
+
     private int entry(int s) {
         return index == null ? s : index[s];
     }
@@ -158,8 +169,9 @@ public class PyDict extends PyObject {
             return -1;
         }
         int mask = index.length - 1;
-        int i = (int) (h & mask);
-        long perturb = h & Long.MAX_VALUE;
+        long m = spread(h);
+        int i = (int) (m & mask);
+        long perturb = m & Long.MAX_VALUE;
         int freeSlot = -1;
         while (true) {
             int e = index[i];
@@ -189,8 +201,9 @@ public class PyDict extends PyObject {
             return scan(key, h);
         }
         int mask = index.length - 1;
-        int i = (int) (h & mask);
-        long perturb = h & Long.MAX_VALUE;
+        long m = spread(h);
+        int i = (int) (m & mask);
+        long perturb = m & Long.MAX_VALUE;
         int freeSlot = -1;
         while (true) {
             int e = index[i];
@@ -266,8 +279,9 @@ public class PyDict extends PyObject {
             return -1;
         }
         int mask = index.length - 1;
-        int i = (int) (h & mask);
-        long perturb = h & Long.MAX_VALUE;
+        long m = spread(h);
+        int i = (int) (m & mask);
+        long perturb = m & Long.MAX_VALUE;
         int freeSlot = -1;
         while (true) {
             int e = index[i];
@@ -418,8 +432,9 @@ public class PyDict extends PyObject {
                 continue;
             }
             long h = hashes[e];
-            int i = (int) (h & mask);
-            long perturb = h & Long.MAX_VALUE;
+            long m = spread(h);
+            int i = (int) (m & mask);
+            long perturb = m & Long.MAX_VALUE;
             while (index[i] != EMPTY) {
                 perturb >>>= 5;
                 i = (int) ((i * 5L + perturb + 1) & mask);
