@@ -95,7 +95,8 @@ public class JavaScriptBuilder extends Executor {
 
     /**
      * The artifacts the translator writes BESIDE the bundle: the deployment configuration the
-     * developer activates by hand, and the suspension report.
+     * developer activates by hand, the suspension report, and the symbol map that turns the
+     * minified function names in a browser profile or stack trace back into the translator's.
      *
      * <p>They are deliberately not in the bundle -- it is a web root, and the zip above unpacks
      * straight into one -- but that leaves them inside the build directory, which
@@ -127,7 +128,7 @@ public class JavaScriptBuilder extends Executor {
         }
         String prefix = distDir.getAbsoluteFile().getName() + "-";
         List<File> found = new ArrayList<File>();
-        String[] names = new String[] {"cn1-security", "suspension-report.txt"};
+        String[] names = new String[] {"cn1-security", "suspension-report.txt", "symbols.txt"};
         for (String name : names) {
             File f = new File(parent, prefix + name);
             if (f.exists()) {
