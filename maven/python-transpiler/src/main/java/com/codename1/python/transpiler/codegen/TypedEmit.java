@@ -2318,7 +2318,7 @@ final class TypedEmit {
             shadow.keySet().removeAll(vars.keySet());
         }
         forgetPaths();
-        return new E(r, Ty.DYN);
+        return new E(r, c.kind == Comp.Kind.LIST ? in.type(c, cur, sc) : Ty.DYN);
     }
 
     /// The loop over one `for` clause of a comprehension: the statement

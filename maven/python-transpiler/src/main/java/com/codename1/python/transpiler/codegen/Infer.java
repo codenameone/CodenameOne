@@ -1789,13 +1789,25 @@ final class Infer {
                     type(x, null, c.scope);
                 }
             }
-            if (c.elt != null) {
-                escape(type(c.elt, null, c.scope));
-            }
+            Ty elt = c.elt != null ? type(c.elt, null, c.scope) : Ty.DYN;
+            escape(elt);
             if (c.value != null) {
                 escape(type(c.value, null, c.scope));
             }
-            return Ty.DYN;
+            if (c.kind != Comp.Kind.LIST) {
+                return Ty.DYN;
+            }
+            // A list of the element type, its length unknown (unslotted).
+            int s = site(c);
+            if (unslotted.add(Integer.valueOf(s))) {
+                changed = true;
+            }
+            Ty j = joinInto(siteElem.get(s), elt);
+            if (!j.equals(siteElem.get(s))) {
+                siteElem.set(s, j);
+                changed = true;
+            }
+            return Ty.list(new int[] {s}, false);
         }
     }
 

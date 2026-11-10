@@ -54,3 +54,35 @@ c = make_counter(5)
 print(c(), c(), c())
 print(make_rec(6), make_late(4)(), list(make_gen(3)(4)))
 print(make_adder.__name__, adders[0].__qualname__)
+
+def bound_param(k):
+    def get():
+        return k
+    return get
+
+def rebound_param(k):
+    def get():
+        return k
+    del k
+    return get
+
+def nonlocal_param(k):
+    def setk():
+        nonlocal k
+        del k
+    def get():
+        return k
+    return setk, get
+
+print(bound_param(5)())
+try:
+    rebound_param(1)()
+except NameError as e:
+    print("NameError", "k" in str(e))
+s, g = nonlocal_param(2)
+print(g())
+s()
+try:
+    g()
+except NameError as e:
+    print("NameError", "k" in str(e))

@@ -466,6 +466,9 @@ public final class Emitter {
                 }
                 return "(" + localVar(sc, n) + " != null ? " + localVar(sc, n) + " : ul(" + javaString(n) + "))";
             case CELL:
+                if (boundCell(sc, n)) {
+                    return cellVar(sc, n) + "[0]";
+                }
                 return "l(" + cellVar(sc, n) + "[0], " + javaString(n) + ")";
             case FREE: {
                 String p = compParams == null ? null : compParams.get(n);
@@ -473,6 +476,9 @@ public final class Emitter {
                     return "l(" + p + ", " + javaString(n) + ")";
                 }
                 Scope o = sc.owner(n);
+                if (boundCell(o, n)) {
+                    return cellVar(o, n) + "[0]";
+                }
                 return "l(" + cellVar(o, n) + "[0], " + javaString(n) + ")";
             }
             case GLOBAL:
@@ -1879,6 +1885,24 @@ public final class Emitter {
         return function("<lambda>", l.args, l.scope, null, l.body);
     }
 
+    /// Whether cell `n` of `o` is bound for as long as anything can read
+    /// it: a parameter (bound on entry) that `o` never assigns or deletes and
+    /// no nested scope rebinds through `nonlocal`. Its reads skip the
+    /// unbound check.
+    private static boolean boundCell(Scope o, String n) {
+        return o != null && o.params.contains(n) && !o.assigned.contains(n) && !o.deleted.contains(n)
+                && !rebinds(o, o, n);
+    }
+
+    private static boolean rebinds(Scope s, Scope owner, String n) {
+        for (Scope c : s.children) {
+            if (c.nonlocals.contains(n) && c.owner(n) == owner || rebinds(c, owner, n)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Set by call() for a lambda it calls in place: function() then answers the
     /// bare body lambda, with no PyFunction around it.
     private boolean inlineCalled;
@@ -2131,10 +2155,14 @@ public final class Emitter {
             r.append(plist);
             r.append(") -> ").append(asStatic).append("(").append(alist).append("))");
         } else {
-            r.append(plist);
-            r.append(") -> {\n").append(pro).append(b);
+            // An anonymous class rather than a lambda: ParparVM makes a
+            // lambda a class whose run() only forwards to a synthetic
+            // method, so every call of the function paid two frames.
+            r.setLength(r.length() - 1);
+            r.append("new PyFunction.Body").append(direct ? String.valueOf(names.size()) : "")
+                    .append("() { public Object run(").append(plist).append(") {\n").append(pro).append(b);
             indent(r, ind - 1);
-            r.append("})");
+            r.append("}})");
         }
         if (bodyOnly) {
             // Without the PyFunction( this opened, its closing parenthesis goes too.
