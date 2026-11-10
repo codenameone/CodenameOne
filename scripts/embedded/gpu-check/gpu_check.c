@@ -53,6 +53,12 @@
 
 typedef void (*Scene)(cairo_t* cr, cairo_surface_t* image, cairo_surface_t* target);
 
+/* The display unit (cn1_linux_embedded.c) is not linked here; this harness
+ * never exits mid-frame. */
+int cn1EmbeddedExiting(void) {
+    return 0;
+}
+
 static void fills(cairo_t* cr, cairo_surface_t* image, cairo_surface_t* target) {
     (void) target;
     (void) image;
