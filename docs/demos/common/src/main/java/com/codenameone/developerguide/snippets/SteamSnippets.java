@@ -28,24 +28,22 @@ import com.codename1.gaming.Gamepads;
 
 /** Compiled source snippets for the Steam guide chapter. */
 public class SteamSnippets {
-    private float stickX;
-
     /** Reads the first controller once per frame. */
     public void readPad() {
         // tag::steam-java-001[]
         Gamepad pad = Gamepads.getGamepad(0);
         if (pad != null && pad.isConnected()) {
             float x = pad.getAxis(Gamepad.AXIS_LEFT_X);   // -1..1, dead zone applied
-            if (pad.isButtonDown(Gamepad.BUTTON_A)) {
-                jump();
-            }
+            boolean jump = pad.isButtonDown(Gamepad.BUTTON_A);
+            System.out.println("stick " + x + ", jump " + jump);
         }
         // end::steam-java-001[]
     }
 
     /** Achievements, stats and a cloud save after a won match. */
-    public void recordWin(byte[] saveBytes) {
+    public void recordWin() {
         // tag::steam-java-002[]
+        byte[] saveBytes = "level=3".getBytes();
         if (GameServices.isAvailable()) {             // true on Steam
             GameServices.unlockAchievement("FIRST_WIN");
             GameServices.setStat("wins", GameServices.getStatInt("wins", 0) + 1);
@@ -53,9 +51,5 @@ public class SteamSnippets {
             GameServices.writeSave("slot1", saveBytes);
         }
         // end::steam-java-002[]
-    }
-
-    private void jump() {
-        stickX = 0;
     }
 }
