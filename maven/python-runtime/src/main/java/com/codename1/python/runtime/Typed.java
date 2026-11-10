@@ -748,6 +748,37 @@ public final class Typed {
         return j <= i ? "" : i == 0 && j == n ? s : s.substring(i, j);
     }
 
+    /// `s.encode(enc, errors)` on a str; a null encoding or handler is the
+    /// default. The result may share its array with the bytes `s` was
+    /// decoded from (see `Codecs.encodeShared`).
+    public static Object encode(String s, String enc, String errors) {
+        return new PyBytes(Codecs.encodeShared(s, enc == null ? "utf-8" : enc, errors == null ? "strict" : errors));
+    }
+
+    /// `b.decode(enc, errors)` on a value the transpiler typed as bytes; a
+    /// null encoding or handler is the default. Anything else (only a
+    /// rebinding the inference cannot see) takes the method call.
+    public static String decode(Object b, String enc, String errors) {
+        String e = enc == null ? "utf-8" : enc;
+        String h = errors == null ? "strict" : errors;
+        if (b instanceof PyBytes) {
+            return Codecs.decodeKeep(((PyBytes) b).value, e, h);
+        }
+        return Py.toStr(Py.callMethod(b, "decode", e, h));
+    }
+
+    /// `b[i]` on a value the transpiler typed as bytes: the byte as an int.
+    public static long bat(Object b, long i) {
+        if (b instanceof PyBytes) {
+            byte[] v = ((PyBytes) b).value;
+            long k = i < 0 ? i + v.length : i;
+            if (k >= 0 && k < v.length) {
+                return v[(int) k] & 0xff;
+            }
+        }
+        return toLong(Py.getitem(b, Long.valueOf(i)));
+    }
+
     /// `fmt % args` for a str format and a tuple of values.
     public static String format(String fmt, Object args) {
         Object r = Py.mod(fmt, args);

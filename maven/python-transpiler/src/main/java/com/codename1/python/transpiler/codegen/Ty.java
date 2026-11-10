@@ -38,6 +38,7 @@ import java.util.Arrays;
 /// | `FLOAT` | `double` | -- |
 /// | `INT` | `Object` (a `Long`, or a big int) | -- |
 /// | `STR` | `String` | null when `opt` |
+/// | `BYTES` | `Object` (a `PyBytes`) | -- |
 /// | `INST` | the class's layout class | null when `opt` |
 /// | `LIST` | `PyList` | null when `opt` |
 /// | `TUPLE` | `Object` (the generic tuple) | -- |
@@ -49,7 +50,7 @@ import java.util.Arrays;
 /// On ParparVM a `Long` below 2^60 is a tagged immediate, so keeping it
 /// boxed allocates nothing.
 final class Ty {
-    enum K { BOT, NONE, BOOL, INT, FLOAT, STR, INST, LIST, TUPLE, DICT, DYN }
+    enum K { BOT, NONE, BOOL, INT, FLOAT, STR, BYTES, INST, LIST, TUPLE, DICT, DYN }
 
     static final Ty BOT = new Ty(K.BOT, null, false, null);
     static final Ty NONE = new Ty(K.NONE, null, false, null);
@@ -57,6 +58,7 @@ final class Ty {
     static final Ty INT = new Ty(K.INT, null, false, null);
     static final Ty FLOAT = new Ty(K.FLOAT, null, false, null);
     static final Ty STR = new Ty(K.STR, null, false, null);
+    static final Ty BYTES = new Ty(K.BYTES, null, false, null);
     static final Ty DYN = new Ty(K.DYN, null, false, null);
 
     /// The list sites a `LIST` value may have come from (see `Infer`). Past
@@ -124,7 +126,7 @@ final class Ty {
     }
 
     boolean isObject() {
-        return k == K.BOT || k == K.NONE || k == K.DYN || k == K.INT || k == K.TUPLE || k == K.DICT;
+        return k == K.BOT || k == K.NONE || k == K.DYN || k == K.INT || k == K.BYTES || k == K.TUPLE || k == K.DICT;
     }
 
     static Ty join(Ty a, Ty b) {

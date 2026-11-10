@@ -1492,6 +1492,8 @@ final class Infer {
                             : Ty.FLOAT;
                 case STR:
                     return Ty.STR;
+                case BYTES:
+                    return Ty.BYTES;
                 default:
                     return Ty.DYN;
             }
@@ -1618,6 +1620,9 @@ final class Infer {
                     // bound raises).
                     return Ty.STR;
                 }
+                if (r.k == Ty.K.BYTES) {
+                    return Ty.BYTES;
+                }
                 escape(r);
                 return Ty.DYN;
             }
@@ -1635,6 +1640,10 @@ final class Infer {
                     ci = n + ci;
                 }
                 return ci >= 0 ? slot(r, ci) : tupleElem(r);
+            }
+            if (r.k == Ty.K.BYTES && (i.k == Ty.K.INT || i.k == Ty.K.BOOL)) {
+                // A byte is an int; a bad index raises.
+                return Ty.INT;
             }
             if (r.k == Ty.K.DICT) {
                 // A key that is not there raises: the read is of the values.
@@ -1953,6 +1962,11 @@ final class Infer {
         if (l.k == Ty.K.STR && r.k == Ty.K.STR && "+".equals(op)) {
             return Ty.STR;
         }
+        if ("*".equals(op) && (l.k == Ty.K.STR && (r.k == Ty.K.INT || r.k == Ty.K.BOOL)
+                || r.k == Ty.K.STR && (l.k == Ty.K.INT || l.k == Ty.K.BOOL))) {
+            // A str repeated is a str; a count too big for memory raises.
+            return Ty.STR;
+        }
         if (l.k == Ty.K.STR && "%".equals(op) && right instanceof TupleExpr) {
             // str % tuple formats, or raises: a tuple has no __rmod__.
             return Ty.STR;
@@ -2100,6 +2114,9 @@ final class Infer {
                     changed = true;
                 }
                 return Ty.list(new int[] {s}, false);
+            }
+            if (codecCall(r, a.attr, args, c)) {
+                return "encode".equals(a.attr) ? Ty.BYTES : Ty.STR;
             }
             if (r.k == Ty.K.STR && !r.opt && c.keywords.isEmpty() && !hasStarred(c.args)) {
                 Ty t = strMethod(a.attr, args);
@@ -2257,6 +2274,21 @@ final class Infer {
             }
         }
         return false;
+    }
+
+    /// `s.encode(...)` on a str or `b.decode(...)` on a bytes, with up to
+    /// two str arguments (the encoding and the error handler), positional:
+    /// TypedEmit calls the codec directly (see its `codecCall`).
+    static boolean codecCall(Ty r, String m, List<Ty> args, Call c) {
+        if (r.opt || !c.keywords.isEmpty() || hasStarred(c.args) || args.size() > 2) {
+            return false;
+        }
+        for (Ty t : args) {
+            if (t.k != Ty.K.STR || t.opt) {
+                return false;
+            }
+        }
+        return r.k == Ty.K.STR && "encode".equals(m) || r.k == Ty.K.BYTES && "decode".equals(m);
     }
 
     /// `s.split()` or `s.split(sep)` with a str separator.

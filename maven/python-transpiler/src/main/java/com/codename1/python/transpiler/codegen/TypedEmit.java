@@ -3684,6 +3684,8 @@ final class TypedEmit {
                 }
                 case STR:
                     return new E(em.constant(c), Ty.STR);
+                case BYTES:
+                    return new E(em.constant(c), Ty.BYTES);
                 default:
                     throw new Unsupported("constant");
             }
@@ -3854,9 +3856,10 @@ final class TypedEmit {
                     return new E("Typed.slice(" + l.c + ", " + sliceParts((Slice) s.index) + ")", Ty.STR);
                 }
                 if (l.t.k != Ty.K.LIST) {
-                    // A str, bytes or any other value: the generic slice, which
-                    // has a direct path for a str with int bounds.
-                    return new E("Py.getslice(" + box(l) + ", " + sliceParts((Slice) s.index) + ")", Ty.DYN);
+                    // A bytes or any other value: the generic slice, which has a
+                    // direct path for bytes with int bounds.
+                    return new E("Py.getslice(" + box(l) + ", " + sliceParts((Slice) s.index) + ")",
+                            l.t.k == Ty.K.BYTES ? Ty.BYTES : Ty.DYN);
                 }
                 return new E("Typed.asList(Py.getslice(" + l.c + ", " + sliceParts((Slice) s.index) + "))",
                         l.t.nonNone());
@@ -3869,6 +3872,10 @@ final class TypedEmit {
             E i = expr(s.index);
             if (l.t.k == Ty.K.DICT) {
                 return dictRead("Typed.dgetv(" + l.c + ", " + box(i) + ")", l.t);
+            }
+            if (l.t.k == Ty.K.BYTES && (i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
+                String c = "Typed.bat(" + l.c + ", " + (i.lc != null ? i.lc : "Py.asLong(" + box(i) + ")") + ")";
+                return small(new E("Long.valueOf(" + c + ")", Ty.INT, c));
             }
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
                 return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.DYN);
@@ -4908,6 +4915,9 @@ final class TypedEmit {
                 if ("%".equals(op)) {
                     return new E("Typed.format(" + l.c + ", " + box(r) + ")", Ty.STR);
                 }
+                if ("*".equals(op)) {
+                    return new E("Typed.asStr(Py.mul(" + box(l) + ", " + box(r) + "))", Ty.STR);
+                }
                 return new E("Typed.concat(" + l.c + ", " + r.c + ")", Ty.STR);
             case BOT:
                 throw new Unsupported("operation on nothing");
@@ -5537,6 +5547,12 @@ final class TypedEmit {
                     return new E("Typed.split(" + r.c + ", " + (args.isEmpty() ? "Py.NONE" : args.get(0).c) + ")",
                             Ty.list(new int[] {site.intValue()}, false));
                 }
+            }
+            if (Infer.codecCall(r.t, a.attr, types(args), c)) {
+                String enc = args.isEmpty() ? "null" : args.get(0).c;
+                String err = args.size() < 2 ? "null" : args.get(1).c;
+                return "encode".equals(a.attr) ? new E("Typed.encode(" + r.c + ", " + enc + ", " + err + ")", Ty.BYTES)
+                        : new E("Typed.decode(" + r.c + ", " + enc + ", " + err + ")", Ty.STR);
             }
             if (r.t.k == Ty.K.STR && !r.t.opt && c.keywords.isEmpty() && !Infer.hasStarred(c.args)) {
                 E s = strMethod(r, a.attr, args);
@@ -6611,6 +6627,10 @@ final class TypedEmit {
                     break;
                 case DICT:
                     check = "Typed.isDict(" + v + ")";
+                    arg = v;
+                    break;
+                case BYTES:
+                    check = v + " instanceof PyBytes";
                     arg = v;
                     break;
                 default:
