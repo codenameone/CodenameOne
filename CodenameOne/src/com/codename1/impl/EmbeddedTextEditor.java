@@ -153,6 +153,9 @@ public final class EmbeddedTextEditor {
                 }
             }
         });
+        // Docked to the bottom edge by showPacked below: framework chrome, never an
+        // operating system window of its own, whatever the theme defaults to.
+        dlg.setNativeWindowMode(false);
         dlg.setDisposeWhenPointerOutOfBounds(false);
         dlg.setScrollable(false);
         dlg.getContentPane().setPreferredH(Display.getInstance().getDisplayHeight() / 2);

@@ -74,7 +74,7 @@ so its key is accepted:
 include::../demos/common/src/main/snippets/developer-guide/embedded-windows.sh[tag=embedded-windows-bash-001,indent=0]
 ----
 
-The goal recognises a Windows executable, checks that its architecture matches
+The goal recognizes a Windows executable, checks that its architecture matches
 the device and copies it to `C:\ProgramData\CodenameOne`. It then makes the
 application the device's shell with *Shell Launcher*: it enables the feature
 if it's missing, restarts the application whenever it exits, and keeps Explorer

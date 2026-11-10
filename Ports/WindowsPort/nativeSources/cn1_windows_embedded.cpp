@@ -227,15 +227,31 @@ void cn1WinEmbeddedRedirectLog(void) {
     if (n == 0 || n >= sizeof(path)) {
         return;
     }
-    FILE* f = NULL;
-    freopen_s(&f, path, "a", stdout);
-    f = NULL;
-    freopen_s(&f, path, "a", stderr);
-    /* Unbuffered: the Microsoft CRT treats _IOLBF as full buffering, so a line
-     * buffer would reach cn1:device-logs a kilobyte at a time and lose the last
-     * output before a crash. */
-    setvbuf(stdout, NULL, _IONBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
+    /* Plain freopen, not freopen_s: the _s variant opens the file without write
+     * sharing, so the second reopen of the same path failed, left stderr closed,
+     * and the setvbuf below then took the CRT's invalid-parameter fail-fast
+     * (0xC0000409) before the window existed. setvbuf only touches a stream
+     * that reopened. Unbuffered: the Microsoft CRT treats
+     * _IOLBF as full buffering, so a line buffer would reach cn1:device-logs a
+     * kilobyte at a time and lose the last output before a crash. */
+#pragma warning(suppress: 4996)
+    if (freopen(path, "a", stdout) != NULL) {
+        setvbuf(stdout, NULL, _IONBF, 0);
+    } else {
+        /* freopen closed the stream before failing; a later write to a closed
+         * stream is the same fail-fast, so park it on NUL instead. */
+#pragma warning(suppress: 4996)
+        freopen("NUL", "w", stdout);
+    }
+#pragma warning(suppress: 4996)
+    if (freopen(path, "a", stderr) != NULL) {
+        setvbuf(stderr, NULL, _IONBF, 0);
+    } else {
+        /* freopen closed the stream before failing; a later write to a closed
+         * stream is the same fail-fast, so park it on NUL instead. */
+#pragma warning(suppress: 4996)
+        freopen("NUL", "w", stderr);
+    }
 }
 
 #else /* a desktop or UWP build */
