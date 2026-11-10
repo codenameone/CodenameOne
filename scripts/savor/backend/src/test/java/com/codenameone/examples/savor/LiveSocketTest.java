@@ -59,6 +59,8 @@ class LiveSocketTest {
     /// The last frame read: its opcode, and its payload as text.
     private int opcode;
     private byte[] payload;
+    /// Frames read so far in this test, for the message when one never comes.
+    private int framesRead;
 
     @Test
     void aTicketOpensTheChannelOnceAndPushesArrive() throws Exception {
@@ -192,7 +194,11 @@ class LiveSocketTest {
     private void readFrame(Tcp connection) throws IOException {
         int first = readByte(connection);
         if (first < 0) {
-            throw new IOException("the connection ended with no frame");
+            // The server closed it. Why is in its own log, the "[live]" lines
+            // above this failure; say where the test had got to.
+            throw new IOException("the connection ended with no frame; " + framesRead
+                    + " frames read in this test, the last opcode " + opcode + ": "
+                    + (payload == null ? "none" : new String(payload, "UTF-8")));
         }
         opcode = first & 0xf;
         int length = readByte(connection) & 0x7f;
@@ -208,6 +214,7 @@ class LiveSocketTest {
             }
             got += read;
         }
+        framesRead++;
     }
 
     /// A client's frames are masked; a server refuses one that is not.

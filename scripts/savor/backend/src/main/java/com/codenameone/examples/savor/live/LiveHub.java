@@ -198,12 +198,30 @@ public class LiveHub {
     /// Sends outside the lock: a slow client holds up its own frame, not
     /// everyone's. One that cannot be written to is dropped; its close callback
     /// takes it out of the maps.
+    /// The `type` of a frame this class wrote, for a log line; never the
+    /// payload, which carries positions and order details.
+    static String frameType(String text) {
+        int at = text.indexOf("\"type\":\"");
+        if (at < 0) {
+            return "a frame";
+        }
+        at += 8;
+        int end = text.indexOf('"', at);
+        return end < 0 ? "a frame" : "a " + text.substring(at, end) + " frame";
+    }
+
     private static void send(List<WebSocketSession> to, String text) {
         for (int iter = 0; iter < to.size(); iter++) {
             WebSocketSession session = to.get(iter);
             try {
                 session.sendText(text);
             } catch (IOException gone) {
+                // Said out loud: a dropped channel is otherwise invisible -- the
+                // app just stops hearing about its order, and a test sees only
+                // the connection end with no frame.
+                System.err.println("[live] websocket " + session.getId() + " of "
+                        + session.getAttachment() + " dropped; could not send "
+                        + frameType(text) + ": " + gone);
                 session.abort();
             }
         }

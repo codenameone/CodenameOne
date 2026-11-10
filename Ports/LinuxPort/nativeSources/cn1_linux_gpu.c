@@ -1155,4 +1155,20 @@ void cn1GpuShutdown(void) {
     cn1gTearDown();
 }
 
+void cn1GpuShutdownAtExit(void) {
+    /* Runs from exit() on whichever thread called System.exit, while the EDT
+     * may still be in the middle of a frame. Tearing the context down here
+     * freed the glyph atlas and terminated EGL under a texture upload in
+     * flight -- a segfault after the application had already finished. The
+     * process is going away, so its buffers are released by the kernel; only
+     * the screen state outlives it and needs putting back. */
+    if (!cn1gActive) {
+        return;
+    }
+    if (cn1gScanout) {
+        (void) cn1gWaitFlip();
+        cn1GpuCursor(0, 0, 0);
+    }
+}
+
 #endif /* CN1_LINUX_EMBEDDED && CN1_EMBEDDED_GPU */

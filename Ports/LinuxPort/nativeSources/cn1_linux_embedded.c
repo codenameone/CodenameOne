@@ -711,7 +711,7 @@ static void cn1Present(CN1EmbRect damage) {
 
 static void cn1RestoreScreen(void) {
 #ifdef CN1_EMBEDDED_GPU
-    cn1GpuShutdown();
+    cn1GpuShutdownAtExit();
 #endif
 #ifdef CN1_EMBEDDED_HAS_DRM
     if (cn1DrmFd >= 0) {
