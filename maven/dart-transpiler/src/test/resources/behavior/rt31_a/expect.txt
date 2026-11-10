@@ -1,0 +1,28 @@
+1
+11
+6
+10
+[6, 2, 4]
+6
+6
+3
+[3, 2, 1]
+[1, 2, 3]
+[a, bb, ccc]
+x3
+7
+-1
+void then
+15
+[21, 31, 41]
+1
+true
+true
+true
+6
+4
+[1, 3]
+true
+true
+null
+caught no

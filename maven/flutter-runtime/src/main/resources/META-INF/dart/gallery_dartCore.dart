@@ -44,10 +44,66 @@ abstract class Comparable<T> {
   external int compareTo(T other);
 }
 
+// Every record (`(1, 'a')`, `(x: 1)`) is a Record; the generated record classes implement
+// dart.core.Record, so `o is Record` holds for any of them and nothing else.
+@JavaName('dart.core.Record')
+abstract class Record {}
+
+// --- dart:core : BigInt ----------------------------------------------------
+
+// Arbitrary-precision integers, implemented in dart.core.BigInt (no
+// java.math.BigInteger on the device). Operators map to the runtime's mangled
+// names; binary minus is declared before unary minus (both are $minus).
+@JavaName('dart.core.BigInt')
+class BigInt implements Comparable<BigInt> {
+  external static BigInt get zero;
+  external static BigInt get one;
+  external static BigInt get two;
+  external static BigInt parse(String source, {int? radix});
+  external static BigInt? tryParse(String source, {int? radix});
+  external static BigInt from(num value);
+  external BigInt operator +(BigInt other);
+  external BigInt operator -(BigInt other);
+  external BigInt operator -();
+  external BigInt operator *(BigInt other);
+  external double operator /(BigInt other);
+  external BigInt operator ~/(BigInt other);
+  external BigInt operator %(BigInt other);
+  external BigInt operator &(BigInt other);
+  external BigInt operator |(BigInt other);
+  external BigInt operator ^(BigInt other);
+  external BigInt operator ~();
+  external BigInt operator <<(int shiftAmount);
+  external BigInt operator >>(int shiftAmount);
+  external bool operator <(BigInt other);
+  external bool operator <=(BigInt other);
+  external bool operator >(BigInt other);
+  external bool operator >=(BigInt other);
+  external BigInt remainder(BigInt other);
+  external int compareTo(BigInt other);
+  external BigInt abs();
+  external int get sign;
+  external int get bitLength;
+  external bool get isEven;
+  external bool get isOdd;
+  external bool get isNegative;
+  external bool get isValidInt;
+  external int toInt();
+  external double toDouble();
+  external String toRadixString(int radix);
+  external String toString();
+  external BigInt pow(int exponent);
+  external BigInt modPow(BigInt exponent, BigInt modulus);
+  external BigInt modInverse(BigInt modulus);
+  external BigInt gcd(BigInt other);
+  external BigInt toUnsigned(int width);
+  external BigInt toSigned(int width);
+}
+
 // --- dart:core : DateTime --------------------------------------------------
 
 @JavaName('dart.core.DateTime')
-class DateTime {
+class DateTime implements Comparable<DateTime> {
   // Dart's own defaults, stated. Without them an omitted month or day is filled
   // with the type's zero, so DateTime(2024) reached the runtime as month 0, day 0
   // -- indistinguishable from DateTime(2024, 3, 0), which Dart defines as the last
@@ -86,7 +142,7 @@ class DateTime {
 
 @JavaName('dart.core.DateTimeRange')
 class DateTimeRange {
-  external DateTimeRange({DateTime start, DateTime end});
+  external DateTimeRange({required DateTime start, required DateTime end});
   external DateTime get start;
   external DateTime get end;
   external Duration get duration;
@@ -107,13 +163,37 @@ class RegExp {
   external String get pattern;
 }
 
+// Match is the supertype Pattern.allMatches/matchAsPrefix declare; the only
+// runtime implementation is RegExpMatch, so both name the same Java class.
 @JavaName('dart.core.RegExpMatch')
-class RegExpMatch {
+abstract class Match {
   external String? group(int group);
+  external String? operator [](int group);
+  external List<String?> groups(List<int> groupIndices);
   external int get groupCount;
   external int get start;
   external int get end;
   external String get input;
+  external Pattern get pattern;
+}
+
+@JavaName('dart.core.RegExpMatch')
+class RegExpMatch extends Match {
+  external String? group(int group);
+  external String? operator [](int group);
+  external List<String?> groups(List<int> groupIndices);
+  external int get groupCount;
+  external int get start;
+  external int get end;
+  external String get input;
+  external RegExp get pattern;
+  external String? namedGroup(String name);
+  external Iterable<String> get groupNames;
+}
+
+@JavaName('dart.core.Symbol')
+class Symbol {
+  external Symbol(String name);
 }
 
 // --- dart:core : StringBuffer ----------------------------------------------
@@ -148,6 +228,9 @@ class Timer {
   external Timer(Duration duration, VoidCallback callback);
   external void cancel();
   external bool get isActive;
+  external int get tick;
+  external static Timer periodic(Duration duration, void Function(Timer timer) callback);
+  external static void run(VoidCallback callback);
 }
 
 // dart.async.Completer existed in the runtime with nothing declaring it, so Dart code
@@ -155,10 +238,20 @@ class Timer {
 @JavaName('dart.async.Completer')
 class Completer<T> {
   external Completer();
+  external static Completer<S> sync<S>();
   external Future<T> get future;
   external void complete([T? value]);
-  external void completeError(Object error);
+  external void completeError(Object error, [StackTrace? stackTrace]);
   external bool get isCompleted;
+}
+
+// dart:core's StackTrace: current captures the Java frames; traces travel with async errors.
+@JavaName('dart.core.StackTrace')
+class StackTrace {
+  external static StackTrace get current;
+  external static StackTrace get empty;
+  external static StackTrace fromString(String stackTraceString);
+  external String toString();
 }
 
 // The eventual-value type — dart:async's `Future<T>`. `await`, the named
@@ -167,43 +260,18 @@ class Completer<T> {
 // on the demo page's clipboard copy) falls through to this stub.
 @JavaName('dart.async.Future')
 abstract class Future<T> {
-  external Future then(Object onValue, {Object? onError});
+  external Future then(Object onValue, {Function? onError});
   external Future catchError(Object onError, {Object? test});
-  external Future whenComplete(Object action);
+  external Future<T> onError<E extends Object>(Object? Function(Object error, StackTrace stackTrace) handleError, {Object? test});
+  external Future whenComplete(dynamic Function() action);
+  external Future<T> timeout(Duration timeLimit, {dynamic Function()? onTimeout});
+  external Stream<T> asStream();
+  external void ignore();
 }
 
 // --- dart:typed_data -------------------------------------------------------
 
-@JavaName('dart.typed_data.Uint8List')
-class Uint8List {
-  external Uint8List(int length);
-  external static Uint8List fromList(List<int> elements);
-  external int get length;
-  external int operator [](int index);
-  external void operator []=(int index, int value);
-  external List<int> toList();
-  external Uint8List sublist(int start, [int? end]);
-  external bool get isEmpty;
-  external bool get isNotEmpty;
-}
-
-@JavaName('dart.typed_data.ByteData')
-class ByteData {
-  external ByteData(int length);
-  external int get lengthInBytes;
-  external int getUint8(int byteOffset);
-  external void setUint8(int byteOffset, int value);
-  external int getInt32(int byteOffset);
-  external void setInt32(int byteOffset, int value);
-  external ByteBuffer get buffer;
-}
-
-@JavaName('dart.typed_data.ByteBuffer')
-class ByteBuffer {
-  external int get lengthInBytes;
-  external Uint8List asUint8List();
-  external ByteData asByteData();
-}
+// dart:typed_data lives in dart_typed_data.dart.
 
 // --- dart:math -------------------------------------------------------------
 // `math` is the import-prefix stub (import 'dart:math' as math;).
@@ -258,6 +326,7 @@ external double log(double x);
 @JavaName('dart.math.DartMath.DartRandom')
 class Random {
   external Random([int seed]);
+  external static Random secure();
   external int nextInt(int max);
   external double nextDouble();
   external bool nextBool();
@@ -323,6 +392,24 @@ class DateFormat {
   external static DateFormat yMMMMd([String locale]);
   external static DateFormat yMMMd([String locale]);
   external static DateFormat yMd([String locale]);
+  external static DateFormat yMMMEd([String locale]);
+  external static DateFormat yMMMMEEEEd([String locale]);
+  external static DateFormat MMMEd([String locale]);
+  external static DateFormat MEd([String locale]);
+  external static DateFormat EEEE([String locale]);
+  external static DateFormat E([String locale]);
+  external static DateFormat MMMM([String locale]);
+  external static DateFormat d([String locale]);
+  external static DateFormat y([String locale]);
+  external static DateFormat yMMMM([String locale]);
+  external static DateFormat Md([String locale]);
+  external static DateFormat MMMMd([String locale]);
+  external static DateFormat jms([String locale]);
+  external static DateFormat Hms([String locale]);
+  external static DateFormat j([String locale]);
+  external static DateFormat ms([String locale]);
+  external static DateFormat MMMMEEEEd([String locale]);
+  external static DateFormat yM([String locale]);
   external DateFormat add_jm();
   external DateFormat add_jms();
   external String format(DateTime date);
@@ -333,6 +420,12 @@ class NumberFormat {
   external static NumberFormat currency({String locale, String symbol, int? decimalDigits, String name});
   external static NumberFormat decimalPercentPattern({String locale, int decimalDigits});
   external static NumberFormat simpleCurrency({String locale, String name, int? decimalDigits});
+  external static NumberFormat compact({String? locale, bool? explicitSign});
+  external static NumberFormat compactLong({String? locale, bool? explicitSign});
+  external static NumberFormat compactCurrency({String? locale, String? name, String? symbol, int? decimalDigits});
+  external static NumberFormat compactSimpleCurrency({String? locale, String? name, int? decimalDigits});
+  external static NumberFormat decimalPattern([String? locale]);
+  external static NumberFormat percentPattern([String? locale]);
   external String format(dynamic number);
 }
 
@@ -355,6 +448,190 @@ abstract class GoogleFonts {
   external static TextTheme ralewayTextTheme([TextTheme textTheme]);
   external static TextTheme rubikTextTheme([TextTheme textTheme]);
   external static TextTheme workSansTextTheme([TextTheme textTheme]);
+  external static TextStyle aBeeZee({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme aBeeZeeTextTheme([TextTheme textTheme]);
+  external static TextStyle abel({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme abelTextTheme([TextTheme textTheme]);
+  external static TextStyle abrilFatface({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme abrilFatfaceTextTheme([TextTheme textTheme]);
+  external static TextStyle alegreya({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme alegreyaTextTheme([TextTheme textTheme]);
+  external static TextStyle alegreyaSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme alegreyaSansTextTheme([TextTheme textTheme]);
+  external static TextStyle alfaSlabOne({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme alfaSlabOneTextTheme([TextTheme textTheme]);
+  external static TextStyle amaticSC({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme amaticSCTextTheme([TextTheme textTheme]);
+  external static TextStyle anton({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme antonTextTheme([TextTheme textTheme]);
+  external static TextStyle archivo({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme archivoTextTheme([TextTheme textTheme]);
+  external static TextStyle arimo({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme arimoTextTheme([TextTheme textTheme]);
+  external static TextStyle arvo({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme arvoTextTheme([TextTheme textTheme]);
+  external static TextStyle asap({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme asapTextTheme([TextTheme textTheme]);
+  external static TextStyle assistant({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme assistantTextTheme([TextTheme textTheme]);
+  external static TextStyle barlow({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme barlowTextTheme([TextTheme textTheme]);
+  external static TextStyle barlowCondensed({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme barlowCondensedTextTheme([TextTheme textTheme]);
+  external static TextStyle bebasNeue({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme bebasNeueTextTheme([TextTheme textTheme]);
+  external static TextStyle bitter({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme bitterTextTheme([TextTheme textTheme]);
+  external static TextStyle cabin({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme cabinTextTheme([TextTheme textTheme]);
+  external static TextStyle cairo({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme cairoTextTheme([TextTheme textTheme]);
+  external static TextStyle caveat({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme caveatTextTheme([TextTheme textTheme]);
+  external static TextStyle cinzel({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme cinzelTextTheme([TextTheme textTheme]);
+  external static TextStyle comfortaa({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme comfortaaTextTheme([TextTheme textTheme]);
+  external static TextStyle cormorantGaramond({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme cormorantGaramondTextTheme([TextTheme textTheme]);
+  external static TextStyle crimsonText({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme crimsonTextTextTheme([TextTheme textTheme]);
+  external static TextStyle dancingScript({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme dancingScriptTextTheme([TextTheme textTheme]);
+  external static TextStyle dmSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme dmSansTextTheme([TextTheme textTheme]);
+  external static TextStyle dmSerifDisplay({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme dmSerifDisplayTextTheme([TextTheme textTheme]);
+  external static TextStyle dosis({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme dosisTextTheme([TextTheme textTheme]);
+  external static TextStyle ebGaramond({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme ebGaramondTextTheme([TextTheme textTheme]);
+  external static TextStyle exo2({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme exo2TextTheme([TextTheme textTheme]);
+  external static TextStyle firaCode({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme firaCodeTextTheme([TextTheme textTheme]);
+  external static TextStyle firaSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme firaSansTextTheme([TextTheme textTheme]);
+  external static TextStyle fjallaOne({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme fjallaOneTextTheme([TextTheme textTheme]);
+  external static TextStyle greatVibes({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme greatVibesTextTheme([TextTheme textTheme]);
+  external static TextStyle heebo({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme heeboTextTheme([TextTheme textTheme]);
+  external static TextStyle hind({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme hindTextTheme([TextTheme textTheme]);
+  external static TextStyle ibmPlexMono({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme ibmPlexMonoTextTheme([TextTheme textTheme]);
+  external static TextStyle ibmPlexSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme ibmPlexSansTextTheme([TextTheme textTheme]);
+  external static TextStyle ibmPlexSerif({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme ibmPlexSerifTextTheme([TextTheme textTheme]);
+  external static TextStyle inconsolata({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme inconsolataTextTheme([TextTheme textTheme]);
+  external static TextStyle indieFlower({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme indieFlowerTextTheme([TextTheme textTheme]);
+  external static TextStyle inter({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme interTextTheme([TextTheme textTheme]);
+  external static TextStyle josefinSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme josefinSansTextTheme([TextTheme textTheme]);
+  external static TextStyle jost({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme jostTextTheme([TextTheme textTheme]);
+  external static TextStyle kanit({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme kanitTextTheme([TextTheme textTheme]);
+  external static TextStyle karla({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme karlaTextTheme([TextTheme textTheme]);
+  external static TextStyle lato({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme latoTextTheme([TextTheme textTheme]);
+  external static TextStyle lexend({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme lexendTextTheme([TextTheme textTheme]);
+  external static TextStyle libreBaskerville({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme libreBaskervilleTextTheme([TextTheme textTheme]);
+  external static TextStyle lobster({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme lobsterTextTheme([TextTheme textTheme]);
+  external static TextStyle lora({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme loraTextTheme([TextTheme textTheme]);
+  external static TextStyle manrope({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme manropeTextTheme([TextTheme textTheme]);
+  external static TextStyle mavenPro({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme mavenProTextTheme([TextTheme textTheme]);
+  external static TextStyle mukta({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme muktaTextTheme([TextTheme textTheme]);
+  external static TextStyle mulish({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme mulishTextTheme([TextTheme textTheme]);
+  external static TextStyle notoSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme notoSansTextTheme([TextTheme textTheme]);
+  external static TextStyle notoSerif({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme notoSerifTextTheme([TextTheme textTheme]);
+  external static TextStyle nunito({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme nunitoTextTheme([TextTheme textTheme]);
+  external static TextStyle nunitoSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme nunitoSansTextTheme([TextTheme textTheme]);
+  external static TextStyle openSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme openSansTextTheme([TextTheme textTheme]);
+  external static TextStyle outfit({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme outfitTextTheme([TextTheme textTheme]);
+  external static TextStyle overpass({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme overpassTextTheme([TextTheme textTheme]);
+  external static TextStyle oxygen({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme oxygenTextTheme([TextTheme textTheme]);
+  external static TextStyle pacifico({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme pacificoTextTheme([TextTheme textTheme]);
+  external static TextStyle permanentMarker({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme permanentMarkerTextTheme([TextTheme textTheme]);
+  external static TextStyle play({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme playTextTheme([TextTheme textTheme]);
+  external static TextStyle playfairDisplay({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme playfairDisplayTextTheme([TextTheme textTheme]);
+  external static TextStyle plusJakartaSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme plusJakartaSansTextTheme([TextTheme textTheme]);
+  external static TextStyle poppins({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme poppinsTextTheme([TextTheme textTheme]);
+  external static TextStyle prompt({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme promptTextTheme([TextTheme textTheme]);
+  external static TextStyle ptSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme ptSansTextTheme([TextTheme textTheme]);
+  external static TextStyle ptSerif({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme ptSerifTextTheme([TextTheme textTheme]);
+  external static TextStyle quicksand({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme quicksandTextTheme([TextTheme textTheme]);
+  external static TextStyle raleway({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle righteous({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme righteousTextTheme([TextTheme textTheme]);
+  external static TextStyle roboto({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme robotoTextTheme([TextTheme textTheme]);
+  external static TextStyle robotoSlab({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme robotoSlabTextTheme([TextTheme textTheme]);
+  external static TextStyle rubik({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle satisfy({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme satisfyTextTheme([TextTheme textTheme]);
+  external static TextStyle shadowsIntoLight({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme shadowsIntoLightTextTheme([TextTheme textTheme]);
+  external static TextStyle signika({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme signikaTextTheme([TextTheme textTheme]);
+  external static TextStyle sourceCodePro({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme sourceCodeProTextTheme([TextTheme textTheme]);
+  external static TextStyle sourceSans3({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme sourceSans3TextTheme([TextTheme textTheme]);
+  external static TextStyle spaceGrotesk({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme spaceGroteskTextTheme([TextTheme textTheme]);
+  external static TextStyle spaceMono({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme spaceMonoTextTheme([TextTheme textTheme]);
+  external static TextStyle teko({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme tekoTextTheme([TextTheme textTheme]);
+  external static TextStyle titilliumWeb({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme titilliumWebTextTheme([TextTheme textTheme]);
+  external static TextStyle ubuntu({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme ubuntuTextTheme([TextTheme textTheme]);
+  external static TextStyle urbanist({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme urbanistTextTheme([TextTheme textTheme]);
+  external static TextStyle varelaRound({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme varelaRoundTextTheme([TextTheme textTheme]);
+  external static TextStyle yanoneKaffeesatz({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme yanoneKaffeesatzTextTheme([TextTheme textTheme]);
+  external static TextStyle zillaSlab({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme zillaSlabTextTheme([TextTheme textTheme]);
+  external static TextStyle getFont(String fontFamily, {double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextTheme getTextTheme(String fontFamily, [TextTheme textTheme]);
 }
 
 @JavaName('com.codename1.flutter.fonts.GoogleFontsConfig')
@@ -381,6 +658,18 @@ abstract class Clipboard {
 abstract class SystemUiOverlayStyle {
   external static SystemUiOverlayStyle get light;
   external static SystemUiOverlayStyle get dark;
+  external SystemUiOverlayStyle copyWith({Color? systemNavigationBarColor, Color? systemNavigationBarDividerColor,
+      Brightness? systemNavigationBarIconBrightness, bool? systemNavigationBarContrastEnforced,
+      Color? statusBarColor, Brightness? statusBarBrightness, Brightness? statusBarIconBrightness,
+      bool? systemStatusBarContrastEnforced});
+  external Color? get systemNavigationBarColor;
+  external Color? get systemNavigationBarDividerColor;
+  external Brightness? get systemNavigationBarIconBrightness;
+  external bool? get systemNavigationBarContrastEnforced;
+  external Color? get statusBarColor;
+  external Brightness? get statusBarBrightness;
+  external Brightness? get statusBarIconBrightness;
+  external bool? get systemStatusBarContrastEnforced;
 }
 
 @JavaName('com.codename1.flutter.services.SystemChrome')

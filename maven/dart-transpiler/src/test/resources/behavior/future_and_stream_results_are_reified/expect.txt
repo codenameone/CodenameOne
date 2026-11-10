@@ -1,0 +1,19 @@
+true
+false
+true
+false
+true
+false
+false
+true
+true
+false
+true
+true
+true
+[2, 4]
+true
+true
+true
+true
+false

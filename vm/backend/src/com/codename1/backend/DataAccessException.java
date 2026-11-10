@@ -52,6 +52,12 @@ public class DataAccessException extends IOException {
         if (err instanceof DataAccessException) {
             return (DataAccessException) err;
         }
+        // SQLite reports a broken constraint only in its message: "UNIQUE
+        // constraint failed: t.c", and the same for NOT NULL, FOREIGN KEY and CHECK.
+        String message = err.getMessage();
+        if (message != null && message.indexOf("constraint failed") >= 0) {
+            return new DataIntegrityViolationException(message, err);
+        }
         return new DataAccessException(err.getMessage(), err);
     }
 }

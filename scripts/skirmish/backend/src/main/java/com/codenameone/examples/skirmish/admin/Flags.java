@@ -25,7 +25,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.skirmish.Clock;
 import com.codenameone.examples.skirmish.Ids;
-import com.codenameone.examples.skirmish.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.skirmish.api.FlagDto;
 import com.codenameone.examples.skirmish.domain.Flag;
 import com.codenameone.examples.skirmish.domain.MatchRecord;

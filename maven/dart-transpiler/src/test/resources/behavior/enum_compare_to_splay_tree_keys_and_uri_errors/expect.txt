@@ -1,0 +1,80 @@
+1
+-1
+-1
+1
+high,mid,low
+low,mid,high
+1
+high,mid,low
+1
+9
+5
+5
+null
+3
+null
+null
+null
+apple
+pear
+FormatException: Missing end `]` to match `[` in host (at character 8)
+http://[::1
+       ^
+
+7
+FormatException: Invalid port (at character 10)
+http://a:b/
+         ^
+
+9
+FormatException: Illegal scheme character (at character 2)
+a b:c
+ ^
+
+1
+parsed %zz
+FormatException: Invalid empty scheme (at character 1)
+:x
+^
+
+0
+FormatException: Scheme not starting with alphabetic character (at character 1)
+1a:b
+^
+
+0
+FormatException: Missing end `]` to match `[` in host (at character 8)
+http://[::1]x/
+       ^
+
+7
+FormatException: Illegal IPv6 address, invalid start colon. (at character 10)
+http://[:1::2]/
+         ^
+
+9
+FormatException: Illegal IPv6 address, only one wildcard `::` is allowed (at character 14)
+http://[1::2::3]/
+             ^
+
+13
+FormatException: Illegal IPv6 address, expected a part after last `:` (at character 13)
+http://[1:2:]/
+            ^
+
+12
+FormatException: Invalid IPvFuture address character (at character 12)
+http://[v1.^]/
+           ^
+
+11
+FormatException: Invalid port (at character 12)
+http://u@h:8 0/
+           ^
+
+11
+FormatException: ZoneID should not contain % anymore (at character 19)
+http://[fe80::1%25%zz]/
+                  ^
+
+18

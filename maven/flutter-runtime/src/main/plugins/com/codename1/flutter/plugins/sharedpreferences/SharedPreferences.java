@@ -147,7 +147,7 @@ public final class SharedPreferences {
         if (!(v instanceof Vector)) {
             return null;
         }
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         for (Object o : (Vector<?>) v) {
             out.add(o instanceof String ? (String) o : String.valueOf(o));
         }

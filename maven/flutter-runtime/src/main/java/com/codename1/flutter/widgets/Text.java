@@ -45,6 +45,37 @@ public class Text extends Widget {
         this.data = data;
     }
 
+    private TextSpan textSpan;
+
+    /**
+     * Flutter's {@code Text.rich}: text drawn from a span tree. It renders as a
+     * {@link RichText} whose root span carries this widget's {@code style}, so the
+     * span's own styles layer over it exactly as they do under a Text.
+     */
+    public static Text rich(TextSpan textSpan, com.codename1.flutter.Key key, TextStyle style,
+                            TextAlign textAlign) {
+        return rich(textSpan, key, style, textAlign, null);
+    }
+
+    /** {@code Text.rich} with a {@code textScaler} (null follows MediaQuery's). */
+    public static Text rich(TextSpan textSpan, com.codename1.flutter.Key key, TextStyle style,
+                            TextAlign textAlign, Object textScaler) {
+        Text t = new Text(textSpan == null ? "" : textSpan.toPlainText());
+        t.key(key);
+        t.textSpan = textSpan;
+        t.style = style;
+        t.textAlign = textAlign;
+        if (textScaler != null) {
+            t.textScaler(textScaler);
+        }
+        return t;
+    }
+
+    /** Flutter's {@code Text.textSpan}: the span of a {@link #rich} text, else null. */
+    public TextSpan textSpan() {
+        return textSpan;
+    }
+
     public void style(TextStyle v) {
         this.style = v;
     }
@@ -94,6 +125,37 @@ public class Text extends Widget {
 
     @Override
     public Element createElement() {
+        if (textSpan != null) {
+            RichText rt = new RichText();
+            TextSpan root = textSpan;
+            if (style != null) {
+                root = new TextSpan();
+                root.style(style);
+                root.children(dart.core.DartList.of(textSpan));
+            }
+            rt.text(root);
+            if (textAlign != null) {
+                rt.textAlign(textAlign);
+            }
+            rt.textScaler(textScaler);
+            return rt.createElement();
+        }
         return new TextRenderElement(this);
+    }
+
+    /// Text.data: the string, or null for Text.rich.
+    public String data() {
+        return data;
+    }
+
+    private Object textScaler;
+
+    /// Text.textScaler: the font size is scaled by it (see TextScaler.applyTo).
+    public void textScaler(Object v) {
+        this.textScaler = v;
+    }
+
+    public Object textScaler() {
+        return textScaler;
     }
 }

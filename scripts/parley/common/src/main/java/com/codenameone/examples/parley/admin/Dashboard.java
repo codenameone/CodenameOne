@@ -30,8 +30,8 @@ import com.codenameone.examples.parley.api.NameCountDto;
 import com.codenameone.examples.parley.api.StatsSeriesDto;
 import com.codenameone.examples.parley.live.LiveChannel;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
-import com.codenameone.examples.parley.ui.Chart;
+import com.codename1.appkit.Net;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.parley.ui.Lang;
 import com.codenameone.examples.parley.ui.StatRow;
 import com.codenameone.examples.parley.ui.Ui;
@@ -164,10 +164,10 @@ final class Dashboard implements LiveChannel.AdminListener {
         String to = Lang.tr("Today");
         series.add(tile("Messages", String.valueOf(sent), "seriesMessages",
                 Lang.tr("{0} calls", String.valueOf(calls)),
-                Chart.of("chartMessages", messages, from, to)));
+                Chart.of("Pl", "chartMessages", messages, from, to)));
         series.add(tile("Active people", String.valueOf(peak), "seriesActive",
                 Lang.tr("{0} new accounts", String.valueOf(joined)),
-                Chart.of("chartActive", active, from, to)));
+                Chart.of("Pl", "chartActive", active, from, to)));
         int hours = found.byHour() == null ? 0 : found.byHour().size();
         double[] hourly = new double[hours];
         for (int iter = 0; iter < hours; iter++) {
@@ -175,7 +175,7 @@ final class Dashboard implements LiveChannel.AdminListener {
             hourly[iter] = value == null ? 0 : value.intValue();
         }
         series.add(tile("Messages by hour", null, null, "The busy hours, in UTC",
-                Chart.of("chartHours", hourly, "00:00", "23:00")));
+                Chart.of("Pl", "chartHours", hourly, "00:00", "23:00")));
         series.add(shares("By kind of chat", found.byKind()));
         series.add(shares("By platform", found.byPlatform()));
         refresh();
@@ -221,7 +221,7 @@ final class Dashboard implements LiveChannel.AdminListener {
         for (int iter = 0; parts != null && iter < parts.size(); iter++) {
             NameCountDto part = parts.get(iter);
             tile.add(Ui.fact(part.name(), String.valueOf(part.count())));
-            tile.add(new Chart.Meter(total == 0 ? 0 : part.count() / (double) total));
+            tile.add(new Chart.Meter("Pl", total == 0 ? 0 : part.count() / (double) total));
         }
         return tile;
     }

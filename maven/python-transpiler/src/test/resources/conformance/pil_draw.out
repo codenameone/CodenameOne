@@ -1,0 +1,16 @@
+rect fill 80c8423f670f5f1a (255, 0, 0) (255, 0, 0) (255, 255, 255)
+rect outline 2f106f3826e270d8 (0, 0, 255) (255, 255, 255)
+rect both 5635def20aa833c4
+point 15c7687d9235a7e1 (1, 2, 3) (0, 0, 0)
+line 23cc8175c644bd71
+gray 3413754910daba3f
+rgba e83c78a7f4e0ddae (10, 20, 30, 128) (255, 255, 255, 255)
+shapes 255 0 100 0
+ops 61b880fec894e58f L
+flip af03c525972014e1 710110561d00ba8a
+invert 234db1cdf3ca7cf5
+expand (13, 11) f5456b313691b49a
+blur 1 fe8c55a2001f568e aab93c3fdadaf042
+blur 2 c88414354f4ff247 626ee244a4d13126
+blur 3 751694fb485447e3 3e6c1d44e1f1b76d
+blur0 True

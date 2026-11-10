@@ -1,0 +1,3 @@
+first<b>
+[first:a]
+[second fail boom]

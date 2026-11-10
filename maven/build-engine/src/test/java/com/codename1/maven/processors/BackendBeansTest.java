@@ -1516,8 +1516,17 @@ public class BackendBeansTest {
         s.put("com.example.Trip", "package com.example;\n"
                 + "import com.codename1.annotations.*;\n"
                 + "@Entity(table = \"injected_trips\") public class Trip {\n"
+                + "    public static int committed;\n"
                 + "    @Id(autoIncrement = true) public long id;\n"
                 + "    private String rider;\n"
+                // Fires during the flush the commit performs, which must still
+                // accept a synchronization (#6184), as Hibernate's does.
+                + "    @com.codename1.annotations.db.PrePersist void track() {\n"
+                + "        com.codename1.backend.Transactions.registerSynchronization(\n"
+                + "            new com.codename1.backend.Transactions.Synchronization() {\n"
+                + "                public void afterCommit() { committed++; }\n"
+                + "            });\n"
+                + "    }\n"
                 + "    public String rider() { return rider; }\n"
                 + "    public void rider(String r) { rider = r; }\n"
                 + "}\n");
@@ -1546,7 +1555,8 @@ public class BackendBeansTest {
                 + "                + \":\" + (trips == same);\n"
                 + "    }\n"
                 + "    public String outside() {\n"
-                + "        try { trips.count(); return \"ran\"; }\n"
+                + "        try { trips.count(); Trip t = new Trip(); t.rider(\"eve\"); trips.insert(t);\n"
+                + "              return trips.countByRider(\"eve\") == 1 ? \"ran\" : \"lost\"; }\n"
                 + "        catch (RuntimeException e) { return \"refused\"; }\n"
                 + "    }\n"
                 + "}\n");
@@ -1601,8 +1611,10 @@ public class BackendBeansTest {
                 assertEquals("1", http("POST", port, "/trips/" + rider));
             }
             assertEquals("2:2:2:false:true", http("GET", port, "/trips/ada"));
-            // The same contract as the injected Session: no transaction, no work.
-            assertEquals("refused", http("GET", port, "/outside"));
+            // Spring Data's contract, not the bare Session's: a repository method
+            // with no transaction open runs in one of its own (#6184).
+            assertEquals("ran", http("GET", port, "/outside"));
+            assertEquals(4, loader.loadClass("com.example.Trip").getField("committed").getInt(null));
         } finally {
             backend.stop();
             loader.close();
@@ -1995,6 +2007,205 @@ public class BackendBeansTest {
             assertEquals("real real", http("GET", port, "/x"));
         } finally {
             on.stop();
+        }
+    }
+
+    @Test
+    public void anExpressionConditionReadsPropertiesWithDefaults() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Feature", PKG + "public interface Feature { String name(); }\n");
+        s.put("com.example.On", PKG + "@Component @ConditionalOnExpression(\n"
+                + "    \"${mode:dev} == 'prod' && !${legacy:false}\")\n"
+                + "public class On implements Feature { public String name() { return \"on\"; } }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired(required = false) private Feature feature;\n"
+                + "    @GetMapping(\"/x\") public String x() {\n"
+                + "        return feature == null ? \"off\" : feature.name();\n"
+                + "    }\n"
+                + "    @GetMapping(value = \"/csv\", produces = \"text/csv\") public String csv() {\n"
+                + "        return \"a,b\";\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend off = start(classes, port, new Properties());
+        try {
+            assertEquals("off", http("GET", port, "/x"));
+            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/csv")
+                    .openConnection();
+            assertEquals("text/csv; charset=utf-8", c.getContentType());
+            c.getInputStream().close();
+        } finally {
+            off.stop();
+        }
+        Properties prod = new Properties();
+        prod.setProperty("mode", "prod");
+        Backend on = start(classes, port, prod);
+        try {
+            assertEquals("on", http("GET", port, "/x"));
+        } finally {
+            on.stop();
+        }
+        prod.setProperty("legacy", "true");
+        Backend legacy = start(classes, port, prod);
+        try {
+            assertEquals("off", http("GET", port, "/x"));
+        } finally {
+            legacy.stop();
+        }
+    }
+
+    @Test
+    public void runnersAndReadyListenersRunInOrderOnceTheServerIsUp() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Log", PKG
+                + "public class Log { public static final StringBuilder SEEN = new StringBuilder(); }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api { @GetMapping(\"/\") public String home() { return \"\"; } }\n");
+        s.put("com.example.Second", PKG
+                + "@Component @Order(2) public class Second implements com.codename1.backend.ApplicationRunner {\n"
+                + "    public void run(com.codename1.backend.ApplicationArguments a) {\n"
+                + "        Log.SEEN.append(\"app\").append(a.getOptionValues(\"mode\")).append(' ');\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.First", PKG
+                + "@Component @Order(1) public class First implements com.codename1.backend.CommandLineRunner {\n"
+                + "    public void run(String... args) { Log.SEEN.append(\"line\").append(args.length).append(' '); }\n"
+                + "    @com.codename1.backend.annotations.EventListener public void ready(com.codename1.backend.ApplicationReadyEvent e) {\n"
+                + "        Log.SEEN.append(e.getBackend() != null ? \"ready\" : \"none\");\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend b = withApplication(Backend.builder(Config.of(settings, "dev")).quiet()
+                .arguments("--mode=x", "file"), app).start();
+        try {
+            Object seen = loader.loadClass("com.example.Log").getField("SEEN").get(null);
+            assertEquals("line2 app[x] ready", seen.toString());
+            assertEquals(Arrays.asList("file"), b.getArguments().getNonOptionArgs());
+        } finally {
+            b.stop();
+        }
+    }
+
+    @Test
+    public void aListenerForAnyOtherEventIsRefused() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.L", PKG
+                + "@Component public class L { @com.codename1.backend.annotations.EventListener public void on(String event) { } }\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("ApplicationReadyEvent or nothing"));
+    }
+
+    @Test
+    public void mappingsAreInheritedFromBaseClassesAndInterfaces() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.ItemApi", PKG
+                + "@RequestMapping(\"/items\") public interface ItemApi {\n"
+                + "    @GetMapping(\"/{id}\") String get(@PathVariable(\"id\") String id);\n"
+                + "}\n");
+        s.put("com.example.Base", PKG
+                + "public abstract class Base {\n"
+                + "    @GetMapping(\"/ping\") public String ping() { return \"pong\"; }\n"
+                + "    @GetMapping(\"/over\") public String over() { return \"base\"; }\n"
+                + "}\n");
+        s.put("com.example.Items", PKG
+                + "@RestController public class Items extends Base implements ItemApi {\n"
+                + "    public String get(String id) { return \"item \" + id; }\n"
+                + "    @Override public String over() { return \"derived\"; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend b = start(classes, port, new Properties());
+        try {
+            assertEquals("item 4", http("GET", port, "/items/4"));
+            assertEquals("pong", http("GET", port, "/items/ping"));
+            assertEquals("derived", http("GET", port, "/items/over"));
+        } finally {
+            b.stop();
+        }
+    }
+
+    @Test
+    public void aCatchAllVariableTakesTheRestOfThePath() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Files", PKG
+                + "@RestController public class Files {\n"
+                + "    @GetMapping(\"/files/{path:.+}\") public String file(@PathVariable(\"path\") String p) {\n"
+                + "        return \"f:\" + p;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/files/{id}/info\") public String info(@PathVariable(\"id\") String id) {\n"
+                + "        return \"i:\" + id;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/raw/{*rest}\") public String raw(@PathVariable(\"rest\") String r) {\n"
+                + "        return \"r:\" + r;\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend b = start(classes, port, new Properties());
+        try {
+            assertEquals("f:a/b/c.txt", http("GET", port, "/files/a/b/c.txt"));
+            assertEquals("r:x", http("GET", port, "/raw/x"));
+            // A catch-all spelled longer must not take a more specific route.
+            assertEquals("i:42", http("GET", port, "/files/42/info"));
+            // {*name} may be empty; {name:.+} may not.
+            assertEquals("r:", http("GET", port, "/raw/"));
+        } finally {
+            b.stop();
+        }
+    }
+
+    @Test
+    public void anyOtherVariablePatternIsRefused() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Files", PKG
+                + "@RestController public class Files {\n"
+                + "    @GetMapping(\"/n/{id:[0-9]+}\") public String n(@PathVariable(\"id\") String id) {\n"
+                + "        return id;\n"
+                + "    }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Only a catch-all"));
+    }
+
+    @Test
+    public void repeatedAndBoxedRequestParamsBind() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/tags\") public String tags(@RequestParam(\"t\") List<String> t,\n"
+                + "            @RequestParam(value = \"x\", required = false) String[] x,\n"
+                + "            @RequestParam(value = \"n\", required = false) Integer n,\n"
+                + "            @RequestParam(value = \"d\", defaultValue = \"7\") Long d) {\n"
+                + "        return t + \" \" + x.length + \" \" + n + \" \" + d;\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend b = start(classes, port, new Properties());
+        try {
+            assertEquals("[a, b] 0 null 7", http("GET", port, "/tags?t=a&t=b"));
+            assertEquals("[c] 2 5 9", http("GET", port, "/tags?t=c&x=1&x=2&n=5&d=9"));
+            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/tags?x=1").openConnection();
+            assertEquals(400, c.getResponseCode());
+            c = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/tags?t=a&n=zz").openConnection();
+            assertEquals(400, c.getResponseCode());
+        } finally {
+            b.stop();
         }
     }
 

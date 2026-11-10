@@ -30,7 +30,7 @@ import dart.core.DartList;
  * below it.
  */
 public abstract class RouteBase {
-    private final DartList<RouteBase> routes = new DartList<RouteBase>();
+    private final DartList<RouteBase> routes = new DartList<RouteBase>(dart.runtime.TypeWitness.of(RouteBase.class, false));
 
     /** The routes nested below this one. */
     public void routes(Object v) {

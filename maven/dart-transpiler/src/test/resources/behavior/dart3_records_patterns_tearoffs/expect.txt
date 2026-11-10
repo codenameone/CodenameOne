@@ -1,0 +1,44 @@
+(1, a)
+1 a
+(a: 1, b: true)
+1 true
+(7, label: seven)
+7 seven
+true
+true
+true
+false
+[1, 2] true
+[2, 3] false
+x
+k
+[(a, 1), (b, 2)]
+[(one, 1), (two, 2)]
+1 a
+5 6
+home 3 H
+one=1
+two=2
+box has 4
+box empty
+trigger timeout
+pair 1 2
+origin
+point 1 2
+other
+many a
+one a
+box 8
+nothing
+P(3,4)
+P(0,0)
+[Cell(1), Cell(2)]
+[Cell(q)]
+42
+HI
+[A, B]
+2020
+true
+xx
+x!
+[MX, mx]

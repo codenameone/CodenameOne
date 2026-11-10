@@ -37,8 +37,8 @@ import com.codenameone.examples.reel.api.StudioTitleEditDto;
 import com.codenameone.examples.reel.api.StudioVideoDto;
 import com.codenameone.examples.reel.api.StudioVideoEditDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
-import com.codenameone.examples.reel.ui.Chart;
+import com.codename1.appkit.Net;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Ui;
 import java.util.ArrayList;
@@ -179,7 +179,7 @@ final class TitleEditor {
                         r[iter] = a.retention().get(iter);
                     }
                     stats.add(Ui.label("Audience retention", "SvLabel"));
-                    stats.add(Chart.of("retention", r, Lang.tr("Start"), Lang.tr("End")));
+                    stats.add(Chart.of("Sv", "retention", r, Lang.tr("Start"), Lang.tr("End")));
                 }
                 for (int iter = 0; a.countries() != null && iter < a.countries().size(); iter++) {
                     stats.add(Ui.fact(a.countries().get(iter).name(), String.valueOf(a.countries().get(iter).count())));

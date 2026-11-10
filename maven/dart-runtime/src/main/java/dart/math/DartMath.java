@@ -181,15 +181,36 @@ public final class DartMath {
      */
     public static final class DartRandom {
         private final Random impl;
+        /// True for {@code Random.secure()}: every draw comes from
+        /// com.codename1.security.SecureRandom (the platform CSPRNG on every port).
+        private final boolean secure;
 
         private static final long FULL_RANGE = 1L << 32;
 
         public DartRandom() {
             impl = new Random();
+            secure = false;
         }
 
         public DartRandom(long seed) {
             impl = new Random(seed);
+            secure = false;
+        }
+
+        private DartRandom(boolean secure) {
+            impl = null;
+            this.secure = secure;
+        }
+
+        private long bits32() {
+            return secure ? com.codename1.security.SecureRandom.longBelow(FULL_RANGE) : impl.nextInt() & 0xFFFFFFFFL;
+        }
+
+        /// {@code Random.secure()}: backed by com.codename1.security.SecureRandom,
+        /// which is the platform's cryptographic generator on every port, so it is
+        /// fit for keys and nonces as Dart's is.
+        public static DartRandom secure() {
+            return new DartRandom(true);
         }
 
         /// Dart's {@code Random.nextInt}, whose bound runs to {@code 1 << 32}
@@ -201,6 +222,9 @@ public final class DartMath {
             if (max <= 0 || max > FULL_RANGE) {
                 throw new dart.core.RangeError("max must be in range 0 < max <= 2^32, was " + max);
             }
+            if (secure) {
+                return com.codename1.security.SecureRandom.longBelow(max);
+            }
             if (max <= Integer.MAX_VALUE) {
                 return impl.nextInt((int) max);
             }
@@ -211,17 +235,21 @@ public final class DartMath {
             long limit = FULL_RANGE - (FULL_RANGE % max);
             long bits;
             do {
-                bits = impl.nextInt() & 0xFFFFFFFFL;
+                bits = bits32();
             } while (bits >= limit);
             return bits % max;
         }
 
         public double nextDouble() {
+            if (secure) {
+                // 53 random bits, as java.util.Random.nextDouble builds its value
+                return com.codename1.security.SecureRandom.longBelow(1L << 53) * (1.0 / (1L << 53));
+            }
             return impl.nextDouble();
         }
 
         public boolean nextBool() {
-            return impl.nextBoolean();
+            return secure ? com.codename1.security.SecureRandom.intBelow(2) == 1 : impl.nextBoolean();
         }
     }
 }

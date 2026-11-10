@@ -1,0 +1,14 @@
+(1, 2, 3, 4, 5) 21 17 12 6
+[1, 2, 3, 4, 5, 6, 7] [1, 2, 3, 4, 5, 6, 0] 15
+24 (1, 2, 3, 4, 10) (1, 2, 3, 4, 5) 10
+(5, 6, 7, 8, 10) (1, 1, 1, 1, 1) [('a', 'b', 'c', 'd', 'e')]
+TypeError: f5() missing 1 required positional argument: 'e'
+TypeError: f6() missing 1 required positional argument: 'c'
+TypeError: K.m4() takes 5 positional arguments but 6 were given
+{"a":[1,2]}
+(1, 2, 9) (5, 2, 3) (2, 1, 0) (7, 2, 8) (1, 2, 3, 4, 10)
+15 [1, 2, 3, 4, 5, 6, 7]
+TypeError: kw3() missing 1 required positional argument: 'a'
+TypeError: kw3() got multiple values for argument 'a'
+TypeError: kw3() got an unexpected keyword argument 'z'
+TypeError: kw3() got multiple values for argument 'c'

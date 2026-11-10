@@ -19,7 +19,7 @@
 package com.codenameone.examples.skirmish.account;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.skirmish.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.skirmish.api.AccountApiServer;
 import com.codenameone.examples.skirmish.api.PlayerDto;
 import com.codenameone.examples.skirmish.api.ProfileDto;

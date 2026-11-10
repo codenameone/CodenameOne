@@ -261,8 +261,105 @@ public class GestureOverlayRenderElement extends RenderElement {
         private int lastX;
         private int lastY;
 
+        /// Scale gesture state. Flutter's scale recognizer is a superset of pan: one
+        /// pointer moves the focal point at scale 1, two pointers also pinch and
+        /// rotate. Codename One reports the extra pointers through the int[] overloads.
+        private boolean scaling;
+        private double scaleStartSpan;
+        private double scaleStartAngle;
+        private double lastFocalX;
+        private double lastFocalY;
+        private int scalePointers;
+
+        @Override
+        public void pointerDragged(int[] x, int[] y) {
+            GestureDetector g = gesture();
+            if (x != null && x.length >= 2 && g != null && g.handlesScale()) {
+                scaleMove(g, x, y);
+                return;
+            }
+            super.pointerDragged(x, y);
+        }
+
+        private void scaleMove(GestureDetector g, int[] x, int[] y) {
+            int n = Math.min(x.length, y.length);
+            double fx = 0;
+            double fy = 0;
+            for (int i = 0; i < n; i++) {
+                fx += x[i];
+                fy += y[i];
+            }
+            fx /= n;
+            fy /= n;
+            double span = n >= 2 ? Math.sqrt((x[1] - x[0]) * (double) (x[1] - x[0])
+                    + (y[1] - y[0]) * (double) (y[1] - y[0])) : 0;
+            double angle = n >= 2 ? com.codename1.util.MathUtil.atan2(y[1] - y[0], x[1] - x[0]) : 0;
+            if (!scaling || n != scalePointers) {
+                // A new gesture, or a finger joined or left: restart the baseline so the
+                // scale stays continuous, as Flutter does when the pointer count changes.
+                boolean fresh = !scaling;
+                scaling = true;
+                scalePointers = n;
+                scaleStartSpan = span;
+                scaleStartAngle = angle;
+                lastFocalX = fx;
+                lastFocalY = fy;
+                if (fresh) {
+                    dragInitiated();
+                    if (g.getOnScaleStart() != null) {
+                        try {
+                            g.getOnScaleStart().call(new com.codename1.flutter.gestures.ScaleStartDetails(
+                                    global((int) fx, (int) fy), local((int) fx, (int) fy), n));
+                        } catch (Throwable t) {
+                            com.codename1.flutter.FlutterErrorReport.record(t);
+                        }
+                    }
+                }
+                return;
+            }
+            double scale = scaleStartSpan > 0 && span > 0 ? span / scaleStartSpan : 1.0;
+            com.codename1.flutter.gestures.ScaleUpdateDetails d = new com.codename1.flutter.gestures.ScaleUpdateDetails(
+                    global((int) fx, (int) fy), local((int) fx, (int) fy), scale, n >= 2 ? angle - scaleStartAngle : 0);
+            double ratio = com.codename1.flutter.rendering.Dp.px(1);
+            d.focalPointDelta(new com.codename1.flutter.Offset((fx - lastFocalX) / ratio, (fy - lastFocalY) / ratio));
+            lastFocalX = fx;
+            lastFocalY = fy;
+            if (g.getOnScaleUpdate() != null) {
+                try {
+                    g.getOnScaleUpdate().call(d);
+                } catch (Throwable t) {
+                    com.codename1.flutter.FlutterErrorReport.record(t);
+                }
+            }
+        }
+
+        private boolean endScale() {
+            if (!scaling) {
+                return false;
+            }
+            scaling = false;
+            GestureDetector g = gesture();
+            if (g != null && g.getOnScaleEnd() != null) {
+                try {
+                    g.getOnScaleEnd().call(new com.codename1.flutter.gestures.ScaleEndDetails(
+                            new com.codename1.flutter.gestures.Velocity(com.codename1.flutter.Offset.zero),
+                            scalePointers));
+                } catch (Throwable t) {
+                    com.codename1.flutter.FlutterErrorReport.record(t);
+                }
+            }
+            return true;
+        }
+
         @Override
         public void pointerDragged(int x, int y) {
+            GestureDetector sg = gesture();
+            // One finger on a scale-only detector is a scale gesture at scale 1.
+            if (sg != null && sg.handlesScale() && !sg.handlesPan() && dragAxis == DRAG_NONE
+                    && (scaling || movedBeyondSlop(x, y)) && !(forwardTo != null && isScrollPane(forwardTo))) {
+                scaleMove(sg, new int[] {x}, new int[] {y});
+                return;
+            }
             // A drag this detector has callbacks for is ITS drag, as in Flutter's gesture
             // arena where the innermost recognizer wins: once claimed, every move goes to
             // those callbacks and no enclosing scrollable moves. An inner scrollable still
@@ -349,6 +446,10 @@ public class GestureOverlayRenderElement extends RenderElement {
 
         @Override
         public void pointerReleased(int x, int y) {
+            if (endScale()) {
+                super.pointerReleased(x, y);
+                return;
+            }
             boolean wasDrag = movedBeyondSlop(x, y);
             if (forwardTo != null) {
                 Component target = forwardTo;

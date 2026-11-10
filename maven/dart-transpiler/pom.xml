@@ -43,6 +43,37 @@
                 </configuration>
             </plugin>
             <plugin>
+                <!-- flutter_material.dart has ONE source: the runtime module's own stub,
+                     maven/flutter-runtime/src/main/resources/META-INF/dart/. The
+                     transpiler's embedded fallback (StubRegistry.loadEmbedded, used when
+                     no stub classpath is given) is copied from it at build time, so the
+                     two can never drift. Do not add a second copy under src/main/resources. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>embed-flutter-material-stub</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/com/codename1/dart/stubs</outputDirectory>
+                            <!-- A stale copy from an older build may be newer than the source. -->
+                            <overwrite>true</overwrite>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../flutter-runtime/src/main/resources/META-INF/dart</directory>
+                                    <includes>
+                                        <include>flutter_material.dart</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-maven-plugin</artifactId>
                 <version>${antlr.version}</version>
@@ -134,6 +165,18 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>codenameone-flutter-runtime</artifactId>
+                    <version>${project.version}</version>
+                    <scope>test</scope>
+                </dependency>
+                <!--
+                  Both runtimes declare core `provided`, so it does not arrive with
+                  them. Without it a runtime class whose signatures name a core type
+                  (Future, Navigator, WebSocket, RegExp) cannot be reflected on, and
+                  StubJavaParameterTypeTest had to skip exactly those classes.
+                -->
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
                     <version>${project.version}</version>
                     <scope>test</scope>
                 </dependency>

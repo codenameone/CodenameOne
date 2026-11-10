@@ -580,14 +580,22 @@ public final class Config {
     /// A system property of that name, then the environment variable it maps to.
     /// The mapping is the conventional one -- upper case, dots and dashes to
     /// underscores -- so cn1.datasource.url is CN1_DATASOURCE_URL.
+    ///
+    /// A property or variable that is SET but empty answers "", as Spring
+    /// reads it: exporting `CN1_FOO=` is how a deployment blanks a value the
+    /// properties file gives. A setting for which empty means nothing (the TLS
+    /// files, the data source URL) treats it as unset where it is read.
     private static String fromProcess(String key) {
         String value = System.getProperty(key);
-        if (value != null && value.length() > 0) {
+        if (value != null) {
             return value;
         }
-        return environment(environmentName(key));
+        return System.getenv(environmentName(key));
     }
 
+    /// A variable by its own name, empty counting as unset: what the
+    /// platform-conventional names (DATABASE_URL, PORT) and a `${}` reference
+    /// read, where an empty value has never meant anything.
     private static String environment(String name) {
         String value = System.getenv(name);
         return value == null || value.length() == 0 ? null : value;

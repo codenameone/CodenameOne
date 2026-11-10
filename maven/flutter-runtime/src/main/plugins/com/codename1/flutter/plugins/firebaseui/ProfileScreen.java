@@ -81,7 +81,7 @@ public class ProfileScreen extends StatelessWidget {
     public Widget build(final BuildContext context) {
         final FirebaseAuth a = auth == null ? FirebaseAuth.instance : auth;
         User u = a.currentUser();
-        DartList<Widget> col = new DartList<Widget>();
+        DartList<Widget> col = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (u != null) {
             if (u.displayName() != null) {
                 col.add(Ui.padded(new Text(u.displayName())));

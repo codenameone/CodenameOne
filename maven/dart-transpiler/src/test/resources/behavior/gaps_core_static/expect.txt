@@ -1,0 +1,27 @@
+stage
+true
+3
+[1, 2, 3] [x, y] [0, 1, 4] [z, z] [] [4, 5] 0
+{k: 1, j: 2} {a: 1} {b: 2} {n1: 10, n2: 20} {u: 0}
+{1, 2} {p}
+ABC
+true
+[1, 2, 3]
+1 7 1 12
+true
+a%20b%26c
+a b&c
+a+b%26c
+a b&c
+2
+4
+3
+caught range
+caught range2
+caught value
+caught index
+ok
+caught arg
+caught notNull
+assert bad
+true

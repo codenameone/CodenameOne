@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.codename1.backend.ConcurrencyFailureException;
+import com.codename1.backend.DataIntegrityViolationException;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
@@ -115,7 +116,10 @@ public final class MySql {
             String password, String sslMode, String caFile, int timeoutMillis,
             int socketTimeoutMillis) throws IOException {
         // BEFORE THE SOCKET, for the reason Postgres gives one engine over.
-        SqlLimits.requireSslMode(sslMode);
+        // Kept as written for the errors, as Postgres does.
+        final String sslModeAsWritten = sslMode;
+        sslMode = SqlLimits.canonicalSslMode(sslMode);
+        SqlLimits.requireRootForVerifyCa(sslMode, caFile);
         Tcp connection = Tcp.connect(host, port <= 0 ? 3306 : port, timeoutMillis);
         // AFTER THE CONNECT, and before anything is said on it: the deadline
         // governs the conversation, which is where a peer can stall a worker.
@@ -126,7 +130,7 @@ public final class MySql {
         }
         try {
             MySql session = new MySql(new Wire(connection));
-            session.handshake(host, database, user, password, sslMode, caFile);
+            session.handshake(host, database, user, password, sslMode, sslModeAsWritten, caFile);
             // UTC, whatever the server's default. A TIMESTAMP column is converted
             // to and from the session zone on every read and write, and a
             // @Temporal value is written as UTC text, so a session left in the
@@ -141,7 +145,7 @@ public final class MySql {
     }
 
     private void handshake(String host, String database, String user, String password,
-            String sslMode, String caFile) throws IOException {
+            String sslMode, String sslModeAsWritten, String caFile) throws IOException {
         Packet greeting = readPacket();
         Reader reader = new Reader(greeting.body);
         int protocol = reader.u8();
@@ -194,9 +198,9 @@ public final class MySql {
 
         boolean useTls = !"disable".equals(sslMode);
         if (useTls && (serverCapabilities & CLIENT_SSL) == 0) {
-            if ("require".equals(sslMode)) {
+            if (SqlLimits.demandsTls(sslMode)) {
                 throw new IOException("The MySQL server at " + host
-                        + " does not offer TLS and sslmode=require");
+                        + " does not offer TLS and sslmode=" + sslModeAsWritten);
             }
             useTls = false;
         }
@@ -235,7 +239,7 @@ public final class MySql {
             }
             sendPacket(request.toByteArray());
             try {
-                wire.getConnection().startTls(host, caFile);
+                wire.getConnection().startTls(host, caFile, SqlLimits.verifiesHost(sslMode));
             } catch (IOException err) {
                 // The SSLRequest packet has already gone out, so this connection
                 // cannot go back to plaintext -- the server is waiting for a
@@ -633,6 +637,13 @@ public final class MySql {
             }
         }
         readPacket(); // EOF ending the definitions
+        if (rows != null) {
+            String[] kinds = new String[resultColumns];
+            for (int iter = 0 ; iter < resultColumns ; iter++) {
+                kinds[iter] = kind(resultDefinitions[iter].type);
+            }
+            rows.setColumnTypes(kinds);
+        }
         while (true) {
             Packet packet = readPacket();
             int marker = packet.body[0] & 0xff;
@@ -654,7 +665,27 @@ public final class MySql {
         }
     }
 
-    /// A binary row: a 0x00 marker, a null bitmap offset by two bits, then each
+    /// The portable column kind (`Database.columnTypes(List)`) of a binary
+    /// protocol type: only the kinds whose values arrive as text a caller must
+    /// parse.
+    static String kind(int type) {
+        switch (type) {
+            case 0x00: // DECIMAL
+            case 0xf6: // NEWDECIMAL
+                return "decimal";
+            case 0x0a: // DATE
+                return "date";
+            case 0x0c: // DATETIME
+            case 0x07: // TIMESTAMP
+                return "datetime";
+            case 0x0b: // TIME
+                return "time";
+            default:
+                return null;
+        }
+    }
+
+        /// A binary row: a 0x00 marker, a null bitmap offset by two bits, then each
     /// non-null value in its column's binary form.
     private static Map decodeBinaryRow(byte[] body, Column[] columns) throws IOException {
         Reader reader = new Reader(body);
@@ -1077,6 +1108,14 @@ public final class MySql {
                 || (state != null && state.startsWith("40"));
     }
 
+    /// Whether an error is a broken schema constraint: SQLSTATE class 23, or a
+    /// code that carries it -- duplicate entry (1062), a foreign key (1451,
+    /// 1452) or a NULL in a NOT NULL column (1048).
+    static boolean isIntegrityViolation(int code, String state) {
+        return code == 1062 || code == 1451 || code == 1452 || code == 1048
+                || (state != null && state.startsWith("23"));
+    }
+
     /// ER_UNSUPPORTED_PS: "This command is not supported in the prepared
     /// statement protocol yet".
     private static final int UNSUPPORTED_IN_PREPARED_STATEMENT = 1295;
@@ -1106,6 +1145,7 @@ public final class MySql {
                     + (state.length() == 0 ? "" : " " + state) + ": " + message
                     + (sql == null ? "" : " [" + sql + "]");
             return isConcurrencyFailure(code, state) ? new ConcurrencyFailureException(text)
+                    : isIntegrityViolation(code, state) ? new DataIntegrityViolationException(text)
                     : new IOException(text);
         } catch (IOException malformed) {
             // This method BUILDS the exception rather than throwing one, so a

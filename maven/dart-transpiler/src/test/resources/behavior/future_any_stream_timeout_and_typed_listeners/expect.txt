@@ -1,0 +1,18 @@
+got 3
+set true
+al true
+got 4
+obj 4
+click click
+[s0, s1, s2]
+s0
+err to
+done
+caught FormatException
+-1
+c0
+c1
+c2
+6
+0123
+int

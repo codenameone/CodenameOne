@@ -55,7 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class PageViewPadEndsTest {
 
     private static PageView pageView(Axis axis, double viewportFraction, Boolean padEnds, int pages) {
-        DartList<Widget> children = new DartList<Widget>();
+        DartList<Widget> children = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < pages; i++) {
             children.add(new ProbeBox(10, 10));
         }

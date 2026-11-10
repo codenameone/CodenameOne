@@ -194,6 +194,15 @@ public final class Tasks {
         return executor(current(), name, kind);
     }
 
+    /// The executor called `name` of the calling thread's server, created on
+    /// first use as `@Async("name")` would create it -- the way to give it a
+    /// [TaskDecorator] from a `@PostConstruct`, before any task is submitted.
+    /// @param name the executor's name, as `@Async` and the settings spell it
+    /// @return the executor
+    public static TaskExecutor executor(String name) {
+        return executor(current(), name, AUTO);
+    }
+
     static TaskExecutor executor(Registry registry, String name, int kind) {
         // An unnamed executor is named by the kind of thread asked for, so an
         // @Async(thread = VIRTUAL) method never lands on the platform pool an
@@ -226,10 +235,14 @@ public final class Tasks {
             String prefix = "cn1.task.executor." + key + ".";
             int threads = SCHEDULING.equals(key) ? 2 : 8;
             String configured = null;
+            int capacity = 0;
+            String namePrefix = null;
             if (registry.config != null) {
                 try {
                     threads = registry.config.getInt(prefix + "threads", threads);
                     configured = registry.config.get(prefix + "kind");
+                    capacity = registry.config.getInt(prefix + "queue-capacity", 0);
+                    namePrefix = registry.config.get(prefix + "thread-name-prefix", null);
                 } catch (java.io.IOException err) {
                     throw new IllegalStateException("Executor " + key
                             + " cannot be configured: " + err.getMessage(), err);
@@ -245,6 +258,7 @@ public final class Tasks {
                 // Decided per task by the executor, not here: this may run during
                 // start-up, before the server's hosts exist.
                 TaskExecutor created = new TaskExecutor(key, false, true, threads, registry);
+                created.configure(capacity, namePrefix);
                 if (configured == null) {
                     registry.requestedKinds.put(key, Integer.valueOf(kind));
                 }
@@ -262,6 +276,7 @@ public final class Tasks {
                 registry.requestedKinds.put(key, Integer.valueOf(kind));
             }
             TaskExecutor created = new TaskExecutor(key, virtual, threads, registry);
+            created.configure(capacity, namePrefix);
             registry.executors.put(key, created);
             return created;
         }

@@ -1,0 +1,7 @@
+collected 3
+done [4, 5]
+runtime: disk
+program: mine
+[<7>, <8>]
+hi bob!
+hi amy?

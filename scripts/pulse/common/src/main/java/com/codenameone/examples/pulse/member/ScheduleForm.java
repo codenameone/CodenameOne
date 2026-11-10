@@ -32,9 +32,9 @@ import com.codenameone.examples.pulse.api.MemberDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
-import com.codenameone.examples.pulse.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -200,7 +200,7 @@ public final class ScheduleForm extends LiveChannel.Adapter {
                             : Lang.tr("Nothing on this day for {0}.", member.name())));
         }
         if (list.getComponentCount() == 0) {
-            list.add(new Skeleton(5));
+            list.add(new Skeleton(5, "SvSkeleton"));
         }
         Ui.refresh(form);
     }

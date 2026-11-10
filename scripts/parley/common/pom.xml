@@ -24,6 +24,13 @@
             <artifactId>parley-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The Codename One app kit, a cn1lib. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-app-kit-lib</artifactId>
+            <version>${cn1.version}</version>
+            <type>pom</type>
+        </dependency>
 
         <!--
           Test-scope deps needed if you add JUnit 5 tests under

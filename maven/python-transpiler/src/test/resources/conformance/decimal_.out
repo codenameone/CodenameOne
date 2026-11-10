@@ -1,0 +1,56 @@
+3.30 1.690 0.3333333333333333333333333333 0.5 2E+2 1.0E+2
+3 -3 1.5 -1.5 (Decimal('-3'), Decimal('-1'))
+0.1000000000000000055511151231257827021181583404541015625 1.5 -0 1000000000000000000000000000000 -0.123400 1000.5 -3.14
+Decimal('-0') Infinity -Infinity NaN sNaN12 True 1E+2 0.000001
+1E-7 1.23E-8 1.23E+5 100 123E+3 0.0E-6 12.3E-9
+1.414213562373095048801688724 4 0.5 2.718281828459045235360287471 2.302585092994045684017991455 2 0.3010299956639811952137388947 -0.6931471805599453094172321215
+1024 3.375 0.25 2.000000000000000000000000000 1.414213562373095048801688724 -8 1.000000000000000000000000000E+30 5.153775207320113310364611298E+47 1
+3.14 2.68 -2 3 1.23
+ROUND_UP ['3', '-3', '2', '-2', '1', '6', '-1']
+ROUND_DOWN ['2', '-2', '1', '-1', '0', '5', '-0']
+ROUND_CEILING ['3', '-2', '2', '-1', '1', '6', '-0']
+ROUND_FLOOR ['2', '-3', '1', '-2', '0', '5', '-1']
+ROUND_HALF_UP ['3', '-3', '1', '-1', '1', '5', '-0']
+ROUND_HALF_DOWN ['2', '-2', '1', '-1', '0', '5', '-0']
+ROUND_HALF_EVEN ['2', '-2', '1', '-1', '0', '5', '-0']
+ROUND_05UP ['2', '-2', '1', '-1', '1', '6', '-1']
+2 4 1.23 -7 1.25 1 -1 DecimalTuple(sign=0, digits=(1, 2, 5, 0), exponent=-2) (3, 4) (-3, 1)
+2.5 1.2E+3 0 -1E+2 0 7 1 1 -1
+True True True False True True False True [Decimal('-2'), Decimal('1.5'), Decimal('1.50'), Decimal('3')]
+True True True 314159 a True
+28 ROUND_HALF_EVEN Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999, capitals=1, clamp=0, flags=[Inexact, FloatOperation, Rounded], traps=[InvalidOperation, DivisionByZero, Overflow])
+0.14286 1.2346E+8 1.2346 5
+0.666 9.99
+28 3.14159 0.3333
+True True False Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999, capitals=1, clamp=0, flags=[Inexact, Rounded], traps=[InvalidOperation, DivisionByZero, Overflow])
+DivisionByZero [<class 'decimal.DivisionByZero'>]
+InvalidOperation [<class 'decimal.DivisionUndefined'>]
+InvalidOperation [<class 'decimal.ConversionSyntax'>]
+Overflow [<class 'decimal.Overflow'>]
+InvalidOperation [<class 'decimal.InvalidOperation'>]
+InvalidOperation [<class 'decimal.InvalidOperation'>]
+InvalidOperation [<class 'decimal.InvalidOperation'>]
+InvalidOperation [<class 'decimal.InvalidOperation'>]
+ValueError cannot convert NaN to integer
+OverflowError cannot convert Infinity to integer
+Infinity NaN NaN True True
+'1,234,567.89' '-0.00' '12.50' '10,000,000,000.00' '0.00' 
+'1.234567891e+6' '-1.23e-4' '1.25e+1' '1e+10' '0e+0' 
+'1.235e+6' '-1.230e-4' '1.250e+1' '1.000e+10' '0.000e+3' 
+'123456789.1%' '-0.0123%' '1250%' '1000000000000%' '0%' 
+'1234567.891' '-0.000123' '12.5' '1E+10' '0' 
+'01,234,567.9' '-0,000,000.0' '00,000,012.5' '10,000,000,000.0' '00,000,000.0' 
+'1234567.891' '-0.000123 ' '   12.5   ' '  1E+10   ' '    0     ' 
+'+1234567.9' '-0.0' '+12.5' '+10000000000.0' '+0.0' 
+'1234567.891' '-0.000123' '12.5' '1e+10' '0' 
+'1.2e+6' '-0.00012' '12' '1e+10' '0' 
+'1_234_567.9' '-0.0' '12.5' '10_000_000_000.0' '0.0' 
+'1.234567891E+6' '-1.23E-4' '1.25E+1' '1E+10' '0E+0' 
+'1234567.89' '-0.00   ' '12.50   ' '10000000000.00' '0.00    ' 
+'1234567.891' '-000.000' '0012.500' '10000000000.000' '0000.000' 
+3.142 0.0   Infinity +NaN
+False True True +Normal -Infinity True -3 3.25 -1 0.18 3
+3 3 2.5 3.0 0.125 3 1 -5 2.5 2.25 8 False True
+TypeError
+0.25 10000000000000000159028911097599180468360808563945281389781327557747838772170381060813469985856815104 True True True
+True False 1 0

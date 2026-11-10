@@ -85,6 +85,22 @@ public final class Tcp {
     /// fails to load would verify against roots the caller deliberately did not
     /// choose, so that is an error rather than a fallback.
     public void startTls(String host, String caFile) throws IOException {
+        startTls(host, caFile, true);
+    }
+
+    /// As [#startTls(String,String)], with the name check optional.
+    ///
+    /// `verifyHost` false still verifies the chain against `caFile` and skips
+    /// only the match between the certificate and `host`: what
+    /// `sslmode=verify-ca` asks for. It is refused without a `caFile`, because
+    /// a public root vouches for names, and a chain to one without the name is
+    /// a certificate for anybody.
+    public void startTls(String host, String caFile, boolean verifyHost)
+            throws IOException {
+        if (!verifyHost && caFile == null) {
+            throw new IOException("Skipping the host name check needs a trust "
+                    + "root of its own (sslrootcert)");
+        }
         // BOTH STRINGS, and the name is the one that decides who the peer is
         // allowed to be. It crosses to a native as a C string, so a NUL inside it
         // ends the name there and OpenSSL verifies the certificate against the
@@ -116,7 +132,7 @@ public final class Tcp {
         long session;
         claim(claimed);
         try {
-            session = startTlsImpl(claimed[0], host, caFile);
+            session = startTlsImpl(claimed[0], host, caFile, verifyHost);
         } finally {
             release();
         }
@@ -222,6 +238,63 @@ public final class Tcp {
     /// Whether this connection is encrypted.
     public boolean isSecure() {
         return tls != 0;
+    }
+
+    /// The certificates the server presented in the TLS handshake, leaf first,
+    /// each as DER; empty while the connection is plaintext. For pinning a
+    /// server's key or reading its expiry -- what `openssl s_client -showcerts`
+    /// prints. The chain has already been verified when this answers: an
+    /// untrusted one failed [#startTls(String)].
+    public byte[][] getPeerCertificates() throws IOException {
+        checkOpen();
+        long[] claimed = new long[1];
+        long session = claim(claimed);
+        byte[] all;
+        try {
+            all = session == 0 ? null : tlsPeerChainImpl(session);
+        } finally {
+            release();
+        }
+        if (all == null) {
+            return new byte[0][];
+        }
+        // The natives hand back the certificates end to end; each is a DER
+        // SEQUENCE, so its own header says where it stops.
+        java.util.List<byte[]> out = new java.util.ArrayList<byte[]>();
+        int at = 0;
+        while (at < all.length) {
+            int length = derLength(all, at);
+            byte[] one = new byte[length];
+            System.arraycopy(all, at, one, 0, length);
+            out.add(one);
+            at += length;
+        }
+        return out.toArray(new byte[out.size()][]);
+    }
+
+    /// The whole length, header included, of the DER element at `at`.
+    private static int derLength(byte[] der, int at) throws IOException {
+        if (at + 2 > der.length) {
+            throw new IOException("A peer certificate is cut short");
+        }
+        int first = der[at + 1] & 0xff;
+        int header = 2;
+        int length = first;
+        if (first >= 0x80) {
+            int count = first & 0x7f;
+            if (count == 0 || count > 4 || at + 2 + count > der.length) {
+                throw new IOException("A peer certificate has a bad length");
+            }
+            length = 0;
+            for (int iter = 0 ; iter < count ; iter++) {
+                length = (length << 8) | (der[at + 2 + iter] & 0xff);
+            }
+            header += count;
+        }
+        if (length < 0 || length > der.length - at - header) {
+            throw new IOException("A peer certificate runs past the chain");
+        }
+        return header + length;
     }
 
     /// A receive and send deadline for this connection, in milliseconds; 0 for
@@ -365,11 +438,13 @@ public final class Tcp {
     private static native int setReadTimeoutImpl(long handle, int millis);
     private static native int writeImpl(long handle, byte[] buffer, int offset, int length);
     private static native int closeImpl(long handle);
-    private static native long startTlsImpl(long handle, String host, String caFile);
+    private static native long startTlsImpl(long handle, String host, String caFile,
+            boolean verifyHost);
     private static native String tlsErrorImpl();
     private static native int tlsReadImpl(long session, byte[] buffer, int offset, int length);
     private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);
     private static native void tlsCloseImpl(long session);
+    private static native byte[] tlsPeerChainImpl(long session);
 
     /// shutdown(2) on the descriptor: wakes whatever is blocked on it WITHOUT
     /// giving the number back to the process. See close().

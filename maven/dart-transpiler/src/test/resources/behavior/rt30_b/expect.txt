@@ -1,0 +1,17 @@
+List<(int) => int>
+List<(int) => void>
+List<Object>
+List<Comparable<dynamic>>
+List<Color>
+List<num>
+List<int>
+List<double>
+List<num>
+List<Object>
+List<int?>
+List<Null>
+_Map<num, String>
+_Set<num>
+List<Object>
+List<Object>
+List<Object>

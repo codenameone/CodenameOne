@@ -68,4 +68,12 @@ public class NestedScrollView extends StatelessWidget {
     public Widget build(BuildContext context) {
         return body != null ? body : new SizedBox();
     }
+
+    private static final SliverOverlapAbsorberHandle HANDLE = new SliverOverlapAbsorberHandle();
+
+    /// Flutter's {@code NestedScrollView.sliverOverlapAbsorberHandleFor}: the
+    /// handle the absorber in the header and the injector in the body share.
+    public static SliverOverlapAbsorberHandle sliverOverlapAbsorberHandleFor(BuildContext context) {
+        return HANDLE;
+    }
 }

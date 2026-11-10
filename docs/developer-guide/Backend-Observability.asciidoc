@@ -400,6 +400,11 @@ somewhere, such as a queue's length. A histogram's second form takes bucket
 boundaries and up to three attribute keys, recorded with
 `record(value, first, second, third)`.
 
+A gauge can carry fixed tags, `Metrics.gauge(name, description, unit, tags,
+source)`, so one callback per queue reports under one name. A histogram also
+answers in process: `getCount`, `getSum` and `getMean` read what it recorded,
+for a health check or a log line that needs no exporter.
+
 ==== Exporting
 
 Metrics use the tracing settings from <<Tracing with OpenTelemetry>> unless a

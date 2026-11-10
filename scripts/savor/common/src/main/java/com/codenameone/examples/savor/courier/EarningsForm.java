@@ -33,9 +33,9 @@ import com.codenameone.examples.savor.api.EarningsSummaryDto;
 import com.codenameone.examples.savor.api.PayoutAccountDto;
 import com.codenameone.examples.savor.api.PayoutDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.pay.Cards;
-import com.codenameone.examples.savor.ui.Chart;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.StatRow;
 import com.codenameone.examples.savor.ui.Ui;
@@ -109,7 +109,7 @@ public final class EarningsForm {
         for (int iter = 0; iter < days; iter++) {
             amounts[iter] = summary.daily().get(iter).amount();
         }
-        page.add(Chart.of("daily", amounts, Lang.tr("{0} days ago", String.valueOf(
+        page.add(Chart.of("Sv", "daily", amounts, Lang.tr("{0} days ago", String.valueOf(
                 Math.max(1, days - 1))), Lang.tr("Today")));
 
         StatRow numbers = Ui.stats(2);

@@ -44,10 +44,13 @@ import com.codename1.backend.security.crypto.Der;
 /// The profile is the one OpenSSL 3 and current JDKs write by default:
 /// PBES2 with PBKDF2-HMAC-SHA-256 (or SHA-1) and AES-128/192/256-CBC for the
 /// encrypted parts, and an HMAC-SHA-256, -384, -512 or -SHA-1 integrity MAC.
-/// The legacy RC2 and 3DES schemes (`openssl pkcs12 -legacy`, very old
-/// keytool) are refused with a message saying how to re-export the file. What
+/// The legacy schemes of RFC 7292 appendix C -- 3DES and RC2 keyed through
+/// the PKCS#12 KDF, which `openssl pkcs12 -legacy`, old keytool and Apple's
+/// keychain write -- are read too. What
 /// [#encode] writes is PBES2/PBKDF2-HMAC-SHA-256/AES-256-CBC with an
 /// HMAC-SHA-256 MAC, which `openssl pkcs12` and `keytool` both read.
+/// [#encodeLegacy] writes the legacy suite instead, for the one reader that
+/// needs it: Apple's keychain, which imports nothing else.
 ///
 /// A store with more than one private key is read for its first one.
 public final class Pkcs12 {
@@ -71,6 +74,14 @@ public final class Pkcs12 {
     private static final String SHA384 = "2.16.840.1.101.3.4.2.2";
     private static final String SHA512 = "2.16.840.1.101.3.4.2.3";
     private static final String PKCS12_PBE = "1.2.840.113549.1.12.1.";
+    /// The `PKCS12_PBE` schemes read: SHA-1 with 128-bit RC2, 3-key 3DES,
+    /// 2-key 3DES and 40-bit RC2.
+    private static final String LEGACY_RC2_128 = "5";
+    private static final String LEGACY_3DES = "3";
+    private static final String LEGACY_2DES = "4";
+    private static final String LEGACY_RC2_40 = "6";
+    /// What `openssl pkcs12 -legacy` and the keychain write.
+    private static final int LEGACY_ITERATIONS = 2048;
 
     /// The iteration count [#encode] uses for both the key derivation and the MAC.
     private static final int ITERATIONS = 10000;
@@ -293,9 +304,7 @@ public final class Pkcs12 {
         Asn1.Reader algorithm = new Asn1.Reader(algorithmIdentifier).open(Asn1.SEQUENCE);
         String oid = algorithm.oid();
         if (oid.startsWith(PKCS12_PBE)) {
-            throw new CertificateException("The PKCS#12 file uses a legacy RC2 or 3DES "
-                    + "encryption. Re-export it with current defaults: `openssl pkcs12 -in old.p12 "
-                    + "-legacy -nodes | openssl pkcs12 -export -out new.p12`");
+            return decryptLegacy(oid, algorithm.open(Asn1.SEQUENCE), sealed, password);
         }
         if (!PBES2.equals(oid)) {
             throw new CertificateException("Not a supported PKCS#12 encryption: " + oid);
@@ -355,6 +364,87 @@ public final class Pkcs12 {
         byte[] plain = new byte[out.length - pad];
         System.arraycopy(out, 0, plain, 0, plain.length);
         return plain;
+    }
+
+    /// RFC 7292 appendix C: the key and the IV come from the PKCS#12 KDF over
+    /// SHA-1, with ids 1 and 2.
+    private static byte[] decryptLegacy(String oid, Asn1.Reader params, byte[] sealed,
+                                        String password) throws IOException {
+        byte[] salt = params.read(Asn1.OCTET_STRING);
+        int iterations = params.smallInteger();
+        checkIterations(iterations);
+        String scheme = oid.substring(PKCS12_PBE.length());
+        int keyLength = legacyKeyLength(scheme);
+        if (keyLength < 0) {
+            throw new CertificateException("Not a supported PKCS#12 encryption: " + oid);
+        }
+        if (sealed.length == 0 || sealed.length % 8 != 0) {
+            throw new CertificateException("A PKCS#12 legacy part is not whole blocks");
+        }
+        byte[] pass = Asn1.bmpBytes(password, true);
+        byte[] key = pkcs12Kdf(Crypto.SHA1, pass, salt, iterations, 1, keyLength);
+        byte[] iv = pkcs12Kdf(Crypto.SHA1, pass, salt, iterations, 2, 8);
+        // As in decrypt(): only reached after the MAC accepted the file.
+        byte[] out = legacyCipher(false, scheme, key, iv, sealed);
+        int pad = out[out.length - 1] & 0xff;
+        boolean good = pad >= 1 && pad <= 8;
+        for (int iter = 1 ; good && iter <= pad ; iter++) {
+            good = (out[out.length - iter] & 0xff) == pad;
+        }
+        if (!good) {
+            throw new CertificateException("The PKCS#12 password is wrong: a part of the file "
+                    + "does not decrypt");
+        }
+        byte[] plain = new byte[out.length - pad];
+        System.arraycopy(out, 0, plain, 0, plain.length);
+        return plain;
+    }
+
+    /// The key length of a `1.2.840.113549.1.12.1.n` scheme, or -1.
+    private static int legacyKeyLength(String scheme) {
+        if (LEGACY_3DES.equals(scheme)) {
+            return 24;
+        }
+        if (LEGACY_2DES.equals(scheme) || LEGACY_RC2_128.equals(scheme)) {
+            return 16;
+        }
+        if (LEGACY_RC2_40.equals(scheme)) {
+            return 5;
+        }
+        return -1;
+    }
+
+    private static byte[] legacyCipher(boolean encrypt, String scheme, byte[] key, byte[] iv,
+                                       byte[] data) {
+        if (LEGACY_3DES.equals(scheme) || LEGACY_2DES.equals(scheme)) {
+            return LegacyCiphers.tripleDes(encrypt, key, iv, data);
+        }
+        return LegacyCiphers.rc2(encrypt, key, key.length * 8, iv, data);
+    }
+
+    /// {AlgorithmIdentifier, ciphertext} under a legacy PKCS#12 scheme.
+    private static byte[][] encryptLegacy(String scheme, byte[] plaintext, String password)
+            throws IOException {
+        byte[] salt = Crypto.randomBytes(8);
+        byte[] pass = Asn1.bmpBytes(password, true);
+        byte[] key = pkcs12Kdf(Crypto.SHA1, pass, salt, LEGACY_ITERATIONS, 1,
+                legacyKeyLength(scheme));
+        byte[] iv = pkcs12Kdf(Crypto.SHA1, pass, salt, LEGACY_ITERATIONS, 2, 8);
+        byte[] sealed = legacyCipher(true, scheme, key, iv, pad(plaintext, 8));
+        byte[] algorithm = Asn1.sequence(Asn1.oid(PKCS12_PBE + scheme),
+                Asn1.sequence(Asn1.octets(salt), Asn1.integer(LEGACY_ITERATIONS)));
+        return new byte[][] {algorithm, sealed};
+    }
+
+    /// PKCS#7 padding to whole blocks of `block` bytes.
+    private static byte[] pad(byte[] plaintext, int block) {
+        int pad = block - plaintext.length % block;
+        byte[] padded = new byte[plaintext.length + pad];
+        System.arraycopy(plaintext, 0, padded, 0, plaintext.length);
+        for (int iter = plaintext.length ; iter < padded.length ; iter++) {
+            padded[iter] = (byte) pad;
+        }
+        return padded;
     }
 
     private static void checkIterations(int iterations) throws CertificateException {
@@ -464,6 +554,21 @@ public final class Pkcs12 {
     /// @param password protects both the key and the MAC
     public static byte[] encode(byte[] privateKey, List<Certificate> chain, String alias,
                                 String password) throws IOException {
+        return encode(privateKey, chain, alias, password, false);
+    }
+
+    /// Writes a store in the legacy suite: certificates under 40-bit RC2, the
+    /// key under 3DES, both keyed by the PKCS#12 KDF, and an HMAC-SHA-1 MAC --
+    /// what `openssl pkcs12 -export -legacy` writes. Apple's keychain (and
+    /// so `security import` on a build machine) imports this and nothing
+    /// newer. The suite is weak; use [#encode] for every other reader.
+    public static byte[] encodeLegacy(byte[] privateKey, List<Certificate> chain, String alias,
+                                      String password) throws IOException {
+        return encode(privateKey, chain, alias, password, true);
+    }
+
+    private static byte[] encode(byte[] privateKey, List<Certificate> chain, String alias,
+                                 String password, boolean legacy) throws IOException {
         if (chain == null || (privateKey == null && chain.isEmpty())) {
             throw new CertificateException("A key store needs a key or a certificate");
         }
@@ -480,7 +585,8 @@ public final class Pkcs12 {
         List<byte[]> safes = new ArrayList<byte[]>();
         if (!certBags.isEmpty()) {
             byte[] contents = Asn1.sequence(certBags.toArray(new byte[certBags.size()][]));
-            byte[][] sealed = encrypt(contents, pass);
+            byte[][] sealed = legacy ? encryptLegacy(LEGACY_RC2_40, contents, pass)
+                    : encrypt(contents, pass);
             byte[] encryptedData = Asn1.sequence(Asn1.integer(0), Asn1.sequence(Asn1.oid(DATA),
                     sealed[0], Asn1.tlv(Asn1.implicit(0), sealed[1])));
             safes.add(Asn1.sequence(Asn1.oid(ENCRYPTED_DATA),
@@ -488,18 +594,22 @@ public final class Pkcs12 {
         }
         if (privateKey != null) {
             Der.privateKeyType(privateKey);
-            byte[][] sealed = encrypt(privateKey, pass);
+            byte[][] sealed = legacy ? encryptLegacy(LEGACY_3DES, privateKey, pass)
+                    : encrypt(privateKey, pass);
             byte[] shrouded = Asn1.sequence(sealed[0], Asn1.octets(sealed[1]));
             byte[] keyBag = bag(SHROUDED_KEY_BAG, shrouded, attributes(keyId, alias));
             safes.add(Asn1.sequence(Asn1.oid(DATA),
                     Asn1.tlv(Asn1.explicit(0), Asn1.octets(Asn1.sequence(keyBag)))));
         }
         byte[] content = Asn1.sequence(safes.toArray(new byte[safes.size()][]));
-        byte[] salt = Crypto.randomBytes(16);
-        byte[] macKey = pkcs12Kdf(Crypto.SHA256, Asn1.bmpBytes(pass, true), salt, ITERATIONS, 3, 32);
-        byte[] mac = Crypto.hmac(Crypto.SHA256, macKey, content);
-        byte[] macData = Asn1.sequence(Asn1.sequence(Asn1.sequence(Asn1.oid(SHA256),
-                Asn1.nullValue()), Asn1.octets(mac)), Asn1.octets(salt), Asn1.integer(ITERATIONS));
+        String macDigest = legacy ? Crypto.SHA1 : Crypto.SHA256;
+        int macIterations = legacy ? LEGACY_ITERATIONS : ITERATIONS;
+        byte[] salt = Crypto.randomBytes(legacy ? 8 : 16);
+        byte[] macKey = pkcs12Kdf(macDigest, Asn1.bmpBytes(pass, true), salt, macIterations, 3,
+                digestLength(macDigest));
+        byte[] mac = Crypto.hmac(macDigest, macKey, content);
+        byte[] macData = Asn1.sequence(Asn1.sequence(Asn1.sequence(Asn1.oid(legacy ? SHA1 : SHA256),
+                Asn1.nullValue()), Asn1.octets(mac)), Asn1.octets(salt), Asn1.integer(macIterations));
         return Asn1.sequence(Asn1.integer(3), Asn1.sequence(Asn1.oid(DATA),
                 Asn1.tlv(Asn1.explicit(0), Asn1.octets(content))), macData);
     }
@@ -526,14 +636,7 @@ public final class Pkcs12 {
         byte[] salt = Crypto.randomBytes(16);
         byte[] iv = Crypto.randomBytes(16);
         byte[] key = Crypto.pbkdf2(Crypto.SHA256, Asn1.utf8Bytes(password), salt, ITERATIONS, 32);
-        // PKCS#7: one to sixteen bytes, each holding the count.
-        int pad = 16 - plaintext.length % 16;
-        byte[] padded = new byte[plaintext.length + pad];
-        System.arraycopy(plaintext, 0, padded, 0, plaintext.length);
-        for (int iter = plaintext.length ; iter < padded.length ; iter++) {
-            padded[iter] = (byte) pad;
-        }
-        byte[] sealed = Crypto.aesCbcEncryptBlocks(key, iv, padded);
+        byte[] sealed = Crypto.aesCbcEncryptBlocks(key, iv, pad(plaintext, 16));
         byte[] kdf = Asn1.sequence(Asn1.oid(PBKDF2), Asn1.sequence(Asn1.octets(salt),
                 Asn1.integer(ITERATIONS), Asn1.sequence(Asn1.oid(HMAC_SHA256), Asn1.nullValue())));
         byte[] scheme = Asn1.sequence(Asn1.oid(AES256_CBC), Asn1.octets(iv));

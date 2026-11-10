@@ -25,7 +25,7 @@ from typing import Any
 
 from syndicate_blog_posts import (
     BLOG_DIR, ELIGIBILITY_FLOOR, MIN_AGE_DAYS, REPO_ROOT,
-    STATE_FILE, USER_AGENT, Post, State, _MERMAID_BLOCK_RE,
+    STATE_FILE, USER_AGENT, Post, State, _MERMAID_BLOCK_RE, canonical_is_live,
     discover_posts, render_syndicated_body, select_candidate,
 )
 
@@ -160,10 +160,10 @@ class GitHub:
     """Use the authenticated gh CLI; credentials never enter command arguments."""
 
     def api(self, endpoint: str, payload: dict | None = None,
-            *, optional: bool = False) -> Any:
+            *, optional: bool = False, method: str = "POST") -> Any:
         command = ["gh", "api", "--hostname", "github.com", endpoint]
         if payload is not None:
-            command += ["--method", "POST", "--input", "-"]
+            command += ["--method", method, "--input", "-"]
         env = os.environ.copy()
         if env.get("FOOJAY_GITHUB_TOKEN"):
             env["GH_TOKEN"] = env["FOOJAY_GITHUB_TOKEN"]
@@ -196,18 +196,28 @@ def sync_fork(github: Any, head_repo: str, branch: str) -> bool:
     upstream ``.github/workflows`` change cannot take the branch without
     workflow permission (see ``fork_missing_upstream_workflow_commit``).
     Syncing first keeps the fork current; it is a no-op when already in sync.
-    A failed sync (the same missing permission, or a fork with commits of its
-    own) is reported and the submission still proceeds -- it only fails if
-    the branch then really needs the missing commits.
+    The fork exists only to carry submission branches, so its default branch
+    is never anyone's work: when it has diverged (merge-upstream answers 409,
+    which happened every week once old submission commits landed on it) it is
+    force-reset to upstream's head. A reset that still fails is reported and
+    the submission proceeds -- it only fails if the branch then really needs
+    the missing commits.
     """
     if head_repo == UPSTREAM:
         return True
     try:
         result = github.api(f"repos/{head_repo}/merge-upstream", {"branch": branch})
     except Exception as err:  # noqa: BLE001
-        print(f"[foojay] WARNING: could not sync {head_repo}:{branch} with {UPSTREAM}: {err}",
-              file=sys.stderr)
-        return False
+        try:
+            upstream_sha = github.api(f"repos/{UPSTREAM}/commits/{branch}")["sha"]
+            github.api(f"repos/{head_repo}/git/refs/heads/{branch}",
+                       {"sha": upstream_sha, "force": True}, method="PATCH")
+        except Exception as reset_err:  # noqa: BLE001
+            print(f"[foojay] WARNING: could not sync {head_repo}:{branch} with {UPSTREAM}: {err}; "
+                  f"force reset failed too: {reset_err}", file=sys.stderr)
+            return False
+        print(f"[foojay] {head_repo}:{branch} had diverged; force-reset to {UPSTREAM} {upstream_sha[:10]}")
+        return True
     message = (result or {}).get("message") if isinstance(result, dict) else None
     if message:
         print(f"[foojay] {head_repo}: {message}")
@@ -359,6 +369,8 @@ def main(argv: list[str]) -> int:
         if args.submit and os.environ.get("GITHUB_ACTIONS") == "true" and not os.environ.get("FOOJAY_GITHUB_TOKEN"):
             raise RuntimeError("Set FOOJAY_GITHUB_TOKEN: the workflow GITHUB_TOKEN cannot write to Foojay or a fork")
         files = build_bundle(post, posts, args.today, args.static_dir)
+        if args.submit and not canonical_is_live(post):
+            raise RuntimeError(f"Canonical page is not live: {post.canonical_url}")
         if args.output_dir:
             for relative, data in files.items():
                 target = args.output_dir / relative

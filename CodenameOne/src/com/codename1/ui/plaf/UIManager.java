@@ -385,6 +385,10 @@ public class UIManager {
     private void rememberNativeValue(String key, Object value) {
         nativeOriginals.put(key, themeProps.get(key));
         nativeDerived.put(key, value);
+        if (!themeProps.containsKey(key)) {
+            // A new key changes what hasStyleDefinition answers; drop its sorted key snapshot.
+            styleDefinitionCache = null;
+        }
         themeProps.put(key, value);
     }
 
@@ -962,8 +966,8 @@ public class UIManager {
     /// `$Dark&lt;UIID&gt;`.
     ///
     /// The answer is memoised for a whole theme generation by the same style-definition index
-    /// that backs dark-style resolution, so the linear scan behind it happens once per UIID
-    /// and type, not once per query.
+    /// that backs dark-style resolution. A sorted key index is built once per theme
+    /// generation, then a lower-bound search answers each previously unseen prefix.
     ///
     /// #### Parameters
     ///
@@ -2592,7 +2596,7 @@ public class UIManager {
         }
 
         // Everything above merged into themeProps, so the style-definition index
-        // and the $Dark key list it carries describe the theme as it was BEFORE
+        // and the sorted key snapshot it carries describe the theme as it was BEFORE
         // this call and have to go.
         //
         // themeGeneration does not cover this. A theme carrying
@@ -3030,8 +3034,8 @@ public class UIManager {
         // straight into themeProps without bumping it, so a $Dark override
         // added through the public parseComponentStyle API was invisible to
         // every id resolved for the first time afterwards, and the light style
-        // was built instead. Dropping the map rebuilds both it and the $Dark
-        // key index on the next question.
+        // was built instead. Dropping the map rebuilds both it and the sorted
+        // property-name index on the next question.
         styleDefinitionCache = null;
 
         return getComponentStyleImpl(originalId, selected, prefix);
@@ -3282,90 +3286,67 @@ public class UIManager {
         return darkMode != null && darkMode.booleanValue() && hasStyleDefinition("$Dark" + id);
     }
 
-    /// Whether any theme entry begins with this id, MEMOISED for the current theme.
+    /// Answers a prefix query against an immutable sorted index of the current theme.
+    /// Each theme generation builds the index once. A lower-bound search finds the
+    /// first key that could have the requested prefix, preserving the former full
+    /// scan's exact String.startsWith semantics for arbitrary UIIDs and state names.
+    /// This avoids a complete theme scan for each previously unseen hover or dark
+    /// style. Existing theme replacement and inline parsing invalidate the cache.
+    /// Calls follow the same UI-thread confinement as the surrounding style caches.
     ///
-    /// The answer cannot change while the theme does not, and the scan behind it
-    /// is linear in the whole theme: 448 defaults before a native theme and the
-    /// application's own are layered on top. createStyle asks this for every
-    /// style it builds -- through shouldUseDarkStyle, once per UIID -- so a dark
-    /// mode start-up walked the entire property table hundreds of times over.
-    /// Profiled on the native port, hasStyleDefinition and its caller were 5% of
-    /// the sampled start-up.
+    /// #### Parameters
     ///
-    /// Keyed on themeGeneration, which setThemePropsImpl already bumps whenever
-    /// the properties are replaced, so a theme change discards this by
-    /// construction rather than by remembering to.
+    /// - `styleId`: exact case-sensitive prefix requested by style resolution
+    ///
+    /// #### Returns
+    ///
+    /// whether any current theme property starts with that prefix
     private boolean hasStyleDefinition(String styleId) {
         if (styleDefinitionCache == null || styleDefinitionCacheGeneration != themeGeneration) {
             styleDefinitionCache = new HashMap<String, Boolean>();
             styleDefinitionCacheGeneration = themeGeneration;
-            darkStyleKeys = indexDarkKeys();
+            styleDefinitionKeys = indexStyleDefinitionKeys();
         }
         Boolean cached = styleDefinitionCache.get(styleId);
         if (cached != null) {
             return cached.booleanValue();
         }
-        boolean found = false;
-        // The memoisation above is per styleId, so a screen with hundreds of
-        // distinct uiids still walked the whole property table hundreds of
-        // times -- once for each uiid's first use. Profiled on the native port,
-        // that loop (String.startsWith plus the HashMap iterator) was the top
-        // non-GC cost of building a screen, and the first use of a uiid cost
-        // 112us against 800ns for every later use.
-        //
-        // Every caller asks the same question -- "does the theme define a $Dark
-        // override for this style" -- so only keys beginning with $Dark can
-        // ever match, and a theme that defines none (which is the normal case
-        // for an application that draws its own visuals) answers in constant
-        // time instead of scanning everything to find nothing.
-        String[] dark = darkStyleKeys;
-        if (styleId.startsWith("$Dark") && dark != null) {
-            for (String darkKey : dark) {
-                if (darkKey.startsWith(styleId)) {
-                    found = true;
-                    break;
-                }
-            }
-        } else {
-            for (String key : themeProps.keySet()) {
-                if (key.startsWith(styleId)) {
-                    found = true;
-                    break;
-                }
+        int low = 0;
+        int high = styleDefinitionKeys.length;
+        while (low < high) {
+            int middle = low + ((high - low) >>> 1);
+            if (styleDefinitionKeys[middle].compareTo(styleId) < 0) {
+                low = middle + 1;
+            } else {
+                high = middle;
             }
         }
+        boolean found = low < styleDefinitionKeys.length && styleDefinitionKeys[low].startsWith(styleId);
         styleDefinitionCache.put(styleId, Boolean.valueOf(found));
         return found;
     }
 
-    /// The theme's $Dark keys, extracted once per theme generation. Usually
-    /// empty: an application that supplies its own visuals defines no dark
-    /// overrides at all, and then the query above never inspects a key.
-    private String[] indexDarkKeys() {
+    /// Snapshots and sorts property names without changing theme values or precedence.
+    /// The additional array contains references to existing immutable strings; sorting
+    /// is paid once per theme generation, not on first use of each component state.
+    ///
+    /// #### Returns
+    ///
+    /// an ascending array, empty when no theme properties are installed
+    private String[] indexStyleDefinitionKeys() {
         if (themeProps == null) {
             return new String[0];
         }
-        int n = 0;
-        for (String key : themeProps.keySet()) {
-            if (key.startsWith("$Dark")) {
-                n++;
-            }
-        }
-        String[] out = new String[n];
-        if (n == 0) {
-            return out;
-        }
-        int i = 0;
-        for (String key : themeProps.keySet()) {
-            if (key.startsWith("$Dark")) {
-                out[i++] = key;
-            }
-        }
-        return out;
+        String[] keys = themeProps.keySet().toArray(new String[themeProps.size()]);
+        Arrays.sort(keys);
+        return keys;
     }
 
+    // hasStyleDefinition answers from a snapshot of themeProps' keys, so every
+    // path that adds a key must bump themeGeneration or null this cache, as
+    // setThemePropsImpl, buildTheme and parseComponentStyle do.
     private HashMap<String, Boolean> styleDefinitionCache;
-    private String[] darkStyleKeys;
+    private String[] styleDefinitionKeys;
     private int styleDefinitionCacheGeneration = -1;
 
     /// This method is used to parse the margin and the padding

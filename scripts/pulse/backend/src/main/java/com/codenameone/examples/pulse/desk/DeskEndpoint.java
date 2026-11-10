@@ -20,7 +20,7 @@ package com.codenameone.examples.pulse.desk;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.api.CheckInRequestDto;
 import com.codenameone.examples.pulse.api.CheckInResultDto;
 import com.codenameone.examples.pulse.api.DeskApiServer;

@@ -96,6 +96,17 @@ class ValuesTest {
             return Values.asCharObject(v); } },
     };
 
+    /// MySQL and MariaDB answer BIT(1) -- Hibernate's boolean column there --
+    /// as a one-byte array (#6184); a wider blob is still not a flag.
+    @Test
+    @DisplayName("A BIT(1) value reads as a boolean")
+    void bitOneReadsAsBoolean() throws IOException {
+        assertEquals(Boolean.TRUE, Values.asBooleanObject(new byte[] {1}));
+        assertEquals(Boolean.FALSE, Values.asBooleanObject(new byte[] {0}));
+        assertTrue(Values.asBoolean(new byte[] {1}, false));
+        assertThrows(IOException.class, () -> Values.asBooleanObject(new byte[] {0, 1}));
+    }
+
     @Test
     @DisplayName("every encoding against every field type")
     void theWholeTable() {

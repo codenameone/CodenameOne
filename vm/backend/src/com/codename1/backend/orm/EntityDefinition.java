@@ -63,6 +63,28 @@ public abstract class EntityDefinition {
     /// somebody can act on rather than a zero appearing in a field.
     public abstract void set(Object entity, int index, Object value) throws IOException;
 
+    /// True for an entity whose fields cannot be written after construction, a
+    /// record. Nothing writes into one: [#with] and [#construct] answer copies.
+    public boolean immutable() {
+        return false;
+    }
+
+    /// `entity` with column `index` set to `value`. A mutable entity is
+    /// written in place and returned; an immutable one answers a copy.
+    public Object with(Object entity, int index, Object value) throws IOException {
+        set(entity, index, value);
+        return entity;
+    }
+
+    /// A new entity holding `values`, one per column in [#columns] order.
+    public Object construct(Object[] values) throws IOException {
+        Object entity = newInstance();
+        for (int iter = 0 ; iter < values.length ; iter++) {
+            set(entity, iter, values[iter]);
+        }
+        return entity;
+    }
+
     /// The index of the primary key column, which every entity has exactly one of.
     public final int idIndex() {
         ColumnDefinition[] all = columns();

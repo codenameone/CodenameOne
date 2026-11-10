@@ -1,0 +1,13 @@
+G<int>(1)
+G<String>(s)
+G<int>
+true
+G<dynamic>(2.5)
+G<dynamic>(true)
+int
+x
+true
+true
+List<int>
+[a, a]
+true

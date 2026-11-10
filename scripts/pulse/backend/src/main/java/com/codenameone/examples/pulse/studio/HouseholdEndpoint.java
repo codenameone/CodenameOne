@@ -19,7 +19,7 @@
 package com.codenameone.examples.pulse.studio;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.api.HouseholdApiServer;
 import com.codenameone.examples.pulse.api.MemberDto;
 import com.codenameone.examples.pulse.api.NewMemberDto;

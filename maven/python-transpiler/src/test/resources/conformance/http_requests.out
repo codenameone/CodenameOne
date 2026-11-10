@@ -1,0 +1,22 @@
+200 True OK utf-8 application/json True
+{'args': {'many': '1,2', 'n': '3', 'q': 'a b'}, 'body': '', 'content_type': None, 'headers': {'x-test': 'yes'}, 'method': 'GET'}
+True GET True
+{'args': {}, 'body': '{"b": [1, 2], "a": null, "s": "x"}', 'content_type': 'application/json', 'headers': {}, 'method': 'POST'}
+{'args': {}, 'body': 'name=py+thon&tags=a&tags=b', 'content_type': 'application/x-www-form-urlencoded', 'headers': {}, 'method': 'POST'}
+{'args': {}, 'body': 'raw text', 'content_type': 'text/plain', 'headers': {'x-a': '1'}, 'method': 'PUT'}
+PATCH {'x': '1'} bytes
+DELETE True
+404 False Not Found status 404 <Response [404]>
+HTTPError: 404 Client Error: Not Found for url: BASE/status/404 404
+HTTPError 503 Server Error: Service Unavailable for url: BASE/status/503
+200 {'redirected': '1'} BASE/get?redirected=1
+302 /get?redirected=1 True
+1 two - headers utf-8
+{'authenticated': True}
+401
+JSONDecodeError Expecting property name enclosed in double quotes: line 1 column 2 (char 1) True
+{'extra': '2', 'fixed': '1'} {'x-call': 'c', 'x-session': 's1'}
+MissingSchema Invalid URL 'nohost': No scheme supplied. Perhaps you meant https://nohost?
+InvalidSchema No connection adapters were found for 'ftp://example.com/x'
+ConnectionError True
+200 404 418

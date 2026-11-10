@@ -1,0 +1,26 @@
+true
+false
+true
+String
+true
+false
+2
+x
+[a, b]
+3
+true
+false
+adapter for int
+true
+false
+true
+true
+false
+false
+[1, 2]
+[a, b]
+later [a, b]
+adapter for double
+true
+false
+3

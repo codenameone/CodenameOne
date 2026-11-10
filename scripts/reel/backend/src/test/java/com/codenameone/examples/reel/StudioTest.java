@@ -24,8 +24,8 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.reel.account.Accounts;
-import com.codenameone.examples.reel.push.PushSender;
-import com.codenameone.examples.reel.push.RecordingPushSender;
+import com.codename1.appkit.server.push.PushSender;
+import com.codename1.appkit.server.push.RecordingPushSender;
 import org.junit.jupiter.api.Test;
 
 import java.security.MessageDigest;

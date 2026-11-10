@@ -23,24 +23,95 @@
  */
 package com.codename1.flutter.services;
 
-/**
- * Describes the status/navigation-bar appearance, mirroring Flutter's
- * {@code SystemUiOverlayStyle}. Inert here (CN1 manages system chrome
- * separately); the {@code light}/{@code dark} presets are provided for API
- * shape.
- */
+/// Flutter's SystemUiOverlayStyle: the colours and icon brightness of the system
+/// bars. copyWith builds a new style with the given values replaced.
 public final class SystemUiOverlayStyle {
 
-    /** Overlays suited to a light (bright) background. */
-    public static final SystemUiOverlayStyle light = new SystemUiOverlayStyle("light");
+    /// Light icons, for a dark app bar.
+    public static final SystemUiOverlayStyle light = new SystemUiOverlayStyle("light",
+            new Object[] {new com.codename1.flutter.Color(0xFF000000L), null, com.codename1.flutter.Brightness.light, null,
+                null, com.codename1.flutter.Brightness.dark, com.codename1.flutter.Brightness.light, null});
 
-    /** Overlays suited to a dark background. */
-    public static final SystemUiOverlayStyle dark = new SystemUiOverlayStyle("dark");
+    /// Dark icons, for a light app bar.
+    public static final SystemUiOverlayStyle dark = new SystemUiOverlayStyle("dark",
+            new Object[] {new com.codename1.flutter.Color(0xFF000000L), null, com.codename1.flutter.Brightness.light, null,
+                null, com.codename1.flutter.Brightness.light, com.codename1.flutter.Brightness.dark, null});
 
     private final String name;
+    private final Object[] values;
 
-    private SystemUiOverlayStyle(String name) {
+    private SystemUiOverlayStyle(String name, Object[] values) {
         this.name = name;
+        this.values = values;
+    }
+
+    public SystemUiOverlayStyle copyWith(Object systemNavigationBarColor, Object systemNavigationBarDividerColor,
+            Object systemNavigationBarIconBrightness, Object systemNavigationBarContrastEnforced,
+            Object statusBarColor, Object statusBarBrightness, Object statusBarIconBrightness,
+            Object systemStatusBarContrastEnforced) {
+        Object[] given = {systemNavigationBarColor, systemNavigationBarDividerColor,
+            systemNavigationBarIconBrightness, systemNavigationBarContrastEnforced, statusBarColor,
+            statusBarBrightness, statusBarIconBrightness, systemStatusBarContrastEnforced};
+        Object[] v = new Object[values.length];
+        for (int i = 0; i < v.length; i++) {
+            v[i] = given[i] != null ? given[i] : values[i];
+        }
+        return new SystemUiOverlayStyle(name, v);
+    }
+
+    public Object systemNavigationBarColor() {
+        return values[0];
+    }
+
+    public Object systemNavigationBarDividerColor() {
+        return values[1];
+    }
+
+    public Object systemNavigationBarIconBrightness() {
+        return values[2];
+    }
+
+    public Object systemNavigationBarContrastEnforced() {
+        return values[3];
+    }
+
+    public Object statusBarColor() {
+        return values[4];
+    }
+
+    public Object statusBarBrightness() {
+        return values[5];
+    }
+
+    public Object statusBarIconBrightness() {
+        return values[6];
+    }
+
+    public Object systemStatusBarContrastEnforced() {
+        return values[7];
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof SystemUiOverlayStyle)) {
+            return false;
+        }
+        Object[] w = ((SystemUiOverlayStyle) o).values;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] == null ? w[i] != null : !values[i].equals(w[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int h = 0;
+        for (Object x : values) {
+            h = h * 31 + (x == null ? 0 : x.hashCode());
+        }
+        return h;
     }
 
     @Override

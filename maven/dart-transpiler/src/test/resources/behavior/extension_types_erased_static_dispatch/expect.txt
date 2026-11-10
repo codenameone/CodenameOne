@@ -1,0 +1,45 @@
+3
+0
+8
+41
+true
+false
+4
+11
+true
+id#3
+x#3
+27
+int
+true
+true
+true
+3
+7
+3
+3
+[1, 2, 3]
+List<int>
+[2, 3, 4]
+five
+2.5m
+5.0m
+2
+3.5
+double
+admin:7
+id#7
+true
+int
+a
+3
+[a, b, c]
+List<String>
+*****
+hello
+40
+41
+Counter
+false
+NoSuchMethodError: describe
+41

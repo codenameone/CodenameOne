@@ -1,0 +1,21 @@
+200 OK True False utf-8 application/json
+{'args': {'n': '3', 'q': 'a b'}, 'body': '', 'content_type': None, 'headers': {'x-test': 'yes'}, 'method': 'GET'} /get a b BASE/get?q=a+b&n=3
+HTTP/1.1 GET <Response [200 OK]>
+{'args': {}, 'body': '{"b":[1,2],"a":null}', 'content_type': 'application/json', 'headers': {}, 'method': 'POST'}
+{'args': {}, 'body': 'k=v+w', 'content_type': 'application/x-www-form-urlencoded', 'headers': {}, 'method': 'POST'}
+{'args': {}, 'body': 'raw', 'content_type': None, 'headers': {'x-put': '1'}, 'method': 'PUT'}
+302 True /get?redirected=1
+200 {'redirected': '1'}
+404 True status 404
+Client error '404 Not Found' for url 'BASE/status/404'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+404 GET
+200
+{'extra': 'e', 'p': '1'} {'x-client': 'c'}
+200 {'authenticated': True}
+async 200 {'async': 'yes'}
+async [1,2,3]
+UnsupportedProtocol Request URL is missing an 'http://' or 'https://' protocol.
+ConnectError True True
+200 404 Timeout(timeout=3.0)
+1 2 ['a', 'b'] True

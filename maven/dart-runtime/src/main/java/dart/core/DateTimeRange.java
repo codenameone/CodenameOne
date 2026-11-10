@@ -38,6 +38,23 @@ public final class DateTimeRange {
         this.end = end;
     }
 
+    // Flutter's constructor takes `start:` and `end:` by name, and a named-argument
+    // construction of a runtime stub is emitted as allocate-then-setters: `new
+    // DateTimeRange()` followed by `start(x)` and `end(y)`. Both forms are kept, the
+    // positional one for Java callers (the date range picker).
+    public DateTimeRange() {
+    }
+
+    public DateTimeRange start(DateTime start) {
+        this.start = start;
+        return this;
+    }
+
+    public DateTimeRange end(DateTime end) {
+        this.end = end;
+        return this;
+    }
+
     public DateTime start() {
         return start;
     }

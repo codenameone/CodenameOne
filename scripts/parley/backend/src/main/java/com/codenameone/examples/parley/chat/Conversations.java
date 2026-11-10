@@ -24,7 +24,7 @@ import com.codename1.backend.Transactions;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.parley.Ids;
-import com.codenameone.examples.parley.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.parley.api.ConversationDto;
 import com.codenameone.examples.parley.api.ConversationEditDto;
 import com.codenameone.examples.parley.api.ConversationFlagsDto;

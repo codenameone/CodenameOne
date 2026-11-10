@@ -25,7 +25,7 @@ import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.wayline.Days;
 import com.codenameone.examples.wayline.Ids;
 import com.codenameone.examples.wayline.Rows;
-import com.codenameone.examples.wayline.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.wayline.api.DayAmountDto;
 import com.codenameone.examples.wayline.api.EarningsSummaryDto;
 import com.codenameone.examples.wayline.api.PayoutAccountDto;

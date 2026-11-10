@@ -1,0 +1,37 @@
+/ posix . .. True
+a/b/c.txt a/b /abs/x x
+('/a/b', 'c') ('', 'c') ('/', '') ('a', 'b')
+('x/y.tar', '.gz') ('.bashrc', '') ('a.b/c', '') ('f', '.')
+ /a/b 
+a/c/d ../x /x . //a
+True False
+/usr/l /usr
+../b/c .
+('', '/', 'a/b') ('', 'x/y')
+True
+True True False
+['f.txt', 'x']
+5 5 True
+['f.txt', 'x'] [False, True]
+d1 ['x'] ['f.txt']
+d1/x ['y'] []
+d1/x/y [] []
+True ['f.txt', 'x']
+12345
+['g.txt', 'x']
+['h.txt', 'y']
+True True
+False
+FileNotFoundError [Errno 2] No such file or directory: 'nope'
+FileNotFoundError [Errno 2] No such file or directory: 'nope'
+FileNotFoundError [Errno 2] No such file or directory: 'nope'
+FileNotFoundError [Errno 2] No such file or directory: 'nope'
+FileNotFoundError [Errno 2] No such file or directory: 'nope'
+[Errno 17] File exists: 'z'
+[Errno 2] No such file or directory: 'p/q'
+True
+z True s b'a'
+expected str, bytes or os.PathLike object, not int
+None dflt
+False getsize
+5

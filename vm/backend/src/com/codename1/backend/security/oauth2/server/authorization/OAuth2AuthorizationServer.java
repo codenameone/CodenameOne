@@ -994,7 +994,8 @@ public final class OAuth2AuthorizationServer {
         // round -- it is for the client.
         List<String> audience = new ArrayList<String>(resources);
         if (audience.isEmpty()) {
-            audience.add(defaultAudience != null ? defaultAudience : issuer);
+            audience.add(client.getAudience() != null ? client.getAudience()
+                    : defaultAudience != null ? defaultAudience : issuer);
         }
         JwtClaimsSet.Builder access = JwtClaimsSet.builder().issuer(issuer).subject(principal)
                 .audience(audience).issuedAt(nowSeconds).notBefore(nowSeconds)
@@ -1199,6 +1200,14 @@ public final class OAuth2AuthorizationServer {
     private boolean forThisServer(Jwt token, String issuer) {
         // Never null: a token with no `aud` has an empty list, and is for nobody.
         List<String> audience = token.getAudience();
+        // A client registered with an audience of its own gets it in place of
+        // the default, so its tokens are for this server under that name too.
+        Object clientId = token.getClaims().get("client_id");
+        RegisteredClient client = clientId instanceof String
+                ? clients.findByClientId((String) clientId) : null;
+        if (client != null && client.getAudience() != null && audience.contains(client.getAudience())) {
+            return true;
+        }
         return audience.contains(issuer)
                 || defaultAudience != null && audience.contains(defaultAudience)
                 || audience.contains(issuer + settings.getOidcUserInfoEndpoint());

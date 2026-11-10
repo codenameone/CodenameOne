@@ -21,7 +21,7 @@ package com.codenameone.examples.parley.admin;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
-import com.codenameone.examples.parley.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.parley.account.Moderation;
 import com.codenameone.examples.parley.api.ReportViewDto;
 import com.codenameone.examples.parley.contact.Contacts;

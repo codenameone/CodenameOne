@@ -1,0 +1,78 @@
+RuntimeError | generator raised StopIteration | StopIteration StopIteration True
+ZeroDivisionError | division by zero | None None False
+ZeroDivisionError | division by zero | None None False
+ZeroDivisionError | division by zero | None None False
+ZeroDivisionError | division by zero | None None False
+IndexError | list index out of range | None None False
+IndexError | tuple index out of range | None None False
+IndexError | string index out of range | None None False
+KeyError | 'k' | None None False
+KeyError | ('t', 1) | None None False
+ValueError | invalid literal for int() with base 10: '12x' | None None False
+ValueError | invalid literal for int() with base 8: '9' | None None False
+ValueError | could not convert string to float: 'nan?' | None None False
+TypeError | can only concatenate str (not "int") to str | None None False
+TypeError | unsupported operand type(s) for +: 'int' and 'str' | None None False
+TypeError | can't multiply sequence by non-int of type 'str' | None None False
+TypeError | object of type 'int' has no len() | None None False
+AttributeError | 'NoneType' object has no attribute 'foo' | None None False
+AttributeError | 'object' object has no attribute 'bar' | None None False
+NameError | name 'undefined_name' is not defined | None None False
+IndexError | pop from empty list | None None False
+KeyError | 'popitem(): dictionary is empty' | None None False
+KeyError | 'pop from an empty set' | None None False
+ValueError | list.index(x): x not in list | None None False
+ValueError | substring not found | None None False
+StopIteration |  | None None False
+TypeError | 'int' object is not iterable | None None False
+TypeError | unhashable type: 'list' | None None False
+TypeError | cannot use 'list' as a dict key (unhashable type: 'list') | None None False
+TypeError | '<' not supported between instances of 'str' and 'int' | None None False
+ValueError | max() iterable argument is empty | None None False
+ValueError | chr() arg not in range(0x110000) | None None False
+TypeError | ord() expected a character, but string of length 2 found | None None False
+TypeError | can't concat str to bytes | None None False
+UnicodeDecodeError | 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte | None None False
+UnicodeEncodeError | 'ascii' codec can't encode character '\xe9' in position 0: ordinal not in range(128) | None None False
+ZeroDivisionError | division by zero | None None False
+ZeroDivisionError | zero to a negative power | None None False
+OverflowError | int too large to convert to float | None None False
+OverflowError | cannot convert float infinity to integer | None None False
+ValueError | cannot convert float NaN to integer | None None False
+ValueError | range() arg 3 must not be zero | None None False
+ValueError | slice step cannot be zero | None None False
+TypeError | tuple.__new__(X): X is not a type object (int) | None None False
+TypeError | <lambda>.<locals>.<lambda>() missing 1 required positional argument: 'x' | None None False
+TypeError | <lambda>.<locals>.<lambda>() takes 1 positional argument but 2 were given | None None False
+TypeError | <lambda>.<locals>.<lambda>() got an unexpected keyword argument 'y' | None None False
+TypeError | <lambda>.<locals>.<lambda>() takes 0 positional arguments but 1 was given | None None False
+TypeError | f() missing 1 required keyword-only argument: 'c' | None None False
+TypeError | f() takes from 1 to 2 positional arguments but 3 were given | None None False
+TypeError | f() got multiple values for argument 'a' | None None False
+AttributeError | 'Thing' object has no attribute 'y' and no __dict__ for setting new attributes | None None False
+UnboundLocalError | cannot access local variable 'v' where it is not associated with a value | None None False
+ValueError | bad | KeyError KeyError True
+TypeError | during | None ZeroDivisionError False
+TypeError | quiet | None ZeroDivisionError True
+FileNotFoundError | [Errno 2] No such file: 'f.txt' | None None False
+FileNotFoundError | [Errno 2] No such file or directory: '/definitely/not/here.txt' | None None False
+Boom | ('boom', 7) | None None False
+('boom', 7) 7 Boom('boom', 7)
+AssertionError | math | None None False
+ValueError | byteorder must be either 'little' or 'big' | None None False
+ok None
+ValueError | dictionary update sequence element #0 has length 3; 2 is required | None None False
+IndexError | Replacement index 1 out of range for positional args tuple | None None False
+KeyError | 'x' | None None False
+TypeError | %d format: a real number is required, not str | None None False
+TypeError | not enough arguments for format string | None None False
+ValueError | Unknown format code 'q' for object of type 'int' | None None False
+ValueError | bytes must be in range(0, 256) | None None False
+ValueError | value not found in bytearray | None None False
+AttributeError | 'frozenset' object has no attribute 'add' | None None False
+SystemExit () None
+SystemExit (None,) None
+SystemExit (3,) 3
+SystemExit ('bye',) 'bye'
+SystemExit (1, 2) (1, 2)
+KwError ('msg', 2) 3

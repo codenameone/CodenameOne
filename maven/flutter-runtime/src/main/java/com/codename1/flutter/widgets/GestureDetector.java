@@ -188,6 +188,39 @@ public class GestureDetector extends Widget {
         return onHorizontalDragStart != null || onHorizontalDragUpdate != null || onHorizontalDragEnd != null;
     }
 
+    private Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleStartDetails> onScaleStart;
+    private Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleUpdateDetails> onScaleUpdate;
+    private Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleEndDetails> onScaleEnd;
+
+    public void onScaleStart(Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleStartDetails> v) {
+        this.onScaleStart = v;
+    }
+
+    public void onScaleUpdate(Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleUpdateDetails> v) {
+        this.onScaleUpdate = v;
+    }
+
+    public void onScaleEnd(Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleEndDetails> v) {
+        this.onScaleEnd = v;
+    }
+
+    Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleStartDetails> getOnScaleStart() {
+        return onScaleStart;
+    }
+
+    Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleUpdateDetails> getOnScaleUpdate() {
+        return onScaleUpdate;
+    }
+
+    Funcs.VoidFunc1<com.codename1.flutter.gestures.ScaleEndDetails> getOnScaleEnd() {
+        return onScaleEnd;
+    }
+
+    /** Whether any scale callback is set. */
+    boolean handlesScale() {
+        return onScaleStart != null || onScaleUpdate != null || onScaleEnd != null;
+    }
+
     /** Whether any pan callback is set. */
     boolean handlesPan() {
         return onPanStart != null || onPanUpdate != null || onPanEnd != null;

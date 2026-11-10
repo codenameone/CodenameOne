@@ -1,0 +1,6 @@
+plain base a
+102
+41
+COUNTED
+[1, 9, 8, 4]
+true true false

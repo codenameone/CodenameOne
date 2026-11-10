@@ -1,0 +1,15 @@
+200 no session None False
+200 ok Cookie True
+ann visits=1
+ann visits=2
+user=ann msgs=['welcome ann']
+user=ann msgs=[]
+bye ann True
+None visits=1
+user=None msgs=[]
+<h1>LIST</h1><ul><li class="first">1. &lt;a&gt;</li><li class="">2. b</li></ul>
+Hi &amp; bye, Ann Lee! /inline None
+200 notes.txt text/plain 12 b'hello\r\nworld' form={'title': 'T1'} extras=[('a.bin', b'x1'), ('b.bin', b'x2')] missing=False
+200 text/plain chunk0;chunk1;chunk2;done
+ab
+error: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.

@@ -40,6 +40,13 @@ public class Invoke extends Instruction {
     private BytecodeMethod lambdaSam;
     public BytecodeMethod getLambdaSam() { return lambdaSam; }
     public void setLambdaSam(BytecodeMethod method) { lambdaSam = method; }
+    // For a lambda lowered to a carrier (LambdaCarriers): the carrier class and the
+    // static bridge that runs the lambda's body given the carrier.
+    private String lambdaCarrier;
+    private Invoke lambdaBridge;
+    public String getLambdaCarrier() { return lambdaCarrier; }
+    public Invoke getLambdaBridge() { return lambdaBridge; }
+    public void setLambdaCarrier(String carrier, Invoke bridge) { lambdaCarrier = carrier; lambdaBridge = bridge; }
     private String exactReceiverType;
 
     public void setClosedWorldReceiverTypes(java.util.Set<String> types) {

@@ -123,7 +123,7 @@ public class NavigationRail extends StatelessWidget {
         double width = extended
                 ? (minExtendedWidth > 0 ? minExtendedWidth : DEFAULT_EXTENDED_WIDTH_LP)
                 : (minWidth > 0 ? minWidth : DEFAULT_WIDTH_LP);
-        DartList<Widget> kids = new DartList<Widget>();
+        DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (leading != null) {
             kids.add(gap(VERTICAL_SPACER_LP));
             kids.add(leading);
@@ -181,7 +181,7 @@ public class NavigationRail extends StatelessWidget {
             box.child(icon);
             top = box;
         }
-        DartList<Widget> parts = new DartList<Widget>();
+        DartList<Widget> parts = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (top != null) {
             parts.add(top);
         }

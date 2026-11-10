@@ -1,0 +1,15 @@
+(3+4j) (1-2j) 1j (-0-1j) 0j 2.5j 0j (2+0j) -0j (-0+0j)
+(4+2j) (2+6j) (11-2j) (-1+2j) (-7+24j) (0.12-0.16j) (2+1j)
+[(-7.461496615+2.885492726j), (-0.222517157-0.100709131j)]
+5.0 3.0 4.0 (3-4j) (-3-4j) (3+4j) True True True True
+(4+4j) (7.5+10j) (6+8j) (0.12-0.16j) (2+4j) (7-4j) False True complex True
+(1+2j) (3-4j) 5j -1j (2.5+0j) (1000-0.01j)
+True 1000003 1000004 1
+(inf+nanj) (1e+300+1e+300j) True
+[0j, (1+1j), (2+2j)] (5.5+1j) (-3+5j)
+ZeroDivisionError division by zero
+TypeError '<' not supported between instances of 'complex' and 'complex'
+ValueError complex() arg is a malformed string
+TypeError complex() argument 'real' must be a real number, not str
+ZeroDivisionError zero to a negative or complex power
+TypeError complex() argument must be a string or a number, not list

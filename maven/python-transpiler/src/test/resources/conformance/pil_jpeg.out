@@ -1,0 +1,10 @@
+True True
+JPEG RGB (40, 24)
+rgb close True True
+JPEG L (33, 17)
+gray close True True
+quality orders size True
+JPEG RGB (40, 24)
+re-encode (40, 24)
+RGBA OSError cannot write mode RGBA as JPEG
+P OSError cannot write mode P as JPEG

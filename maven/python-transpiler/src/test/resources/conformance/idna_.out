@@ -1,0 +1,47 @@
+'example.com' b'example.com'
+'Example.COM' b'Example.COM'
+'m\xfcnchen.de' b'xn--mnchen-3ya.de'
+'b\xfccher.example' b'xn--bcher-kva.example'
+'\u65e5\u672c\u8a9e.jp' b'xn--wgv71a119e.jp'
+'ex--ample.com' IDNAError Label has disallowed hyphens in 3rd and 4th position
+'-ab.com' IDNAError Label must not start or end with a hyphen
+'ab-.com' IDNAError Label must not start or end with a hyphen
+'a..b' IDNAError Empty Label
+'' IDNAError Empty domain
+'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa IDNAError Label too long
+'B\xfccher.de' InvalidCodepoint Codepoint U+0042 at position 1 of 'Bücher' not allowed
+'\u0391\u0392\u0393.gr' InvalidCodepoint Codepoint U+0391 at position 1 of 'ΑΒΓ' not allowed
+'ab\u3002cd' b'ab.cd'
+'xn--mnchen-3ya.de' b'xn--mnchen-3ya.de'
+'xn--zzz.com' b'xn--zzz.com'
+'a b.com' InvalidCodepoint Codepoint U+0020 at position 2 of 'a b' not allowed
+'.com' IDNAError Empty Label
+'a.' b'a.'
+'\xdf.de' b'xn--zca.de'
+'fa\xdf.de' b'xn--fa-hia.de'
+'\u4f8b\u3048.\u30c6\u30b9\u30c8' b'xn--r8jz45g.xn--zckzah'
+'a_b.com' InvalidCodepoint Codepoint U+005F at position 2 of 'a_b' not allowed
+'ab.12' b'ab.12'
+'1.2.3.4' b'1.2.3.4'
+'\u0431\u0443\u043a\u0432\u0430.\u0440\u b'xn--80abd5a7b.xn--p1ai'
+'\xe9.fr' b'xn--9ca.fr'
+'caf\xe9.example.org.' b'xn--caf-dma.example.org.'
+xn--mnchen-3ya.de 'm\xfcnchen.de'
+xn--wgv71a119e.jp '\u65e5\u672c\u8a9e.jp'
+XN--MNCHEN-3YA.de 'm\xfcnchen.de'
+xn--.com IDNAError Malformed A-label, no Punycode eligible content found
+abc.def 'abc.def'
+xn--zzz.com '\u7ba5.com'
+ab..cd IDNAError Empty Label
+xn--bcher-kva.example 'b\xfccher.example'
+xn--r8jz45g.xn--zckzah '\u4f8b\u3048.\u30c6\u30b9\u30c8'
+xn--e1afmkfd.xn--p1ai '\u043f\u0440\u0438\u043c\u0435\u0440.\u0440\u0444'
+Example.COM 'example.com'
+xn--caf-dma.example.org. 'caf\xe9.example.org.'
+b'xn--mnchen-3ya' 'm\xfcnchen' abc
+b'xn--mnchen-3ya.de' b'xn--mnchen-3ya.de'
+True True
+b'abc.com' 'b\xfccher.de'
+b'xn--fiq228c.com' True
+b'xn--mgbh0fb.xn--kgbechtv' True
+b'xn--j2bd4cyah0f.com' True

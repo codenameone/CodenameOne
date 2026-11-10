@@ -1,0 +1,4 @@
+count 0 hits 200
+dup 1
+set 1
+set after 0

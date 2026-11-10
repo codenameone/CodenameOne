@@ -60,8 +60,11 @@ public class Align extends Widget implements HasChild {
         return heightFactor;
     }
 
-    public void alignment(Alignment v) {
-        this.alignment = v;
+    /// Flutter declares this as AlignmentGeometry, so a value typed only as that is
+    /// accepted. AlignmentDirectional is an Alignment here and stays unresolved, so the
+    /// render element can mirror it under RTL.
+    public void alignment(com.codename1.flutter.AlignmentGeometry v) {
+        this.alignment = v instanceof Alignment ? (Alignment) v : null;
     }
 
     public void child(Widget v) {

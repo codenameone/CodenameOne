@@ -1,0 +1,8 @@
+3 65 'x' 3 0xff True
+3 dflt True
+TypeError: len() takes exactly one argument (0 given)
+TypeError: len() takes exactly one argument (2 given)
+TypeError: ord() expected a character, but string of length 2 found
+AttributeError: 'int' object has no attribute 'nope'
+2 [104, 105]
+[1, 2, 3] L 1 1

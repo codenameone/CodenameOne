@@ -369,7 +369,7 @@ public class MaterialLocalizations {
 
     /** Flutter's {@code narrowWeekdays}: one-letter names, Sunday first whatever the locale. */
     public dart.core.DartList<String> narrowWeekdays() {
-        dart.core.DartList<String> out = new dart.core.DartList<String>();
+        dart.core.DartList<String> out = new dart.core.DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         for (String n : NARROW_WEEKDAYS[lang]) {
             out.add(n);
         }

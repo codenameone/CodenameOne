@@ -1,0 +1,5 @@
+p4 1nullnullnull
+p5 1nullnullnullnull
+p6 0nullnullnullnull1
+dyn p5 null2nullnullnull
+direct nullnullnullnull3

@@ -479,6 +479,11 @@ public abstract class CodenameOneImplementation {
     public void vibrate(int duration) {
     }
 
+    /// Rumbles game controller `index`; motors are 0 to 1. A port with
+    /// controller force feedback overrides this, the rest ignore it.
+    public void rumbleGamepad(int index, float strong, float weak, int durationMillis) {
+    }
+
     /// Flash the backlight of the device for the given length of time
     ///
     /// #### Parameters
@@ -4740,6 +4745,32 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Creates a native TrueType or OpenType font from the content of a font file.
+    /// Ports that return true from `#isTrueTypeStreamSupported()` override this;
+    /// the result must be usable with `#deriveTrueTypeFont(Object, float, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontName`: the name the application gave the font
+    ///
+    /// - `data`: the bytes of a .ttf or .otf file
+    ///
+    /// #### Returns
+    ///
+    /// the native font, or null if it can't be created
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        return null;
+    }
+
+    /// Returns true if `#loadTrueTypeFontFromData(String, byte[])` is implemented by this port.
+    ///
+    /// #### Returns
+    ///
+    /// true if fonts can be created from data
+    public boolean isTrueTypeStreamSupported() {
+        return false;
+    }
+
     /// Indicates whether the implementation supports loading a font "natively" to handle one of the common
     /// native prefixes
     ///
@@ -8790,6 +8821,12 @@ public abstract class CodenameOneImplementation {
 
     /// Factory for the built-in LiteRT inference API.
     public InferenceImpl createInferenceImpl() {
+        return null;
+    }
+
+    /// Factory for the llama.cpp backend of `com.codename1.ai.LocalLlmClient`.
+    /// Returns `null` unless the port has the library linked in.
+    public LocalLlmImpl createLocalLlmImpl() {
         return null;
     }
 

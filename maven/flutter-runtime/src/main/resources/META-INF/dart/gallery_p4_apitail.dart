@@ -165,7 +165,7 @@ enum Thumb { start, end }
 @JavaName('com.codename1.flutter.material.ToggleButtons')
 class ToggleButtons extends Widget {
   external ToggleButtons(
-      {Key? key, List<Widget> children, List<bool> isSelected, Object? onPressed,
+      {Key? key, List<Widget> children, List<bool> isSelected, void Function(int)? onPressed,
        TextStyle? textStyle, Object? constraints, Color? color, Color? selectedColor,
        Color? disabledColor, Color? fillColor, Color? focusColor, Color? highlightColor,
        Color? hoverColor, Color? splashColor, bool? renderBorder, Color? borderColor,
@@ -193,7 +193,7 @@ class SimpleDialog extends Widget {
 @JavaName('com.codename1.flutter.material.SimpleDialogOption')
 class SimpleDialogOption extends Widget {
   external SimpleDialogOption(
-      {Key? key, Object? onPressed, EdgeInsets? padding, Widget? child});
+      {Key? key, VoidCallback? onPressed, EdgeInsets? padding, Widget? child});
 }
 
 // ======================================================================
@@ -227,7 +227,7 @@ class Typography {
 @JavaName('com.codename1.flutter.navigation.PageRouteBuilder')
 class PageRouteBuilder<T> extends Route<T> {
   external PageRouteBuilder(
-      {RouteSettings? settings, Object pageBuilder, Object? transitionsBuilder,
+      {RouteSettings? settings, Widget Function(BuildContext, Animation<double>, Animation<double>) pageBuilder, Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)? transitionsBuilder,
        Duration? transitionDuration, Duration? reverseTransitionDuration,
        bool? opaque, bool? barrierDismissible, Color? barrierColor,
        String? barrierLabel, bool? maintainState, bool? fullscreenDialog});
@@ -271,16 +271,18 @@ class SharedAxisTransition extends Widget {
 // Used by Transform to build its `transform` argument.
 @JavaName('com.codename1.flutter.vectormath.Matrix4')
 class Matrix4 {
+  external Matrix4(double arg0, double arg1, double arg2, double arg3, double arg4, double arg5, double arg6, double arg7, double arg8, double arg9, double arg10, double arg11, double arg12, double arg13, double arg14, double arg15);
   external static Matrix4 identity();
   external static Matrix4 rotationX(double radians);
   external static Matrix4 rotationY(double radians);
   external static Matrix4 rotationZ(double radians);
   external static Matrix4 translationValues(double x, double y, double z);
   external static Matrix4 diagonal3Values(double x, double y, double z);
-  external List<double> get storage;
+  external Float64List get storage;
   external Matrix4 clone();
   external void translate(double x, [double y, double z]);
   external void scale(double x, [double? y, double? z]);
+  external void scaleByDouble(double sx, double sy, double sz, double sw);
   external void setEntry(int row, int col, double value);
   external void setRotationZ(double radians);
 }
@@ -294,7 +296,7 @@ class Matrix4 {
 @JavaName('com.codename1.flutter.scheduler.SchedulerBinding')
 class SchedulerBinding {
   external static SchedulerBinding get instance;
-  external void addPostFrameCallback(Object callback);
+  external void addPostFrameCallback(void Function(dynamic) callback);
   external int scheduleFrameCallback(Object callback, {bool rescheduling});
   external void scheduleFrame();
 }
@@ -325,6 +327,14 @@ external Future<bool> canLaunchUrlString(String urlString);
 // package:flutter/foundation — true only in a web build; always false here.
 @JavaName('com.codename1.flutter.foundation.FoundationConstants.kIsWeb')
 bool kIsWeb = false;
+
+// package:flutter/foundation build modes: the simulator is a debug build.
+@JavaName('com.codename1.flutter.foundation.FoundationConstants.kDebugMode')
+bool kDebugMode = false;
+@JavaName('com.codename1.flutter.foundation.FoundationConstants.kReleaseMode')
+bool kReleaseMode = false;
+@JavaName('com.codename1.flutter.foundation.FoundationConstants.kProfileMode')
+bool kProfileMode = false;
 
 // package:flutter/material — default AppBar toolbar height (logical pixels).
 @JavaName('com.codename1.flutter.material.MaterialConstants.kToolbarHeight')

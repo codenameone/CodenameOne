@@ -96,8 +96,13 @@ CN1_LOG="$WORK/cn1-build.log"
 # the archetype's settings file sets ios.themeMode and and.themeMode to modern.
 cn1_build() {   # cn1_build <platform> <buildTarget> [extra maven args...]
   local plat="$1" target="$2"; shift 2
+  # The heap is set, not left to the JVM's quarter of the machine. Transpiling
+  # and compiling the gallery all happen inside Maven's own JVM, and a macOS
+  # runner's quarter (about 1.75 GB of 7) ran out in jar packaging once the
+  # gallery compiled under #6154's larger output, while the 16 GB Linux and
+  # Windows runners' default 4 GB was enough.
   # retry.sh for Central's transient 403/429 only; a build failure is not retried.
-  ( cd "$CN1" && RETRY_ONLY_MATCHING=transient $XVFB bash "$HERE/../../ci/retry.sh" \
+  ( cd "$CN1" && MAVEN_OPTS="${MAVEN_OPTS:+$MAVEN_OPTS }-Xmx4g" RETRY_ONLY_MATCHING=transient $XVFB bash "$HERE/../../ci/retry.sh" \
       mvn -B $MVN_REPO_ARG package -DskipTests \
       -DskipComplianceCheck=true \
       -Dcodename1.arg.nativeTheme=custom \

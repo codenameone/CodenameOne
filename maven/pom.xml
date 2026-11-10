@@ -82,6 +82,7 @@
         <module>cn1-binaries</module>
         <module>platform-feature-catalog</module>
         <module>project-model</module>
+        <module>annotation-processor</module>
         <module>build-hint-catalog</module>
         <module>build-hint-tools</module>
         <module>java-runtime</module>
@@ -114,6 +115,8 @@
           exactly the JDK the plugin is built with.
         -->
         <module>dart-transpiler</module>
+        <!-- Java 8 like dart-transpiler; its runtime is in flutter-modules. -->
+        <module>python-transpiler</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
         <module>backend</module>
@@ -717,6 +720,7 @@
             <modules>
                 <module>dart-runtime</module>
                 <module>flutter-runtime</module>
+                <module>python-runtime</module>
             </modules>
         </profile>
 
@@ -759,10 +763,12 @@
                                              skipexisting="true"
                                              ignoreerrors="true"/>
 
+                                        <!-- Best effort, like the <java> below (no failonerror): a GitHub
+                                             outage must not fail the framework build. -->
                                         <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
                                              dest="${user.home}/UpdateCodenameOne.jar"
                                              skipexisting="true"
-                                             ignoreerrors="false"/>
+                                             ignoreerrors="true"/>
                                         <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
                                             <arg value="${project.build.directory}/generated-sources/project"/>
                                             <arg value="force" />

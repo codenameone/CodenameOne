@@ -1,0 +1,16 @@
+200 OK 200 application/json True
+GET {'q': 'a b'}
+PUT True /anything True
+PUT {"k": [1, 2]} application/json {'x-mine': '1'}
+POST name=py+thon&n=3 application/x-www-form-urlencoded
+HTTPError 404 Not Found HTTP Error 404: Not Found True True
+redirect 200 BASE/get?redirected=1 {'redirected': '1'}
+['x-one', 'x-two']
+URLError unknown url type: ftp-nope
+auth needed 401
+no challenge, no retry 401
+auth 200 b'{"authenticated": true}'
+200 OK application/json raw
+503 Service Unavailable b'statu' Service Unavailable
+404 Created True True
+404 <HTTPStatus.OK: 200>

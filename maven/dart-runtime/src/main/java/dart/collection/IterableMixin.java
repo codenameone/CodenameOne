@@ -172,8 +172,124 @@ public interface IterableMixin<E> {
         return sb.toString();
     }
 
+    /**
+     * The elements as Dart prints them, between {@code open} and {@code close}. A Java
+     * interface cannot supply {@code toString()}, so a class applying this mixin (or
+     * {@code ListMixin}) gets a transpiler-emitted {@code toString()} that calls this:
+     * Dart's {@code IterableMixin} prints {@code (1, 2)}, {@code ListMixin} {@code [1, 2]}.
+     * Dart elides the middle of an iterable past 100 elements; this prints them all.
+     */
+    default String $mixinToString(String open, String close) {
+        StringBuilder sb = new StringBuilder(open);
+        Iterator<E> it = iterator();
+        boolean firstElement = true;
+        while (it.moveNext()) {
+            if (!firstElement) {
+                sb.append(", ");
+            }
+            E e = it.current();
+            sb.append(e == this ? (open + "..." + close) : dart.runtime.DartRuntime.str(e));
+            firstElement = false;
+        }
+        return sb.append(close).toString();
+    }
+
     /** Dart's {@code Iterable.join()} with no separator. */
     default String join() {
         return join("");
+    }
+
+    /// dart:collection's {@code IterableBase.iterableToFullString(it, [left, right])}:
+    /// every element, comma separated, between the delimiters ("(" and ")" by default).
+    static String iterableToFullString(Iterable<?> it, String left, String right) {
+        StringBuilder sb = new StringBuilder(left);
+        boolean first = true;
+        for (Object o : it) {
+            if (!first) {
+                sb.append(", ");
+            }
+            first = false;
+            sb.append(dart.runtime.DartRuntime.str(o));
+        }
+        return sb.append(right).toString();
+    }
+
+    static String iterableToFullString(Iterable<?> it) {
+        return iterableToFullString(it, "(", ")");
+    }
+
+    static String iterableToFullString(Iterable<?> it, String left) {
+        return iterableToFullString(it, left, ")");
+    }
+
+    // The rest of the Iterable protocol a class extending or implementing Iterable (or
+    // IterableBase) is called with from outside: each reads through a live DartIterable
+    // view of this object.
+
+    /** Dart's {@code toList()}: a growable copy. */
+    default dart.core.DartList<E> toList() {
+        return dart.core.DartIterable.ofMixin(this).toList();
+    }
+
+    /** Dart's {@code toList(growable: ...)}. */
+    default dart.core.DartList<E> toList(boolean growable) {
+        return dart.core.DartIterable.ofMixin(this).toList(growable);
+    }
+
+    /** Dart's {@code toSet()}. */
+    default dart.core.DartSet<E> toSet() {
+        return dart.core.DartIterable.ofMixin(this).toSet();
+    }
+
+    /** Dart's {@code where(test)}, a lazy view. */
+    default dart.core.DartIterable<E> where(Funcs.Func1<E, Boolean> test) {
+        return dart.core.DartIterable.ofMixin(this).where(test);
+    }
+
+    /** Dart's {@code map(f)}, a lazy view. */
+    default <R> dart.core.DartIterable<R> map(Funcs.Func1<E, R> f) {
+        return dart.core.DartIterable.ofMixin(this).map(f);
+    }
+
+    /** Dart's {@code skip(count)}, a lazy view. */
+    default dart.core.DartIterable<E> skip(long count) {
+        return dart.core.DartIterable.ofMixin(this).skip(count);
+    }
+
+    /** Dart's {@code take(count)}, a lazy view. */
+    default dart.core.DartIterable<E> take(long count) {
+        return dart.core.DartIterable.ofMixin(this).take(count);
+    }
+
+    /** Dart's {@code fold(initial, combine)}. */
+    default <R> R fold(R initialValue, Funcs.Func2<R, E, R> combine) {
+        return dart.core.DartIterable.ofMixin(this).fold(initialValue, combine);
+    }
+
+    /**
+     * {@code fold<T>(..)} with its type argument written: the stub's {@code fold} returns
+     * its own type parameter, so the call passes T's class as a trailing witness. The
+     * result is the combiner's, which already has that type.
+     */
+    default <R> R fold(R initialValue, Funcs.Func2<R, E, R> combine, Class<?> type) {
+        return fold(initialValue, combine);
+    }
+    // The element lookups by test. `single` on a class applying this mixin is emitted
+    // as singleWhere with an always-true test, so a class that only implements
+    // Iterable (taking the rest from here) must answer all three.
+
+    /** Dart's {@code firstWhere(test, {orElse})}. */
+    default E firstWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return dart.core.DartIterable.ofMixin(this).firstWhere(test, orElse);
+    }
+
+    /** Dart's {@code lastWhere(test, {orElse})}. */
+    default E lastWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return dart.core.DartIterable.ofMixin(this).lastWhere(test, orElse);
+    }
+
+    /** Dart's {@code singleWhere(test, {orElse})}. */
+    default E singleWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return dart.core.DartIterable.ofMixin(this).singleWhere(test, orElse);
     }
 }

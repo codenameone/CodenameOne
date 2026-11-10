@@ -38,6 +38,9 @@ public final class MaterialConstants {
     /** Flutter's {@code kToolbarHeight}: the default AppBar height (logical px). */
     public static final double kToolbarHeight = 56.0;
 
+    /** Flutter's {@code kDefaultFontSize}: the text size when no style gives one. */
+    public static final double kDefaultFontSize = 14.0;
+
     /** Flutter's {@code kFloatingActionButtonMargin}: default FAB margin (logical px). */
     public static final double kFloatingActionButtonMargin = 16.0;
 

@@ -50,6 +50,14 @@ public interface BuildContext {
      * documented fallback ({@code Theme.of}, {@code MediaQuery.of}, ...), where
      * a miss is an ordinary answer rather than a fault worth a diagnostic.
      */
+    /**
+     * Flutter's {@code getInheritedWidgetOfExactType}: the nearest such widget above, without
+     * making this element depend on it; null when there is none.
+     */
+    default <W extends Widget> W getInheritedWidgetOfExactType(Class<W> type) {
+        return maybeDependOnInheritedWidgetOfExactType(type);
+    }
+
     default <W extends Widget> W maybeDependOnInheritedWidgetOfExactType(Class<W> type) {
         return dependOnInheritedWidgetOfExactType(type);
     }

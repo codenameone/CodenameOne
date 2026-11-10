@@ -19,7 +19,7 @@
 package com.codenameone.examples.savor.pay;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.savor.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.savor.account.Accounts;
 import com.codenameone.examples.savor.api.CardDto;
 import com.codenameone.examples.savor.api.PaymentApiServer;

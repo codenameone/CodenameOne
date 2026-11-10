@@ -24,4 +24,4 @@ b
 group 4294967296: RangeError
 group -1: RangeError
 group 2: RangeError
-[future, sync]
+[sync]

@@ -31,7 +31,7 @@ import com.codenameone.examples.reel.api.HistoryEntryDto;
 import com.codenameone.examples.reel.net.Account;
 import com.codenameone.examples.reel.net.Api;
 import com.codenameone.examples.reel.net.Device;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.player.PlayerForm;
 import com.codenameone.examples.reel.ui.Art;
 import com.codenameone.examples.reel.ui.Lang;

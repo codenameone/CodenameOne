@@ -20,7 +20,7 @@ package com.codenameone.examples.pulse.pay;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Value;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.account.Accounts;
 import com.codenameone.examples.pulse.api.CardDto;
 import com.codenameone.examples.pulse.api.PaymentApiServer;

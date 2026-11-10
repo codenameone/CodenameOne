@@ -28,6 +28,8 @@ import java.util.Collections;
 import java.util.List;
 
 import com.codename1.backend.Crypto;
+import com.codename1.backend.Tcp;
+import com.codename1.backend.security.crypto.Der;
 
 /// An X.509 v3 certificate, read from DER or PEM.
 ///
@@ -130,6 +132,78 @@ public final class Certificate {
             throw err;
         } catch (IOException err) {
             throw new CertificateException("Not an X.509 certificate: " + err.getMessage(), err);
+        }
+    }
+
+    /// A self-signed X.509 v3 certificate for `privateKey`: issuer and subject
+    /// are both `subject`, valid from now for `days` days, with a random
+    /// 128-bit serial number and no extensions. For tests, a development TLS
+    /// endpoint, or an identity a peer pins by its key rather than its issuer.
+    ///
+    /// @param privateKey a PKCS#8 key, RSA, P-256 or P-384, carrying its
+    /// public key as every key [Crypto] generates and `openssl` writes does
+    /// @param days how long it is valid, at least 1
+    public static Certificate selfSigned(DistinguishedName subject, byte[] privateKey, int days)
+            throws IOException {
+        if (subject == null || privateKey == null) {
+            throw new CertificateException("A subject and a private key are required");
+        }
+        if (days < 1) {
+            throw new CertificateException("A certificate is valid for at least one day");
+        }
+        byte[] publicKey = Der.publicKeyOf(privateKey);
+        String algorithm = SignatureAlgorithms.forKey(publicKey);
+        byte[] serial = Crypto.randomBytes(16);
+        // Positive and not starting with a zero byte, so the encoding is the
+        // full 16 bytes and nothing reads it as negative.
+        serial[0] = (byte) ((serial[0] & 0x7f) | 0x40);
+        long now = System.currentTimeMillis() / 1000L * 1000L;
+        byte[] id = SignatureAlgorithms.identifier(algorithm);
+        byte[] tbs = Asn1.sequence(Asn1.tlv(Asn1.explicit(0), Asn1.integer(2)),
+                Asn1.unsignedInteger(serial), id, subject.der(),
+                Asn1.sequence(validity(now), validity(now + days * 86400000L)),
+                subject.der(), publicKey);
+        byte[] signature = Crypto.sign(algorithm, privateKey, tbs);
+        return new Certificate(Asn1.sequence(tbs, id, Asn1.bitString(signature)));
+    }
+
+    /// RFC 5280 4.1.2.5: UTCTime through 2049, GeneralizedTime from 2050.
+    private static byte[] validity(long millis) {
+        // formatTime is "YYYY-MM-DDTHH:MM:SSZ".
+        String iso = Asn1.formatTime(millis);
+        String compact = iso.substring(0, 4) + iso.substring(5, 7) + iso.substring(8, 10)
+                + iso.substring(11, 13) + iso.substring(14, 16) + iso.substring(17, 19) + "Z";
+        int year = Integer.parseInt(iso.substring(0, 4));
+        if (year >= 1950 && year < 2050) {
+            return Asn1.tlv(Asn1.UTC_TIME, Asn1.asciiBytes(compact.substring(2)));
+        }
+        return Asn1.tlv(Asn1.GENERALIZED_TIME, Asn1.asciiBytes(compact));
+    }
+
+    /// The chain `host` presents on `port`, leaf first, after a verified TLS
+    /// handshake against the default roots: the input a pinning check compares
+    /// against, or an expiry monitor reads.
+    ///
+    /// ```java
+    /// List<Certificate> chain = Certificate.fetchChain("api.example.com", 443, 5000);
+    /// byte[] spkiHash = Crypto.sha256(chain.get(0).getPublicKey());
+    /// ```
+    ///
+    /// @throws IOException when the connection or the handshake fails, which
+    /// includes a chain the default roots do not vouch for
+    public static List<Certificate> fetchChain(String host, int port, int timeoutMillis)
+            throws IOException {
+        Tcp tcp = Tcp.connect(host, port, timeoutMillis);
+        try {
+            tcp.setReadTimeout(timeoutMillis);
+            tcp.startTls(host);
+            List<Certificate> out = new ArrayList<Certificate>();
+            for (byte[] der : tcp.getPeerCertificates()) {
+                out.add(new Certificate(der));
+            }
+            return Collections.unmodifiableList(out);
+        } finally {
+            tcp.close();
         }
     }
 

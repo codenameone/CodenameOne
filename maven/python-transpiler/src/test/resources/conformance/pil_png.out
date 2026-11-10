@@ -1,0 +1,12 @@
+bit (9, 4) PNG 218be6c5703006d7 (0, 0, 0, 255) (0, 0, 0, 255)
+l (13, 9) PNG c66c5aa77eb7683c (18, 18, 18, 255) (131, 131, 131, 255)
+la (13, 9) PNG 70bd7ea122b88380 (18, 18, 18, 42) (131, 131, 131, 132)
+p (7, 5) PNG 64baabd8ac9cc55c (59, 7, 17, 255) (29, 23, 47, 255)
+pt (7, 5) PNG 7a9001b5a8c45b0a (59, 7, 17, 255) (29, 23, 47, 255)
+rgb (13, 9) PNG 401d364a6bc512f4 (48, 4, 12, 255) (20, 168, 231, 255)
+rgba (13, 9) PNG 8ce2da94f384f776 (48, 4, 12, 42) (20, 168, 231, 132)
+L L (13, 9) True 90adee0b26352f08
+RGB RGB (13, 9) True f8ecc7d7089db771
+RGBA RGBA (13, 9) True 8ce2da94f384f776
+path RGBA (13, 9) True
+UnidentifiedImageError True

@@ -37,6 +37,7 @@ import java.util.Iterator;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import java.security.cert.CertificateEncodingException;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -125,6 +126,22 @@ public final class Tcp {
     /// As [#startTls(String)], verifying against the PEM bundle at `caFile`
     /// INSTEAD of the system trust store. See the translated twin for why.
     public void startTls(String host, String caFile) throws IOException {
+        startTls(host, caFile, true);
+    }
+
+    /// As [#startTls(String,String)], with the name check optional.
+    ///
+    /// `verifyHost` false still verifies the chain against `caFile` and skips
+    /// only the match between the certificate and `host`: what
+    /// `sslmode=verify-ca` asks for. It is refused without a `caFile`, because
+    /// a public root vouches for names, and a chain to one without the name is
+    /// a certificate for anybody.
+    public void startTls(String host, String caFile, boolean verifyHost)
+            throws IOException {
+        if (!verifyHost && caFile == null) {
+            throw new IOException("Skipping the host name check needs a trust "
+                    + "root of its own (sslrootcert)");
+        }
         // BOTH STRINGS, and the name is the one that decides who the peer is
         // allowed to be. It crosses to a native as a C string, so a NUL inside it
         // ends the name there and OpenSSL verifies the certificate against the
@@ -153,7 +170,9 @@ public final class Tcp {
         }
         SSLSocket upgraded = (SSLSocket) created; //NOPMD CloseResource - becomes this connection's socket in rebind()
         SSLParameters parameters = upgraded.getSSLParameters();
-        parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        if (verifyHost) {
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        }
         upgraded.setSSLParameters(parameters);
         // BOUNDED, for the reason the packaged arm's comment gives at its own
         // SSL_connect: connectTimeout was spent reaching the port, and a peer that
@@ -187,6 +206,27 @@ public final class Tcp {
     /// Whether this connection is encrypted.
     public boolean isSecure() {
         return secure;
+    }
+
+    /// The certificates the server presented in the TLS handshake, leaf first,
+    /// each as DER; empty while the connection is plaintext. For pinning a
+    /// server's key or reading its expiry -- what `openssl s_client -showcerts`
+    /// prints. The chain has already been verified when this answers: an
+    /// untrusted one failed [#startTls(String)].
+    public byte[][] getPeerCertificates() throws IOException {
+        if (!secure || !(socket instanceof SSLSocket)) {
+            return new byte[0][];
+        }
+        try {
+            Certificate[] chain = ((SSLSocket) socket).getSession().getPeerCertificates();
+            byte[][] out = new byte[chain.length][];
+            for (int iter = 0 ; iter < chain.length ; iter++) {
+                out[iter] = chain[iter].getEncoded();
+            }
+            return out;
+        } catch (CertificateEncodingException err) {
+            throw new IOException("A peer certificate could not be encoded", err);
+        }
     }
 
     /// A factory that trusts exactly the certificates in one PEM bundle. The

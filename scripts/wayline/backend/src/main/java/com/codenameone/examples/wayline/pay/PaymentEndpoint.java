@@ -19,7 +19,7 @@
 package com.codenameone.examples.wayline.pay;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.wayline.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.api.CardDto;
 import com.codenameone.examples.wayline.api.PaymentApiServer;

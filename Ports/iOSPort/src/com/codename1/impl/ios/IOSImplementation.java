@@ -6357,6 +6357,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                 ? new IOSLanguageImpl() : null;
     }
 
+    private com.codename1.impl.LocalLlmImpl localLlm;
+
+    @Override
+    public com.codename1.impl.LocalLlmImpl createLocalLlmImpl() {
+        if (localLlm == null && nativeInstance.cn1LlamaIsSupported()) {
+            localLlm = new IOSLocalLlmImpl();
+        }
+        return localLlm;
+    }
+
     @Override
     public com.codename1.impl.InferenceImpl createInferenceImpl() {
         return nativeInstance.cn1InferenceIsSupported()
@@ -12021,6 +12031,26 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.registerBundledFont(fileName);
         }
         fnt.peer = nativeInstance.createTruetypeFont(fontName);
+        return fnt;
+    }
+
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        String postScriptName = nativeInstance.registerFontData(data);
+        if (postScriptName == null) {
+            return null;
+        }
+        NativeFont fnt = new NativeFont();
+        fnt.face = com.codename1.ui.Font.FACE_SYSTEM;
+        fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
+        fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
+        fnt.name = postScriptName;
+        fnt.peer = nativeInstance.createTruetypeFont(postScriptName);
         return fnt;
     }
 

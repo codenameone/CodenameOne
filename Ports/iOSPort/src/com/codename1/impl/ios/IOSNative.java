@@ -757,6 +757,18 @@ public class IOSNative {
     native long cn1InferenceOutputData(int handle, int index);
     native String cn1InferenceResize(int handle, int index, int[] shape);
     native void cn1InferenceClose(int handle);
+    // llama.cpp (CN1Llama.m, behind INCLUDE_CN1_LLAMA).
+    native boolean cn1LlamaIsSupported();
+    native int cn1LlamaOpen(String path, int contextSize, int gpuLayers, int threads);
+    native String cn1LlamaLastError(int handle);
+    native boolean cn1LlamaStart(int handle, String[] roles, String[] contents,
+                                 int maxTokens, float temperature, float topP,
+                                 int seed, String grammar);
+    native String cn1LlamaNext(int handle);
+    native int cn1LlamaPromptTokens(int handle);
+    native int cn1LlamaCompletionTokens(int handle);
+    native float[] cn1LlamaEmbed(int handle, String text);
+    native void cn1LlamaClose(int handle);
 
     // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
     // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class
@@ -1004,6 +1016,7 @@ public class IOSNative {
     native short sqlCursorValueAtColumnShort(long statement, int col);
     native byte[] sqlCursorValueAtColumnText(long statement, int col);
     native boolean sqlCursorNullValueAtColumn(long statement, int col); //Warning. This function only works if no automatic type conversions have occurred for the value in question. So it must be called before any of the sqlCursorValueAtColumn* methods. After a type conversion, the result of calling this method is undefined, though harmless
+    native int sqlCursorColumnType(long statement, int col);
     
     native int sqlCursorGetColumnCount(long statementPeer);
     
@@ -1040,6 +1053,7 @@ public class IOSNative {
     /// lookup -- 33 files and 5.7MB in an application shipping a font family,
     /// measured at 25ms on the start-up path.
     native void registerBundledFont(String fileName);
+    native String registerFontData(byte[] data);
     native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
 
     native void log(String text);
@@ -2352,6 +2366,9 @@ public class IOSNative {
 
     /** Closes a peer connection and frees its handle. */
     native void webRtcClosePeerConnection(int peer);
+
+    /** Makes the next offer restart ICE. */
+    native void webRtcRestartIce(int peer);
 
     /** Mutes or unmutes a track. */
     native void webRtcSetTrackEnabled(int track, boolean enabled);

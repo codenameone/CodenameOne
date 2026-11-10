@@ -68,6 +68,9 @@ public class ColorScheme {
     private Color surfaceContainerLowest;
     private Color surfaceContainerLow;
     private Color surfaceContainer;
+    private Color surfaceDim;
+    private Color surfaceBright;
+    private Color surfaceTint;
     private Color surfaceContainerHigh;
     private Color surfaceContainerHighest;
     private Color shadow;
@@ -98,6 +101,7 @@ public class ColorScheme {
             c.surface = fromHsl(h, Math.min(0.25, s), 0.06);
             c.onSurface = new Color(0xFFE6E1E5);
             c.secondary = fromHsl(h, s * 0.35, 0.70);
+            neutralTones(c, h, s, true);
         } else {
             c.primary = fromHsl(h, s, 0.40);
             c.inversePrimary = fromHsl(h, Math.min(1, s + 0.15), 0.80);
@@ -105,8 +109,51 @@ public class ColorScheme {
             c.surface = fromHsl(h, Math.min(0.35, s), 0.98);
             c.onSurface = new Color(0xFF1C1B1F);
             c.secondary = fromHsl(h, s * 0.35, 0.45);
+            neutralTones(c, h, s, false);
         }
+        c.surfaceTint = c.primary;
         return c;
+    }
+
+    /**
+     * The Material 3 neutral and neutral-variant roles, at the tones Flutter's
+     * {@code ColorScheme.fromSeed} reads from its palettes (surfaceContainerLowest is
+     * tone 100 in light and 4 in dark, and so on). The neutral palettes are the seed's
+     * hue at a low chroma -- 4 and 8 in the M3 spec -- approximated here as a fraction of
+     * the seed's HSL saturation.
+     */
+    private static void neutralTones(ColorScheme c, double h, double s, boolean dark) {
+        double n = Math.min(0.12, s * 0.12);
+        double nv = Math.min(0.20, s * 0.25);
+        if (dark) {
+            c.surfaceDim = fromHsl(h, n, 0.06);
+            c.surfaceBright = fromHsl(h, n, 0.24);
+            c.surfaceContainerLowest = fromHsl(h, n, 0.04);
+            c.surfaceContainerLow = fromHsl(h, n, 0.10);
+            c.surfaceContainer = fromHsl(h, n, 0.12);
+            c.surfaceContainerHigh = fromHsl(h, n, 0.17);
+            c.surfaceContainerHighest = fromHsl(h, n, 0.22);
+            c.onSurfaceVariant = fromHsl(h, nv, 0.80);
+            c.outline = fromHsl(h, nv, 0.60);
+            c.outlineVariant = fromHsl(h, nv, 0.30);
+            c.inverseSurface = fromHsl(h, n, 0.90);
+            c.onInverseSurface = fromHsl(h, n, 0.20);
+        } else {
+            c.surfaceDim = fromHsl(h, n, 0.87);
+            c.surfaceBright = fromHsl(h, n, 0.98);
+            c.surfaceContainerLowest = fromHsl(h, n, 1.0);
+            c.surfaceContainerLow = fromHsl(h, n, 0.96);
+            c.surfaceContainer = fromHsl(h, n, 0.94);
+            c.surfaceContainerHigh = fromHsl(h, n, 0.92);
+            c.surfaceContainerHighest = fromHsl(h, n, 0.90);
+            c.onSurfaceVariant = fromHsl(h, nv, 0.30);
+            c.outline = fromHsl(h, nv, 0.50);
+            c.outlineVariant = fromHsl(h, nv, 0.80);
+            c.inverseSurface = fromHsl(h, n, 0.20);
+            c.onInverseSurface = fromHsl(h, n, 0.95);
+        }
+        c.scrim = new Color(0xFF000000);
+        c.shadow = new Color(0xFF000000);
     }
 
     private static final Color DEFAULT_SEED = new Color(0xFF6750A4);
@@ -271,6 +318,12 @@ public class ColorScheme {
     public Color surfaceContainerHigh() { return or(surfaceContainerHigh, surface); }
     public Color surfaceContainerHighest() { return or(surfaceContainerHighest, surface); }
 
+    public Color surfaceDim() { return or(surfaceDim, surface); }
+    public Color surfaceBright() { return or(surfaceBright, surface); }
+    public Color surfaceTint() { return or(surfaceTint, primary); }
+    public void surfaceDim(Color v) { this.surfaceDim = v; }
+    public void surfaceBright(Color v) { this.surfaceBright = v; }
+    public void surfaceTint(Color v) { this.surfaceTint = v; }
     public Color outline() { return or(outline, new Color(0xFF79747E)); }
     /// Falls back to {@link #onBackground()}, which is what Flutter's ColorScheme does --
     /// and it is load bearing rather than a detail, because an M3 Divider takes its colour

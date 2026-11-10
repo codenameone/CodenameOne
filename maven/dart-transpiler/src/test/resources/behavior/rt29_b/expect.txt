@@ -1,0 +1,23 @@
+2
+[typedef, s]
+8
+{int, List<int>, List<dynamic>, Map<String, int>, (int) => int, Null, Object, dynamic}
+true
+true
+true
+false
+false
+List<int?>
+List<(int) => int>
+List<((int) => int)?>
+3
+9
+List<(int) => int>
+<Y0>(Y0) => Y0
+true
+(int) => int
+7
+2
+true
+true
+false

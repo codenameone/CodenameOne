@@ -161,4 +161,26 @@ public interface Row {
     ///
     /// - `IOException`
     //public Boolean wasNull()throws IOException;
+
+    /// Returns how the value in a column of the current row is stored.
+    ///
+    /// SQLite types values rather than columns, so one column can hold an
+    /// integer in one row and text in the next, and the typed getters convert
+    /// whatever is stored. A caller that has to hand a value back as it was
+    /// written -- a scripting layer, a generic exporter -- asks this first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the zero-based column index
+    ///
+    /// #### Returns
+    ///
+    /// one of `Database#COLUMN_NULL`, `Database#COLUMN_INTEGER`,
+    /// `Database#COLUMN_FLOAT`, `Database#COLUMN_TEXT`, `Database#COLUMN_BLOB`,
+    /// or `Database#COLUMN_UNKNOWN` when the engine cannot tell
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the cursor is closed, not on a row, or the index is out of range
+    int getColumnType(int index) throws IOException;
 }

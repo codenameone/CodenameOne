@@ -1,0 +1,55 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package dart.async;
+
+/// Dart's {@code StreamSink}, and the {@code EventSink}/{@code Sink} it extends: one
+/// interface, since an EventSink's void close() is a StreamSink's close() whose future
+/// is ignored.
+public interface StreamSink<S> extends StreamConsumer<S> {
+    void add(S event);
+
+    void addError(Object error);
+
+    /// Dart's {@code addError(error, stackTrace)}: the trace travels with the error.
+    default void addError(Object error, Object stackTrace) {
+        addError(stackTrace == null ? error : dart.core.StackTrace.carry(error, stackTrace));
+    }
+
+    /// Dart's {@code done}. Every Dart StreamSink declares it; the default is for a Dart
+    /// EventSink, which is this interface in Java and has no {@code done} to give.
+    default Future<Object> done() {
+        throw new dart.core.UnsupportedError("An EventSink has no done future");
+    }
+
+    /// A sink's close() future carries nothing, so it stays the {@code Future<Object>}
+    /// every caller and implementation already uses.
+    @Override
+    Future<Object> close();
+
+    /// Dart's {@code addStream}, defaulted for the same reason as {@link #done()}.
+    @Override
+    default Future<Object> addStream(Stream<S> stream) {
+        throw new dart.core.UnsupportedError("An EventSink has no addStream");
+    }
+}

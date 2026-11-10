@@ -1,0 +1,16 @@
+done
+tryInBody: val 1, got 1, boom t1, caught Oops(t1) true, val 2, in catch 2, finally, val 3, after finally await
+11
+returnThroughFinally: val 10, fin runs before return, val 12
+2
+loopsThroughFinally: val 0, fin 0, fin 1, val 2, fin 2, fin 3, val 100, inner fin 0, outer fin 0, val 101, inner fin 1, outer fin 1
+finallyThrowReplaces: boom first, val 20, outer saw Oops(second)
+rethrowAndUntyped: boom r, typed Oops(r), val 30, untyped Oops(r), val 31, bare catch a string
+41
+nestedReturns: val 40, inner, val 42, outer
+awaitFreeTryInFrame: val 50, plain try, plain catch Oops(plain), plain finally, val 51
+uncaughtThroughFinally: boom escape, cleanup, main caught Oops(escape)
+receivers: n=0 a=1 b=0 c=0, n=0 a=2 b=0 c=0, n=0 a=3 b=0 c=0
+argumentOrder: p1, c, val 2, n=0 a=1 b=2 c=3, c2, p2, val 4, n=0 a=1 b=4 c=3
+nullShorting: short null, val 61, long n=5 a=61 b=0 c=0
+forHeaderAwaits: val 0, val 3, val 1, val 3, val 1, val 3, val 1, val 3, captured [0, 1, 2]

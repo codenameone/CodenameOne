@@ -101,7 +101,7 @@ public final class NotifierListeners {
         Key k = new Key(notifier);
         List<Funcs.VoidFunc0> l = lists.get(k);
         if (l != null) {
-            l.remove(listener);
+            dart.runtime.DartRuntime.removeEq(l, listener);
             if (l.isEmpty()) {
                 lists.remove(k);
             }

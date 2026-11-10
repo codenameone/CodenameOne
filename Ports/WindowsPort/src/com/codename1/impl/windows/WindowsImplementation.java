@@ -928,9 +928,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     dispatchPointerHover(windowId, x, y, key);
                     break;
                 case EVENT_KEY_PRESSED:
+                    reportGamepadKey(key, true);
                     windowKeyPressed(windowId, key);
                     break;
                 case EVENT_KEY_RELEASED:
+                    reportGamepadKey(key, false);
                     windowKeyReleased(windowId, key);
                     break;
                 case EVENT_SIZE_CHANGED:
@@ -2088,6 +2090,37 @@ public class WindowsImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTrueTypeStreamSupported() {
+        // Asked of the system rather than assumed: without DirectWrite's in-memory
+        // loader every createTrueTypeFontFromData would answer null.
+        return WindowsNative.isFontMemoryLoadingSupported();
+    }
+
+    /// True when data starts with a TrueType (0x00010000 or 'true'), OpenType
+    /// CFF ('OTTO') or collection ('ttcf') tag.
+    private static boolean isSfntHeader(byte[] data) {
+        if (data == null || data.length < 12) {
+            return false;
+        }
+        int tag = ((data[0] & 0xff) << 24) | ((data[1] & 0xff) << 16)
+                | ((data[2] & 0xff) << 8) | (data[3] & 0xff);
+        return tag == 0x00010000 || tag == 0x74727565 || tag == 0x4f54544f
+                || tag == 0x74746366;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // The contract for data that is not a font is null. Bytes without an
+        // SFNT header are rejected here; bytes with one that the native loader
+        // still cannot parse or register make it answer 0, which is null too.
+        if (!isSfntHeader(data)) {
+            return null;
+        }
+        long font = WindowsNative.loadTrueTypeFontFromMemory(fontName, data);
+        return font == 0 ? null : Long.valueOf(font);
+    }
+
+    @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
         long font = 0;
         // Bundled TTFs (material-design-font.ttf and any app font) ship as
@@ -2746,6 +2779,45 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int VK_GAMEPAD_LEFT_THUMBSTICK_DOWN = 0xD4;
     private static final int VK_GAMEPAD_LEFT_THUMBSTICK_RIGHT = 0xD5;
     private static final int VK_GAMEPAD_LEFT_THUMBSTICK_LEFT = 0xD6;
+
+    /// The Gamepad.BUTTON_* a gamepad virtual key stands for, or -1. The stick
+    /// directions are left out: they are a direction, not a button, and the
+    /// key events already navigate with them.
+    static int gamepadButtonOf(int vk) {
+        switch (vk) {
+            case VK_GAMEPAD_A: return com.codename1.gaming.Gamepad.BUTTON_A;
+            case VK_GAMEPAD_B: return com.codename1.gaming.Gamepad.BUTTON_B;
+            case 0xC5: return com.codename1.gaming.Gamepad.BUTTON_X;
+            case 0xC6: return com.codename1.gaming.Gamepad.BUTTON_Y;
+            case 0xC7: return com.codename1.gaming.Gamepad.BUTTON_RIGHT_SHOULDER;
+            case 0xC8: return com.codename1.gaming.Gamepad.BUTTON_LEFT_SHOULDER;
+            case 0xC9: return com.codename1.gaming.Gamepad.BUTTON_LEFT_TRIGGER;
+            case 0xCA: return com.codename1.gaming.Gamepad.BUTTON_RIGHT_TRIGGER;
+            case VK_GAMEPAD_DPAD_UP: return com.codename1.gaming.Gamepad.BUTTON_DPAD_UP;
+            case VK_GAMEPAD_DPAD_DOWN: return com.codename1.gaming.Gamepad.BUTTON_DPAD_DOWN;
+            case VK_GAMEPAD_DPAD_LEFT: return com.codename1.gaming.Gamepad.BUTTON_DPAD_LEFT;
+            case VK_GAMEPAD_DPAD_RIGHT: return com.codename1.gaming.Gamepad.BUTTON_DPAD_RIGHT;
+            case 0xCF: return com.codename1.gaming.Gamepad.BUTTON_START;
+            case 0xD0: return com.codename1.gaming.Gamepad.BUTTON_BACK;
+            case 0xD1: return com.codename1.gaming.Gamepad.BUTTON_LEFT_STICK;
+            case 0xD2: return com.codename1.gaming.Gamepad.BUTTON_RIGHT_STICK;
+            default: return -1;
+        }
+    }
+
+    /// The Xbox build gets the controller as keys and only as keys, so it is
+    /// reported to Gamepads from them, as one controller in slot 0. Navigation
+    /// stays with the key event itself, which is why `navigate` is false.
+    private static void reportGamepadKey(int vk, boolean down) {
+        int button = gamepadButtonOf(vk);
+        if (button < 0) {
+            return;
+        }
+        if (com.codename1.gaming.Gamepads.getGamepad(0) == null) {
+            com.codename1.gaming.Gamepads.reportConnected(0, "Gamepad");
+        }
+        com.codename1.gaming.Gamepads.reportButton(0, button, down, false);
+    }
 
     /// B on a controller, the console's universal "back". A Win32 window never
     /// receives it, so on the desktop this changes nothing.

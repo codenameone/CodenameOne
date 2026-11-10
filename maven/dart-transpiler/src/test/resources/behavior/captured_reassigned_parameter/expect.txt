@@ -1,0 +1,15 @@
+3   |
+ab  |
+    |
+first sees 30
+second sees 30
+level 0
+level 7
+4
+p!
+q!
+*mid*
+#mid#
+42
+9  |
+z  :

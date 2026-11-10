@@ -61,6 +61,17 @@ public abstract class Flex extends Widget {
         return children;
     }
 
+    private com.codename1.flutter.TextBaseline textBaseline;
+
+    /** The baseline {@code CrossAxisAlignment.baseline} aligns on. */
+    public void textBaseline(com.codename1.flutter.TextBaseline v) {
+        this.textBaseline = v;
+    }
+
+    public com.codename1.flutter.TextBaseline textBaseline() {
+        return textBaseline;
+    }
+
     public MainAxisAlignment getMainAxisAlignment() {
         return mainAxisAlignment;
     }

@@ -27,7 +27,7 @@ import com.codenameone.examples.skirmish.api.PlayerDto;
 import com.codenameone.examples.skirmish.api.QueryDto;
 import com.codenameone.examples.skirmish.api.QueryResultDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.ui.Ui;
 import java.util.Arrays;
 

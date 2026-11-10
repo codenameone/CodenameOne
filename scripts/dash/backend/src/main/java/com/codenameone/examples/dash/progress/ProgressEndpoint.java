@@ -19,7 +19,7 @@
 package com.codenameone.examples.dash.progress;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.dash.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.dash.api.ClaimDto;
 import com.codenameone.examples.dash.api.ProgressApiServer;
 import com.codenameone.examples.dash.api.ProgressDto;

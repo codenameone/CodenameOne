@@ -32,7 +32,7 @@ import com.codenameone.examples.skirmish.battle.Sfx;
 import com.codenameone.examples.skirmish.engage.Notifications;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 
 /// Settings: the battle name, sound, analytics consent, push, the server.

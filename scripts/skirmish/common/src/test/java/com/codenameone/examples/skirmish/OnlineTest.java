@@ -35,10 +35,12 @@ public class OnlineTest extends E2e {
         final BattleView view = arena();
         assertTrue(view.driver() instanceof OnlineDriver, "an online battle");
         // The clock only moves when the server says it may: reaching tick 100
-        // means the ticks are arriving.
-        until(() -> view.driver().match().tick() > 100, 30000, "server ticks");
+        // means the ticks are arriving. Both waits fail when the ticks stop,
+        // never on how long a loaded runner took to reach them.
+        until(() -> view.driver().match() != null, 30000, "the match");
         final Match m = view.driver().match();
-        until(() -> m.player(view.driver().me()).wholeElixir() >= 7, 30000, "elixir");
+        untilAdvancing(() -> m.tick() > 100, () -> m.tick(), 10000, "server ticks");
+        untilAdvancing(() -> m.player(view.driver().me()).wholeElixir() >= 7, () -> m.tick(), 10000, "elixir");
         touch("card0");
         touch(view.getAbsoluteX() + view.getWidth() * 2 / 3, view.getAbsoluteY() + view.getHeight() * 3 / 4);
         until(() -> m.player(view.driver().me()).wholeElixir() < 7, 10000, "the card to be accepted");

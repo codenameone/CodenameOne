@@ -19,7 +19,7 @@
 // ======================================================================
 
 @JavaName('com.codename1.flutter.material.TabController')
-class TabController {
+class TabController extends ChangeNotifier {
   external TabController({int? initialIndex, required int length, Duration? animationDuration, TickerProvider? vsync});
   external int get index;
   external set index(int value);
@@ -42,6 +42,7 @@ class Tab extends Widget {
 @JavaName('com.codename1.flutter.material.TabBar')
 class TabBar extends Widget {
   external TabBar({Key? key, required List<Widget> tabs, TabController? controller, bool? isScrollable, Object? padding, Color? indicatorColor, double? indicatorWeight, Object? indicatorPadding, Object? indicator, Object? indicatorSize, Color? labelColor, TextStyle? labelStyle, Object? labelPadding, Color? unselectedLabelColor, TextStyle? unselectedLabelStyle, Object? dragStartBehavior, Object? mouseCursor, bool? enableFeedback, IntCallback? onTap, Object? physics});
+  external Size get preferredSize;
 }
 
 @JavaName('com.codename1.flutter.material.TabBarView')
@@ -75,7 +76,7 @@ class RangeLabels {
 
 @JavaName('com.codename1.flutter.material.RangeSlider')
 class RangeSlider extends Widget {
-  external RangeSlider({Key? key, required RangeValues values, Object? onChanged, Object? onChangeStart, Object? onChangeEnd, double? min, double? max, int? divisions, RangeLabels? labels, Color? activeColor, Color? inactiveColor, Object? semanticFormatterCallback});
+  external RangeSlider({Key? key, required RangeValues values, void Function(RangeValues)? onChanged, void Function(RangeValues)? onChangeStart, void Function(RangeValues)? onChangeEnd, double? min, double? max, int? divisions, RangeLabels? labels, Color? activeColor, Color? inactiveColor, Object? semanticFormatterCallback});
 }
 
 // ======================================================================
@@ -163,7 +164,8 @@ class SliverAppBar extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.NestedScrollView')
 class NestedScrollView extends Widget {
-  external NestedScrollView({Key? key, required Object headerSliverBuilder, required Widget body, Object? controller, Object? scrollDirection, bool? reverse, Object? physics, bool? floatHeaderSlivers});
+  external NestedScrollView({Key? key, required List<Widget> Function(BuildContext, bool) headerSliverBuilder, required Widget body, Object? controller, Object? scrollDirection, bool? reverse, Object? physics, bool? floatHeaderSlivers});
+  external static SliverOverlapAbsorberHandle sliverOverlapAbsorberHandleFor(BuildContext context);
 }
 
 // ======================================================================
@@ -172,7 +174,7 @@ class NestedScrollView extends Widget {
 
 @JavaName('com.codename1.flutter.material.RefreshIndicator')
 class RefreshIndicator extends Widget {
-  external RefreshIndicator({Key? key, required Widget child, double? displacement, Object? onRefresh, Color? color, Color? backgroundColor, double? strokeWidth, Object? notificationPredicate, String? semanticsLabel, String? semanticsValue});
+  external RefreshIndicator({Key? key, required Widget child, double? displacement, dynamic Function()? onRefresh, Color? color, Color? backgroundColor, double? strokeWidth, Object? notificationPredicate, String? semanticsLabel, String? semanticsValue});
 }
 
 // ======================================================================
@@ -193,8 +195,8 @@ class Dismissible extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.ReorderableListView')
 class ReorderableListView extends Widget {
-  external ReorderableListView({Key? key, List<Widget> children, required Object onReorder, Object? padding, Widget? header, Object? scrollDirection, bool? shrinkWrap, Object? physics, bool? buildDefaultDragHandles});
-  external static ReorderableListView builder({Key? key, required IndexedWidgetBuilder itemBuilder, required int itemCount, required Object onReorder, Object? padding, Object? scrollDirection, bool? shrinkWrap});
+  external ReorderableListView({Key? key, List<Widget> children, required void Function(int, int) onReorder, Object? padding, Widget? header, Object? scrollDirection, bool? shrinkWrap, Object? physics, bool? buildDefaultDragHandles});
+  external static ReorderableListView builder({Key? key, required IndexedWidgetBuilder itemBuilder, required int itemCount, required void Function(int, int) onReorder, Object? padding, Object? scrollDirection, bool? shrinkWrap});
 }
 
 // ======================================================================
@@ -209,7 +211,7 @@ class AnimatedListState {
 
 @JavaName('com.codename1.flutter.widgets.AnimatedList')
 class AnimatedList extends Widget {
-  external AnimatedList({Key? key, required Object itemBuilder, int? initialItemCount, Object? scrollDirection, bool? reverse, Object? controller, Object? primary, Object? physics, bool? shrinkWrap, Object? padding, Clip? clipBehavior});
+  external AnimatedList({Key? key, required Widget Function(BuildContext, int, Animation<double>) itemBuilder, int? initialItemCount, Object? scrollDirection, bool? reverse, Object? controller, Object? primary, Object? physics, bool? shrinkWrap, Object? padding, Clip? clipBehavior});
   external static AnimatedListState of(BuildContext context);
 }
 
@@ -239,12 +241,12 @@ class Stepper extends Widget {
 
 @JavaName('com.codename1.flutter.material.ExpansionPanel')
 class ExpansionPanel {
-  external ExpansionPanel({required Object headerBuilder, required Widget body, bool? isExpanded, bool? canTapOnHeader, Color? backgroundColor});
+  external ExpansionPanel({required Widget Function(BuildContext, bool) headerBuilder, required Widget body, bool? isExpanded, bool? canTapOnHeader, Color? backgroundColor});
 }
 
 @JavaName('com.codename1.flutter.material.ExpansionPanelList')
 class ExpansionPanelList extends Widget {
-  external ExpansionPanelList({Key? key, List<ExpansionPanel> children, Object? expansionCallback, Object? animationDuration, Object? expandedHeaderPadding, double? elevation});
+  external ExpansionPanelList({Key? key, List<ExpansionPanel> children, void Function(int, bool)? expansionCallback, Object? animationDuration, Object? expandedHeaderPadding, double? elevation});
 }
 
 @JavaName('com.codename1.flutter.material.ExpansionTile')
@@ -258,7 +260,7 @@ class ExpansionTile extends Widget {
 
 @JavaName('com.codename1.flutter.material.DataColumn')
 class DataColumn {
-  external DataColumn({required Widget label, String? tooltip, bool? numeric, Object? onSort});
+  external DataColumn({required Widget label, String? tooltip, bool? numeric, void Function(int, bool)? onSort});
 }
 
 @JavaName('com.codename1.flutter.material.DataCell')
@@ -367,7 +369,7 @@ class BottomSheet extends Widget {
 }
 
 @JavaName('com.codename1.flutter.material.BottomSheets.showModalBottomSheet')
-external Future<dynamic> showModalBottomSheet({required BuildContext context, required WidgetBuilder builder, Color? backgroundColor, double? elevation, Object? shape, Clip? clipBehavior, Object? constraints, Color? barrierColor, bool? isScrollControlled, bool? useRootNavigator, bool? isDismissible, bool? enableDrag, bool? showDragHandle, Object? routeSettings, Object? transitionAnimationController});
+external Future<dynamic> showModalBottomSheet({required BuildContext context, required WidgetBuilder builder, Color? backgroundColor, double? elevation, Object? shape, Clip? clipBehavior, Object? constraints, Color? barrierColor, bool? isScrollControlled, bool? useRootNavigator, bool? isDismissible, bool? enableDrag, bool? showDragHandle, Object? routeSettings, Object? transitionAnimationController, bool? useSafeArea});
 
 // ======================================================================
 // Hero (minimal: renders child, no flight animation)

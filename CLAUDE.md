@@ -113,8 +113,9 @@ PR CI (`.github/workflows/pr.yml`, Java 8 leg) runs SpotBugs over
 `codenameone-maven-plugin`, `build-engine` (the Maven-free build logic both
 build plugins share), `project-model` (the project-layout API),
 `android-res-compiler` and `android-compat` (the Android compatibility
-runtime), `codenameone-gradle-plugin` and `javac` (the in-tree Java compiler,
-`vm/JavaCompiler`), then enforces the result in
+runtime), `codenameone-gradle-plugin`, `javac` (the in-tree Java compiler,
+`vm/JavaCompiler`) and `python-transpiler`, plus `python-runtime` in a step of
+its own on JDK 17 (it compiles at release 17), then enforces the result in
 `.github/scripts/generate-quality-report.py`. `cil-translator` and
 `unity-compat` (the Unity compatibility translator and runtime) are held to the
 same script with SpotBugs, PMD and Checkstyle all three, but in
@@ -133,6 +134,7 @@ any of them cannot skip it.
   `maven/build-engine/`, `maven/project-model/`,
   `maven/android-res-compiler/`, `maven/android-compat/`,
   `maven/codenameone-gradle-plugin/`, `maven/javac/`,
+  `maven/python-transpiler/`, `maven/python-runtime/`,
   `maven/cil-translator/`, `maven/unity-compat/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
@@ -377,7 +379,8 @@ The scope is what a translation actually sees -- `maven/core`, `maven/ios`,
 `vm/JavaAPI` and `maven/android-compat`, whose runtime an application with
 Android sources ships relocated inside its own classes, and
 `maven/swing-compat` and `maven/javafx-compat`, which are relocated into an
-application with desktop sources the same way. **The Android port is not covered**, and adding it back would be a
+application with desktop sources the same way. `maven/python-runtime` is in
+scope too: an application with Python sources ships it. **The Android port is not covered**, and adding it back would be a
 mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
 `(NotificationManager) getSystemService(...)` there is live, correct code, and
 `Ports/Android` is never translated. That is the same reason `Ports/CLDC11` is
@@ -510,7 +513,7 @@ guessed at versions, which is worse than none -- `scripts/check-since-tags.sh`.
 the next tag or the end of the comment: text written after one was swallowed into
 it, and since the doclet drops `@author`, 90 published comments had silently lost
 a "See also" or "Deprecated" section. `scripts/check-author-tags.py` rejects them
-in every tracked `.java` file (its own workflow, `check-author-tags.yml`), in `///`
+in every tracked `.java` file (`source-gates.yml`), in `///`
 and `/** */` comments. A plain `/* */` comment is left alone: vendored license
 headers (MiG Layout's BSD notice) carry an `@author` that is part of the notice.
 
@@ -563,7 +566,7 @@ escape (`'\0'`, `"\u001f"`, `\x1f`). TAB, LF and CR are the only control
 characters allowed. It covers every tracked text file -- source, scripts,
 config and docs -- because this tree had corrupted files in several of them.
 
-It runs as its own workflow (`.github/workflows/check-control-characters.yml`)
+It runs in its own workflow (`.github/workflows/source-gates.yml`, one job with the other cheap tree-wide script gates)
 rather than inside `pr.yml`, whose `paths` filter excludes `scripts/**` and
 `docs/**` and would let a PR touching only those skip the check.
 
@@ -611,8 +614,8 @@ not honour -- check `.note.android.ident`, which records the API level the
 slice was really compiled against.
 
 `scripts/check-16k-page-alignment.py` gates this over every tracked archive and
-loose `.so` in the tree, in its own workflow
-(`.github/workflows/check-16k-page-alignment.yml`) rather than inside `pr.yml`,
+loose `.so` in the tree, as a step of
+`.github/workflows/source-gates.yml` rather than inside `pr.yml`,
 whose `paths` filter would let a PR that only adds a native artifact skip it.
 Containers and libraries are found by magic bytes, not by extension, so a
 `.cn1lib` or any future container is covered.

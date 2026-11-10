@@ -1,0 +1,17 @@
+[<C.RED: 1>, <C.GREEN: 2>, <C.BLUE: 3>] C.GREEN C.BLUE <C.RED: 1> True 3 True green ['RED', 'GREEN', 'BLUE', 'ALIAS']
+<P.R|W: 3> P.R|W [<P.R: 1>, <P.X: 4>] True <P.W|X: 6> False <P: 0>
+2 2 1 <N.B: 2> 2 True
+M.A <M.A: 1> M.A
+x <S.Y: 'yy'> X
+<I.A|B: 3> 3 <I: 8> 3
+5.97e+24 (5.97e+24, 6370000.0)
+[<A.x: 1>, <A.y: 2>, <A.z: 3>] 2
+9 is not a valid C
+duplicate values found in <enum 'U'>: b -> a
+Red Color.GREEN r GREEN True
+1 True True True
+['GREEN', 'RED'] Color Color.GREEN
+12 4
+AttributeError cannot reassign member 'RED'
+True [<Status.OK: 200>, <Status.NOT_FOUND: 404>] NOT_FOUND 200
+200 True 200 404

@@ -1,0 +1,17 @@
+ticker closed 3
+[0, 1, 2]
+ticker closed 4
+[0, 2, 4, 6]
+ticker closed 3
+{0: 0, 1: 1, 2: 4}
+ticker closed 5
+{0, 1}
+[0, 1, 4, 9]
+ticker closed 2
+async_generator [100, 101]
+0 1
+ticker closed 10
+exhausted
+None hi 5
+athrow x
+function async_generator

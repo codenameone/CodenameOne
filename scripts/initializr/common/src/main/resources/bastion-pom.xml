@@ -76,10 +76,16 @@
                                          usetimestamp="true"
                                          ignoreerrors="true"/>
 
+                                    <!-- A fallback: failing here only when neither source answered and no
+                                         copy is on disk, so a GitHub outage no longer fails a build that
+                                         already has the updater. -->
                                     <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
                                          dest="${user.home}/UpdateCodenameOne.jar"
                                          usetimestamp="true"
-                                         ignoreerrors="false"/>
+                                         ignoreerrors="true"/>
+                                    <available file="${user.home}/UpdateCodenameOne.jar" property="cn1.updater.present"/>
+                                    <fail unless="cn1.updater.present"
+                                          message="Could not download UpdateCodenameOne.jar from codenameone.com or GitHub"/>
                                     <java jar="${user.home}/UpdateCodenameOne.jar" fork="true">
                                         <arg value="${project.build.directory}/codenameone/tmpProject"/>
                                         <arg value="force"/>

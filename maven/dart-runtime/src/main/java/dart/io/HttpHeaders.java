@@ -24,7 +24,7 @@
 package dart.io;
 
 import dart.core.DartList;
-import dart.runtime.Dyn;
+import dart.runtime.Funcs;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -78,7 +78,7 @@ public class HttpHeaders {
         if (v == null) {
             return null;
         }
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         out.addAll(v);
         return out;
     }
@@ -143,12 +143,15 @@ public class HttpHeaders {
         values.clear();
     }
 
-    /** Dart's {@code forEach((name, values) {...})}. */
-    public void forEach(Object action) {
+    /**
+     * Dart's {@code forEach((name, values) {...})}. Typed, so a closure passed here is a
+     * Java lambda with a functional interface to bind to.
+     */
+    public void forEach(Funcs.VoidFunc2<String, DartList<String>> action) {
         for (Map.Entry<String, List<String>> e : new ArrayList<Map.Entry<String, List<String>>>(values.entrySet())) {
-            DartList<String> l = new DartList<String>();
+            DartList<String> l = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
             l.addAll(e.getValue());
-            Dyn.invoke(action, e.getKey(), l);
+            action.call(e.getKey(), l);
         }
     }
 

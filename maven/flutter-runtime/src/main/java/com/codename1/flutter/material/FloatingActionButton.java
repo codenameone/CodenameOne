@@ -119,6 +119,34 @@ public class FloatingActionButton extends Widget {
      * rendered as an ordinary round FAB with the default plus sign — which is
      * what every gallery study showed instead of its "Back to gallery" pill.</p>
      */
+    private double sizeLp = FabRenderElement.FAB_SIZE_LP;
+
+    /** The square's side in logical pixels: 40 small, 56 regular, 96 large (Material 3). */
+    public double getSizeLp() {
+        return sizeLp;
+    }
+
+    /** Flutter's {@code FloatingActionButton.small}: a 40-pixel square. */
+    public static FloatingActionButton small(Key key, Funcs.VoidFunc0 onPressed, String tooltip, Widget child) {
+        return sized(40, key, onPressed, tooltip, child);
+    }
+
+    /** Flutter's {@code FloatingActionButton.large}: a 96-pixel square. */
+    public static FloatingActionButton large(Key key, Funcs.VoidFunc0 onPressed, String tooltip, Widget child) {
+        return sized(96, key, onPressed, tooltip, child);
+    }
+
+    private static FloatingActionButton sized(double side, Key key, Funcs.VoidFunc0 onPressed, String tooltip,
+            Widget child) {
+        FloatingActionButton f = new FloatingActionButton();
+        f.key(key);
+        f.onPressed(onPressed);
+        f.tooltip(tooltip);
+        f.child(child);
+        f.sizeLp = side;
+        return f;
+    }
+
     public static FloatingActionButton extended(Key key, Funcs.VoidFunc0 onPressed, Widget label,
             Widget icon, String tooltip, Object heroTag, Color backgroundColor) {
         FloatingActionButton f = new FloatingActionButton();

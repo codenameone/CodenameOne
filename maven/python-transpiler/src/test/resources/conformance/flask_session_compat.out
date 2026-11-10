@@ -1,0 +1,14 @@
+b=bytes:b'\x00hi'|m=dict:{' t': 'x'}|n=int:3|t=tuple:(1, 2)|user=str:'alice'|when=datetime:datetime.datetime(2024, 5, 6, 7, 8, 9, tzinfo=datetime.timezone.utc)
+b=bytes:b'\x00hi'|big=str:'abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc'|m=dict:{' t': 'x'}|n=int:3|t=tuple:(1, 2)|user=str:'alice'|when=datetime:datetime.datetime(2024, 5, 6, 7, 8, 9, tzinfo=datetime.timezone.utc)
+empty
+eyJ0Ijp7IiB0IjpbMSwieCJdfSwidXNlciI6ImJvYiJ9.cT-zAA.zlAkaBL0o4pLDoZuWjg22ZYJQ34
+t=tuple:(1, 'x')|user=str:'bob'
+True True
+big=str:'xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyz'|t=tuple:(1, 'x')|user=str:'bob'
+b'hello.E09YEwkmhp2f6vmJaITaXlEvFuc' b'hello' False
+b'v.cT-zAA.0b4O2Yf7AClrgvw2u9RK2NBi75k' b'v'
+eyJhIjpbMSwyXX0.Q066ynt7YYu3wNu2plLwXD-xis8 {'a': [1, 2]}
+InBheWxvYWQi.cT-zAA.Wj158aMBUqXyg6gHZKkY0iqmMSg payload
+bad BadTimeSignature
+expired Signature age 100 > 10 seconds
+7

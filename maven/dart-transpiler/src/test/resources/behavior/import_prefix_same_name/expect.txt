@@ -1,0 +1,5 @@
+wrapped(base channel base:a)
+base channel base:b
+base channel base:c
+base channel d
+wrapped(base channel e)

@@ -36,8 +36,8 @@ import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.api.StatsSeriesDto;
 import com.codenameone.examples.wayline.live.LiveChannel;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
-import com.codenameone.examples.wayline.ui.Chart;
+import com.codename1.appkit.Net;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Layouts;
 import com.codenameone.examples.wayline.ui.StatRow;
@@ -243,10 +243,10 @@ final class Dashboard extends LiveChannel.Adapter {
         column[next++ % columns].add(tile("Rides", String.valueOf(asked), "seriesRides",
                 Lang.tr("{0} completed, {1} cancelled", String.valueOf(completed),
                         String.valueOf(cancelled)),
-                Chart.of("chartRides", rides, from, to)));
+                Chart.of("Wl", "chartRides", rides, from, to)));
         column[next++ % columns].add(tile("Fares", Ui.money(taken, found.currency()),
                 "seriesRevenue", Lang.tr("{0} new accounts", String.valueOf(joined)),
-                Chart.of("chartRevenue", revenue, from, to)));
+                Chart.of("Wl", "chartRevenue", revenue, from, to)));
         if (columns == 1) {
             series.add(rates);
         }
@@ -258,7 +258,7 @@ final class Dashboard extends LiveChannel.Adapter {
             hourly[iter] = value == null ? 0 : value.intValue();
         }
         column[next++ % columns].add(tile("Requests by hour", null, null,
-                "The busy hours, in UTC", Chart.of("chartHours", hourly, "00:00", "23:00")));
+                "The busy hours, in UTC", Chart.of("Wl", "chartHours", hourly, "00:00", "23:00")));
         column[next++ % columns].add(shares("By outcome", found.byState(), true));
         column[next++ % columns].add(shares("By kind of ride", found.byProduct(), false));
 
@@ -323,7 +323,7 @@ final class Dashboard extends LiveChannel.Adapter {
             tile.add(Ui.fact(name.length() == 0 ? part.name() : name,
                     String.valueOf(part.count())));
             // A total of nothing has no shares; the bars are then empty.
-            tile.add(new Chart.Meter(total == 0 ? 0 : part.count() / (double) total));
+            tile.add(new Chart.Meter("Wl", total == 0 ? 0 : part.count() / (double) total));
         }
         return tile;
     }

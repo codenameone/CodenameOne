@@ -1,0 +1,38 @@
+name: club_hub
+description: An ordinary Flutter app for a hobby club -- events calendar, markdown notes, live chat over STOMP, local Hive storage -- used to check that Codename One transpiles the foundational pub packages and current Dart and Flutter API surface unmodified.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  async: ^2.11.0
+  collection: ^1.18.0
+  confetti: ^0.8.0
+  crypto: ^3.0.3
+  flutter_markdown: ^0.7.0
+  font_awesome_flutter: ^10.7.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  http: ^1.2.0
+  http_parser: ^4.0.2
+  intl: ^0.20.0
+  markdown: ^7.2.0
+  meta: ^1.11.0
+  path: ^1.9.0
+  simple_gesture_detector: ^0.2.1
+  source_span: ^1.10.0
+  stomp_dart_client: ^2.0.0
+  stream_channel: ^2.1.2
+  string_scanner: ^1.2.0
+  table_calendar: ^3.1.0
+  typed_data: ^1.3.2
+  web_socket_channel: ^3.0.0
+
+flutter:
+  uses-material-design: true

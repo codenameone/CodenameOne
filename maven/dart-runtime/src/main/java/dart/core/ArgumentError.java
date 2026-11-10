@@ -34,16 +34,22 @@ public class ArgumentError extends RuntimeException {
     private final String name;
 
     public ArgumentError(String message) {
-        super(message);
-        this.invalidValue = null;
-        this.hasValue = false;
-        this.name = null;
+        this(null, false, null, message);
+    }
+
+    /// Dart's `ArgumentError([message, name])`: no value is to blame.
+    public ArgumentError(String message, String name) {
+        this(null, false, name, message);
     }
 
     public ArgumentError(Object value, String name, String message) {
+        this(value, true, name, message);
+    }
+
+    protected ArgumentError(Object value, boolean hasValue, String name, String message) {
         super(message);
         this.invalidValue = value;
-        this.hasValue = true;
+        this.hasValue = hasValue;
         this.name = name;
     }
 
@@ -59,19 +65,29 @@ public class ArgumentError extends RuntimeException {
         return name;
     }
 
+    /// Dart's `message` getter: the message the error was built with, not its text.
+    public String dartMessage() {
+        return getMessage();
+    }
+
+    /// The text Dart's toString starts with.
+    protected String errorName() {
+        return hasValue ? "Invalid argument" : "Invalid argument(s)";
+    }
+
+    /// What Dart's toString puts between the message and the value.
+    protected String errorExplanation() {
+        return "";
+    }
+
     @Override
     public String toString() {
-        // Dart says "argument(s)" when no single value is to blame.
-        StringBuilder sb = new StringBuilder(hasValue ? "Invalid argument" : "Invalid argument(s)");
-        if (name != null) {
-            sb.append(" (").append(name).append(")");
+        // Dart's ArgumentError.toString, which RangeError and IndexError share.
+        String prefix = errorName() + (name == null ? "" : " (" + name + ")")
+                + (getMessage() == null ? "" : ": " + getMessage());
+        if (!hasValue) {
+            return prefix;
         }
-        if (getMessage() != null) {
-            sb.append(": ").append(getMessage());
-        }
-        if (hasValue) {
-            sb.append(": ").append(DartRuntime.str(invalidValue));
-        }
-        return sb.toString();
+        return prefix + errorExplanation() + ": " + DartRuntime.str(invalidValue);
     }
 }

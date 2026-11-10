@@ -1,0 +1,20 @@
+[1, 2, 3, 4]
+[3, 2, 1]
+a1
+3
+true
+true
+false
+Symbol("foo")
+short string 2
+long string 5
+list 2
+other
+8
+....a
+Cell(7)
+2024
+120
+example.com
+3
+3

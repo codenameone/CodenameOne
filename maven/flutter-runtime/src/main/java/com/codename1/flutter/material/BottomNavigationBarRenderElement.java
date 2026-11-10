@@ -123,6 +123,9 @@ public class BottomNavigationBarRenderElement extends RenderElement {
     private void style(Component c) {
         try {
             Color bg = bar().getBackgroundColor();
+            if (bg == null && barTheme() != null) {
+                bg = barTheme().backgroundColor();
+            }
             if (bg == null) {
                 bg = Theme.of(this).colorScheme().surface();
             }
@@ -161,6 +164,9 @@ public class BottomNavigationBarRenderElement extends RenderElement {
 
     private Color tintFor(boolean selected) {
         Color own = selected ? bar().getSelectedItemColor() : bar().getUnselectedItemColor();
+        if (own == null && barTheme() != null) {
+            own = selected ? barTheme().selectedItemColor() : barTheme().unselectedItemColor();
+        }
         if (own != null) {
             return own;
         }
@@ -350,6 +356,16 @@ public class BottomNavigationBarRenderElement extends RenderElement {
                 int index = (x - getAbsoluteX()) * n / getWidth();
                 bar.userTapped(Math.max(0, Math.min(n - 1, index)));
             }
+        }
+    }
+
+    /// ThemeData.bottomNavigationBarTheme, which supplies what the bar leaves unset.
+    private BottomNavigationBarThemeData barTheme() {
+        try {
+            Object t = Theme.of(this).bottomNavigationBarTheme();
+            return t instanceof BottomNavigationBarThemeData ? (BottomNavigationBarThemeData) t : null;
+        } catch (Throwable noTheme) {
+            return null;
         }
     }
 }

@@ -1,0 +1,15 @@
+a%20b%26c%2Fd%3Fe%3Df
+a b&c
+file:///tmp/my%20file.txt
+&lt;a href=&quot;x&quot;&gt;'&lt;/a&gt;
+&lt;b&gt;&amp;"&lt;/b&gt;
+&lt;i&gt;&quot;x&quot;&lt;&#47;i&gt;
+boom
+7
+[1, 2, 3]
+3
+true
+{a: 1, b: 2}
+{x, y}
+[1, 2]
+square has 4 sides

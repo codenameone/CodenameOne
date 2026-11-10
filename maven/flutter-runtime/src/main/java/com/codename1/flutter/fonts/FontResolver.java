@@ -108,8 +108,43 @@ public final class FontResolver {
         CACHE.clear();
     }
 
+    /**
+     * Flutter's {@code TextStyle(package: p, fontFamily: f)} names the family
+     * {@code packages/p/f}, and the package's font assets are bundled under
+     * {@code packages/p/}. That prefix is a search location, not part of the face's
+     * name: the package's own folders are searched first, then the app's.
+     */
+    private static java.util.List<String> foldersFor(String family) {
+        String pkg = packageOf(family);
+        if (pkg == null) {
+            return FOLDERS;
+        }
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        for (int i = 0; i < FOLDERS.size(); i++) {
+            out.add("packages/" + pkg + "/" + FOLDERS.get(i));
+        }
+        out.addAll(FOLDERS);
+        return out;
+    }
+
+    /** The {@code p} of a {@code packages/p/family} name, or null. */
+    static String packageOf(String family) {
+        if (!family.startsWith("packages/")) {
+            return null;
+        }
+        int slash = family.indexOf('/', 9);
+        return slash > 9 ? family.substring(9, slash) : null;
+    }
+
+    /** The family with any {@code packages/p/} prefix removed. */
+    static String bareFamily(String family) {
+        String pkg = packageOf(family);
+        return pkg == null ? family : family.substring(10 + pkg.length());
+    }
+
     private static Font load(String family, FontWeight weight, boolean italic) {
-        String base = compact(family);
+        java.util.List<String> folders = foldersFor(family);
+        String base = compact(bareFamily(family));
         int want = index(weight);
         // Nearest-weight order: the exact one, then outwards, so a family that
         // ships only Regular and Bold still answers a request for Medium.
@@ -119,14 +154,14 @@ public final class FontResolver {
                 if (i < 0 || i >= VARIANTS.length || (distance == 0 && sign == 1)) {
                     continue;
                 }
-                Font f = tryFile(base + '-' + VARIANTS[i] + (italic ? "Italic" : ""));
+                Font f = tryFile(folders, base + '-' + VARIANTS[i] + (italic ? "Italic" : ""));
                 if (f != null) {
                     return f;
                 }
             }
         }
         // A face bundled without a variant suffix at all ("Foo.ttf").
-        return tryFile(base);
+        return tryFile(folders, base);
     }
 
     /** Flutter family names carry spaces ("Work Sans"); the files do not. */
@@ -195,7 +230,8 @@ public final class FontResolver {
         // The same candidate order load() uses, so the metrics come from the FACE that
         // was actually resolved rather than from whichever file happens to be found first.
         double ratio = 0;
-        String base = compact(family);
+        java.util.List<String> folders = foldersFor(family);
+        String base = compact(bareFamily(family));
         int want = index(weight);
         outer:
         for (int distance = 0; distance < VARIANTS.length; distance++) {
@@ -204,14 +240,14 @@ public final class FontResolver {
                 if (i < 0 || i >= VARIANTS.length || (distance == 0 && sign == 1)) {
                     continue;
                 }
-                ratio = readRatio(base + '-' + VARIANTS[i] + (italic ? "Italic" : ""));
+                ratio = readRatio(folders, base + '-' + VARIANTS[i] + (italic ? "Italic" : ""));
                 if (ratio > 0) {
                     break outer;
                 }
             }
         }
         if (ratio <= 0) {
-            ratio = readRatio(base);
+            ratio = readRatio(folders, base);
         }
         synchronized (RATIOS) {
             RATIOS.put(key, Double.valueOf(ratio));
@@ -219,11 +255,11 @@ public final class FontResolver {
         return ratio;
     }
 
-    private static double readRatio(String baseName) {
-        for (int i = 0; i < FOLDERS.size(); i++) {
+    private static double readRatio(java.util.List<String> folders, String baseName) {
+        for (int i = 0; i < folders.size(); i++) {
             for (int e = 0; e < EXTENSIONS.length; e++) {
                 String flat = FlutterAssets.flatName(
-                        FOLDERS.get(i) + baseName + EXTENSIONS[e]);
+                        folders.get(i) + baseName + EXTENSIONS[e]);
                 byte[] data = readAll(flat);
                 if (data != null) {
                     double r = metrics(data);
@@ -340,10 +376,10 @@ public final class FontResolver {
 
     private static final String[] EXTENSIONS = {".ttf", ".otf"};
 
-    private static Font tryFile(String baseName) {
-        for (int i = 0; i < FOLDERS.size(); i++) {
+    private static Font tryFile(java.util.List<String> folders, String baseName) {
+        for (int i = 0; i < folders.size(); i++) {
             for (int e = 0; e < EXTENSIONS.length; e++) {
-                String asset = FOLDERS.get(i) + baseName + EXTENSIONS[e];
+                String asset = folders.get(i) + baseName + EXTENSIONS[e];
                 String flat = FlutterAssets.flatName(asset);
                 if (!exists(flat)) {
                     continue;

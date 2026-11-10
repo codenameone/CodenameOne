@@ -75,7 +75,7 @@ public class GenerateInitializr {
    }
    // The Maven layouts, generated against the first plugin that has them whatever
    // release this checkout is on. MAVEN-FULL is every platform module plus backend/.
-   String[] layouts = {"APP", "APP_WITH_BACKEND", "BACKEND_ONLY", "FULL"};
+   String[] layouts = {"APP", "APP_WITH_BACKEND", "BACKEND_ONLY", "COMMAND_LINE", "FULL"};
    for (String layout : layouts) {
     boolean full = "FULL".equals(layout);
     ProjectOptions.ProjectType type = full ? ProjectOptions.ProjectType.APP_WITH_BACKEND
@@ -90,7 +90,7 @@ public class GenerateInitializr {
    }
    // The full-stack templates, each in both of its layouts and in a colour scheme of
    // its own with an icon: an app, its server and the module they share.
-   for (Template template : new Template[] {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.DASH, Template.PARLEY, Template.BASTION, Template.REEL, Template.PULSE}) {
+   for (Template template : new Template[] {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.DASH, Template.PARLEY, Template.BASTION, Template.REEL, Template.PULSE, Template.SLATE}) {
     for (boolean full : new boolean[] {false, true}) {
      ProjectOptions options = ProjectOptions.defaults().forFullStack().withPlatformModules(full)
        .withScheme(0x0f766e, false).withIcon(new byte[] {(byte)0x89, 'P', 'N', 'G'});

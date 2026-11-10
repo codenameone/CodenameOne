@@ -72,6 +72,11 @@ public class ScaffoldMessengerState {
         clearActiveStatus();
     }
 
+    /** Flutter's {@code clearSnackBars}: removes the visible snack bar and any queued. */
+    public void clearSnackBars() {
+        removeCurrentSnackBar(null);
+    }
+
     public void showSnackBar(SnackBar snackBar) {
         if (snackBar == null) {
             return;

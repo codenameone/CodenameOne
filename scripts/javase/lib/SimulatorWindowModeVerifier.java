@@ -147,6 +147,7 @@ public class SimulatorWindowModeVerifier {
             Instant renderDeadline = Instant.now().plusSeconds(30);
             while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image)
                         || isSingleWindowDeviceUnpainted(parsed, image)
+                        || isMultiWindowScreenUnpainted(parsed, image)
                         || isComponentInspectorDetailsUnsettled(parsed, image)
                         || isComponentInspectorPropertiesUnpopulated(parsed, image))
                     && Instant.now().isBefore(renderDeadline)) {
@@ -233,6 +234,9 @@ public class SimulatorWindowModeVerifier {
             throw new AssertionError("Single-window simulator device content did not appear before capture; darkPixels="
                     + darkPixels);
         }
+        if (isMultiWindowScreenUnpainted(args, image)) {
+            throw new AssertionError("Multi-window simulator screen was still unpainted (solid black) at capture");
+        }
         if (isComponentInspectorDetailsUnsettled(args, image)) {
             throw new AssertionError("Component inspector details panel had not settled before capture; textPixels="
                     + countComponentDetailsPixels(image));
@@ -302,6 +306,41 @@ public class SimulatorWindowModeVerifier {
         // Nearly all of it. A painted screen in any of these themes leaves plenty of
         // light pixels; an unpainted one measured 99% here against 0% for the stored
         // reference of the same scenario.
+        return total > 0 && dark * 100L / total >= 95;
+    }
+
+    /**
+     * The multi-window twin of isSingleWindowDeviceUnpainted. In multi mode the
+     * menu bar alone gives the capture enough colours to pass isBlankOrFlat, so a
+     * capture taken before the first paint -- skin and form both still solid black
+     * -- was accepted at once and failed the golden comparison instead of being
+     * waited out. The box is well inside the device screen of the default
+     * scenario's window (x 30-648, y 153-1253 at 2200x1400), which the painted form
+     * fills with its light background. Landscape places the screen elsewhere and
+     * is left to the flat check.
+     */
+    private static boolean isMultiWindowScreenUnpainted(Args args, BufferedImage image) {
+        if (!"multi".equals(args.mode) || !"default".equals(args.scenario)) {
+            return false;
+        }
+        int x0 = 150;
+        int y0 = 500;
+        int x1 = Math.min(image.getWidth(), 550);
+        int y1 = Math.min(image.getHeight(), 1100);
+        if (x1 - x0 < 20 || y1 - y0 < 20) {
+            return false;
+        }
+        int dark = 0;
+        int total = 0;
+        for (int y = y0; y < y1; y += 2) {
+            for (int x = x0; x < x1; x += 2) {
+                int rgb = image.getRGB(x, y);
+                if (((rgb >> 16) & 0xff) < 45 && ((rgb >> 8) & 0xff) < 45 && (rgb & 0xff) < 45) {
+                    dark++;
+                }
+                total++;
+            }
+        }
         return total > 0 && dark * 100L / total >= 95;
     }
 

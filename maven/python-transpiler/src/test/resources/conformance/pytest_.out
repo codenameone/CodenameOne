@@ -1,0 +1,22 @@
+type ValueError
+value invalid literal for int() with base 10: 'zz'
+typename ValueError
+call ZeroDivisionError
+no raise Failed: DID NOT RAISE ValueError
+no match Regex pattern did not match.
+passes through TypeError
+approx1 True
+approx2 False
+approx3 True
+approx4 True
+approx5 True
+approx6 True
+approx7 False
+approx8 True
+approx9 True
+approx10 True
+fail Failed: boom
+skip Skipped: later
+xfail XFailed: known
+=== 5 failed, 21 passed, 4 skipped, 1 xfailed, 1 xpassed ===
+exit 1

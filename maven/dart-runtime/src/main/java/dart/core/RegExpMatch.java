@@ -41,11 +41,49 @@ public final class RegExpMatch {
     private final int[] ends;
     private final String input;
 
+    private final String[] names;
+
+    /// The Pattern that produced this match: the RegExp, or the String of a
+    /// literal String.allMatches. Set once by the producer.
+    Object pattern;
+
     RegExpMatch(String[] groups, int[] starts, int[] ends, String input) {
+        this(groups, starts, ends, input, null);
+    }
+
+    RegExpMatch(String[] groups, int[] starts, int[] ends, String input, String[] names) {
+        this.names = names;
         this.groups = groups;
         this.starts = starts;
         this.ends = ends;
         this.input = input;
+    }
+
+    /// Dart's {@code RegExpMatch.namedGroup(name)}: the text of the group named
+    /// {@code name}, null when it did not take part; ArgumentError for a name the
+    /// pattern does not declare.
+    public String namedGroup(String name) {
+        if (names != null) {
+            for (int i = 1; i < names.length; i++) {
+                if (name != null && name.equals(names[i])) {
+                    return i < groups.length ? groups[i] : null;
+                }
+            }
+        }
+        throw new ArgumentError("Not a capture group name: " + name);
+    }
+
+    /// Dart's {@code RegExpMatch.groupNames}, in declaration order.
+    public DartList<String> groupNames() {
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
+        if (names != null) {
+            for (int i = 1; i < names.length; i++) {
+                if (names[i] != null) {
+                    out.add(names[i]);
+                }
+            }
+        }
+        return out;
     }
 
     /** Dart's {@code Match.group(index)} — null for an unmatched group. */
@@ -66,6 +104,11 @@ public final class RegExpMatch {
     }
 
     /** Dart's {@code Match.groupCount} getter — number of capturing groups. */
+    /// Dart's {@code operator []} under the transpiler's operator name.
+    public String $index(long index) {
+        return group(index);
+    }
+
     public long groupCount() {
         return groups.length - 1;
     }
@@ -81,13 +124,18 @@ public final class RegExpMatch {
     }
 
     /** Dart's {@code Match.input} getter. */
+    /// Dart's {@code Match.pattern}.
+    public Object pattern() {
+        return pattern;
+    }
+
     public String input() {
         return input;
     }
 
     /** Dart's {@code Match.groups(indices)} — the listed groups in order. */
     public DartList<String> groups(java.util.List<? extends Number> indices) {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         for (Number n : indices) {
             out.add(group(n.longValue()));
         }

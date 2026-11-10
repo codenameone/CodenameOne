@@ -171,6 +171,30 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   core, that many concurrent slow calls of that kind occupy every host while other
   connections wait. A server whose handlers spend their time in SQLite should size
   for that, or run the thread pool with `CN1_HTTP_POLL_MODE=0`.
+* Each virtual thread has 64KB of C stack. That holds a few hundred nested Java
+  frames, well past what a handler usually needs, but deep recursion -- a
+  recursive parser, a template nested many levels -- can run out, and an overflow ends
+  the connection's host thread with an empty reply. Put `@VirtualThreadStack` on
+  any class in the backend module to raise it; the size is read at build time,
+  in bytes or with a `KB` or `MB` suffix, and when several classes ask, the
+  largest wins:
++
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DeepReports.java[tag=backend-virtual-thread-stack,indent=0]
+----
++
+The `CN1_HTTP_VT_STACK` environment variable sets it at start-up instead, in
+bytes, and the larger of the two applies. Memory backs a page of the stack only
+once it's touched, so a generous size costs address space rather than memory:
++
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.sh[tag=backend-vt-stack-sh-001,indent=0]
+----
++
+A Python backend starts at 1MB and takes its size from a build hint instead;
+see <<python-backends>>.
 * TLS runs on the thread pool, whatever the poll mode says. The TLS layer can't
   park a read yet, and a blocking read on a virtual thread holds its host for the
   duration, so one idle TLS client per core would occupy every one of them. The

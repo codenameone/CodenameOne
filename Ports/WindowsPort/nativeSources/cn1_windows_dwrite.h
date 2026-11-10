@@ -58,6 +58,10 @@ int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, int outLen);
  * The loader copies the data, so the buffer need not outlive the call. */
 int cn1dwRegisterFontMemory(const void* data, unsigned int len, wchar_t* outFamily, int outLen);
 
+/* 1 when cn1dwRegisterFontMemory can work at all: the DirectWrite factory offers
+ * IDWriteFactory5 (Windows 10 1703 and later), which owns the in-memory loader. */
+int cn1dwFontMemorySupported(void);
+
 /* Vertical metrics, in DIPs, for a text format handle. */
 float cn1dwFontHeight(void* format);
 float cn1dwFontAscent(void* format);

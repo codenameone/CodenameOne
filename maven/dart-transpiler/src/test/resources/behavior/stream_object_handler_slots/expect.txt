@@ -1,0 +1,6 @@
+data 1
+error2 boom
+done
+[dat:7, err:bad, done]
+caught late
+error1 one

@@ -36,6 +36,10 @@
 #include <string.h>
 #include <time.h>
 
+/* cn1_virtual_thread.c asks cn1_globals.m whether the process has a memory
+   budget before releasing a retired stack; this test links without the VM. */
+int cn1ProcessHasMemoryBudget(void) { return 0; }
+
 static int failures = 0;
 static void check(const char* what, int ok) {
     if(!ok) { printf("FAIL %s\n", what); failures++; }

@@ -183,19 +183,59 @@ class IteratorEscape {
     /// stores knowable from the call site, where every reference parameter has already
     /// been shown to be a cluster member.
     static boolean ctorOnlyStoresParamsIntoThis(String owner, String desc) {
-        BytecodeMethod ctor = null;
-        String mangled = mangle(owner);
-        for (ByteCodeClass c : Parser.getClasses()) {
-            if (!mangle(c.getClsName()).equals(mangled)) {
-                continue;
+        // Called for every constructor call on a tracked receiver, so both the class
+        // lookup and the answer are memoized. Scanning the class list (mangling every
+        // name) per call was quadratic: a translation of a few thousand classes spent
+        // tens of minutes here. Both caches are dropped whenever the class list changes.
+        syncCaches();
+        String key = owner + '\u0000' + desc;
+        Boolean known = CTOR_ANSWERS.get(key);
+        if (known != null) {
+            return known.booleanValue();
+        }
+        boolean answer = ctorOnlyStoresParamsIntoThisUncached(owner, desc);
+        CTOR_ANSWERS.put(key, Boolean.valueOf(answer));
+        return answer;
+    }
+
+    private static final java.util.Map<String, Boolean> CTOR_ANSWERS = new java.util.HashMap<String, Boolean>();
+    private static final java.util.Map<String, ByteCodeClass> BY_MANGLED_NAME = new java.util.HashMap<String, ByteCodeClass>();
+    private static List<ByteCodeClass> cachedList;
+    private static int cachedSize = -1;
+
+    /// Forgets everything memoized; Parser calls it when it starts a new class list.
+    static void resetCaches() {
+        cachedList = null;
+        cachedSize = -1;
+    }
+
+    private static void syncCaches() {
+        List<ByteCodeClass> all = Parser.getClasses();
+        if (all == cachedList && all.size() == cachedSize) {
+            return;
+        }
+        CTOR_ANSWERS.clear();
+        BY_MANGLED_NAME.clear();
+        for (ByteCodeClass c : all) {
+            String m = mangle(c.getClsName());
+            if (!BY_MANGLED_NAME.containsKey(m)) {
+                BY_MANGLED_NAME.put(m, c);
             }
+        }
+        cachedList = all;
+        cachedSize = all.size();
+    }
+
+    private static boolean ctorOnlyStoresParamsIntoThisUncached(String owner, String desc) {
+        BytecodeMethod ctor = null;
+        ByteCodeClass c = BY_MANGLED_NAME.get(mangle(owner));
+        if (c != null) {
             for (BytecodeMethod m : c.getMethods()) {
                 if ("__INIT__".equals(m.getMethodName()) && desc.equals(m.getDesc())) {
                     ctor = m;
                     break;
                 }
             }
-            break;
         }
         if (ctor == null || ctor.isNative() || ctor.isAbstract()) {
             return false;   // an unknown body is an unchecked body

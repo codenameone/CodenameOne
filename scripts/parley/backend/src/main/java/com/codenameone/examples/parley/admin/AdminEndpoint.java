@@ -19,7 +19,7 @@
 package com.codenameone.examples.parley.admin;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.parley.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.parley.account.Accounts;
 import com.codenameone.examples.parley.api.AdminApiServer;
 import com.codenameone.examples.parley.api.AdminStatsDto;

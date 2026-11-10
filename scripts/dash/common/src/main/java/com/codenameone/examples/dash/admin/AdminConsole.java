@@ -50,7 +50,7 @@ import com.codenameone.examples.dash.api.PlayerDto;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.forge.PackScreen;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.rules.forge.AssetRef;
 import com.codenameone.examples.dash.ui.HistoryForm;
 import com.codenameone.examples.dash.ui.RaceLobby;

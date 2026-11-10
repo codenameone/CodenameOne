@@ -294,7 +294,7 @@ public class FlutterLocalNotificationsPlugin {
     /// fired for the last time: a repeating one stays pending, a one-shot one until
     /// its time passes. Read from what schedule() persisted, so it survives a restart.
     public Future<DartList<PendingNotificationRequest>> pendingNotificationRequests() {
-        DartList<PendingNotificationRequest> out = new DartList<PendingNotificationRequest>();
+        DartList<PendingNotificationRequest> out = new DartList<PendingNotificationRequest>(dart.runtime.TypeWitness.of(PendingNotificationRequest.class, false));
         long now = System.currentTimeMillis();
         for (String key : payloadKeys()) {
             String[] m = meta(key);

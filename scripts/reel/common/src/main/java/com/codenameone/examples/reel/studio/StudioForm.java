@@ -24,7 +24,7 @@ import com.codename1.ui.Form;
 import com.codenameone.examples.reel.api.JobDto;
 import com.codenameone.examples.reel.api.StudioTitleDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Nav;
 import com.codenameone.examples.reel.ui.SettingsForm;

@@ -52,6 +52,19 @@ CN1_BACKEND_CFLAGS="${CN1_BACKEND_CFLAGS:-} -DCN1_VIRTUAL_THREADS=1"
 # #ifndef-guarded precisely so a deployment can choose its own floor at build
 # time, which is what this is.
 CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_GC_MIN_TRIGGER_BYTES=$((4*1024*1024))"
+
+# Hold the heap near the live set while the collector has time to spare.
+#
+# The trigger grows after two sweeps at or above a survival threshold, and that
+# threshold sets the heap relative to the live set: the VM's 25% lets it reach
+# about four times what is live, 66% about one and a half. A fixed 66% halved the
+# Flask sample's footprint after load and cost 9% of its throughput, so it is not
+# fixed: cn1BibopGrowSurvivalPercent moves between this value and the VM's from the
+# collector's duty cycle. A collector that is mostly idle keeps the heap tight; one
+# busy enough to cost throughput gets the classic growth back. Measured on the same
+# sample at full speed, three interleaved runs: 29.1-29.7k req/s against 29.6-30.1k
+# for the VM default, where the fixed value measured 26.0-26.9k.
+CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_TIGHT_SURVIVAL_PERCENT=66"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a JDK 8 home}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1backend.XXXXXX")"
 
@@ -147,6 +160,12 @@ if [ -d contract ] && [ "$STANDALONE_DEMO" != "1" ]; then
 fi
 GEN=""
 if [ -d gen ]; then GEN="gen"; fi
+# CN1_BACKEND_EXTRA_CLASSES=<dir> adds classes compiled elsewhere -- a Python
+# backend's transpiled modules and their runtime -- to the demo's class path
+# and to the translation.
+if [ -n "${CN1_BACKEND_EXTRA_CLASSES:-}" ]; then
+    GEN="${GEN:+$GEN:}$CN1_BACKEND_EXTRA_CLASSES"
+fi
 # src/ is the shared runtime -- protocol logic, pure Java, identical on every
 # target. impl/parparvm holds the classes backed by natives; impl/javase holds
 # their Java SE twins and is what the local dev loop compiles instead.
@@ -168,7 +187,10 @@ SHARED=()
 while IFS= read -r f; do SHARED+=("$f"); done <<< "$SHARED_LIST"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" ${GEN:+-cp "$GEN"} -source 1.8 -target 1.8 \
     -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
-if [ -n "$GEN" ]; then cp -r "$GEN/." "$WORK/classes/"; fi
+if [ -n "$GEN" ]; then
+    IFS=: read -r -a GEN_DIRS <<< "$GEN"
+    for g in "${GEN_DIRS[@]}"; do cp -r "$g/." "$WORK/classes/"; done
+fi
 
 mkdir -p "$WORK/out"
 # The native sources have to be in the source root BEFORE the translator runs, not

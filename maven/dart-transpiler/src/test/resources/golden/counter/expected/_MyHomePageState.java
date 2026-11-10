@@ -12,18 +12,19 @@ import com.codename1.flutter.Icons;
 import com.codename1.flutter.MainAxisAlignment;
 import com.codename1.flutter.material.Scaffold;
 import com.codename1.flutter.State;
+import dart.runtime.TearOff;
 import com.codename1.flutter.widgets.Text;
 import com.codename1.flutter.material.Theme;
 import com.codename1.flutter.Widget;
 
-// Generated from main.dart — do not edit.
+// Generated from main.dart -- do not edit.
 public class _MyHomePageState extends State<MyHomePage> {
 
     private long _counter = 0L;
-    long get$_counter() {
+    public long get$_counter() {
         return _counter;
     }
-    void set$_counter(long v) {
+    public void set$_counter(long v) {
         this._counter = v;
     }
 
@@ -48,16 +49,16 @@ public class _MyHomePageState extends State<MyHomePage> {
         $t3.mainAxisAlignment(MainAxisAlignment.center);
         var $t4 = new Text(DartRuntime.str(this._counter));
         $t4.style(Theme.of(context).textTheme().headlineMedium());
-        $t3.children(DartList.<Widget>of(new Text("You have pushed the button this many times:"), $t4));
+        $t3.children(dart.core.DartList.typed(DartList.<Widget>of(new Text("You have pushed the button this many times:"), $t4), dart.runtime.TypeWitness.of(Widget.class, false)));
         $t2.child($t3);
         $t0.body($t2);
         var $t5 = new FloatingActionButton();
-        $t5.onPressed(this::_incrementCounter);
+        $t5.onPressed(TearOff.v0(this, "_incrementCounter", this::_incrementCounter));
         $t5.tooltip("Increment");
         $t5.child(new Icon(Icons.add()));
         $t0.floatingActionButton($t5);
         return $t0;
     }
 
-    static final String $cn1DartLines = "main.dart\n32:36,34:37,41:43";
+    static final String $cn1DartLines = "main.dart\n33:36,35:37,42:43";
 }

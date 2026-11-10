@@ -44,7 +44,7 @@ import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.member.Classes;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;

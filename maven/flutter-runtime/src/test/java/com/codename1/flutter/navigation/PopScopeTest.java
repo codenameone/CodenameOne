@@ -66,7 +66,10 @@ class PopScopeTest {
     void canPopFalseVetoesMaybePopAndReportsTheAttempt() {
         List<String> heard = new ArrayList<String>();
         pushMounted(scope(false, heard));
-        assertEquals(Boolean.TRUE, Navigator.maybePop(null, "x").getNow(), "a veto is a handled request");
+        dart.async.Future<Boolean> request = Navigator.maybePop(null, "x");
+        // The answer is delivered from the microtask queue, as in Flutter.
+        dart.async.Async.drainMicrotasks();
+        assertEquals(Boolean.TRUE, request.getNow(), "a veto is a handled request");
         assertEquals(1, Navigator.stackSize());
         assertEquals("[false:x]", heard.toString());
 
@@ -78,7 +81,10 @@ class PopScopeTest {
     void canPopTrueLetsMaybePopCloseAndReportsDidPop() {
         List<String> heard = new ArrayList<String>();
         pushMounted(scope(true, heard));
-        assertEquals(Boolean.TRUE, Navigator.maybePop(null, "done").getNow());
+        dart.async.Future<Boolean> request = Navigator.maybePop(null, "done");
+        // The answer is delivered from the microtask queue, as in Flutter.
+        dart.async.Async.drainMicrotasks();
+        assertEquals(Boolean.TRUE, request.getNow());
         assertEquals(0, Navigator.stackSize());
         assertEquals("[true:done]", heard.toString());
     }

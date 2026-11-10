@@ -25,7 +25,7 @@ import com.codenameone.examples.wayline.api.DriverStatusDto;
 import com.codenameone.examples.wayline.map.Locator;
 import com.codenameone.examples.wayline.map.Maps;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 

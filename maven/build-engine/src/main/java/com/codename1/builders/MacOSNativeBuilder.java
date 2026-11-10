@@ -2376,9 +2376,9 @@ public class MacOSNativeBuilder extends Executor {
         // SYMROOT/OBJROOT rather than -derivedDataPath. xcodebuild refuses
         // -derivedDataPath unless it is also given -scheme ("The flag -scheme,
         // -testProductsPath, or -xctestrun is required when specifying
-        // -derivedDataPath"), and the generated project has no shared scheme --
-        // the screenshot script writes one itself precisely because the
-        // translator emits none. These two settings are target-compatible and
+        // -derivedDataPath"), and this build selects a target, not a scheme:
+        // the translator's shared scheme exists only to load cn1.lldbinit for a
+        // debug session in Xcode. These two settings are target-compatible and
         // put the products in the same place under `derived`, which is where
         // findAppBundle looks.
         cmd.add("SYMROOT=" + new File(derived, "Build/Products").getAbsolutePath());

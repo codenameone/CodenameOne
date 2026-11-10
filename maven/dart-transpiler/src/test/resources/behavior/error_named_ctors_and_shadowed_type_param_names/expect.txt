@@ -1,0 +1,26 @@
+s 42 5
+null null plain
+Invalid argument(s): plain
+nm null m
+Invalid argument(s) (nm): m
+v 7 bad
+Invalid argument (v): bad: 7
+p null Must not be null
+Invalid argument(s) (p): Must not be null
+i 5 null null msg
+RangeError (i): msg: 5
+idx 9 0 3 Invalid value
+RangeError (idx): Invalid value: Not in inclusive range 0..3: 9
+ix 4 0 1 Index out of range
+RangeError (ix): Index out of range: index should be less than 2: 4
+null null null null r
+RangeError: r
+q null Must not be null
+Invalid argument(s) (q): Must not be null
+2
+w 8 0 5 Invalid value
+RangeError (w): Invalid value: Not in inclusive range 0..5: 8
+3
+n -1 0 null Invalid value
+RangeError (n): Invalid value: Not greater than or equal to 0: -1
+2

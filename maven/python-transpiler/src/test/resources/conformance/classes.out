@@ -1,0 +1,13 @@
+[Rect('rect', area=6.0), Square('square', area=16.0), Square('square', area=1.0), Square('square', area=4.0)] 4 A shape.
+5 25 True True 
+Vec(4, 6) Vec(8, 12) Vec(12, 18) True 2 6 [4, 6] {Vec(4, 6)} [Vec(1, 5), Vec(2, 0)]
+enter a
+enter b
+body a
+exit b None
+exit a None
+enter c
+exit c KeyError
+after
+MyError code 7 7 True
+2 <missing color> 1 True

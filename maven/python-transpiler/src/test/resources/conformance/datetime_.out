@@ -1,0 +1,43 @@
+1 day, 2:03:04.506007 datetime.timedelta(days=1, seconds=7384, microseconds=506007) 1 7384 506007 93784.506007
+0:00:00 datetime.timedelta(0) -1 day, 23:59:59 datetime.timedelta(days=-1, seconds=86399) 14 days, 0:00:00
+-2 days, 23:00:00 1 day, 12:00:00 14.4 14:24:00
+0:00:25 0:03:00 0:00:01 (2, datetime.timedelta(seconds=1)) 1 day, 0:00:00
+0:00:00 0:00:00.000002 0:00:00.333333
+True True False 999999999 days, 23:59:59.999999 -999999999 days, 0:00:00
+days=1000000000; must have magnitude <= 999999999
+2024-02-29 datetime.date(2024, 2, 29) 2024 2 29 3 4 738945 datetime.IsoCalendarDate(year=2024, week=9, weekday=4)
+9 (2024, 9, 4) 2024-03-01 2023-12-31 424 days, 0:00:00
+0001-01-01 2021-07-29 2021-12-31 2021-12-31 2021-01-04 2021-01-03
+2024-02-01 Thu Feb 29 00:00:00 2024 Thursday 29 February 2024, day 060, week 08/09, Thu Feb 24 02 2024 2024-02-29
+time.struct_time(tm_year=2024, tm_mon=2, tm_mday=29, tm_hour=0, tm_min=0, tm_sec=0, tm_wday=3, tm_yday=60, tm_isdst=-1) 0001-01-01 9999-12-31 True True
+day 29 must be in range 1..28 for month 2 in year 2023
+year must be in 1..9999, not 0
+month must be in 1..12, not 13
+Invalid isoformat string: '2021-1-1'
+13:05:09.001500 datetime.time(13, 5, 9, 1500) datetime.time(1, 2) datetime.time(1, 2, 3) 13:05:09.001 13:05 01:05:09 PM 001500 10:11:12.500000 10:11:12
+01:00:00+05:30 datetime.time(1, 0, tzinfo=datetime.timezone(datetime.timedelta(seconds=19800))) 5:30:00 UTC+05:30
+True True 00:00:00 23:59:59.999999
+can't compare offset-naive and offset-aware times
+UTC+05:30 datetime.timezone(datetime.timedelta(seconds=19800)) datetime.timezone.utc UTC datetime.timezone(datetime.timedelta(days=-1, seconds=75600), 'BRT') True UTC-01:30 True
+offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24), not datetime.timedelta(days=1)
+2024-03-10 14:30:15.250000 datetime.datetime(2024, 3, 10, 14, 30, 15, 250000) 2024-03-10 14:30:15.250000 2024-03-10T14:30:15.250000 2024-03-10 14:30:15 Sun Mar 10 14:30:15 2024 6
+datetime.datetime(2020, 1, 1, 0, 0) datetime.datetime(2020, 1, 1, 5, 0) datetime.datetime(2020, 1, 1, 0, 0, 7)
+2024-01-01 12:00:00+00:00 datetime.datetime(2024, 1, 1, 12, 0, tzinfo=datetime.timezone.utc) True 0:00:00 2024-01-01 12:00:00+00:00 2024-01-01 17:30:00+05:30 1704110400.0 5:30:00
+1970-01-01 00:00:00+00:00 2023-11-15 03:43:20.500000+05:30 1971-01-01T06:00:00+00:00
+2024-02-01 00:00:00 6 days, 18:00:00 2023-12-31 23:59:59
+2024-05-06 07:08:09.123000+02:00 2024-05-06 07:08:00 2024-05-06 00:00:00 2024-05-06 07:08:09+00:00 2024-05-07 00:00:00
+2020-05-05 08:09:00+05:30 +0530 UTC+05:30 00 [][]
+2023-07-04 09:15:30 2023-07-04 15:00:00 2023-07-04 09:15:30.500000+01:30 2023-12-01
+2024-02-29 00:00:00 2024-03-04 00:00:00
+unconverted data remains: x
+time data 'July' does not match format '%Y'
+can't compare offset-naive and offset-aware datetimes
+False False 2000-03-10 14:30:15.250000+05:30
+time.struct_time(tm_year=2024, tm_mon=3, tm_mday=10, tm_hour=14, tm_min=30, tm_sec=15, tm_wday=6, tm_yday=70, tm_isdst=-1) time.struct_time(tm_year=2024, tm_mon=1, tm_mday=1, tm_hour=12, tm_min=0, tm_sec=0, tm_wday=0, tm_yday=1, tm_isdst=0) 14:30 2024 2000-01-01 00:00:00
+0001-01-01 00:00:00 9999-12-31 23:59:59.999999 True 1
+time.struct_time(tm_year=1970, tm_mon=1, tm_mday=1, tm_hour=0, tm_min=0, tm_sec=0, tm_wday=3, tm_yday=1, tm_isdst=0) time.struct_time(tm_year=2023, tm_mon=11, tm_mday=14, tm_hour=22, tm_min=13, tm_sec=20, tm_wday=1, tm_yday=318, tm_isdst=0) 2009-02-13 23:31:30
+Thu Jan  1 00:00:00 1970 2 3
+(2020, 2, 3, 0, 0, 0, 0, 34)
+float True
+True True
+2001-09-09 01:46:40+00:00 2001-09-09 01:46:40+00:00

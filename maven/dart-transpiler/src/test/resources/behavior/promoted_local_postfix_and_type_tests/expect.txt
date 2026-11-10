@@ -1,0 +1,26 @@
+true
+2
+false
+2
+true
+3
+true
+3
+3
+4
+4
+3
+3
+4
+5
+4
+1
+8 10
+11 6
+14 3
+6
+SnotintnotWideasFaildflto
+SnotintnotWideasFailemptyo
+Inumnotdbl
+Lobj
+

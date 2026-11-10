@@ -1,0 +1,365 @@
+[[slate-implementors-guide]]
+== Slate: Building on the sample
+
+Slate shares its shape with <<pulse-implementors-guide,Pulse>>,
+<<savor-implementors-guide,Savor>> and <<wayline-implementors-guide,Wayline>>:
+the module layout, accounts and sign-in, cards and the payment provider, text
+messages, push notifications, the live channel and hosting the app in a browser.
+This chapter covers what an appointment business changes: a slot engine that
+asks every party at once, rules about gaps, and calendars that are read and
+written in both directions.
+
+[[slate-launch]]
+=== Running it
+
+The project is in `scripts/slate`. Start the server on the development profile,
+which seeds the demo salon and its accounts, simulates the cards and the online
+calendars:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/slate.sh[tag=slate-sh-server,indent=0]
+----
+
+Then run the app in the simulator:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/slate.sh[tag=slate-sh-simulator,indent=0]
+----
+
+=== The modules
+
+`shared` holds the data classes and the `@RestClient` interfaces both sides build
+from. `common` is the app, for every platform. `backend` is the server, in
+packages by subject:
+
+[cols="1,3"]
+|===
+| Package | What it holds
+
+| `account`
+| Accounts, phone verification, preferences and the demo accounts.
+
+| `catalog`
+| The business, its locations, services, providers, resources and verticals.
+
+| `booking`
+| The slot engine, availability, holds, bookings, rescheduling, the waitlist and
+  the demo business.
+
+| `provider`
+| Working hours, time off and a provider's schedule.
+
+| `sync`
+| Connected calendars: Google, Microsoft, published ICS addresses, the phone's
+  own calendars and the feed Slate publishes.
+
+| `owner`
+| The dashboard and the board of the day.
+
+| `pay`
+| Deposits and no-show fees: simulated or Stripe.
+
+| `live`, `push`, `sms`
+| The WebSocket, push notifications and text messages.
+|===
+
+Roles are `CLIENT`, `PROVIDER` and `OWNER`, in `Roles`. Every account is a
+client; the others are granted by an owner, and the app offers a mode for each.
+
+=== One business, many verticals
+
+A salon books a stylist and a chair, a tutor a room, a clinic a practitioner and
+a treatment room. The rules and the screens are the same; only the words and the
+accent colour differ:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/catalog/Verticals.java[tag=slate-verticals,indent=0]
+----
+
+=== The slot engine
+
+`SlotEngine` decides which starts can be booked. A start is offered only when
+every party the service needs is free -- the providers, one resource of the
+right kind, and the client -- and every rule the business set holds:
+notice and horizon, buffers before and after, a provider's daily cap and breaks,
+travel time between locations, the client's gap between bookings and their
+bookings per day, and the shortest gap worth leaving on a provider's day. It reads
+nothing and writes nothing, which is what lets each rule be tested by itself:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/SlotEngine.java[tag=slate-slot-engine,indent=0]
+----
+
+Starts are read off the business's local clock, so a day when the clocks go
+forward has no slot at a time that doesn't exist:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/Availability.java[tag=slate-local-starts,indent=0]
+----
+
+=== Never double booked
+
+Time is claimed in five-minute cells. A `SlotClaim` row's key is the party and
+the cell, so two appointments over the same five minutes of one stylist or one
+chair are refused by the database itself, however many clients tap at once. A
+client picking a start first holds it, in a transaction of its own, for the
+business's hold time:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/Bookings.java[tag=slate-hold,indent=0]
+----
+
+Placing the booking asks the engine again for that one start, then writes the
+parties and claims their cells:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/Bookings.java[tag=slate-place,indent=0]
+----
+
+A refused start says why, in words a client understands:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/Bookings.java[tag=slate-reasons,indent=0]
+----
+
+The app's slot picker shows the server's starts and adds the one thing the server
+can't know: with the calendar check on, a start that clashes with the client's
+own phone calendar is marked, though it can still be booked:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/client/BookForm.java[tag=slate-slot-picker,indent=0]
+----
+
+When a booking is given back, the first waiting client it fits is told:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/Waitlists.java[tag=slate-waitlist-offer,indent=0]
+----
+
+=== Rules an owner can try first
+
+Changing the gap rules changes what every client is offered, so the policy screen
+previews a day under draft rules before saving them. The business row is copied,
+the draft applied to the copy, and the engine explains every start for every
+provider:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/Availability.java[tag=slate-preview,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/owner/PolicyForm.java[tag=slate-policy-preview,indent=0]
+----
+
+Saved rules are validated on the server:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/catalog/Catalog.java[tag=slate-policy-validation,indent=0]
+----
+
+=== Hours and schedules
+
+A provider's week is shifts on the five-minute grid. Saving new hours never moves
+a booking already made: hours decide what's offered, not what was sold.
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/provider/Schedules.java[tag=slate-save-hours,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/HoursForm.java[tag=slate-hours-form,indent=0]
+----
+
+The provider's day, week and agenda are one schedule read over a range, drawn as
+a timeline: a lane per day, the working hours as a band, bookings as blocks as long
+as they last, calendar busy time shaded and a line at the current time. The owner's
+day board is the same component with a lane per provider, so a gap reads the same
+on both:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/provider/Schedules.java[tag=slate-schedule,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/ProviderForm.java[tag=slate-provider-timeline,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/ui/Timeline.java[tag=slate-timeline,indent=0]
+----
+
+=== Calendars, both ways
+
+A provider's other commitments keep clients from booking over them, and their
+bookings appear in the calendar they already use. Slate reads busy time from
+four kinds of calendar and writes in two ways.
+
+*The phone's own calendars* are read by the app, never the server: `DeviceSync`
+reads the events of the calendars the provider chose and uploads only busy
+intervals, so the server never sees what an event is called.
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/calendar/DeviceCalendar.java[tag=slate-device-calendar,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/DeviceSync.java[tag=slate-device-busy,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/sync/CalendarLinks.java[tag=slate-busy-upload,indent=0]
+----
+
+*Google and Microsoft calendars* are read by the server, with the refresh token
+the provider granted, so the schedule stays right while the phone is off. Slate
+asks for busy times only, never the events:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/sync/GoogleCalendar.java[tag=slate-google-freebusy,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/sync/CalendarLinks.java[tag=slate-connect-calendar,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/CalendarsForm.java[tag=slate-device-calendars,indent=0]
+----
+
+The development profile simulates both services. On a real deployment the choice
+is made from configuration:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/Services.java[tag=slate-calendar-choice,indent=0]
+----
+
+*A published ICS address* is fetched on a schedule, the same way.
+
+Writing goes the other way. Every provider has a calendar feed any calendar app
+can subscribe to, and every appointment has an `.ics` file a client can open:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/sync/Ics.java[tag=slate-ics-write,indent=0]
+----
+
+A client can also add a booking straight to their phone's calendar. The app keeps
+the ids of the events it wrote, so moving a booking moves its own event and a
+cancellation removes it:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/calendar/DeviceCalendar.java[tag=slate-add-to-calendar,indent=0]
+----
+
+=== Deposits
+
+A deposit is a part of the price, authorized on the card about six days before the
+appointment (at once when booking is closer than that) and taken when a client
+cancels late or doesn't come. Payments go through the same `PaymentProvider` as
+the other samples:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/pay/PaymentProvider.java[tag=slate-payment-provider,indent=0]
+----
+
+=== The owner's day
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/owner/Dashboard.java[tag=slate-dashboard,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/owner/OwnerForm.java[tag=slate-owner-dashboard,indent=0]
+----
+
+=== Tests
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/slate.sh[tag=slate-sh-tests,indent=0]
+----
+
+The slot engine's rules are tested one at a time, against the engine alone, and
+again end to end through the booking service. `run-e2e.sh` starts the server and
+drives the app in the simulator as a client, a provider and an owner.
+`sample-server-tests-on-database.sh` runs the server tests against PostgreSQL or
+MySQL. CI runs all them, in `.github/workflows/slate.yml`.
+
+=== Making it yours
+
+* *Your business.* Replace `DemoBusiness` with your locations, services, people
+  and resources, or create them from the owner's screens on an empty database:
++
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slate/booking/DemoBusiness.java[tag=slate-demo-business,indent=0]
+----
+* *Your vertical.* A row in `Verticals` and, for the demo, a set of services.
+* *Your brand.* Colors and shapes are in `common/src/main/css/theme.css`, text in
+  `common/src/main/l10n`.
+* *What it leaves out.* Slate books single appointments. Packages and memberships,
+  gift cards, reviews, recurring appointments, intake forms beyond the one question
+  a service can ask, tips and staff commission aren't included; each is a table
+  and a screen on top of the booking rules, which stay as they are.
+* *Your rules.* Every gap rule is a column of the business that the owner edits
+  and previews; the engine is where a new rule goes, with a reason to report.
+
+[[slate-before-product]]
+=== Before it's a product
+
+The sample is complete as a demonstration. A product needs at least:
+
+* *Recurring events in ICS calendars.* A published calendar's repeating events
+  (`RRULE`) aren't expanded; only single events count as busy. Google and
+  Microsoft expand them on their side, so those are right.
+* *Encrypted calendar credentials.* Refresh tokens and ICS addresses are stored as
+  they are. Encrypt them at rest, with a key outside the database, and let a
+  provider revoke them.
+* *Safe fetching of calendar addresses.* The server fetches whatever ICS address a
+  provider types. Restrict it to public `https` addresses, refuse private and
+  loopback networks, and cap the size and time of each fetch.
+* *Stricter concurrency on the daily rules.* Cells make a double booking
+  impossible, but a provider's daily cap, their breaks and travel time, and a
+  client's bookings per day are checked by the engine before the claim. Two
+  bookings placed in the same instant for different times can both pass. The
+  hold narrows the window; a product that must never exceed them takes a lock
+  per provider and client day.
+* *Tested late cancellation and no-show fees.* Taking a deposit is simulated and
+  hasn't been tested against a real processor's capture and refund flows.
+* *A real payment processor and PCI scope.* Wire `PaymentProvider` to your
+  processor and test it with its test keys. Keep card entry on the processor's
+  hosted page, confirm your PCI DSS self-assessment, and add receipts, tax,
+  refunds and disputes.
+* *Reviewed translations.* The non-English bundles are machine translations; have
+  them reviewed before release.
+* *Operations.* Monitoring, backups that have been restored in a test, a support
+  process, and a channel between server instances before you run more than one.

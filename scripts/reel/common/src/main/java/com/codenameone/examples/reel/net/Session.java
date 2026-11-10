@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel.net;
 
+import com.codename1.appkit.Net;
+
 import com.codenameone.examples.reel.api.AccountDto;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;

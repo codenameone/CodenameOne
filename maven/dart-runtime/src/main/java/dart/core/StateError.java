@@ -32,6 +32,11 @@ public class StateError extends RuntimeException {
         super(message);
     }
 
+    /// Dart's `StateError.message`.
+    public String message() {
+        return getMessage();
+    }
+
     @Override
     public String toString() {
         return "Bad state: " + getMessage();

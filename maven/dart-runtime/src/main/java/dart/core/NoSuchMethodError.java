@@ -31,6 +31,14 @@ public class NoSuchMethodError extends RuntimeException {
         super(message);
     }
 
+    /// Object's {@code noSuchMethod}, reached by a program class's
+    /// {@code super.noSuchMethod(invocation)}: Dart's default throws. Typed to return
+    /// anything so it stands where the call's value is used.
+    public static <T> T fromObject(Object receiver, Object invocation) {
+        throw new NoSuchMethodError("Class '" + (receiver == null ? "Null" : receiver.getClass().getSimpleName())
+                + "' has no instance member for " + invocation);
+    }
+
     @Override
     public String toString() {
         return "NoSuchMethodError: " + getMessage();

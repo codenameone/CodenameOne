@@ -68,7 +68,7 @@ class TabBarIndicatorTest {
 
     private static TabBar barWithThreeTabs() {
         TabBar bar = new TabBar();
-        DartList<Widget> tabs = new DartList<Widget>();
+        DartList<Widget> tabs = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         for (int i = 0; i < 3; i++) {
             Tab t = new Tab();
             t.text("tab" + i);

@@ -232,7 +232,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void addAllOfItselfDuplicatesTheOriginal() {
-        DartList<Object> l = new DartList<Object>();
+        DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         l.add("a");
         l.add("b");
         l.addAllIterable(l);
@@ -495,7 +495,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void mixedNumbersSortNumerically() {
-        DartList<Object> l = new DartList<Object>();
+        DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         l.add(Long.valueOf(2));
         l.add(Double.valueOf(1.5));
         l.add(Long.valueOf(1));
@@ -786,7 +786,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void takeAndSkipRefuseANegativeCount() {
-        DartList<Object> l = new DartList<Object>();
+        DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         l.add("x");
         assertThrows(RangeError.class, () -> l.take(-1));
         assertThrows(RangeError.class, () -> l.skip(-1));
@@ -839,7 +839,7 @@ public class DartCoreSemanticsTest {
     /// loop quietly: hasNext() answered false from the live size.
     @Test
     public void shrinkingACollectionWhileIteratingItThrowsFromHasNext() {
-        final DartList<Object> l = new DartList<Object>();
+        final DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         l.add("a");
         l.add("b");
         assertThrows(ConcurrentModificationError.class, () -> {
@@ -848,7 +848,7 @@ public class DartCoreSemanticsTest {
             }
         });
         // Replacing an element is not a length change, so Dart does not report it.
-        DartList<Object> r = new DartList<Object>();
+        DartList<Object> r = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         r.add("a");
         r.add("b");
         int seen = 0;
@@ -935,7 +935,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void aListModifiedWhileIteratedFailsInsteadOfLooping() {
-        DartList<Object> l = new DartList<Object>();
+        DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         l.add("a");
         l.add("b");
         assertThrows(ConcurrentModificationError.class, () -> {
@@ -970,7 +970,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void anIterableHasForEachDart() {
-        DartList<Object> l = new DartList<Object>();
+        DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         l.add("a");
         l.add("b");
         final StringBuilder sb = new StringBuilder();
@@ -1272,7 +1272,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void getRangeIsALiveViewThatNoticesALengthChange() {
-        DartList<Long> list = new DartList<Long>();
+        DartList<Long> list = new DartList<Long>(dart.runtime.TypeWitness.of(Long.class, false));
         list.add(1L);
         list.add(2L);
         list.add(3L);
@@ -1380,7 +1380,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void forEachRefusesALengthChange() {
-        final DartList<Long> list = new DartList<Long>();
+        final DartList<Long> list = new DartList<Long>(dart.runtime.TypeWitness.of(Long.class, false));
         list.add(1L);
         list.add(2L);
         assertThrows(ConcurrentModificationError.class, () -> list.forEachDart(e -> list.add(3L)));
@@ -1504,10 +1504,10 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void hashAllHashesTheElements() {
-        DartList<Object> one = new DartList<Object>();
+        DartList<Object> one = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         one.add(1L);
         one.add("x");
-        DartList<Object> two = new DartList<Object>();
+        DartList<Object> two = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         two.add(1L);
         two.add("x");
         assertEquals(dart.runtime.DartRuntime.hashAll(one), dart.runtime.DartRuntime.hashAll(two));
@@ -1583,7 +1583,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void unmodifiableListsRefuseEveryWrite() {
-        DartList<Long> source = new DartList<Long>();
+        DartList<Long> source = new DartList<Long>(dart.runtime.TypeWitness.of(Long.class, false));
         source.add(1L);
         DartList<Long> ro = DartList.unmodifiable(source);
         assertThrows(UnsupportedError.class, () -> ro.set(0, 9L));
@@ -1719,7 +1719,7 @@ public class DartCoreSemanticsTest {
 
     @Test
     public void reversedThrowsWhenTheListChangesLengthMidLoop() {
-        final DartList<Long> grow = new DartList<Long>();
+        final DartList<Long> grow = new DartList<Long>(dart.runtime.TypeWitness.of(Long.class, false));
         grow.add(1L);
         grow.add(2L);
         assertThrows(ConcurrentModificationError.class, () -> {
@@ -1727,7 +1727,7 @@ public class DartCoreSemanticsTest {
                 grow.add(v);
             }
         });
-        final DartList<Long> shrink = new DartList<Long>();
+        final DartList<Long> shrink = new DartList<Long>(dart.runtime.TypeWitness.of(Long.class, false));
         shrink.add(1L);
         shrink.add(2L);
         shrink.add(3L);
@@ -1737,7 +1737,7 @@ public class DartCoreSemanticsTest {
                 shrink.removeLast();
             }
         });
-        DartList<Long> same = new DartList<Long>();
+        DartList<Long> same = new DartList<Long>(dart.runtime.TypeWitness.of(Long.class, false));
         same.add(1L);
         same.add(2L);
         StringBuilder seen = new StringBuilder();

@@ -613,6 +613,16 @@ public class ThreadSafeDatabase extends Database {
                 }
             });
         }
+
+        @Override
+        public int getColumnType(final int index) throws IOException {
+            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
+                public Object run() throws IOException {
+                    return underlyingRow.getColumnType(index);
+                }
+            });
+        }
     }
 
     /// Implements `CursorExt` as well as `Cursor`, because every cursor a Codename One port

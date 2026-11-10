@@ -1,0 +1,17 @@
+a <class 'int'> None ()
+b list[int] <class 'list'> (<class 'int'>,)
+c dict[str, float] <class 'dict'> (<class 'str'>, <class 'float'>)
+d str | None <class 'typing.Union'> (<class 'str'>, <class 'NoneType'>)
+e int | str <class 'typing.Union'> (<class 'int'>, <class 'str'>)
+f typing.Literal['x', 'y'] typing.Literal ('x', 'y')
+g typing.Annotated[int, 'meta'] typing.Annotated (<class 'int'>, 'meta')
+h M | None None ()
+i int | None <class 'typing.Union'> (<class 'int'>, <class 'NoneType'>)
+j tuple[int, ...] <class 'tuple'> (<class 'int'>, Ellipsis)
+k <class 'datetime.date'> None ()
+l <enum 'Color'> None ()
+m set[str] <class 'set'> (<class 'str'>,)
+n typing.Any None ()
+o list['M'] <class 'list'> ('M',)
+__main__.M | None
+None True M

@@ -43,6 +43,46 @@ public class DartIterable<E> implements Iterable<E> {
     /// -- see the field's one use for why a scan is not always the same answer.
     private final Funcs.Func1<Object, Boolean> membershipTest;
 
+    /// The reified element type when an operation knew it (a signed `map` callback's
+    /// return, the source's own for `where`/`take`/..), else read from a collection
+    /// source; null when nothing could record it.
+    private dart.runtime.TypeWitness elem;
+
+    private static <T> DartIterable<T> withElem(DartIterable<T> it, dart.runtime.TypeWitness w) {
+        it.elem = w;
+        return it;
+    }
+
+    /// Records the element witness on {@code it} (null leaves it unknown) and answers it.
+    public static <T> DartIterable<T> typed(DartIterable<T> it, dart.runtime.TypeWitness w) {
+        if (w != null) {
+            it.elem = w;
+        }
+        return it;
+    }
+
+    /// The reified element type: recorded, or the collection this iterable reads.
+    public dart.runtime.TypeWitness elementWitness() {
+        if (elem != null) {
+            return elem;
+        }
+        return witnessOf(source);
+    }
+
+    /// The element witness any runtime iterable records, or null.
+    public static dart.runtime.TypeWitness witnessOf(Object it) {
+        if (it instanceof DartList) {
+            return ((DartList<?>) it).elementWitness();
+        }
+        if (it instanceof DartSet) {
+            return ((DartSet<?>) it).elementWitness();
+        }
+        if (it instanceof DartIterable) {
+            return ((DartIterable<?>) it).elementWitness();
+        }
+        return null;
+    }
+
     protected DartIterable(Iterable<E> source) {
         this(source, null);
     }
@@ -52,6 +92,93 @@ public class DartIterable<E> implements Iterable<E> {
     DartIterable(Iterable<E> source, Funcs.Func1<Object, Boolean> membershipTest) {
         this.source = source;
         this.membershipTest = membershipTest;
+    }
+
+    /// A live Iterable over a program object applying dart:collection's
+    /// {@code IterableMixin} (or {@code ListMixin}), made where it is passed to an
+    /// {@code Iterable} parameter: each iteration asks the object for a fresh iterator,
+    /// so it sees the object's state at that moment. {@code identical} looks through it.
+    public static <E> DartIterable<E> ofMixin(dart.collection.IterableMixin<E> source) {
+        return new MixinIterable<E>(source);
+    }
+
+    private static final class MixinIterable<E> extends DartIterable<E> implements MixinView {
+        private final dart.collection.IterableMixin<E> src;
+
+        MixinIterable(dart.collection.IterableMixin<E> src) {
+            super(() -> new java.util.Iterator<E>() {
+                private final dart.collection.Iterator<E> it = src.iterator();
+                private boolean ready;
+                private boolean has;
+
+                @Override
+                public boolean hasNext() {
+                    if (!ready) {
+                        has = it.moveNext();
+                        ready = true;
+                    }
+                    return has;
+                }
+
+                @Override
+                public E next() {
+                    if (!hasNext()) {
+                        throw new java.util.NoSuchElementException();
+                    }
+                    ready = false;
+                    return it.current();
+                }
+            });
+            this.src = src;
+        }
+
+        @Override
+        public Object source() {
+            return src;
+        }
+    }
+
+    /// The Dart list or set this iterable is the plain view of ({@link #wrap} of a
+    /// {@link DartList} or {@link DartSet}), else the value itself. A List or Set passed
+    /// where an Iterable is expected travels as that view, and is still that List or Set
+    /// in Dart: `it is List` / `it is Set` look through it.
+    ///
+    /// This is the runtime's answer to Dart's `List<E> implements Iterable<E>`. Java
+    /// cannot say it: DartList must extend AbstractList and DartSet LinkedHashSet to be
+    /// the java.util collections Java APIs take, and dart:core's Iterable is this class,
+    /// so neither can also extend it. The transpiler therefore emits a program override
+    /// that narrows an Iterable return to List or Set (`Set<T> cast()` over
+    /// `Iterable<T> cast()`) with the member's Iterable return, returning this view, and
+    /// a call through the narrower static type reads the collection back through here.
+    public static Object listBehind(Object value) {
+        if (value != null && value.getClass() == DartIterable.class
+                && (((DartIterable<?>) value).source instanceof DartList
+                        || ((DartIterable<?>) value).source instanceof DartSet)) {
+            return ((DartIterable<?>) value).source;
+        }
+        return value;
+    }
+
+    /**
+     * The DartIterable a value that already passed Dart's checked downcast to
+     * {@code Iterable} (TypeWitness.checkCast) is handed over as: itself when it is one,
+     * a live view of any other runtime collection -- a DartList, a primitive-backed
+     * DartLongList, an ElementViews view -- and of a program object applying
+     * IterableMixin. Null stays null (the cast already decided whether it may be).
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static Object viewOf(Object value) {
+        if (value == null || value instanceof DartIterable) {
+            return value;
+        }
+        if (value instanceof Iterable) {
+            return new DartIterable((Iterable) value);
+        }
+        if (value instanceof dart.collection.IterableMixin) {
+            return ofMixin((dart.collection.IterableMixin) value);
+        }
+        throw new TypeError("type '" + dart.runtime.DartRuntime.typeName(value)
+                + "' is not a subtype of type 'Iterable'");
     }
 
     public static <E> DartIterable<E> wrap(Iterable<E> source) {
@@ -74,11 +201,49 @@ public class DartIterable<E> implements Iterable<E> {
      * and it would cost a thread per live iterator. The limitation is listed in
      * flutter-runtime/READINESS.md and in the conversion skill.</p>
      */
+    /// A `sync*` body whose declared element type is {@code elem}: the generated
+    /// iterable, and the list each iteration fills, record it.
+    public static <E> DartIterable<E> syncStar(final dart.runtime.TypeWitness elem,
+            final Funcs.VoidFunc1<DartList<E>> body) {
+        DartIterable<E> it = wrap(new Iterable<E>() {
+            @Override
+            public Iterator<E> iterator() {
+                DartList<E> out = new DartList<E>(elem);
+                body.call(out);
+                return out.iterator();
+            }
+        });
+        it.elem = elem;
+        return it;
+    }
+
+    /// A `sync*` body lowered to a dart.async.SyncStarFrame: {@code make} builds a fresh
+    /// frame for each iteration, which runs the body lazily, one yield per step.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static <E> DartIterable<E> syncStarFrame(final dart.runtime.TypeWitness elem,
+            final Funcs.Func0<? extends Iterator> make) {
+        DartIterable<E> it = wrap(new Iterable<E>() {
+            @Override
+            public Iterator<E> iterator() {
+                return (Iterator<E>) make.call();
+            }
+        });
+        it.elem = elem;
+        return it;
+    }
+
+    /// As {@link #syncStarFrame(dart.runtime.TypeWitness, Funcs.Func0)}, unrecorded.
+    @SuppressWarnings("rawtypes")
+    public static <E> DartIterable<E> syncStarFrame(final Funcs.Func0<? extends Iterator> make) {
+        return syncStarFrame(null, make);
+    }
+
+    /// A `sync*` body whose element type is an unwitnessed type variable: unrecorded.
     public static <E> DartIterable<E> syncStar(final Funcs.VoidFunc1<DartList<E>> body) {
         return wrap(new Iterable<E>() {
             @Override
             public Iterator<E> iterator() {
-                DartList<E> out = new DartList<E>();
+                DartList<E> out = new DartList<E>((dart.runtime.TypeWitness) null);
                 body.call(out);
                 return out.iterator();
             }
@@ -129,7 +294,7 @@ public class DartIterable<E> implements Iterable<E> {
 
     public <R> DartIterable<R> map(Funcs.Func1<E, R> f) {
         Iterable<E> src = this;
-        return new DartIterable<>(() -> new Iterator<R>() {
+        return withElem(new DartIterable<>(() -> new Iterator<R>() {
             private final Iterator<E> it = src.iterator();
 
             @Override
@@ -141,12 +306,12 @@ public class DartIterable<E> implements Iterable<E> {
             public R next() {
                 return f.call(it.next());
             }
-        });
+        }), f instanceof dart.runtime.Signed && !((dart.runtime.Signed) f).$generic() ? ((dart.runtime.Signed) f).$sig()[0] : null);
     }
 
     public DartIterable<E> where(Funcs.Func1<E, Boolean> test) {
         Iterable<E> src = this;
-        return new DartIterable<>(() -> new Iterator<E>() {
+        return withElem(new DartIterable<>(() -> new Iterator<E>() {
             private final Iterator<E> it = src.iterator();
             private boolean ready;
             private E next;
@@ -178,7 +343,7 @@ public class DartIterable<E> implements Iterable<E> {
                 next = null;
                 return r;
             }
-        });
+        }), elementWitness());
     }
 
     public DartIterable<E> take(long count) {
@@ -186,7 +351,7 @@ public class DartIterable<E> implements Iterable<E> {
         // mirrored skip(-1) returned everything.
         RangeError.checkNotNegative(count, "count");
         Iterable<E> src = this;
-        return new DartIterable<>(() -> new Iterator<E>() {
+        return withElem(new DartIterable<>(() -> new Iterator<E>() {
             private final Iterator<E> it = src.iterator();
             private long remaining = count;
 
@@ -203,7 +368,7 @@ public class DartIterable<E> implements Iterable<E> {
                 remaining--;
                 return it.next();
             }
-        });
+        }), elementWitness());
     }
 
     public DartIterable<E> skip(long count) {
@@ -211,7 +376,7 @@ public class DartIterable<E> implements Iterable<E> {
         Iterable<E> src = this;
         // Lazy, as Dart's: nothing is skipped (or computed by an upstream map/where)
         // until the iterator is first advanced, not when it is created.
-        return new DartIterable<>(() -> new Iterator<E>() {
+        return withElem(new DartIterable<>(() -> new Iterator<E>() {
             private final Iterator<E> it = src.iterator();
             private boolean skipped;
 
@@ -235,7 +400,7 @@ public class DartIterable<E> implements Iterable<E> {
                 skipOnce();
                 return it.next();
             }
-        });
+        }), elementWitness());
     }
 
     public long length() {
@@ -252,6 +417,19 @@ public class DartIterable<E> implements Iterable<E> {
 
     public boolean isNotEmpty() {
         return iterator().hasNext();
+    }
+
+    /** Dart's {@code Iterable.single}. */
+    public E single() {
+        Iterator<E> it = iterator();
+        if (!it.hasNext()) {
+            throw new StateError("No element");
+        }
+        E result = it.next();
+        if (it.hasNext()) {
+            throw new StateError("Too many elements");
+        }
+        return result;
     }
 
     public E first() {
@@ -369,7 +547,7 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     /** Dart's {@code Iterable.expand(f)} — flat-maps each element to an iterable. */
-    public <R> DartIterable<R> expand(Funcs.Func1<E, Iterable<R>> f) {
+    public <R> DartIterable<R> expand(Funcs.Func1<E, ? extends Iterable<R>> f) {
         Iterable<E> src = this;
         return new DartIterable<>(() -> new Iterator<R>() {
             private final Iterator<E> outer = src.iterator();
@@ -402,7 +580,7 @@ public class DartIterable<E> implements Iterable<E> {
     /** Dart's {@code Iterable.followedBy(other)} — lazy concatenation. */
     public DartIterable<E> followedBy(Iterable<E> other) {
         Iterable<E> src = this;
-        return new DartIterable<>(() -> new Iterator<E>() {
+        return withElem(new DartIterable<>(() -> new Iterator<E>() {
             private Iterator<E> it = src.iterator();
             private boolean second;
 
@@ -425,7 +603,7 @@ public class DartIterable<E> implements Iterable<E> {
                 }
                 return it.next();
             }
-        });
+        }), elementWitness());
     }
 
     /**
@@ -445,7 +623,7 @@ public class DartIterable<E> implements Iterable<E> {
     @SuppressWarnings("unchecked")
     public <T> DartIterable<T> whereType(Class<T> type, boolean nullable) {
         Iterable<E> src = this;
-        return new DartIterable<>(() -> new Iterator<T>() {
+        return withElem(new DartIterable<>(() -> new Iterator<T>() {
             private final Iterator<E> it = src.iterator();
             private boolean ready;
             private T next;
@@ -477,7 +655,7 @@ public class DartIterable<E> implements Iterable<E> {
                 next = null;
                 return r;
             }
-        });
+        }), dart.runtime.TypeWitness.of(type, nullable));
     }
 
     /** Dart's {@code Iterable.asMap()} — index-to-element map. */
@@ -533,7 +711,7 @@ public class DartIterable<E> implements Iterable<E> {
 
     public DartIterable<E> takeWhile(Funcs.Func1<E, Boolean> test) {
         Iterable<E> src = this;
-        return new DartIterable<>(() -> new Iterator<E>() {
+        return withElem(new DartIterable<>(() -> new Iterator<E>() {
             private final Iterator<E> it = src.iterator();
             private boolean done;
             private boolean ready;
@@ -566,14 +744,14 @@ public class DartIterable<E> implements Iterable<E> {
                 ready = false;
                 return next;
             }
-        });
+        }), elementWitness());
     }
 
     public DartIterable<E> skipWhile(Funcs.Func1<E, Boolean> test) {
         Iterable<E> src = this;
         // Lazy, as Dart's: the predicate first runs when the iterator is advanced,
         // not when it is created, so an iterator obtained and never used runs nothing.
-        return new DartIterable<>(() -> new Iterator<E>() {
+        return withElem(new DartIterable<>(() -> new Iterator<E>() {
             private final Iterator<E> it = src.iterator();
             private boolean skipping = true;
             private boolean hasHead;
@@ -611,7 +789,7 @@ public class DartIterable<E> implements Iterable<E> {
                 }
                 return it.next();
             }
-        });
+        }), elementWitness());
     }
 
     public String join(String separator) {
@@ -633,11 +811,11 @@ public class DartIterable<E> implements Iterable<E> {
 
     /** Dart's {@code toList(growable: ...)}: a fixed-length copy when growable is false. */
     public DartList<E> toList(boolean growable) {
-        return growable ? toList() : DartList.from(this, false);
+        return growable ? toList() : DartList.typed(DartList.from(this, false), elementWitness());
     }
 
     public DartList<E> toList() {
-        DartList<E> l = new DartList<>();
+        DartList<E> l = new DartList<E>(elementWitness());
         for (E e : this) {
             l.add(e);
         }
@@ -645,7 +823,7 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     public DartSet<E> toSet() {
-        DartSet<E> s = new DartSet<>();
+        DartSet<E> s = DartSet.typed(new DartSet<E>(), elementWitness());
         for (E e : this) {
             s.add(e);
         }
@@ -654,6 +832,11 @@ public class DartIterable<E> implements Iterable<E> {
 
     @Override
     public String toString() {
+        if (source instanceof DartList || source instanceof DartSet) {
+            // A List or Set held as an Iterable (`Future<Iterable<int>> f() async => [3, 4]`)
+            // is still that collection: Dart prints it as one, `[3, 4]`, not `(3, 4)`.
+            return source.toString();
+        }
         if (!DartRuntime.beginFormat(this)) {
             return "(...)";
         }

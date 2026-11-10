@@ -47,7 +47,7 @@ public class SliverList extends StatelessWidget {
     @Override
     public Widget build(BuildContext context) {
         DartList<Widget> kids = delegate != null
-                ? delegate.buildChildren(context) : new DartList<Widget>();
+                ? delegate.buildChildren(context) : new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         Column col = new Column();
         col.crossAxisAlignment(CrossAxisAlignment.stretch);
         col.mainAxisSize(MainAxisSize.min);

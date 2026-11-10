@@ -205,6 +205,7 @@ final class LibrarySupport {
         project.getConfigurations().getByName("api").extendsFrom(
                 project.getConfigurations().getByName(Cn1libs.DECLARED));
         AppSupport.addFramework(project, "compileOnly", ext.getVersion(), "codenameone-core", "java-runtime");
+        AppSupport.addProcessor(project);
         AppSupport.addFramework(project, "testImplementation", ext.getVersion(), "codenameone-core",
                 "codenameone-javase");
         Configuration javasePort = AppSupport.resolvable(project, "cn1Simulator", "The JavaSE port");

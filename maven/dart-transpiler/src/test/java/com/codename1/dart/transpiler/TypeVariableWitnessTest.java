@@ -64,13 +64,14 @@ public class TypeVariableWitnessTest {
     public void whereTypeOfATypeVariableIsDiagnosed() {
         String src =
                 "Iterable<Object> only<T>(List<Object> xs) => xs.whereType<T>();\n"
-              + "void main() {}\n";
+              + "void main() { print(only<int>(<Object>[1])); print(only(<Object>[1])); }\n";
         TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
-        assertTrue(r.diags.hasErrors(), "whereType<T>() on a type variable must be diagnosed");
-        assertTrue(count(r, "E0142") >= 1, "expected E0142: " + r.diags.asList());
+        // The generic method takes a hidden witness of T; the call that writes <int> passes
+        // one, and only the call that neither writes nor lets T be inferred is an error.
+        assertEquals(1, count(r, "E0142"), "expected one E0142, at the uninferable call: " + r.diags.asList());
         boolean namesConstruct = false;
         for (Diagnostic d : r.diags.asList()) {
-            if (d.code.equals("E0142") && d.message.contains("whereType<T>") && d.message.contains("T")) {
+            if (d.code.equals("E0142") && d.message.contains("only") && d.message.contains("'T'")) {
                 namesConstruct = true;
             }
         }
@@ -82,10 +83,10 @@ public class TypeVariableWitnessTest {
     public void isTestOfATypeVariableIsDiagnosed() {
         String src =
                 "bool isa<T>(Object x) => x is T;\n"
-              + "void main() {}\n";
+              + "void main() { print(isa<String>(1)); print(isa(1)); }\n";
         TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
-        assertTrue(r.diags.hasErrors(), "x is T on a type variable must be diagnosed");
-        assertTrue(count(r, "E0142") >= 1, "expected E0142: " + r.diags.asList());
+        // Witnessed: never a guess for the call that gives T no type.
+        assertEquals(1, count(r, "E0142"), "expected one E0142, at isa(1): " + r.diags.asList());
     }
 
     /**

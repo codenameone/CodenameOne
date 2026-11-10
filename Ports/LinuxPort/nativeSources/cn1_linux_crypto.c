@@ -92,12 +92,6 @@
     X(EVP_PKEY_CTX_free) \
     X(EVP_PKEY_CTX_new) \
     X(EVP_PKEY_CTX_new_id) \
-    X(EVP_PKEY_CTX_set_ec_paramgen_curve_nid) \
-    X(EVP_PKEY_CTX_set_rsa_keygen_bits) \
-    X(EVP_PKEY_CTX_set_rsa_mgf1_md) \
-    X(EVP_PKEY_CTX_set_rsa_oaep_md) \
-    X(EVP_PKEY_CTX_set_rsa_padding) \
-    X(EVP_PKEY_get_base_id) \
     X(EVP_PKEY_decrypt) \
     X(EVP_PKEY_decrypt_init) \
     X(EVP_PKEY_derive) \
@@ -106,7 +100,6 @@
     X(EVP_PKEY_encrypt) \
     X(EVP_PKEY_encrypt_init) \
     X(EVP_PKEY_free) \
-    X(EVP_PKEY_get_id) \
     X(EVP_PKEY_keygen) \
     X(EVP_PKEY_keygen_init) \
     X(EVP_aes_128_cbc) \
@@ -131,26 +124,121 @@
     X(i2d_PKCS8_PRIV_KEY_INFO) \
     X(i2d_PUBKEY)
 
+/* OpenSSL 3 functions that 1.1 does not export: the two getters are renamed
+ * there, and the EVP_PKEY_CTX_set_* calls are macros over EVP_PKEY_CTX_ctrl. */
+#define CN1_CRYPTO_V3_FUNCTIONS(X) \
+    X(EVP_PKEY_CTX_set_ec_paramgen_curve_nid) \
+    X(EVP_PKEY_CTX_set_rsa_keygen_bits) \
+    X(EVP_PKEY_CTX_set_rsa_mgf1_md) \
+    X(EVP_PKEY_CTX_set_rsa_oaep_md) \
+    X(EVP_PKEY_CTX_set_rsa_padding) \
+    X(EVP_PKEY_get_base_id) \
+    X(EVP_PKEY_get_id)
+
 #define CN1_CRYPTO_POINTER(name) static __typeof__(name)* p_##name;
 CN1_CRYPTO_FUNCTIONS(CN1_CRYPTO_POINTER)
+CN1_CRYPTO_V3_FUNCTIONS(CN1_CRYPTO_POINTER)
 #undef CN1_CRYPTO_POINTER
+
+/*
+ * OpenSSL 1.1 fallback. The glibc 2.28 target runs on RHEL 8 and Debian 11, and
+ * the Steam Linux Runtime is Debian 11 based: all ship libcrypto.so.1.1 and no
+ * libcrypto.so.3, so crypto used to report unavailable there. The 1.1 ABI is
+ * the same for every other function used here; these stand in for the seven
+ * that differ, with the control codes and operation bits of the 1.1.1 headers
+ * spelled out (the build compiles against the 3 headers).
+ */
+typedef int (*Cn1PkeyCtxCtrl)(EVP_PKEY_CTX*, int, int, int, int, void*);
+typedef int (*Cn1PkeyId)(const EVP_PKEY*);
+static Cn1PkeyCtxCtrl p11_EVP_PKEY_CTX_ctrl;
+static Cn1PkeyId p11_EVP_PKEY_id;
+static Cn1PkeyId p11_EVP_PKEY_base_id;
+
+#define CN1_11_PKEY_RSA 6
+#define CN1_11_PKEY_EC 408
+#define CN1_11_OP_PARAMGEN (1 << 1)
+#define CN1_11_OP_KEYGEN (1 << 2)
+#define CN1_11_OP_TYPE_SIG ((1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7))
+#define CN1_11_OP_TYPE_CRYPT ((1 << 8) | (1 << 9))
+#define CN1_11_ALG_CTRL 0x1000
+#define CN1_11_CTRL_RSA_PADDING (CN1_11_ALG_CTRL + 1)
+#define CN1_11_CTRL_RSA_KEYGEN_BITS (CN1_11_ALG_CTRL + 3)
+#define CN1_11_CTRL_RSA_MGF1_MD (CN1_11_ALG_CTRL + 5)
+#define CN1_11_CTRL_RSA_OAEP_MD (CN1_11_ALG_CTRL + 9)
+#define CN1_11_CTRL_EC_PARAMGEN_CURVE_NID (CN1_11_ALG_CTRL + 1)
+
+static int cn1v11_set_ec_paramgen_curve_nid(EVP_PKEY_CTX* ctx, int nid) {
+    return p11_EVP_PKEY_CTX_ctrl(ctx, CN1_11_PKEY_EC, CN1_11_OP_PARAMGEN | CN1_11_OP_KEYGEN,
+            CN1_11_CTRL_EC_PARAMGEN_CURVE_NID, nid, NULL);
+}
+
+static int cn1v11_set_rsa_keygen_bits(EVP_PKEY_CTX* ctx, int bits) {
+    return p11_EVP_PKEY_CTX_ctrl(ctx, CN1_11_PKEY_RSA, CN1_11_OP_KEYGEN,
+            CN1_11_CTRL_RSA_KEYGEN_BITS, bits, NULL);
+}
+
+static int cn1v11_set_rsa_mgf1_md(EVP_PKEY_CTX* ctx, const EVP_MD* md) {
+    return p11_EVP_PKEY_CTX_ctrl(ctx, -1, CN1_11_OP_TYPE_SIG | CN1_11_OP_TYPE_CRYPT,
+            CN1_11_CTRL_RSA_MGF1_MD, 0, (void*) md);
+}
+
+static int cn1v11_set_rsa_oaep_md(EVP_PKEY_CTX* ctx, const EVP_MD* md) {
+    return p11_EVP_PKEY_CTX_ctrl(ctx, CN1_11_PKEY_RSA, CN1_11_OP_TYPE_CRYPT,
+            CN1_11_CTRL_RSA_OAEP_MD, 0, (void*) md);
+}
+
+static int cn1v11_set_rsa_padding(EVP_PKEY_CTX* ctx, int pad) {
+    return p11_EVP_PKEY_CTX_ctrl(ctx, -1, -1, CN1_11_CTRL_RSA_PADDING, pad, NULL);
+}
+
+static int cn1v11_get_base_id(const EVP_PKEY* k) {
+    return p11_EVP_PKEY_base_id(k);
+}
+
+static int cn1v11_get_id(const EVP_PKEY* k) {
+    return p11_EVP_PKEY_id(k);
+}
 
 static pthread_once_t cn1CryptoOnce = PTHREAD_ONCE_INIT;
 static int cn1CryptoAvailable;
 
 static void cn1LoadCrypto(void) {
+    int v3 = 1;
     void* library = dlopen("libcrypto.so.3", RTLD_NOW | RTLD_LOCAL);
     if (library == NULL) {
-        fprintf(stderr, "Codename One: unable to load libcrypto.so.3: %s\n", dlerror());
+        v3 = 0;
+        library = dlopen("libcrypto.so.1.1", RTLD_NOW | RTLD_LOCAL);
+    }
+    if (library == NULL) {
+        fprintf(stderr, "Codename One: unable to load libcrypto.so.3 or libcrypto.so.1.1: %s\n", dlerror());
         return;
     }
 #define CN1_CRYPTO_RESOLVE(name) \
     if ((*(void**) (&p_##name) = dlsym(library, #name)) == NULL) { \
-        fprintf(stderr, "Codename One: libcrypto.so.3 is missing %s\n", #name); \
+        fprintf(stderr, "Codename One: libcrypto is missing %s\n", #name); \
         dlclose(library); \
         return; \
     }
     CN1_CRYPTO_FUNCTIONS(CN1_CRYPTO_RESOLVE)
+    if (v3) {
+        CN1_CRYPTO_V3_FUNCTIONS(CN1_CRYPTO_RESOLVE)
+    } else {
+        *(void**) (&p11_EVP_PKEY_CTX_ctrl) = dlsym(library, "EVP_PKEY_CTX_ctrl");
+        *(void**) (&p11_EVP_PKEY_id) = dlsym(library, "EVP_PKEY_id");
+        *(void**) (&p11_EVP_PKEY_base_id) = dlsym(library, "EVP_PKEY_base_id");
+        if (p11_EVP_PKEY_CTX_ctrl == NULL || p11_EVP_PKEY_id == NULL || p11_EVP_PKEY_base_id == NULL) {
+            fprintf(stderr, "Codename One: libcrypto.so.1.1 is missing EVP_PKEY_CTX_ctrl or EVP_PKEY_id\n");
+            dlclose(library);
+            return;
+        }
+        p_EVP_PKEY_CTX_set_ec_paramgen_curve_nid = cn1v11_set_ec_paramgen_curve_nid;
+        p_EVP_PKEY_CTX_set_rsa_keygen_bits = cn1v11_set_rsa_keygen_bits;
+        p_EVP_PKEY_CTX_set_rsa_mgf1_md = cn1v11_set_rsa_mgf1_md;
+        p_EVP_PKEY_CTX_set_rsa_oaep_md = cn1v11_set_rsa_oaep_md;
+        p_EVP_PKEY_CTX_set_rsa_padding = cn1v11_set_rsa_padding;
+        p_EVP_PKEY_get_base_id = cn1v11_get_base_id;
+        p_EVP_PKEY_get_id = cn1v11_get_id;
+    }
 #undef CN1_CRYPTO_RESOLVE
     cn1CryptoAvailable = 1;
 }

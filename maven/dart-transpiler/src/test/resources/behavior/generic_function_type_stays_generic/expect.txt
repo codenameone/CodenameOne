@@ -1,0 +1,12 @@
+i 3
+F true
+CB true
+2
+3
+2
+List<int>
+List<num>
+List<dynamic>
+List<int>
+DG true
+List<String>

@@ -1,0 +1,153 @@
+'a+' (1, 4) 'aaa' () None None
+  False False ['aaa']
+'(a)(b)?' (0, 1) 'a' ('a', None) 1 None
+  True False [('a', '')]
+'(?P<word>\\w+)\\s(?P=word)' (0, 11) 'hello hello' ('hello',) 1 word
+  True False ['hello']
+'\\d{2,3}' (1, 4) '123' () None None
+  False False ['123', '45']
+'\\d{,2}x' (1, 4) '23x' () None None
+  False False ['23x']
+'x{2}' (0, 2) 'xx' () None None
+  True False ['xx']
+'a{,}' (0, 3) 'aaa' () None None
+  True True ['aaa', '']
+'[a-c]+' (2, 7) 'abcab' () None None
+  False False ['abcab']
+'[^a-c]+' (3, 6) 'xyz' () None None
+  False False ['xyz']
+'(?i)hello' (0, 5) 'HeLLo' () None None
+  True True ['HeLLo']
+'^abc$' (0, 3) 'abc' () None None
+  True False ['abc']
+'(?m)^b$' (2, 3) 'b' () None None
+  False False ['b']
+'a.c' None
+  False False []
+'(?s)a.c' (0, 3) 'a\nc' () None None
+  True True ['a\nc']
+'\\bfoo\\b' (2, 5) 'foo' () None None
+  False False ['foo']
+'\\Bfoo' (1, 4) 'foo' () None None
+  False False ['foo']
+'(a|ab)(c|bcd)(d*)' (0, 4) 'abcd' ('a', 'bcd', '') 3 None
+  True True [('a', 'bcd', '')]
+'(a*)*' (0, 0) '' ('',) 1 None
+  True False ['', '']
+'(a?)*' (0, 0) '' ('',) 1 None
+  True False ['', '']
+'(a*)+' (0, 2) 'aa' ('',) 1 None
+  True False ['', '', '']
+'(?:ab)+?c' (0, 5) 'ababc' () None None
+  True True ['ababc']
+'a*?b' (0, 4) 'aaab' () None None
+  True True ['aaab']
+'a{2,4}?' (0, 2) 'aa' () None None
+  True True ['aa', 'aa']
+'foo(?=bar)' (0, 3) 'foo' () None None
+  True False ['foo']
+'foo(?!bar)' (0, 3) 'foo' () None None
+  True False ['foo']
+'(?<=\\$)\\d+' (6, 8) '42' () None None
+  False False ['42']
+'(?<!\\$)\\b\\d+' (4, 6) '17' () None None
+  False False ['17']
+'(?>a+)b' (0, 4) 'aaab' () None None
+  True True ['aaab']
+'a++b' (0, 4) 'aaab' () None None
+  True True ['aaab']
+'a++a' None
+  False False []
+'(\\w)(\\w)?\\2' (0, 3) 'abb' ('a', 'b') 2 None
+  True True [('a', 'b')]
+'(a)?(?(1)b|c)' (0, 2) 'ab' ('a',) 1 None
+  True True ['a']
+'(a)?(?(1)b|c)' (0, 1) 'c' (None,) None None
+  True True ['']
+'[\\d\\s]+' (0, 5) '1 2 3' () None None
+  True False ['1 2 3']
+'[\\w.-]+@[\\w.-]+' (6, 17) 'a.b-c@x.org' () None None
+  False False ['a.b-c@x.org']
+'\\x41é\\101' (0, 3) 'AéA' () None None
+  True True ['AéA']
+'[\\]]+' (0, 2) ']]' () None None
+  True False [']]']
+'[]a]+' (0, 2) 'a]' () None None
+  True False ['a]']
+'[-a]+' (0, 3) '-a-' () None None
+  True True ['-a-']
+'[a-]+' (0, 3) '-a-' () None None
+  True True ['-a-']
+'\\.\\*\\+' (0, 3) '.*+' () None None
+  True True ['.*+']
+'café' None
+  False False []
+'(?i)café' (0, 4) 'CAFÉ' () None None
+  True True ['CAFÉ']
+'(?i)[a-z]+' (0, 5) 'HeLLo' () None None
+  True True ['HeLLo']
+'\\w+' (0, 5) 'naïve' () None None
+  True False ['naïve', 'café']
+'(?a)\\w+' (0, 2) 'na' () None None
+  True False ['na', 've']
+'(?x) a  b # comment\\n c' (0, 2) 'ab' () None None
+  True False ['ab']
+'(a)|(b)' (0, 1) 'b' (None, 'b') 2 None
+  True True [('', 'b')]
+'((a)(b))' (0, 2) 'ab' ('ab', 'a', 'b') 1 None
+  True True [('ab', 'a', 'b')]
+'\\Aab\\Z' (0, 2) 'ab' () None None
+  True True ['ab']
+'$' (2, 2) '' () None None
+  False False ['', '']
+'x*' (0, 0) '' () None None
+  True False ['', '', '', '']
+'(?i:a)b' (0, 2) 'Ab' () None None
+  True True ['Ab']
+'(?i:a)b' None
+  False False []
+'(?-i:a)b' None
+  False False []
+'\\s+$' (3, 6) '  \t' () None None
+  False False ['  \t']
+-a-b--d- world hello
+a<111>b<222><222> ('bba', 2)
+a2 b44 c666 -a-b-c-
+True axcb
+['Words', 'words', 'words', ''] ['Words', ', ', 'words', ', ', 'words', '.', '']
+['Words', 'words, words.'] ['', 'a', '', 'b', 'c', ''] ['0', '3', '9']
+[('a', '1'), ('b', ''), ('c', '3')] ['o', 't'] ['', '', '']
+[(0, 2), (3, 5), (7, 9)] ['', 'aa', '', '']
+re.compile('(?P<key>\\w+)=(?P<val>\\w*)') (?P<key>\w+)=(?P<val>\w*) 2 {'key': 1, 'val': 2} <re.Match object; span=(3, 6), match='k=v'> {'key': 'k', 'val': 'v'} ('k', 'v') v 5 4
+(5, 6) v:k 0 10 x  k=v; z= True ((3, 6), (3, 4), (5, 6))
+<re.Match object; span=(0, 3), match='a=b'> <re.Match object; span=(3, 6), match='a=b'> None <re.Match object; span=(0, 3), match='a=b'> None
+re.compile('a', re.IGNORECASE|re.MULTILINE) re.compile('a', re.DOTALL) re.IGNORECASE re.IGNORECASE|re.MULTILINE re.compile(b'a+') re.compile('x', re.VERBOSE|re.ASCII)
+a\.b\*c\?d\[e\]f\(g\)\ h\-i_j b'a\\.b' True
+b'123' [b'a', b'b', b'c'] b'aXc'
+('a', 'b') ('a', '-') {}
+last None
+error 'a**' multiple repeat at position 2 | multiple repeat 2 1 3
+error '*a' nothing to repeat at position 0 | nothing to repeat 0 1 1
+error '(ab' missing ), unterminated subpattern at position 0 | missing ), unterminated subpattern 0 1 1
+error 'ab)' unbalanced parenthesis at position 2 | unbalanced parenthesis 2 1 3
+error '[ab' unterminated character set at position 0 | unterminated character set 0 1 1
+error '\\q' bad escape \q at position 0 | bad escape \q 0 1 1
+error '(?P<1>a)' bad character in group name '1' at position 4 | bad character in group name '1' 4 1 5
+error '(?P=x)' unknown group name 'x' at position 4 | unknown group name 'x' 4 1 5
+error '(?<=a+)b' look-behind requires fixed-width pattern | look-behind requires fixed-width pattern None None None
+error 'a{3,2}' min repeat greater than max repeat at position 2 | min repeat greater than max repeat 2 1 3
+error '(?z)' unknown extension ?z at position 1 | unknown extension ?z 1 1 2
+error '\\1(a)' invalid group reference 1 at position 1 | invalid group reference 1 1 1 2
+error 'x(?i)y' global flags not at the start of the expression at position 1 | global flags not at the start of the expression 1 1 2
+error '(?P<n>a)(?P<n>b)' redefinition of group name 'n' as group 2; was group 1 at position 12 | redefinition of group name 'n' as group 2; was group 1 12 1 13
+error '[z-a]' bad character range z-a at position 1 | bad character range z-a 1 1 2
+error 'abc\n(' missing ), unterminated subpattern at position 4 (line 2, column 1) | missing ), unterminated subpattern 4 2 1
+error '(?' unexpected end of pattern at position 2 | unexpected end of pattern 2 1 3
+error '\\x4' incomplete escape \x4 at position 0 | incomplete escape \x4 0 1 1
+TypeError cannot use a string pattern on a bytes-like object
+error invalid group reference 2 at position 1
+error bad escape \q at position 0
+IndexError no such group
+True PatternError True
+(0, 6001) 3000 6001
+6001 True

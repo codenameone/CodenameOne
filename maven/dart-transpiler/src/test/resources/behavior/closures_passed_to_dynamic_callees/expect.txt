@@ -1,0 +1,19 @@
+1
+1
+1
+gop true
+1
+ap true
+num 1
+dyn 1
+5
+tw true
+tw2 true
+3
+6
+fa true
+9
+true
+true
+false
+9

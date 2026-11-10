@@ -31,7 +31,7 @@ import com.codenameone.examples.dash.api.SpotlightDto;
 import com.codenameone.examples.dash.engage.Friends;
 import com.codenameone.examples.dash.forge.Fields;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.ui.Ui;
 import java.util.Date;
 

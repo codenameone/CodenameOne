@@ -1,0 +1,19 @@
+MyObject(3)
+MyString
+MyType
+42
+MyMap
+MyEnum
+true
+{a: 1}
+Object
+5
+Thread<int>
+userDyn
+userFuncs
+77
+DartList
+5
+8
+true
+false

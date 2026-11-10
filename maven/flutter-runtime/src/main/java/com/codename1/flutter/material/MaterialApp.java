@@ -675,7 +675,7 @@ public class MaterialApp extends StatelessWidget
     /// mapped to the ISO 639 ones Flutter and its ARB files use (a Hebrew device reports
     /// "iw" on older Java platforms, and no app supports "iw").
     private DartList<Locale> deviceLocales() {
-        DartList<Locale> out = new DartList<Locale>();
+        DartList<Locale> out = new DartList<Locale>(dart.runtime.TypeWitness.of(Locale.class, false));
         try {
             com.codename1.l10n.L10NManager l10n = com.codename1.l10n.L10NManager.getInstance();
             String lang = l10n.getLanguage();
@@ -707,7 +707,7 @@ public class MaterialApp extends StatelessWidget
     }
 
     private DartIterable<Locale> supportedLocaleList() {
-        DartList<Locale> out = new DartList<Locale>();
+        DartList<Locale> out = new DartList<Locale>(dart.runtime.TypeWitness.of(Locale.class, false));
         if (supportedLocales instanceof Iterable) {
             for (Object l : (Iterable<?>) supportedLocales) {
                 if (l instanceof Locale) {

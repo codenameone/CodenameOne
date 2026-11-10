@@ -49,6 +49,9 @@ public class REDebugCompiler extends RECompiler {
         hashOpcode.put(Integer.valueOf(RE.OP_POSIXCLASS), "OP_POSIXCLASS");
         hashOpcode.put(Integer.valueOf(RE.OP_OPEN_CLUSTER), "OP_OPEN_CLUSTER");
         hashOpcode.put(Integer.valueOf(RE.OP_CLOSE_CLUSTER), "OP_CLOSE_CLUSTER");
+        hashOpcode.put(Integer.valueOf(RE.OP_LOOKAHEAD), "OP_LOOKAHEAD");
+        hashOpcode.put(Integer.valueOf(RE.OP_NEGLOOKAHEAD), "OP_NEGLOOKAHEAD");
+        hashOpcode.put(Integer.valueOf(RE.OP_LOOKEND), "OP_LOOKEND");
     }
 
     /// Returns a descriptive string for an opcode.

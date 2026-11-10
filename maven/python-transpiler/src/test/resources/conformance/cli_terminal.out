@@ -1,0 +1,8 @@
+isatty False False False
+fileno 0 1 2
+OSError 25
+True True
+True 2
+name? EOFError EOF when reading a line
+''
+'' []

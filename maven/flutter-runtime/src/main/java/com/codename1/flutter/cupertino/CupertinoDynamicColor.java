@@ -36,8 +36,27 @@ import com.codename1.flutter.Color;
  */
 public class CupertinoDynamicColor extends Color {
 
+    private Color dark;
+
     public CupertinoDynamicColor(long value) {
         super(value);
+    }
+
+    /** Flutter's {@code CupertinoDynamicColor.withBrightness}: a light and a dark variant. */
+    public static CupertinoDynamicColor withBrightness(Color color, Color darkColor) {
+        CupertinoDynamicColor c = new CupertinoDynamicColor(color.value());
+        c.dark = darkColor;
+        return c;
+    }
+
+    /** The light, normal-contrast variant: this color itself. */
+    public Color color() {
+        return new Color(value());
+    }
+
+    /** The dark variant; the light one when none was given. */
+    public Color darkColor() {
+        return dark == null ? color() : dark;
     }
 
     /**

@@ -5441,15 +5441,16 @@ public class SelfTest {
      * written to prevent, reached by spelling it slightly wrong.
      */
     private static void anUnknownSslModeIsRefused() throws Exception {
-        String[] typos = new String[] { "Require", "required", "requrie", "verify-full" };
+        String[] typos = new String[] { "Require", "required", "requrie", "verify_full" };
         for(int iter = 0 ; iter < typos.length ; iter++) {
             check("sslmode=" + typos[iter] + " is refused", "refused",
                     sslModeRefused(typos[iter]));
         }
-        // THE THREE THIS RUNTIME IMPLEMENTS still open a connection -- there is
+        // THE MODES THIS RUNTIME IMPLEMENTS still open a connection -- there is
         // nothing listening on port 1, so a connection failure is what "accepted"
         // looks like here, and it is what says the refusals are about the mode.
-        String[] known = new String[] { "require", "prefer", "disable" };
+        String[] known = new String[] { "require", "prefer", "disable", "verify-ca",
+                "verify-full", "VERIFY_IDENTITY" };
         for(int iter = 0 ; iter < known.length ; iter++) {
             check("sslmode=" + known[iter] + " is accepted", "accepted",
                     sslModeRefused(known[iter]));

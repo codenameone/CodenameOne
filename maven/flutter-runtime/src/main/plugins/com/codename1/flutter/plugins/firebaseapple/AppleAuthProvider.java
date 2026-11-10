@@ -50,7 +50,7 @@ public class AppleAuthProvider implements FederatedSignIn {
     public static final String PROVIDER_ID = "apple.com";
     public static final String APPLE_SIGN_IN_METHOD = "apple.com";
 
-    private final DartList<String> scopes = new DartList<String>();
+    private final DartList<String> scopes = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
 
     public static OAuthCredential credentialWithIDToken(String idToken, String rawNonce, Object fullName) {
         return new OAuthCredential(PROVIDER_ID, APPLE_SIGN_IN_METHOD, idToken, null, rawNonce, null);

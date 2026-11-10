@@ -33,6 +33,19 @@ public class TextButton extends ButtonBase {
      * Builds a {@link ButtonStyle} to hand to a TextButton's {@code style:}
      * parameter. Parameter order matches the Dart stub.
      */
+    /** The full {@code styleFrom}, with sizes and disabled colours. */
+    public static ButtonStyle styleFrom(com.codename1.flutter.Color foregroundColor,
+            com.codename1.flutter.Color backgroundColor, com.codename1.flutter.Color shadowColor,
+            Double elevation, com.codename1.flutter.TextStyle textStyle,
+            com.codename1.flutter.EdgeInsets padding, Object side, Object shape, Object alignment,
+            Object tapTargetSize, Object visualDensity, com.codename1.flutter.rendering.Size minimumSize,
+            com.codename1.flutter.rendering.Size maximumSize, com.codename1.flutter.Color disabledForegroundColor,
+            com.codename1.flutter.Color disabledBackgroundColor) {
+        return ButtonStyle.styleFrom(foregroundColor, backgroundColor, shadowColor, elevation, textStyle,
+                padding, side, shape, alignment, tapTargetSize, visualDensity, minimumSize, maximumSize,
+                disabledForegroundColor, disabledBackgroundColor);
+    }
+
     public static ButtonStyle styleFrom(com.codename1.flutter.Color foregroundColor,
             com.codename1.flutter.Color backgroundColor, com.codename1.flutter.Color shadowColor,
             Double elevation, com.codename1.flutter.TextStyle textStyle,

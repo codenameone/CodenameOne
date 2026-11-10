@@ -1,0 +1,21 @@
+FromA>A.Base
+A.M
+1
+FromB>B.Base
+B.M
+42
+only in B
+LocalA>A.Base
+A.M
+LocalB>B.Base only in B
+B.M
+42
+FromB>B.Base B.M 42
+true
+true
+true
+true
+false
+false
+false
+[1, 1]

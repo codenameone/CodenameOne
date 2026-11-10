@@ -1,0 +1,16 @@
+[Grade.a, Grade.b, Grade.c, Grade.b]
+Grade.c
+3
+Grade.c
+Grade.b
+Grade.a
+true
+A,B,C
+Grade.a
+[0, 1, 1, 2, 3, 5, 8, 13]
+2 1
+7 9
+7
+y
+nn 5
+[1, 0, 0]

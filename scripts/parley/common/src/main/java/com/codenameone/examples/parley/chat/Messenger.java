@@ -38,7 +38,7 @@ import com.codenameone.examples.parley.crypto.Vault;
 import com.codenameone.examples.parley.live.LiveChannel;
 import com.codenameone.examples.parley.Prefs;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.net.Session;
 import com.codenameone.examples.parley.store.Message;
 import com.codenameone.examples.parley.store.Store;

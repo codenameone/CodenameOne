@@ -89,7 +89,7 @@ class Round15RuntimeTest {
             }
         });
         Column col = new Column();
-        DartList<Widget> kids = new DartList<Widget>();
+        DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         kids.add(s);
         kids.add(s);   // the SAME widget instance in two places
         col.children(kids);

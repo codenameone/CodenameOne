@@ -138,7 +138,7 @@ public class TextEditingController {
 
     public void removeListener(Funcs.VoidFunc0 listener) {
         if (listener != null) {
-            listeners.remove(listener);
+            dart.runtime.DartRuntime.removeEq(listeners, listener);
         }
     }
 

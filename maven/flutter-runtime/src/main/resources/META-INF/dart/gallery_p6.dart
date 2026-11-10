@@ -31,7 +31,7 @@ class NavigationRail extends Widget {
   external NavigationRail(
       {Key? key, Color? backgroundColor, bool? extended, Widget? leading,
        Widget? trailing, List<NavigationRailDestination> destinations,
-       int selectedIndex, Object? onDestinationSelected, double? elevation,
+       int selectedIndex, void Function(int)? onDestinationSelected, double? elevation,
        double? groupAlignment, NavigationRailLabelType? labelType,
        TextStyle? unselectedLabelTextStyle, TextStyle? selectedLabelTextStyle,
        IconThemeData? unselectedIconTheme, IconThemeData? selectedIconTheme,

@@ -91,7 +91,7 @@ public class Acceptance {
             javac.add("-encoding");
             javac.add("UTF-8");
             javac.add("-Xmaxerrs");
-            javac.add("200");
+            javac.add("10000");
             javac.add("-d");
             javac.add(classes.getPath());
             javac.add("-cp");

@@ -1,0 +1,48 @@
+(int, (int, String))
+({int a, ({double c, Null d}) b})
+List<(int, String)>
+List<(int, String)>
+_Map<(int, int), String>
+true
+false
+true
+true
+true
+false
+true
+true
+1
+List<num>
+List<Object>
+List<int?>
+List<Object>
+List<num>
+List<String?>
+Box<Object>
+Box<num>
+Box<int?>
+Named<int>
+Named<Object>
+_Set<int?>
+List<Object>
+List<Object>
+sq,ci
+3.5
+_Set<num>
+_Set<Object>
+_Set<(int, String)>
+true
+false
+true
+false
+false
+true
+false
+false
+false
+true
+false
+true
+1
+true
+Sq

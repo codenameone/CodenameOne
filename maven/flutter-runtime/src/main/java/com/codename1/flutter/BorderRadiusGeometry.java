@@ -28,4 +28,6 @@ package com.codename1.flutter;
  * {@link BorderRadiusDirectional} — Flutter's {@code BorderRadiusGeometry}.
  */
 public abstract class BorderRadiusGeometry {
+    /// Flutter's BorderRadiusGeometry.resolve: the absolute radii under a text direction.
+    public abstract BorderRadius resolve(TextDirection direction);
 }

@@ -66,6 +66,8 @@ public final class PeerConnection {
     /// [#getState()] while media flows.
     public static final String CONNECTED = "connected";
     /// [#getState()] after the path was lost; it may come back by itself.
+    /// A phone moving from Wi-Fi to mobile data lands here, and the path it
+    /// had is usually gone for good: see [#restartIce()].
     public static final String DISCONNECTED = "disconnected";
     /// [#getState()] when no path could be found or it was lost for good.
     public static final String FAILED = "failed";
@@ -157,6 +159,28 @@ public final class PeerConnection {
         if (!CLOSED.equals(state)) {
             WebRtc.bridge().addIceCandidate(handle, candidate.getSdpMid(),
                     candidate.getSdpMLineIndex(), candidate.getCandidate());
+        }
+    }
+
+    /// Gathers new paths on the next offer, for a connection whose path was
+    /// lost -- the device changed network, say, and the addresses the two
+    /// sides agreed on no longer reach it.
+    ///
+    /// Nothing changes until the offer is exchanged: call this, then
+    /// [#createOffer()], and send the offer over the app's signalling as at
+    /// the start of the call. The other side answers it with
+    /// [#setRemoteDescription(SessionDescription)] and [#createAnswer()] and
+    /// sends that back; tracks, views and the call keep going, and the
+    /// connection reports [#CONNECTED] again once a new path is found.
+    ///
+    /// Only one side restarts -- by convention the one that made the first
+    /// offer -- or both offer at once and neither offer can be answered.
+    /// [#DISCONNECTED] is the cue to show "reconnecting", and to restart if
+    /// it does not recover within a second or two; [#FAILED] is the cue to
+    /// restart at once.
+    public void restartIce() {
+        if (!CLOSED.equals(state)) {
+            WebRtc.bridge().restartIce(handle);
         }
     }
 

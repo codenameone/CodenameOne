@@ -265,7 +265,7 @@ final class DoublePipeline implements DoubleStream {
         Iterator<Double> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                all.add(it.next());
+                addNext(all, it);
             }
             double[] out = new double[all.size()];
             for (int i = 0; i < out.length; i++) {
@@ -490,6 +490,12 @@ final class DoublePipeline implements DoubleStream {
     // are Doubles by construction, so the cast cannot fail anyway.
     private static double unboxNext(Iterator<Double> it) {
         return it.next().doubleValue();
+    }
+
+    // Outside the caller's try: the element cast javac inserts must not sit
+    // under a catch, because a failed cast does not throw on ParparVM.
+    private static void addNext(List<Double> all, Iterator<Double> it) {
+        all.add(it.next());
     }
 
     private static double unboxAt(List<Double> all, int i) {

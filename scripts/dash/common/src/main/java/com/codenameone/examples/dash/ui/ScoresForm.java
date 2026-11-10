@@ -30,7 +30,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.dash.api.CrewDto;
 import com.codenameone.examples.dash.api.ScoreDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 
 /// A level's leaderboards. Every score on them was re-simulated by the server
 /// from the inputs alone, so a board shows runs that really happened.

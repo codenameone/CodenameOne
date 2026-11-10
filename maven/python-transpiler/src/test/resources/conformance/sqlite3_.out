@@ -1,0 +1,51 @@
+None -1
+lastrowid 1 rowcount 1 in_tx True
+many rowcount 3
+after commit in_tx False total 4
+(2, 'And Now for Something', 1971, 7.5) ['int', 'str', 'int', 'float']
+(1, 'Monty Python', 1975, 8.2) ['int', 'str', 'int', 'float']
+(3, 'Life of Brian', 1979, 8.0) ['int', 'str', 'int', 'float']
+(4, 'Meaning of Life', 1983, 7.6) ['int', 'str', 'int', 'float']
+['id', 'title', 'year', 'score']
+[('Monty Python',), ('Life of Brian',)]
+('b', 'a')
+(4, 8.2, 'And Now for Something')
+None
+updated 3
+(8.2,)
+(b'\x00\x01\xff', 1975, 8.2)
+(None, None, None)
+IntegrityError UNIQUE constraint failed: movie.title
+OperationalError no such table: no_such_table
+ProgrammingError Incorrect number of bindings supplied. The current statement uses 1, and there are 2 supplied.
+ProgrammingError You can only execute one statement at a time.
+ProgrammingError You did not supply a value for binding parameter :a.
+True True
+And Now for Something And Now for Something 2 ['id', 'name'] (2, 'And Now for Something') 2
+[('one; two',), ('three',), ('FOUR',)]
+(4,)
+((1.0, 2.5), datetime.date(2024, 2, 29), datetime.datetime(2024, 1, 2, 3, 4, 5, 600))
+((1.0, 2.5),)
+pt
+ProgrammingError Cannot operate on a closed database.
+(b'abc',)
+CREATE TABLE log(id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT);
+INSERT INTO "log" VALUES(1,'one; two');
+INSERT INTO "log" VALUES(2,'three');
+INSERT INTO "log" VALUES(3,'FOUR');
+INSERT INTO "log" VALUES(4,'CTX');
+CREATE TABLE movie(id INTEGER PRIMARY KEY, title TEXT NOT NULL UNIQUE, year INTEGER, score REAL, poster BLOB);
+INSERT INTO "movie" VALUES(1,'Monty Python',1975,8.2,X'0001FF');
+INSERT INTO "movie" VALUES(2,'And Now for Something',1971,7.5,NULL);
+INSERT INTO "movie" VALUES(3,'Life of Brian',1979,8.0,NULL);
+INSERT INTO "movie" VALUES(4,'Meaning of Life',1983,7.6,NULL);
+INSERT INTO "movie" VALUES(5,'Untitled',NULL,NULL,NULL);
+CREATE TRIGGER t AFTER INSERT ON log BEGIN UPDATE log SET msg = upper(msg) WHERE id = new.id; END;
+INSERT INTO "sqlite_sequence" VALUES('log',4);
+True False
+autocommit False in_tx True
+still True
+isolation None in_tx False
+explicit True
+[(1,)]
+qmark 2.0

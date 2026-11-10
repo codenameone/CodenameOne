@@ -30,7 +30,7 @@ import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.wayline.Days;
 import com.codenameone.examples.wayline.Roles;
-import com.codenameone.examples.wayline.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.wayline.account.Moderation;
 import com.codenameone.examples.wayline.api.DocumentContentDto;
 import com.codenameone.examples.wayline.api.DocumentDto;

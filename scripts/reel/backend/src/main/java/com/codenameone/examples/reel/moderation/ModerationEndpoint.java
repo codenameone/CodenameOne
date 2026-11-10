@@ -19,7 +19,7 @@
 package com.codenameone.examples.reel.moderation;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.account.Moderation;
 import com.codenameone.examples.reel.api.BlocklistEntryDto;
 import com.codenameone.examples.reel.api.ModerationApiServer;

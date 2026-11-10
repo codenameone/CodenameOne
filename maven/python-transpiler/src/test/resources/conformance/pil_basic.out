@@ -1,0 +1,58 @@
+RGB (3, 2) 3 2 RGB (10, 20, 30) (10, 20, 30)
+RGBA (3, 2) 3 2 RGBA (1, 2, 3, 4) (1, 2, 3, 4)
+L (3, 2) 3 2 L 77 77
+RGB (3, 2) 3 2 RGB (255, 0, 0) (255, 0, 0)
+L (3, 2) 3 2 L 173 173
+RGBA (3, 2) 3 2 RGBA (51, 102, 153, 255) (51, 102, 153, 255)
+RGB (3, 2) 3 2 RGB (86, 52, 18) (86, 52, 18)
+RGBA (3, 2) 3 2 RGBA (5, 6, 7, 255) (5, 6, 7, 255)
+conv 30aeec5a8ff988b7 df8161af64f2aea4 ccb7940aec92d446 0c26e17e3685eeca ea98f2a3c2caa88a 4d0a15fb0e6b0f8c
+px (155, 21, 67) 66 (180, 118, 51, 48)
+bands ('R', 'G', 'B', 'A') ('R', 'G', 'B') ('L',)
+crop (6, 4) aa74708a3c99af88 42c80fa961fbf570
+copy True
+transpose 0 (11, 7) c97c423bedca7d8c
+transpose 1 (11, 7) f49bf5f4057170fa
+transpose 2 (7, 11) 21649e90f9cec3f8
+transpose 3 (11, 7) 6a18e2be07eb1c0a
+transpose 4 (7, 11) 5389077858487ad2
+transpose 5 (7, 11) ef05d48ef38bc74f
+transpose 6 (7, 11) d65d64a690273e9b
+rotate 90 True (7, 11) 43ebef4f15b0c518
+rotate 180 False (11, 7) 2513ca399c3f379e
+rotate 270 True (7, 11) 1dd1408b2b7e9867
+rotate 90 False (11, 7) aa08f0060bcf06d9
+rotate 30 False (11, 7) ac0c042f4cc55c71
+rotate 45 True (13, 13) a2129e8ffea62f24
+rotate -20 True (13, 11) 049f5525869c996f
+rotate fill 5a2fe40f1e402296
+nearest (5, 3) edf6a00a5c80dfbe df605ceb850541b7
+bilinear (5, 3) 439f9218ec55a260 64fd8205dc6758e1
+nearest (22, 14) 7edd865aae132fc1 ebc29fe3f059de5b
+bilinear (22, 14) 1583b294fd3d94bf bc1441eeb131db28
+nearest (11, 3) 283648da60b87f61 58443460c79c397c
+bilinear (11, 3) 83433bab339353e5 ac14d803e1b24cde
+nearest (4, 7) 5db553a6f9ae0108 a7f16bb4c185f97f
+bilinear (4, 7) 3b0ac914ab6e9b62 d2a35ccddcc17e03
+nearest (17, 7) f5df00970f2b7c23 b3fb35a4457f7cd3
+bilinear (17, 7) d2660f07c74dcf75 59d723c0357512ff
+box 5257779b9803d7df
+thumb (6, 4)
+thumb (128, 85)
+paste c8a7a72c2b4812ca
+paste color 3cecb217b58f4978
+paste mask 281a6dc7bf86231a
+paste gray 0927c59cf4f36055 (38, 38, 38)
+paste color mask 0738976c4ee66c00
+split L 099561e6763f8640 be7149bedee57af9 599b3d2d957d174c acd65f39e46d11a5
+merge RGB 3fbf4493276025dc (27, 10, 96)
+channel acd65f39e46d11a5 be7149bedee57af9
+bytes 231 df8161af64f2aea4
+bbox empty None
+bbox (3, 2, 8, 5)
+bbox alpha (6, 6, 7, 7) (0, 0, 10, 10)
+point 94223524082f80ea 8e172aff6e7a9022
+point lut 909f035184e2ada3
+data [1, 12, 25, 39, 54] (111, 9, 7) (1, 137) ((0, 255), (0, 118), (1, 247))
+hist 77 1
+eq True False

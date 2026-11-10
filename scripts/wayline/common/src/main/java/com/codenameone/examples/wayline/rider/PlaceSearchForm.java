@@ -29,7 +29,7 @@ import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.wayline.Prefs;
 import com.codenameone.examples.wayline.api.PlaceDto;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.ui.Ui;
 
 import java.util.List;

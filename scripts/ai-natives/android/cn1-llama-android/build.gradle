@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.library'
+}
+
+// Built by ../build.sh, which checks out the upstream tag pinned in
+// ../versions.properties and passes its directory here.
+def upstreamDir = project.findProperty('llamaCppDir') ?: System.getenv('LLAMA_CPP_DIR')
+if (upstreamDir == null || upstreamDir.trim().length() == 0) {
+    throw new GradleException("Set -PllamaCppDir (or LLAMA_CPP_DIR) to the upstream checkout")
+}
+
+android {
+    namespace 'com.codename1.ai.llama.android'
+    compileSdk 34
+    // NDK r28 is the first release that links shared libraries with 16 KB
+    // aligned PT_LOAD segments by default, which Google Play requires of every
+    // 64-bit native library (API 35+ uploads since 2025-11-01, Wear OS from
+    // 2026-09-15). The CMake flags make the same promise for any other NDK.
+    ndkVersion '28.2.13676358'
+
+    defaultConfig {
+        // The NDK's own floor; PlatformFeatureCatalog raises a consuming
+        // app's android.min_sdk_version to match.
+        // llama.cpp maps models with posix_madvise, which bionic has from API 23.
+        minSdk 23
+        externalNativeBuild {
+            cmake {
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+                // Static STL: the whisper and llama AARs can both be in one
+                // app, and two AARs carrying libc++_shared.so fail the merge
+                // ("2 files found with path lib/<abi>/libc++_shared.so").
+                arguments '-DANDROID_STL=c++_static',
+                        "-DUPSTREAM_DIR=${file(upstreamDir).absolutePath}"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+        }
+    }
+}

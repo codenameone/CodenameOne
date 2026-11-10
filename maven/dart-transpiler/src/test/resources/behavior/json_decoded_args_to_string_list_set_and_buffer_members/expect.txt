@@ -1,0 +1,29 @@
+[a, b]
+splitn true
+contains true
+sw true
+io true
+sub true
+pl2 true
+ew true
+add true 1
+join true
+lio true
+false
+false
+tk true
+[1, 3]
+ln true [1, 3]
+lni true
+sa true
+true
+sadd true
+ea true
+sct true
+ct true
+wcc true
+3
+[a, b]
+a;b
+true
+axb

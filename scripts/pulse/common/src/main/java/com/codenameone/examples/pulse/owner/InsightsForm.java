@@ -29,10 +29,10 @@ import com.codenameone.examples.pulse.api.PlanMixDto;
 import com.codenameone.examples.pulse.api.TypeFillDto;
 import com.codenameone.examples.pulse.api.WeekPointDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Layouts;
-import com.codenameone.examples.pulse.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
@@ -51,7 +51,7 @@ public final class InsightsForm {
         final Container page = Ui.page();
         page.setName("insights");
         Layouts.broaden(page);
-        page.add(new Skeleton(6));
+        page.add(new Skeleton(6, "SvSkeleton"));
         final Runnable[] load = new Runnable[1];
         load[0] = () -> Api.owner().insights(Net.to(found -> fill(form, page, found),
                 Ui.failed(page, load[0])));

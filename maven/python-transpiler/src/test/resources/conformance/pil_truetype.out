@@ -1,0 +1,35 @@
+FreeTypeFont ('Aileron', 'Regular') 20
+(20, 5) 10 (10, 3)
+'H' 15.0 True
+'AVA' 38.0 True
+'Hello World' 107.0 True
+'' 0.0 True
+'gy j' 31.0 True
+la True
+lt True
+ls True
+lb True
+ld True
+ma True
+mm True
+ms True
+rs True
+rd True
+ValueError bad anchor specified: xx
+KeyError direction
+10 (10, 3) [True, True, True] True
+13 (13, 3) [True, True, True] True
+37 (36, 9) [True, True, True] True
+('Aileron', 'Regular') (20, 5) 48.0 True
+40 (39, 10) True
+OSError bad font
+OSError missing file
+True True
+t1 True True
+True
+t2 True True
+True
+t3 True True
+ValueError anchor not supported for multiline text
+True True True
+red pixels True

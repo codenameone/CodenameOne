@@ -19,7 +19,7 @@
 package com.codenameone.examples.skirmish.progress;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.skirmish.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.skirmish.api.ClaimDto;
 import com.codenameone.examples.skirmish.api.ProgressApiServer;
 import com.codenameone.examples.skirmish.api.ProgressDto;

@@ -1,0 +1,7 @@
+got p
+42
+false
+true
+false
+true
+int

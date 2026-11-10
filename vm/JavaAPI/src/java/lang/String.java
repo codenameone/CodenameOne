@@ -1451,6 +1451,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (beginIndex < 0 || endIndex > count || beginIndex > endIndex) {
             throw new IndexOutOfBoundsException();
         }
+        if (isLatin1()) {
+            // No Latin-1 character is a surrogate.
+            return endIndex - beginIndex;
+        }
         return Character.codePointCount(this, beginIndex, endIndex);
     }
 
@@ -1498,11 +1502,40 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
     }
 
+    // A join of Latin-1 Strings, the common case, measured here and built by the
+    // native in ONE fused allocation with the bytes copied straight in, as
+    // cn1FusedConcatN does: no StringBuilder, no char[] and no width scan. Null
+    // when any part is not a Latin-1 String; the general path then runs.
+    private static String cn1JoinLatin1(CharSequence delimiter, CharSequence[] elements) {
+        if (!(delimiter instanceof String) || !((String) delimiter).isLatin1()) {
+            return null;
+        }
+        int n = elements.length;
+        long total = n > 1 ? (long) ((String) delimiter).count * (n - 1) : 0;
+        for (int i = 0; i < n; i++) {
+            CharSequence e = elements[i];
+            if (!(e instanceof String) || !((String) e).isLatin1()) {
+                return null;
+            }
+            total += ((String) e).count;
+        }
+        if (total > Integer.MAX_VALUE) {
+            throw new OutOfMemoryError();
+        }
+        return cn1FusedJoin((String) delimiter, elements, n, (int) total);
+    }
+
+    private static native String cn1FusedJoin(String delimiter, Object[] parts, int n, int total);
+
     /// The elements, each as `String.valueOf` writes it, with `delimiter`
     /// between every two.
     public static String join(CharSequence delimiter, CharSequence... elements) {
         if (delimiter == null || elements == null) {
             throw new NullPointerException();
+        }
+        String fused = cn1JoinLatin1(delimiter, elements);
+        if (fused != null) {
+            return fused;
         }
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < elements.length; i++) {

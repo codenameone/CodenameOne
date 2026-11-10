@@ -1,0 +1,16 @@
+lam false false
+recv false true
+static true true true
+obj true true true
+set 4
+map 1 2
+cast true true
+lit true 0
+named true
+n 11
+reg 2
+n2 13
+local true true
+lamself true
+call 15 true
+tostr true

@@ -17,6 +17,7 @@ on:
       - 'scripts/savor/**'
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
+      - 'scripts/slate/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'
       - 'scripts/hellocodenameone/common/src/main/kmp/**'

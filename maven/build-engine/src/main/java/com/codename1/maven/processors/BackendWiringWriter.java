@@ -359,6 +359,11 @@ final class BackendWiringWriter {
             parts.add(p.append("})").toString());
         }
         for (String[] c : b.propertyConditions) {
+            if (c.length == 1) {
+                parts.add("com.codename1.impl.backend.Wiring.expressionMatches(config, "
+                        + BackendSources.quote(c[0]) + ")");
+                continue;
+            }
             parts.add("com.codename1.impl.backend.Wiring.propertyMatches(config, "
                     + BackendSources.quote(c[0]) + ", " + BackendSources.quote(c[1]) + ", "
                     + c[2] + ")");
@@ -817,6 +822,49 @@ final class BackendWiringWriter {
             }
             sb.append("        scheduler.start();\n");
         }
+        // Then the runners, by @Order, and the ready listeners after them,
+        // as Spring Boot runs them once the context is up.
+        List<BackendBeans.Bean> ordered = new ArrayList<BackendBeans.Bean>(model.beans);
+        BackendBeans.sortByOrder(ordered);
+        int runner = 0;
+        for (BackendBeans.Bean b : ordered) {
+            boolean line = b.types.contains("com/codename1/backend/CommandLineRunner");
+            boolean app = b.types.contains("com/codename1/backend/ApplicationRunner");
+            if (!line && !app) {
+                continue;
+            }
+            String var = "runner" + runner++;
+            sb.append("        final ").append(typeOf(b)).append(" ").append(var).append(" = ")
+              .append(reference(b)).append(";\n");
+            if (line) {
+                sb.append("        if (").append(var).append(" != null) ((com.codename1.backend.CommandLineRunner) ")
+                  .append(var).append(").run(backend.getArguments().getSourceArgs());\n");
+            }
+            if (app) {
+                sb.append("        if (").append(var).append(" != null) ((com.codename1.backend.ApplicationRunner) ")
+                  .append(var).append(").run(backend.getArguments());\n");
+            }
+        }
+        int listener = 0;
+        for (BackendBeans.Bean b : ordered) {
+            if (b.readyListeners.isEmpty()) {
+                continue;
+            }
+            if (listener == 0) {
+                sb.append("        final com.codename1.backend.ApplicationReadyEvent ready = "
+                        + "new com.codename1.backend.ApplicationReadyEvent(backend);\n");
+            }
+            String var = "listener" + listener++;
+            sb.append("        final ").append(typeOf(b)).append(" ").append(var).append(" = ")
+              .append(reference(b)).append(";\n");
+            sb.append("        if (").append(var).append(" != null) {\n");
+            for (MethodInfo m : b.readyListeners) {
+                sb.append("            ").append(var).append(".").append(callName(m)).append("(")
+                  .append(Type.getArgumentTypes(m.getDescriptor()).length == 0 ? "" : "ready")
+                  .append(");\n");
+            }
+            sb.append("        }\n");
+        }
         sb.append("    }\n\n");
     }
 
@@ -1020,7 +1068,7 @@ final class BackendWiringWriter {
             if (sb.length() > 0) {
                 sb.append(" and ");
             }
-            sb.append(c[0]).append(c[1].length() > 0 ? "=" + c[1] : " set");
+            sb.append(c.length == 1 ? "expression " + c[0] : c[0] + (c[1].length() > 0 ? "=" + c[1] : " set"));
         }
         return sb.toString();
     }

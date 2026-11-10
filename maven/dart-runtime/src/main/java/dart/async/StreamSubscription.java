@@ -31,9 +31,8 @@ package dart.async;
  * {@link #cancel()} issued while paused discards whatever was buffered
  * instead of delivering it.</p>
  *
- * <p>Not implemented: {@code pause(Future resumeSignal)} (use the no-arg
- * {@link #pause()} / {@link #resume()} pair) and {@code asFuture()} are not
- * provided.</p>
+ * <p>{@code pause(resumeSignal)} pauses and resumes once that future
+ * completes, with a value or an error, as Dart's does.</p>
  */
 public interface StreamSubscription<T> {
 
@@ -61,8 +60,30 @@ public interface StreamSubscription<T> {
     /** Pauses delivery; events raised while paused are buffered, not dropped. */
     void pause();
 
+    /// Dart's {@code pause(resumeSignal)}: pauses now and resumes when the signal
+    /// future completes, with a value or an error. A null signal is plain pause().
+    default void pause(Future<Object> resumeSignal) {
+        pause();
+        if (resumeSignal != null) {
+            final Future<Object> f = resumeSignal;
+            f.markHandled();
+            f.onComplete(new Runnable() {
+                @Override
+                public void run() {
+                    resume();
+                }
+            });
+        }
+    }
+
     /** Resumes delivery after {@link #pause()}. */
     void resume();
 
     boolean isPaused();
+
+    /// {@code asFuture([futureValue])}: completes with futureValue when the stream is
+    /// done, or with the first error.
+    Future<Object> asFuture();
+
+    Future<Object> asFuture(Object futureValue);
 }

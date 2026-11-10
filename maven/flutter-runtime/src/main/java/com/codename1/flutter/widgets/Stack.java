@@ -24,6 +24,8 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.Alignment;
+import com.codename1.flutter.AlignmentDirectional;
+import com.codename1.flutter.AlignmentGeometry;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
 
@@ -49,8 +51,11 @@ public class Stack extends Widget {
         this.clipBehavior = v;
     }
 
-    public void alignment(Alignment v) {
-        this.alignment = v;
+    public void alignment(AlignmentGeometry v) {
+        // Flutter types the slot AlignmentGeometry; a directional value is resolved
+        // left-to-right, the way the rest of the runtime lays it out.
+        this.alignment = v instanceof AlignmentDirectional ? ((AlignmentDirectional) v).resolve()
+                : v instanceof Alignment ? (Alignment) v : null;
     }
 
     public void children(DartList<Widget> v) {

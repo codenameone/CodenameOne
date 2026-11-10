@@ -1,0 +1,40 @@
+   id  name  price   qty
+0   1   pen   1.50  10.0
+1   2  book  12.00   NaN
+2   3  lamp  30.25   2.0
+id         int64
+name         str
+price    float64
+qty      float64
+dtype: object
+[False, True, False]
+   id  name  price   qty
+0   1   pen   1.50  10.0
+1   2  book  12.00   0.0
+2   3  lamp  30.25   2.0
+   id  name  price   qty
+0   1   pen   1.50  10.0
+2   3  lamp  30.25   2.0
+id,name,price,qty
+1,pen,1.5,10.0
+2,book,12.0,
+3,lamp,30.25,2.0
+
+,id,name,price,qty
+0,1,pen,1.5,10.0
+1,2,book,12.0,
+2,3,lamp,30.25,2.0
+
+[{"id":1,"name":"pen","price":1.5,"qty":10.0},{"id":2,"name":"book","price":12.0,"qty":null},{"id":3,"name":"lamp","price":30.25,"qty":2.0}]
+   a  b
+0  1  x
+1  2  y
+a    int64
+b      str
+dtype: object
+True (3, 4)
+0    15.0
+1     NaN
+2    60.5
+dtype: float64
+75.5

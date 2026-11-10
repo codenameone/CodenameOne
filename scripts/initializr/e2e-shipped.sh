@@ -12,7 +12,7 @@
 #
 #   e2e-shipped.sh [--require-latest] [--no-ui] [TEMPLATE ...]
 #
-# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, DASH, PARLEY, BASTION, REEL or PULSE; all of them
+# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, DASH, PARLEY, BASTION, REEL, PULSE or SLATE; all of them
 # by default. Every other check of the templates builds them against this
 # checkout's 8.0-SNAPSHOT, which no developer has: the generated pom names the
 # release the Initializr pins, and that is the only thing this script builds
@@ -63,7 +63,7 @@ for arg in "$@"; do
     *) TEMPLATES+=("$arg") ;;
   esac
 done
-[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH DASH PARLEY BASTION REEL PULSE)
+[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH DASH PARLEY BASTION REEL PULSE SLATE)
 
 log() { echo "[e2e-shipped] $*" >&2; }
 fail() { echo "[e2e-shipped] FAIL: $*" >&2; exit 1; }
@@ -209,7 +209,10 @@ for template in "${TEMPLATES[@]}"; do
   if curl -fs -o /dev/null "http://localhost:$PORT/oauth2/jwks"; then
     fail "$template: something already answers on port $PORT; stop it or set E2E_PORT"
   fi
-  (cd "$dir" && CN1_PROFILE=test PORT="$PORT" exec ./run-server.sh) > "$server_log" 2>&1 &
+  # SLATE_DEMO_HISTORY seeds Slate's demo day, as scripts/slate/run-e2e.sh
+  # does: its board and schedule tests wait for those bookings. Every other
+  # template ignores it.
+  (cd "$dir" && CN1_PROFILE=test SLATE_DEMO_HISTORY=true PORT="$PORT" exec ./run-server.sh) > "$server_log" 2>&1 &
   SERVER_PID=$!
   ready=0
   for _ in $(seq 1 300); do

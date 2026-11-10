@@ -328,6 +328,29 @@ If your application crashes and you don't have a clue where to begin, follow the
 image::img/chrome-debugger.png[Debugging using Chrome tools,scaledwidth=50%]
 
 
+[id="profiling-javascript", reftext="Profiling in Chrome"]
+=== Profiling
+
+Chrome's profiler samples the call stack while your app runs, so it doesn't change the code it measures:
+
+1. Open the app in Chrome, open DevTools and select the *Performance* tab.
+2. Set *CPU* to a 4x slowdown to get closer to a phone, then press *Record*.
+3. Do the slow thing in the app, then stop the recording.
+4. Open *Bottom-Up* and sort by *Self Time*. The functions at the top are where the time goes.
+
+To record one section only, wrap it in `console.profile("name")` and `console.profileEnd("name")` from a native interface.
+
+The build shortens every translated function name to keep the bundle small, so the profile shows names like `$Mbqx`. It writes the mapping to a file that ends in `-js-symbols.txt`, never into the website itself. A local Maven or Gradle build copies it into the build directory as `MyAppJavaScriptMain-js-symbols.txt`, named after your main class, and a cloud build delivers it as `symbols.txt` in the separate build artifacts zip. Each line holds a short name, a tab, and the full name, which spells out the Java package, class, method and signature: `cn1_com_mycompany_Board_copyBoard_int`.
+
+To restore the names, save the profile from the *Performance* tab (the download button) and run https://github.com/codenameone/CodenameOne/blob/master/scripts/deobfuscate-javascript-profile.py[`deobfuscate-javascript-profile.py`] over it:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/working-with-javascript.sh[tag=working-with-javascript-bash-001,indent=0]
+----
+
+Load `Trace-named.json` back into the *Performance* tab. A few functions keep their full names in every build, such as constructors and static initializers, so a profile shows both forms. The same command works on a stack trace pasted into a text file. Use the map from the build you profiled: every build assigns the short names again, and the script warns when a name isn't in the map.
+
 [id="third_party_libs", reftext="Including Third-Party JavaScript Libraries"]
 === Including Third-Party JavaScript libraries
 

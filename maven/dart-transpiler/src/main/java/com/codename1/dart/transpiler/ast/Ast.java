@@ -65,10 +65,42 @@ public final class Ast {
         public String name;                       // "int", "String", "List", "Widget", "MyApp", "void", "var", "dynamic"
         public List<TypeRef> args = new ArrayList<TypeRef>();
         public boolean nullable;
+        /// The program class a prefixed name (`md.Text`) resolved to, kept once the
+        /// prefix is stripped from {@link #name}: a bare name may mean a different
+        /// type (a stub of the same name) in the library that reads it.
+        public ClassDecl resolved;
+        /// A prefixed name (`io.WebSocket`) whose prefix's library declares no program class
+        /// of that name: it is the runtime type, even where a program class of the same
+        /// simple name is in scope.
+        public boolean runtimeOnly;
+        /// The Dart 3 extension type this type was written as before it was erased to its
+        /// representation (Program.eraseExtensionTypes): its members are dispatched
+        /// statically and shadow the representation's own.
+        public ClassDecl extensionType;
+        /// The type arguments {@link #extensionType} was written with (`Boxed<Shape>`), as
+        /// they were before erasure; null for a non-generic one. Member types of the extension
+        /// type are substituted with them.
+        public List<TypeRef> extensionTypeArgs;
+        /// The name as written when the parser aliased it to a built-in collection
+        /// (`Queue` to List); null otherwise. A program class of that name visible in the
+        /// library wins over the alias (Program.restoreShadowedAliases).
+        public String aliasedFrom;
         // For an inline function type (name == "Function", e.g. `void Function(int)`):
         // the parsed signature so codegen can render a real Funcs.* SAM instead of Object.
         public List<TypeRef> funcParams;          // non-null iff this is an inline function type
         public TypeRef funcReturn;                // return type of the inline function type
+        // How many of funcParams are required positional; -1 when all are. The optional
+        // positional ones follow, then the named ones (names in funcNamed, in order).
+        public int funcRequired = -1;
+        public List<String> funcNamed;
+        /// A generic function type's own type parameters (`T Function<T>(T)`); null otherwise.
+        public List<String> funcTypeParams;
+        /// The generic closure (a generic function literal or local function) a local of
+        /// this type holds, built through SignedFns.generic: a call of the local passes
+        /// its type arguments at run time (SignedFns.instantiate). Null otherwise.
+        public Lambda genericClosure;
+        // The named parameters of funcNamed that are `required`; null when none are.
+        public List<String> funcNamedRequired;
 
         public TypeRef(String name) {
             this.name = name;
@@ -82,9 +114,32 @@ public final class Ast {
             return t;
         }
 
+        /// Whether this is the type named {@code n}. For a dart:core name it means dart:core's
+        /// type: a written name that a program class of that name shadows
+        /// ({@link #shadowsCore}, set by Program.markShadowedCoreTypes) is not it.
         public boolean is(String n) {
-            return name.equals(n);
+            return name.equals(n) && !(shadowsCore && CORE_NAMES.contains(n));
         }
+
+        /// A dart:core name this reference spells that resolves, in its library, to a program
+        /// class of the same name instead (`import 'dart:core' hide String; class String {}`).
+        public boolean shadowsCore;
+
+        /// {@code t}, named for a program class (one the emitter holds as a declaration), marked
+        /// as the program class where its name is a dart:core one.
+        public static TypeRef own(TypeRef t) {
+            if (t != null && CORE_NAMES.contains(t.name)) {
+                t.shadowsCore = true;
+            }
+            return t;
+        }
+
+        /// The dart:core type names the emitter tests by spelling through {@link #is}.
+        public static final java.util.Set<String> CORE_NAMES = new java.util.HashSet<String>(
+                java.util.Arrays.asList("String", "Object", "int", "double", "num", "bool", "List",
+                        "Map", "Set", "Iterable", "Iterator", "Future", "Stream", "Type", "Enum",
+                        "Comparable", "Duration", "DateTime", "Null", "Function", "Record", "Symbol",
+                        "Pattern", "RegExp", "Uri", "StackTrace", "Error", "Exception"));
 
         public TypeRef arg(int i) {
             return i < args.size() ? args.get(i) : DYNAMIC;
@@ -136,6 +191,11 @@ public final class Ast {
         public List<FunctionDecl> functions = new ArrayList<FunctionDecl>();
         public List<FieldDecl> topLevelVars = new ArrayList<FieldDecl>();
         public List<TypedefDecl> typedefs = new ArrayList<TypedefDecl>();
+        /// Every unprefixed type annotation the parser aliased to a built-in collection.
+        public List<TypeRef> aliasedTypes = new ArrayList<TypeRef>();
+        /// Every named (non-record, non-function) type annotation, so a record typedef can be
+        /// expanded in place once every library's typedefs are known (Program).
+        public List<TypeRef> namedTypes = new ArrayList<TypeRef>();
         /** Every import with its show/hide combinators, in source order. */
         public List<Directive> importDirectives = new ArrayList<Directive>();
         /** Every export with its show/hide combinators, in source order. */
@@ -176,20 +236,38 @@ public final class Ast {
         public String name;
         public Library ownerLibrary;              // the user library that declares this class (single-package model)
         public EnumDecl enumOf;                   // set on the stand-in class an enhanced enum's body is emitted with
+        /// A stub class marked `@ConstKeyed`: its Java class implements ConstCanon.Keyed over
+        /// its own const-relevant state, so its constants and its subclasses' are canonical.
+        public boolean constKeyed;
         public String javaName;                   // from @JavaName('...') in stub files
         public boolean isAbstract;
         public boolean isSealed;                  // Dart 3: sealed class C { }
         public boolean isMixin;                   // mixin M { }
         public List<TypeRef> mixinOn = new ArrayList<TypeRef>();  // mixin M on S1, S2
+        /// An extension's (or extension type's) static fields, hoisted to top-level variables
+        /// of its library by AstBuilder: field name to the variable's name. Program rewrites
+        /// `E.f` and a bare `f` in E's members to that variable.
+        public java.util.Map<String, String> hoistedStatics = new java.util.LinkedHashMap<String, String>();
+        /// The variables {@link #hoistedStatics} names, whose initializers read E's scope. An
+        /// array, not a List: the reflective AST walks must not reach them a second time as
+        /// members of E (they are the library's top-level variables).
+        public FieldDecl[] hoistedFields = new FieldDecl[0];
         public TypeRef extensionOn;               // extension X on T { } — non-null marks an extension
         /** An `extension on T` with no name: no show combinator can import it, no hide drop it. */
         public boolean unnamedExtension;
+        /// A Dart 3 `extension type X(R r)`: lowered to an extension on R (its
+        /// {@link #extensionOn}), every type named X erased to R (Program.eraseExtensionTypes)
+        /// and its constructors to functions returning the representation, so no value of X
+        /// is ever wrapped.
+        public boolean isExtensionType;
         public List<TypeRef> mixins = new ArrayList<TypeRef>();  // class C with M1, M2
         /** {@code class C = S with M;}: C gets a forwarding constructor for each of S's. */
         public boolean forwardSuperCtors;
         public TypeRef superclass;                // null if none/Object
         public List<TypeRef> interfaces = new ArrayList<TypeRef>();
         public List<String> typeParams = new ArrayList<String>();
+        /** Declared bound of each bounded type parameter ({@code B extends Base<T>}). */
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         public List<FieldDecl> fields = new ArrayList<FieldDecl>();
         public List<CtorDecl> ctors = new ArrayList<CtorDecl>();
         public List<MethodDecl> methods = new ArrayList<MethodDecl>();
@@ -255,6 +333,12 @@ public final class Ast {
         public String javaName;                   // from @JavaName('...') in stub files
         public Library ownerLibrary;              // the user library that declares this enum
         public List<String> entries = new ArrayList<String>();
+        // Per entry, the arguments an enhanced enum passes its unnamed constructor
+        // (`boundary('boundary')`), or null when the entry has none.
+        public List<Args> entryArgs = new ArrayList<Args>();
+        // Per entry, the named constructor it invokes (`x.named(...)`), or null for the
+        // unnamed one.
+        public List<String> entryCtors = new ArrayList<String>();
         // Dart 2.17 enhanced-enum body members (methods / getters, fields, constructors).
         public List<FieldDecl> fields = new ArrayList<FieldDecl>();
         public List<MethodDecl> methods = new ArrayList<MethodDecl>();
@@ -292,10 +376,16 @@ public final class Ast {
      */
     public static class TypedefDecl extends Node {
         public String name;
+        /// The name as declared when Program gave the typedef a unique one ({@code name}),
+        /// so a reference by the declared name still resolves in a scope that sees it.
+        public String declaredName;
         public List<String> typeParams = new ArrayList<String>();
         public List<TypeRef> paramTypes;          // non-null for a function-type alias
         public TypeRef returnType;                // non-null for a function-type alias
         public TypeRef aliased;                   // non-null for a plain (non-function) alias
+        public int funcRequired = -1;             // see TypeRef.funcRequired
+        public List<String> funcNamed;            // see TypeRef.funcNamed
+        public List<String> funcNamedRequired;    // see TypeRef.funcNamedRequired
     }
 
     public static class FieldDecl extends Node {
@@ -318,6 +408,15 @@ public final class Ast {
         public boolean isThis;                    // this.x
         public boolean isSuper;                   // super.x
         public Expr defaultValue;                 // nullable
+        /// The name a named argument reaches this parameter by, when the transpiler
+        /// renamed the parameter itself (a constructor tear-off's `p$b` for Dart's `b`);
+        /// null when it is {@link #name}.
+        public String argName;
+
+        /// The name a call passes a named argument to this parameter by.
+        public String argumentName() {
+            return argName != null ? argName : name;
+        }
     }
 
     public static class CtorDecl extends Node {
@@ -347,6 +446,7 @@ public final class Ast {
         public TypeRef returnType;                // may be VAR (=> inferred) or VOID
         public String name;
         public List<String> typeParams = new ArrayList<String>();  // generic method: m<T>(...)
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         public List<Param> params = new ArrayList<Param>();
         public boolean isStatic;
         public boolean isGetter;
@@ -371,6 +471,7 @@ public final class Ast {
         public boolean isGetter;                  // top-level `T get x => ...`
         public boolean isSetter;                  // top-level `set x(v) { ... }`
         public List<String> typeParams = new ArrayList<String>();  // generic function: fn<T>(...)
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         public List<Param> params = new ArrayList<Param>();
         public Block body;
         public Expr exprBody;
@@ -387,6 +488,22 @@ public final class Ast {
 
     public static class Block extends Stmt {
         public List<Stmt> statements = new ArrayList<Stmt>();
+    }
+
+    /** {@code rethrow;} -- throws again what the enclosing catch clause caught. */
+    public static class RethrowStmt extends Stmt {
+    }
+
+    /** Dart 3 destructuring declaration: `final (a, b) = init;`. */
+    public static class PatternDeclStmt extends Stmt {
+        public Pattern pattern;
+        public Expr init;
+    }
+
+    /** A null-check (`p?`) or null-assert (`p!`) pattern. */
+    public static class NullCheckPattern extends Pattern {
+        public Pattern inner;
+        public boolean assertNonNull;             // `!` rather than `?`
     }
 
     public static class ExprStmt extends Stmt {
@@ -417,6 +534,8 @@ public final class Ast {
     public static class WhileStmt extends Stmt {
         public Expr condition;
         public Stmt body;
+        /** {@code do body while (condition);}: the body runs once before the first test. */
+        public boolean isDo;
     }
 
     public static class ForStmt extends Stmt {
@@ -424,6 +543,12 @@ public final class Ast {
         public Expr condition;                    // nullable
         public List<Expr> updates = new ArrayList<Expr>();
         public Stmt body;
+        /// Set only by the async lowering's normal form (AsyncAnf) when the header awaits:
+        /// the statements that compute {@code condition} at the head of every pass, and the
+        /// statements that replace {@code updates}. The loop stays a for loop, so each pass
+        /// keeps its own loop variable.
+        public List<Stmt> conditionStmts;
+        public List<Stmt> updateStmts;
     }
 
     public static class ForInStmt extends Stmt {
@@ -469,6 +594,12 @@ public final class Ast {
         public boolean isAsync;
         public boolean isSyncStar;                // Iterable<T> f() sync* { ... }
         public boolean isAsyncStar;               // Stream<T> f() async* { ... }
+        /// A generic local function's type parameters (`T id<T>(T v)`), erased from the
+        /// types above; {@link #typeVarSlots} keeps where each one was written.
+        public List<String> typeParams = new ArrayList<String>();
+        /// For a generic local function: the type parameter its return type, then each
+        /// parameter's type, was before erasure (`T`, `T?`), or null; empty otherwise.
+        public List<String> typeVarSlots = new ArrayList<String>();
     }
 
     // ------------------------------------------------------------------
@@ -502,6 +633,9 @@ public final class Ast {
         public TypeRef elementType;               // nullable
         public List<Expr> elements = new ArrayList<Expr>();
         public boolean isConst;
+        /** Set by the async lowering on the empty literal it fills element by element: the
+         *  original elements, which the element type is inferred from as it would have been. */
+        public List<Expr> inferFrom;
     }
 
     public static class MapLit extends Expr {
@@ -514,15 +648,26 @@ public final class Ast {
         public List<Expr> elements = new ArrayList<Expr>();
         public boolean structured;
         public boolean isConst;
+        /** Set by the async lowering on the empty literal it fills entry by entry: the
+         *  original elements, which the key and value types are inferred from. */
+        public List<Expr> inferFrom;
     }
     public static class SetLit extends Expr {
         public TypeRef elementType;               // nullable
         public List<Expr> elements = new ArrayList<Expr>();  // plain / spread / if / for
         public boolean isConst;
+        /** Set by the async lowering on the empty literal it fills element by element: the
+         *  original elements, which the element type is inferred from as it would have been. */
+        public List<Expr> inferFrom;
     }
 
     public static class Ident extends Expr {
         public String name;
+        // `Cell<int>` in the constructor tear-off `Cell<int>.new`; null otherwise
+        public List<TypeRef> typeArgs;
+        // A class reference the emitter built itself (a static tear-off's call) and had
+        // already resolved -- through an import prefix the synthetic name no longer carries.
+        public ClassDecl pinnedClass;
     }
 
     public static class ThisExpr extends Expr {
@@ -603,15 +748,22 @@ public final class Ast {
         public Expr target;
         public String name;
         public boolean nullAware;
+        // `K.s<int>` / `p.K.s<int>` without a call: the explicit instantiation's type
+        // arguments; null otherwise
+        public List<TypeRef> typeArgs;
     }
 
     /** target.name(args) — method call, or function/ctor call when target == null. */
     public static class Call extends Expr {
+        // Inside a constant context (`const x = Point(0, 0)`): a constructor call is const.
+        public boolean inConst;
         public Expr target;                       // null for bare calls
         public String name;                       // method or function/class name; null when calling an expression value
         public Args args = new Args();
         public boolean nullAware;
         public List<TypeRef> typeArgs = new ArrayList<TypeRef>();
+        /// A `#name` literal built as {@code Symbol("name")}: a private one is library scoped.
+        public boolean symbolLiteral;
     }
 
     /** Explicit `new X(...)`/`const X(...)`/`X.named(...)` when syntactically unambiguous. */
@@ -690,9 +842,26 @@ public final class Ast {
         public boolean isSyncStar;                // () sync* { ... }
         public boolean isAsyncStar;               // () async* { ... }
         public List<String> typeParams = new ArrayList<String>();  // <T>(T x) => ... (erased)
+        /// For a generic closure: the type parameter its declared return type (null for a
+        /// function literal, which declares none), then each parameter's type, was before
+        /// erasure, or null. Empty when the closure is not generic. runtimeType prints it.
+        public List<String> typeVarSlots = new ArrayList<String>();
+        /// A generic closure's declared bounds (`<T extends num>`), by type parameter name.
+        /// An uninstantiated call infers T from its argument, so the bound is what that
+        /// argument is tested against.
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
+        /// The closure is a local function declaration: its signature is its own, even
+        /// though it is emitted against the SAM of that signature.
+        public boolean ownSignature;
         public List<Param> params = new ArrayList<Param>();
         public Block body;                        // nullable
         public Expr exprBody;                     // for `=> expr`
+        /**
+         * A tear-off closure's receiver, evaluated ONCE where the closure is built and
+         * bound to {@link #boundName} inside it; null for an ordinary function literal.
+         */
+        public Expr boundRecv;
+        public String boundName;
     }
 
     public static class ParenExpr extends Expr {
@@ -715,6 +884,8 @@ public final class Ast {
         public Expr guard;                        // optional `when` guard
         public List<Stmt> body = new ArrayList<Stmt>();
         public boolean isDefault;
+        /** Labels on the case ({@code again: case ...}), the targets of {@code continue again;}; null when none. */
+        public List<String> labels;
     }
 
     /** A `switch (e) { p when g => v, _ => v }` expression. */
@@ -763,6 +934,19 @@ public final class Ast {
         public List<Pattern> elements = new ArrayList<Pattern>();
     }
 
+    /** A map pattern: `{key: p, ...}`; {@code keys[i]} is the constant key of {@code values[i]}. */
+    public static class MapPattern extends Pattern {
+        /** `<K, V>{...}`: the Map type the subject must be; null when the pattern has no type arguments. */
+        public TypeRef type;
+        public List<Expr> keys = new ArrayList<Expr>();
+        public List<Pattern> values = new ArrayList<Pattern>();
+    }
+
+    /** A rest element of a list pattern: `...` or `...rest`; {@code inner} is null for a bare `...`. */
+    public static class RestPattern extends Pattern {
+        public Pattern inner;
+    }
+
     /** A relational pattern: `> 5`, `== x`, `<= y`, etc. */
     public static class RelationalPattern extends Pattern {
         public String op;
@@ -798,11 +982,62 @@ public final class Ast {
     /** A record literal: `(a, b, name: c)`. */
     public static class RecordLit extends Expr {
         public List<RecordField> fields = new ArrayList<RecordField>();
+        /// Written `const (...)`, or inside a constant context: canonicalized.
+        public boolean isConst;
     }
 
     /** One field of a record literal (name null for a positional field). */
     public static class RecordField extends Node {
         public String name;
         public Expr value;
+    }
+
+    /// Marks the constant context below a const expression: Dart reads every constructor
+    /// call and collection literal written there as const (`const [Point(0, 0)]`).
+    public static void markConst(Expr e) {
+        if (e instanceof CtorCall) {
+            ((CtorCall) e).isConst = true;
+            markConstArgs(((CtorCall) e).args);
+        } else if (e instanceof Call && ((Call) e).target == null && ((Call) e).name != null) {
+            ((Call) e).inConst = true;
+            markConstArgs(((Call) e).args);
+        } else if (e instanceof ListLit) {
+            ((ListLit) e).isConst = true;
+            for (Expr x : ((ListLit) e).elements) {
+                markConst(x);
+            }
+        } else if (e instanceof SetLit) {
+            ((SetLit) e).isConst = true;
+            for (Expr x : ((SetLit) e).elements) {
+                markConst(x);
+            }
+        } else if (e instanceof RecordLit) {
+            ((RecordLit) e).isConst = true;
+            for (RecordField f : ((RecordLit) e).fields) {
+                markConst(f.value);
+            }
+        } else if (e instanceof MapLit) {
+            ((MapLit) e).isConst = true;
+            for (Expr x : ((MapLit) e).keys) {
+                markConst(x);
+            }
+            for (Expr x : ((MapLit) e).values) {
+                markConst(x);
+            }
+        }
+    }
+
+    /// Marks the arguments of a const constructor call as constant context.
+    public static void markConstArgsOf(CtorCall c) {
+        markConstArgs(c.args);
+    }
+
+    private static void markConstArgs(Args a) {
+        for (Expr x : a.positional) {
+            markConst(x);
+        }
+        for (NamedArg n : a.named) {
+            markConst(n.value);
+        }
     }
 }

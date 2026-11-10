@@ -33,7 +33,7 @@ import com.codenameone.examples.wayline.api.RideActivityKeys;
 import com.codenameone.examples.wayline.api.RideDto;
 import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 
 import java.util.HashMap;
 import java.util.Map;

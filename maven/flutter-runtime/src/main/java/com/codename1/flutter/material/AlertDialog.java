@@ -78,4 +78,15 @@ public class AlertDialog extends Widget {
     public Element createElement() {
         return new AlertDialogRenderElement(this);
     }
+
+    /** Flutter's {@code AlertDialog.adaptive}: the Material dialog on every platform here. */
+    public static AlertDialog adaptive(com.codename1.flutter.Key key, Widget title, Widget content,
+                                       DartList<Widget> actions) {
+        AlertDialog d = new AlertDialog();
+        d.key(key);
+        d.title(title);
+        d.content(content);
+        d.actions(actions);
+        return d;
+    }
 }

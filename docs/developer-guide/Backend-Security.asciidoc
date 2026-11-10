@@ -1843,7 +1843,8 @@ The algorithm profile is the same on every runtime:
 |Signatures on certificates and requests
 |RSA with SHA-256, SHA-384 or SHA-512; RSASSA-PSS with SHA-256; ECDSA with
 P-256 and SHA-256, or P-384 and SHA-384
-|SHA-1, MD5, ECDSA with a digest that doesn't match its curve
+|MD5, ECDSA with SHA-1 or a digest that doesn't match its curve. RSA with
+SHA-1 is checked, for older intermediates, but never made
 
 |Keys
 |RSA from 2048 to 8192 bits; EC on P-256 and P-384
@@ -1851,9 +1852,10 @@ P-256 and SHA-256, or P-384 and SHA-384
 
 |PKCS#12
 |PBES2 with PBKDF2 and AES-CBC, with an HMAC integrity check. This is what
-OpenSSL 3 and current JDKs write
-|The legacy RC2 and 3DES schemes (`openssl pkcs12 -legacy`), stores without
-an integrity check
+OpenSSL 3 and current JDKs write. The legacy 3DES and RC2 schemes
+(`openssl pkcs12 -legacy`, Apple's keychain) are read too, and
+`Pkcs12.encodeLegacy` writes them for the keychain, which imports nothing newer
+|Stores without an integrity check
 
 |Encoding
 |DER and PEM
@@ -1861,8 +1863,13 @@ an integrity check
 |===
 
 A file outside the profile is refused with a message that names what it uses.
-For a legacy PKCS#12 file, the message also gives the `openssl` command that
-re-exports it.
+
+`Certificate.selfSigned` makes a self-signed certificate for a key, and
+`Certificate.fetchChain` returns the chain a server presents, which is what a
+pinning check compares. `SignedData` reads the content and certificates of a
+CMS envelope, such as a provisioning profile, but it doesn't check the
+signature. `Asn1` is the DER reader and writer the package is built on, for
+formats it doesn't cover.
 
 [[backend-security-testing]]
 === Testing

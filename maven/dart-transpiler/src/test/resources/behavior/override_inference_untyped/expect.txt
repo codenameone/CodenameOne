@@ -1,0 +1,21 @@
+true
+false
+false
+true
+Point(1, 2)
+Point(2, 1)
+2
+2.25
+square 2.25 BIG
+4
+square
+square
+4
+double
+8
+21
+3
+5
+6
+15
+6

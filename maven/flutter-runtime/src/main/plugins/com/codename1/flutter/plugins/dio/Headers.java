@@ -81,14 +81,14 @@ public class Headers {
         String k = fold(name);
         DartList<String> vs = map.get(k);
         if (vs == null) {
-            vs = new DartList<String>();
+            vs = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
             map.put(k, vs);
         }
         vs.add(value);
     }
 
     public void set(String name, Object value) {
-        DartList<String> vs = new DartList<String>();
+        DartList<String> vs = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         if (value instanceof List) {
             for (Object o : (List<?>) value) {
                 vs.add(String.valueOf(o));

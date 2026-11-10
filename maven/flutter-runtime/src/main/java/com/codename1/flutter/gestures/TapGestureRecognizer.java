@@ -30,7 +30,7 @@ import dart.runtime.Funcs;
  * page wires one to each link span, so only {@code onTap} and {@code dispose}
  * are consumed.
  */
-public final class TapGestureRecognizer {
+public final class TapGestureRecognizer extends GestureRecognizer {
 
     private Funcs.VoidFunc0 onTap;
     private Object debugOwner;
@@ -59,7 +59,9 @@ public final class TapGestureRecognizer {
         }
     }
 
+    @Override
     public void dispose() {
+        super.dispose();
         this.onTap = null;
     }
 }

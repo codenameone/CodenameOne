@@ -1,0 +1,19 @@
+evens [2, 4, 6]
+squares [1, 4, 16, 36]
+tail [2, 4, 6]
+head [1, 2]
+setAll [1, 7, 8, 6]
+setRange [10, 11, 8, 6]
+bag [10, 11, 8, 6]
+has onListen true
+has onCancel false
+has onCancel now true
+[listen, v3, cancel]
+{"a":[1,2]}
+[1, 2]
+bound
+42
+42
+view 2
+view 4
+view 6

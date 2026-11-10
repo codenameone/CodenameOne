@@ -23,7 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.pulse.Days;
 import com.codenameone.examples.pulse.Ids;
-import com.codenameone.examples.pulse.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.pulse.account.Accounts;
 import com.codenameone.examples.pulse.api.CheckInRequestDto;
 import com.codenameone.examples.pulse.api.CheckInResultDto;

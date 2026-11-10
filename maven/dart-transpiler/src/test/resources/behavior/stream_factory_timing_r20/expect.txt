@@ -1,0 +1,25 @@
+m1
+it 1
+err bad
+m2
+value v
+empty done
+f 1
+it 2
+err done
+value done
+f err iterBoom
+f done
+it 3
+it done
+event
+a 10
+b 10
+p 7
+m3
+a 20
+b 20
+resume
+p 8
+p 9
+p done

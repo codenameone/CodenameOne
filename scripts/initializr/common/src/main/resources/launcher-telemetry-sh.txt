@@ -160,6 +160,10 @@ function cn1_mvnw {
   # everything under it (Maven included), then reports and exits with the
   # signal's own status: 130 for Ctrl+C (SIGINT), 143 for SIGTERM.
   function cn1_on_signal {
+    # A signal can land after the background subshell forked but before
+    # `pipe_pid=$!` ran; $! already names it then. An empty pid would kill
+    # nothing and turn the wait below into a wait for every child, Maven too.
+    pipe_pid="${pipe_pid:-$!}"
     cn1_kill_tree "$pipe_pid"
     wait "$pipe_pid" 2>/dev/null
     cn1_event --data-urlencode "step=exit" --data-urlencode "target=$target" \

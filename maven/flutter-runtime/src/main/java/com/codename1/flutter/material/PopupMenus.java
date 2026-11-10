@@ -243,7 +243,7 @@ public final class PopupMenus {
         @Override
         @SuppressWarnings({"unchecked", "rawtypes"})
         public Widget build(BuildContext context) {
-            DartList<Widget> rows = new DartList<Widget>();
+            DartList<Widget> rows = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             for (int i = 0; i < entries.size(); i++) {
                 final PopupMenuEntry<?> entry = entries.get(i);
                 if (entry instanceof PopupMenuDivider) {

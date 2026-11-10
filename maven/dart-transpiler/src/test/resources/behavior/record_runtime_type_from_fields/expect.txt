@@ -1,0 +1,4 @@
+[(Null, int, {Null x}), (null, 1, x: null), true]
+(int, String)
+(double, String, {int n, bool ok})
+(int, List<int>)

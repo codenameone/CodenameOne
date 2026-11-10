@@ -70,6 +70,10 @@ class AndroidSixteenKbPageFloorTest {
         FLOORS.put("com.microsoft.onnxruntime:onnxruntime-android", "1.21.1");
         // 0.1.0 is 4 KB aligned; 0.1.1 is the first aligned release.
         FLOORS.put("com.scottyab:rootbeer-lib", "0.1.1");
+        // Ours, built with NDK r28 by scripts/ai-natives from their first
+        // release; every version is aligned, so the floor is the first one.
+        FLOORS.put("com.codenameone.natives:cn1-whisper-android", "1.9.5-1");
+        FLOORS.put("com.codenameone.natives:cn1-llama-android", "0.9.0-1");
     }
 
     /// group:artifact prefixes that never resolve to 16 KB aligned natives:

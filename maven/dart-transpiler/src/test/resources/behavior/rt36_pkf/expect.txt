@@ -1,0 +1,14 @@
+mine/base
+myT:A
+T:b
+myT:C
+true
+true
+base,mine/base,myT:D
+z
+Comp<String>
+Node<Leaf>
+Leaf
+myT:E
+T:f
+false

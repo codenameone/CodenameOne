@@ -35,7 +35,7 @@ import com.codenameone.examples.wayline.api.AccountClosureDto;
 import com.codenameone.examples.wayline.api.PasswordChangeDto;
 import com.codenameone.examples.wayline.api.UserDto;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.net.Session;
 import com.codenameone.examples.wayline.pay.WalletForm;
 

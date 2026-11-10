@@ -25,7 +25,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.dash.api.PackSummaryDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.ui.Nav;
 import com.codenameone.examples.dash.ui.Ui;
 

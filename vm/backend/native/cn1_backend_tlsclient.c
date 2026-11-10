@@ -359,7 +359,7 @@ static int cn1IsIpLiteral(const char* host) {
     return inet_pton(AF_INET6, host, &v6) == 1;
 }
 
-JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile) {
+JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost) {
     SSL_CTX* ctx;
     SSL* ssl;
     char* h;
@@ -419,7 +419,14 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
      * a host by address failed verification against a certificate that correctly
      * carried the IP -- after packaging only, since the Java SE arm checks both.
      * X509_VERIFY_PARAM_set1_ip_asc is the IP half of the same door. */
-    if(cn1IsIpLiteral(h)) {
+    /* verifyHost is false only for sslmode=verify-ca, where the caller named a
+     * private trust root of its own (Database refuses verify-ca without one) and
+     * asked for the chain to be checked but not the name: a development
+     * container's generated certificate names no host anyone connects by. The
+     * chain is still verified -- SSL_VERIFY_PEER is set on the context. */
+    if(!verifyHost) {
+        /* SNI above is still sent; only the name match is skipped. */
+    } else if(cn1IsIpLiteral(h)) {
         if(X509_VERIFY_PARAM_set1_ip_asc(SSL_get0_param(ssl), h) != 1) {
             cn1ClientTlsRecordError("could not set the expected peer address");
             SSL_free(ssl);
@@ -588,9 +595,43 @@ void com_codename1_backend_Tcp_tlsCloseImpl___long(CODENAME_ONE_THREAD_STATE, JA
     SSL_free(ssl);
 }
 
+/* The chain the server sent, leaf first, as DER certificates end to end; NULL
+   when there is none. SSL_get_peer_cert_chain on the client side includes the
+   leaf. */
+JAVA_OBJECT com_codename1_backend_Tcp_tlsPeerChainImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG session) {
+    SSL* ssl = (SSL*)(intptr_t)session;
+    STACK_OF(X509)* chain;
+    int count, iter, total = 0, at = 0;
+    JAVA_OBJECT arr;
+    if(ssl == NULL) {
+        return JAVA_NULL;
+    }
+    chain = SSL_get_peer_cert_chain(ssl);
+    if(chain == NULL) {
+        return JAVA_NULL;
+    }
+    count = sk_X509_num(chain);
+    for(iter = 0; iter < count; iter++) {
+        int length = i2d_X509(sk_X509_value(chain, iter), NULL);
+        if(length <= 0 || total > 0x7fffffff - length) {
+            return JAVA_NULL;
+        }
+        total += length;
+    }
+    if(total == 0) {
+        return JAVA_NULL;
+    }
+    arr = allocArray(threadStateData, total, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    for(iter = 0; iter < count; iter++) {
+        unsigned char* p = (unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)arr) + at;
+        at += i2d_X509(sk_X509_value(chain, iter), &p);
+    }
+    return arr;
+}
+
 #else /* CN1_BACKEND_NO_TLS */
 
-JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile) {
+JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost) {
     return 0;
 }
 
@@ -611,6 +652,10 @@ void com_codename1_backend_Tcp_tlsCloseImpl___long(CODENAME_ONE_THREAD_STATE, JA
 }
 
 void com_codename1_backend_Tcp_tlsDiscardImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG session) {
+}
+
+JAVA_OBJECT com_codename1_backend_Tcp_tlsPeerChainImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG session) {
+    return JAVA_NULL;
 }
 
 #endif

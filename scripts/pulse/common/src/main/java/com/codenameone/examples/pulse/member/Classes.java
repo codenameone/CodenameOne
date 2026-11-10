@@ -34,7 +34,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codenameone.examples.pulse.ui.Chart;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.pulse.Telemetry;
 import com.codenameone.examples.pulse.api.BookRequestDto;
 import com.codenameone.examples.pulse.api.BookingDto;
@@ -43,7 +43,7 @@ import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.api.UserDto;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.time.Duration;
@@ -225,7 +225,7 @@ public final class Classes {
             body.add(new Label(Lang.tr("Cancelled by the studio"), "SvClassFull"));
         } else {
             int left = session.capacity() - session.booked();
-            Chart.Meter meter = new Chart.Meter(session.capacity() <= 0 ? 0
+            Chart.Meter meter = new Chart.Meter("Sv", session.capacity() <= 0 ? 0
                     : session.booked() / (double) session.capacity());
             meter.getAllStyles().setFgColor(color);
             Container fill = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));

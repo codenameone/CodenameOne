@@ -109,7 +109,10 @@ final class StreamFusion {
                 if (item.factory != null) {
                     nextRoot += Type.getArgumentTypes(item.factory.getDesc()).length;
                     BytecodeMethod sam = item.factory.getLambdaSam();
-                    dependencies.add(new Invoke(Opcodes.INVOKESPECIAL, item.factory.getOwner(),
+                    Invoke bridge = item.factory.getLambdaBridge();
+                    dependencies.add(bridge != null ? new Invoke(Opcodes.INVOKESTATIC, bridge.getOwner(),
+                            bridge.getName(), bridge.getDesc(), false)
+                            : new Invoke(Opcodes.INVOKESPECIAL, item.factory.getOwner(),
                             sam.getMethodName(), sam.getSignature(), false));
                 }
             }
@@ -162,9 +165,26 @@ final class StreamFusion {
     }
     private static String callback(Stage stage, int index, String element) {
         BytecodeMethod sam = stage.factory.getLambdaSam();
-        StringBuilder name = new StringBuilder(Util.mangle(stage.factory.getOwner()));
-        name.append('_').append(sam.getMethodName()).append("__");
-        BytecodeMethod.appendMethodSignatureSuffixFromDesc(sam.getSignature(), name, new ArrayList<String>());
+        Invoke bridge = stage.factory.getLambdaBridge();
+        StringBuilder name;
+        if (bridge != null) {
+            // A carrier lambda: call its function directly with the stack carrier's
+            // captures, which is the carrier's own calling convention.
+            String carrier = stage.factory.getLambdaCarrier();
+            name = new StringBuilder(Util.mangle(bridge.getOwner()));
+            name.append('_').append(bridge.getName()).append("__");
+            BytecodeMethod.appendMethodSignatureSuffixFromDesc(bridge.getDesc(), name, new ArrayList<String>());
+            name.append("(threadStateData");
+            int captures = Type.getArgumentTypes(stage.factory.getDesc()).length;
+            for (int c = 0; c < captures; c++) {
+                name.append(", __sfLambda").append(index).append('.').append(carrier).append("_c").append(c);
+            }
+            return name + ", " + element + ")";
+        } else {
+            name = new StringBuilder(Util.mangle(stage.factory.getOwner()));
+            name.append('_').append(sam.getMethodName()).append("__");
+            BytecodeMethod.appendMethodSignatureSuffixFromDesc(sam.getSignature(), name, new ArrayList<String>());
+        }
         return name + "(threadStateData, (JAVA_OBJECT)&__sfLambda" + index + ", " + element + ")";
     }
 
@@ -187,7 +207,10 @@ final class StreamFusion {
         @Override public boolean isComplexInstruction() { return true; }
         @Override public void addDependencies(List<String> dependencies) {
             dependencies.add("java_lang_IllegalArgumentException");
-            for (Stage stage : stages) if (stage.factory != null) dependencies.add(Util.mangle(stage.factory.getOwner()));
+            for (Stage stage : stages) if (stage.factory != null) {
+                dependencies.add(Util.mangle(stage.factory.getOwner()));
+                if (stage.factory.getLambdaCarrier() != null) dependencies.add(stage.factory.getLambdaCarrier());
+            }
         }
         @Override public void appendInstruction(StringBuilder out, List<Instruction> ignored) {
             out.append("{ /* fused array stream; callbacks cannot escape */\n");
@@ -197,7 +220,8 @@ final class StreamFusion {
                 Stage stage = stages.get(i);
                 for (Instruction argument : stage.arguments) argument.appendInstruction(out, Collections.<Instruction>emptyList());
                 if (stage.factory != null) {
-                    String cls = Util.mangle(stage.factory.getOwner());
+                    String carrier = stage.factory.getLambdaCarrier();
+                    String cls = carrier != null ? carrier : Util.mangle(stage.factory.getOwner());
                     Type[] captures = Type.getArgumentTypes(stage.factory.getDesc());
                     out.append("__STATIC_INITIALIZER_").append(cls).append("(threadStateData);\n");
                     out.append("struct obj__").append(cls).append(" __sfLambda").append(i).append(" = {0};\n")
@@ -211,7 +235,8 @@ final class StreamFusion {
                             save(out, stage.captureRoot + c, value);
                             value = root(stage.captureRoot + c);
                         }
-                        out.append("__sfLambda").append(i).append('.').append(cls).append("_arg_").append(c + 1)
+                        out.append("__sfLambda").append(i).append('.').append(cls)
+                                .append(carrier != null ? "_c" + c : "_arg_" + (c + 1))
                                 .append(" = ").append(value).append(";\n");
                     }
                     out.append("POP_MANY(").append(captures.length).append(");\n");

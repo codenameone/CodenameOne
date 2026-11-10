@@ -498,6 +498,8 @@ public class Parser extends ClassVisitor {
         cn1SubclassIndexSize = -1;
         nativeSources = null;
         classes.clear();
+        IteratorEscape.resetCaches();
+        LambdaCarriers.reset();
         // classes is cleared in place (same List reference), so the name index's
         // (reference, size) guard cannot detect a subsequent same-size refill across
         // translation runs in the same JVM (e.g. the unit tests). Invalidate it here.
@@ -2809,6 +2811,10 @@ public class Parser extends ClassVisitor {
 
             if ("java/lang/invoke/LambdaMetafactory".equals(bsm.getOwner()) &&
                 ("metafactory".equals(bsm.getName()) || "altMetafactory".equals(bsm.getName()))) {
+                if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                        && lowerToCarrier(name, desc, bsm, bsmArgs)) {
+                    return;
+                }
 
                 // 1. Generate a unique class name for the lambda
                 String lambdaClassName = clsName + "_lambda_" + (lambdaCounter++);
@@ -3087,6 +3093,176 @@ public class Parser extends ClassVisitor {
          * (e.g. when a method reference's parameter or return type differs from
          * the functional interface's). A no-op when the types already match.
          */
+        /**
+         * Lowers a lambda to a shared carrier that calls javac's own method, or a
+         * bridge in this class when the C types differ; see {@link LambdaCarriers}.
+         * Answers false, leaving the class-per-lambda path, for
+         * an altMetafactory that asks for marker interfaces or bridge methods.
+         */
+        private boolean lowerToCarrier(String name, String desc, Handle bsm, Object[] bsmArgs) {
+            if ("altMetafactory".equals(bsm.getName())) {
+                if (bsmArgs.length < 4 || !(bsmArgs[3] instanceof Integer)
+                        || (((Integer) bsmArgs[3]).intValue() & ~1) != 0) {
+                    return false;
+                }
+            }
+            Type invokedType = Type.getMethodType(desc);
+            Type[] captured = invokedType.getArgumentTypes();
+            Type samType = (Type) bsmArgs[0];
+            Handle implMethod = (Handle) bsmArgs[1];
+            String shape = LambdaCarriers.shape(captured);
+            ByteCodeClass carrier = LambdaCarriers.carrier(invokedType.getReturnType().getInternalName(),
+                    name, samType.getDescriptor(), shape, classes);
+            String carrierName = carrier.getClsName();
+            int n = lambdaCounter++;
+
+            Type[] samArgs = samType.getArgumentTypes();
+            boolean isCtorRef = implMethod.getTag() == Opcodes.H_NEWINVOKESPECIAL;
+            int invokeOpcode;
+            switch (implMethod.getTag()) {
+                case Opcodes.H_INVOKEVIRTUAL: invokeOpcode = Opcodes.INVOKEVIRTUAL; break;
+                case Opcodes.H_INVOKEINTERFACE: invokeOpcode = Opcodes.INVOKEINTERFACE; break;
+                case Opcodes.H_INVOKESPECIAL:
+                case Opcodes.H_NEWINVOKESPECIAL: invokeOpcode = Opcodes.INVOKESPECIAL; break;
+                default: invokeOpcode = Opcodes.INVOKESTATIC; break;
+            }
+            boolean instanceCall = !isCtorRef && invokeOpcode != Opcodes.INVOKESTATIC;
+            Type[] implArgTypes = Type.getArgumentTypes(implMethod.getDesc());
+            Type[] targetTypes = new Type[(instanceCall ? 1 : 0) + implArgTypes.length];
+            int tIdx = 0;
+            if (instanceCall) {
+                targetTypes[tIdx++] = Type.getObjectType(implMethod.getOwner());
+            }
+            for (Type t : implArgTypes) {
+                targetTypes[tIdx++] = t;
+            }
+            Type returnType = samType.getReturnType();
+            Type implReturnType = isCtorRef ? Type.getObjectType(implMethod.getOwner())
+                    : Type.getReturnType(implMethod.getDesc());
+
+            // fn is javac's own method when its C signature is already
+            // fn(captures..., arguments...): a static method of this class, or a
+            // lambda body of this class (private, so a direct, non-virtual C function)
+            // taking `this`. Another class's method could be translated to a macro or
+            // an intrinsic with no address, so it goes through a bridge.
+            boolean direct = !isCtorRef && targetTypes.length == captured.length + samArgs.length
+                    && LambdaCarriers.cType(implReturnType).equals(LambdaCarriers.cType(returnType))
+                    && Util.mangle(implMethod.getOwner()).equals(clsName)
+                    && (invokeOpcode == Opcodes.INVOKESTATIC
+                        || (implMethod.getName().startsWith("lambda$")
+                            && (invokeOpcode == Opcodes.INVOKESPECIAL || invokeOpcode == Opcodes.INVOKEVIRTUAL)));
+            for (int i = 0; direct && i < targetTypes.length; i++) {
+                String have = i < captured.length ? LambdaCarriers.kindCType(shape.charAt(i))
+                        : LambdaCarriers.cType(samArgs[i - captured.length]);
+                direct = have.equals(LambdaCarriers.cType(targetTypes[i]));
+            }
+            String fnOwner;
+            String fnName;
+            String fnDesc;
+            if (direct) {
+                fnOwner = implMethod.getOwner();
+                fnName = implMethod.getName();
+                fnDesc = implMethod.getDesc();
+            } else {
+                // A bridge with the carrier's convention that adapts and calls on.
+                StringBuilder bridgeDesc = new StringBuilder("(");
+                for (int i = 0; i < captured.length; i++) {
+                    bridgeDesc.append(LambdaCarriers.fieldDesc(shape.charAt(i)));
+                }
+                for (Type t : samArgs) {
+                    bridgeDesc.append(t.getDescriptor());
+                }
+                bridgeDesc.append(')').append(returnType.getDescriptor());
+                fnOwner = clsName;
+                fnName = "cn1fnBridge" + n;
+                fnDesc = bridgeDesc.toString();
+                BytecodeMethod bridge = new BytecodeMethod(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC
+                        | Opcodes.ACC_SYNTHETIC, fnName, fnDesc, null, null);
+                cls.addMethod(bridge);
+                boolean adapt = targetTypes.length == captured.length + samArgs.length;
+                if (isCtorRef) {
+                    bridge.addTypeInstruction(Opcodes.NEW, implMethod.getOwner());
+                    bridge.addInstruction(Opcodes.DUP);
+                }
+                int local = 0;
+                int targetIndex = 0;
+                for (int i = 0; i < captured.length; i++) {
+                    char kind = shape.charAt(i);
+                    Type stored = Type.getType(LambdaCarriers.fieldDesc(kind));
+                    bridge.addVariableOperation(stored.getOpcode(Opcodes.ILOAD), local);
+                    local += stored.getSize();
+                    if (kind == 'O' && !"java/lang/Object".equals(captured[i].getInternalName())) {
+                        bridge.addTypeInstruction(Opcodes.CHECKCAST, captured[i].getInternalName());
+                    }
+                    if (adapt) {
+                        adaptLambdaType(bridge, captured[i], targetTypes[targetIndex]);
+                    }
+                    targetIndex++;
+                }
+                for (Type t : samArgs) {
+                    bridge.addVariableOperation(t.getOpcode(Opcodes.ILOAD), local);
+                    local += t.getSize();
+                    if (adapt) {
+                        adaptLambdaType(bridge, t, targetTypes[targetIndex]);
+                    }
+                    targetIndex++;
+                }
+                bridge.addInvoke(invokeOpcode, implMethod.getOwner(), implMethod.getName(), implMethod.getDesc(),
+                        !isCtorRef && implMethod.isInterface());
+                adaptLambdaType(bridge, implReturnType, returnType);
+                bridge.addInstruction(returnType.getOpcode(Opcodes.IRETURN));
+                bridge.setMaxes(20, local);
+            }
+
+            String carrierDesc = "L" + carrierName + ";";
+            String factoryName = "cn1fnNew" + n;
+            String factoryDesc = desc.substring(0, desc.lastIndexOf(')') + 1) + carrierDesc;
+            BytecodeMethod factory = new BytecodeMethod(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC
+                    | Opcodes.ACC_SYNTHETIC, factoryName, factoryDesc, null, null);
+            cls.addMethod(factory);
+            Label haveIt = null;
+            String cacheName = "cn1fnInstance" + n;
+            if (captured.length == 0) {
+                // Indistinguishable instances: allocate once (see the class-per-lambda
+                // path below for why this needs no lock).
+                cls.addField(new ByteCodeField(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC
+                        | Opcodes.ACC_SYNTHETIC, cacheName, carrierDesc, null, null));
+                haveIt = new Label();
+                factory.addField(cls, Opcodes.GETSTATIC, clsName, cacheName, carrierDesc);
+                factory.addInstruction(Opcodes.DUP);
+                factory.addJump(Opcodes.IFNONNULL, haveIt);
+                factory.addInstruction(Opcodes.POP);
+            }
+            factory.addTypeInstruction(Opcodes.NEW, carrierName);
+            factory.addInstruction(Opcodes.DUP);
+            factory.addInvoke(Opcodes.INVOKESPECIAL, carrierName, "<init>", "()V", false);
+            factory.addInstruction(Opcodes.DUP);
+            factory.addRawInstruction(new LambdaCarriers.FunctionAddress(fnOwner, fnName, fnDesc));
+            factory.addField(carrier, Opcodes.PUTFIELD, carrierName, "fn", "J");
+            int arg = 0;
+            for (int i = 0; i < captured.length; i++) {
+                factory.addInstruction(Opcodes.DUP);
+                factory.addVariableOperation(captured[i].getOpcode(Opcodes.ILOAD), arg);
+                arg += captured[i].getSize();
+                factory.addField(carrier, Opcodes.PUTFIELD, carrierName, "c" + i,
+                        LambdaCarriers.fieldDesc(shape.charAt(i)));
+            }
+            if (haveIt != null) {
+                factory.addInstruction(Opcodes.DUP);
+                factory.addField(cls, Opcodes.PUTSTATIC, clsName, cacheName, carrierDesc);
+                factory.addLabel(haveIt);
+            }
+            factory.addInstruction(Opcodes.ARETURN);
+            factory.setMaxes(6, arg);
+            mtd.addInvoke(Opcodes.INVOKESTATIC, clsName, factoryName, factoryDesc, false);
+            com.codename1.tools.translator.bytecodes.Invoke site =
+                    (com.codename1.tools.translator.bytecodes.Invoke) mtd.getInstructions().get(mtd.getInstructions().size() - 1);
+            site.setLambdaSam(LambdaCarriers.sam(carrier, name, samType.getDescriptor()));
+            site.setLambdaCarrier(carrierName, new com.codename1.tools.translator.bytecodes.Invoke(
+                    Opcodes.INVOKESTATIC, fnOwner, fnName, fnDesc, false));
+            return true;
+        }
+
         private void adaptLambdaType(BytecodeMethod m, Type from, Type to) {
             if (from.equals(to)) {
                 return;

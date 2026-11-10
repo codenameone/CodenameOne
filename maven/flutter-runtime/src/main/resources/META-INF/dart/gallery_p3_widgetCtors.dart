@@ -73,6 +73,7 @@ class FadeInImage extends Widget {
 
 @JavaName('com.codename1.flutter.material.CircularProgressIndicator')
 class CircularProgressIndicator extends Widget {
+  external static CircularProgressIndicator adaptive({Key? key, double? value, Color? backgroundColor, Color? color, Object? valueColor, double? strokeWidth, String? semanticsLabel, String? semanticsValue});
   external CircularProgressIndicator({Key? key, double? value, Color? backgroundColor, Color? color, Object? valueColor, double? strokeWidth, String? semanticsLabel, String? semanticsValue});
 }
 
@@ -114,7 +115,9 @@ class CheckedPopupMenuItem<T> extends PopupMenuItem<T> {
 
 @JavaName('com.codename1.flutter.widgets.ValueListenableBuilder')
 class ValueListenableBuilder<T> extends Widget {
-  external ValueListenableBuilder({Key? key, Object valueListenable, Object builder, Widget? child});
+  // The builder is typed so an untyped `(context, value, _) {...}` takes the
+  // runtime setter's Func3<BuildContext, T, Widget, Widget> instead of Object params.
+  external ValueListenableBuilder({Key? key, ValueListenable<T> valueListenable, ValueWidgetBuilder<T> builder, Widget? child});
 }
 
 // ======================================================================
@@ -199,6 +202,40 @@ class ClampingScrollPhysics extends ScrollPhysics {
   external ClampingScrollPhysics({ScrollPhysics? parent});
 }
 
+@JavaName('com.codename1.flutter.widgets.PageScrollPhysics')
+class PageScrollPhysics extends ScrollPhysics {
+  external PageScrollPhysics({ScrollPhysics? parent});
+}
+
+@JavaName('com.codename1.flutter.FontVariation')
+class FontVariation {
+  external FontVariation(String axis, double value);
+  external static FontVariation weight(double value);
+  external static FontVariation width(double value);
+  external static FontVariation slant(double value);
+  external static FontVariation opticalSize(double value);
+  external static FontVariation italic(double value);
+  external String get axis;
+  external double get value;
+}
+
+// dart:ui's OpenType feature setting; recorded on a TextStyle, not applied.
+@JavaName('com.codename1.flutter.FontFeature')
+class FontFeature {
+  external FontFeature(String feature, [int value]);
+  external static FontFeature enable(String feature);
+  external static FontFeature disable(String feature);
+  external static FontFeature tabularFigures();
+  external static FontFeature proportionalFigures();
+  external static FontFeature superscripts();
+  external static FontFeature subscripts();
+  external String get feature;
+  external int get value;
+}
+
+@JavaName('com.codename1.flutter.TextLeadingDistribution')
+enum TextLeadingDistribution { proportional, even }
+
 @JavaName('com.codename1.flutter.widgets.BouncingScrollPhysics')
 class BouncingScrollPhysics extends ScrollPhysics {
   external BouncingScrollPhysics({ScrollPhysics? parent});
@@ -222,7 +259,7 @@ class SizeTransition extends Widget {
 
 @JavaName('com.codename1.flutter.animation.PageTransitionSwitcher')
 class PageTransitionSwitcher extends Widget {
-  external PageTransitionSwitcher({Key? key, Duration? duration, bool? reverse, Object transitionBuilder, Widget? child});
+  external PageTransitionSwitcher({Key? key, Duration? duration, bool? reverse, Widget Function(Widget, Animation<double>, Animation<double>) transitionBuilder, Widget? child});
 }
 
 // ======================================================================
@@ -231,14 +268,16 @@ class PageTransitionSwitcher extends Widget {
 
 @JavaName('com.codename1.flutter.animations.OpenContainer')
 class OpenContainer extends Widget {
-  external OpenContainer({Key? key, Object? onClosed, Object closedBuilder, Object openBuilder, bool? tappable, Duration? transitionDuration, Object? transitionType, Color? closedColor, Color? openColor, Color? middleColor, double? closedElevation, double? openElevation, Object? closedShape, Object? openShape, String? routeSettings, bool? useRootNavigator});
+  external OpenContainer({Key? key, Object? onClosed, CloseContainerBuilder closedBuilder, CloseContainerBuilder openBuilder, bool? tappable, Duration? transitionDuration, Object? transitionType, Color? closedColor, Color? openColor, Color? middleColor, double? closedElevation, double? openElevation, Object? closedShape, Object? openShape, String? routeSettings, bool? useRootNavigator});
 }
 
 // The `closedBuilder` signature of an OpenContainer — the animations package's
 // `CloseContainerBuilder` (`Widget Function(BuildContext, VoidCallback)`). A SAM
 // the transpiler binds closures to; new_gallery's _OpenContainerWrapper stores one.
 @JavaName('com.codename1.flutter.animations.CloseContainerBuilder')
-class CloseContainerBuilder {}
+class CloseContainerBuilder {
+  external Widget call(BuildContext context, VoidCallback openContainer);
+}
 
 // ======================================================================
 // navigation — DialogRoute

@@ -1,0 +1,8 @@
+[blue]>>[/]|[red]---[/]len=4 doubled=8
+12
+[4, 3, 5]
+char,class
+CHAR
+INT
+CLASS
+x!

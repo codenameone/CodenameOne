@@ -92,6 +92,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
     private static final String WEBSOCKET_INTERFACE = "com/codename1/backend/WebSocket";
     static final String OPEN_TELEMETRY = PKG + "OpenTelemetry;";
+    static final String VIRTUAL_THREAD_STACK = PKG + "VirtualThreadStack;";
 
     /// The application.properties key that enables tracing without touching the
     /// source, read at build time from the module directory -- where Config reads
@@ -210,6 +211,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// Whether the generated entry point registers server-side daos. Settled
     /// when the entry point is written; see [#hasGeneratedDaos].
     private boolean daos;
+    /// The generated `CliApplication` of this module's `@Command` classes, or
+    /// null; set by [CommandAnnotationProcessor], which runs first.
+    private String cliApplication;
+    /// The name the command-line help prints, or null.
+    private String cliName;
 
     /// The beans this build resolved, once [#finish] has asked for them.
     BackendBeans beans;
@@ -232,6 +238,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// The settings annotations, and whether the build asked for the management
     /// and MCP endpoints. Settled in [#finish] beside [#telemetry].
     BackendSettings settings;
+
+    /// The C stack `@VirtualThreadStack` asks for, in bytes, or 0 when no class
+    /// asks. Settled in [#finish] beside [#telemetry].
+    int virtualThreadStack;
 
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
@@ -270,6 +280,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String prefix;
         /** For each variable, the literal that must follow it; "" when it runs to the end. */
         List<String> after = new ArrayList<String>();
+        /// The last variable takes the rest of the path, slashes included:
+        /// `{name:.+}`, `{name:.*}` or Spring's `{*name}`.
+        boolean greedyLast;
+        /// `{name:.*}` and `{*name}`: the catch-all may also be empty.
+        boolean emptyLast;
         /**
          * The statements that write `result` through the generated codecs, when the
          * return type is one of the application's own classes or holds one; null
@@ -402,14 +417,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         controller.packageName = RestClientAnnotationProcessor.packageOf(controller.binaryName);
         controller.simpleName = RestClientAnnotationProcessor.simpleName(controller.binaryName);
         controller.routerSimpleName = controller.simpleName + "Router";
-        controller.basePaths.addAll(pathsOf(cls.getClassAnnotation(REQUEST_MAPPING)));
+        controller.basePaths.addAll(pathsOf(inheritedClassMapping(ctx, cls)));
         if (controller.basePaths.isEmpty()) {
             controller.basePaths.add("");
         }
         // What the constructor is given is the bean pass's to decide -- see
         // BackendBeans -- like every other bean's.
 
-        for (MethodInfo m : cls.getMethods()) {
+        for (MethodInfo m : mappedMethods(ctx, cls)) {
             if (m.isConstructor() || m.isSynthetic() || m.isStatic() || !m.isPublic()) {
                 continue;
             }
@@ -855,6 +870,41 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             String variableName = route.pattern.substring(pos + 1, close);
+            int next = route.pattern.indexOf('{', close);
+            // A PATTERN IN A VARIABLE. The one form a real API needs is the
+            // catch-all at the end -- a file path, a proxied remainder -- and
+            // that is a matcher flag, not a regex: /files/{path:.+} takes
+            // every segment that is left. Any other regex is refused rather
+            // than ignored. The device's class library has no regex engine
+            // the generated router could call, and a variable whose constraint
+            // was silently dropped would answer requests the author meant to
+            // reject; a constraint is checked in the handler instead.
+            String constraint = null;
+            if (variableName.startsWith("*")) {
+                variableName = variableName.substring(1);
+                constraint = ".*";
+            } else if (variableName.indexOf(':') >= 0) {
+                constraint = variableName.substring(variableName.indexOf(':') + 1);
+                variableName = variableName.substring(0, variableName.indexOf(':'));
+            }
+            if (constraint != null) {
+                boolean catchAll = ".+".equals(constraint) || ".*".equals(constraint)
+                        || "**".equals(constraint);
+                if (!catchAll || next >= 0 || close != route.pattern.length() - 1) {
+                    ctx.error(cls, "The route " + route.pattern + " on "
+                            + cls.getBinaryName() + "." + m.getName() + " constrains {"
+                            + variableName + "} with " + constraint + ". Only a catch-all "
+                            + "({name:.+} or {*name}) as the last part of a route is "
+                            + "supported; check any other format in the method");
+                    return null;
+                }
+                route.greedyLast = true;
+                route.emptyLast = !".+".equals(constraint);
+                // Spelled as a plain variable from here on, so the overlap check,
+                // the contract and the trace all read one form.
+                route.pattern = route.pattern.substring(0, pos) + "{" + variableName + "}";
+                close = route.pattern.length() - 1;
+            }
             // A NAME ONCE. Every binding is resolved with indexOf, which answers
             // the FIRST match, so /pairs/{id}/{id} bound both @PathVariable("id")
             // parameters to the first segment and dropped the second without a
@@ -868,7 +918,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             variableNames.add(variableName);
-            int next = route.pattern.indexOf('{', close);
             String following = next < 0 ? route.pattern.substring(close + 1)
                                         : route.pattern.substring(close + 1, next);
             // Two variables with nothing between them cannot be split. There is
@@ -973,6 +1022,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 p.name = requestParam.getStringOrDefault("value", "");
                 p.defaultValue = requestParam.getStringOrDefault("defaultValue", "");
                 p.required = requestParam.getBoolOrDefault("required", true);
+                if ("java.util.List".equals(p.javaType) && genericType != null
+                        && !"java.util.List<java.lang.String>".equals(genericType)) {
+                    ctx.error(cls, "A multi-value @RequestParam is List<String> or String[]; "
+                            + cls.getBinaryName() + "." + m.getName() + " declares "
+                            + genericType);
+                    return null;
+                }
                 if (p.name.length() == 0) {
                     ctx.error(cls, "@RequestParam needs the parameter name: "
                             + cls.getBinaryName() + "." + m.getName());
@@ -1109,7 +1165,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     && !isBindable(p.javaType, p.kind)) {
                 ctx.error(cls, "Cannot bind " + p.javaType + " from the request on "
                         + cls.getBinaryName() + "." + m.getName() + ". Path, query and "
-                        + "header values bind to String and the primitive types; a body "
+                        + "header values bind to String, the primitive types and their "
+                        + "wrappers, a query parameter also to List<String> or String[]; a body "
                         + "binds to String or java.util.Map");
                 return null;
             }
@@ -1121,7 +1178,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // wrote. This is the author's own configuration, not a client's input,
             // and it is wrong at build time or never.
             if (p.defaultValue != null && p.defaultValue.length() > 0
-                    && !defaultParsesAs(p.javaType, p.defaultValue)) {
+                    && !defaultParsesAs(unboxed(p.javaType), p.defaultValue)) {
                 ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares "
                         + "defaultValue=\"" + p.defaultValue + "\" for a " + p.javaType
                         + " parameter, which is not a " + p.javaType + ". It would be "
@@ -1316,6 +1373,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return "java.lang.String".equals(javaType) || "java.util.Map".equals(javaType)
                     || "java.util.List".equals(javaType);
         }
+        if ("QUERY".equals(kind) && isMultiValue(javaType)) {
+            return true;
+        }
+        javaType = unboxed(javaType);
         return "java.lang.String".equals(javaType) || "int".equals(javaType)
                 || "long".equals(javaType) || "boolean".equals(javaType)
                 || "double".equals(javaType) || "float".equals(javaType)
@@ -1403,6 +1464,118 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         RestClientAnnotationProcessor.packageOf(endpoint.binaryName);
                 endpoint.path = full;
                 webSockets.put(full, endpoint);
+            }
+        }
+    }
+
+    /// The class's own `@RequestMapping`, or else the nearest one up the
+    /// hierarchy -- superclasses first, then interfaces -- as Spring merges a
+    /// base controller's mapping into the subclass that declares none.
+    private static AnnotationValues inheritedClassMapping(ProcessorContext ctx,
+            AnnotatedClass cls) {
+        Set<String> seen = new LinkedHashSet<String>();
+        List<AnnotatedClass> order = new ArrayList<AnnotatedClass>();
+        hierarchy(ctx, cls, seen, order);
+        for (AnnotatedClass c : order) {
+            AnnotationValues v = c.getClassAnnotation(REQUEST_MAPPING);
+            if (v != null) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /// Every handler of the controller, inherited ones included.
+    ///
+    /// A method is taken once per name and descriptor. Its mapping and its
+    /// parameter annotations come from the most derived declaration that maps
+    /// it -- the class itself, then its superclasses, then its interfaces --
+    /// and it is routed only if the class really has a public, concrete
+    /// implementation of it, the one the router will call. That is Spring's
+    /// rule for a base controller and for an API interface that carries the
+    /// mappings. A generic interface method is matched by its erased
+    /// descriptor, so a mapping on `get(T)` reaches only a bridge, which is
+    /// synthetic and skipped: put such a mapping on the class.
+    private static List<MethodInfo> mappedMethods(ProcessorContext ctx, AnnotatedClass cls) {
+        Set<String> seen = new LinkedHashSet<String>();
+        List<AnnotatedClass> order = new ArrayList<AnnotatedClass>();
+        hierarchy(ctx, cls, seen, order);
+        Map<String, MethodInfo> implementation = new LinkedHashMap<String, MethodInfo>();
+        for (AnnotatedClass c : order) {
+            if (c.isInterface()) {
+                continue;
+            }
+            for (MethodInfo m : c.getMethods()) {
+                String key = m.getName() + m.getDescriptor();
+                if (!implementation.containsKey(key) && !m.isAbstract()) {
+                    implementation.put(key, m);
+                }
+            }
+        }
+        Map<String, MethodInfo> mapped = new LinkedHashMap<String, MethodInfo>();
+        for (AnnotatedClass c : order) {
+            for (MethodInfo m : c.getMethods()) {
+                String key = m.getName() + m.getDescriptor();
+                if (mapped.containsKey(key) || !isMapped(m)) {
+                    continue;
+                }
+                MethodInfo impl = implementation.get(key);
+                if (impl == null || !impl.isPublic() || impl.isStatic() || impl.isSynthetic()) {
+                    continue;
+                }
+                mapped.put(key, m);
+            }
+        }
+        // The class's own unmapped methods still go through the loop, which
+        // skips them; keeping them costs nothing and keeps its order.
+        List<MethodInfo> out = new ArrayList<MethodInfo>(mapped.values());
+        for (MethodInfo m : cls.getMethods()) {
+            if (!mapped.containsKey(m.getName() + m.getDescriptor())) {
+                out.add(m);
+            }
+        }
+        return out;
+    }
+
+    private static boolean isMapped(MethodInfo m) {
+        if (m.getAnnotation(REQUEST_MAPPING) != null) {
+            return true;
+        }
+        for (String annotation : MAPPINGS.keySet()) {
+            if (m.getAnnotation(annotation) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The class, its superclasses up to Object, then every interface, each once.
+    private static void hierarchy(ProcessorContext ctx, AnnotatedClass cls, Set<String> seen,
+            List<AnnotatedClass> order) {
+        List<AnnotatedClass> supers = new ArrayList<AnnotatedClass>();
+        AnnotatedClass c = cls;
+        while (c != null) {
+            supers.add(c);
+            String parent = c.getSuperInternalName();
+            if (parent == null || "java/lang/Object".equals(parent) || !seen.add(parent)) {
+                break;
+            }
+            c = resolve(ctx, parent);
+        }
+        order.addAll(supers);
+        List<String> pending = new ArrayList<String>();
+        for (AnnotatedClass s : supers) {
+            pending.addAll(s.getInterfaceInternalNames());
+        }
+        for (int i = 0 ; i < pending.size() ; i++) {
+            String itf = pending.get(i);
+            if (!seen.add(itf)) {
+                continue;
+            }
+            AnnotatedClass resolved = resolve(ctx, itf);
+            if (resolved != null) {
+                order.add(resolved);
+                pending.addAll(resolved.getInterfaceInternalNames());
             }
         }
     }
@@ -1620,6 +1793,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return;
         }
         resolveTelemetry(ctx);
+        resolveVirtualThreadStack(ctx);
         if (ctx.hasErrors()) {
             return;
         }
@@ -1714,6 +1888,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             catch (IllegalArgumentException error) { ctx.error(error.getMessage()); return; }
         }
         daos = hasGeneratedDaos(ctx);
+        Object cli = ctx.getAttribute(CommandAnnotationProcessor.CLI_APPLICATION_ATTRIBUTE);
+        cliApplication = cli instanceof String ? (String) cli : null;
+        Object name = ctx.getAttribute(CommandAnnotationProcessor.CLI_NAME_ATTRIBUTE);
+        cliName = name instanceof String ? (String) name : null;
         sources.put(wiring, generateWiring(entryPackage));
         sources.put(bootstrap, generateBootstrap(entryPackage));
         try {
@@ -1795,6 +1973,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 if (byKind != 0) {
                     return byKind;
                 }
+                // A catch-all after every other dynamic route: /files/{id}/info
+                // must not lose /files/42/info to /files/{path:.+}, whichever
+                // pattern is spelled longer.
+                int byGreedy = (a.greedyLast ? 1 : 0) - (b.greedyLast ? 1 : 0);
+                if (byGreedy != 0) {
+                    return byGreedy;
+                }
                 return b.pattern.length() - a.pattern.length();
             }
         });
@@ -1855,7 +2040,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     sb.append("request.pathIs(P").append(i).append(")");
                 } else {
                     sb.append("request.pathStartsWith(P").append(i).append(") && bindPath(request.pathFrom(P")
-                      .append(i).append(".length), A").append(i).append(") != null");
+                      .append(i).append(".length), A").append(i).append(", ").append(route.greedyLast)
+                      .append(", ").append(route.emptyLast).append(") != null");
                 }
                 sb.append(") return C").append(i).append(";\n");
             }
@@ -1954,7 +2140,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         } else {
             sb.append("            if (request.pathStartsWith(P").append(index).append(")) {\n");
             sb.append(pad).append("String[] bound = bindPath(request.pathFrom(P").append(index)
-              .append(".length), A").append(index).append(");\n");
+              .append(".length), A").append(index).append(", ").append(route.greedyLast)
+              .append(", ").append(route.emptyLast).append(");\n");
             sb.append(pad).append("if (bound != null) {\n");
             pad = "                    ";
             bound = "bound";
@@ -2058,7 +2245,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("String result = ").append(call).append(";\n");
             sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
             sb.append(pad).append("        : request.respond(").append(route.status)
-              .append(", \"text/plain; charset=utf-8\", utf8(result));\n");
+              .append(", ").append(quote(stringContentType(route.produces))).append(", utf8(result));\n");
         } else if (route.codecWrite != null) {
             // The application's own classes: written straight into the connection's
             // buffer by the codec the build generated, with no Map in between.
@@ -2076,6 +2263,29 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("        : request.respondJson(").append(route.status)
               .append(", result);\n");
         }
+    }
+
+    /// The Content-Type a String result is sent with: the first concrete type
+    /// the route declares it produces, as Spring answers `produces =
+    /// TEXT_HTML_VALUE` with text/html, and text/plain when it declares none.
+    /// A text type without a charset gets UTF-8, which is how the String is
+    /// encoded.
+    static String stringContentType(String produces) {
+        if (produces != null) {
+            for (String type : produces.split(",")) {
+                String t = type.trim();
+                if (t.length() == 0 || t.indexOf('*') >= 0) {
+                    continue;
+                }
+                boolean textual = t.regionMatches(true, 0, "text/", 0, 5)
+                        || t.regionMatches(true, 0, "application/json", 0, 16)
+                        || t.regionMatches(true, 0, "application/xml", 0, 15)
+                        || t.regionMatches(true, 0, "application/javascript", 0, 22);
+                return textual && t.toLowerCase(java.util.Locale.ROOT).indexOf("charset=") < 0
+                        ? t + "; charset=utf-8" : t;
+            }
+        }
+        return "text/plain; charset=utf-8";
     }
 
     /// The checks of every constrained parameter, before the call. A form
@@ -2228,7 +2438,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             String test;
             String what;
-            if ("QUERY".equals(p.kind)) {
+            if ("QUERY".equals(p.kind) && isMultiValue(p.javaType)) {
+                test = "request.params(" + quote(p.name) + ").isEmpty()";
+                what = "query parameter " + p.name;
+            } else if ("QUERY".equals(p.kind)) {
                 test = "request.param(" + quote(p.name) + ") == null";
                 what = "query parameter " + p.name;
             } else if ("HEADER".equals(p.kind)) {
@@ -2572,7 +2785,30 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return value.trim().indexOf("Infinity") >= 0;
     }
 
+    /// The primitive a wrapper binds as -- an absent value is null rather than
+    /// zero -- or `javaType` itself.
+    static String unboxed(String javaType) {
+        if (javaType == null || !javaType.startsWith("java.lang.")) {
+            return javaType;
+        }
+        String simple = javaType.substring(10);
+        if ("Integer".equals(simple)) {
+            return "int";
+        }
+        if ("Long".equals(simple) || "Double".equals(simple) || "Float".equals(simple)
+                || "Short".equals(simple) || "Byte".equals(simple) || "Boolean".equals(simple)) {
+            return simple.toLowerCase(java.util.Locale.ROOT);
+        }
+        return javaType;
+    }
+
+    /// A `@RequestParam` that takes every value of a repeated parameter.
+    static boolean isMultiValue(String javaType) {
+        return "java.util.List".equals(javaType) || "java.lang.String[]".equals(javaType);
+    }
+
     private static String numericChecker(String javaType) {
+        javaType = unboxed(javaType);
         if ("boolean".equals(javaType)) return "parsesBoolean";
         if ("int".equals(javaType)) return "parsesInt";
         if ("long".equals(javaType)) return "parsesLong";
@@ -2800,6 +3036,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String raw;
         if ("PATH".equals(p.kind)) {
             raw = "bound[" + p.variableIndex + "]";
+        } else if ("QUERY".equals(p.kind) && isMultiValue(p.javaType)) {
+            String all = "request.params(" + quote(p.name) + ")";
+            if (p.defaultValue != null && p.defaultValue.length() > 0) {
+                all = "(" + all + ".isEmpty() ? java.util.Collections.singletonList("
+                        + quote(p.defaultValue) + ") : " + all + ")";
+            }
+            return "java.util.List".equals(p.javaType) ? all
+                    : all + ".toArray(new String[0])";
         } else if ("QUERY".equals(p.kind)) {
             raw = "request.param(" + quote(p.name) + ")";
         } else if ("HEADER".equals(p.kind)) {
@@ -2840,6 +3084,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      */
     private static String convert(String javaType, String raw, String defaultValue) {
         String fallback = defaultValue == null ? "" : defaultValue;
+        String primitive = unboxed(javaType);
+        if (!primitive.equals(javaType)) {
+            // A wrapper is null when the request omits the value and has no
+            // default, as Spring binds it.
+            String value = javaType.replace("java.lang.", "") + ".valueOf("
+                    + convert(primitive, raw, defaultValue) + ")";
+            return fallback.length() > 0 ? value
+                    : "(" + raw + " == null ? null : " + value + ")";
+        }
         if ("java.lang.String".equals(javaType)) {
             return fallback.length() == 0 ? raw
                     : "orDefault(" + raw + ", " + quote(fallback) + ")";
@@ -2964,7 +3217,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("     * to the server's header limit. The same path now fails on the suffix\n");
         sb.append("     * check, before anything is searched at all.\n");
         sb.append("     */\n");
-        sb.append("    private static String[] bindPath(String rest, String[] after) {\n");
+        sb.append("    private static String[] bindPath(String rest, String[] after, boolean greedyLast,\n            boolean emptyLast) {\n");
         sb.append("        int last = after.length - 1;\n");
         sb.append("        int end = rest.length();\n");
         sb.append("        if (after[last].length() > 0) {\n");
@@ -2993,7 +3246,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("            bounds[i * 2 + 1] = at;\n");
         sb.append("            pos = at + literal.length();\n");
         sb.append("        }\n");
-        sb.append("        if (pos >= end || crossesASlash(rest, pos, end)) {\n");
+        sb.append("        // A catch-all ({path:.+}) is the one value allowed to span segments.\n");
+        sb.append("        // {name:.*} and {*name} also take nothing at all: /static/ binds \"\".\n");
+        sb.append("        if ((pos >= end && !(emptyLast && pos == end))\n");
+        sb.append("                || (!greedyLast && crossesASlash(rest, pos, end))) {\n");
         sb.append("            return null;\n");
         sb.append("        }\n");
         sb.append("        bounds[last * 2] = pos;\n");
@@ -3325,7 +3581,33 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("@com.codename1.backend.annotations.Generated\n");
         sb.append("public final class BackendApplication {\n\n");
         sb.append("    private BackendApplication() {\n    }\n\n");
+        // The command line first. With no arguments -- how every backend has
+        // always been started -- it is the server, untouched. With arguments
+        // it goes to the module's @Command classes, the server being their
+        // "serve" sibling; a module with no commands still answers --help and
+        // otherwise starts the server whatever it was passed, as it always did.
+        String appName = cliName != null ? cliName : "server";
+        // Kept for the runners, which Spring Boot hands the whole command line.
+        sb.append("    private static String[] cn1Args = new String[0];\n\n");
         sb.append("    public static void main(String[] args) throws Exception {\n");
+        sb.append("        cn1Args = args == null ? new String[0] : args;\n");
+        sb.append("        int code = com.codename1.cli.CommandLine.serve(")
+          .append(quote(appName)).append(", ")
+          .append(cliApplication != null ? cliApplication + ".commands()" : "null")
+          .append(", new Cn1Server(), args);\n");
+        sb.append("        if (code != com.codename1.cli.CommandLine.SERVED) {\n");
+        sb.append("            System.out.flush();\n");
+        sb.append("            System.err.flush();\n");
+        sb.append("            System.exit(code);\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static final class Cn1Server implements "
+                + "com.codename1.cli.CommandLine.Server {\n");
+        sb.append("        public void serve() throws Exception {\n");
+        sb.append("            cn1Serve();\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static void cn1Serve() throws Exception {\n");
         if (daos) {
             // The generated daos are reachable from here and from nowhere else.
             // The translator drops a class nothing references, so this line is
@@ -3343,8 +3625,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // runtime's internal access, so none of them is public API.
         sb.append("        com.codename1.impl.backend.BackendAccess cn1Access =\n")
           .append("                com.codename1.impl.backend.BackendAccess.get();\n");
+        if (virtualThreadStack > 0) {
+            // Before the builder exists, so before any server can start: the
+            // runtime reads the size when it creates a connection's thread.
+            sb.append("        com.codename1.backend.HttpServer.requireVirtualThreadStack(")
+              .append(virtualThreadStack).append(");\n");
+        }
         sb.append("        com.codename1.backend.Backend.Builder cn1Builder = "
-                + "com.codename1.backend.Backend.builder()");
+                + "com.codename1.backend.Backend.builder().arguments(cn1Args)");
         if (telemetry) {
             // The ONLY references to the OTLP exporters anywhere in the program,
             // which is what keeps them out of a binary that does not ask for
@@ -3513,6 +3801,44 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (!telemetry && propertyEnablesTelemetry(ctx)) {
             telemetry = true;
         }
+    }
+
+    /// The C stack `@VirtualThreadStack` asks for, across the whole class index
+    /// the way [#resolveTelemetry] looks for `@OpenTelemetry`.
+    ///
+    /// Several classes may carry it and the LARGEST size wins rather than the
+    /// build failing: the runtime call only ever raises the size, so a module
+    /// that combines two libraries each asking for its own floor gets what both
+    /// need. A value that is not a size is a build error naming the class.
+    void resolveVirtualThreadStack(ProcessorContext ctx) {
+        virtualThreadStack = 0;
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            AnnotationValues vts = cls.getClassAnnotation(VIRTUAL_THREAD_STACK);
+            if (vts == null) {
+                continue;
+            }
+            if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                    ctx.getSourceEncoding())) {
+                continue;
+            }
+            String raw = vts.getStringOrDefault("value", "");
+            int bytes = parseStackSize(raw);
+            if (bytes <= 0) {
+                ctx.error(cls, "@VirtualThreadStack(\"" + raw + "\") on " + cls.getBinaryName()
+                        + " is not a stack size. Write a positive number of bytes, or a number "
+                        + "followed by KB or MB, such as \"512KB\" or \"1MB\".");
+                return;
+            }
+            if (bytes > virtualThreadStack) {
+                virtualThreadStack = bytes;
+            }
+        }
+    }
+
+    /// Parses a size the way the Python build hint does, so the annotation and
+    /// the hint accept exactly the same spellings.
+    static int parseStackSize(String raw) {
+        return com.codename1.python.transpiler.api.PythonTranspiler.parseStackSize(raw);
     }
 
     /// `cn1.otel.enabled` from the module's application properties, the files

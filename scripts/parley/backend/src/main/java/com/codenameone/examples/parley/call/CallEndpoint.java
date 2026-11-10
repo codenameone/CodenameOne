@@ -20,7 +20,7 @@ package com.codenameone.examples.parley.call;
 
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.parley.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.parley.api.CallApiServer;
 import com.codenameone.examples.parley.api.CallDto;
 import com.codenameone.examples.parley.api.CallSignalDto;

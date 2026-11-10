@@ -81,6 +81,7 @@ final class AppSupport {
 
     /// The local native Linux build, which `cn1RunOnDevice` deploys.
     static final String LINUX_LOCAL_BUILD_TASK = "buildLinuxLocal";
+    static final String STEAM_LOCAL_BUILD_TASK = "buildSteamLocal";
 
     /// The embedded board of a local Linux build (`-Pcn1.board=rpi5`).
     static final String BOARD_PROPERTY = "cn1.board";
@@ -97,6 +98,9 @@ final class AppSupport {
         // The framework is `provided`: compiled against, supplied by the build server
         // or the simulator, never part of the upload.
         addFramework(project, "compileOnly", version, "codenameone-core", "java-runtime");
+        // Writes the source application code compiles against, such as the
+        // builder of each record entity.
+        addProcessor(project);
         final boolean androidProject = com.codename1.maven.AndroidResourceRunner.isAndroidProject(layout.androidSourceDir());
         if (androidProject) {
             // The android.* API the application compiles against; the remap
@@ -172,6 +176,8 @@ final class AppSupport {
             t.getPlaceholderDirectory().set(new File(layout.buildDir(), "css-resources"));
         });
         main.getJava().srcDir(svg.flatMap(TranscodeSvgTask::getOutputDirectory));
+
+        registerPython(project, layout, ext, userProperties, main);
 
         registerGuiSources(project, layout, ext, userProperties, main);
 
@@ -536,6 +542,14 @@ final class AppSupport {
         registerBuild(project, "cn1Build", null, null,
                 "Runs the build given by -Pcodename1.platform and -Pcodename1.buildTarget",
                 layout, main, javase, framework, ext, userProperties, queue);
+        // The cloud Steam build: linux-device with the steam.package hint, as cn1:buildSteam sends it.
+        registerBuild(project, "buildSteam", "linux", "linux-device",
+                "Sends a Steam depot build to the build server",
+                layout, main, javase, framework, ext, userProperties.map(given -> {
+                    Map<String, String> out = new java.util.LinkedHashMap<String, String>(given);
+                    out.put("codename1.arg.steam.package", "true");
+                    return out;
+                }), queue);
 
         final File settingsFile = layout.settingsFile();
         final Provider<Map<String, String>> hosted = userProperties.map(
@@ -552,6 +566,10 @@ final class AppSupport {
         registerBuild(project, LINUX_LOCAL_BUILD_TASK, "linux", "local-linux-device",
                 "Builds the native Linux executable locally (-Pcn1.board=rpi5 for an embedded board)",
                 layout, main, javase, framework, ext, userProperties.zip(board, (given, b) -> boardProperties(given, b, settingsFile)), queue);
+        // The same build laid out as a Steam depot with its SteamPipe scripts.
+        registerBuild(project, STEAM_LOCAL_BUILD_TASK, "linux", "local-steam",
+                "Builds the native Linux executable locally as a Steam depot (needs steam.appId)",
+                layout, main, javase, framework, ext, userProperties, queue);
         // The bundle is found by looking in the build directory, so one an
         // earlier build left there must not be this build's answer.
         final Provider<File> bundle = project.getLayout().getBuildDirectory()
@@ -1151,6 +1169,54 @@ final class AppSupport {
             roots.add(new File(layout.projectDir(), "src/main/kotlin").getAbsolutePath());
         }
         return new ArrayList<String>(roots);
+    }
+
+    /// Python: src/main/python transpiles to Java the main source set
+    /// compiles, against codenameone-python-runtime, which only a project with
+    /// Python sources gets as a dependency. An application and a backend or
+    /// command-line tool alike; the transpiler reads the project's own class
+    /// path, so a backend's program imports the backend's Java classes.
+    static void registerPython(Project project, ProjectLayout layout, CodenameOneExtension ext,
+                               Provider<Map<String, String>> userProperties, SourceSet main) {
+        final File pythonDir = new File(layout.projectDir(), "src/main/python");
+        if (com.codename1.maven.PythonProjectBuilder.isPythonProject(pythonDir)) {
+            addFramework(project, "implementation", ext.getVersion(),
+                    com.codename1.maven.PythonProjectBuilder.RUNTIME_ARTIFACT);
+        }
+        final java.util.Properties pythonSettings = AppSettings.read(layout.settingsFile());
+        final String pythonMain = pythonSettings
+                .getProperty(com.codename1.maven.PythonProjectImporter.MAIN_MODULE_SETTING);
+        final String pythonStack = pythonSettings
+                .getProperty(com.codename1.maven.PythonProjectBuilder.VIRTUAL_THREAD_STACK_HINT);
+        TaskProvider<com.codename1.gradle.tasks.TranspilePythonTask> python = project.getTasks().register(
+                "transpilePython", com.codename1.gradle.tasks.TranspilePythonTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Transpiles the Python sources in src/main/python to Java");
+                    t.getPythonDirectory().set(pythonDir);
+                    t.getSources().from(project.fileTree(pythonDir, f -> f.include("**/*.py")));
+                    if (pythonMain != null) {
+                        t.getMainModule().set(pythonMain);
+                    }
+                    if (pythonStack != null) {
+                        t.getVirtualThreadStack().set(pythonStack);
+                    }
+                    t.getJavaClassPath().from(project.getConfigurations().getByName("compileClasspath"));
+                    t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-python"));
+                    File javaDir = project.file("src/main/java");
+                    t.getJavaSourceDirectory().set(javaDir);
+                    t.getJavaSources().from(project.fileTree(javaDir, f -> f.include("**/*.java")));
+                    t.getJavaImportsDirectory().set(new File(layout.buildDir(), "cn1-python-java-imports"));
+                });
+        main.getJava().srcDir(python.flatMap(com.codename1.gradle.tasks.TranspilePythonTask::getOutputDirectory));
+    }
+
+    /// The javac annotation processor that writes the source a project compiles
+    /// against, such as the builder of each record entity. It is the plugin's
+    /// own version, not the framework's: it depends on nothing, and a project
+    /// may pin a framework released before the processor existed.
+    static void addProcessor(Project project) {
+        project.getDependencies().add("annotationProcessor",
+                PluginInfo.GROUP + ":codenameone-annotation-processor:" + PluginInfo.version());
     }
 
     static void addFramework(Project project, String configuration, Provider<String> version, String... artifactIds) {

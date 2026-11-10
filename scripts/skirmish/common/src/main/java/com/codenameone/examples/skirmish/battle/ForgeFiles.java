@@ -23,7 +23,7 @@ import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.util.Base64;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;

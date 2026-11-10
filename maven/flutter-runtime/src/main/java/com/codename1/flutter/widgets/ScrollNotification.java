@@ -48,8 +48,12 @@ public class ScrollNotification {
         this.metrics = v;
     }
 
-    /** The number of scrollables this notification has bubbled through. */
-    public long get$depth() {
+    /**
+     * The number of scrollables this notification has bubbled through. Named as the
+     * stub's other getters are ({@code metrics()}): the stub declares {@code int get depth},
+     * and a {@code case UserScrollNotification(depth: 0)} pattern reads it as depth().
+     */
+    public long depth() {
         return depth;
     }
 
@@ -78,7 +82,7 @@ public class ScrollNotification {
      * innermost first, stopping at the first one that returns true -- Flutter's
      * {@code Notification.dispatch}.
      *
-     * <p>{@link #get$depth()} counts the scroll views the notification has bubbled THROUGH,
+     * <p>{@link #depth()} counts the scroll views the notification has bubbled THROUGH,
      * not the listeners. That is the distinction the gallery relies on: Reply hides its
      * bottom bar on {@code UserScrollNotification(depth: 0)}, so that dragging the image
      * carousel inside a mail card -- a scroll view of its own, whose notifications reach

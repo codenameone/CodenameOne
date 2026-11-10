@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.dash.net;
 
+import com.codename1.appkit.Net;
+
 import com.codename1.io.CharArrayReader;
 import com.codename1.io.JSONParser;
 import com.codename1.io.WebSocket;

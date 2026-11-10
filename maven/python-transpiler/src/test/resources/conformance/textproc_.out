@@ -1,0 +1,44 @@
+[('UserWarning', 'first', 'UserWarning'), ('DeprecationWarning', 'dep', 'DeprecationWarning'), ('RuntimeWarning', 'rt', 'RuntimeWarning')]
+2 ['same', 'keep me']
+raised boom
+f.py:3: UserWarning: msg
+invalid action: 'bogus'
+['ls', '-l', 'my file.txt', 'single q', 'a b', '#', 'c'] ['a']
+safe 'it'"'"'s here' '' echo 'a b' c
+['a=1', ';', 'b=x y', '&&', 'c']
+['foo', '(', 'bar', ',', "'baz'", ')']
+No closing quotation
+No escaped character
+&lt;a href=&quot;x&quot;&gt;&#x27;&amp;&#x27;&lt;/a&gt; &lt;b&gt;
+<p> &amp; © © © ¬it; &x � €  | ≂̸ &bogus;
+ParseResult(scheme='https', netloc='user:pw@Example.COM:8080', path='/a/b', params='p', query='q=1&r=2', fragment='frag') example.com 8080 user pw https://user:pw@Example.COM:8080/a/b;p?q=1&r=2#frag
+SplitResult(scheme='', netloc='net', path='/loc', query='x', fragment='') SplitResult(scheme='mailto', netloc='', path='a@b.c', query='', fragment='') ::1 b'h'
+'g' http://a/b/c/g
+'./g' http://a/b/c/g
+'g/' http://a/b/c/g/
+'/g' http://a/g
+'//g' http://g
+'?y' http://a/b/c/d;p?y
+'g?y' http://a/b/c/g?y
+'#s' http://a/b/c/d;p?q#s
+'g#s' http://a/b/c/g#s
+'..' http://a/b/
+'../g' http://a/b/g
+'../..' http://a/
+'../../../g' http://a/g
+'g;x' http://a/b/c/g;x
+'' http://a/b/c/d;p?q
+'.' http://a/b/c/
+'./' http://a/b/c/
+DefragResult(url='http://x/y', fragment='z') http://h/p?a=1#f
+a%20b%26c/d%3F%C3%A9 %2Fx%20y a+b%2Bc €%2 a b c b'A%zz'
+a=1&b=x+y&c=%C3%A9 k=1&k=2 k=%5B1%2C+2%5D
+{'a': ['1', '2'], 'c': ['x y!']} [('a', '1'), ('b', ''), ('c', '')] {'x': ['1'], 'y': ['2']}
+16 16 12 True True True False True
+True 2
+full
+1 2 True
+empty
+[(1, '1'), (2, '2'), (4, '4'), (5, '5')]
+c b 1
+9 True

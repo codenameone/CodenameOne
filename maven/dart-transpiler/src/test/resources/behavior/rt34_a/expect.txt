@@ -1,0 +1,8 @@
+set1 1 true
+map 3 2 4
+hash true true
+cl true false 2 true
+gen true false 2
+ctor true false G<int>(3) G<String>(a) G<int>(5) 2
+ctor2 G<num>(1) false true false
+loop 60000

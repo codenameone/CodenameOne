@@ -1,0 +1,27 @@
+(97, 98, 99)
+3
+4
+[97, 55357, 56832, 98]
+[97, 128512, 98]
+3
+97
+98
+61 1f600 62
+a😀b
+[120, 55296, 121]
+true
+1179647
+true
+[10, 2, 3]
+[10, 2, 3]
+refused: fixed length
+refused: fixed length
+refused: fixed length
+3
+[10, 2, 3, 4]
+[false, true, false]
+refused: fixed length
+refused: fixed length
+refused: fixed length
+3
+[false, false, false, true]

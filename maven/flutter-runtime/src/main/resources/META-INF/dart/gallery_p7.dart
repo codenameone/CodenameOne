@@ -125,16 +125,28 @@ class ScaleStartDetails {
   external int get pointerCount;
 }
 
+// Signature for a drag-start callback -- Flutter's `GestureDragStartCallback`
+// (`void Function(DragStartDetails)`), the type GestureDetector's drag-start
+// parameters declare.
+@JavaName('com.codename1.flutter.gestures.GestureDragStartCallback')
+class GestureDragStartCallback {
+  external void call(DragStartDetails details);
+}
+
 // Signature for a drag-update callback — Flutter's `GestureDragUpdateCallback`
 // (`void Function(DragUpdateDetails)`). A SAM the transpiler binds closures to;
 // the reply bottom-drawer stores one and hands it to a GestureDetector.
 @JavaName('com.codename1.flutter.gestures.GestureDragUpdateCallback')
-class GestureDragUpdateCallback {}
+class GestureDragUpdateCallback {
+  external void call(DragUpdateDetails details);
+}
 
 // Signature for a drag-end callback — Flutter's `GestureDragEndCallback`
 // (`void Function(DragEndDetails)`).
 @JavaName('com.codename1.flutter.gestures.GestureDragEndCallback')
-class GestureDragEndCallback {}
+class GestureDragEndCallback {
+  external void call(DragEndDetails details);
+}
 
 // ======================================================================
 // Physics — Tolerance / Simulation family
@@ -234,8 +246,8 @@ class InteractiveViewer extends Widget {
       {Key? key, TransformationController? transformationController,
        EdgeInsets? boundaryMargin, double? minScale, double? maxScale,
        bool? constrained, bool? panEnabled, bool? scaleEnabled,
-       double? scaleFactor, Object? onInteractionStart, Object? onInteractionUpdate,
-       Object? onInteractionEnd, Object? clipBehavior, bool? alignPanAxis,
+       double? scaleFactor, void Function(ScaleStartDetails)? onInteractionStart, void Function(ScaleUpdateDetails)? onInteractionUpdate,
+       void Function(ScaleEndDetails)? onInteractionEnd, Object? clipBehavior, bool? alignPanAxis,
        Widget? child});
 }
 
@@ -246,7 +258,7 @@ class InteractiveViewer extends Widget {
 // Controls the visible page of a PageView — Flutter's `PageController`. The home
 // carousel reads `page` and `position.haveDimensions`.
 @JavaName('com.codename1.flutter.widgets.PageController')
-class PageController {
+class PageController implements Listenable {
   external PageController({int? initialPage, bool? keepPage, double? viewportFraction});
   external double? get page;
   external int get initialPage;
@@ -267,12 +279,12 @@ class PageController {
 class PageView extends Widget {
   external PageView(
       {Key? key, PageController? controller, Object? scrollDirection, bool? reverse,
-       Object? physics, bool? pageSnapping, Object? onPageChanged, List<Widget>? children,
+       Object? physics, bool? pageSnapping, void Function(int)? onPageChanged, List<Widget>? children,
        bool? allowImplicitScrolling, String? restorationId, Object? clipBehavior});
   external static PageView builder(
       {Key? key, PageController? controller, Object? scrollDirection, bool? reverse,
-       Object? physics, bool? pageSnapping, Object? onPageChanged,
-       Object? itemBuilder, int? itemCount, bool? allowImplicitScrolling,
+       Object? physics, bool? pageSnapping, void Function(int)? onPageChanged,
+       IndexedWidgetBuilder itemBuilder, int? itemCount, bool? allowImplicitScrolling,
        String? restorationId, Object? clipBehavior});
 }
 
@@ -283,7 +295,7 @@ class PageView extends Widget {
 // The State of a Form, driving validation/save across its fields — Flutter's
 // `FormState`.
 @JavaName('com.codename1.flutter.widgets.FormState')
-class FormState {
+class FormState extends State<Form> {
   external bool validate();
   external void save();
   external void reset();
@@ -292,7 +304,7 @@ class FormState {
 // The State of a single FormField — Flutter's `FormFieldState<T>`. The text-field
 // demo reads/writes `value` and calls didChange/validate/save/reset.
 @JavaName('com.codename1.flutter.widgets.FormFieldState')
-class FormFieldState<T> {
+class FormFieldState<T> extends State<Widget> {
   external T? get value;
   external bool get hasError;
   external bool get isValid;
@@ -306,12 +318,16 @@ class FormFieldState<T> {
 // Persists a form field's value on save — Flutter's `FormFieldSetter<T>` typedef
 // (`void Function(T? newValue)`). A SAM the transpiler binds closures to.
 @JavaName('com.codename1.flutter.widgets.FormFieldSetter')
-class FormFieldSetter<T> {}
+class FormFieldSetter<T> {
+  external void call(T? newValue);
+}
 
 // Validates a form field's value — Flutter's `FormFieldValidator<T>` typedef
 // (`String? Function(T? value)`). A SAM the transpiler binds closures to.
 @JavaName('com.codename1.flutter.widgets.FormFieldValidator')
-class FormFieldValidator<T> {}
+class FormFieldValidator<T> {
+  external String? call(T? value);
+}
 
 // A grouping of form fields that validate/save together — Flutter's `Form`.
 @JavaName('com.codename1.flutter.widgets.Form')
@@ -329,8 +345,8 @@ class TextFormField extends Widget {
       {Key? key, TextEditingController? controller, String? initialValue,
        InputDecoration? decoration, TextInputType? keyboardType, TextStyle? style,
        bool? obscureText, bool? enabled, int? maxLines, int? minLines, int? maxLength,
-       Object? validator, Object? onSaved, Object? onChanged, Object? onFieldSubmitted,
-       Object? onEditingComplete, Object? focusNode, Object? textInputAction,
+       FormFieldValidator<String>? validator, FormFieldSetter<String>? onSaved, void Function(String)? onChanged, void Function(String)? onFieldSubmitted,
+       VoidCallback? onEditingComplete, Object? focusNode, Object? textInputAction,
        Object? textCapitalization, Object? autovalidateMode, Object? inputFormatters,
        List<String>? autofillHints, Object? autofocus, Object? cursorColor});
 }
@@ -396,7 +412,7 @@ class PreferredSizeWidget extends Widget {
 // Adapts its child to a PreferredSizeWidget of the given size — Flutter's
 // `PreferredSize`.
 @JavaName('com.codename1.flutter.widgets.PreferredSize')
-class PreferredSize extends Widget {
+class PreferredSize extends Widget implements PreferredSizeWidget {
   external PreferredSize({Key? key, Size preferredSize, Widget child});
   external Size get preferredSize;
 }
@@ -430,8 +446,8 @@ class PhysicalShape extends Widget {
 // A widget managing a FocusNode for its subtree — Flutter's `Focus`.
 @JavaName('com.codename1.flutter.widgets.Focus')
 class Focus extends Widget {
-  external Focus({Key? key, FocusNode? focusNode, bool? autofocus, Object? onFocusChange,
-      Object? onKey, Object? onKeyEvent, bool? canRequestFocus, bool? skipTraversal,
+  external Focus({Key? key, FocusNode? focusNode, bool? autofocus, void Function(bool)? onFocusChange,
+      Object? onKey, KeyEventResult Function(FocusNode, KeyEvent)? onKeyEvent, bool? canRequestFocus, bool? skipTraversal,
       bool? descendantsAreFocusable, bool? includeSemantics, String? debugLabel, Widget? child});
   external static FocusNode of(BuildContext context, {bool scopeOk});
 }
@@ -446,22 +462,22 @@ class ExcludeFocus extends Widget {
 @JavaName('com.codename1.flutter.widgets.KeyboardListener')
 class KeyboardListener extends Widget {
   external KeyboardListener({Key? key, FocusNode focusNode, bool? autofocus,
-      bool? includeSemantics, Object? onKeyEvent, Widget child});
+      bool? includeSemantics, void Function(KeyEvent)? onKeyEvent, Widget child});
 }
 
 // A low-level pointer-event listener — Flutter's `Listener`.
 @JavaName('com.codename1.flutter.widgets.Listener')
 class Listener extends Widget {
-  external Listener({Key? key, Object? onPointerDown, Object? onPointerMove,
-      Object? onPointerUp, Object? onPointerCancel, Object? onPointerHover,
-      Object? onPointerSignal, Object? behavior, Widget? child});
+  external Listener({Key? key, void Function(dynamic)? onPointerDown, void Function(dynamic)? onPointerMove,
+      void Function(dynamic)? onPointerUp, void Function(dynamic)? onPointerCancel, void Function(dynamic)? onPointerHover,
+      void Function(dynamic)? onPointerSignal, Object? behavior, Widget? child});
 }
 
 // Listens for a Notification bubbling up from its subtree — Flutter's
 // `NotificationListener<T>`.
 @JavaName('com.codename1.flutter.widgets.NotificationListener')
 class NotificationListener<T> extends Widget {
-  external NotificationListener({Key? key, Object? onNotification, Widget? child});
+  external NotificationListener({Key? key, bool Function(ScrollNotification)? onNotification, Widget? child});
 }
 
 // Intercepts the system back gesture — Flutter's `WillPopScope`.
@@ -542,7 +558,7 @@ class OverlayState {
 @JavaName('com.codename1.flutter.material.BottomAppBar')
 class BottomAppBar extends Widget {
   external BottomAppBar({Key? key, Color? color, double? elevation, NotchedShape? shape,
-      Object? clipBehavior, double? notchMargin, EdgeInsets? padding, double? height,
+      Clip? clipBehavior, double? notchMargin, EdgeInsets? padding, double? height,
       Color? surfaceTintColor, Color? shadowColor, Widget? child});
 }
 
@@ -580,10 +596,10 @@ class RawMaterialButton extends Widget {
 // `InkResponse`.
 @JavaName('com.codename1.flutter.material.InkResponse')
 class InkResponse extends Widget {
-  external InkResponse({Key? key, VoidCallback? onTap, Object? onTapDown, Object? onTapUp,
-      Object? onTapCancel, Object? onDoubleTap, Object? onLongPress, Object? onHighlightChanged,
+  external InkResponse({Key? key, VoidCallback? onTap, GestureTapDownCallback? onTapDown, GestureTapUpCallback? onTapUp,
+      Object? onTapCancel, VoidCallback? onDoubleTap, VoidCallback? onLongPress, Object? onHighlightChanged,
       Object? onHover, bool? containedInkWell, Object? highlightShape, double? radius,
-      Object? borderRadius, Object? customBorder, Color? focusColor, Color? hoverColor,
+      BorderRadius? borderRadius, ShapeBorder? customBorder, Color? focusColor, Color? hoverColor,
       Color? highlightColor, Color? splashColor, Object? splashFactory, bool? enableFeedback,
       bool? excludeFromSemantics, Object? mouseCursor, bool? canRequestFocus, Widget? child});
 }
@@ -591,21 +607,21 @@ class InkResponse extends Widget {
 // The leading back button of an app bar — Flutter's `BackButton`.
 @JavaName('com.codename1.flutter.material.BackButton')
 class BackButton extends Widget {
-  external BackButton({Key? key, Color? color, Object? onPressed, Object? style});
+  external BackButton({Key? key, Color? color, VoidCallback? onPressed, Object? style});
 }
 
 // A builder that rebuilds its own subtree via a local setState — Flutter's
 // `StatefulBuilder`.
 @JavaName('com.codename1.flutter.widgets.StatefulBuilder')
 class StatefulBuilder extends Widget {
-  external StatefulBuilder({Key? key, Object builder});
+  external StatefulBuilder({Key? key, Widget Function(BuildContext, void Function(VoidCallback)) builder});
 }
 
 // Builds itself from the latest snapshot of a Future — Flutter's
 // `FutureBuilder<T>`.
 @JavaName('com.codename1.flutter.widgets.FutureBuilder')
 class FutureBuilder<T> extends Widget {
-  external FutureBuilder({Key? key, Object? future, T? initialData, Object builder});
+  external FutureBuilder({Key? key, Object? future, T? initialData, Widget Function(BuildContext, AsyncSnapshot<T>) builder});
 }
 
 // Builds itself from the latest event of a Stream -- Flutter's `StreamBuilder<T>`.
@@ -673,6 +689,7 @@ class DateRangePickerDialog extends Widget {
 @JavaName('com.codename1.flutter.ObjectKey')
 class ObjectKey extends Key {
   external ObjectKey(Object? value);
+  external Object? get value;
 }
 
 // ======================================================================
@@ -753,9 +770,10 @@ class ExactAssetImage extends ImageProvider {
 // Recognizes single taps, wired to link spans in the about page — Flutter's
 // `TapGestureRecognizer`.
 @JavaName('com.codename1.flutter.gestures.TapGestureRecognizer')
-class TapGestureRecognizer {
+class TapGestureRecognizer extends GestureRecognizer {
   external TapGestureRecognizer({Object? debugOwner});
   external set onTap(VoidCallback? handler);
+  external VoidCallback? get onTap;
   external void dispose();
 }
 
@@ -850,9 +868,23 @@ class WidgetsBinding {
   external static WidgetsBinding get instance;
   external PlatformDispatcher get platformDispatcher;
   external Object get window;
-  external void addPostFrameCallback(Object callback);
+  external void addPostFrameCallback(void Function(dynamic) callback);
   external void addObserver(Object observer);
-  external void removeObserver(Object observer);
+  external bool removeObserver(Object observer);
+  external AppLifecycleState? get lifecycleState;
+}
+
+@JavaName('com.codename1.flutter.widgets.AppLifecycleState')
+enum AppLifecycleState { detached, resumed, inactive, hidden, paused }
+
+@JavaName('com.codename1.flutter.widgets.WidgetsBindingObserver')
+mixin WidgetsBindingObserver {
+  void didChangeAppLifecycleState(AppLifecycleState state) {}
+  void didChangeMetrics() {}
+  void didChangePlatformBrightness() {}
+  void didChangeTextScaleFactor() {}
+  void didHaveMemoryPressure() {}
+  void didChangeLocales(List<Object>? locales) {}
 }
 
 // The default height of a BottomNavigationBar — Flutter's top-level const
@@ -884,7 +916,7 @@ class BottomSheetThemeData {
 // `provider` package's `Selector<A, S>`.
 @JavaName('com.codename1.flutter.provider.Selector')
 class Selector<A, S> extends StatelessWidget {
-  external Selector({Key? key, Object selector, Object builder, Object? shouldRebuild, Widget? child});
+  external Selector({Key? key, S Function(BuildContext, A) selector, Widget Function(BuildContext, S, Widget) builder, Object? shouldRebuild, Widget? child});
 }
 
 // ======================================================================
@@ -894,7 +926,7 @@ class Selector<A, S> extends StatelessWidget {
 // The localizations delegate contributing translated locale/country names — the
 // `flutter_localized_countries` package's `LocaleNamesLocalizationsDelegate`.
 @JavaName('com.codename1.flutter.l10n.LocaleNamesLocalizationsDelegate')
-class LocaleNamesLocalizationsDelegate {
+class LocaleNamesLocalizationsDelegate extends LocalizationsDelegate<Object?> {
   external LocaleNamesLocalizationsDelegate();
   // The map of locale-code -> native display name — the
   // `flutter_localized_countries` package's static `nativeLocaleNames`.
@@ -947,9 +979,22 @@ external int compareAsciiUpperCase(String a, String b);
 // A Future that is already complete and calls its listeners synchronously —
 // Flutter foundation's `SynchronousFuture<T>`.
 @JavaName('com.codename1.flutter.foundation.SynchronousFuture')
-class SynchronousFuture<T> {
+class SynchronousFuture<T> implements Future<T> {
   external SynchronousFuture(T value);
   external Object then(Object onValue, {Object? onError});
-  external Object whenComplete(Object action);
+  external Object whenComplete(dynamic Function() action);
   external Object catchError(Object onError, {Object? test});
+}
+
+// `InkResponse.onTapDown` / `onTapUp` take the gestures library's named SAMs
+// (`void Function(TapDownDetails)` / `void Function(TapUpDetails)`), not a
+// `Funcs.VoidFunc1`; the transpiler binds a closure to them by the Java name.
+@JavaName('com.codename1.flutter.gestures.GestureTapDownCallback')
+class GestureTapDownCallback {
+  external void call(TapDownDetails details);
+}
+
+@JavaName('com.codename1.flutter.gestures.GestureTapUpCallback')
+class GestureTapUpCallback {
+  external void call(TapUpDetails details);
 }

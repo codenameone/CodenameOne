@@ -128,7 +128,9 @@ class FloatingActionButtonThemeData {
 // `style:` parameter, so it needs no members here.
 
 @JavaName('com.codename1.flutter.material.ButtonStyle')
-class ButtonStyle {}
+class ButtonStyle {
+  external ButtonStyle merge(ButtonStyle? style);
+}
 
 // Note: FilterChip / ChoiceChip / InputChip are owned by the widgetsMore
 // category (gallery_p2_widgetsMore.dart), not this file, to avoid a duplicate

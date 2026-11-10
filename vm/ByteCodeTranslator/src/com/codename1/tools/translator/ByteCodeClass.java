@@ -732,6 +732,13 @@ public class ByteCodeClass {
             ByteCodeClass depClass = Parser.getClassObject(dep);
             if (depClass != null && depClass.getConcreteClass() != null) {
                 String concrete = depClass.getConcreteClass().replace('/', '_').replace('$', '_').replace('-', '_');
+                // A concrete class that is not part of this translation (a program
+                // built without a port) is no dependency: Invoke resolves nothing
+                // against it and the call stays virtual, so naming it here only
+                // emitted an #include of a header no translation writes.
+                if (Parser.getClassObject(concrete) == null) {
+                    continue;
+                }
                 if (!dependsClassesInterfaces.contains(concrete) && !concreteExtras.contains(concrete)) {
                     concreteExtras.add(concrete);
                 }

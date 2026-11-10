@@ -29,8 +29,11 @@ import java.util.LinkedList;
 /// A named place background work runs: a pool of platform threads, or virtual
 /// threads on the server's hosts.
 ///
-/// Configured as `cn1.task.executor.<name>.threads` and
+/// Configured as `cn1.task.executor.<name>.threads`,
 /// `cn1.task.executor.<name>.kind` (`platform` or `virtual`),
+/// `cn1.task.executor.<name>.queue-capacity` (how many tasks may wait for a
+/// pool thread before [TaskRejectedException]; unbounded by default) and
+/// `cn1.task.executor.<name>.thread-name-prefix`,
 /// and listed by [Tasks#executors]. The threads of a pool start on the
 /// first task, so an executor the configuration names and nothing uses costs a
 /// map entry.
@@ -86,6 +89,23 @@ public final class TaskExecutor {
     }
 
     private boolean auto;
+    /// Pool tasks that may wait for a thread; set once, before any task.
+    private int queueCapacity = Integer.MAX_VALUE;
+    private String threadNamePrefix;
+    private TaskDecorator decorator;
+
+    /// The settings Tasks reads for this executor, applied before it is shared.
+    synchronized void configure(int capacity, String prefix) {
+        queueCapacity = capacity < 1 ? Integer.MAX_VALUE : capacity;
+        threadNamePrefix = prefix;
+    }
+
+    /// Wraps every task submitted from now on; null removes the decorator.
+    /// Tasks already submitted run as they were.
+    /// @param decorator the decorator, or null
+    public synchronized void setTaskDecorator(TaskDecorator decorator) {
+        this.decorator = decorator;
+    }
 
     /// Fixes an AUTO executor to one kind of thread, when another caller of the
     /// same name asks for that kind explicitly. Otherwise which kind a
@@ -158,6 +178,21 @@ public final class TaskExecutor {
         if (task == null) {
             return;
         }
+        TaskDecorator wrap;
+        synchronized (this) {
+            wrap = decorator;
+        }
+        if (wrap != null) {
+            // On the submitting thread, outside the lock: decorating is what
+            // reads the submitter's context, and it is the application's code.
+            Runnable decorated = wrap.decorate(task);
+            if (decorated != null && decorated != task) { //NOPMD CompareObjectsWithEquals - same task back means undecorated
+                // The original is kept beside it: shutdown fails an unfinished
+                // @Async task's Future by finding the AsyncTask, which a
+                // decorator's wrapper hides.
+                task = new Decorated(decorated, task);
+            }
+        }
         boolean tryVirtual;
         synchronized (this) {
             tryVirtual = virtual || auto;
@@ -191,6 +226,10 @@ public final class TaskExecutor {
             if (shutdown) {
                 throw new IllegalStateException("Executor " + name + " has been shut down");
             }
+            if (queue.size() >= queueCapacity) {
+                throw new TaskRejectedException("Executor " + name + " has "
+                        + queue.size() + " tasks waiting, its queue-capacity");
+            }
             queue.addLast(task);
             if (workers == null) {
                 startWorkers();
@@ -207,7 +246,7 @@ public final class TaskExecutor {
                 public void run() {
                     work();
                 }
-            }, "cn1-task-" + name + "-" + iter);
+            }, (threadNamePrefix != null ? threadNamePrefix : "cn1-task-" + name + "-") + iter);
             t.setDaemon(true);
             workers[iter] = t;
             t.start();
@@ -313,8 +352,9 @@ public final class TaskExecutor {
         // A dropped @Async call still has a Future someone may be waiting on;
         // it fails rather than never finishing.
         for (Object queued : queue) {
-            if (queued instanceof AsyncTask) {
-                ((AsyncTask) queued).abandon("dropped when the server stopped before it "
+            AsyncTask async = asyncOf(queued);
+            if (async != null) {
+                async.abandon("dropped when the server stopped before it "
                         + "could start");
             }
         }
@@ -366,8 +406,32 @@ public final class TaskExecutor {
                 c.owner.notifyAll();
             }
         }
-        if (inner instanceof AsyncTask) {
-            ((AsyncTask) inner).abandon("abandoned when the server stopped before it finished");
+        AsyncTask async = asyncOf(inner);
+        if (async != null) {
+            async.abandon("abandoned when the server stopped before it finished");
+        }
+    }
+
+    /// The `@Async` call behind a queued task, seen through a decorator's
+    /// wrapper; null for any other task.
+    private static AsyncTask asyncOf(Object task) {
+        Object inner = task instanceof Decorated ? ((Decorated) task).original : task;
+        return inner instanceof AsyncTask ? (AsyncTask) inner : null;
+    }
+
+    /// A task as the decorator returned it, with the task it was given.
+    private static final class Decorated implements Runnable {
+        private final Runnable decorated;
+        final Runnable original;
+
+        Decorated(Runnable decorated, Runnable original) {
+            this.decorated = decorated;
+            this.original = original;
+        }
+
+        @Override
+        public void run() {
+            decorated.run();
         }
     }
 
@@ -375,8 +439,9 @@ public final class TaskExecutor {
         active--;
         if (timedOut) {
             dropped++;
-            if (task instanceof AsyncTask) {
-                ((AsyncTask) task).abandon("dropped when the server stopped before it could "
+            AsyncTask async = asyncOf(task);
+            if (async != null) {
+                async.abandon("dropped when the server stopped before it could "
                         + "start");
             }
             notifyAll();

@@ -91,6 +91,28 @@ public final class PlatformFeatureCatalog {
     // StableDiffusion entry therefore raises the app to.
     private static final String ONNX_RUNTIME =
             "com.microsoft.onnxruntime:onnxruntime-android:1.21.1";
+    // whisper.cpp and llama.cpp are not published by their authors in a form a
+    // build can link: we build pinned upstream tags ourselves
+    // (scripts/ai-natives, workflow ai-natives.yml) and publish them to the
+    // Codename One repository. The version is "<upstream tag>-<our revision>";
+    // bump the revision when only our JNI glue or build flags change. Each
+    // artifact links its own ggml with every symbol hidden except its own C
+    // API, so an application using both carries two copies of ggml and no
+    // duplicate symbols.
+    public static final String AI_NATIVES_GROUP = "com.codenameone.natives";
+    public static final String WHISPER_NATIVES_VERSION = "1.9.5-1";
+    public static final String LLAMA_NATIVES_VERSION = "0.9.0-1";
+
+    static final String LOCAL_LLM_OWNER = "com/codename1/ai/LlmClient";
+    static final String LOCAL_LLM_METHOD = "local";
+    private static final String WHISPER_ANDROID =
+            AI_NATIVES_GROUP + ":cn1-whisper-android:" + WHISPER_NATIVES_VERSION + "@aar";
+    private static final String WHISPER_IOS =
+            AI_NATIVES_GROUP + ":cn1-whisper-ios:" + WHISPER_NATIVES_VERSION;
+    private static final String LLAMA_ANDROID =
+            AI_NATIVES_GROUP + ":cn1-llama-android:" + LLAMA_NATIVES_VERSION + "@aar";
+    private static final String LLAMA_IOS =
+            AI_NATIVES_GROUP + ":cn1-llama-ios:" + LLAMA_NATIVES_VERSION;
     private static final String MLKIT_LANGUAGE_ID =
             "com.google.mlkit:language-id:17.0.6";
     private static final String MLKIT_TRANSLATE =
@@ -113,6 +135,18 @@ public final class PlatformFeatureCatalog {
         // entry so the scanner has a positive hit for diagnostics.
         e.add(new Entry("com/codename1/ai/LlmClient")
                 .description("LLM client (OpenAI / Anthropic / Gemini / Ollama)"));
+        // On-device llama.cpp. Core always contains LlmClient, so the class
+        // alone says nothing: the entry fires only on a call to
+        // LlmClient.local, the one way to reach LocalLlmClient. Both builders
+        // read the same call through isLocalLlmCall to enable the port glue.
+        e.add(new Entry("com/codename1/ai/LlmClient")
+                .requiresMethod(LOCAL_LLM_OWNER, LOCAL_LLM_METHOD)
+                .iosXcframework(LLAMA_IOS)
+                .iosFrameworks("Accelerate", "Metal", "MetalKit")
+                .androidGradle(LLAMA_ANDROID)
+                // llama.cpp calls posix_madvise, which bionic has from API 23.
+                .androidMinimumSdk(23)
+                .description("On-device LLM (llama.cpp)"));
         e.add(new Entry("com/codename1/ai/OpenAiClient").description("OpenAI client"));
         e.add(new Entry("com/codename1/ai/AnthropicClient").description("Anthropic client"));
         e.add(new Entry("com/codename1/ai/GeminiClient").description("Gemini client"));
@@ -443,10 +477,17 @@ public final class PlatformFeatureCatalog {
         // project, whose android.min_sdk_version is 19, with
         // "uses-sdk:minSdkVersion 19 cannot be smaller than version 21 declared
         // in library".
+        //
+        // The prefix is the cn1lib's package, so the libraries are fetched for
+        // every application that depends on cn1-ai-whisper -- the cn1lib is
+        // the opt-in. Metal runs the encoder on the GPU; ggml's Metal shaders
+        // are embedded in the library, so no .metallib ships.
         e.add(new Entry("com/codename1/ai/whisper/")
-                .iosFrameworks("Accelerate")
+                .iosXcframework(WHISPER_IOS)
+                .iosFrameworks("Accelerate", "Metal", "MetalKit")
+                .androidGradle(WHISPER_ANDROID)
                 .androidMinimumSdk(21)
-                .description("On-device Whisper transcription (libwhisper.a ships with the cn1lib)"));
+                .description("On-device Whisper transcription (whisper.cpp)"));
 
         // Low-level cross-platform camera API: live preview + frame
         // stream + photo + video. iOS uses AVFoundation (framework
@@ -958,6 +999,21 @@ public final class PlatformFeatureCatalog {
     private PlatformFeatureCatalog() {
     }
 
+
+    /**
+     * Whether a method reference is the call that opts an application into
+     * on-device llama.cpp ({@code LlmClient.local}). The builders use it to
+     * enable the port glue that the catalog entry's libraries serve.
+     *
+     * @param internalClassName JVM internal-form owner name
+     * @param methodName referenced method name
+     * @return {@code true} for {@code com/codename1/ai/LlmClient#local}
+     */
+    public static boolean isLocalLlmCall(String internalClassName, String methodName) {
+        return LOCAL_LLM_OWNER.equals(internalClassName)
+                && LOCAL_LLM_METHOD.equals(methodName);
+    }
+
     /**
      * Returns every registered platform feature in declaration order.
      *
@@ -1106,6 +1162,20 @@ public final class PlatformFeatureCatalog {
             }
             return Collections.unmodifiableSet(frameworks);
         }
+
+        /**
+         * Returns the de-duplicated xcframework coordinates of the matched
+         * entries, in declaration order.
+         *
+         * @return immutable {@code group:artifact:version} coordinates
+         */
+        public Set<String> iosXcframeworks() {
+            Set<String> out = new LinkedHashSet<String>();
+            for (Entry entry : hits()) {
+                out.addAll(entry.iosXcframeworks());
+            }
+            return Collections.unmodifiableSet(out);
+        }
     }
 
     private static boolean isCatalogClass(String internalClassName) {
@@ -1141,6 +1211,7 @@ public final class PlatformFeatureCatalog {
         private final List<String> iosPods = new ArrayList<String>();
         private final List<IosSpm> iosSpm = new ArrayList<IosSpm>();
         private final List<String> iosFrameworks = new ArrayList<String>();
+        private final List<String> iosXcframeworks = new ArrayList<String>();
         private final List<String[]> iosPlist = new ArrayList<String[]>();
         private final List<String> androidGradle = new ArrayList<String>();
         private final List<String> androidPermissions = new ArrayList<String>();
@@ -1234,6 +1305,19 @@ public final class PlatformFeatureCatalog {
             for (String f : fws) {
                 iosFrameworks.add(f);
             }
+            return this;
+        }
+
+        /**
+         * Adds a static xcframework, as {@code group:artifact:version} of a
+         * zip in the Codename One repository that holds one
+         * {@code <Name>.xcframework} at its top level.
+         *
+         * @param coordinates Maven coordinates of the zip
+         * @return this entry
+         */
+        Entry iosXcframework(String coordinates) {
+            iosXcframeworks.add(coordinates);
             return this;
         }
 
@@ -1338,6 +1422,14 @@ public final class PlatformFeatureCatalog {
         /** @return immutable Apple system-framework names without suffixes */
         public List<String> iosFrameworks() {
             return Collections.unmodifiableList(iosFrameworks);
+        }
+
+        /**
+         * @return immutable {@code group:artifact:version} coordinates of the
+         *         static xcframework zips this entry links
+         */
+        public List<String> iosXcframeworks() {
+            return Collections.unmodifiableList(iosXcframeworks);
         }
 
         /** Each entry is {key, defaultValue}. The builder injects the

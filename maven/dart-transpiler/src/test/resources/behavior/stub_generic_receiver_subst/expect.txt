@@ -1,0 +1,4 @@
+[Wrapped(1), Wrapped(2), Wrapped(3)]
+[Wrapped(x), Wrapped(y), Wrapped(z)]
+[1, 2, 3, 4, 5]
+3

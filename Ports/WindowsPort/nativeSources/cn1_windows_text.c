@@ -312,7 +312,9 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFont___java_lang_
  * PE-resource data, read out of the exe) via the DirectWrite in-memory loader --
  * the single-exe path, no file on disk. Falls back to a system family resolved
  * from the font name (so "native:" scheme names still work) when there are no
- * bytes or registration fails.
+ * bytes. Bytes that DirectWrite cannot register answer 0: a corrupt font is a
+ * failure the caller reports (Font.createTrueTypeFontFromData answers null, a
+ * bundled font falls back to the file loader), never a silent system family.
  */
 JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___java_lang_String_byte_1ARRAY_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
@@ -325,9 +327,14 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___
         void* data = CN1_ARRAY_DATA(__cn1Arg2);
         wchar_t registered[128];
         registered[0] = L'\0';
-        if (len > 0 && data != NULL
-                && cn1dwRegisterFontMemory(data, (unsigned int) len, registered, 128) && registered[0] != L'\0') {
-            font = cn1WinMakeFont(registered, 15.0f * dpi, 0, 0);
+        if (len > 0 && data != NULL) {
+            if (cn1dwRegisterFontMemory(data, (unsigned int) len, registered, 128) && registered[0] != L'\0') {
+                font = cn1WinMakeFont(registered, 15.0f * dpi, 0, 0);
+            }
+            if (font == NULL) {
+                free(name);
+                return 0;
+            }
         }
     }
 
@@ -336,6 +343,16 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___
     }
     free(name);
     return (JAVA_LONG) (intptr_t) font;
+}
+
+/*
+ * Whether fonts can be loaded from bytes on this system at all, which is what
+ * isTrueTypeStreamSupported reports: without IDWriteFactory5 every load from
+ * memory fails.
+ */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isFontMemoryLoadingSupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE) {
+    return cn1dwFontMemorySupported() ? JAVA_TRUE : JAVA_FALSE;
 }
 
 /*

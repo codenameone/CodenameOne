@@ -1,0 +1,17 @@
+handler frame sock:hello
+socket close 1000
+multi got id 1
+local one
+multi got id 2
+local two
+retyped [4, 5]
+true
+true
+framed raw
+framed frame:f1
+framed done
+sync part done
+a1
+b1
+a2
+b2

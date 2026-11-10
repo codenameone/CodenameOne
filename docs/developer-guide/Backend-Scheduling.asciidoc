@@ -96,6 +96,13 @@ A pool's threads start with its first task, so an unused executor costs
 nothing. A task submitted while every thread is busy waits in the executor's
 queue, and `cn1.task.queue_depth` reports how many are waiting, by executor.
 
+An executor's properties also take `queue-capacity`, the number of tasks that may
+wait for a thread before a submission is refused with `TaskRejectedException`,
+and `thread-name-prefix`, which names its threads. `Tasks.executor(name)`
+returns the executor itself, and `setTaskDecorator` on it wraps every task it
+runs, which is where context such as a logging tag is carried from the
+submitting thread to the worker.
+
 === Platform or virtual threads
 
 `thread` on `@Async` and `@Scheduled` chooses the kind of thread, from

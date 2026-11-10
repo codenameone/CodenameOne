@@ -33,6 +33,7 @@ import java.util.Map;
 import com.codename1.backend.sql.Dialect;
 import com.codename1.backend.sql.MySql;
 import com.codename1.backend.sql.Postgres;
+import com.codename1.backend.sql.QueryRows;
 
 /// One database API over SQLite, PostgreSQL and MySQL, chosen by URL.
 ///
@@ -51,13 +52,23 @@ import com.codename1.backend.sql.Postgres;
 /// PostgreSQL without a branch. Parameters are always bound, never interpolated,
 /// on all three.
 ///
-/// TLS has three settings, and none of them is "encrypted but unverified".
-/// `sslmode=require` demands TLS whose certificate chains to a trusted root AND
-/// carries the host's name; `sslmode=disable` is plaintext, deliberately;
-/// `sslmode=prefer` uses TLS when the server offers it and fails loudly rather
-/// than silently downgrading when verification does not hold. A managed instance
-/// or a development container that presents a private CA is reached by naming it:
-/// `sslrootcert=/path/to/ca.pem`.
+/// TLS has five settings, and none of them is "encrypted but unverified".
+/// `sslmode=require` (and its synonym `verify-full`) demands TLS whose
+/// certificate chains to a trusted root AND carries the host's name;
+/// `sslmode=verify-ca` demands a chain to the root named by `sslrootcert`, which
+/// it requires, and does not check the name; `sslmode=disable` is plaintext,
+/// deliberately; `sslmode=prefer` uses TLS when the server offers it and fails
+/// loudly rather than silently downgrading when verification does not hold. A
+/// managed instance or a development container that presents a private CA is
+/// reached by naming it: `sslrootcert=/path/to/ca.pem`. MySQL's own spellings are
+/// accepted too: `ssl-mode=DISABLED|PREFERRED|REQUIRED|VERIFY_CA|VERIFY_IDENTITY`
+/// and `ssl-ca`.
+///
+/// Unlike libpq and MySQL Connector, `require` here verifies. Those clients read
+/// `require` as "encrypt, trust any certificate", which an on-path peer satisfies
+/// with a certificate of its own; a stock `mysql:8.4` container, whose generated
+/// certificate names no host, is reached with `sslmode=verify-ca` and its
+/// `ca.pem` instead.
 ///
 /// SQLite goes through [Db], which is per-target: the engine is linked into
 /// the binary on the translated side and reached through a JDBC driver on the
@@ -312,6 +323,24 @@ public final class Database {
         } finally {
             exit();
         }
+    }
+
+    /// The kind of each column of a result `query` returned, in the order the
+    /// statement projects them, for the columns whose values come back as text
+    /// that still has to be parsed: `"decimal"` (an exact DECIMAL or NUMERIC,
+    /// kept as its digits), `"date"`, `"datetime"` (no zone), `"datetimetz"`
+    /// (PostgreSQL's timestamp with time zone, which carries its offset),
+    /// `"time"` and `"timetz"` (PostgreSQL's time with time zone, which carries
+    /// its offset). Every other column is null, because its value is already the
+    /// Long, Double, String or byte\[\] it is.
+    ///
+    /// Answers null for rows this class did not produce, and for SQLite, which
+    /// has no column types to report.
+    public static String[] columnTypes(List rows) {
+        if (rows instanceof QueryRows) {
+            return ((QueryRows) rows).getColumnTypes();
+        }
+        return null;
     }
 
     private List queryUntraced(String sql, Object[] params) throws IOException {
@@ -1197,7 +1226,7 @@ public final class Database {
     /// pulled from java.net: URI is not on the server-safe surface, and the
     /// password in the userinfo has to be percent-decoded, which a hand-rolled
     /// split usually forgets.
-    private static final class Url {
+    static final class Url {
         String host = "localhost";
         int port;
         String path = "";
@@ -1305,18 +1334,18 @@ public final class Database {
                 }
                 String key = pair.substring(0, equals);
                 String value = decode(pair.substring(equals + 1));
-                if ("sslmode".equals(key) || "ssl".equals(key)) {
-                    if (!"require".equals(value) && !"prefer".equals(value)
-                            && !"disable".equals(value)) {
-                        throw new IOException("sslmode must be require, prefer or "
-                                + "disable, not '" + value + "'");
-                    }
-                    out.sslMode = value;
+                if ("sslmode".equals(key) || "ssl".equals(key)
+                        || "ssl-mode".equals(key) || "sslMode".equals(key)) {
+                    // Validated here, before any socket, and handed on as
+                    // written so the drivers' errors name the user's spelling.
+                    canonicalSslMode(value);
+                    out.sslMode = value.trim();
                 } else if ("user".equals(key)) {
                     out.user = value;
                 } else if ("password".equals(key)) {
                     out.password = value;
-                } else if ("sslrootcert".equals(key) || "sslca".equals(key)) {
+                } else if ("sslrootcert".equals(key) || "sslca".equals(key)
+                        || "ssl-ca".equals(key)) {
                     out.caFile = value;
                 } else if ("connectTimeout".equals(key)) {
                     try {
@@ -1375,6 +1404,37 @@ public final class Database {
                 return host.substring(1, host.length() - 1);
             }
             return host;
+        }
+
+        /// Reduces every accepted spelling of an sslmode to the three-plus-one values
+        /// the drivers implement: `disable`, `prefer`, `require` (verify-full) and
+        /// `verify-ca`. Anything else is refused rather than read as prefer, which
+        /// would accept plaintext.
+        ///
+        /// Folding verify-full (and MySQL's VERIFY_IDENTITY) into `require` is
+        /// safe only because `require` here is stricter than libpq's: it verifies
+        /// the certificate chain AND the host name (`SqlLimits.verifiesHost`
+        /// answers true for it). If `require` ever stops checking the host, this
+        /// mapping silently weakens verify-full, so `DatabaseUrlSslModeTest`
+        /// holds both facts together.
+        static String canonicalSslMode(String value) throws IOException {
+            String v = value == null ? "" : value.trim();
+            if ("disable".equals(v) || "DISABLED".equals(v) || "false".equals(v)) {
+                return "disable";
+            }
+            if ("prefer".equals(v) || "PREFERRED".equals(v)) {
+                return "prefer";
+            }
+            if ("require".equals(v) || "REQUIRED".equals(v) || "true".equals(v)
+                    || "verify-full".equals(v) || "VERIFY_IDENTITY".equals(v)) {
+                return "require";
+            }
+            if ("verify-ca".equals(v) || "VERIFY_CA".equals(v)) {
+                return "verify-ca";
+            }
+            throw new IOException("sslmode must be disable, prefer, require, verify-ca "
+                    + "or verify-full (or MySQL's DISABLED, PREFERRED, REQUIRED, "
+                    + "VERIFY_CA, VERIFY_IDENTITY), not '" + value + "'");
         }
 
         private static String decode(String value) throws IOException {

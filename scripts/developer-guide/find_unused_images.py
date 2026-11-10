@@ -95,8 +95,21 @@ def main() -> None:
         rel_path = image_path.relative_to(doc_root).as_posix()
         if rel_path in references:
             continue
+        # A PNG beside a referenced SVG is that SVG rasterized for syndication
+        # (rasterize_blog_svgs.py): blog posts share these diagrams, and other
+        # platforms are sent the PNG. The guide itself shows the SVG.
+        if (image_path.suffix.lower() == ".png"
+                and Path(rel_path).with_suffix(".svg").as_posix() in references):
+            continue
         if rel_path in allowed_unused:
             continue
+        # A PNG beside a referenced SVG is that SVG rasterized for
+        # syndication (scripts/website/rasterize_blog_svgs.py): platforms
+        # that cannot draw an SVG are sent the PNG instead.
+        if image_path.suffix.lower() == ".png":
+            twin = image_path.with_suffix(".svg").relative_to(doc_root).as_posix()
+            if twin in references:
+                continue
         unused.append(rel_path)
 
     report = {"unused_images": unused}

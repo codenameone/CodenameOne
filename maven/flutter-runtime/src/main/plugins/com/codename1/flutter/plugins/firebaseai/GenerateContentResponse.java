@@ -36,7 +36,7 @@ import dart.core.DartList;
  * parts and, like the real class, throws when the prompt itself was blocked.
  */
 public class GenerateContentResponse {
-    private final DartList<Candidate> candidates = new DartList<Candidate>();
+    private final DartList<Candidate> candidates = new DartList<Candidate>(dart.runtime.TypeWitness.of(Candidate.class, false));
     private final UsageMetadata usageMetadata;
     private final String blockReason;
 

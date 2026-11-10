@@ -1,0 +1,19 @@
+4.25
+true
+true
+3.5
+3
+0.5
+null
+false
+true
+true
+add threw add
+at threw at 3
+flush threw flush
+0
+put threw closed put
+items threw closed items
+label threw closed label
+set add threw read-only
+set remove threw read-only

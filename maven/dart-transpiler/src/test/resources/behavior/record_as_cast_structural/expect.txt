@@ -1,0 +1,21 @@
+true
+false
+a
+TypeError
+true
+false
+true
+true
+false
+3
+1x
+2y
+10
+true
+true
+1
+true
+true
+false
+(1, a)
+(2, a: 1)

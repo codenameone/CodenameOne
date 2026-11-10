@@ -1,0 +1,105 @@
+'title' 'TOML Example'
+'int1' 99
+'int2' 1000
+'hex' 3735928559
+'oct' 493
+'bin' 13
+'neg' -17
+'f1' 3.14
+'f2' -2000.0
+'f3' 6.626e-34
+'f4' 10.5
+'inf1' inf
+'inf2' -inf
+'b1' True
+'b2' False
+'lit' 'C:\\Users\\x'
+'esc' 'tab\there é 😀 q"q'
+'ml' 'Roses\n  are red'
+'mll' 'raw \\n text'
+'quoted':
+  'key with space':
+    'bare' 1
+'a.b' 2
+'d1' datetime.date(1979, 5, 27)
+'t1' datetime.time(7, 32)
+'t2' datetime.time(0, 32, 0, 999999)
+'dt1' datetime.datetime(1979, 5, 27, 7, 32)
+'dt2' datetime.datetime(1979, 5, 27, 7, 32, tzinfo=datetime.timezone.utc)
+'dt3' datetime.datetime(1979, 5, 27, 0, 32, 0, 500000, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=61200)))
+'arr' [1, 2, 3]
+'nested' [[1, 2], ['a', 'b'], [1.5]]
+'empty' []
+'inl':
+  'x' 1
+  'y':
+    'z' 'w'
+  'p':
+    'q' 3
+'emptyinl':
+'owner':
+  'name' 'Tom'
+  'dob' datetime.datetime(1979, 5, 27, 7, 32, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=57600)))
+'database':
+  'ports' [8000, 8001]
+  'data' [['delta', 'phi'], [3.14]]
+'servers':
+  'alpha':
+    'ip' '10.0.0.1'
+  'beta':
+    'ip' '10.0.0.2'
+'products' [{'name': 'Hammer', 'sku': 738594937}, {}, {'name': 'Nail', 'meta': {'tags': ['a']}}]
+'fruit' [{'name': 'apple', 'physical': {'color': 'red'}, 'variety': [{'name': 'red delicious'}, {'name': 'granny smith'}]}, {'name': 'banana', 'variety': [{'name': 'plantain'}]}]
+'x':
+  'y':
+    'z':
+      'w' 1
+  'v' 2
+True
+True
+{'a': 1, 'b': 2}
+{'a': 'F3.0'}
+'a' -> Expected '=' after a key in a key/value pair (at end of document)
+'a =' -> Invalid value (at end of document)
+'a = ' -> Invalid value (at end of document)
+'a = 1 b = 2' -> Expected newline or end of document after a statement (at line 1, column 7)
+'a = [1, 2' -> Unclosed array (at end of document)
+'a = {x = 1' -> Unclosed inline table (at end of document)
+'a = {x = 1,}' -> Invalid initial character for a key part (at line 1, column 12)
+'[a' -> Expected ']' at the end of a table declaration (at end of document)
+'[[a]' -> Expected ']]' at the end of an array declaration (at line 1, column 4)
+'a = 1\na = 2' -> Cannot overwrite a value (at end of document)
+'[a]\n[a]' -> Cannot declare ('a',) twice (at line 2, column 3)
+'a = 1\n[a]' -> Cannot overwrite a value (at line 2, column 3)
+'a.b = 1\na = 2' -> Cannot overwrite a value (at end of document)
+'a = {x = 1}\n[a]' -> Cannot declare ('a',) twice (at line 2, column 3)
+'a = {x = 1}\na.y = 2' -> Cannot mutate immutable namespace ('a',) (at end of document)
+'a = [1]\n[[a]]' -> Cannot mutate immutable namespace ('a',) (at line 2, column 4)
+"a = 'abc" -> Expected "'" (at end of document)
+'a = "abc' -> Unterminated string (at end of document)
+'a = "abc\n"' -> Illegal character '\n' (at line 1, column 9)
+'a = "\\q"' -> Unescaped '\' in a string (at line 1, column 8)
+'a = "\\u12"' -> Invalid hex value (at line 1, column 8)
+'a = """abc' -> Unterminated string (at end of document)
+'a = 01' -> Expected newline or end of document after a statement (at line 1, column 6)
+'a = 1__0' -> Expected newline or end of document after a statement (at line 1, column 6)
+'a = _1' -> Invalid value (at line 1, column 5)
+'a = 1.' -> Expected newline or end of document after a statement (at line 1, column 6)
+'a = .5' -> Invalid value (at line 1, column 5)
+'a = 0x' -> Expected newline or end of document after a statement (at line 1, column 6)
+'a = 2023-13-45' -> Expected newline or end of document after a statement (at line 1, column 9)
+'a = 12:61:00' -> Expected newline or end of document after a statement (at line 1, column 7)
+'= 1' -> Invalid statement (at line 1, column 1)
+'a = 1 # \x01' -> Found invalid character '\x01' (at line 1, column 9)
+'a = \x00' -> Invalid value (at line 1, column 5)
+'[a]\nb = 1\n[a.b]' -> Cannot overwrite a value (at line 3, column 5)
+'[a.b]\n[a]\n[a]' -> Cannot declare ('a',) twice (at line 3, column 3)
+'a = tru' -> Invalid value (at line 1, column 5)
+'a = +inf2' -> Expected newline or end of document after a statement (at line 1, column 9)
+"x = 'a' 'b'" -> Expected newline or end of document after a statement (at line 1, column 9)
+'a=1 .b' -> Expected newline or end of document after a statement (at line 1, column 5)
+'@' -> Invalid statement (at line 1, column 1)
+'a = """x""""""' -> Expected newline or end of document after a statement (at line 1, column 14)
+TypeError Expected str object, not 'bytes'
+TypeError File must be opened in binary mode, e.g. use `open('foo.toml', 'rb')`
+{'a': 1, 'b': 'x'}

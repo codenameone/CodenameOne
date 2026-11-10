@@ -29,7 +29,7 @@ import com.codenameone.examples.pulse.Telemetry;
 import com.codenameone.examples.pulse.api.PhoneCodeDto;
 import com.codenameone.examples.pulse.api.UserDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.net.Session;
 
 /// Proves the phone number is the user's, which the server asks for before the

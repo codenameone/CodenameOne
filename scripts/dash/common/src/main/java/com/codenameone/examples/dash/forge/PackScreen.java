@@ -31,7 +31,7 @@ import com.codenameone.examples.dash.api.PackReportDto;
 import com.codenameone.examples.dash.api.PackSummaryDto;
 import com.codenameone.examples.dash.api.RateDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 import com.codenameone.examples.dash.rules.LevelDef;
 import com.codenameone.examples.dash.rules.forge.ContentPack;

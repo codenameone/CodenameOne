@@ -19,7 +19,7 @@
 package com.codenameone.examples.parley.chat;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.parley.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.parley.api.MediaApiServer;
 import com.codenameone.examples.parley.api.MediaDataDto;
 import com.codenameone.examples.parley.api.MediaRefDto;

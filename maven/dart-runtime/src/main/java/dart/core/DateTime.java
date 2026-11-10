@@ -37,14 +37,44 @@ import java.util.TimeZone;
  * instants a microsecond apart compared equal, differed by zero, and a
  * sub-millisecond Duration added nothing.</p>
  */
-public final class DateTime {
+@SuppressWarnings("rawtypes")
+public class DateTime implements Comparable {
 
-    private final long epochMicros;
-    private final boolean utc;
+    // Not final: Dart lets a program class extend DateTime, and a subclass's named
+    // constructor (`: super.fromMillisecondsSinceEpoch(ms)`) is its marker constructor
+    // plus a call of the matching $init$ method below, which assigns these once.
+    private long epochMicros;
+    private boolean utc;
 
     private DateTime(long epochMicros, boolean utc) {
         this.epochMicros = epochMicros;
         this.utc = utc;
+    }
+
+    /** For a program subclass; one of the $init$ methods then sets the instant. */
+    protected DateTime() {
+        this(0L, false);
+    }
+
+    /** {@code super.fromMillisecondsSinceEpoch(ms, isUtc: u)} from a subclass. */
+    protected final void $init$fromMillisecondsSinceEpoch(long millisecondsSinceEpoch, boolean isUtc) {
+        DateTime d = fromMillisecondsSinceEpoch(millisecondsSinceEpoch, isUtc);
+        this.epochMicros = d.epochMicros;
+        this.utc = d.utc;
+    }
+
+    /** {@code super.fromMicrosecondsSinceEpoch(us, isUtc: u)} from a subclass. */
+    protected final void $init$fromMicrosecondsSinceEpoch(long microsecondsSinceEpoch, boolean isUtc) {
+        DateTime d = fromMicrosecondsSinceEpoch(microsecondsSinceEpoch, isUtc);
+        this.epochMicros = d.epochMicros;
+        this.utc = d.utc;
+    }
+
+    /** {@code super.now()} from a subclass. */
+    protected final void $init$now() {
+        DateTime d = now();
+        this.epochMicros = d.epochMicros;
+        this.utc = d.utc;
     }
 
     /** Local-time constructor mirroring {@code DateTime(year, [month, day, ...])}. */
@@ -615,6 +645,21 @@ public final class DateTime {
 
     public long compareTo(DateTime other) {
         return epochMicros < other.epochMicros ? -1 : (epochMicros > other.epochMicros ? 1 : 0);
+    }
+
+    /**
+     * DateTime is a {@code Comparable<DateTime>} in Dart, so it must be assignable
+     * where Dart's {@code Comparable} maps (java.lang.Comparable). Dart's own
+     * compareTo above answers a Dart int (long), so the Java contract is this
+     * overload; it rejects a non-DateTime as Dart's covariant parameter check does.
+     */
+    @Override
+    public int compareTo(Object other) {
+        if (!(other instanceof DateTime)) {
+            throw new TypeError("type '" + (other == null ? "Null" : other.getClass().getName())
+                    + "' is not a subtype of type 'DateTime'");
+        }
+        return (int) compareTo((DateTime) other);
     }
 
     /** The underlying instant as a {@link java.util.Date} (used by DateFormat). */

@@ -46,6 +46,14 @@ additiveOperator
 argumentList
     : namedArgument (C namedArgument)*
     | expressionList ( C namedArgument)*
+    // Dart 2.17: named arguments anywhere, so a named one may precede a positional one.
+    // Only reached when neither form above matches; positional order is kept as written.
+    | mixedArgument (C mixedArgument)*
+    ;
+
+mixedArgument
+    : namedArgument
+    | expr
     ;
 
 argumentPart
@@ -353,6 +361,14 @@ expressionWithoutCascade
     | throwExpressionWithoutCascade
     ;
 
+// Dart 3 extension type -- CN1 addition. `type` is a built-in identifier, not a keyword,
+// so it is matched by text: `extension type X(...)` cannot be read as `extension X on T`,
+// which needs ON_ after the name.
+extensionTypeDeclaration
+    : EXTENSION_ {_input.LT(1).getText().equals("type")}? identifier CONST_? typeIdentifier typeParameters?
+      (DOT identifier)? OP metadata type identifier CP interfaces? OBC (metadata classMemberDeclaration)* CBC
+    ;
+
 extensionDeclaration
     : EXTENSION_ identifier? typeParameters? ON_ type OBC (metadata classMemberDeclaration)* CBC
     ;
@@ -592,7 +608,9 @@ libraryImport
     ;
 
 libraryName
-    : metadata LIBRARY_ dottedIdentifierList SC
+    // The name is optional since Dart 2.19 (`library;`), which only anchors doc
+    // comments and annotations.
+    : metadata LIBRARY_ dottedIdentifierList? SC
     ;
 
 listLiteral
@@ -615,6 +633,18 @@ localFunctionDeclaration
 
 localVariableDeclaration
     : metadata initializedVariableDeclaration SC
+    ;
+
+// Dart 3 destructuring declaration -- CN1 addition: `final (a, b) = e;`, `var [x, y] = e;`
+patternVariableDeclaration
+    : metadata (FINAL_ | VAR_) (recordPattern | listPattern | mapPattern | objectPattern) EQ expr SC
+    ;
+
+// Dart 3 pattern assignment to existing locals: `(a, b) = (b, a + b);`, `[x, _] = xs;`,
+// `Point(:x, :y) = p;`, `({'k': v}) = m;` (a map pattern needs the parentheses at the start
+// of a statement, where `{` opens a block).
+patternAssignment
+    : (OP mapPattern CP | recordPattern | listPattern | objectPattern) EQ expr SC
     ;
 
 logicalAndExpression
@@ -716,6 +746,8 @@ nonLabelledStatement
     // `yield i;` would otherwise parse as a variable declaration of a type named `yield`.
     | yieldEachStatement
     | yieldStatement
+    | patternVariableDeclaration
+    | patternAssignment
     | localVariableDeclaration
     | forStatement
     | whileStatement
@@ -840,12 +872,20 @@ primary
     | switchExpression
     | functionExpression
     | literal
+    // before `identifier`: with the instantiation selector `identifier typeArguments`
+    // also matches `Foo<T>.named(...)`, and the lower alternative wins the ambiguity
+    | constructorInvocation
+    | genericTearOff
     | identifier
     | newExpression
     | constObjectExpression
-    | constructorInvocation
     | recordLiteral
     | OP expr CP
+    ;
+
+// `Cell<int>.new` -- CN1 addition: a constructor tear-off of an instantiated type
+genericTearOff
+    : typeIdentifier typeArguments D (NEW_ | identifier)
     ;
 
 // ===== Dart 3 records — CN1 addition =====
@@ -855,6 +895,7 @@ recordLiteral
     : CONST_? OP recordField C (recordField (C recordField)* C?)? CP
     | CONST_? OP identifier CO expr (C recordField)* C? CP
     | CONST_? OP recordField C CP
+    | CONST_? OP CP   // the empty record `()`
     ;
 
 recordField
@@ -934,6 +975,7 @@ selector
     : NOT
     | assignableSelector
     | argumentPart
+    | typeArguments   // `identity<int>` / `obj.m<T>`: explicit generic instantiation (Dart 2.15)
     ;
 
 setOrMapLiteral
@@ -1034,6 +1076,8 @@ relationalPattern
 
 unaryPattern
     : primaryPattern (AS_ type)?
+    | primaryPattern QU
+    | primaryPattern NOT
     ;
 
 primaryPattern
@@ -1041,6 +1085,7 @@ primaryPattern
     | objectPattern
     | recordPattern
     | listPattern
+    | mapPattern
     | variablePattern
     | OP pattern CP
     ;
@@ -1068,7 +1113,22 @@ recordPattern
     ;
 
 listPattern
-    : typeArguments? OB (pattern (C pattern)* C?)? CB
+    : typeArguments? OB (listPatternElement (C listPatternElement)* C?)? CB
+    ;
+
+// `...` or `...rest` matches the elements between the leading and trailing ones
+listPatternElement
+    : DDD pattern?
+    | pattern
+    ;
+
+// `{'key': subpattern, ...}`: every key present (containsKey), its value matched
+mapPattern
+    : typeArguments? OBC (mapPatternEntry (C mapPatternEntry)* C?)? CBC
+    ;
+
+mapPatternEntry
+    : constantPattern CO pattern
     ;
 
 patternField
@@ -1098,6 +1158,7 @@ tildeOperator
 topLevelDeclaration
     : classDeclaration
     | mixinDeclaration
+    | extensionTypeDeclaration
     | extensionDeclaration
     | enumType
     | typeAlias
@@ -1181,6 +1242,29 @@ typeNotVoidList
 typeNotVoidNotFunction
     : typeName typeArguments? QU?
     | FUNCTION_ QU?
+    | recordType QU?
+    ;
+
+// Dart 3 record types -- CN1 addition. A single positional field needs a
+// trailing comma, so `(T)` is never read as a record type.
+recordType
+    : OP CP   // the empty record type `()`
+    | OP recordTypeField C CP
+    | OP recordTypeField (C recordTypeField)+ C? CP
+    | OP recordTypeField (C recordTypeField)* C recordTypeNamedFields CP
+    | OP recordTypeNamedFields CP
+    ;
+
+recordTypeField
+    : metadata type identifier?
+    ;
+
+recordTypeNamedFields
+    : OBC recordTypeNamedField (C recordTypeNamedField)* C? CBC
+    ;
+
+recordTypeNamedField
+    : metadata type identifier
     ;
 
 typeNotVoidNotFunctionList
@@ -1210,6 +1294,7 @@ unaryExpression
 unconditionalAssignableSelector
     : OB expr CB
     | D identifier
+    | D NEW_
     ;
 
 uri

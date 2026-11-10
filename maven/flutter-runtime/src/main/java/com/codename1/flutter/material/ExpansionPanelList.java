@@ -63,7 +63,7 @@ public class ExpansionPanelList extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        DartList<Widget> kids = new DartList<Widget>();
+        DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (children != null) {
             for (int i = 0; i < children.size(); i++) {
                 ExpansionPanel p = children.get(i);

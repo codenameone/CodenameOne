@@ -17,7 +17,7 @@
 // by dart.runtime.DartRuntime and dart.core.Dart*List.
 
 @JavaName('dart.core.Duration')
-class Duration {
+class Duration implements Comparable<Duration> {
   external Duration({int days, int hours, int minutes, int seconds, int milliseconds, int microseconds});
   external static Duration get zero;
   external int get inDays;

@@ -1,0 +1,198 @@
+200
+content-type: application/json
+{"hello":"world"}
+--
+200
+{"item_id":5,"q":"abc"}
+--
+422
+{"detail":[{"type":"int_parsing","loc":["path","item_id"],"msg":"Input should be a valid integer, unable to parse string as an integer","input":"abc"}]}
+--
+422
+{"detail":[{"type":"int_parsing","loc":["path","item_id"],"msg":"Input should be a valid integer, unable to parse string as an integer","input":"5.5"}]}
+--
+200
+{"x":2.0}
+--
+200
+{"color":"red","value":"red"}
+--
+422
+{"detail":[{"type":"enum","loc":["path","c"],"msg":"Input should be 'red' or 'green'","input":"blue","ctx":{"expected":"'red' or 'green'"}}]}
+--
+200
+{"path":"a/b/c.txt"}
+--
+200
+{"q":"x","limit":3,"flag":true,"tags":["a","b"]}
+--
+422
+{"detail":[{"type":"missing","loc":["query","q"],"msg":"Field required","input":null}]}
+--
+422
+{"detail":[{"type":"int_parsing","loc":["query","limit"],"msg":"Input should be a valid integer, unable to parse string as an integer","input":"abc"},{"type":"bool_parsing","loc":["query","flag"],"msg":"Input should be a valid boolean, unable to interpret input","input":"maybe"}]}
+--
+422
+{"detail":[{"type":"string_too_short","loc":["query","name"],"msg":"String should have at least 3 characters","input":"ab","ctx":{"min_length":3}},{"type":"greater_than_equal","loc":["query","n"],"msg":"Input should be greater than or equal to 1","input":"0","ctx":{"ge":1}}]}
+--
+422
+{"detail":[{"type":"string_too_long","loc":["query","name"],"msg":"String should have at most 5 characters","input":"abcdefg","ctx":{"max_length":5}},{"type":"less_than_equal","loc":["query","n"],"msg":"Input should be less than or equal to 10","input":"11","ctx":{"le":10}}]}
+--
+200
+{"name":"abc","n":1}
+--
+422
+{"detail":[{"type":"greater_than","loc":["path","pid"],"msg":"Input should be greater than 0","input":"0","ctx":{"gt":0}}]}
+--
+200
+{"pid":3,"q":"zz"}
+--
+422
+{"detail":[{"type":"missing","loc":["header","x-api-key"],"msg":"Field required","input":null}]}
+--
+200
+{"k":"k","c":"cc"}
+--
+200
+{"x_token":"tok","ua":"ua1"}
+--
+201
+{"name":"n","price":2.0,"tags":["a"],"address":{"city":"X","zip":null}}
+--
+422
+{"detail":[{"type":"missing","loc":["body","price"],"msg":"Field required","input":{"name":"n"}}]}
+--
+422
+{"detail":[{"type":"string_type","loc":["body","name"],"msg":"Input should be a valid string","input":5},{"type":"float_parsing","loc":["body","price"],"msg":"Input should be a valid number, unable to parse string as a number","input":"abc"},{"type":"missing","loc":["body","address","city"],"msg":"Field required","input":{}}]}
+--
+422
+{"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid dictionary or object to extract fields from","input":[1]}]}
+--
+422
+{"detail":[{"type":"missing","loc":["body"],"msg":"Field required","input":null}]}
+--
+422
+{"detail":[{"type":"json_invalid","loc":["body",0],"msg":"JSON decode error","input":{},"ctx":{"error":"Expecting value"}}]}
+--
+200
+{"item_id":7,"name":"z","notify":true,"city":"C"}
+--
+422
+{"detail":[{"type":"int_parsing","loc":["path","item_id"],"msg":"Input should be a valid integer, unable to parse string as an integer","input":"x"}]}
+--
+201
+{"username":"u","age":18}
+--
+422
+{"detail":[{"type":"greater_than_equal","loc":["body","age"],"msg":"Input should be greater than or equal to 0","input":-1,"ctx":{"ge":0}}]}
+--
+200
+{"name":"e","importance":5}
+--
+200
+{"name":"e","importance":1}
+--
+422
+{"detail":[{"type":"missing","loc":["body","item"],"msg":"Field required","input":null}]}
+--
+200
+{"sum":6}
+--
+422
+{"detail":[{"type":"int_parsing","loc":["body",1],"msg":"Input should be a valid integer, unable to parse string as an integer","input":"x"}]}
+--
+200
+{"commons":{"skip":2,"limit":100},"token":"t"}
+--
+['common', 'nested']
+200
+{"r":"res","log":["open","handler"]}
+--
+['open', 'handler', 'close']
+200
+{"a":1}
+--
+403
+x-err: 1
+{"detail":"custom detail"}
+--
+400
+{"detail":{"a":1}}
+--
+418
+{"message":"oops bob"}
+--
+202
+x-a: b
+content-type: application/json
+{"a":1}
+--
+200
+content-type: text/plain; charset=utf-8
+plain text
+--
+200
+content-type: text/html; charset=utf-8
+<h1>hi</h1>
+--
+204
+
+--
+307
+location: /
+
+--
+200
+{"async":true}
+--
+200
+{"d":"async-dep"}
+--
+200
+{"method":"GET","path":"/req","q":{"a":"1","b":"2"},"ua":"testclient"}
+--
+200
+{"name":"n","price":1.5}
+--
+200
+[{"username":"a","age":1},{"username":"b","age":18}]
+--
+200
+{"tid":3}
+--
+201
+{"created":"t"}
+--
+200
+"pong"
+--
+['router_dep']
+404
+{"detail":"Not Found"}
+--
+405
+allow: GET
+{"detail":"Method Not Allowed"}
+--
+405
+allow: GET
+{"detail":"Method Not Allowed"}
+--
+405
+allow: POST
+{"detail":"Method Not Allowed"}
+--
+200
+{"item_id":1,"q":null}
+--
+307
+location: http://testserver/sub/ping
+
+--
+400
+{"custom":true,"n":1}
+--
+{'title': 'Demo', 'version': '1.2.3'}
+['/', '/async', '/async-dep', '/cls', '/color/{c}', '/constrained', '/deps', '/embed', '/files/{file_path}', '/float/{x}', '/headers', '/html', '/http-error-dict', '/http-error/{code}', '/items', '/items/{item_id}', '/json-response', '/list', '/model-list', '/myerror', '/needhdr', '/nocontent', '/pathc/{pid}', '/plain', '/redirect', '/req', '/search', '/sub/ping', '/unset', '/users', '/v1/things', '/v1/things/{tid}', '/yield']
+['Address', 'Body_embed_embed_post', 'Color', 'HTTPValidationError', 'Item', 'UserIn', 'UserOut', 'ValidationError']
+[{'name': 'item_id', 'in': 'path', 'required': True, 'schema': {'type': 'integer', 'title': 'Item Id'}}, {'name': 'q', 'in': 'query', 'required': False, 'schema': {'anyOf': [{'type': 'string'}, {'type': 'null'}], 'title': 'Q'}}]

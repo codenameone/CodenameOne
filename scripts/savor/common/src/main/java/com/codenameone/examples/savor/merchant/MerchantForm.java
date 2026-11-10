@@ -35,7 +35,7 @@ import com.codenameone.examples.savor.api.OrderState;
 import com.codenameone.examples.savor.api.RestaurantDto;
 import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Layouts;
 import com.codenameone.examples.savor.ui.Menu;

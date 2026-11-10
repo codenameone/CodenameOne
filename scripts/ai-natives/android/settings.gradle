@@ -1,0 +1,28 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'cn1-ai-natives-android'
+// A module is included only when its upstream checkout is named, so
+// `build.sh llama android` never configures (and fails on) whisper.
+def upstream = { String prop, String env ->
+    startParameter.projectProperties[prop] ?: System.getenv(env)
+}
+if (upstream('whisperCppDir', 'WHISPER_CPP_DIR')) {
+    include ':cn1-whisper-android'
+}
+if (upstream('llamaCppDir', 'LLAMA_CPP_DIR')) {
+    include ':cn1-llama-android'
+}

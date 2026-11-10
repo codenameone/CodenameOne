@@ -13,7 +13,9 @@ name: Nightly watchdog
 # nightly is one cron line, with no list here to keep in sync. It then finds
 # the newest scheduled run of each on master and keeps ONE issue open,
 # assigned to NIGHTLY_ALERT_ASSIGNEE, listing every suite that failed or has
-# not run in the last 30 hours. A run still going when checked is judged by
+# not run in the last 30 hours -- except one that has never had a scheduled
+# run and reached master inside that window, which is awaiting its first night.
+# A run still going when checked is judged by
 # the previous completed one, so a suite that fails after this job has looked
 # is reported the next morning; and the issue closes only when every suite has
 # finished green, never on one still running.
@@ -72,6 +74,7 @@ jobs:
             const GREEN = ['success', 'skipped', 'neutral'];
             const problems = [];
             const running = [];
+            const awaiting = [];
             const cancelled = [];
             for (const file of nightly) {
               let runs;
@@ -86,6 +89,31 @@ jobs:
               }
               const newest = runs[0];
               if (!newest || Date.now() - new Date(newest.created_at).getTime() > STALE_MS) {
+                // A suite that has never had a scheduled run, and whose file
+                // reached master inside the window, joined the nightly after
+                // the night's slot: it is awaiting its first run, not broken.
+                // Only a suite with NO scheduled run at all qualifies -- one
+                // that ran before and then went quiet is a schedule that
+                // stopped, however recently its file was edited -- and only
+                // for the window after its file's latest master commit, so a
+                // cron that never fires is reported once the file has gone a
+                // day unedited. It keeps the issue open like a running
+                // suite, under its own heading.
+                if (!newest) {
+                  let changed = null;
+                  try {
+                    const { data: commits } = await github.rest.repos.listCommits({
+                      owner, repo, sha: 'master', path: `${dir}/${file}`, per_page: 1,
+                    });
+                    changed = commits.length ? new Date(commits[0].commit.committer.date).getTime() : null;
+                  } catch (e) {
+                    changed = null;
+                  }
+                  if (changed !== null && Date.now() - changed <= STALE_MS) {
+                    awaiting.push(`- \`${file}\`: no scheduled run yet; it reached master at ${new Date(changed).toISOString()}`);
+                    continue;
+                  }
+                }
                 problems.push(`- \`${file}\`: no scheduled run in the last 30 hours (workflow disabled, or the schedule did not fire)`);
                 continue;
               }
@@ -111,13 +139,13 @@ jobs:
 
             await core.summary
               .addHeading('Nightly watchdog')
-              .addRaw(`${nightly.length} nightly workflows, ${problems.length} failing, ${running.length} still running.\n\n`)
-              .addRaw([...problems, ...running].join('\n') || 'All green.')
+              .addRaw(`${nightly.length} nightly workflows, ${problems.length} failing, ${running.length} still running, ${awaiting.length} awaiting a first run.\n\n`)
+              .addRaw([...problems, ...running, ...awaiting].join('\n') || 'All green.')
               .write();
 
             if (problems.length === 0) {
               // Close only on a night where everything finished green.
-              if (issue && running.length === 0) {
+              if (issue && running.length === 0 && awaiting.length === 0) {
                 await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
                   body: `Recovered: every nightly workflow passed on the run checked at ${now}.` });
                 await github.rest.issues.update({ owner, repo, issue_number: issue.number,
@@ -126,7 +154,7 @@ jobs:
                 // Nothing failing any more, but not every suite has finished:
                 // keep the issue open and stop it listing failures that are gone.
                 await github.rest.issues.update({ owner, repo, issue_number: issue.number, body: [
-                  marker, `No failures as of ${now}; the issue closes once these finish green:`, '', ...running,
+                  marker, `No failures as of ${now}; the issue closes once these finish green:`, '', ...running, ...awaiting,
                 ].join('\n') });
               }
               return;
@@ -138,6 +166,7 @@ jobs:
               '',
               ...problems,
               ...(running.length ? ['', 'Still running when checked (judged by their previous completed run):', '', ...running] : []),
+              ...(awaiting.length ? ['', 'Awaiting their first scheduled run (new to the nightly):', '', ...awaiting] : []),
               ...(cancelled.length ? ['', 'Cancelled (not counted as failures):', '', ...cancelled] : []),
               '',
               'They run on a pull request only when their own tree changes, so a change to shared code (core, ports, builders, backend) first meets them here. This issue closes itself after a fully green night.',

@@ -1,0 +1,23 @@
+static == true identical true hash true
+static int/String == false identical false hash -
+top == true identical true hash true
+top int/double == false identical false hash -
+inst same == true identical false hash true
+inst other recv == false identical false hash -
+inst int/bool == false identical false hash -
+2
+2
+3
+true
+true
+generic 0 int/int == true identical false hash true
+generic 0 int/String == false identical false hash -
+generic 1 int/int == true identical false hash true
+generic 1 int/String == false identical false hash -
+generic 2 int/int == true identical false hash true
+generic 2 int/String == false identical false hash -
+generic static vs direct == true identical false hash true
+generic top vs direct == true identical false hash true
+generic inst vs direct == true identical false hash true
+sm int:1 double:2.5 im bool:true
+sm String:x

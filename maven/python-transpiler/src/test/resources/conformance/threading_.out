@@ -1,0 +1,24 @@
+squares [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+alive False False consumer
+counter 200
+order ['set', 'woke']
+wait timeout False
+cond saw [0, 1, 2]
+rlock nested ok
+sem True True False
+sem error Semaphore released too many times
+barrier [0, 1, 2]
+local [False, 'worker'] main
+main True MainThread
+timer [1]
+map [0, 10, 20, 30, 40]
+completed [1, 2, 4, 8, 16, 32]
+future raised ZeroDivisionError
+exception ZeroDivisionError
+wait 1 0
+callback [7] True False
+process pool [1, 2, 3]
+lifo [2, 1, 0]
+empty after timeout
+simple hello
+joined 0
