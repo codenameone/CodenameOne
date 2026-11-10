@@ -3275,6 +3275,18 @@
         "url": "https://dev.to/codenameone/bastion-a-hardened-bank-template-and-crypto-wallets-in-core-3i06",
         "syndicated_at": "2026-11-09T14:01:15+00:00"
       }
+    },
+    "reel-streaming-and-courses-template": {
+      "hashnode": {
+        "url": "https://debugagent.com/reel-your-own-streaming-service-or-course-platform",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af26c9f1491a789dd3dace5",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-10T01:01:10+00:00"
+      }
     }
   }
 }
