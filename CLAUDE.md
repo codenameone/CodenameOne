@@ -513,7 +513,7 @@ guessed at versions, which is worse than none -- `scripts/check-since-tags.sh`.
 the next tag or the end of the comment: text written after one was swallowed into
 it, and since the doclet drops `@author`, 90 published comments had silently lost
 a "See also" or "Deprecated" section. `scripts/check-author-tags.py` rejects them
-in every tracked `.java` file (its own workflow, `check-author-tags.yml`), in `///`
+in every tracked `.java` file (`source-gates.yml`), in `///`
 and `/** */` comments. A plain `/* */` comment is left alone: vendored license
 headers (MiG Layout's BSD notice) carry an `@author` that is part of the notice.
 
@@ -566,7 +566,7 @@ escape (`'\0'`, `"\u001f"`, `\x1f`). TAB, LF and CR are the only control
 characters allowed. It covers every tracked text file -- source, scripts,
 config and docs -- because this tree had corrupted files in several of them.
 
-It runs as its own workflow (`.github/workflows/check-control-characters.yml`)
+It runs in its own workflow (`.github/workflows/source-gates.yml`, one job with the other cheap tree-wide script gates)
 rather than inside `pr.yml`, whose `paths` filter excludes `scripts/**` and
 `docs/**` and would let a PR touching only those skip the check.
 
@@ -614,8 +614,8 @@ not honour -- check `.note.android.ident`, which records the API level the
 slice was really compiled against.
 
 `scripts/check-16k-page-alignment.py` gates this over every tracked archive and
-loose `.so` in the tree, in its own workflow
-(`.github/workflows/check-16k-page-alignment.yml`) rather than inside `pr.yml`,
+loose `.so` in the tree, as a step of
+`.github/workflows/source-gates.yml` rather than inside `pr.yml`,
 whose `paths` filter would let a PR that only adds a native artifact skip it.
 Containers and libraries are found by magic bytes, not by extension, so a
 `.cn1lib` or any future container is covered.
