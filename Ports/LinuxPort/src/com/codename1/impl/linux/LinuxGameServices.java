@@ -93,7 +93,8 @@ final class LinuxGameServices extends GameServicesBackend {
                             public void run() {
                                 Component c = keyboardTarget;
                                 keyboardTarget = null;
-                                if (c != null && Display.getInstance().isTextEditing(c)) {
+                                // stopEditing is a no-op unless c is still editing.
+                                if (c != null) {
                                     Display.getInstance().stopEditing(c);
                                 }
                             }
