@@ -48,7 +48,7 @@ the CPU architecture, so an arm64 board needs no `windows.arch`.
 
 Each value can be changed on the device without a rebuild, through the matching
 environment variable: `CN1_ROTATION`, `CN1_DPI`, `CN1_MONITOR` and `CN1_CURSOR`
-(`1` shows the pointer, `0` hides it).
+(`true` or `1` shows the pointer, `false` or `0` hides it).
 
 === What the embedded build does
 
@@ -76,7 +76,7 @@ include::../demos/common/src/main/snippets/developer-guide/embedded-windows.sh[t
 
 The goal recognises a Windows executable, checks that its architecture matches
 the device and copies it to `C:\ProgramData\CodenameOne`. It then makes the
-application the device's shell with *Shell Launcher v2*: it enables the feature
+application the device's shell with *Shell Launcher*: it enables the feature
 if it's missing, restarts the application whenever it exits, and keeps Explorer
 as the shell for administrators, so the device can still be serviced. Enabling
 the feature takes a restart, which the goal performs.
@@ -86,10 +86,10 @@ Options, as `cn1.device.*` properties:
 * `kioskUser` limits the kiosk shell to one account, `kiosk` for instance; other
   users keep Explorer.
 * `keyboardFilter=true` enables the Keyboard Filter and blocks Ctrl+Alt+Del,
-  Ctrl+Shift+Esc, Win+L and the Windows key.
+  Ctrl+Shift+Esc, Win+L, the Windows key, Alt+Tab, Ctrl+Esc and Alt+F4.
 * `kioskMode=autostart` replaces no shell and starts the application at logon
-  instead. Use it on a development device, or on an edition without Shell
-  Launcher.
+  instead, for every account, administrators included. Use it on a development
+  device, or on an edition without Shell Launcher.
 * `env` sets machine environment variables, `CN1_ROTATION=90` for instance. Windows
   reads them at logon, so they apply from the next one.
 

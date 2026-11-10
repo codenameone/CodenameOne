@@ -134,6 +134,13 @@ static int cn1WinHwAlloc(int kind) {
     return h;
 }
 
+static unsigned cn1WinHwSlotGen(int h) {
+    AcquireSRWLockShared(&cn1WinHwLock);
+    unsigned gen = cn1WinHwSlots[h].gen;
+    ReleaseSRWLockShared(&cn1WinHwLock);
+    return gen;
+}
+
 /* A referenced copy of the slot's device interface, or NULL for a stale or
  * wrong-kind handle. The caller releases it. */
 static IUnknown* cn1WinHwRef(int h, int kind) {
@@ -367,9 +374,10 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_hwGpioOpen___java_lang_String_
     if (!output && edges != 0) {
         HANDLE ev = CreateEventW(NULL, FALSE, FALSE, NULL);
         int slot = h;
+        unsigned gen = cn1WinHwSlotGen(h);
         EventRegistrationToken token;
         hr = pin->add_ValueChanged(Callback<ITypedEventHandler<GpioPin*, GpioPinValueChangedEventArgs*>>(
-                [slot, edges](IGpioPin*, IGpioPinValueChangedEventArgs* args) -> HRESULT {
+                [slot, gen, edges](IGpioPin*, IGpioPinValueChangedEventArgs* args) -> HRESULT {
                     GpioPinEdge edge = GpioPinEdge_FallingEdge;
                     args->get_Edge(&edge);
                     int rising = edge == GpioPinEdge_RisingEdge ? 1 : 0;
@@ -379,7 +387,10 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_hwGpioOpen___java_lang_String_
                     LONGLONG ns = cn1WinHwNanos();
                     AcquireSRWLockExclusive(&cn1WinHwLock);
                     CN1WinHwSlot* s = &cn1WinHwSlots[slot];
-                    if (s->kind == HW_GPIO && s->edgeEvent != NULL) {
+                    /* remove_ValueChanged does not wait for a callback already
+                     * running: a late edge of a closed pin must not land in the
+                     * pin that reopened this slot. */
+                    if (s->kind == HW_GPIO && s->gen == gen && s->edgeEvent != NULL) {
                         /* A full ring drops the oldest edge, as the kernel's
                          * line-event buffer does. */
                         int tail = (s->edgeHead + s->edgeCount) % CN1HW_EDGE_RING;

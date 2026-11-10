@@ -195,7 +195,7 @@ public final class DeviceDeployer {
             throw new BuildException("No device host: set cn1.device.host (an address or an ~/.ssh/config alias)");
         }
         if (binary == null || !binary.isFile()) {
-            throw new BuildException("No native Linux binary to deploy" + (binary == null ? "" : " at " + binary)
+            throw new BuildException("No native Linux or Windows binary to deploy" + (binary == null ? "" : " at " + binary)
                     + ": build the linux-native target locally or set cn1.device.binary");
         }
         if (isPe(binary)) {
@@ -416,11 +416,14 @@ public final class DeviceDeployer {
                 // create files, so inheritance is cut and the grants replaced.
                 .append("icacls $dir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'"
                         + " '*S-1-5-32-545:(OI)(CI)RX' | Out-Null\n")
+                // icacls is a native command: Stop does not see its failure.
+                .append("if ($LASTEXITCODE -ne 0) { throw \"icacls could not lock down $dir\" }\n")
                 // The kiosk account is not an administrator and writes its log
                 // here, the one place it can write.
                 .append("$logs = Join-Path $dir 'logs'\n")
                 .append("New-Item -ItemType Directory -Force -Path $logs | Out-Null\n")
                 .append("icacls $logs /grant '*S-1-5-32-545:(OI)(CI)M' | Out-Null\n")
+                .append("if ($LASTEXITCODE -ne 0) { throw \"icacls could not open $logs to Users\" }\n")
                 .append("Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force\n")
                 .append("Start-Sleep -Milliseconds 300\n")
                 .append("Move-Item -Force -LiteralPath $staged -Destination $exe\n")

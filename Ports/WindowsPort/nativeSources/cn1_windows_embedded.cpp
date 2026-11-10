@@ -79,6 +79,13 @@ static int cn1EmbEnvInt(const char* name, int def) {
     if (n == 0 || n >= sizeof(buf)) {
         return def;
     }
+    /* The hints are booleans for the cursor; accept the words as well as 1/0. */
+    if (lstrcmpiA(buf, "true") == 0) {
+        return 1;
+    }
+    if (lstrcmpiA(buf, "false") == 0) {
+        return 0;
+    }
     return atoi(buf);
 }
 
@@ -224,9 +231,10 @@ void cn1WinEmbeddedRedirectLog(void) {
     freopen_s(&f, path, "a", stdout);
     f = NULL;
     freopen_s(&f, path, "a", stderr);
-    /* Line buffered, so cn1:device-logs follows the application as it runs
-     * rather than a buffer at a time. */
-    setvbuf(stdout, NULL, _IOLBF, 1024);
+    /* Unbuffered: the Microsoft CRT treats _IOLBF as full buffering, so a line
+     * buffer would reach cn1:device-logs a kilobyte at a time and lose the last
+     * output before a crash. */
+    setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 }
 
