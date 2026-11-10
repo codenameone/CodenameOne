@@ -480,15 +480,17 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_hwI2cOpen___int_int_R_int(CODE
     if (id == NULL) {
         return -CN1HW_ENODEV;
     }
+    // Windows.Devices.I2c addresses 7-bit devices only; there is no 10-bit mode.
+    if (address > 0x7f) {
+        WindowsDeleteString(id);
+        return -CN1HW_ENOTSUP;
+    }
     ComPtr<II2cConnectionSettingsFactory> settingsFactory;
     ComPtr<II2cConnectionSettings> settings;
     HRESULT hr = RoGetActivationFactory(HStringReference(RuntimeClass_Windows_Devices_I2c_I2cConnectionSettings).Get(),
             IID_PPV_ARGS(&settingsFactory));
     if (SUCCEEDED(hr)) {
         hr = settingsFactory->Create(address, &settings);
-    }
-    if (SUCCEEDED(hr) && address > 0x7f) {
-        hr = settings->put_AddressingMode(I2cAddressingMode_TenBit);
     }
     ComPtr<IAsyncOperation<I2cDevice*>> op;
     if (SUCCEEDED(hr)) {

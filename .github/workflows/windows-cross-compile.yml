@@ -17,6 +17,7 @@ on:
       - 'maven/windows/**'
       - 'scripts/gen-windows-uwp-stubs.py'
       - 'maven/build-engine/src/main/java/com/codename1/builders/WindowsNativeBuilder.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/WindowsEmbeddedProfile.java'
       - 'maven/build-engine/src/test/java/com/codename1/builders/WindowsNativeBuilderArchTest.java'
       - 'maven/build-engine/src/test/resources/com/codename1/builders/xbox-smoke-AppxManifest.xml'
       - '!vm/**/README.md'
@@ -31,6 +32,7 @@ on:
       - 'maven/windows/**'
       - 'scripts/gen-windows-uwp-stubs.py'
       - 'maven/build-engine/src/main/java/com/codename1/builders/WindowsNativeBuilder.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/WindowsEmbeddedProfile.java'
       - 'maven/build-engine/src/test/java/com/codename1/builders/WindowsNativeBuilderArchTest.java'
       - 'maven/build-engine/src/test/resources/com/codename1/builders/xbox-smoke-AppxManifest.xml'
 
@@ -94,7 +96,7 @@ jobs:
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '8' }
 
-      - name: Install xwin + lay out the Windows SDK (x64)
+      - name: Install xwin + lay out the Windows SDK (x64 + arm64)
         env:
           # Harden against transient crates.io / download flakes ("curl [16]
           # HTTP2 framing layer", "[55] OpenSSL SSL_read unexpected eof"):
@@ -106,7 +108,7 @@ jobs:
           n=0
           until [ "$n" -ge 3 ]; do
             cargo install xwin --version 0.9.0 --locked \
-              && xwin --accept-license --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk" \
+              && xwin --accept-license --arch x86_64,aarch64 splat --output "$RUNNER_TEMP/xwin-sdk" \
               && break
             n=$((n+1))
             echo "xwin install/splat attempt $n failed; retrying after backoff..."
@@ -178,12 +180,14 @@ jobs:
           CN1_CLANG_CL: clang-cl
           CN1_LLVM_RC: llvm-rc
           CN1_UWP_EXE_OUT: ${{ github.workspace }}/uwp-smoke/app.exe
+          CN1_KIOSK_EXE_OUT: ${{ github.workspace }}/kiosk-smoke/app.exe
         run: |
           cd vm
           JAVA_HOME="$JDK_8_HOME" mvn -B -pl tests -am test \
             '-Dtest=CleanTargetIntegrationTest#crossCompilesWindowsExeWithXwin' \
             '-Dsurefire.failIfNoSpecifiedTests=false'
           test -f "$CN1_UWP_EXE_OUT"
+          test -f "$CN1_KIOSK_EXE_OUT"
 
       # The development certificate windows.xbox builds create, made by the
       # builder's own openssl commands; the Windows job signs with it, so a
@@ -209,6 +213,14 @@ jobs:
       # The manifest is pinned to WindowsNativeBuilder.buildXboxAppxManifest by
       # WindowsNativeBuilderArchTest, so the run below installs what windows.xbox
       # builds ship.
+      - name: Upload the kiosk smoke app
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-smoke
+          path: kiosk-smoke/app.exe
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Upload the UWP smoke app
         uses: actions/upload-artifact@v4
         with:
@@ -314,5 +326,84 @@ jobs:
         with:
           name: uwp-run-capture
           path: uwp-run/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The windows.embedded=true build on a real desktop: the window must cover the
+  # primary monitor with no frame, stay topmost, and survive the shortcuts the
+  # kiosk hook blocks. Shell Launcher itself needs IoT Enterprise, which no
+  # runner has; the deploy script is unit-tested in build-engine instead.
+  kiosk-run:
+    name: launch the kiosk build (Windows x64)
+    needs: cross-compile
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the kiosk smoke app
+        uses: actions/download-artifact@v4
+        with:
+          name: kiosk-smoke
+          path: kiosk-smoke
+
+      - name: Launch, check the window, send the blocked shortcuts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+          Add-Type @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class K {
+              [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+              [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
+              [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+              [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+              [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+              public static void Chord(byte mod, byte key) {
+                  keybd_event(mod, 0, 0, UIntPtr.Zero); keybd_event(key, 0, 0, UIntPtr.Zero);
+                  keybd_event(key, 0, 2, UIntPtr.Zero); keybd_event(mod, 0, 2, UIntPtr.Zero);
+              }
+          }
+          '@
+          New-Item -ItemType Directory -Force kiosk-run | Out-Null
+          $log = Join-Path (Resolve-Path kiosk-run) 'app.log'
+          $env:CN1_LOG_FILE = $log
+          $p = Start-Process -FilePath (Resolve-Path kiosk-smoke/app.exe) -PassThru
+          $h = [IntPtr]::Zero
+          for ($i = 0; $i -lt 60 -and $h -eq [IntPtr]::Zero; $i++) {
+            Start-Sleep -Seconds 1
+            if ($p.HasExited) { throw "the kiosk app exited with $($p.ExitCode) before showing a window" }
+            $p.Refresh(); $h = $p.MainWindowHandle
+          }
+          if ($h -eq [IntPtr]::Zero) { throw "the kiosk app showed no window in 60s" }
+          Start-Sleep -Seconds 3
+          $style = [K]::GetWindowLong($h, -16); $ex = [K]::GetWindowLong($h, -20)
+          $r = New-Object K+RECT; [void][K]::GetWindowRect($h, [ref]$r)
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          Write-Host ("style=0x{0:X8} ex=0x{1:X8} rect={2},{3},{4},{5} screen={6}" -f $style, $ex, $r.L, $r.T, $r.R, $r.B, $b)
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $g.Dispose()
+          $bmp.Save('kiosk-run/screen.png', [System.Drawing.Imaging.ImageFormat]::Png)
+          if (($style -band 0x80000000) -eq 0) { throw "the kiosk window is not WS_POPUP" }
+          if (($style -band 0x00C00000) -ne 0) { throw "the kiosk window has a caption" }
+          if (($ex -band 0x8) -eq 0) { throw "the kiosk window is not topmost" }
+          if ($r.L -ne $b.Left -or $r.T -ne $b.Top -or $r.R -ne $b.Right -or $r.B -ne $b.Bottom) {
+            throw "the kiosk window does not cover the primary monitor"
+          }
+          # Alt+F4 would close an ordinary window; the kiosk hook swallows it.
+          [void][K]::SetForegroundWindow($h)
+          [K]::Chord(0x12, 0x73)
+          [K]::Chord(0x12, 0x09)
+          Start-Sleep -Seconds 3
+          if ($p.HasExited) { throw "Alt+F4 reached the kiosk window and closed it" }
+          if (-not (Test-Path $log)) { throw "CN1_LOG_FILE was not created" }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Upload the kiosk capture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-run-capture
+          path: kiosk-run/
           if-no-files-found: ignore
           retention-days: 7
