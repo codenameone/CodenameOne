@@ -1049,6 +1049,21 @@ final class TypedEmit {
             }
         }
         scalarDecls(b);
+        for (String n : Infer.paramCells(f.def)) {
+            // The cell a closure reads, beside the typed parameter.
+            int pi = f.names.indexOf(n);
+            Ty lt = f.locals.get(n);
+            String v;
+            if (lp != null && lp[pi] != null || longLocals.contains(n)) {
+                v = "Long.valueOf(" + var(n) + ")";
+            } else if (lt != null && lt.k == Ty.K.INT) {
+                v = box(dual(var(n), big(n)));
+            } else {
+                v = box(new E(var(n), lt == null ? Ty.DYN : lt));
+            }
+            b.append("        final Object[] ").append(em.cellName(f.def.scope, n)).append(" = new Object[] {").append(v)
+                    .append("};\n");
+        }
         temps = new StringBuilder();
         int at = b.length();
         boolean abrupt = block(f.def.body, b, 2);
@@ -1113,6 +1128,17 @@ final class TypedEmit {
     private int preInd;
 
     private boolean stmt(Stmt s, StringBuilder b, int ind) {
+        if (s instanceof FunctionDef) {
+            FunctionDef d = (FunctionDef) s;
+            if (!d.decorators.isEmpty() || !d.args.defaults.isEmpty() || d.args.kwDefaults.stream().anyMatch(x -> x != null)
+                    || !cur.def.scope.cells.isEmpty() && !Infer.paramCells(cur.def).containsAll(capturedBy(d))) {
+                throw new Unsupported("nested def");
+            }
+            // A closure over parameters only: the generic function object,
+            // its free names read from the cells made on entry.
+            store(new Name(d.name), new E(em.nestedDef(d), Ty.DYN), b, ind);
+            return false;
+        }
         StringBuilder savedPre = pre;
         int savedInd = preInd;
         boolean hoist = (s instanceof ExprStmt || s instanceof Assign || s instanceof AugAssign
@@ -2955,6 +2981,33 @@ final class TypedEmit {
     private Map<Expr, Object> folded;
     private static final Object NO_FOLD = new Object();
     private final Set<String> folding = new HashSet<String>();
+
+    /// The names of the enclosing function nested `d` reads as free.
+    private Set<String> capturedBy(FunctionDef d) {
+        Set<String> out = new HashSet<String>();
+        Infer.Visit[] v = new Infer.Visit[1];
+        v[0] = x -> {
+            if (x instanceof Name && cur.def.scope.cells.contains(((Name) x).id)) {
+                out.add(((Name) x).id);
+            }
+            Infer.children(x, v[0]);
+        };
+        for (Stmt st : d.body) {
+            v[0].on(st);
+        }
+        return out;
+    }
+
+    /// How many times each name is bound anywhere in `body`, nested scopes
+    /// included.
+    static Map<String, Integer> storeCounts(List<Stmt> body) {
+        Map<String, Integer> count = new HashMap<String, Integer>();
+        Map<String, Expr> value = new HashMap<String, Expr>();
+        for (Stmt st : body) {
+            countStores(st, count, value);
+        }
+        return count;
+    }
 
     private static Map<String, Expr> soleStores(List<Stmt> body) {
         Map<String, Integer> count = new HashMap<String, Integer>();

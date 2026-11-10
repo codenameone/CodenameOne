@@ -1862,6 +1862,19 @@ public final class Emitter {
 
     /// Lambda `l` as a function object, for the typed code: one that reads
     /// nothing of the frame it is made in (`TypedEmit.closedLambda`).
+    /// The function object of nested `def f`, for TypedEmit: the body is
+    /// generic code, and reads the enclosing function's captured
+    /// parameters through the cells TypedEmit names with [#cellName].
+    String nestedDef(FunctionDef f) {
+        nextAsync = f.isAsync;
+        return withMetadata(f, function(f.name, f.args, f.scope, f.body, null));
+    }
+
+    /// The Java name of cell `n` of function scope `s`.
+    String cellName(Scope s, String n) {
+        return cellVar(s, n);
+    }
+
     String lambdaValue(Lambda l) {
         return function("<lambda>", l.args, l.scope, null, l.body);
     }

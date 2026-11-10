@@ -1072,7 +1072,7 @@ final class Infer {
             } else {
                 walkBlock(d.body, null, d.scope);
             }
-            if (sc.kind == Scope.Kind.MODULE && fns.get(d) == null) {
+            if (sc.kind == Scope.Kind.MODULE && fns.get(d) == null || fn != null && sc.kind != Scope.Kind.MODULE) {
                 storeName(d.name, Ty.DYN, fn, sc);
             }
         } else if (s instanceof ClassDef) {
@@ -1741,6 +1741,26 @@ final class Infer {
         Set<String> out = new java.util.LinkedHashSet<String>(d.scope.cells);
         for (Stmt s : d.body) {
             dropCaptured(s, out, false);
+        }
+        out.addAll(paramCells(d));
+        return out;
+    }
+
+    /// The cells of `d` that are positional parameters nothing ever stores
+    /// into -- not the body, not a nested scope through `nonlocal`, not
+    /// `del`. A closure reads one; its value is the argument for the whole
+    /// call, so as far as types go it is a plain local, and TypedEmit
+    /// keeps the cell beside it.
+    static Set<String> paramCells(FunctionDef d) {
+        Set<String> out = new java.util.LinkedHashSet<String>();
+        if (d.args.vararg != null || d.args.kwarg != null || !d.args.kwonly.isEmpty()) {
+            return out;
+        }
+        Map<String, Integer> stores = TypedEmit.storeCounts(d.body);
+        for (String n : d.scope.cells) {
+            if (d.args.names().contains(n) && !stores.containsKey(n)) {
+                out.add(n);
+            }
         }
         return out;
     }
