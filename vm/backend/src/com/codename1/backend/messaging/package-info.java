@@ -22,8 +22,8 @@
  */
 /// Messaging: sending through [com.codename1.backend.messaging.MessageTemplate]
 /// and receiving in `@MessageListener` methods, over a queue in the
-/// application's own database, Redis Streams, RabbitMQ or Kafka -- whichever
-/// [com.codename1.backend.messaging.Messaging] is configured with.
+/// application's own database, Redis Streams, RabbitMQ, Kafka, Amazon SQS or
+/// Google Cloud Pub/Sub -- whichever [com.codename1.backend.messaging.Messaging] is configured with.
 ///
 /// Listeners are found and wired at build time: no reflection, no proxies, and
 /// a protocol the configuration does not name is not in the application.

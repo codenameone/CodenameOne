@@ -1713,6 +1713,14 @@ public class BackendBeansTest {
         if (kafka != null && kafka.length() > 0) {
             runs.add(new String[] {kafka, new File(dir, "e.db").getAbsolutePath()});
         }
+        String sqs = System.getenv("CN1_TEST_SQS");
+        if (sqs != null && sqs.length() > 0) {
+            runs.add(new String[] {sqs, new File(dir, "f.db").getAbsolutePath()});
+        }
+        String pubsub = System.getenv("CN1_TEST_PUBSUB");
+        if (pubsub != null && pubsub.length() > 0) {
+            runs.add(new String[] {pubsub, new File(dir, "g.db").getAbsolutePath()});
+        }
         runs.add(new String[] {"memory:", new File(dir, "a.db").getAbsolutePath()});
         runs.add(new String[] {"db:", new File(dir, "b.db").getAbsolutePath()});
         String external = System.getenv("CN1_TEST_DB_URL");

@@ -34,7 +34,7 @@ import java.util.Map;
 ///
 /// | Setting | Default | |
 /// |---|---|---|
-/// | `cn1.messaging.url` | see below | `memory:`, `db:`, `redis://...`, `amqp://...`, `kafka://...` |
+/// | `cn1.messaging.url` | see below | `memory:`, `db:`, `redis://...`, `amqp://...`, `kafka://...`, `sqs://...`, `pubsub://...` |
 /// | `cn1.messaging.lease` | 60000 | milliseconds before a message a consumer took and never settled is delivered again |
 /// | `cn1.messaging.timeout` | 5000 | milliseconds a broker connection or reply may take |
 /// | `cn1.messaging.db.poll` | 500 | milliseconds between polls of an empty `db:` queue |

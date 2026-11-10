@@ -30,6 +30,8 @@ import com.codename1.backend.messaging.MessageTransport;
 import com.codename1.backend.messaging.Messaging;
 import com.codename1.backend.messaging.amqp.AmqpTransport;
 import com.codename1.backend.messaging.kafka.KafkaTransport;
+import com.codename1.backend.messaging.pubsub.PubSubTransport;
+import com.codename1.backend.messaging.sqs.SqsTransport;
 import com.codename1.backend.messaging.redis.RedisStreamTransport;
 import com.codename1.backend.messaging.Subscription;
 import java.util.ArrayList;
@@ -55,6 +57,8 @@ public class MsgCheck {
         Messaging.register("redis", new RedisStreamTransport.Factory());
         Messaging.register("amqp", new AmqpTransport.Factory());
         Messaging.register("kafka", new KafkaTransport.Factory());
+        Messaging.register("sqs", new SqsTransport.Factory());
+        Messaging.register("pubsub", new PubSubTransport.Factory());
         run("memory:", null);
         String file = "msgcheck-" + Long.toString(System.nanoTime(), 36) + ".db";
         run("db:", file);
@@ -91,6 +95,12 @@ public class MsgCheck {
             }
         } catch (java.io.IOException noTableYet) {
             // created by the first send
+        }
+        if (t instanceof PubSubTransport) {
+            // Pub/Sub keeps a message only for subscriptions that already exist.
+            for (String s : new String[] {"o", "h", "b", "c", "r", "d", "x"}) {
+                ((PubSubTransport) t).declare(q + s, "g");
+            }
         }
         try {
             order(w, t, q + "o");

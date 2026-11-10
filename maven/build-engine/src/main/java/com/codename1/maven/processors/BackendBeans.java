@@ -1925,6 +1925,8 @@ final class BackendBeans {
                 "com.codename1.backend.messaging.redis.RedisStreamTransport.Factory");
         TRANSPORTS.put("amqp", "com.codename1.backend.messaging.amqp.AmqpTransport.Factory");
         TRANSPORTS.put("kafka", "com.codename1.backend.messaging.kafka.KafkaTransport.Factory");
+        TRANSPORTS.put("sqs", "com.codename1.backend.messaging.sqs.SqsTransport.Factory");
+        TRANSPORTS.put("pubsub", "com.codename1.backend.messaging.pubsub.PubSubTransport.Factory");
     }
 
     /// The listener annotation on `m`, under any of its names, or null.
