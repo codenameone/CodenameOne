@@ -583,14 +583,21 @@ final class TypeMethods {
             if (only instanceof String) {
                 return (String) only;
             }
-            // Sized from the items when all are plain strings, so the
-            // builder never grows and copies.
-            long total = n > 1 ? (long) sep.length() * (n - 1) : 0;
-            for (int i = 0; i < n && total >= 0; i++) {
-                Object v = l.get(i);
-                total = v instanceof String ? total + ((String) v).length() : -1;
+            // All plain strings: String.join, which on ParparVM copies
+            // Latin-1 bytes straight into one allocation.
+            String[] parts = new String[n];
+            int i0 = 0;
+            for (; i0 < n; i0++) {
+                Object v = l.get(i0);
+                if (!(v instanceof String)) {
+                    break;
+                }
+                parts[i0] = (String) v;
             }
-            StringBuilder sb = new StringBuilder(total > 0 && total < Integer.MAX_VALUE ? (int) total : 16);
+            if (i0 == n) {
+                return String.join(sep, parts);
+            }
+            StringBuilder sb = new StringBuilder();
             for (int i = 0; i < n; i++) {
                 Object v = joinItem(l.get(i));
                 if (!(v instanceof String)) {

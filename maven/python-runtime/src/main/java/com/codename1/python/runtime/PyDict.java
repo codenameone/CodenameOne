@@ -219,8 +219,20 @@ public class PyDict extends PyObject {
             final int[] ix = index;
             final Object[] ks = keys;
             int e = entry(s);
+            Object cur = values[e];
+            if (cur instanceof Long && inc instanceof Long) {
+                // Two ints: no Python code runs, so the slot stays put.
+                long a = (Long) cur;
+                long b = (Long) inc;
+                long c = a + b;
+                if (((a ^ c) & (b ^ c)) >= 0) {
+                    Object r = Long.valueOf(c);
+                    values[e] = r;
+                    return r;
+                }
+            }
             Object stored = ks[e];
-            Object r = Py.add(values[e], inc);
+            Object r = Py.add(cur, inc);
             if (index != ix || keys != ks || ix != null && ix[s] != e || ks[e] != stored) { //NOPMD CompareObjectsWithEquals - identity is meant
                 // The addition ran Python code that changed the dict.
                 s = find(key, h);

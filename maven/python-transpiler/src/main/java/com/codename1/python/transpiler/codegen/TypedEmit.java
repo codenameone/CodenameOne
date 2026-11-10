@@ -2785,16 +2785,44 @@ final class TypedEmit {
 
     private static final String[] NO_PAIR = new String[0];
 
+    /// A list read through a call (a module global's `Typed.asList(g(5))`)
+    /// held in a local before the statement, where the statement cannot
+    /// rebind it, so the fast index and length paths can name it twice.
+    private E heldList(E l) {
+        if (plain(l.c) || pre == null || !stmtPure || condDepth != 0) {
+            return l;
+        }
+        String t = fresh();
+        indent(pre, preInd);
+        pre.append("final PyList ").append(t).append(" = ").append(l.c).append(";\n");
+        return new E(t, l.t);
+    }
+
     /// `x % k` for an int `x` held as a long and a constant `k` of 31 bits
     /// above zero: Python's remainder, never an overflow, and an int.
     private E modConstant(BinOp b) {
         Long k = intConstant(b.right);
-        if (k == null || k <= 0 || k > Integer.MAX_VALUE) {
-            return null;
-        }
         Ty lt = in.type(b.left, cur, sc);
         if (lt == null || lt.opt || lt.k != Ty.K.INT) {
             return null;
+        }
+        if (k == null || k <= 0 || k > Integer.MAX_VALUE) {
+            // `x % y` of two ints held as longs: the remainder is smaller
+            // than `y`, so it is a long too; a zero `y` raises.
+            Ty rt = in.type(b.right, cur, sc);
+            if (k != null || rt == null || rt.opt || rt.k != Ty.K.INT) {
+                return null;
+            }
+            E l = expr(b.left);
+            E r = expr(b.right);
+            if (l.lc == null || l.pk != null || r.lc == null || r.pk != null || l.t.k != Ty.K.INT || r.t.k != Ty.K.INT
+                    || l.t.opt || r.t.opt) {
+                return binop("%", l, r, b.right);
+            }
+            String lc = "Typed.lmod(" + l.lc + ", " + r.lc + ")";
+            E m = new E("Long.valueOf(" + lc + ")", Ty.INT, lc);
+            m.small = r.small;
+            return m;
         }
         E l = expr(b.left);
         if (l.lc == null || l.pk != null || l.t.k != Ty.K.INT || l.t.opt) {
@@ -3608,6 +3636,7 @@ final class TypedEmit {
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
                 return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.DYN);
             }
+            l = heldList(l);
             Ty el = in.elem(l.t);
             if (el.k == Ty.K.BOT) {
                 throw new Unsupported("element of nothing");
@@ -3673,6 +3702,9 @@ final class TypedEmit {
                         : "(" + in + " ? (" + l.c + ".ints != null ? (Object) Long.valueOf(" + l.c + ".ints[(int) " + i.lc
                         + "]) : " + l.c + ".floats == null ? " + l.c + ".items[(int) " + i.lc + "] : " + slow + ") : "
                         + slow + ")";
+            } else if (i.lc != null && i.pk == null && el.k != Ty.K.FLOAT) {
+                // A list named by a call: one helper, the index unboxed.
+                fast = "Typed.at(" + l.c + ", " + i.lc + ")";
             }
             return el.k == Ty.K.FLOAT ? new E(fast, el) : new E(unbox(fast, el), el);
         }
@@ -5975,11 +6007,12 @@ final class TypedEmit {
         switch (n) {
             case "len":
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.LIST) {
-                    if (plain(a.get(0).c)) {
-                        String l = "Typed.llen(" + a.get(0).c + ")";
-                        return small(new E("Long.valueOf(" + l + ")", Ty.INT, l));
-                    }
-                    return new E("h_len(" + a.get(0).c + ")", Ty.INT);
+                    a = new ArrayList<E>(a);
+                    a.set(0, heldList(a.get(0)));
+                    // The list read through a call stays in the long: every use
+                    // of a length reads it once.
+                    String l = "Typed.llen(" + a.get(0).c + ")";
+                    return small(new E("Long.valueOf(" + l + ")", Ty.INT, l));
                 }
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.STR && !a.get(0).t.opt) {
                     String l = "Typed.slen(" + a.get(0).c + ")";

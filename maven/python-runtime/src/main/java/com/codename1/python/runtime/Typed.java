@@ -423,6 +423,26 @@ public final class Typed {
         return r < 0 ? r + k : r;
     }
 
+    /// `x % y`: Python's remainder, which takes the divisor's sign; a zero
+    /// divisor raises ZeroDivisionError.
+    public static long lmod(long x, long y) {
+        if (y == 0) {
+            throw Py.zeroDivision("integer modulo by zero");
+        }
+        long r = x % y;
+        return r != 0 && (r ^ y) < 0 ? r + y : r;
+    }
+
+    /// `l[k]` with the index as a long.
+    public static Object at(PyList l, long k) {
+        nzl(l);
+        if (k >= 0 && k < l.size && l.floats == null) {
+            int[] n = l.ints;
+            return n != null ? Long.valueOf(n[(int) k]) : l.items[(int) k];
+        }
+        return get(l, Long.valueOf(k));
+    }
+
     /// `len(l)` as a Java long; a missing list raises as `len` does.
     public static long llen(PyList l) {
         return l != null ? l.size : Py.len(Py.NONE);
