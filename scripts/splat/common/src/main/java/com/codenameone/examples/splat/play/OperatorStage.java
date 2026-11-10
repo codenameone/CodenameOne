@@ -37,7 +37,8 @@ public class OperatorStage extends GameView {
     private AnimatedModel op;
     private AnimatedModel gun;
     private float scale;
-    private final float[] hand = new float[16];
+    private final Grip grip = new Grip();
+    private final float[] turn = new float[16];
     private GraphicsDevice device;
     private float time;
     private final float offset;
@@ -70,6 +71,9 @@ public class OperatorStage extends GameView {
             float[] b = Models.bounds(gun);
             gun.setScale(0.34f / Math.max(0.01f, Math.max(b[3] - b[0], Math.max(b[4] - b[1], b[5] - b[2]))));
             gun.addTo(this);
+            if (op != null) {
+                holdMarker();
+            }
         }
     }
 
@@ -105,7 +109,6 @@ public class OperatorStage extends GameView {
         prop("barrel", 1.0f, 2.2f, -1.2f, 0f);
         prop("streetlight", 7f, 3.8f, -4.5f, 200f);
         op = Models.create(d, operator);
-        op.hideNode(Models.PISTOL);
         float[] b = Models.bounds(op);
         scale = 1.8f / Math.max(0.01f, b[4] - b[1]);
         op.setScale(scale);
@@ -114,6 +117,10 @@ public class OperatorStage extends GameView {
         op.play(Models.IDLE, true);
         op.addTo(this);
         setMarker(marker);
+        // pose now: the first frame can be drawn (and captured) before the
+        // first update, and the rig's rest pose is an A with arms out
+        op.update(0f);
+        holdMarker();
     }
 
     private void prop(String name, float height, float x, float z, float deg) {
@@ -135,14 +142,20 @@ public class OperatorStage extends GameView {
         op.update((float) dt);
         // A slow drift of the camera, so the stage never looks like a still.
         getCamera().setPosition((float) Math.sin(time * 0.25f) * 0.25f, 1.35f, 5.2f);
-        if (gun != null && op.getNodeMatrix(Models.HAND, hand)) {
+        holdMarker();
+    }
+
+    private void holdMarker() {
+        if (gun != null) {
+            float[] t = turn;
             double r = Math.toRadians(op.getRotationY());
-            float c = (float) Math.cos(r);
-            float sn = (float) Math.sin(r);
-            float hx = hand[12] * scale;
-            float hz = hand[14] * scale;
-            gun.setPosition(op.getX() + hx * c + hz * sn, hand[13] * scale, op.getZ() - hx * sn + hz * c);
-            gun.setRotation(0f, op.getRotationY() + 180f, 0f);
+            t[0] = (float) Math.cos(r);
+            t[2] = (float) -Math.sin(r);
+            t[8] = (float) Math.sin(r);
+            t[10] = (float) Math.cos(r);
+            t[5] = 1f;
+            t[15] = 1f;
+            grip.place(op, scale, t, op.getX(), op.getY(), op.getZ(), gun, null);
         }
     }
 }

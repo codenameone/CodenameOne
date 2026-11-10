@@ -136,9 +136,12 @@ Skirmish sample 3D models (scripts/skirmish/common/src/main/resources/model_*.gl
   released under CC0 1.0. Repacked by scripts/skirmish/tools/pack-models.py.
 
 Splat sample 3D models (scripts/splat/common/src/main/resources/model_*.glb)
-  Ultimate Modular Men and Toon Shooter Game Kit by Quaternius
-  (quaternius.com), and Blaster Kit and Survival Kit by Kenney (kenney.nl),
-  all released under CC0 1.0. Repacked by scripts/splat/tools/pack-art.py.
+  Toon Shooter Game Kit, Ultimate Nature and Universal Animation Library 1
+  and 2 by Quaternius (quaternius.com), Blaster Kit and Survival Kit by
+  Kenney (kenney.nl), and MakeHuman system and community assets (bodies,
+  skins, hair and clothes marked CC0, makehumancommunity.org), all released
+  under CC0 1.0. Built by scripts/splat/tools/make-operators.py and
+  scripts/splat/tools/pack-art.py.
   Photo-scanned props and ground textures (model_car, model_barrier*,
   model_sofa, model_barrel, model_streetlight, model_boxes, tex_*.jpg) by
   Poly Haven (polyhaven.com), released under CC0 1.0.

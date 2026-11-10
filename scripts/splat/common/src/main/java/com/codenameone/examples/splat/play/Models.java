@@ -32,9 +32,10 @@ import java.util.Map;
 
 /// Every model the field is drawn with, and which one plays what.
 ///
-/// The operators are Quaternius' Modular Men, the markers Kenney's Blaster Kit
+/// The operators are MakeHuman characters animated with Quaternius' Universal
+/// Animation Library (`tools/make-operators.py`), the markers Kenney's Blaster Kit
 /// and the cover Quaternius' Toon Shooter and Kenney's Survival Kit, all CC0,
-/// packed into `src/main/resources/model_*.glb` by `tools/pack-art.py` (see
+/// packed into `src/main/resources/model_*.glb` by the scripts in `tools/` (see
 /// `ART.md`). Re-skin the game here: swap a name, or drop in any other skinned
 /// glTF with the same clip names.
 // tag::splat-models[]
@@ -44,24 +45,29 @@ public final class Models {
         {"op-swat", "op-worker", "op-farmer", "op-punk", "op-ranger", "op-hoodie"},
         {"op-dad", "op-suit", "op-hoodie", "op-ranger", "op-punk", "op-worker"},
     };
-    /// Clips of the Modular Men rig.
-    static final String IDLE = "Idle_Gun";
-    static final String IDLE_SHOOT = "Idle_Gun_Shoot";
-    static final String RUN = "Run";
-    static final String RUN_BACK = "Run_Back";
-    static final String RUN_LEFT = "Run_Left";
-    static final String RUN_RIGHT = "Run_Right";
-    static final String RUN_SHOOT = "Run_Shoot";
+    /// Clips every operator carries (`tools/make-operators.py` retargets them
+    /// from Quaternius' Universal Animation Library onto the MakeHuman rig).
+    static final String IDLE = "Idle";
+    /// Standing, marker up and aimed: the pose a player holds.
+    static final String AIM = "Aim";
+    /// The aim pose pitched up and down, mixed into the spine by look pitch.
+    static final String AIM_UP = "AimUp";
+    static final String AIM_DOWN = "AimDown";
     static final String WALK = "Walk";
+    static final String RUN = "Run";
+    static final String CROUCH = "CrouchIdle";
+    static final String CROUCH_WALK = "CrouchWalk";
     static final String DEATH = "Death";
-    static final String WAVE = "Wave";
-    static final String HIT = "HitRecieve";
-    static final String HIT2 = "HitRecieve_2";
+    static final String HIT = "HitChest";
+    static final String HIT2 = "Knockback";
     static final String ROLL = "Roll";
-    /// The bone a marker is held by, and the rig's own pistol, which it replaces.
-    static final String HAND = "Wrist.R";
-    static final String PISTOL = "Pistol";
-    static final String HEAD = "Head";
+    /// Shaking the head: "it was a bounce", and the paint wiped off.
+    static final String DISPUTE = "No";
+    static final String DANCE = "Dance";
+    /// The bone a marker is held by, the head, and where the aim layer starts.
+    static final String HAND = "hand_r";
+    static final String HEAD = "head";
+    static final String SPINE = "spine_01";
 
     private static final Map<String, GltfScene> SCENES = new HashMap<String, GltfScene>();
 

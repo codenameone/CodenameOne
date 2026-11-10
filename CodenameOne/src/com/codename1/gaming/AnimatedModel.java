@@ -117,6 +117,12 @@ public class AnimatedModel {
     private float fadeLength;
     private float fadeElapsed;
     private boolean posed;
+    private GltfScene.Animation layer;
+    private float layerTime;
+    private float layerWeight;
+    private boolean[] layerMask;
+    private String layerRoot;
+    private float[] layerPose;
 
     private float x;
     private float y;
@@ -340,6 +346,74 @@ public class AnimatedModel {
         return true;
     }
 
+    /// Blends clip `name` over whatever plays, at `weight` (0 to 1), on the
+    /// node `root` and everything under it. The layer keeps its own clock
+    /// and loops. It is how a character aims where it looks: a run plays
+    /// below, and an aim-up or aim-down pose is mixed into the spine by how
+    /// far the camera is pitched, without dragging the legs along.
+    ///
+    /// Calling it every frame with a new weight is cheap; the same clip keeps
+    /// its time. A weight of 0, a null name or a clip the scene lacks turns
+    /// the layer off.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the clip to mix in, or null for none
+    ///
+    /// - `weight`: how much of it, 0 to 1
+    ///
+    /// - `root`: the node whose subtree it moves, or null for the whole model
+    ///
+    /// #### Returns
+    ///
+    /// false when the layer is off afterwards
+    public boolean setLayer(String name, float weight, String root) {
+        GltfScene.Animation a = name == null ? null : scene.findAnimation(name);
+        if (a == null || weight <= 0f) {
+            if (layer != null) {
+                posed = false;
+            }
+            layer = null;
+            return false;
+        }
+        if (a != layer) { //NOPMD CompareObjectsWithEquals - the same clip instance
+            layer = a;
+            layerTime = 0f;
+            posed = false;
+        }
+        boolean sameRoot = root == null ? layerRoot == null : root.equals(layerRoot);
+        if (layerMask == null || !sameRoot) {
+            layerMask = mask(root);
+            layerRoot = root;
+            posed = false;
+            if (layerPose == null) {
+                layerPose = new float[rest.length];
+            }
+        }
+        layerWeight = weight > 1f ? 1f : weight;
+        posed = false;
+        return true;
+    }
+
+    private boolean[] mask(String root) {
+        int count = scene.getNodeCount();
+        boolean[] m = new boolean[count];
+        int top = -1;
+        if (root != null) {
+            for (int i = 0; i < count; i++) {
+                if (root.equals(scene.getNode(i).getName())) {
+                    top = i;
+                    break;
+                }
+            }
+        }
+        for (int n : order) {
+            int parent = scene.getNode(n).getParent();
+            m[n] = top < 0 || n == top || parent >= 0 && m[parent];
+        }
+        return m;
+    }
+
     /// The name of the clip playing, or null.
     public String getClipName() {
         return clip == null ? null : clip.getName();
@@ -387,6 +461,10 @@ public class AnimatedModel {
             }
             posed = false;
         }
+        if (layer != null) {
+            layerTime = advance(layer, layerTime + dt, true);
+            posed = false;
+        }
         if (!posed && visible) {
             pose();
         }
@@ -413,6 +491,10 @@ public class AnimatedModel {
             sample(fadeFrom, fadeFromTime, fadePose);
             float w = fadeLength <= 0f ? 1f : Math.min(1f, fadeElapsed / fadeLength);
             blend(fadePose, pose, w, pose);
+        }
+        if (layer != null) {
+            sample(layer, layerTime, layerPose);
+            blendMasked(pose, layerPose, layerWeight, layerMask);
         }
         computeWorld();
         int skinned = -1;
@@ -480,6 +562,35 @@ public class AnimatedModel {
             if (len > 0f) {
                 for (int i = 3; i < 7; i++) {
                     dst[n + i] /= len;
+                }
+            }
+        }
+    }
+
+    /// `pose = lerp(pose, over, w)` on the nodes `mask` selects.
+    private static void blendMasked(float[] pose, float[] over, float w, boolean[] mask) {
+        for (int node = 0; node < mask.length; node++) {
+            if (!mask[node]) {
+                continue;
+            }
+            int n = node * POSE;
+            for (int i = 0; i < 3; i++) {
+                pose[n + i] += (over[n + i] - pose[n + i]) * w;
+                pose[n + 7 + i] += (over[n + 7 + i] - pose[n + 7 + i]) * w;
+            }
+            float dot = pose[n + 3] * over[n + 3] + pose[n + 4] * over[n + 4]
+                    + pose[n + 5] * over[n + 5] + pose[n + 6] * over[n + 6];
+            float sign = dot < 0f ? -1f : 1f;
+            float len = 0f;
+            for (int i = 3; i < 7; i++) {
+                float v = pose[n + i] + (sign * over[n + i] - pose[n + i]) * w;
+                pose[n + i] = v;
+                len += v * v;
+            }
+            len = (float) Math.sqrt(len);
+            if (len > 0f) {
+                for (int i = 3; i < 7; i++) {
+                    pose[n + i] /= len;
                 }
             }
         }
