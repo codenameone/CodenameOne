@@ -161,6 +161,11 @@ final class TypedEmit {
     /// put in a Java `long` (see `IntRanges`).
     private IntRanges ranges;
     private Set<String> longLocals = new HashSet<String>();
+    /// Untyped locals that accumulate with `+=` / `-=`: held as a long and
+    /// an object (null while the long is the value), so adding an int to
+    /// one that holds an int allocates nothing. The object takes anything
+    /// else, and every read boxes the pair back into one value.
+    private Set<String> accLocals = new HashSet<String>();
     /// The module functions that also have a version taking their int
     /// parameters as Java longs (`TL_`), and the interval each such
     /// parameter is known to hold there; what that version returns, when
@@ -950,6 +955,7 @@ final class TypedEmit {
         da = new DefAssign();
         da.function(f.def.body, sc.params);
         soleStores = soleStores(f.def.body);
+        accLocals = accumulators(f);
         folded = new IdentityHashMap<Expr, Object>();
         recycled = ListRecycling.find(f.def.body, f.names, sc);
         scalars = findScalars(f);
@@ -1039,7 +1045,7 @@ final class TypedEmit {
                 declared.add(e.getKey());
                 b.append("        long ").append(var(e.getKey())).append(" = 0L;\n");
             } else if (declared.add(e.getKey())) {
-                if (e.getValue().k == Ty.K.INT) {
+                if (e.getValue().k == Ty.K.INT || accLocals.contains(e.getKey())) {
                     b.append("        long ").append(var(e.getKey())).append(" = 0L;\n        Object ")
                             .append(big(e.getKey())).append(" = null;\n");
                 } else {
@@ -2374,7 +2380,7 @@ final class TypedEmit {
                                 .append(";\n");
                         return;
                     }
-                    if (localType(n).k == Ty.K.INT) {
+                    if (localType(n).k == Ty.K.INT || accLocals.contains(n)) {
                         storePair(var(n), big(n), v, b, ind);
                     } else {
                         b.append(var(n)).append(" = ").append(conv(v, localType(n))).append(";\n");
@@ -2596,8 +2602,95 @@ final class TypedEmit {
         }
     }
 
+    /// The untyped locals of `f` worth holding as a long and an object: a
+    /// `+=` or `-=` targets them, and nothing deletes them.
+    private Set<String> accumulators(Infer.Fn f) {
+        Set<String> targets = new HashSet<String>();
+        Infer.Visit[] v = new Infer.Visit[1];
+        v[0] = x -> {
+            if (x instanceof AugAssign && ((AugAssign) x).target instanceof Name
+                    && ("+".equals(((AugAssign) x).op) || "-".equals(((AugAssign) x).op))) {
+                targets.add(((Name) ((AugAssign) x).target).id);
+            }
+            if (!(x instanceof FunctionDef || x instanceof Lambda || x instanceof ClassDef || x instanceof Comp)) {
+                Infer.children(x, v[0]);
+            }
+        };
+        for (Stmt st : f.def.body) {
+            v[0].on(st);
+        }
+        Set<String> out = new HashSet<String>();
+        for (String n : targets) {
+            Ty t = f.locals.get(n);
+            if (t != null && t.k == Ty.K.DYN && !sc.params.contains(n) && !longLocals.contains(n)
+                    && !sc.deleted.contains(n) && sc.resolve(n) == Scope.Binding.LOCAL) {
+                out.add(n);
+            }
+        }
+        return out;
+    }
+
+    /// `n += v` (or `-=`) on an accumulator: the long sum while both are
+    /// ints and it fits, Python's in-place operator on the boxed value
+    /// otherwise.
+    private void accumulate(String n, String op, E v, StringBuilder b, int ind) {
+        String lv = var(n);
+        String ob = big(n);
+        String slow = "Py." + ("+".equals(op) ? "iadd" : "isub") + "(" + ob + " == null ? (Object) Long.valueOf(" + lv
+                + ") : " + ob + ", ";
+        String r = fresh();
+        String s = fresh();
+        indent(b, ind);
+        String over = "+".equals(op) ? "((" + lv + " ^ " + s + ") & (" + r + " ^ " + s + ")) < 0"
+                : "((" + lv + " ^ " + r + ") & (" + lv + " ^ " + s + ")) < 0";
+        if (v.t.k == Ty.K.INT && !v.t.opt && v.lc != null && v.pk == null) {
+            b.append("long ").append(r).append(" = ").append(v.lc).append(";\n");
+            indent(b, ind);
+            b.append("long ").append(s).append(" = ").append(lv).append(' ').append(op).append(' ').append(r).append(";\n");
+            indent(b, ind);
+            b.append("if (").append(ob).append(" == null && !(").append(over).append(")) {\n");
+            indent(b, ind + 1);
+            b.append(lv).append(" = ").append(s).append(";\n");
+            indent(b, ind);
+            b.append("} else {\n");
+            indent(b, ind + 1);
+            storePair(lv, ob, new E(slow + "Long.valueOf(" + r + "))", Ty.DYN), b, ind + 1);
+            indent(b, ind);
+            b.append("}\n");
+            return;
+        }
+        String x = fresh();
+        b.append("Object ").append(x).append(" = ").append(box(v)).append(";\n");
+        indent(b, ind);
+        b.append("if (").append(ob).append(" == null && ").append(x).append(" instanceof Long) {\n");
+        indent(b, ind + 1);
+        b.append("long ").append(r).append(" = ((Long) ").append(x).append(").longValue();\n");
+        indent(b, ind + 1);
+        b.append("long ").append(s).append(" = ").append(lv).append(' ').append(op).append(' ').append(r).append(";\n");
+        indent(b, ind + 1);
+        b.append("if (!(").append(over).append(")) {\n");
+        indent(b, ind + 2);
+        b.append(lv).append(" = ").append(s).append(";\n");
+        indent(b, ind + 2);
+        b.append(x).append(" = null;\n");
+        indent(b, ind + 1);
+        b.append("}\n");
+        indent(b, ind);
+        b.append("}\n");
+        indent(b, ind);
+        b.append("if (").append(x).append(" != null) {\n");
+        indent(b, ind + 1);
+        storePair(lv, ob, new E(slow + x + ")", Ty.DYN), b, ind + 1);
+        indent(b, ind);
+        b.append("}\n");
+    }
+
     private void augAssign(AugAssign a, StringBuilder b, int ind) {
         Expr t = a.target;
+        if (t instanceof Name && accLocals.contains(((Name) t).id) && ("+".equals(a.op) || "-".equals(a.op))) {
+            accumulate(((Name) t).id, a.op, expr(a.value), b, ind);
+            return;
+        }
         if (t instanceof Name && longLocals.contains(((Name) t).id)) {
             store(t, top(new BinOp(t, a.op, a.value)), b, ind);
             return;
@@ -2619,6 +2712,12 @@ final class TypedEmit {
         }
         if (t instanceof Name) {
             E cur0 = expr(t);
+            if (cur0.t.k == Ty.K.LIST && !cur0.t.opt && "+".equals(a.op)) {
+                // list += extends in place, so an alias sees the new items;
+                // Py.iadd answers the same PyList it was given.
+                store(t, new E("((PyList) Py.iadd(" + cur0.c + ", " + box(expr(a.value)) + "))", cur0.t), b, ind);
+                return;
+            }
             E r = binop(a.op, cur0, expr(a.value), a.value);
             store(t, r, b, ind);
             return;
@@ -3920,6 +4019,9 @@ final class TypedEmit {
                 }
                 if (t.k == Ty.K.INT) {
                     return dual(var(n), big(n));
+                }
+                if (accLocals.contains(n)) {
+                    return new E("(" + big(n) + " == null ? (Object) Long.valueOf(" + var(n) + ") : " + big(n) + ")", Ty.DYN);
                 }
                 return new E(var(n), nonNull.contains(n) ? t.nonNone() : t);
             }
