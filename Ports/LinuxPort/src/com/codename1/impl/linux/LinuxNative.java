@@ -210,6 +210,98 @@ public final class LinuxNative {
      */
     public static native boolean pollEvent(int[] out);
 
+    /**
+     * Starts the game controller reader (cn1_linux_gamepad.c) once; later calls do
+     * nothing. Controllers then arrive through {@link #pollEvent} as the
+     * CN1_EVENT_GAMEPAD_* events.
+     */
+    public static native void gamepadStart();
+
+    /** The device name of the controller in a slot, or an empty string. */
+    public static native String gamepadName(int index);
+
+    /** Rumbles a controller; motors 0..65535. Best effort. */
+    public static native void gamepadRumble(int index, int strong, int weak, int millis);
+
+    // Steamworks (cn1_linux_steam.c), backing LinuxGameServices. With no
+    // libsteam_api.so beside the executable, or no Steam client, steamInit is
+    // false and every other call answers its default.
+
+    /** Connects to the Steam client once; true when connected. */
+    public static native boolean steamInit();
+
+    /** True when Steam is relaunching the app and this process must exit; 0 reads CN1_STEAM_APPID. */
+    public static native boolean steamRestartIfNecessary(int appId);
+
+    /** Disconnects from Steam. */
+    public static native void steamShutdown();
+
+    /** Runs one frame of callbacks; answers an EV_* event code or 0. */
+    public static native int steamPump();
+
+    /** Unlocks (set) or relocks an achievement. */
+    public static native boolean steamAchievement(String name, boolean set);
+
+    /** Whether an achievement is unlocked. */
+    public static native boolean steamIsAchieved(String name);
+
+    /** Sends stats and achievements to the server. */
+    public static native boolean steamStoreStats();
+
+    /** Reads an int stat. */
+    public static native int steamGetStatInt(String name, int def);
+
+    /** Writes an int stat. */
+    public static native boolean steamSetStatInt(String name, int value);
+
+    /** Reads a float stat. */
+    public static native float steamGetStatFloat(String name, float def);
+
+    /** Writes a float stat. */
+    public static native boolean steamSetStatFloat(String name, float value);
+
+    /** The player's persona name. */
+    public static native String steamPersonaName();
+
+    /** The player's 64 bit Steam id. */
+    public static native long steamUserId();
+
+    /** The running app id. */
+    public static native int steamAppId();
+
+    /** Bit 1 Steam Deck, bit 2 Big Picture. */
+    public static native int steamDeviceFlags();
+
+    /** Opens the overlay at a dialog, or a web page. */
+    public static native void steamOverlay(String target, boolean webPage);
+
+    /** Sets a rich presence key; a null key clears all. */
+    public static native boolean steamRichPresence(String key, String value);
+
+    /** Shows the floating gamepad keyboard over a rectangle. */
+    public static native boolean steamFloatingKeyboard(int mode, int x, int y, int w, int h);
+
+    /** Whether a DLC is installed. */
+    public static native boolean steamDlcInstalled(int appId);
+
+    /** The game language chosen in Steam. */
+    public static native String steamLanguage();
+
+    /** Whether Steam Cloud is on for the account and the app. */
+    public static native boolean steamCloudEnabled();
+
+    /** Writes a Steam Cloud file. */
+    public static native boolean steamCloudWrite(String name, byte[] data);
+
+    /** Reads a Steam Cloud file, or null. */
+    public static native byte[] steamCloudRead(String name);
+
+    /** Whether a Steam Cloud file exists. */
+    public static native boolean steamCloudExists(String name);
+
+    /** Deletes a Steam Cloud file. */
+    public static native boolean steamCloudDelete(String name);
+
     // ---- additional desktop windows (cn1_linux_desktopwindow.c) --------------
     //
     // A window is addressed by the slot index returned from desktopWindowCreate.

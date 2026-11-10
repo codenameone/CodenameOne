@@ -78,6 +78,14 @@ static int cn1LinuxIsProtectedEvent(int type, int x, int y) {
             || type == CN1_EVENT_POINTER_RELEASED
             || type == CN1_EVENT_WINDOW_FOCUS
             || type == CN1_EVENT_SIZE_CHANGED
+            /* A lost button release would leave a controller button held down for
+             * good, and a lost connect or disconnect would leave the slot table
+             * wrong. Presses are protected with releases because this test does not
+             * see the keyCode that tells them apart; buttons are rare next to the
+             * axis stream, which the next value repairs and so may go. */
+            || type == CN1_EVENT_GAMEPAD_CONNECTED
+            || type == CN1_EVENT_GAMEPAD_DISCONNECTED
+            || type == CN1_EVENT_GAMEPAD_BUTTON
             || (type == CN1_EVENT_POINTER_HOVER && x == -1 && y == -1);
 }
 

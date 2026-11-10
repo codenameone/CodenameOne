@@ -907,3 +907,4 @@ minimap
 killfeed
 paintballs
 Paintballs
+gamepad
