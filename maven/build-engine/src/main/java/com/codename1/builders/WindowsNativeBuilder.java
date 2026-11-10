@@ -175,9 +175,50 @@ public class WindowsNativeBuilder extends Executor {
         return "win";
     }
 
+    /// True for `windows.embedded=true`: the kiosk target, one borderless window
+    /// over a whole monitor of a Windows IoT Enterprise device, normally run as
+    /// its shell (see `cn1_windows_embedded.cpp` and `cn1:deploy-device`).
+    static boolean isEmbeddedRequested(BuildRequest request) {
+        return "true".equalsIgnoreCase(request.getArg("windows.embedded", "false"));
+    }
+
+    /// The `CN1_DEFAULT_*` defines the kiosk unit reads when the device sets no
+    /// `CN1_*` environment variable: the board profile's, overridden by the
+    /// individual hints. Semicolon separated, as CMake lists are.
+    static String embeddedDefines(BuildRequest request, WindowsEmbeddedProfile profile) {
+        int rotation = parseIntOr(request.getArg("windows.embedded.rotation", null), profile.rotation);
+        if (rotation != 90 && rotation != 180 && rotation != 270) {
+            rotation = 0;
+        }
+        int dpi = Math.max(0, parseIntOr(request.getArg("windows.embedded.dpi", null), profile.dpi));
+        int monitor = Math.max(0, parseIntOr(request.getArg("windows.embedded.monitor", null), 0));
+        String cursorHint = request.getArg("windows.embedded.cursor", null);
+        boolean cursor = cursorHint == null || cursorHint.trim().isEmpty()
+                ? profile.cursor : "true".equalsIgnoreCase(cursorHint.trim());
+        return "CN1_DEFAULT_ROTATION=" + rotation + ";CN1_DEFAULT_DPI=" + dpi
+                + ";CN1_DEFAULT_MONITOR=" + monitor + ";CN1_DEFAULT_CURSOR=" + (cursor ? 1 : 0);
+    }
+
+    private static int parseIntOr(String value, int def) {
+        if (value == null || value.trim().isEmpty()) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return def;
+        }
+    }
+
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
-        String arch = normalizeArch(request.getArg("windows.arch", ARCH_X64));
+        boolean embedded = isEmbeddedRequested(request);
+        WindowsEmbeddedProfile board = WindowsEmbeddedProfile.forBoard(request.getArg("windows.embedded.board", null));
+        // A board implies its architecture; windows.arch still wins when given.
+        String arch = normalizeArch(request.getArg("windows.arch", embedded ? board.arch : ARCH_X64));
+        if (embedded) {
+            log("Embedded Windows (kiosk) target, board profile " + board.name + " (" + board.description + ")");
+        }
         log("Building native Windows app for arch=" + arch + " (triple " + targetTriple(arch) + ")");
 
         File tmpFile = getBuildDirectory();
@@ -451,6 +492,12 @@ public class WindowsNativeBuilder extends Executor {
                     + "desktop package with a Widgets Board provider. Build them separately.");
         }
 
+        if (xbox && embedded) {
+            throw new BuildException("windows.xbox=true and windows.embedded=true cannot be combined: "
+                    + "the kiosk target is a full-trust Win32 shell for Windows IoT Enterprise, the Xbox "
+                    + "package a UWP app container.");
+        }
+
         List<String> configure = new ArrayList<String>();
         configure.add("cmake");
         configure.add("-S");
@@ -463,6 +510,10 @@ public class WindowsNativeBuilder extends Executor {
         configure.add("-DCMAKE_C_COMPILER=" + clangClExecutable());
         configure.add("-DCMAKE_CXX_COMPILER=" + clangClExecutable());
         configure.add("-DCN1_WINDOWS_UWP=" + (xbox ? "ON" : "OFF"));
+        configure.add("-DCN1_WINDOWS_EMBEDDED=" + (embedded ? "ON" : "OFF"));
+        if (embedded) {
+            configure.add("-DCN1_WINDOWS_EMBEDDED_DEFINES=" + embeddedDefines(request, board));
+        }
         if (cross) {
             addCrossCompileConfigure(configure, triple, arch, xwinSysroot,
                     widgetBoardCompileFlags, msix ? widgetBoardLinkFlags(winAppSdk, arch) : "");

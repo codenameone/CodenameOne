@@ -437,6 +437,60 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .platform("windows"));
 
+        h.add(new Hint("windows.embedded")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("windows")
+                .doc("Native Windows port only. Builds the kiosk target for a Windows IoT Enterprise "
+                        + "device: one borderless, topmost window covering a whole monitor, the Windows key "
+                        + "and the shell's task switching shortcuts filtered, and text edited through an "
+                        + "on-screen keyboard. `cn1:deploy-device` installs it as the device's shell through "
+                        + "Shell Launcher. Cannot be combined with `windows.xbox`."));
+
+        h.add(new Hint("windows.embedded.board")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.STRING)
+                .def("generic-x64")
+                .platform("windows")
+                .doc("Board profile for `windows.embedded`, which sets the architecture and the "
+                        + "cursor and density defaults: `generic-x64`, `generic-x64-mouse`, "
+                        + "`generic-arm64`, `imx8` or `qualcomm-iot`."));
+
+        h.add(new Hint("windows.embedded.rotation")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.INT)
+                .def("0")
+                .platform("windows")
+                .doc("Clockwise rotation `windows.embedded` applies to its monitor while it runs: "
+                        + "0, 90, 180 or 270. Windows restores the panel's own orientation when the "
+                        + "application exits. `CN1_ROTATION` on the device overrides it."));
+
+        h.add(new Hint("windows.embedded.dpi")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.INT)
+                .def("0")
+                .platform("windows")
+                .doc("Panel density for `windows.embedded` when the panel misreports its size; 0 "
+                        + "uses what Windows reports. `CN1_DPI` on the device overrides it."));
+
+        h.add(new Hint("windows.embedded.monitor")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.INT)
+                .def("0")
+                .platform("windows")
+                .doc("Which monitor `windows.embedded` covers, in Windows' enumeration order; 0, or a "
+                        + "monitor that does not exist, is the primary. `CN1_MONITOR` on the device "
+                        + "overrides it."));
+
+        h.add(new Hint("windows.embedded.cursor")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.BOOLEAN)
+                .platform("windows")
+                .doc("Whether `windows.embedded` shows the mouse cursor. Defaults to the board "
+                        + "profile's choice: hidden on touch panels. `CN1_CURSOR` on the device "
+                        + "overrides it."));
+
         h.add(new Hint("windows.xbox")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.BOOLEAN)

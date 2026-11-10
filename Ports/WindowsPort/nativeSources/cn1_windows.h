@@ -355,6 +355,20 @@ extern CN1WindowsContext cn1Win;
 void cn1WindowsLog(const char* message);
 void cn1WinApplyPendingResize(void);
 int  cn1WinCreateWindow(const char* utf8Title, int width, int height);
+
+/* The embedded (kiosk) target, cn1_windows_embedded.cpp. Each is a no-op in a
+ * build without CN1_WINDOWS_EMBEDDED. */
+int  cn1WinEmbeddedActive(void);
+/* Rotates the target monitor if asked, then answers the window style and the
+ * screen rectangle a kiosk window covers. */
+void cn1WinEmbeddedPlaceWindow(DWORD* style, DWORD* exStyle, RECT* rc);
+/* After the window is shown: topmost, the cursor policy, the keyboard filter. */
+void cn1WinEmbeddedWindowShown(HWND hwnd);
+/* A forced density in DPI, or 0 for the monitor's own. */
+int  cn1WinEmbeddedDpi(void);
+/* Points stdout and stderr at CN1_LOG_FILE, which cn1:deploy-device sets: a
+ * shell has no console, and the device's log is what cn1:device-logs reads. */
+void cn1WinEmbeddedRedirectLog(void);
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
 /* Same, but tagged with the desktop window the event came from. */
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode);

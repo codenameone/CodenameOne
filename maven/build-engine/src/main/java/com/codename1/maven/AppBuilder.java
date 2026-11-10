@@ -2949,6 +2949,17 @@ public class AppBuilder {
             }
             if (e.getWindowsExecutable() != null) {
                 getLog().info("Built native Windows executable: " + e.getWindowsExecutable().getAbsolutePath());
+                // Also kept where deploy-device looks for it, as the Linux build is:
+                // a windows.embedded build goes to a kiosk the same way.
+                File out = new File(host.buildDirectory(), "windows-native");
+                out.mkdirs();
+                try {
+                    java.nio.file.Files.copy(e.getWindowsExecutable().toPath(),
+                            new File(out, e.getWindowsExecutable().getName()).toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.io.IOException ioe) {
+                    throw new BuildExecutionException("Could not copy the Windows executable to " + out, ioe);
+                }
             }
         } catch (com.codename1.builders.BuildException hardeningEx) {
             throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);

@@ -59,7 +59,8 @@ public abstract class DeployDeviceTask extends DefaultTask {
         File buildDir = getProject().getLayout().getBuildDirectory().get().getAsFile();
         String binary = deviceProperty("binary");
         File bin = binary != null ? getProject().file(binary)
-                : DeviceDeployer.findBinary(buildDir, new File(buildDir, "linux-native"));
+                : DeviceDeployer.findBinary(buildDir, new File(buildDir, "linux-native"),
+                        new File(buildDir, "windows-native"));
         String port = deviceProperty("port");
         String dir = deviceProperty("dir");
         try {
@@ -69,7 +70,9 @@ public abstract class DeployDeviceTask extends DefaultTask {
                     .environment(deviceProperty("env"))
                     .profile(deviceProperty("profile") == null ? "device" : deviceProperty("profile"))
                     .followLogs(deviceProperty("logs") == null ? followLogsByDefault
-                            : "true".equals(deviceProperty("logs"))).deploy();
+                            : "true".equals(deviceProperty("logs")))
+                    .kioskMode(deviceProperty("kioskMode")).kioskUser(deviceProperty("kioskUser"))
+                    .keyboardFilter("true".equals(deviceProperty("keyboardFilter"))).deploy();
         } catch (BuildException ex) {
             throw new GradleException(ex.getMessage(), ex);
         } catch (NumberFormatException ex) {
