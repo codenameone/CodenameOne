@@ -503,7 +503,7 @@ final class BuildHintsDesktop {
                         + "device: one borderless, topmost window covering a whole monitor, the Windows key "
                         + "and the shell's task switching shortcuts filtered, and text edited through an "
                         + "on-screen keyboard. `cn1:deploy-device` installs it as the device's shell through "
-                        + "Shell Launcher. Cannot be combined with `windows.xbox`."));
+                        + "Shell Launcher. Can't be combined with `windows.xbox`."));
 
         h.add(new Hint("windows.embedded.board")
                 .group(HintGroup.WINDOWS)
@@ -537,7 +537,7 @@ final class BuildHintsDesktop {
                 .def("0")
                 .platform("windows")
                 .doc("Which monitor `windows.embedded` covers, in Windows' enumeration order; 0, or a "
-                        + "monitor that does not exist, is the primary. `CN1_MONITOR` on the device "
+                        + "monitor that doesn't exist, is the primary. `CN1_MONITOR` on the device "
                         + "overrides it."));
 
         h.add(new Hint("windows.embedded.cursor")
