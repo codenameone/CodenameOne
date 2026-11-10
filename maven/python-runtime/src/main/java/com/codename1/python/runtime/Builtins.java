@@ -592,7 +592,7 @@ public final class Builtins {
             if (!(p[0] instanceof PyBytes)) {
                 throw Py.typeError("decoding to str: need a bytes-like object, " + Py.typeOf(p[0]).name + " found");
             }
-            return Py.str(Codecs.decode(((PyBytes) p[0]).value, p[1] == ABSENT ? "utf-8" : Py.toStr(p[1]),
+            return Py.str(Codecs.decodeKeep(((PyBytes) p[0]).value, p[1] == ABSENT ? "utf-8" : Py.toStr(p[1]),
                     p[2] == ABSENT ? "strict" : Py.toStr(p[2])));
         };
         Py.LIST_TYPE.factory = (t, args, kw) -> {

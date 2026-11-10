@@ -1,0 +1,12 @@
+src = ("naïve café — résumé <p>x</p>\n" * 4).encode("utf-8")
+text = src.decode("utf-8")
+back = text.encode("utf-8")
+print(back == src, len(back), type(back).__name__)
+print(text.encode("utf-16-le")[:6], text.encode("ascii", "replace")[:12])
+ba = bytearray(back)
+ba[0] = 0x4e
+print(bytes(ba[:4]), back[:4], src[:4])
+other = str(src, "utf-8")
+print(other.encode() == src, (text + "!").encode()[-2:])
+lat = src.decode("latin-1")
+print(len(lat), lat.encode("utf-8") == src, len(lat.encode("latin-1")))

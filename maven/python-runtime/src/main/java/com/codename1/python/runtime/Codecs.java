@@ -109,6 +109,55 @@ final class Codecs {
         throw Py.error(Py.LOOKUP_ERROR, "unknown encoding: " + encoding);
     }
 
+    /// The UTF-8 bytes a str was decoded from, by the str's identity: what
+    /// PyPy keeps for every str, since it stores text as UTF-8. Encoding
+    /// such a str back to UTF-8 then shares the array instead of
+    /// transcoding it, which is safe because a `bytes` never changes.
+    private static final class Source {
+        final String s;
+        final byte[] b;
+
+        Source(String s, byte[] b) {
+            this.s = s;
+            this.b = b;
+        }
+    }
+
+    private static final Source[] SOURCES = new Source[256];
+
+    /// Strings shorter than this are cheaper to encode again than to record.
+    private static final int SOURCE_MIN = 32;
+
+    private static int sourceSlot(String s) {
+        int h = System.identityHashCode(s);
+        h ^= h >>> 16;
+        h *= 0x45d9f3b;
+        h ^= h >>> 16;
+        return h & (SOURCES.length - 1);
+    }
+
+    /// [#decode] of a `bytes` object's own array, which never changes: a
+    /// UTF-8 result remembers it for [#encodeShared].
+    static String decodeKeep(byte[] b, String encoding, String errors) {
+        String r = decode(b, encoding, errors);
+        if (b.length >= SOURCE_MIN && "strict".equals(errors) && "utf-8".equals(normalize(encoding))) {
+            SOURCES[sourceSlot(r)] = new Source(r, b);
+        }
+        return r;
+    }
+
+    /// [#encode] into a new `bytes` object, which may share its array with
+    /// the `bytes` the str was decoded from.
+    static byte[] encodeShared(String s, String encoding, String errors) {
+        if (s.length() >= SOURCE_MIN) {
+            Source c = SOURCES[sourceSlot(s)];
+            if (c != null && c.s == s && "utf-8".equals(normalize(encoding))) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return c.b;
+            }
+        }
+        return encode(s, encoding, errors);
+    }
+
     static byte[] encode(String s, String encoding, String errors) {
         String enc = normalize(encoding);
         if ("utf-8".equals(enc)) {

@@ -872,15 +872,15 @@ final class TypeMethods {
             // `s.encode()` and `s.encode("utf-8")`, bound without Args.
             if ((kw == null || kw.length == 0) && a.length <= 2 && a[0] instanceof String
                     && (a.length == 1 || a[1] instanceof String)) {
-                return new PyBytes(Codecs.encode((String) a[0], a.length == 1 ? "utf-8" : (String) a[1], "strict"));
+                return new PyBytes(Codecs.encodeShared((String) a[0], a.length == 1 ? "utf-8" : (String) a[1], "strict"));
             }
             Object[] p = Args.bind("encode", a, kw, new String[] {"self", "encoding", "errors"},
                     new Object[] {null, Py.str("utf-8"), Py.str("strict")});
-            return new PyBytes(Codecs.encode(s(p[0]), Py.toStr(p[1]), Py.toStr(p[2])));
+            return new PyBytes(Codecs.encodeShared(s(p[0]), Py.toStr(p[1]), Py.toStr(p[2])));
         });
         // The same two calls without an argument array, for the method-call site.
-        encode.with1(o -> new PyBytes(Codecs.encode(s(o), "utf-8", "strict")));
-        encode.with2((o, e) -> e instanceof String ? new PyBytes(Codecs.encode(s(o), (String) e, "strict"))
+        encode.with1(o -> new PyBytes(Codecs.encodeShared(s(o), "utf-8", "strict")));
+        encode.with2((o, e) -> e instanceof String ? new PyBytes(Codecs.encodeShared(s(o), (String) e, "strict"))
                 : encode.impl.call(new Object[] {o, e}, Py.NO_KW));
         t.define("encode", encode);
         def(t, "__len__", a -> PyInt.of(Py.len(a[0])));

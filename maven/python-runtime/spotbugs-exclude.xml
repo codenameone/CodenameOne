@@ -54,6 +54,14 @@
         <Method name="surrogates"/>
         <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
     </Match>
+    <!-- The UTF-8 source cache is keyed by identity on purpose: only the
+         very str decoded from those bytes may share them, and equals()
+         would read the whole string, the work the cache exists to skip. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.Codecs"/>
+        <Method name="encodeShared"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
     <!-- Typed.yes is a guard generated code reads so that javac cannot
          fold it: final would make the code after the guard unreachable, and
          generated code is the only reader. -->

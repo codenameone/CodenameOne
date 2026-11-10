@@ -298,18 +298,18 @@ public final class PyBytes extends PyObject {
             // `b.decode()` and `b.decode("utf-8")`, bound without Args.
             if ((kw == null || kw.length == 0) && a.length <= 2 && a[0] instanceof PyBytes
                     && (a.length == 1 || a[1] instanceof String)) {
-                return Codecs.decode(((PyBytes) a[0]).value, a.length == 1 ? "utf-8" : (String) a[1], "strict");
+                return Codecs.decodeKeep(((PyBytes) a[0]).value, a.length == 1 ? "utf-8" : (String) a[1], "strict");
             }
             Object[] p = Args.bind("decode", a, kw, new String[] {"self", "encoding", "errors"},
                     new Object[] {null, Py.str("utf-8"), Py.str("strict")});
-            return Py.str(Codecs.decode(((PyBytes) p[0]).value, Py.toStr(p[1]), Py.toStr(p[2])));
+            return Py.str(Codecs.decodeKeep(((PyBytes) p[0]).value, Py.toStr(p[1]), Py.toStr(p[2])));
         });
         // `b.decode()` and `b.decode("utf-8")` once more, without an argument array: the
         // method-call site hands a builtin its receiver and argument directly.
-        decode.with1(b -> b instanceof PyBytes ? Codecs.decode(((PyBytes) b).value, "utf-8", "strict")
+        decode.with1(b -> b instanceof PyBytes ? Codecs.decodeKeep(((PyBytes) b).value, "utf-8", "strict")
                 : decode.impl.call(new Object[] {b}, Py.NO_KW));
         decode.with2((b, e) -> b instanceof PyBytes && e instanceof String
-                ? Codecs.decode(((PyBytes) b).value, (String) e, "strict")
+                ? Codecs.decodeKeep(((PyBytes) b).value, (String) e, "strict")
                 : decode.impl.call(new Object[] {b, e}, Py.NO_KW));
         Py.BYTES_TYPE.define("decode", decode);
         Py.BYTES_TYPE.define("hex", PyBuiltin.methodKw(Py.BYTES_TYPE, "hex", (args, kw) -> {
