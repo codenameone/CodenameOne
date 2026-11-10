@@ -82,6 +82,7 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
                 properties.setProperty(key, System.getProperty(key));
             }
         }
+        addProperties(properties);
         request.setProperties(properties);
 
         if (buildExecutableJar()) {
@@ -99,6 +100,10 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
         } catch (MavenInvocationException e) {
             throw new MojoExecutionException("Failed to invoke Maven", e);
         }
+    }
+
+    /// Adds what this goal sends to the child build beyond the platform and target.
+    protected void addProperties(Properties properties) {
     }
 
     /// Runs in this Maven run once the child build has succeeded.

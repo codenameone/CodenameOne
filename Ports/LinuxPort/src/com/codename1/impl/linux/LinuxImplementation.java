@@ -133,6 +133,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// do not drift apart.
     private static final int EVENT_MENU_COMMAND = 23;
     private static final int EVENT_THEME_SETTINGS_CHANGED = 24;
+    /// Game controllers; must match CN1_EVENT_GAMEPAD_* in cn1_linux.h.
+    private static final int EVENT_GAMEPAD_CONNECTED = 25;
+    private static final int EVENT_GAMEPAD_DISCONNECTED = 26;
+    private static final int EVENT_GAMEPAD_BUTTON = 27;
+    private static final int EVENT_GAMEPAD_AXIS = 28;
+    /// CN1_GAMEPAD_FIXED: the fixed-point scale of an axis value.
+    private static final float GAMEPAD_FIXED = 10000f;
     private static final int EVENT_ROTATE = 11;
     private static final int EVENT_ACCESSIBILITY_ACTION = 12;
     // Additional desktop windows. These always carry a non-zero window id.
@@ -376,6 +383,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // random bytes, digests and locale symbols through Codename One.
         com.codename1.impl.CoreJdkHostInstaller.install();
         LinuxNative.initDisplay("Codename One", defaultWindowWidth, defaultWindowHeight);
+        // Controllers reach Gamepads through the input ring like every other input.
+        LinuxNative.gamepadStart();
+        // Steam, when the application was started by it (and a no-op otherwise).
+        LinuxGameServices.install();
         windowGraphicsPeer = LinuxNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);
         defaultFont = Long.valueOf(LinuxNative.getDefaultFont());
@@ -1215,6 +1226,21 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     // hover state like any other; the earlier main-window-only guard
                     // made hover unreachable there.
                     dispatchPointerHover(windowId, x, y, key);
+                    break;
+                case EVENT_GAMEPAD_CONNECTED:
+                    // The name is read now, not when the event was queued: a pad
+                    // unplugged in between reports "" and its DISCONNECTED follows
+                    // in this same drain, so the label is only ever briefly empty.
+                    com.codename1.gaming.Gamepads.reportConnected(x, LinuxNative.gamepadName(x));
+                    break;
+                case EVENT_GAMEPAD_DISCONNECTED:
+                    com.codename1.gaming.Gamepads.reportDisconnected(x);
+                    break;
+                case EVENT_GAMEPAD_BUTTON:
+                    com.codename1.gaming.Gamepads.reportButton(x, y, key != 0);
+                    break;
+                case EVENT_GAMEPAD_AXIS:
+                    com.codename1.gaming.Gamepads.reportAxis(x, y, key / GAMEPAD_FIXED);
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, keyCodeOf(key));
@@ -2572,6 +2598,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
         boolean singleLine = !(cmp instanceof com.codename1.ui.TextArea)
                 || ((com.codename1.ui.TextArea) cmp).isSingleLineTextArea();
+        LinuxGameServices.onEditStarted(cmp, singleLine, constraint);
 
         com.codename1.ui.plaf.Style s = cmp.getStyle();
         int padL = s.getPaddingLeft(false);
@@ -3091,6 +3118,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 return Display.GAME_LEFT;
             case GAME_KEY_CODE_RIGHT:
                 return Display.GAME_RIGHT;
+            case GAME_KEY_CODE_FIRE:
+                return Display.GAME_FIRE;
             default:
                 return 0;
         }
@@ -3107,6 +3136,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 return GAME_KEY_CODE_LEFT;
             case Display.GAME_RIGHT:
                 return GAME_KEY_CODE_RIGHT;
+            case Display.GAME_FIRE:
+                return GAME_KEY_CODE_FIRE;
             default:
                 return 0;
         }
@@ -3120,6 +3151,15 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private static final int GAME_KEY_CODE_DOWN = -92;
     private static final int GAME_KEY_CODE_LEFT = -93;
     private static final int GAME_KEY_CODE_RIGHT = -94;
+    // No key produces this one: it is what a controller's A button presses
+    // (Gamepads asks getKeyCode(GAME_FIRE)), so that A activates the focused
+    // component. Answering 0 for GAME_FIRE made A do nothing.
+    private static final int GAME_KEY_CODE_FIRE = -90;
+
+    @Override
+    public void rumbleGamepad(int index, float strong, float weak, int durationMillis) {
+        LinuxNative.gamepadRumble(index, (int) (strong * 65535f), (int) (weak * 65535f), durationMillis);
+    }
 
     /// The Codename One code of a key the window reported.
     ///

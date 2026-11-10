@@ -312,6 +312,8 @@ include::Working-With-Linux.asciidoc[]
 
 include::Embedded-Linux.asciidoc[]
 
+include::Steam.asciidoc[]
+
 include::Realtime.asciidoc[]
 
 include::Desktop-Integration.asciidoc[]
