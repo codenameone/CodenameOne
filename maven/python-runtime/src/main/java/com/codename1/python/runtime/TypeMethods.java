@@ -583,7 +583,14 @@ final class TypeMethods {
             if (only instanceof String) {
                 return (String) only;
             }
-            StringBuilder sb = new StringBuilder();
+            // Sized from the items when all are plain strings, so the
+            // builder never grows and copies.
+            long total = n > 1 ? (long) sep.length() * (n - 1) : 0;
+            for (int i = 0; i < n && total >= 0; i++) {
+                Object v = l.get(i);
+                total = v instanceof String ? total + ((String) v).length() : -1;
+            }
+            StringBuilder sb = new StringBuilder(total > 0 && total < Integer.MAX_VALUE ? (int) total : 16);
             for (int i = 0; i < n; i++) {
                 Object v = joinItem(l.get(i));
                 if (!(v instanceof String)) {

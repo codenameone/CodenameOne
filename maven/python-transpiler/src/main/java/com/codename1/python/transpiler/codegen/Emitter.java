@@ -2209,7 +2209,28 @@ public final class Emitter {
     /// typed as a str or a number, which is one value and never a tuple to
     /// spread. Null when the format is not one `Py.pct` takes.
     String percentHead(Constant f, int count) {
-        if (f.kind != Constant.Kind.STR || count < 1 || count > 4) {
+        if (count > 4) {
+            return null;
+        }
+        List<String> lits = percentParts(f, count);
+        if (lits == null) {
+            return null;
+        }
+        String convs = lits.remove(lits.size() - 1);
+        StringBuilder arr = new StringBuilder("new String[] {");
+        for (int i = 0; i < lits.size(); i++) {
+            arr.append(i == 0 ? "" : ", ").append(javaString(lits.get(i)));
+        }
+        String l = hoist("String[]", arr.append("}").toString());
+        return "Py.pct(" + l + ", " + javaString(convs);
+    }
+
+    /// The literal format `f` of bare `%s`, `%d`, `%i` and `%%` split for
+    /// `count` values: the text around the conversions (one more than
+    /// there are values), then the conversion letters as one last element.
+    /// Null for any other format or a count that does not match.
+    List<String> percentParts(Constant f, int count) {
+        if (f.kind != Constant.Kind.STR || count < 1) {
             return null;
         }
         List<String> lits = new ArrayList<>();
@@ -2241,12 +2262,8 @@ public final class Emitter {
         if (convs.length() != count) {
             return null;
         }
-        StringBuilder arr = new StringBuilder("new String[] {");
-        for (int i = 0; i < lits.size(); i++) {
-            arr.append(i == 0 ? "" : ", ").append(javaString(lits.get(i)));
-        }
-        String l = hoist("String[]", arr.append("}").toString());
-        return "Py.pct(" + l + ", " + javaString(convs.toString());
+        lits.add(convs.toString());
+        return lits;
     }
 
     /// [#percentLiteral] for TypedEmit, which appends the values itself.

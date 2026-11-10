@@ -523,6 +523,12 @@ final class Formatting {
                 + conv(convs.charAt(2), c) + lits[3] + conv(convs.charAt(3), d) + lits[4];
     }
 
+    /// One `%s`, `%d` or `%i` conversion of `v`, for the transpiler's
+    /// concatenation of a literal format whose values are mostly typed.
+    public static String conv1(char c, Object v) {
+        return conv(c, v);
+    }
+
     private static String conv(char c, Object v) {
         if (c == 's') {
             return v instanceof String ? (String) v : Py.toStr(v);

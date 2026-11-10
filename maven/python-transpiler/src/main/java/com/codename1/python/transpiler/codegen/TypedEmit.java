@@ -949,6 +949,8 @@ final class TypedEmit {
         }
         da = new DefAssign();
         da.function(f.def.body, sc.params);
+        soleStores = soleStores(f.def.body);
+        folded = new IdentityHashMap<Expr, Object>();
         recycled = ListRecycling.find(f.def.body, f.names, sc);
         scalars = findScalars(f);
         StringBuilder b = new StringBuilder();
@@ -2783,6 +2785,96 @@ final class TypedEmit {
 
     private static final String[] NO_PAIR = new String[0];
 
+    /// `x % k` for an int `x` held as a long and a constant `k` of 31 bits
+    /// above zero: Python's remainder, never an overflow, and an int.
+    private E modConstant(BinOp b) {
+        Long k = intConstant(b.right);
+        if (k == null || k <= 0 || k > Integer.MAX_VALUE) {
+            return null;
+        }
+        Ty lt = in.type(b.left, cur, sc);
+        if (lt == null || lt.opt || lt.k != Ty.K.INT) {
+            return null;
+        }
+        E l = expr(b.left);
+        if (l.lc == null || l.pk != null || l.t.k != Ty.K.INT || l.t.opt) {
+            return binop("%", l, constE(k), b.right);
+        }
+        String lc = "Typed.imod(" + l.lc + ", " + k + "L)";
+        E r = new E("Long.valueOf(" + lc + ")", Ty.INT, lc);
+        r.small = true;
+        return r;
+    }
+
+    /// `"| %s | %d |" % (s, n)` with every value typed: a str for `%s`, an
+    /// int held as a long for `%d`, `%i` or `%s`. One Java concatenation,
+    /// with no tuple, no boxed int and no conversion dispatch; the values
+    /// are evaluated left to right, as CPython builds the tuple. Null when
+    /// any value is of another type, so `Py.pct` or `Py.mod` takes it.
+    private E percentConcat(BinOp b) {
+        if (!"%".equals(b.op) || !(b.left instanceof Constant)) {
+            return null;
+        }
+        List<Expr> vals;
+        if (b.right instanceof TupleExpr) {
+            vals = ((TupleExpr) b.right).elts;
+        } else {
+            Ty rt = in.type(b.right, cur, sc);
+            if (rt == null || rt.opt || rt.k != Ty.K.STR && rt.k != Ty.K.INT) {
+                return null;
+            }
+            vals = java.util.Collections.singletonList(b.right);
+        }
+        for (Expr v : vals) {
+            Ty vt = v instanceof Starred ? null : in.type(v, cur, sc);
+            if (vt == null || vt.opt || vt.k != Ty.K.STR && vt.k != Ty.K.INT) {
+                return null;
+            }
+        }
+        List<String> lits = em.percentParts((Constant) b.left, vals.size());
+        if (lits == null) {
+            return null;
+        }
+        String convs = lits.get(lits.size() - 1);
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < vals.size(); i++) {
+            Object kv = inlineArgs == null ? fold(vals.get(i)) : null;
+            if (kv instanceof String && convs.charAt(i) == 's' || kv instanceof Long) {
+                // A folded value joins the literal text around it.
+                lits.set(i, lits.get(i) + kv + lits.get(i + 1));
+                lits.remove(i + 1);
+                convs = convs.substring(0, i) + convs.substring(i + 1);
+                vals = new ArrayList<Expr>(vals);
+                vals.remove(i);
+                i--;
+                continue;
+            }
+            E v = expr(vals.get(i));
+            char k = convs.charAt(i);
+            if (v.t.k == Ty.K.STR && !v.t.opt && k == 's') {
+                parts.add(v.c);
+            } else if (v.t.k == Ty.K.INT && !v.t.opt && v.lc != null && v.pk == null) {
+                parts.add("Long.toString(" + v.lc + ")");
+            } else {
+                parts.add("Py.pconv('" + k + "', " + box(v) + ")");
+            }
+        }
+        StringBuilder sb = new StringBuilder("(");
+        boolean first = true;
+        for (int i = 0; i <= vals.size(); i++) {
+            String lit = lits.get(i);
+            if (!lit.isEmpty() || first && i == vals.size()) {
+                sb.append(first ? "" : " + ").append(Emitter.javaString(lit));
+                first = false;
+            }
+            if (i < vals.size()) {
+                sb.append(first ? "\"\" + " : " + ").append(parts.get(i));
+                first = false;
+            }
+        }
+        return new E(sb.append(')').toString(), Ty.STR);
+    }
+
     /// An int as a Java long and the object standing in for it (null when
     /// the long is the value), both free of effects; or an empty array.
     private static String[] longPair(E e) {
@@ -2827,6 +2919,306 @@ final class TypedEmit {
     }
 
     /// Every local `body` may store into.
+    /// Per function: each local stored exactly once, by a plain `n = value`,
+    /// mapped to that value. A local whose one value folds to a constant
+    /// holds that constant wherever it is bound, in a loop or not.
+    private Map<String, Expr> soleStores;
+    /// [#fold]'s answers, NO_FOLD for an expression that does not fold.
+    private Map<Expr, Object> folded;
+    private static final Object NO_FOLD = new Object();
+    private final Set<String> folding = new HashSet<String>();
+
+    private static Map<String, Expr> soleStores(List<Stmt> body) {
+        Map<String, Integer> count = new HashMap<String, Integer>();
+        Map<String, Expr> value = new HashMap<String, Expr>();
+        for (Stmt st : body) {
+            countStores(st, count, value);
+        }
+        Map<String, Expr> r = new HashMap<String, Expr>();
+        for (Map.Entry<String, Expr> en : value.entrySet()) {
+            if (count.get(en.getKey()) == 1) {
+                r.put(en.getKey(), en.getValue());
+            }
+        }
+        return r;
+    }
+
+    /// Every way a name is bound counts, in nested scopes too: a comprehension
+    /// variable or an inner function's local of the same name only makes the
+    /// local look stored twice, which costs a fold and never correctness.
+    private static void countStores(Object o, Map<String, Integer> count, Map<String, Expr> value) {
+        List<String> ns = new ArrayList<String>();
+        if (o instanceof Assign) {
+            Assign a = (Assign) o;
+            for (Expr t : a.targets) {
+                names(t, ns);
+            }
+            if (a.targets.size() == 1 && a.targets.get(0) instanceof Name) {
+                value.put(((Name) a.targets.get(0)).id, a.value);
+            }
+        } else if (o instanceof AugAssign) {
+            names(((AugAssign) o).target, ns);
+        } else if (o instanceof AnnAssign) {
+            names(((AnnAssign) o).target, ns);
+            ns.add(ns.isEmpty() ? "" : ns.get(0));
+        } else if (o instanceof For) {
+            names(((For) o).target, ns);
+        } else if (o instanceof NamedExpr) {
+            ns.add(((NamedExpr) o).target.id);
+        } else if (o instanceof Comprehension) {
+            names(((Comprehension) o).target, ns);
+        } else if (o instanceof WithItem && ((WithItem) o).vars != null) {
+            names(((WithItem) o).vars, ns);
+        } else if (o instanceof ExceptHandler && ((ExceptHandler) o).name != null) {
+            ns.add(((ExceptHandler) o).name);
+        } else if (o instanceof Delete) {
+            for (Expr t : ((Delete) o).targets) {
+                names(t, ns);
+            }
+        } else if (o instanceof Import || o instanceof ImportFrom) {
+            for (Alias al : o instanceof Import ? ((Import) o).names : ((ImportFrom) o).names) {
+                ns.add(al.asname != null ? al.asname : al.name);
+            }
+        } else if (o instanceof Global) {
+            for (String n : ((Global) o).names) {
+                ns.add(n);
+                ns.add(n);
+            }
+        } else if (o instanceof FunctionDef) {
+            ns.add(((FunctionDef) o).name);
+        } else if (o instanceof ClassDef) {
+            ns.add(((ClassDef) o).name);
+        }
+        for (String n : ns) {
+            Integer c = count.get(n);
+            count.put(n, c == null ? 1 : c + 1);
+        }
+        Infer.children(o, x -> countStores(x, count, value));
+    }
+
+    /// `e` as a constant computed here, when it is a pure function of
+    /// literals and of locals whose one store folds: a str, a Long or a
+    /// Boolean; or null. Strings fold only while ASCII, where Java's
+    /// `trim`-free scans, `indexOf` and case maps answer what CPython does.
+    private Object fold(Expr e) {
+        Object m = folded.get(e);
+        if (m != null) {
+            return m == NO_FOLD ? null : m; //NOPMD CompareObjectsWithEquals - sentinel
+        }
+        Object r = fold0(e);
+        folded.put(e, r == null ? NO_FOLD : r);
+        return r;
+    }
+
+    private Object fold0(Expr e) {
+        if (e instanceof Constant) {
+            Constant c = (Constant) e;
+            if (c.kind == Constant.Kind.STR) {
+                return ascii(c.text) ? c.text : null;
+            }
+            if (c.kind == Constant.Kind.INT && c.text.length() <= 9 && c.text.matches("[0-9]+")) {
+                return Long.valueOf(c.text);
+            }
+            if (c.kind == Constant.Kind.TRUE || c.kind == Constant.Kind.FALSE) {
+                return c.kind == Constant.Kind.TRUE;
+            }
+            return null;
+        }
+        if (e instanceof Name) {
+            Name n = (Name) e;
+            Expr v = soleStores.get(n.id);
+            if (v == null || !da.safe.contains(n) || binding(n.id) != Scope.Binding.LOCAL || !folding.add(n.id)) {
+                return null;
+            }
+            try {
+                return fold(v);
+            } finally {
+                folding.remove(n.id);
+            }
+        }
+        if (e instanceof UnaryOp && "-".equals(((UnaryOp) e).op)) {
+            Object v = fold(((UnaryOp) e).operand);
+            return v instanceof Long ? Long.valueOf(-(Long) v) : null;
+        }
+        if (e instanceof BinOp) {
+            BinOp b = (BinOp) e;
+            Object l = fold(b.left);
+            Object r = l == null ? null : fold(b.right);
+            if (l instanceof Long && r instanceof Long && small((Long) l) && small((Long) r)) {
+                long x = (Long) l;
+                long y = (Long) r;
+                switch (b.op) {
+                    case "+":
+                        return x + y;
+                    case "-":
+                        return x - y;
+                    case "*":
+                        return x * y;
+                    default:
+                        return null;
+                }
+            }
+            if (l instanceof String && r instanceof String && "+".equals(b.op)
+                    && ((String) l).length() + ((String) r).length() <= 4096) {
+                return (String) l + r;
+            }
+            return null;
+        }
+        if (e instanceof Subscript && ((Subscript) e).index instanceof Slice) {
+            Slice sl = (Slice) ((Subscript) e).index;
+            Object v = fold(((Subscript) e).value);
+            if (!(v instanceof String) || sl.step != null) {
+                return null;
+            }
+            String str = (String) v;
+            Object lo = sl.lower == null ? Long.valueOf(0) : fold(sl.lower);
+            Object hi = sl.upper == null ? Long.valueOf(str.length()) : fold(sl.upper);
+            if (!(lo instanceof Long) || !(hi instanceof Long)) {
+                return null;
+            }
+            int n = str.length();
+            long a = (Long) lo < 0 ? Math.max(0, (Long) lo + n) : Math.min((Long) lo, n);
+            long z = (Long) hi < 0 ? Math.max(0, (Long) hi + n) : Math.min((Long) hi, n);
+            return a >= z ? "" : str.substring((int) a, (int) z);
+        }
+        if (!(e instanceof Call) || !((Call) e).keywords.isEmpty()) {
+            return null;
+        }
+        Call c = (Call) e;
+        for (Expr a : c.args) {
+            if (a instanceof Starred) {
+                return null;
+            }
+        }
+        if (c.func instanceof Name && "len".equals(((Name) c.func).id) && c.args.size() == 1
+                && binding("len") == Scope.Binding.BUILTIN) {
+            Object v = fold(c.args.get(0));
+            return v instanceof String ? Long.valueOf(((String) v).length()) : null;
+        }
+        if (!(c.func instanceof Attribute)) {
+            return null;
+        }
+        Object recv = fold(((Attribute) c.func).value);
+        if (!(recv instanceof String)) {
+            return null;
+        }
+        String str = (String) recv;
+        List<Object> args = new ArrayList<Object>();
+        for (Expr a : c.args) {
+            Object v = fold(a);
+            if (!(v instanceof String)) {
+                return null;
+            }
+            args.add(v);
+        }
+        String m = ((Attribute) c.func).attr;
+        int na = args.size();
+        if (na == 0) {
+            switch (m) {
+                case "strip":
+                    return stripAscii(str, true, true);
+                case "lstrip":
+                    return stripAscii(str, true, false);
+                case "rstrip":
+                    return stripAscii(str, false, true);
+                case "lower":
+                    return asciiCase(str, false);
+                case "upper":
+                    return asciiCase(str, true);
+                default:
+                    return null;
+            }
+        }
+        String a0 = (String) args.get(0);
+        if (na == 1) {
+            switch (m) {
+                case "find":
+                    return Long.valueOf(str.indexOf(a0));
+                case "rfind":
+                    return Long.valueOf(str.lastIndexOf(a0));
+                case "startswith":
+                    return str.startsWith(a0);
+                case "endswith":
+                    return str.endsWith(a0);
+                case "count":
+                    return a0.isEmpty() ? null : Long.valueOf(countOf(str, a0));
+                default:
+                    return null;
+            }
+        }
+        if (na == 2 && "replace".equals(m) && !a0.isEmpty()) {
+            String r = str.replace(a0, (String) args.get(1));
+            return r.length() <= 4096 ? r : null;
+        }
+        return null;
+    }
+
+    private static boolean small(long v) {
+        return v > -(1L << 30) && v < (1L << 30);
+    }
+
+    private static boolean ascii(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) >= 128) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// CPython's whitespace among ASCII: space, tab to carriage return, and
+    /// the four separators 0x1c to 0x1f.
+    private static boolean pySpace(char ch) {
+        return ch == ' ' || ch >= '\t' && ch <= '\r' || ch >= 0x1c && ch <= 0x1f;
+    }
+
+    private static String stripAscii(String s, boolean left, boolean right) {
+        int a = 0;
+        int z = s.length();
+        while (left && a < z && pySpace(s.charAt(a))) {
+            a++;
+        }
+        while (right && z > a && pySpace(s.charAt(z - 1))) {
+            z--;
+        }
+        return s.substring(a, z);
+    }
+
+    private static String asciiCase(String s, boolean up) {
+        char[] cs = s.toCharArray();
+        for (int i = 0; i < cs.length; i++) {
+            char ch = cs[i];
+            if (up && ch >= 'a' && ch <= 'z') {
+                cs[i] = (char) (ch - 32);
+            } else if (!up && ch >= 'A' && ch <= 'Z') {
+                cs[i] = (char) (ch + 32);
+            }
+        }
+        return new String(cs);
+    }
+
+    private static int countOf(String s, String sub) {
+        int n = 0;
+        for (int i = s.indexOf(sub); i >= 0; i = s.indexOf(sub, i + sub.length())) {
+            n++;
+        }
+        return n;
+    }
+
+    /// A folded constant as an expression of its type.
+    private static E constE(Object k) {
+        if (k instanceof String) {
+            return new E(Emitter.javaString((String) k), Ty.STR);
+        }
+        if (k instanceof Boolean) {
+            return new E(((Boolean) k) ? "true" : "false", Ty.BOOL);
+        }
+        long v = (Long) k;
+        E r = new E("Long.valueOf(" + v + "L)", Ty.INT, v + "L");
+        r.small = v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE;
+        return r;
+    }
+
     static Set<String> assigned(List<Stmt> body) {
         List<String> out = new ArrayList<String>();
         for (Stmt s : body) {
@@ -2985,6 +3377,18 @@ final class TypedEmit {
         if (sub != null) {
             return sub;
         }
+        if (!(e instanceof Constant) && inlineArgs == null && soleStores != null) {
+            Object k = fold(e);
+            if (k != null) {
+                return constE(k);
+            }
+        }
+        if (e instanceof BinOp && "%".equals(((BinOp) e).op) && inlineArgs == null) {
+            E m = modConstant((BinOp) e);
+            if (m != null) {
+                return m;
+            }
+        }
         if (e != plainExpr && (e instanceof BinOp || e instanceof UnaryOp || e instanceof IfExp //NOPMD CompareObjectsWithEquals
                 || e instanceof Call && ranges.inlinable((Call) e) != null)) {
             E w = wrapped(e);
@@ -3056,6 +3460,10 @@ final class TypedEmit {
         }
         if (e instanceof BinOp) {
             BinOp b = (BinOp) e;
+            E pc = percentConcat(b);
+            if (pc != null) {
+                return pc;
+            }
             String pf = em.percentHead(b);
             if (pf != null) {
                 StringBuilder sb = new StringBuilder(pf);

@@ -1558,6 +1558,12 @@ public final class Py {
     }
 
     /// The transpiler's lowering of `"lit %s" % (a,)`; see `Formatting.pct`.
+    /// One `%s`, `%d` or `%i` conversion of `v`, for the transpiler's
+    /// concatenation of a literal format whose values are mostly typed.
+    public static String pconv(char c, Object v) {
+        return Formatting.conv1(c, v);
+    }
+
     public static String pct(String[] lits, String convs, Object a) {
         return Formatting.pct(lits, convs, a);
     }

@@ -416,6 +416,13 @@ public final class Typed {
         l.setItem(i, Double.valueOf(v));
     }
 
+    /// `x % k` for `k` above zero: Python's remainder, which takes the
+    /// divisor's sign.
+    public static long imod(long x, long k) {
+        long r = x % k;
+        return r < 0 ? r + k : r;
+    }
+
     /// `len(l)` as a Java long; a missing list raises as `len` does.
     public static long llen(PyList l) {
         return l != null ? l.size : Py.len(Py.NONE);
