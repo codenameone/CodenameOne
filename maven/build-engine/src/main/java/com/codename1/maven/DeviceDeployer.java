@@ -376,7 +376,7 @@ public final class DeviceDeployer {
 
     private String windowsLogCommand(String name, int lines) {
         return "powershell -NoProfile -Command \"Get-Content -Wait -Tail " + lines + " -LiteralPath '"
-                + windowsDir() + "\\" + name + ".log'\"";
+                + windowsDir() + "\\logs\\" + name + ".log'\"";
     }
 
     private static String psQuote(String s) {
@@ -408,13 +408,24 @@ public final class DeviceDeployer {
                     .append("}\n");
         }
         ps.append("New-Item -ItemType Directory -Force -Path $dir | Out-Null\n")
-                // The kiosk account writes its log here; it is not an administrator.
-                .append("icacls $dir /grant '*S-1-5-32-545:(OI)(CI)M' | Out-Null\n")
+                // The exe is the shell of every non-administrator: only
+                // Administrators and SYSTEM may change anything beside it. With
+                // write access a user could replace it, or plant a DLL the exe
+                // would load from its own directory first, and run code as the
+                // next user to log on. ProgramData's inherited ACL lets Users
+                // create files, so inheritance is cut and the grants replaced.
+                .append("icacls $dir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'"
+                        + " '*S-1-5-32-545:(OI)(CI)RX' | Out-Null\n")
+                // The kiosk account is not an administrator and writes its log
+                // here, the one place it can write.
+                .append("$logs = Join-Path $dir 'logs'\n")
+                .append("New-Item -ItemType Directory -Force -Path $logs | Out-Null\n")
+                .append("icacls $logs /grant '*S-1-5-32-545:(OI)(CI)M' | Out-Null\n")
                 .append("Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force\n")
                 .append("Start-Sleep -Milliseconds 300\n")
                 .append("Move-Item -Force -LiteralPath $staged -Destination $exe\n")
                 .append("Remove-Item -Force -LiteralPath $PSCommandPath\n")
-                .append("[Environment]::SetEnvironmentVariable('CN1_LOG_FILE', (Join-Path $dir \"$name.log\"), 'Machine')\n");
+                .append("[Environment]::SetEnvironmentVariable('CN1_LOG_FILE', (Join-Path $logs \"$name.log\"), 'Machine')\n");
         String pairs = environment;
         if (!profile.isEmpty() && !(" " + environment.replace(',', ' ')).contains(" CN1_PROFILE=")) {
             pairs = environment + " CN1_PROFILE=" + profile;

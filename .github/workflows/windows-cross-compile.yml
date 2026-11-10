@@ -358,6 +358,8 @@ jobs:
               [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
               [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
               [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+              [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+              [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
               [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
               public static void Chord(byte mod, byte key) {
                   keybd_event(mod, 0, 0, UIntPtr.Zero); keybd_event(key, 0, 0, UIntPtr.Zero);
@@ -391,13 +393,26 @@ jobs:
             throw "the kiosk window does not cover the primary monitor"
           }
           # Alt+F4 would close an ordinary window; the kiosk hook swallows it.
-          [void][K]::SetForegroundWindow($h)
+          # The hook filters only while the kiosk window is in front, so the
+          # check means nothing unless it is: a refused SetForegroundWindow
+          # would send the chord to another window and pass vacuously. A lone
+          # Alt tap releases the foreground lock for this process.
+          for ($i = 0; $i -lt 10 -and [K]::GetForegroundWindow() -ne $h; $i++) {
+            [K]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [K]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+            [void][K]::SetForegroundWindow($h)
+            Start-Sleep -Milliseconds 300
+          }
+          if ([K]::GetForegroundWindow() -ne $h) { throw "the kiosk window never became the foreground window" }
           [K]::Chord(0x12, 0x73)
           [K]::Chord(0x12, 0x09)
           Start-Sleep -Seconds 3
           if ($p.HasExited) { throw "Alt+F4 reached the kiosk window and closed it" }
           if (-not (Test-Path $log)) { throw "CN1_LOG_FILE was not created" }
-          Stop-Process -Id $p.Id -Force
+          if ([K]::GetForegroundWindow() -ne $h) { throw "Alt+Tab moved the foreground away from the kiosk window" }
+          # Control: the same window does close when asked directly, so its
+          # surviving Alt+F4 above was the hook, not an app that ignores closing.
+          [void][K]::PostMessage($h, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+          if (-not $p.WaitForExit(15000)) { Stop-Process -Id $p.Id -Force; throw "WM_CLOSE did not close the kiosk app" }
 
       - name: Upload the kiosk capture
         if: always()

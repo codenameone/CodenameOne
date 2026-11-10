@@ -101,6 +101,7 @@ enum { HW_FREE = 0, HW_GPIO, HW_I2C, HW_SPI, HW_SERIAL, HW_PWM };
 
 typedef struct CN1WinHwSlot {
     int kind;
+    unsigned gen;            /* bumped on every open: a waiter's handle is stale once it moves */
     IUnknown* device;        /* IGpioPin / II2cDevice / ISpiDevice / IPwmPin */
     IUnknown* owner;         /* IPwmController a PWM pin needs kept alive    */
     HANDLE serial;
@@ -120,7 +121,9 @@ static int cn1WinHwAlloc(int kind) {
     AcquireSRWLockExclusive(&cn1WinHwLock);
     for (int i = 0; i < CN1HW_SLOTS; i++) {
         if (cn1WinHwSlots[i].kind == HW_FREE) {
+            unsigned gen = cn1WinHwSlots[i].gen + 1;
             ZeroMemory(&cn1WinHwSlots[i], sizeof(CN1WinHwSlot));
+            cn1WinHwSlots[i].gen = gen;
             cn1WinHwSlots[i].kind = kind;
             cn1WinHwSlots[i].serial = INVALID_HANDLE_VALUE;
             h = i;
@@ -176,6 +179,9 @@ static int cn1WinHwFromHr(HRESULT hr) {
             || hr == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)) {
         return -CN1HW_EBUSY;
     }
+    if (hr == HRESULT_FROM_WIN32(ERROR_TIMEOUT)) {
+        return -CN1HW_ETIMEDOUT;
+    }
     if (hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND)
             || hr == REGDB_E_CLASSNOTREG) {
         return -CN1HW_ENODEV;
@@ -203,21 +209,43 @@ static int cn1WinHwFromWin32(DWORD err) {
 
 /* Blocks the calling worker thread until a WinRT operation completes. The same
  * helper as cn1_windows_winrt.cpp's, kept file-local as that one is. */
+/* The completion event belongs to the handler object, which the operation
+ * holds a reference to: an operation that completes after this function gave up
+ * on it signals an event that still exists, never a closed (and possibly
+ * reused) handle. */
+template <typename TOp>
+class CN1WinHwCompleted : public RuntimeClass<RuntimeClassFlags<ClassicCom>, IAsyncOperationCompletedHandler<TOp>> {
+public:
+    HANDLE done;
+    CN1WinHwCompleted() : done(CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS)) {}
+    ~CN1WinHwCompleted() {
+        if (done != NULL) {
+            CloseHandle(done);
+        }
+    }
+    HRESULT STDMETHODCALLTYPE Invoke(IAsyncOperation<TOp>*, AsyncStatus) override {
+        SetEvent(done);
+        return S_OK;
+    }
+};
+
 template <typename TOp, typename TResultPtr>
 static HRESULT cn1WinHwAwait(IAsyncOperation<TOp>* op, TResultPtr result) {
-    Event done(CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS));
-    if (!done.IsValid()) {
+    ComPtr<CN1WinHwCompleted<TOp>> handler = Make<CN1WinHwCompleted<TOp>>();
+    if (handler == nullptr || handler->done == NULL) {
         return E_FAIL;
     }
-    HRESULT hr = op->put_Completed(Callback<IAsyncOperationCompletedHandler<TOp>>(
-            [&done](IAsyncOperation<TOp>*, AsyncStatus) {
-                SetEvent(done.Get());
-                return S_OK;
-            }).Get());
+    HRESULT hr = op->put_Completed(handler.Get());
     if (FAILED(hr)) {
         return hr;
     }
-    WaitForSingleObject(done.Get(), 30000);
+    if (WaitForSingleObject(handler->done, 30000) != WAIT_OBJECT_0) {
+        ComPtr<IAsyncInfo> info;
+        if (SUCCEEDED(op->QueryInterface(IID_PPV_ARGS(&info)))) {
+            info->Cancel();
+        }
+        return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    }
     return op->GetResults(result);
 }
 
@@ -246,7 +274,11 @@ static int cn1WinHwFindDevices(HSTRING selector, HSTRING* ids, int max) {
         return 0;
     }
     ComPtr<IVectorView<DeviceInformation*>> list;
-    if (FAILED(cn1WinHwAwait(op.Get(), list.GetAddressOf())) || list == nullptr) {
+    /* Enumeration can take seconds; no Java object is touched while parked. */
+    CN1_YIELD_THREAD;
+    HRESULT hr = cn1WinHwAwait(op.Get(), list.GetAddressOf());
+    CN1_RESUME_THREAD;
+    if (FAILED(hr) || list == nullptr) {
         return 0;
     }
     unsigned size = 0;
@@ -407,11 +439,13 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_hwGpioWrite___int_boolean_R_in
 JAVA_INT com_codename1_impl_windows_WindowsNative_hwGpioWaitEdge___int_int_long_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE,
         JAVA_INT h, JAVA_INT timeoutMs, JAVA_OBJECT tsOut) {
     HANDLE ev = NULL;
+    unsigned gen = 0;
     if (h < 0 || h >= CN1HW_SLOTS) {
         return -CN1HW_EBADF;
     }
     AcquireSRWLockShared(&cn1WinHwLock);
     if (cn1WinHwSlots[h].kind == HW_GPIO && cn1WinHwSlots[h].edgeEvent != NULL) {
+        gen = cn1WinHwSlots[h].gen;
         DuplicateHandle(GetCurrentProcess(), cn1WinHwSlots[h].edgeEvent, GetCurrentProcess(), &ev, 0, FALSE,
                 DUPLICATE_SAME_ACCESS);
     }
@@ -425,7 +459,8 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_hwGpioWaitEdge___int_int_long_
     for (;;) {
         AcquireSRWLockExclusive(&cn1WinHwLock);
         CN1WinHwSlot* s = &cn1WinHwSlots[h];
-        if (s->kind != HW_GPIO) {
+        if (s->kind != HW_GPIO || s->gen != gen) {
+            /* Closed, or closed and reopened as another pin while we waited. */
             r = -CN1HW_EBADF;
         } else if (s->edgeCount > 0) {
             r = s->edgeRising[s->edgeHead];
@@ -448,6 +483,10 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_hwGpioWaitEdge___int_int_long_
         CN1_YIELD_THREAD;
         DWORD w = WaitForSingleObject(ev, wait);
         CN1_RESUME_THREAD;
+        if (w == WAIT_FAILED) {
+            r = -CN1HW_EIO;
+            break;
+        }
         if (w != WAIT_OBJECT_0 && timeoutMs >= 0) {
             break;
         }
@@ -724,7 +763,10 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_hwSerialRead___int_byte_1ARRAY
         CloseHandle(port);
         return 0;
     }
-    /* Return as soon as any byte is there, or after timeoutMs with nothing: the
+    /* A timeout with nothing read answers 0, not -ETIMEDOUT: the Linux port's
+     * hwSerialRead (cn1_hardware_impl.h) does the same, and KernelHardware reads
+     * 0 as "nothing yet" on both.
+     * Return as soon as any byte is there, or after timeoutMs with nothing: the
      * documented MAXDWORD/MAXDWORD/constant combination. A negative timeout
      * waits indefinitely, which the constant cannot say, so it is a long one. */
     COMMTIMEOUTS t;
@@ -903,6 +945,11 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_hwClose___int_boolean(CODENAM
     }
     if (s.kind == HW_GPIO && s.device != NULL && s.edgeEvent != NULL) {
         ((IGpioPin*) s.device)->remove_ValueChanged(s.edgeToken);
+    }
+    if (s.edgeEvent != NULL) {
+        /* Wake a hwGpioWaitEdge parked on its duplicate of this event; it then
+         * sees the slot freed and answers EBADF instead of waiting forever. */
+        SetEvent(s.edgeEvent);
     }
     if (s.kind == HW_PWM && s.device != NULL) {
         ((IPwmPin*) s.device)->Stop();

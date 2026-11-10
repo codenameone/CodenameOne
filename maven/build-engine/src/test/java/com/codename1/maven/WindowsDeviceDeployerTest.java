@@ -90,6 +90,13 @@ class WindowsDeviceDeployerTest {
         assertTrue(ps.contains("SetEnvironmentVariable('CN1_PROFILE', 'device', 'Machine')"), ps);
         assertTrue(ps.contains("$arch -eq 'ARM64'"), ps);
         assertFalse(ps.contains("Client-KeyboardFilter"), ps);
+        // Users may run the shell but never write beside it (exe swap, DLL plant);
+        // only the logs folder is theirs.
+        assertTrue(ps.contains("icacls $dir /inheritance:r /grant:r"), ps);
+        assertTrue(ps.contains("'*S-1-5-32-545:(OI)(CI)RX'"), ps);
+        assertFalse(ps.contains("icacls $dir /grant '*S-1-5-32-545:(OI)(CI)M'"), ps);
+        assertTrue(ps.contains("icacls $logs /grant '*S-1-5-32-545:(OI)(CI)M'"), ps);
+        assertTrue(ps.contains("(Join-Path $logs \"$name.log\")"), ps);
         // The architecture is checked before anything is replaced.
         assertTrue(ps.indexOf("PROCESSOR_ARCHITECTURE") < ps.indexOf("Move-Item"), ps);
     }
