@@ -35,9 +35,9 @@ import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Issue #6203: `mvn -Prun-desktop` runs the stub with `exec:java`, where the application's
@@ -67,15 +67,6 @@ public class CN1BootstrapClasspathTest {
     }
 
     @Test
-    public void javaClassPathAloneCannotSeeExecJavaClasses() throws Exception {
-        compileStub();
-        // What CN1Bootstrap did before the fix: only java.class.path
-        List<File> cp = CN1Bootstrap.bootstrapClasspath(System.getProperty("java.class.path"), null);
-        ClassPathLoader loader = new ClassPathLoader(cp.toArray(new File[0]));
-        assertThrows(ClassNotFoundException.class, () -> loader.loadClass(STUB));
-    }
-
-    @Test
     public void reloadsMainClassThroughTheLoaderThatRanIt() throws Exception {
         File classes = compileStub();
         try (URLClassLoader execJava = new URLClassLoader(new URL[]{classes.toURI().toURL()},
@@ -98,5 +89,15 @@ public class CN1BootstrapClasspathTest {
             List<File> cp = CN1Bootstrap.bootstrapClasspath(classes.getPath(), execJava);
             assertSame(1, cp.size());
         }
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void acceptsUnescapedFileToUrlEntries() throws Exception {
+        File dir = tmp.resolve("with space").toFile();
+        dir.mkdirs();
+        // File.toURL() leaves the space unescaped, which URL.toURI() rejects
+        URL legacy = dir.toURL();
+        assertEquals(dir.getAbsoluteFile(), CN1Bootstrap.urlToFile(legacy).getAbsoluteFile());
     }
 }

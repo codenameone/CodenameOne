@@ -23,10 +23,12 @@
 package com.codename1.impl.javase;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -283,20 +285,40 @@ public class CN1Bootstrap {
                 if (!"file".equals(u.getProtocol())) {
                     continue;
                 }
-                File f;
-                try {
-                    f = new File(u.toURI());
-                } catch (URISyntaxException ex) {
-                    f = new File(u.getPath());
-                } catch (IllegalArgumentException ex) {
-                    continue;
-                }
+                File f = urlToFile(u);
                 if (!files.contains(f)) {
                     files.add(f);
                 }
             }
         }
         return files;
+    }
+
+    /// A `file:` URL as a file. `toURI()` rejects the unescaped spaces of the deprecated
+    /// `File.toURL()`, and `File(URI)` rejects a UNC authority, so both fall back to the decoded
+    /// path, without the leading slash `getPath()` puts before a Windows drive letter.
+    static File urlToFile(URL u) {
+        try {
+            return new File(u.toURI());
+        } catch (URISyntaxException ex) {
+            // fall through to the decoded path
+        } catch (IllegalArgumentException ex) {
+            // fall through to the decoded path
+        }
+        String path;
+        try {
+            path = URLDecoder.decode(u.getPath().replace("+", "%2B"), "UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            path = u.getPath();
+        }
+        String host = u.getHost();
+        if (host != null && host.length() > 0) {
+            return new File("\\\\" + host + path.replace('/', '\\'));
+        }
+        if (path.length() > 2 && path.charAt(0) == '/' && path.charAt(2) == ':') {
+            path = path.substring(1);
+        }
+        return new File(path);
     }
 
      private static String OS = System.getProperty("os.name").toLowerCase();
