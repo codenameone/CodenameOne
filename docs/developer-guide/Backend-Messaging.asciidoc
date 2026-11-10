@@ -156,8 +156,8 @@ With a broker, a message sent from a `@Transactional` method isn't sent straight
 away. It's written to a table, `cn1_outbox`, in the same transaction, and sent once the
 transaction commits. This is the _transactional outbox_ pattern. A rollback
 sends nothing, so no message ever announces an order that was never saved. A
-commit never loses its messages either: a process that dies between the commit
-and the send leaves the row behind, and another instance sends it after
+commit never loses its messages either: a process that dies after the commit
+but before sending leaves the row behind, and another instance sends it after
 `cn1.messaging.outbox.sweep` milliseconds (10 seconds). The message may then be
 sent twice, which at-least-once delivery already allows. Outside a transaction,
 `send` sends at once and throws when the broker doesn't accept the message.
@@ -189,7 +189,7 @@ elsewhere, on the transports that take a lease.
 
 Each broker has its own details:
 
-* *Database.* A send inside a transaction is a row of that transaction, so it
+* *Database.* A message sent inside a transaction is a row of that transaction, so it
   needs no outbox. A consumer claims a row with a compare-and-set on it, safe on
   every engine, and PostgreSQL claims a batch at once with
   `FOR UPDATE SKIP LOCKED`. `cn1.messaging.db.poll` (500 milliseconds) sets how
@@ -219,7 +219,7 @@ Each broker has its own details:
   has never run misses earlier messages. Create the subscriptions when you
   deploy, or call `PubSubTransport.declare` before the first send.
 
-Destination names that a broker doesn't allow are adjusted: SQS turns the `.`
+Destination names that a broker rejects are adjusted: SQS turns the `.`
 of `orders.dlq` into `-`, for example. Keep destination names to letters,
 digits, `.`, `-` and `_` and they stay recognizable on every broker.
 
