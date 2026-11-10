@@ -416,6 +416,11 @@ public final class Typed {
         l.setItem(i, Double.valueOf(v));
     }
 
+    /// `len(l)` as a Java long; a missing list raises as `len` does.
+    public static long llen(PyList l) {
+        return l != null ? l.size : Py.asLong(len(l));
+    }
+
     public static Object len(PyList l) {
         return Long.valueOf(nzl(l).size);
     }
@@ -648,6 +653,22 @@ public final class Typed {
     public static String slice(String s, Object a, Object b, Object c) {
         Object r = Py.getslice(s, a, b, c);
         return r instanceof String ? (String) r : String.valueOf(r);
+    }
+
+    /// `s[a:b]` with int bounds held as longs: `aw` / `bw`, when not
+    /// null, is the bound's real value (a big int, a bool) and `a` / `b`
+    /// are ignored.
+    public static String sliceL(String s, long a, Object aw, long b, Object bw) {
+        int n = s.length();
+        if (aw != null || bw != null || PyStr.surrogates(s) != 0) {
+            // A big int or bool bound, or a string whose code points are not
+            // its chars: the generic slice.
+            return slice(s, aw != null ? aw : Long.valueOf(a), bw != null ? bw : b == Long.MAX_VALUE ? Py.NONE
+                    : Long.valueOf(b), Py.NONE);
+        }
+        int i = Py.clampSlice(a, n);
+        int j = b == Long.MAX_VALUE ? n : Py.clampSlice(b, n);
+        return j <= i ? "" : i == 0 && j == n ? s : s.substring(i, j);
     }
 
     /// `fmt % args` for a str format and a tuple of values.

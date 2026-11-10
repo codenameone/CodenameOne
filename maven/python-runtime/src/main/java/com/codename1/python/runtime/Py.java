@@ -1574,7 +1574,7 @@ public final class Py {
         return Formatting.pct(lits, convs, a, b, c, d);
     }
 
-    private static int clampSlice(long v, int n) {
+    static int clampSlice(long v, int n) {
         if (v < 0) {
             v += n;
             return v < 0 ? 0 : (int) v;

@@ -80,6 +80,10 @@ final class TypedEmit {
         /// waiting in `Typed.take`, which `c` takes. Only the consumers that
         /// know to take it exactly once see one (see `pushed`); or null.
         String pk;
+        /// Whether `lc` is known to fit a Java `int` (a length, an index
+        /// `find` answered), so adding a constant of 31 bits to it cannot
+        /// overflow a `long`.
+        boolean small;
 
         E(String c, Ty t) {
             this(c, t, null);
@@ -2611,6 +2615,36 @@ final class TypedEmit {
     }
 
     /// The three parts of a slice, boxed, `Py.NONE` for a missing one.
+    /// `s[a:b]` with no step and int bounds, the bounds passed as Java
+    /// longs (each beside the object that replaces it when it is a big int
+    /// or a bool, see `dual`); or null when a bound is anything else.
+    private String strSliceLong(E l, Slice sl) {
+        if (sl.step != null) {
+            return null;
+        }
+        String[] lo = sl.lower == null ? new String[] {"0L", "null"} : longPair(expr(sl.lower));
+        String[] hi = sl.upper == null ? new String[] {"Long.MAX_VALUE", "null"} : longPair(expr(sl.upper));
+        if (lo == null || hi == null) {
+            return null;
+        }
+        return "Typed.sliceL(" + l.c + ", " + lo[0] + ", " + lo[1] + ", " + hi[0] + ", " + hi[1] + ")";
+    }
+
+    /// An int as a Java long and the object standing in for it (null when
+    /// the long is the value), both free of effects; or null.
+    private static String[] longPair(E e) {
+        if (e.t.k != Ty.K.INT || e.t.opt || e.pk != null) {
+            return null;
+        }
+        if (e.ll != null && e.bg != null) {
+            return new String[] {e.ll, e.bg};
+        }
+        if (e.lc != null && (plain(e.lc) || literal(e.lc) || e.small)) {
+            return new String[] {e.lc, "null"};
+        }
+        return null;
+    }
+
     private String sliceParts(Slice s) {
         Expr[] parts = {s.lower, s.upper, s.step};
         StringBuilder sb = new StringBuilder();
@@ -2987,6 +3021,10 @@ final class TypedEmit {
             if (s.index instanceof Slice) {
                 E l = expr(s.value);
                 if (l.t.k == Ty.K.STR && !l.t.opt) {
+                    String fast = strSliceLong(l, (Slice) s.index);
+                    if (fast != null) {
+                        return new E(fast, Ty.STR);
+                    }
                     return new E("Typed.slice(" + l.c + ", " + sliceParts((Slice) s.index) + ")", Ty.STR);
                 }
                 if (l.t.k != Ty.K.LIST) {
@@ -4022,8 +4060,17 @@ final class TypedEmit {
                         throw new Unsupported("float " + op);
                 }
             }
-            case INT:
+            case INT: {
+                Long k = intConstant(right);
+                if (("+".equals(op) || "-".equals(op)) && l.small && l.lc != null && l.pk == null && !l.t.opt && k != null
+                        && Math.abs(k.longValue()) < 0x80000000L) {
+                    // A length or an index plus a constant of 31 bits: no
+                    // overflow is possible, so plain Java arithmetic.
+                    String lc = "(" + l.lc + " " + op + " " + k + "L)";
+                    return new E("Long.valueOf(" + lc + ")", Ty.INT, lc);
+                }
                 return new E(intOp(pyOp(op), box(l), box(r), right), Ty.INT);
+            }
             case STR:
                 if ("%".equals(op)) {
                     return new E("Typed.format(" + l.c + ", " + box(r) + ")", Ty.STR);
@@ -5367,11 +5414,15 @@ final class TypedEmit {
         switch (n) {
             case "len":
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.LIST) {
+                    if (plain(a.get(0).c)) {
+                        String l = "Typed.llen(" + a.get(0).c + ")";
+                        return small(new E("Long.valueOf(" + l + ")", Ty.INT, l));
+                    }
                     return new E("h_len(" + a.get(0).c + ")", Ty.INT);
                 }
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.STR && !a.get(0).t.opt) {
                     String l = "Typed.slen(" + a.get(0).c + ")";
-                    return new E("Long.valueOf(" + l + ")", Ty.INT, l);
+                    return small(new E("Long.valueOf(" + l + ")", Ty.INT, l));
                 }
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.DYN) {
                     // The builtin's work without a call, unless the name
@@ -5518,7 +5569,13 @@ final class TypedEmit {
                 c = "Typed.join(" + v + ", " + box(a.get(0)) + ")";
                 break;
         }
-        return t.k == Ty.K.INT ? new E("Long.valueOf(" + c + ")", t, c) : new E(c, t);
+        return t.k == Ty.K.INT ? small(new E("Long.valueOf(" + c + ")", t, c)) : new E(c, t);
+    }
+
+    /// `e`, marked as an int that fits a Java `int` (see `E.small`).
+    private static E small(E e) {
+        e.small = true;
+        return e;
     }
 
     private static List<Ty> types(List<E> a) {
