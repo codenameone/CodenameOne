@@ -27,13 +27,7 @@ and the menu buttons.
 
 [source,java]
 ----
-Gamepad pad = Gamepads.getGamepad(0);
-if (pad != null && pad.isConnected()) {
-    float x = pad.getAxis(Gamepad.AXIS_LEFT_X);   // -1..1, dead zone applied
-    if (pad.isButtonDown(Gamepad.BUTTON_A)) {
-        jump();
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/SteamSnippets.java[tag=steam-java-001,indent=0]
 ----
 
 `GameInput` reads the first controller too: `wasGamepadButtonPressed` gives the
@@ -59,12 +53,7 @@ pad, and the port skips the devices Steam hides so a controller never appears tw
 
 [source,java]
 ----
-if (GameServices.isAvailable()) {             // true on Steam
-    GameServices.unlockAchievement("FIRST_WIN");
-    GameServices.setStat("wins", GameServices.getStatInt("wins", 0) + 1);
-    GameServices.commit();
-    GameServices.writeSave("slot1", saveBytes);
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/SteamSnippets.java[tag=steam-java-002,indent=0]
 ----
 
 * *Achievements and stats* use the API names defined on the Steamworks site.
@@ -100,15 +89,14 @@ Add the hints to `codenameone_settings.properties`:
 
 [source,properties]
 ----
-codename1.arg.steam.appId=480
-codename1.arg.steam.sdkPath=/path/to/steamworks_sdk
+include::../demos/common/src/main/snippets/developer-guide/steam.properties[tag=steam-properties-001,indent=0]
 ----
 
 and build:
 
 [source,bash]
 ----
-mvn cn1:buildSteamLocal       # or ./gradlew buildSteamLocal
+include::../demos/common/src/main/snippets/developer-guide/steam.sh[tag=steam-bash-001,indent=0]
 ----
 
 The SDK path can also come from the `STEAMWORKS_SDK` environment variable. Without
@@ -148,7 +136,7 @@ With SteamCMD installed:
 
 [source,bash]
 ----
-mvn cn1:steamUpload -Dsteam.user=my_build_account
+include::../demos/common/src/main/snippets/developer-guide/steam.sh[tag=steam-bash-002,indent=0]
 ----
 
 The first run asks for the password and the Steam Guard code; later runs reuse
