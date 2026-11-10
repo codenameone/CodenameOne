@@ -1883,6 +1883,86 @@ final class TypedEmit {
         b.append("}\n");
     }
 
+    /// `for w in s.split()` / `for w in s.split(sep)` with a str target: the
+    /// pieces found one at a time in `s`, held in a Java local, so the list
+    /// and its array are never made. The string is immutable, so finding
+    /// each piece as the loop reaches it sees what the list would hold.
+    private boolean splitLoop(For f, StringBuilder b, int ind) {
+        if (!(f.iter instanceof Call) || !(((Call) f.iter).func instanceof Attribute)) {
+            return false;
+        }
+        Call c = (Call) f.iter;
+        Attribute m = (Attribute) c.func;
+        String tn = ((Name) f.target).id;
+        Ty vt = localType(tn);
+        if (!"split".equals(m.attr) || !c.keywords.isEmpty() || c.args.size() > 1
+                // A separator that is a name or a constant is read with no
+                // statement of its own, so the receiver is still read first.
+                || c.args.size() == 1 && !(c.args.get(0) instanceof Name || c.args.get(0) instanceof Constant)
+                || longLocals.contains(tn)
+                || vt.k != Ty.K.STR && vt.k != Ty.K.DYN) {
+            return false;
+        }
+        E r = expr(m.value);
+        if (r.t.k != Ty.K.STR || r.t.opt) {
+            return false;
+        }
+        E sepE = c.args.isEmpty() ? null : expr(c.args.get(0));
+        if (sepE != null && (sepE.t.k != Ty.K.STR || sepE.t.opt)) {
+            return false;
+        }
+        String s = fresh();
+        String p = fresh();
+        String q = fresh();
+        indent(b, ind);
+        b.append("{\n");
+        indent(b, ind + 1);
+        b.append("String ").append(s).append(" = ").append(r.c).append(";\n");
+        if (sepE == null) {
+            indent(b, ind + 1);
+            b.append("int ").append(p).append(" = 0;\n");
+            indent(b, ind + 1);
+            b.append("while ((").append(p).append(" = Typed.wordStart(").append(s).append(", ").append(p).append(")) < ")
+                    .append(s).append(".length()) {\n");
+            indent(b, ind + 2);
+            b.append("int ").append(q).append(" = Typed.wordEnd(").append(s).append(", ").append(p).append(");\n");
+            indent(b, ind + 2);
+            b.append(var(tn)).append(" = ").append(s).append(".substring(").append(p).append(", ").append(q)
+                    .append(");\n");
+            indent(b, ind + 2);
+            b.append(p).append(" = ").append(q).append(";\n");
+        } else {
+            String sep = fresh();
+            indent(b, ind + 1);
+            b.append("String ").append(sep).append(" = Typed.splitSep(").append(sepE.c).append(");\n");
+            indent(b, ind + 1);
+            b.append("int ").append(p).append(" = 0;\n");
+            indent(b, ind + 1);
+            b.append("while (").append(p).append(" >= 0) {\n");
+            indent(b, ind + 2);
+            b.append("int ").append(q).append(" = ").append(s).append(".indexOf(").append(sep).append(", ").append(p)
+                    .append(");\n");
+            indent(b, ind + 2);
+            b.append(var(tn)).append(" = ").append(q).append(" < 0 ? ").append(s).append(".substring(").append(p)
+                    .append(") : ").append(s).append(".substring(").append(p).append(", ").append(q).append(");\n");
+            indent(b, ind + 2);
+            b.append(p).append(" = ").append(q).append(" < 0 ? -1 : ").append(q).append(" + ").append(sep)
+                    .append(".length();\n");
+        }
+        Set<String> inBody = assigned(f.body);
+        if (!inBody.contains(tn)) {
+            nonNull.add(tn);
+        }
+        block(f.body, b, ind + 2);
+        // The target keeps whatever it held when the loop runs no times.
+        nonNull.remove(tn);
+        indent(b, ind + 1);
+        b.append("}\n");
+        indent(b, ind);
+        b.append("}\n");
+        return true;
+    }
+
     /// Whether every read of `n` in `o` is the argument of the builtin `ord`.
     private boolean onlyOrd(Object o, String n) {
         if (ordOf(o, n)) {
@@ -1992,6 +2072,9 @@ final class TypedEmit {
             b.append("}\n");
             indent(b, ind);
             b.append("}\n");
+            return;
+        }
+        if (splitLoop(f, b, ind)) {
             return;
         }
         E it = expr(f.iter);

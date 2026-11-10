@@ -556,6 +556,44 @@ public final class Typed {
         return v != null ? v : def;
     }
 
+    /// Where the next word of `s.split()` starts at or after `a`:
+    /// `s.length()` when there is none. With [#wordEnd], a loop over the
+    /// words that makes no list.
+    public static int wordStart(String s, int a) {
+        int n = s.length();
+        while (a < n) {
+            char c = s.charAt(a);
+            if ((c <= ' ' || c >= '\u0085') && TypeMethods.isSpace(c)) {
+                a++;
+            } else {
+                break;
+            }
+        }
+        return a;
+    }
+
+    /// Where the word of `s.split()` starting at `a` ends.
+    public static int wordEnd(String s, int a) {
+        int n = s.length();
+        int b = a + 1;
+        while (b < n) {
+            char c = s.charAt(b);
+            if ((c <= ' ' || c >= '\u0085') && TypeMethods.isSpace(c)) {
+                break;
+            }
+            b++;
+        }
+        return b;
+    }
+
+    /// The separator of `s.split(sep)` in a loop over the pieces.
+    public static String splitSep(String sep) {
+        if (sep.isEmpty()) {
+            throw Py.valueError("empty separator");
+        }
+        return sep;
+    }
+
     /// `d[k]` probed on a plain dict: the value, or [Py#MISS] -- never a
     /// [Py.Miss], since a plain dict raises no KeyError of its own.
     public static Object dprobe(Object d, long k) {

@@ -229,7 +229,7 @@ final class TypeMethods {
         }
     }
 
-    private static boolean isSpace(char c) {
+    static boolean isSpace(char c) {
         if (c > ' ' && c < '\u0085') {
             return false;
         }
