@@ -1,0 +1,241 @@
+[[backend-messaging]]
+== Backend caching and messaging
+
+A server that runs as one process can keep its state in memory: the cache, the
+sessions, the rate-limit counters and the record of which scheduled job ran. Once
+a second instance starts behind a load balancer, each of those splits in two. A
+user signs in on one instance and is a stranger to the other, a limit of five
+attempts becomes ten, and every instance sends the nightly digest. Work that has
+to outlive a request -- shipping an order, sending a receipt -- needs somewhere to
+wait that survives a restart.
+
+This chapter covers both answers: a shared key/value store, usually Redis, that
+holds the state instances must agree on, and messaging, which hands work from one
+part of a system to another through a queue or a topic. The programming model is
+Spring's (`@Cacheable`, `@KafkaListener`, `@RabbitListener`), and Spring Boot's
+property names work too. What differs is how it's built: the build finds every
+cache annotation and listener and writes the code for it, so there are no
+proxies and no reflection. Each broker protocol is a few hundred lines on the
+backend's own network layer, with no client library. A protocol the configuration
+doesn't name isn't compiled into the server.
+
+=== Scaling out
+
+Two settings move a server from one process to many:
+
+[source,properties]
+----
+include::../demos/backend/src/main/resources/application.properties[tag=backend-scale-out]
+----
+
+`cn1.kv.url` names the shared store: `redis://user:password@host:6379/0`, or
+`rediss://` for TLS. Redis, Valkey and KeyDB all speak the same protocol. Once
+it's set:
+
+* `@Cacheable` and the rest of the cache annotations keep their entries there,
+  so a value one instance computed is a hit on every other.
+* `cn1.session.store=kv` keeps sessions there, so any instance can serve any
+  request.
+* `KeyValueRateLimiter` counts there, so a limit applies across the whole
+  deployment.
+* A `@Scheduled` job with a `lock` claims it there when the server has no
+  database. A server with a database keeps its locks in the database, as
+  <<backend-scheduling>> describes.
+* The health endpoint reports whether the store answers.
+
+Without `cn1.kv.url`, Spring Boot's `spring.data.redis.url` is read, and then
+`spring.data.redis.host` with its `port`, `username`, `password`, `database` and
+`ssl.enabled`. A configuration written for a Spring application needs no change.
+With none of them set, everything stays in the process, as it was.
+
+=== Caching
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/messaging/OrderLookup.java[tag=backend-cache,indent=0]
+----
+
+`@Cacheable` answers a call from the cache when the cache holds its key, and
+otherwise runs the method and keeps the result. `@CachePut` always runs the
+method and stores the result, and `@CacheEvict` removes one key, or every key of
+the cache with `allEntries = true`.
+
+The build rewrites each method rather than wrapping it in a proxy, so a call
+from inside the same class is cached too. Spring's proxy would skip that call.
+The key expression is compiled at build time. It can name a parameter (`#id`,
+or `#p0` by position), a property of one (`#order.id`, read through its getter
+or a public field), a quoted literal, and `#root.methodName`, joined with `+`.
+An expression the build can't compile fails the build, instead of failing on
+the first call in production. An empty key means every parameter, as Spring's
+default key generator does.
+
+Values are written as JSON by a codec the build generates for the return type,
+not by Java serialization. A null result isn't kept. An entry lives for
+`cn1.cache.<name>.ttl` seconds, then `cn1.cache.ttl`, then Spring's
+`spring.cache.redis.time-to-live`; with none set it lives until evicted.
+
+=== Messaging
+
+A message is a payload, an optional key and some string headers, sent to a
+_destination_: a queue, a topic or a stream, depending on the broker. Sending
+goes through `MessageTemplate`, which a bean receives like any other dependency:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/messaging/Checkout.java[tag=backend-messaging-send,indent=0]
+----
+
+The payload is written as JSON by a generated codec, unless it's already a
+`String` or a `byte[]`. The key keeps related messages in order on brokers that
+partition, such as Kafka: messages with one key are handled in the order they
+were sent.
+
+Receiving is a method on a bean:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/messaging/Shipping.java[tag=backend-messaging-listen,indent=0]
+----
+
+The method runs once for each message, on a consumer thread, and the message is
+acknowledged when the method returns. It takes the payload, decoded by a
+generated codec, or a `String`, a `byte[]`, or the whole `Message` with its
+headers. `concurrency` sets how many messages it handles at once. A destination
+can name a setting, `${orders.topic}`, read when the server starts.
+
+Spring's annotations are accepted as written, so a listener can be moved from a
+Spring application unchanged:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/messaging/Shipping.java[tag=backend-messaging-spring,indent=0]
+----
+
+`@RabbitListener(queues = ...)` and `@JmsListener(destination = ...)` work the
+same way.
+
+==== Groups
+
+Every listener belongs to a group, `group` (or `groupId`). Each group receives
+every message sent to the destination, and the listeners of one group share the
+messages between them: `shipping` and `invoicing` each see every order, and
+two instances of the shipping service never ship one order twice. Brokers that
+have no groups of their own (RabbitMQ and SQS) hand every listener of a queue a
+share of its messages, whatever its group. Use a destination per consumer
+there, or a fan-out exchange or SNS topic in front of the queues.
+
+==== Delivery, retries and dead letters
+
+Delivery is _at least once_. A message is acknowledged only after its listener
+returned, so a server that dies halfway through a message has that message
+delivered again, to itself after a restart or to another instance. A listener
+should therefore be safe to run twice for one message: check whether the order
+already shipped before shipping it.
+
+A listener that throws has its message delivered again after a backoff:
+
+[cols="2,1,3"]
+|===
+|Setting |Default |
+
+|`cn1.messaging.retry.max-attempts` |3 |deliveries before the message goes to the dead-letter destination
+|`cn1.messaging.retry.backoff` |1000 |milliseconds before the second delivery
+|`cn1.messaging.retry.multiplier` |2 |how much longer each wait is than the last
+|`cn1.messaging.retry.max-backoff` |30000 |the longest wait
+|===
+
+A message that fails every attempt goes to `<destination>.dlq`, with two extra
+headers: the exception that failed it (`Message.ERROR`) and the destination it
+came from (`Message.ORIGIN`). A dead-letter destination is a destination like
+any other, so a listener can read it, as `gaveUp` does above, to alert someone
+or to send the message back after a fix.
+
+==== Sending inside a transaction
+
+With a broker, a message sent from a `@Transactional` method isn't sent straight
+away. It's written to a table, `cn1_outbox`, in the same transaction, and sent once the
+transaction commits. This is the _transactional outbox_ pattern. A rollback
+sends nothing, so no message ever announces an order that was never saved. A
+commit never loses its messages either: a process that dies between the commit
+and the send leaves the row behind, and another instance sends it after
+`cn1.messaging.outbox.sweep` milliseconds (10 seconds). The message may then be
+sent twice, which at-least-once delivery already allows. Outside a transaction,
+`send` sends at once and throws when the broker doesn't accept the message.
+
+=== Brokers
+
+`cn1.messaging.url` chooses the transport:
+
+[cols="2,3"]
+|===
+|URL |Transport
+
+|`memory:` |In the process. Nothing survives a restart, and other instances see nothing. The default without a database.
+|`db:` |A queue table, `cn1_messages`, in the server's own database. The default when there's a database, so messaging works with no new infrastructure.
+|`redis://host:6379` |Redis Streams, one stream per destination and one consumer group per group.
+|`amqp://user:password@host:5672/vhost` |RabbitMQ, one durable queue per destination, with publisher confirms.
+|`kafka://host:9092,host:9092` |Apache Kafka, one topic per destination and one consumer group per group.
+|`sqs://eu-west-1` |Amazon SQS, one standard queue per destination.
+|`pubsub://project` |Google Cloud Pub/Sub, one topic per destination and one subscription per group.
+|===
+
+`amqps://`, `rediss://` and `kafkas://` are the TLS forms. Spring Boot's
+`spring.rabbitmq.host` (or `addresses`) selects RabbitMQ when
+`cn1.messaging.url` isn't set, and `spring.kafka.bootstrap-servers` selects
+Kafka. `cn1.messaging.timeout` (5000 milliseconds) limits how long a broker
+connection or reply may take, and `cn1.messaging.lease` (60000 milliseconds)
+is how long a consumer may hold a message before it's delivered again
+elsewhere, on the transports that take a lease.
+
+Each broker has its own details:
+
+* *Database.* A send inside a transaction is a row of that transaction, so it
+  needs no outbox. A consumer claims a row with a compare-and-set on it, safe on
+  every engine, and PostgreSQL claims a batch at once with
+  `FOR UPDATE SKIP LOCKED`. `cn1.messaging.db.poll` (500 milliseconds) sets how
+  often an empty queue is polled.
+* *Redis Streams.* A message a consumer claimed and never acknowledged is
+  claimed again by another after the lease.
+* *RabbitMQ.* A retry waits in a queue of its own whose messages expire back
+  into the original queue. Nothing needs installing on the broker.
+* *Kafka.* Partitions are shared among a group's members as the Java client
+  shares them, so a Codename One server and a Spring one can be members of the
+  same group. Records of a partition are handled one at a time, in order, and
+  the group's offset moves past a record only after its listener returned. A
+  failed record waits in `<topic>.retry.<group>` and never holds up the topic
+  itself, which Spring Kafka calls a non-blocking retry. A new group starts at
+  the earliest offset; `spring.kafka.consumer.auto-offset-reset=latest` starts
+  it at the end. Gzip-compressed records can be read; snappy, lz4 and zstd
+  can't, and transactions and SASL aren't supported.
+* *SQS.* `sqs://<region>` addresses AWS, and `sqs://host:port` a compatible
+  service such as ElasticMQ or LocalStack, signed for `cn1.messaging.sqs.region`.
+  Credentials come from the environment, the container or the instance, as
+  for S3. A failed message stays in its queue, hidden until its retry is due.
+  SQS limits a message to 256 KiB, about 190 KiB of payload after encoding.
+* *Pub/Sub.* Credentials come from the service-account key file named by
+  `GOOGLE_APPLICATION_CREDENTIALS`, or from the metadata server on Google
+  Cloud; `PUBSUB_EMULATOR_HOST` points everything at the emulator. Pub/Sub keeps
+  a message only for subscriptions that exist when it's sent, so a group that
+  has never run misses earlier messages. Create the subscriptions when you
+  deploy, or call `PubSubTransport.declare` before the first send.
+
+Destination names that a broker doesn't allow are adjusted: SQS turns the `.`
+of `orders.dlq` into `-`, for example. Keep destination names to letters,
+digits, `.`, `-` and `_` and they stay recognizable on every broker.
+
+=== Pitfalls
+
+* *A listener that isn't idempotent.* Every transport redelivers a message whose
+  listener didn't finish, and the outbox can send a message twice. A listener
+  that charges a card on every delivery charges it twice sooner or later.
+* *A `memory:` transport in production.* It's the default for a server without
+  a database, and it loses every queued message on restart. Name a broker, or
+  give the server a database for `db:`.
+* *Holding a message too long.* A listener that runs longer than
+  `cn1.messaging.lease` has its message delivered again to another consumer
+  while it's still running. Raise the lease, or hand the slow work to a job of
+  its own.
+* *Ordering without a key.* Only messages with one key keep their order on
+  Kafka. Messages without a key are spread over the partitions.
+* *Caching a mutable object.* A cached value is a copy written as JSON. Changing
+  the object a call returned doesn't change the cache; evict or put instead.
