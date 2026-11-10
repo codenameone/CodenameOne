@@ -556,6 +556,18 @@ public final class Typed {
         return v != null ? v : def;
     }
 
+    /// `d[k]` probed on a plain dict: the value, or [Py#MISS] -- never a
+    /// [Py.Miss], since a plain dict raises no KeyError of its own.
+    public static Object dprobe(Object d, long k) {
+        Object v = ((PyDict) d).getLong(k);
+        return v != null ? v : Py.MISS;
+    }
+
+    public static Object dprobe(Object d, Object k) {
+        Object v = ((PyDict) d).getOrNull(k);
+        return v != null ? v : Py.MISS;
+    }
+
     /// Whether `o` is a plain dict, of no subclass: what a typed function
     /// taking a dict the transpiler followed may be entered with.
     public static boolean isDict(Object o) {

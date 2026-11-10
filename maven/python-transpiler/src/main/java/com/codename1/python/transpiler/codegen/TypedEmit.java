@@ -5203,6 +5203,17 @@ final class TypedEmit {
         if ("$probe".equals(fn)) {
             return new E(probeRead(c.args.get(0), true), Ty.DYN);
         }
+        if ("$unmiss".equals(fn) && plainProbe(c.args.get(0))) {
+            // A miss reaches here only when the handler's name was rebound:
+            // the re-read raises the real KeyError for it.
+            String m = box(expr(c.args.get(0)));
+            return dictRead("(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : " + m + ")",
+                    expr(((Subscript) c.args.get(1)).value).t);
+        }
+        if ("$ismiss".equals(fn) && plainProbe(c.args.get(0))) {
+            return new E("(" + box(expr(c.args.get(0))) + " == Py.MISS && " + excRef(c.args.get(1)) + " == Py.KEY_ERROR)",
+                    Ty.BOOL);
+        }
         if ("$unmiss".equals(fn)) {
             String m = box(expr(c.args.get(0)));
             String v = "(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : Py.unmissed(" + m + "))";
@@ -5269,10 +5280,38 @@ final class TypedEmit {
     private String probeRead(Expr e, boolean probe) {
         if (e instanceof Attribute) {
             Attribute a = (Attribute) e;
+            if (a.value instanceof Name && scalars.containsKey(((Name) a.value).id)) {
+                return scalarProbeRead(((Name) a.value).id, a.attr, probe);
+            }
             return em.attrSite(a.attr) + (probe ? ".getOrMiss(" : ".get(") + box(expr(a.value)) + ")";
         }
         Subscript s = (Subscript) e;
+        if (probe && dictProbe(s)) {
+            E k = expr(s.index);
+            return "Typed.dprobe(" + expr(s.value).c + ", " + (k.lc != null ? k.lc : box(k)) + ")";
+        }
         return (probe ? "Py.getitemOrMiss(" : "Py.getitem(") + box(expr(s.value)) + ", " + box(expr(s.index)) + ")";
+    }
+
+    /// `d[k]` on a dict local that is never None: a plain `PyDict`, whose
+    /// probe answers the value or the bare miss sentinel.
+    private boolean dictProbe(Subscript s) {
+        if (!(s.value instanceof Name) || binding(((Name) s.value).id) != Scope.Binding.LOCAL) {
+            return false;
+        }
+        Ty t = localType(((Name) s.value).id);
+        return t.k == Ty.K.DICT && !t.opt;
+    }
+
+    /// Whether hidden local `m` (a miss probe's) only ever holds a
+    /// [#dictProbe]: the value itself, or `Py.MISS`.
+    private boolean plainProbe(Expr m) {
+        if (!(m instanceof Name) || soleStores == null) {
+            return false;
+        }
+        Expr v = soleStores.get(((Name) m).id);
+        return v instanceof Call && ((Call) v).func instanceof Name && "$probe".equals(((Name) ((Call) v).func).id)
+                && ((Call) v).args.get(0) instanceof Subscript && dictProbe((Subscript) ((Call) v).args.get(0));
     }
 
     private E call0(Call c) {
@@ -5289,8 +5328,8 @@ final class TypedEmit {
             }
         }
         if (Emitter.getattrDefault(c) && binding("getattr") == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport()) {
-            return new E("Py.orDefault(" + em.attrSite(((Constant) c.args.get(1)).text) + ".getOrMiss("
-                    + box(expr(c.args.get(0))) + "), " + box(expr(c.args.get(2))) + ")", Ty.DYN);
+            Attribute probe = new Attribute(c.args.get(0), ((Constant) c.args.get(1)).text);
+            return new E("Py.orDefault(" + probeRead(probe, true) + ", " + box(expr(c.args.get(2))) + ")", Ty.DYN);
         }
         if (c.args.size() == 1 && c.args.get(0) instanceof Name && codePoints.containsKey(((Name) c.args.get(0)).id)
                 && ordOf(c, ((Name) c.args.get(0)).id)) {
@@ -5857,6 +5896,12 @@ final class TypedEmit {
         String[] attrs;
         final Set<String> reads = new HashSet<String>();
         final Set<String> getters = new HashSet<String>();
+        /// Attributes a miss probe or a `getattr` with a default asks for.
+        final Set<String> probes = new HashSet<String>();
+        /// The probed ones no field, class or base defines: each answers a
+        /// miss while the class still lacks it, and rebuilds the object
+        /// from every field when it does not.
+        final Set<String> missing = new HashSet<String>();
     }
 
     private Map<String, Scalar> scalars = new HashMap<String, Scalar>();
@@ -5895,6 +5940,18 @@ final class TypedEmit {
     /// Whether every use of `x` reads a field its constructor set.
     private boolean scalarUses(Scalar x) {
         Set<String> fields = new HashSet<String>(Arrays.asList(x.attrs));
+        for (String p : x.probes) {
+            if (fields.contains(p)) {
+                x.reads.add(p);
+            } else if (p.startsWith("__") || Layouts.resolver(x.k, p) != null) {
+                return false;
+            } else {
+                x.missing.add(p);
+            }
+        }
+        if (!x.missing.isEmpty()) {
+            x.reads.addAll(fields);
+        }
         for (String g : x.getters) {
             Layouts.Cls o = Layouts.resolver(x.k, g);
             FunctionDef d = o == null ? null : o.typable.get(g);
@@ -5959,6 +6016,8 @@ final class TypedEmit {
             storeTargets(((Comprehension) o).target, cand, bad);
         } else if (o instanceof WithItem && ((WithItem) o).vars != null) {
             storeTargets(((WithItem) o).vars, cand, bad);
+        } else if (o instanceof Call && scalarProbe((Call) o, cand, bad)) {
+            return;
         } else if (o instanceof Call && ((Call) o).func instanceof Attribute) {
             Attribute f = (Attribute) ((Call) o).func;
             if (f.value instanceof Name && cand.containsKey(((Name) f.value).id)) {
@@ -5992,6 +6051,62 @@ final class TypedEmit {
             return;
         }
         Infer.children(o, x -> scanScalars(x, cand, bad));
+    }
+
+    /// A miss probe (`$probe(n.a)`, `$unmiss(m, n.a)`) or `getattr(n, "a", d)`
+    /// on candidate `n`: records `a` as probed and scans the rest. False,
+    /// scanning nothing, when the call is none of those.
+    private boolean scalarProbe(Call c, Map<String, Scalar> cand, Set<String> bad) {
+        Expr recv;
+        String attr;
+        List<Expr> rest = new ArrayList<Expr>();
+        String fn = c.func instanceof Name ? ((Name) c.func).id : "";
+        if ("$probe".equals(fn) || "$unmiss".equals(fn)) {
+            Expr x = c.args.get(c.args.size() - 1);
+            if (!(x instanceof Attribute)) {
+                return false;
+            }
+            recv = ((Attribute) x).value;
+            attr = ((Attribute) x).attr;
+            rest.addAll(c.args.subList(0, c.args.size() - 1));
+        } else if (Emitter.getattrDefault(c) && binding("getattr") == Scope.Binding.BUILTIN
+                && !em.moduleScopeHasStarImport()) {
+            recv = c.args.get(0);
+            attr = ((Constant) c.args.get(1)).text;
+            rest.add(c.args.get(2));
+        } else {
+            return false;
+        }
+        if (!(recv instanceof Name) || !cand.containsKey(((Name) recv).id)) {
+            return false;
+        }
+        if (da.safe.contains((Name) recv)) {
+            cand.get(((Name) recv).id).probes.add(attr);
+        } else {
+            bad.add(((Name) recv).id);
+        }
+        for (Expr x : rest) {
+            scanScalars(x, cand, bad);
+        }
+        return true;
+    }
+
+    /// `n.attr` probed (`probe`) or read on scalar local `n`.
+    private String scalarProbeRead(String n, String attr, boolean probe) {
+        Scalar x = scalars.get(n);
+        if (!x.missing.contains(attr)) {
+            return box(scalarRead(n, attr));
+        }
+        List<E> fs = new ArrayList<E>();
+        for (String a : x.attrs) {
+            fs.add(scalarRead(n, a));
+        }
+        String site = em.attrSite(attr);
+        String obj = construct(x.k, fs).c;
+        if (!probe) {
+            return site + ".get(" + obj + ")";
+        }
+        return "(" + site + ".classLacks(" + x.k.typeVar + ") ? Py.MISS : " + site + ".getOrMiss(" + obj + "))";
     }
 
     /// Marks every candidate whose field a store target writes.

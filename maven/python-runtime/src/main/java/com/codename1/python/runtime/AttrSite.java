@@ -335,6 +335,27 @@ public final class AttrSite {
         }
     }
 
+    /// The class [#classLacks] last found without this attribute.
+    private PyType lackType;
+    private int lackVersion;
+
+    /// Whether an instance of `cls` with no attribute of its own would miss
+    /// this one: the class, its bases and `__getattr__` all lack it. The
+    /// typed code asks this for an object it never made, whose fields it
+    /// knows; a class given the attribute later answers false from then on.
+    public boolean classLacks(PyType cls) {
+        if (lackType == cls && lackVersion == PyType.version) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return true;
+        }
+        if (name.startsWith("__") || cls.hasCustomGetattribute() || cls.lookup("__getattr__") != null
+                || cls.lookup(name) != null) {
+            return false;
+        }
+        lackType = cls;
+        lackVersion = PyType.version;
+        return true;
+    }
+
     private Object getSlow(PyInstance i) {
         int k = findGet(i.cls, i.shape);
         if (k >= 0) {
