@@ -3148,6 +3148,17 @@ public class AppBuilder {
             // the finally below deletes that directory outright -- without this the developer
             // never sees either artifact at all. They are copied, not attached: host
             // configuration is not something to publish to a Maven repository.
+            // A symbol map left in the build directory by an earlier, minified build would be
+            // read against this bundle's different names; this build's own map, if it wrote one,
+            // is copied below.
+            File[] staleMaps = buildDirectory().listFiles();
+            if (staleMaps != null) {
+                for (File stale : staleMaps) {
+                    if (stale.isFile() && stale.getName().endsWith("-js-symbols.txt") && !stale.delete()) {
+                        getLog().warn("Could not delete stale JavaScript symbol map " + stale);
+                    }
+                }
+            }
             for (File artifact : e.getJavaScriptBuildArtifacts()) {
                 File copyTo = new File(buildDirectory(), artifact.getName());
                 try {
