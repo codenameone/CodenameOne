@@ -120,8 +120,8 @@ public final class PyFunction extends PyObject {
     final Object[] kwDefaults;
     final Body body;
     private Body0 body0;
-    private Body1 body1;
-    private Body2 body2;
+    Body1 body1;
+    Body2 body2;
     private Body3 body3;
     private Body4 body4;
     private Body5 body5;

@@ -1852,6 +1852,14 @@ public final class Py {
 
     /// One-argument call; `len(x)` skips the argument array and the builtin.
     public static Object call(Object f, Object a) {
+        if (f instanceof PyFunction) {
+            // A Python function straight into its body: no view, no
+            // virtual call1.
+            PyFunction.Body1 b = ((PyFunction) f).body1;
+            if (b != null) {
+                return b.run(a);
+            }
+        }
         if (f == Builtins.LEN) { //NOPMD CompareObjectsWithEquals - identity is meant
             return Long.valueOf(len(a));
         }
@@ -1863,6 +1871,12 @@ public final class Py {
     }
 
     public static Object call(Object f, Object a, Object b) {
+        if (f instanceof PyFunction) {
+            PyFunction.Body2 g = ((PyFunction) f).body2;
+            if (g != null) {
+                return g.run(a, b);
+            }
+        }
         return Py.obj(f).call2(a, b);
     }
 

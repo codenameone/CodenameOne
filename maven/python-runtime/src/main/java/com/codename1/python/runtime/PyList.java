@@ -856,35 +856,46 @@ public final class PyList extends PyObject {
         };
     }
 
-    /// `list.sort(key=None, reverse=False)`: a stable merge sort.
+    /// `list.sort(key=None, reverse=False)`: a stable merge sort. The order
+    /// is an int array, and keys that are all ints compare as longs.
     public void sort(Object key, boolean reverse) {
         objects();
+        boolean none = key == null || key == Py.NONE; //NOPMD CompareObjectsWithEquals - identity is meant
         Object[] keys = new Object[size];
+        boolean longs = true;
         for (int i = 0; i < size; i++) {
-            keys[i] = key == null || key == Py.NONE ? items[i] : Py.obj(key).call(new Object[] {items[i]}, Py.NO_KW); //NOPMD CompareObjectsWithEquals - identity is meant
+            Object k = none ? items[i] : Py.call(key, items[i]);
+            keys[i] = k;
+            longs &= k instanceof Long;
         }
-        Integer[] order = new Integer[size];
+        long[] lk = null;
+        if (longs) {
+            lk = new long[size];
+            for (int i = 0; i < size; i++) {
+                lk[i] = (Long) keys[i];
+            }
+        }
+        int[] order = new int[size];
         for (int i = 0; i < size; i++) {
-            order[i] = Integer.valueOf(i);
+            order[i] = i;
         }
-        Integer[] tmp = new Integer[size];
-        mergeSort(order, tmp, keys, 0, size, reverse);
+        mergeSort(order, new int[size], keys, lk, 0, size, reverse);
         Object[] out = new Object[Math.max(4, size)];
         for (int i = 0; i < size; i++) {
-            out[i] = items[order[i].intValue()];
+            out[i] = items[order[i]];
         }
         items = out;
     }
 
-    private static void mergeSort(Integer[] a, Integer[] tmp, Object[] keys, int lo, int hi, boolean rev) {
+    private static void mergeSort(int[] a, int[] tmp, Object[] keys, long[] lk, int lo, int hi, boolean rev) {
         if (hi - lo < 2) {
             return;
         }
         if (hi - lo <= 8) {
             for (int i = lo + 1; i < hi; i++) {
-                Integer v = a[i];
+                int v = a[i];
                 int j = i - 1;
-                while (j >= lo && before(keys[v.intValue()], keys[a[j].intValue()], rev)) {
+                while (j >= lo && before(keys, lk, v, a[j], rev)) {
                     a[j + 1] = a[j];
                     j--;
                 }
@@ -893,13 +904,17 @@ public final class PyList extends PyObject {
             return;
         }
         int mid = (lo + hi) >>> 1;
-        mergeSort(a, tmp, keys, lo, mid, rev);
-        mergeSort(a, tmp, keys, mid, hi, rev);
+        mergeSort(a, tmp, keys, lk, lo, mid, rev);
+        mergeSort(a, tmp, keys, lk, mid, hi, rev);
+        if (!before(keys, lk, a[mid], a[mid - 1], rev)) {
+            // Already in order: the two runs need no merge.
+            return;
+        }
         int i = lo;
         int j = mid;
         int k = lo;
         while (i < mid && j < hi) {
-            if (before(keys[a[j].intValue()], keys[a[i].intValue()], rev)) {
+            if (before(keys, lk, a[j], a[i], rev)) {
                 tmp[k++] = a[j++];
             } else {
                 tmp[k++] = a[i++];
@@ -912,6 +927,13 @@ public final class PyList extends PyObject {
             tmp[k++] = a[j++];
         }
         System.arraycopy(tmp, lo, a, lo, hi - lo);
+    }
+
+    private static boolean before(Object[] keys, long[] lk, int x, int y, boolean rev) {
+        if (lk != null) {
+            return rev ? lk[y] < lk[x] : lk[x] < lk[y];
+        }
+        return before(keys[x], keys[y], rev);
     }
 
     /// Whether `x` must move before `y`: `x < y`, or `y < x` reversed. Equal
