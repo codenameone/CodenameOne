@@ -1645,6 +1645,13 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesDatabase;
     private boolean visionSupport;
     private boolean inferenceSupport;
+    /// Default home of the `com.codenameone.natives` artifacts.
+    static final String CN1_NATIVES_REPOSITORY = "https://repo.codenameone.com/maven2";
+    /// A catalog hit names an artifact in `com.codenameone.natives`.
+    private boolean usesCodenameOneNatives;
+    /// The app calls `LlmClient.local`; keeps `AndroidLocalLlmImpl`, whose
+    /// native library the catalog's llama AAR supplies.
+    private boolean localLlmSupport;
     private boolean languageSupport;
     private final Set<String> includedAiAdapterSources =
             new HashSet<String>();
@@ -2744,6 +2751,8 @@ public class AndroidGradleBuilder extends Executor {
         mediaPlaybackPermission = false;
         visionSupport = false;
         inferenceSupport = false;
+        localLlmSupport = false;
+        usesCodenameOneNatives = false;
         languageSupport = false;
         includedAiAdapterSources.clear();
 
@@ -3235,6 +3244,9 @@ public class AndroidGradleBuilder extends Executor {
                     // dependencies and plist entries for every feature,
                     // health included, and is indifferent to what follows.
                     aiAcc.consumeMethod(cls, method);
+                    if (PlatformFeatureCatalog.isLocalLlmCall(cls, method)) {
+                        localLlmSupport = true;
+                    }
                     String scriptAdapter =
                             androidTextScriptAdapterSource(cls, method);
                     if (scriptAdapter != null) {
@@ -3605,6 +3617,9 @@ public class AndroidGradleBuilder extends Executor {
             }
             for (String gav : entry.androidGradleDeps()) {
                 aiExtraGradleDependencies.append("    implementation '").append(gav).append("'\n");
+                if (gav.startsWith(PlatformFeatureCatalog.AI_NATIVES_GROUP + ":")) {
+                    usesCodenameOneNatives = true;
+                }
             }
         }
         if (aiAcc.minimumAndroidSdk() > 0) {
@@ -7964,6 +7979,7 @@ public class AndroidGradleBuilder extends Executor {
         String keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
                 "-keep class com.google.firebase.** { *; }\n\n";
         String keepAi = visionSupport || languageSupport || inferenceSupport
+                || localLlmSupport
                 ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
                 : "";
         String keepInferenceRuntime =
@@ -8522,6 +8538,13 @@ public class AndroidGradleBuilder extends Executor {
         injectRepo += "      google()\n" +
                 "     mavenLocal()\n" +
                 "      mavenCentral()\n";
+        if (usesCodenameOneNatives) {
+            // whisper.cpp / llama.cpp AARs (PlatformFeatureCatalog) live only
+            // in the Codename One repository. Listed only when one is used,
+            // so every other project resolves exactly as before.
+            injectRepo += "      maven { url '" + request.getArg("android.cn1NativesRepository",
+                    CN1_NATIVES_REPOSITORY) + "' }\n";
+        }
         if(!androidAppBundle && gradleVersionInt < 6 && buildToolsVersionInt < 30){
             gradlePropertiesObject.put("android.enableAapt2", "false");
         }
@@ -8977,6 +9000,9 @@ public class AndroidGradleBuilder extends Executor {
                     "AndroidLanguageAdapter.java"}, language);
         if (!inferenceSupport) {
             new File(aiDir, "AndroidInferenceImpl.java").delete();
+        }
+        if (!localLlmSupport) {
+            new File(aiDir, "AndroidLocalLlmImpl.java").delete();
         }
     }
 

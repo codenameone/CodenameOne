@@ -141,6 +141,19 @@ A typical script calls these tools in order:
 
 `sim_rotate` switches between portrait and landscape, and `sim_keyboard_state` reports whether the keyboard is showing, its height, the layout, and the screen size the application currently sees.
 
+=== Restyling the application
+
+The simulator also lets an agent change the application's look through its `theme.css`, with every change staged so a person can review it and undo it.
+
+`sim_style_get` reads one rule as written. `sim_style_set` sets a property in a rule, adding the declaration or the rule when it's missing; an empty value removes the declaration. The change goes straight into `theme.css`, so live CSS reload shows it on the simulated screen within a second. The tools keep the text the file had before the first change, and answer each call with a unified diff of everything staged since:
+
+. `sim_style_audit` lists drift in the theme, the same findings as the `css-audit` Maven goal.
+. `sim_style_set` with `{"selector": "Button", "property": "color", "value": "var(--brand)"}`.
+. `sim_style_diff` shows the staged changes.
+. `sim_style_approve` keeps them, or `sim_style_reject` restores the earlier text and the old theme reloads.
+
+The tools edit only top-level rules, never rules inside `@media` blocks, and accept no value that could close the declaration or the rule. If the file is saved in an editor while changes are staged, they refuse to write until the agent approves, or rejects with `force`, so a stale snapshot never overwrites a person's edits.
+
 === Debug logging
 
 Because an agent drives the tool on its own, it helps to watch what it does. The server echoes the MCP conversation to the Codename One log at a level chosen through the menu's *Debug Logging* item or in code:

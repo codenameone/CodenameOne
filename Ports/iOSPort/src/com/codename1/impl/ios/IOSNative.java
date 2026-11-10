@@ -757,6 +757,18 @@ public class IOSNative {
     native long cn1InferenceOutputData(int handle, int index);
     native String cn1InferenceResize(int handle, int index, int[] shape);
     native void cn1InferenceClose(int handle);
+    // llama.cpp (CN1Llama.m, behind INCLUDE_CN1_LLAMA).
+    native boolean cn1LlamaIsSupported();
+    native int cn1LlamaOpen(String path, int contextSize, int gpuLayers, int threads);
+    native String cn1LlamaLastError(int handle);
+    native boolean cn1LlamaStart(int handle, String[] roles, String[] contents,
+                                 int maxTokens, float temperature, float topP,
+                                 int seed, String grammar);
+    native String cn1LlamaNext(int handle);
+    native int cn1LlamaPromptTokens(int handle);
+    native int cn1LlamaCompletionTokens(int handle);
+    native float[] cn1LlamaEmbed(int handle, String text);
+    native void cn1LlamaClose(int handle);
 
     // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
     // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class

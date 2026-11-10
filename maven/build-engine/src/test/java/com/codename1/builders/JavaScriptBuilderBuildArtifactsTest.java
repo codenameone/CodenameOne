@@ -55,11 +55,14 @@ class JavaScriptBuilderBuildArtifactsTest {
         assertTrue(new File(dist, "MyApp-js-cn1-security").mkdirs());
         Files.write(new File(dist, "MyApp-js-suspension-report.txt").toPath(),
                 "report".getBytes(StandardCharsets.UTF_8));
+        Files.write(new File(dist, "MyApp-js-symbols.txt").toPath(),
+                "$Ma\tcn1_x\n".getBytes(StandardCharsets.UTF_8));
 
         List<String> found = namesOf(JavaScriptBuilder.locateBuildArtifacts(bundle));
-        assertEquals(2, found.size(), found.toString());
+        assertEquals(3, found.size(), found.toString());
         assertTrue(found.contains("MyApp-js-cn1-security"), found.toString());
         assertTrue(found.contains("MyApp-js-suspension-report.txt"), found.toString());
+        assertTrue(found.contains("MyApp-js-symbols.txt"), found.toString());
     }
 
     @Test

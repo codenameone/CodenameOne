@@ -59,6 +59,15 @@ public interface Dao<T> {
     /// `SELECT last_insert_rowid()`.
     void insert(T entity) throws IOException;
 
+    /// Stores `entity` and answers the instance that holds what the database
+    /// decided: inserted when its auto-increment key is still unassigned or no
+    /// row has its key, updated otherwise.
+    ///
+    /// For an ordinary entity the answer is `entity` itself. A record cannot
+    /// have its generated key written into it, so for one the answer is a copy
+    /// that carries the key -- the instance to keep.
+    T save(T entity) throws IOException;
+
     /// `UPDATE ... WHERE id = ?`.
     void update(T entity) throws IOException;
 

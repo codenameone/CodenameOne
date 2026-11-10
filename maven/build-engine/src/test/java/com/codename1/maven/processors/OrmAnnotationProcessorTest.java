@@ -329,6 +329,525 @@ public class OrmAnnotationProcessorTest {
         assertEquals(riderMethods,methodNames(new File(classes,"hidden/Rider.class")));
     }
 
+    /// A record entity: read through its canonical constructor, never written,
+    /// and changed by saving a copy. The session writes a record through and
+    /// answers the copy that carries the generated key and version; saving the
+    /// stale copy again fails on its version. Records need a JDK that compiles
+    /// them, so the test is skipped on JDK 8.
+    @Test
+    public void recordEntitiesAreSavedAsCopiesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordEntities(false);
+        recordEntities(true);
+    }
+    private static int javaFeature() {
+        String version=System.getProperty("java.specification.version");
+        return version.startsWith("1.") ? Integer.parseInt(version.substring(2)) : Integer.parseInt(version);
+    }
+    private void recordEntities(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("records.Mood","package records; public enum Mood { CALM, LOUD }");
+        sources.put("records.Note","package records; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
+            + "@Entity public record Note(@Id long id, String title, int score, Mood mood, java.util.Date when, @Version long version, @DbTransient String scratch) { "
+            + "public Note { if (score < 0) throw new IllegalArgumentException(\"score\"); } }");
+        sources.put("records.Tag","package records; import com.codename1.annotations.*; @Entity public record Tag(@Id long id, String name, boolean pinned) { }");
+        sources.put("records.Notes","package records; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Note.class,key=Long.class) public interface Notes extends CrudRepository<Note,Long> { "
+            + "List<Note> findByTitle(String title); }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        // Nothing is woven into a record.
+        assertFalse(methodNames(new File(classes,"records/Note.class")).contains("__cn1OrmState"));
+        assertTrue(new File(classes,"records/NoteBuilder.class").isFile());
+        // The check uses the generated builder, so it compiles after the processor ran.
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("records.Check","package records; import com.codename1.orm.repository.*; import com.codename1.orm.session.*; public class Check { public static void run(Session s) { "
+            + "Notes repo=Repositories.create(Notes.class,s); s.createTables(); s.beginTransaction(); "
+            + "Note draft=NoteBuilder.create().title(\"a\").score(3).mood(Mood.LOUD).when(new java.util.Date(5000L)).scratch(\"x\").build(); "
+            + "Note saved=repo.save(draft); "
+            + "if(saved==draft || draft.id()!=0) throw new AssertionError(\"the caller's record must not change\"); "
+            + "if(saved.id()==0) throw new AssertionError(\"generated key in the copy\"); "
+            + "if(!\"x\".equals(saved.scratch())) throw new AssertionError(\"a copy keeps transient components\"); "
+            + "if(!s.contains(saved) || s.contains(draft)) throw new AssertionError(\"the copy is the managed instance\"); "
+            + "if(s.find(Note.class,saved.id())!=saved) throw new AssertionError(\"identity map holds the copy\"); "
+            + "Note changed=repo.save(NoteBuilder.of(saved).score(5).build()); "
+            + "if(changed.version()!=saved.version()+1 || changed.score()!=5) throw new AssertionError(\"version in the copy \"+changed); "
+            + "if(s.find(Note.class,saved.id())!=changed) throw new AssertionError(\"identity map follows the newest copy\"); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Note back=repo.findById(saved.id()); "
+            + "if(back.score()!=5 || !\"a\".equals(back.title()) || back.mood()!=Mood.LOUD || back.when().getTime()!=5000L || back.version()!=changed.version() || back.scratch()!=null) throw new AssertionError(\"read back \"+back); "
+            + "if(!back.equals(NoteBuilder.of(changed).scratch(null).build())) throw new AssertionError(\"record equality\"); "
+            + "if(repo.findByTitle(\"a\").size()!=1) throw new AssertionError(\"derived query\"); "
+            + "s.beginTransaction(); boolean stale=false; try { repo.save(saved); } catch(OptimisticLockException expected) { stale=true; } s.rollbackTransaction(); "
+            + "if(!stale) throw new AssertionError(\"saving a stale copy must fail on its version\"); "
+            + "s.clear(); s.beginTransaction(); Note current=repo.findById(saved.id()); s.refresh(current); repo.delete(s.find(Note.class,saved.id())); s.commitTransaction(); "
+            + "s.clear(); if(repo.findById(saved.id())!=null) throw new AssertionError(\"delete\"); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("records.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            // The plain daos answer the copy too. Both refuse a versioned mapping
+            // outright, record or not -- that needs a session -- so this is an
+            // unversioned one.
+            Class tag=loader.loadClass("records.Tag");
+            java.lang.reflect.Constructor make=tag.getConstructors()[0];
+            Object fresh=make.newInstance(0L,"t",Boolean.TRUE);
+            Object saved,renamed;
+            if (backend) {
+                com.codename1.backend.orm.Dao dao=server.dao(tag);
+                dao.createTable();
+                saved=dao.save(fresh);
+                long id=((Long)tag.getMethod("id").invoke(saved)).longValue();
+                assertTrue(saved.toString(),id!=0);
+                assertEquals(saved,dao.findById(Long.valueOf(id)));
+                renamed=make.newInstance(Long.valueOf(id),"u",Boolean.FALSE);
+                assertTrue(dao.save(renamed)==renamed);
+                assertEquals(renamed,dao.findById(Long.valueOf(id)));
+                assertEquals(1,dao.findAll().size());
+            } else {
+                com.codename1.orm.Dao dao=client.dao(tag);
+                dao.createTable();
+                saved=dao.save(fresh);
+                long id=((Long)tag.getMethod("id").invoke(saved)).longValue();
+                assertTrue(saved.toString(),id!=0);
+                assertEquals(saved,dao.findById(Long.valueOf(id)));
+                renamed=make.newInstance(Long.valueOf(id),"u",Boolean.FALSE);
+                assertTrue(dao.save(renamed)==renamed);
+                assertEquals(renamed,dao.findById(Long.valueOf(id)));
+                assertEquals(1,dao.findAll().size());
+            }
+            assertEquals(0L,((Long)tag.getMethod("id").invoke(fresh)).longValue());
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// A record entity with a relationship it cannot hold is
+    /// refused by name rather than generated into code that cannot compile.
+    @Test
+    public void recordEntitiesRefuseWhatTheyCannotHoldYet() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("refused.Owner","package refused; import com.codename1.annotations.*; @Entity public class Owner { @Id public long id; public Owner() {} }");
+        sources.put("refused.Pet","package refused; import com.codename1.annotations.*; import com.codename1.annotations.db.*; "
+            + "@Entity public record Pet(@Id long id, @ManyToOne Owner owner, @ManyToOne(fetch=FetchType.LAZY) java.util.Optional<Owner> vet, "
+            + "@OneToMany(mappedBy=\"x\") java.util.Map<String,Owner> byName) { }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes);
+        String errors=ctx.getErrors().toString();
+        assertTrue(errors,errors.contains("A record's to-one relationship is a Ref<T>, read on first use, or an Optional<T>, read with the row: refused.Pet.owner"));
+        assertTrue(errors,errors.contains("An Optional is read with the row; a lazy to-one is a Ref<T>: refused.Pet.vet"));
+        assertTrue(errors,errors.contains("A record's to-many relationship is a List or a Set: refused.Pet.byName"));
+    }
+
+    /// Relationships of a record: a lazy to-one is a Ref, read on first use and
+    /// refused once the session is gone; an eager one is an Optional, read with
+    /// the row; a to-many is a session list or set, changed in place. Changing a
+    /// to-one is a copy with another Ref, and a target persisted through a
+    /// cascade gives its key to the record pointing at it.
+    @Test
+    public void recordRelationshipsOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordRelationships(false);
+        recordRelationships(true);
+    }
+    private void recordRelationships(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package shop; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("shop.Customer",imports+"@Entity public record Customer(@Id long id, String name) { }");
+        sources.put("shop.Purchase",imports+"@Entity public record Purchase(@Id long id, String code, "
+            + "@ManyToOne(cascade=CascadeType.PERSIST) Ref<Customer> customer, @ManyToOne Optional<Customer> reviewer, "
+            + "@OneToMany(mappedBy=\"purchase\") List<Line> lines, @ElementCollection Set<String> tags, @Version long version) { }");
+        sources.put("shop.Line",imports+"@Entity public record Line(@Id long id, String label, @ManyToOne Ref<Purchase> purchase) { }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("shop.Check","package shop; import com.codename1.orm.Ref; import com.codename1.orm.session.*; import java.util.*; public class Check { "
+            + "static void ok(boolean b,String m) { if(!b) throw new AssertionError(m); } "
+            + "public static void run(Session s) { s.createTables(); s.beginTransaction(); "
+            + "Customer ada=s.merge(CustomerBuilder.create().name(\"Ada\").build()); ok(ada.id()!=0,\"customer key\"); "
+            + "Customer draftBob=CustomerBuilder.create().name(\"Bob\").build(); "
+            + "Purchase p=s.merge(PurchaseBuilder.create().code(\"p1\").customer(Ref.of(draftBob)).reviewer(Optional.of(ada)).lines(new ArrayList<Line>()).tags(new HashSet<String>(Arrays.asList(\"x\"))).build()); "
+            + "ok(p.id()!=0,\"purchase key\"); Object bobId=p.customer().id(); "
+            + "ok(bobId!=null && ((Long)bobId).longValue()!=0,\"the cascaded customer's key reaches the ref \"+bobId); "
+            + "ok(p.customer().get()!=draftBob && \"Bob\".equals(p.customer().get().name()),\"the ref follows the saved copy\"); "
+            + "ok(s.query(Customer.class).list().size()==2,\"the cascaded customer is one row\"); Line line=s.merge(LineBuilder.create().label(\"l1\").purchase(Ref.of(p)).build()); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Purchase back=s.find(Purchase.class,p.id()); "
+            + "ok(!back.customer().isLoaded() && back.customer().isPresent() && bobId.equals(back.customer().id()),\"a lazy ref answers its id without reading \"+back.customer()); "
+            + "ok(back.reviewer().isPresent() && \"Ada\".equals(back.reviewer().get().name()),\"an Optional is read with the row\"); "
+            + "ok(s.find(Purchase.class,p.id())==back,\"the identity map holds the copy carrying the Optional\"); "
+            + "ok(\"Bob\".equals(back.customer().get().name()) && back.customer().isLoaded(),\"a ref reads on first use\"); "
+            + "ok(back.lines().size()==1 && \"l1\".equals(back.lines().get(0).label()),\"to-many \"+back.lines()); "
+            + "ok(back.lines().get(0).purchase().get()==back,\"back reference resolves to the managed copy\"); "
+            + "ok(back.tags().contains(\"x\"),\"element collection\"); "
+            + "ok(back.customer().equals(Ref.of(s.find(Customer.class,bobId))),\"refs are equal by target\"); "
+            + "s.clear(); Purchase cold=s.find(Purchase.class,p.id()); s.clear(); boolean refused=false; "
+            + "try { cold.customer().get(); } catch(LazyInitializationException expected) { refused=true; } "
+            + "ok(refused,\"a detached unread ref refuses\"); ok(bobId.equals(cold.customer().id()),\"but still knows its id\"); "
+            + "s.beginTransaction(); Purchase current=s.find(Purchase.class,p.id()); "
+            + "current.tags().add(\"y\"); "
+            + "Purchase moved=s.merge(PurchaseBuilder.of(current).customer(Ref.of(s.find(Customer.class,ada.id()))).build()); "
+            + "ok(moved.version()==current.version()+1,\"changing a ref is an update \"+moved.version()); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Purchase last=s.find(Purchase.class,p.id()); "
+            + "ok(Long.valueOf(ada.id()).equals(last.customer().id()),\"the new ref is stored\"); "
+            + "ok(last.tags().equals(new HashSet<String>(Arrays.asList(\"x\",\"y\"))),\"a session set changes in place \"+last.tags()); "
+            + "s.beginTransaction(); boolean stale=false; try { s.merge(cold); } catch(OptimisticLockException expected) { stale=true; } s.rollbackTransaction(); "
+            + "ok(stale,\"a detached copy from before the move is stale\"); "
+            + "}}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("shop.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// A value embedded in a record is a record too, read with its columns and
+    /// changed with the entity's copy. A value whose columns are all null reads
+    /// back as null, nested ones included, and an embedded value that is not a
+    /// record is refused by name, as is a record embedded in a class.
+    @Test
+    public void recordEmbeddedValuesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordEmbedded(false);
+        recordEmbedded(true);
+    }
+    private void recordEmbedded(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package place; import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("place.Geo",imports+"@Embeddable public record Geo(double lat, double lng) { }");
+        sources.put("place.Address",imports+"@Embeddable public record Address(String street, String city, @Embedded Geo geo) { }");
+        sources.put("place.Venue",imports+"@Entity public record Venue(@Id long id, String name, @Embedded Address home, @Embedded Address billing, @Version long version) { }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("place.Check","package place; import com.codename1.orm.session.*; public class Check { "
+            + "static void ok(boolean b,String m) { if(!b) throw new AssertionError(m); } "
+            + "public static void run(Session s) { s.createTables(); s.beginTransaction(); "
+            + "Address home=new Address(\"1 Main\",\"Springfield\",new Geo(1.5,2.5)); "
+            + "Venue v=s.merge(VenueBuilder.create().name(\"hall\").home(home).build()); "
+            + "ok(v.id()!=0 && home.equals(v.home()) && v.billing()==null,\"saved copy \"+v); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Venue back=s.find(Venue.class,v.id()); "
+            + "ok(home.equals(back.home()),\"embedded read back \"+back); ok(back.billing()==null,\"all-null columns read as null \"+back); "
+            + "s.beginTransaction(); Venue moved=s.merge(VenueBuilder.of(back).billing(new Address(\"PO 7\",null,null)).home(new Address(\"2 Elm\",\"Springfield\",new Geo(1.5,2.5))).build()); "
+            + "ok(moved.version()==back.version()+1,\"changing an embedded value is an update\"); "
+            + "ok(\"1 Main\".equals(back.home().street()),\"the old copy keeps its value\"); "
+            + "s.commitTransaction(); s.clear(); "
+            + "Venue last=s.find(Venue.class,v.id()); "
+            + "ok(\"2 Elm\".equals(last.home().street()) && last.home().geo().lng()==2.5,\"new value stored \"+last); "
+            + "ok(\"PO 7\".equals(last.billing().street()) && last.billing().city()==null && last.billing().geo()==null,\"nested null \"+last.billing()); "
+            + "ok(s.query(Venue.class).eq(\"home.city\",\"Springfield\").list().size()==1,\"query by an embedded path\"); "
+            + "s.beginTransaction(); s.merge(VenueBuilder.of(last).home(null).build()); s.commitTransaction(); s.clear(); "
+            + "ok(s.find(Venue.class,v.id()).home()==null,\"an embedded value set to null\"); "
+            + "s.beginTransaction(); boolean stale=false; try { s.merge(back); } catch(OptimisticLockException expected) { stale=true; } s.rollbackTransaction(); "
+            + "ok(stale,\"a stale copy fails on its version\"); "
+            + "}}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("place.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+        if (backend) return;
+        File refused=tmp.newFolder();
+        Map<String,String> wrong=new java.util.LinkedHashMap<String,String>();
+        wrong.put("wrong.Mutable",imports.replace("place","wrong")+"@Embeddable public class Mutable { public String a; public Mutable() {} }");
+        wrong.put("wrong.Fixed",imports.replace("place","wrong")+"@Embeddable public record Fixed(String b) { }");
+        wrong.put("wrong.Rec",imports.replace("place","wrong")+"@Entity public record Rec(@Id long id, @Embedded Mutable m) { }");
+        wrong.put("wrong.Cls",imports.replace("place","wrong")+"@Entity public class Cls { @Id public long id; @Embedded public Fixed f; public Cls() {} }");
+        compileEntities(wrong,refused);
+        String errors=runProcessor(refused).getErrors().toString();
+        assertTrue(errors,errors.contains("An embedded value in a record entity is an @Embeddable record: m"));
+        assertTrue(errors,errors.contains("An @Embeddable record is held by a record entity: f"));
+    }
+
+    /// What the guide says of records beyond the main paths: the inverse side of
+    /// a one-to-one as a Ref reads its target on first use, since the row stores
+    /// no key for it, and refuses once detached; persist hands the keyed copy to
+    /// the identity map; Ref.empty and Optional.empty clear a foreign key; field
+    /// annotations work on components; embedded columns are named by path.
+    @Test
+    public void recordCornersOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        recordCorners(false);
+        recordCorners(true);
+    }
+    private void recordCorners(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package corner; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("corner.Code",imports+"public record Code(String text) { }");
+        sources.put("corner.CodeConverter",imports+"public class CodeConverter implements com.codename1.orm.session.AttributeConverter<Code,String> { public CodeConverter() {} "
+            + "public String toDatabase(Code c) { return c == null ? null : c.text(); } public Code fromDatabase(String v) { return v == null ? null : new Code(v); } }");
+        sources.put("corner.Pin",imports+"@Embeddable public record Pin(double lat, double lng) { }");
+        sources.put("corner.User",imports+"@Entity(table=\"people\") public record User(@Id long id, @Column(name=\"handle\") String name, "
+            + "@Temporal(TemporalType.DATE) java.util.Date born, @Convert(converter=CodeConverter.class, storageType=String.class) Code code, "
+            + "@Embedded Pin spot, @OneToOne(mappedBy=\"user\") Ref<Profile> profile, @ManyToOne Ref<User> mentor, @ManyToOne Optional<User> buddy) { }");
+        sources.put("corner.Profile",imports+"@Entity public record Profile(@Id long id, String bio, @OneToOne Ref<User> user) { }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("corner.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static void ok(boolean b,String m) { if(!b) throw new AssertionError(m); } "
+            + "public static void run(Session s) { s.createTables(); s.beginTransaction(); "
+            + "User mentor=s.merge(UserBuilder.create().name(\"m\").build()); "
+            + "User draft=UserBuilder.create().name(\"u\").born(new Date(86400000L*3)).code(new Code(\"C7\")).spot(new Pin(1.5,2.5)).mentor(Ref.of(mentor)).buddy(Optional.of(mentor)).build(); "
+            + "s.persist(draft); s.flush(); "
+            + "ok(draft.id()==0 && !s.contains(draft),\"persist leaves the caller's record alone\"); "
+            + "List<User> named=s.query(User.class).eq(\"name\",\"u\").list(); ok(named.size()==1 && named.get(0).id()!=0 && s.contains(named.get(0)),\"persist manages the keyed copy \"+named); "
+            + "User u=named.get(0); s.merge(ProfileBuilder.create().bio(\"b\").user(Ref.of(u)).build()); "
+            + "s.commitTransaction(); s.clear(); "
+            + "User back=s.find(User.class,u.id()); "
+            + "ok(\"u\".equals(back.name()) && \"C7\".equals(back.code().text()) && back.born().getTime()==86400000L*3 && back.spot().lng()==2.5,\"component annotations \"+back); "
+            + "ok(!back.profile().isLoaded(),\"the inverse side is unread \"+back.profile()); "
+            + "ok(back.profile().isPresent() && back.profile().isLoaded() && \"b\".equals(back.profile().get().bio()),\"the inverse side reads on first use\"); "
+            + "ok(s.createNativeQuery(\"SELECT handle FROM people WHERE spot_lat = 1.5 AND spot_lng = 2.5\",String.class).list().size()==1,\"columns named by @Column and by path\"); "
+            + "s.clear(); User cold=s.find(User.class,u.id()); s.clear(); boolean refused=false; "
+            + "try { cold.profile().id(); } catch(LazyInitializationException expected) { refused=true; } ok(refused,\"a detached unread inverse side refuses\"); "
+            + "s.beginTransaction(); User current=s.find(User.class,u.id()); "
+            + "s.merge(UserBuilder.of(current).mentor(Ref.empty()).buddy(Optional.empty()).build()); s.commitTransaction(); s.clear(); "
+            + "User cleared=s.find(User.class,u.id()); "
+            + "ok(!cleared.mentor().isPresent() && cleared.mentor().id()==null && !cleared.buddy().isPresent(),\"empty holders clear the keys \"+cleared); "
+            + "User lone=s.find(User.class,mentor.id()); ok(!lone.profile().isPresent() && lone.profile().get()==null,\"an inverse side with no row is empty\"); "
+            + "}}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try {
+            loader.loadClass("corner.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { throw new AssertionError((backend?"backend: ":"client: ")+error.getCause(),error.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// Inverse one-to-one refs and nested embedded records under pressure: an
+    /// eager inverse side, owners that are classes, copies that replace the
+    /// owner, targets moved or removed in the same transaction, a detached
+    /// unread inverse side in a set, and plain Daos with embedded records.
+    @Test
+    public void recordInverseRefsAndNestedValuesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        StringBuilder out=new StringBuilder();
+        inverseRefs(false,out);
+        inverseRefs(true,out);
+        assertTrue(out.toString(),out.length()==0);
+    }
+    private void inverseRefs(boolean backend,StringBuilder out) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package rt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("rt.Inner",imports+"@Embeddable public record Inner(String a, Integer n) { }");
+        sources.put("rt.Mid",imports+"@Embeddable public record Mid(String b, @Embedded Inner in) { }");
+        sources.put("rt.User",imports+"@Entity(table=\"rt_user\") public record User(@Id long id, String name, @OneToOne(mappedBy=\"user\") Ref<Profile> profile, @OneToOne(mappedBy=\"user\",fetch=FetchType.EAGER) Ref<Badge> badge, @OneToOne(mappedBy=\"owner\") Ref<Note> note, @Embedded Mid mid) { }");
+        sources.put("rt.Profile",imports+"@Entity(table=\"rt_profile\") public record Profile(@Id long id, String bio, @OneToOne Ref<User> user) { }");
+        sources.put("rt.Badge",imports+"@Entity(table=\"rt_badge\") public record Badge(@Id long id, String label, @OneToOne Ref<User> user) { }");
+        sources.put("rt.Note",imports+"@Entity(table=\"rt_note\") public class Note { @Id public long id; public String text; @OneToOne public User owner; }");
+        sources.put("rt.Tag",imports+"@Entity(table=\"rt_tag\") public record Tag(@Id long id, String name, @Embedded Mid mid) { }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("rt.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static StringBuilder f=new StringBuilder(); static void ok(boolean b,String m) { if(!b) f.append(m).append(\"; \"); } "
+            + "interface R { void run() throws Exception; } static void t(String n,R r) { try { r.run(); } catch(Throwable e) { f.append(n).append(\" threw \").append(e).append(\"; \"); } } "
+            + "public static String run(Session s) { f.setLength(0); s.createTables(); s.beginTransaction(); "
+            + "User u=s.merge(UserBuilder.create().name(\"u\").mid(new Mid(\"m\",null)).build()); final long uid=u.id(); "
+            + "Profile p=s.merge(ProfileBuilder.create().bio(\"b\").user(Ref.of(u)).build()); s.merge(BadgeBuilder.create().label(\"L\").user(Ref.of(u)).build()); "
+            + "Note n=new Note(); n.text=\"t\"; n.owner=u; s.persist(n); s.commitTransaction(); s.clear(); "
+            + "t(\"eager\",()->{ User b=s.find(User.class,uid); ok(b.badge().isLoaded() && b.badge().isPresent() && \"L\".equals(b.badge().get().label()),\"eager inverse \"+b.badge()); }); s.clear(); "
+            + "t(\"classOwner\",()->{ User b=s.find(User.class,uid); ok(b.note().isPresent() && \"t\".equals(b.note().get().text),\"class owner inverse \"+b.note()); }); s.clear(); "
+            + "t(\"toString\",()->{ User b=s.find(User.class,uid); String x=b.profile().toString()+b.toString(); ok(!b.profile().isLoaded(),\"toString loaded \"+x); }); s.clear(); "
+            + "t(\"hash\",()->{ User b=s.find(User.class,uid); Ref<Profile> r1=b.profile(); User c=s.find(User.class,uid); Ref<Profile> r2=c.profile(); Set<Ref<Profile>> set=new HashSet<>(); set.add(r1); ok(set.contains(r2) && r1.equals(r2) && r1.hashCode()==r2.hashCode(),\"hash/equals \"+r1+\" \"+r2); ok(set.contains(r1),\"self contains\"); }); s.clear(); "
+            + "t(\"detachedHash\",()->{ User b=s.find(User.class,uid); s.clear(); Set<User> set=new HashSet<>(); set.add(b); ok(set.contains(b) && b.equals(b),\"detached record in a set\"); }); s.clear(); "
+            + "t(\"rebind\",()->{ s.beginTransaction(); User old=s.find(User.class,uid); User nu=s.merge(UserBuilder.of(old).name(\"v\").build()); s.commitTransaction(); ok(nu.profile().isPresent() && \"b\".equals(nu.profile().get().bio()),\"new copy inverse \"+nu.profile()); ok(old.profile().isPresent() && \"b\".equals(old.profile().get().bio()),\"old copy inverse \"+old.profile()); }); s.clear(); "
+            + "t(\"userRef\",()->{ s.beginTransaction(); User cur=s.find(User.class,uid); Profile other=s.merge(ProfileBuilder.create().bio(\"o\").build()); User nu=s.merge(UserBuilder.of(cur).profile(Ref.of(other)).build()); s.commitTransaction(); s.clear(); User b=s.find(User.class,uid); ok(\"b\".equals(b.profile().get().bio()),\"user Ref.of on inverse changed db \"+b.profile().get()); }); s.clear(); "
+            + "t(\"removeSameTx\",()->{ s.beginTransaction(); User b=s.find(User.class,uid); Profile pr=s.find(Profile.class,p.id()); s.remove(pr); s.flush(); ok(!b.profile().isPresent(),\"removed target still present \"+b.profile()); s.rollbackTransaction(); }); s.clear(); "
+            + "t(\"retarget\",()->{ s.beginTransaction(); User b=s.find(User.class,uid); User w=s.merge(UserBuilder.create().name(\"w\").build()); Profile pr=s.find(Profile.class,p.id()); s.merge(ProfileBuilder.of(pr).user(Ref.of(w)).build()); s.flush(); ok(!b.profile().isPresent(),\"retargeted target still present \"+b.profile()); s.rollbackTransaction(); }); s.clear(); "
+            + "t(\"nestedNull\",()->{ User b=s.find(User.class,uid); ok(b.mid()!=null && \"m\".equals(b.mid().b()) && (b.mid().in()==null || b.mid().in().a()==null),\"nested embedded \"+b.mid()); }); s.clear(); "
+            + "t(\"nestedAllNull\",()->{ s.beginTransaction(); User z=s.merge(UserBuilder.create().name(\"z\").mid(new Mid(null,new Inner(\"deep\",3))).build()); s.commitTransaction(); s.clear(); User b=s.find(User.class,z.id()); ok(b.mid()!=null && b.mid().in()!=null && \"deep\".equals(b.mid().in().a()) && b.mid().in().n()==3,\"deep embedded with null middle field \"+b.mid()); }); s.clear(); "
+            + "return f.toString(); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        String tag=backend?"backend: ":"client: ";
+        try {
+            String r=(String)loader.loadClass("rt.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            if(r.length()>0) out.append(tag).append(r).append('\n');
+            Class tg=loader.loadClass("rt.Tag");
+            // An embedded value needs a session, for a record as for a class.
+            boolean refused=false;
+            try { if(backend) server.dao(tg); else client.dao(tg); }
+            catch(IllegalStateException expected) { refused=true; }
+            if(!refused) out.append(tag+"the plain dao must refuse an embedded mapping\n");
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { out.append(tag+error.getCause()+"\n"); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// A merged record copy that replaces a relationship the managed record
+    /// never read: the stored targets are read first, so an orphan on the
+    /// inverse side of a one-to-one is deleted and the join rows of a replaced
+    /// many-to-many set are unlinked.
+    @Test
+    public void recordReplacedUnreadRelationsOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        StringBuilder out=new StringBuilder();
+        replacedUnread(false,out); replacedUnread(true,out);
+        assertTrue(out.toString(),out.length()==0);
+    }
+    private void replacedUnread(boolean backend,StringBuilder out) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package rt; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        sources.put("rt.User",imports+"@Entity(table=\"pc_user\") public record User(@Id long id, String name, @OneToOne(mappedBy=\"user\",cascade=CascadeType.REMOVE) Ref<Profile> profile) { }");
+        sources.put("rt.Profile",imports+"@Entity(table=\"pc_profile\") public record Profile(@Id long id, String bio, @OneToOne Ref<User> user) { }");
+        sources.put("rt.Owner",imports+"@Entity(table=\"pc_owner\") public record Owner(@Id long id, String name, @OneToOne(mappedBy=\"owner\",orphanRemoval=true) Ref<Pet> pet) { }");
+        sources.put("rt.Pet",imports+"@Entity(table=\"pc_pet\") public record Pet(@Id long id, String bio, @OneToOne Ref<Owner> owner) { }");
+        sources.put("rt.Club",imports+"@Entity(table=\"pc_club\") public record Club(@Id long id, String name, @ManyToMany Set<Pet> members) { }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("rt.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static StringBuilder f=new StringBuilder(); static void ok(boolean b,String m) { if(!b) f.append(m).append(\"; \"); } "
+            + "interface R { void run() throws Exception; } static void t(String n,R r) { try { r.run(); } catch(Throwable e) { f.append(n).append(\" threw \").append(e).append(\"; \"); } } "
+            + "public static String run(Session s) { f.setLength(0); s.createTables(); "
+            + "t(\"orphan\",()->{ s.beginTransaction(); Owner u=s.merge(OwnerBuilder.create().name(\"u\").build()); Pet p=s.merge(PetBuilder.create().bio(\"b\").owner(Ref.of(u)).build()); s.commitTransaction(); s.clear(); s.beginTransaction(); Owner c=s.find(Owner.class,u.id()); s.merge(OwnerBuilder.of(c).pet(Ref.<Pet>empty()).build()); s.commitTransaction(); s.clear(); ok(s.find(Pet.class,p.id())==null,\"orphanRemoval on inverse Ref ignored Ref.empty()\"); }); s.clear(); "
+            + "t(\"m2m\",()->{ s.beginTransaction(); Pet a=s.merge(PetBuilder.create().bio(\"a\").build()); Pet b=s.merge(PetBuilder.create().bio(\"z\").build()); "
+            + "Club c=s.merge(ClubBuilder.create().name(\"c\").members(new HashSet<Pet>(Arrays.asList(a,b))).build()); s.commitTransaction(); s.clear(); "
+            + "s.beginTransaction(); Club cold=s.find(Club.class,c.id()); Pet keep=s.find(Pet.class,a.id()); "
+            + "s.merge(ClubBuilder.of(cold).members(new HashSet<Pet>(Collections.singleton(keep))).build()); s.commitTransaction(); s.clear(); "
+            + "Set<Pet> now=s.find(Club.class,c.id()).members(); ok(now.size()==1 && \"a\".equals(now.iterator().next().bio()),\"replaced unread set \"+now); }); "
+            + "return f.toString(); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        String tag=backend?"backend: ":"client: ";
+        try {
+            String r=(String)loader.loadClass("rt.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            if(r.length()>0) out.append(tag).append(r).append('\n');
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { out.append(tag+error.getCause()+"\n"); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
+    /// Compiles entity sources the way an application's javac does, with the
+    /// Codename One annotation processor writing each record entity's builder.
+    private static void compileEntities(Map<String,String> sources,File out) throws Exception {
+        javax.tools.JavaCompiler javac=javax.tools.ToolProvider.getSystemJavaCompiler();
+        javax.tools.DiagnosticCollector<javax.tools.JavaFileObject> diags=new javax.tools.DiagnosticCollector<javax.tools.JavaFileObject>();
+        javax.tools.StandardJavaFileManager fm=javac.getStandardFileManager(diags,java.util.Locale.ROOT,java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            List<File> cp=new ArrayList<File>();
+            String surefire=System.getProperty("surefire.test.class.path");
+            for(String e:(surefire!=null && surefire.length()>0?surefire:System.getProperty("java.class.path")).split(File.pathSeparator)) cp.add(new File(e));
+            cp.add(testClassesDir());
+            fm.setLocation(javax.tools.StandardLocation.CLASS_PATH,cp);
+            fm.setLocation(javax.tools.StandardLocation.CLASS_OUTPUT,Collections.singletonList(out));
+            File generated=new File(out.getParentFile(),out.getName()+"-generated");generated.mkdirs();
+            fm.setLocation(javax.tools.StandardLocation.SOURCE_OUTPUT,Collections.singletonList(generated));
+            List<javax.tools.JavaFileObject> units=new ArrayList<javax.tools.JavaFileObject>();
+            for(final Map.Entry<String,String> e:sources.entrySet()) units.add(new javax.tools.SimpleJavaFileObject(java.net.URI.create("string:///"+e.getKey().replace('.','/')+".java"),javax.tools.JavaFileObject.Kind.SOURCE) {
+                @Override public CharSequence getCharContent(boolean ignore) { return e.getValue(); } });
+            javax.tools.JavaCompiler.CompilationTask task=javac.getTask(null,fm,diags,Arrays.asList("-Xlint:none","--release","17"),null,units);
+            task.setProcessors(Collections.singletonList(new com.codename1.annotations.processing.RecordBuilderProcessor()));
+            if(!task.call()) throw new java.io.IOException("Compilation failed: "+diags.getDiagnostics());
+        } finally { fm.close(); }
+    }
+
+    /// A copy of a found record that keeps its unread `Ref` shares that holder
+    /// with the original, and an embedded record component may be named like a
+    /// method of the generated stand-ins.
+    @Test
+    public void recordSharedHoldersAndStandInNamesOnBothRuntimes() throws Exception {
+        org.junit.Assume.assumeTrue("records need JDK 16+", javaFeature() >= 16);
+        StringBuilder out=new StringBuilder();
+        sharedHolders(false,out); sharedHolders(true,out);
+        assertTrue(out.toString(),out.length()==0);
+    }
+    private void sharedHolders(boolean backend,StringBuilder out) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="package sh; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.orm.Ref; import java.util.*; ";
+        // A type-use annotation, which javac 17 prints in front of a qualified name.
+        sources.put("sh.N","package sh; @java.lang.annotation.Target(java.lang.annotation.ElementType.TYPE_USE) public @interface N { }");
+        sources.put("sh.Buyer",imports+"@Entity(table=\"sh_buyer\") public record Buyer(@Id long id, java.lang.@N String name) { }");
+        sources.put("sh.Spot",imports+"@Embeddable public record Spot(double lat, String of) { }");
+        sources.put("sh.Place",imports+"@Embeddable public record Place(String city, @Embedded Spot build) { }");
+        sources.put("sh.Order",imports+"@Entity(table=\"sh_order\") public record Order(@Id long id, String note, @ManyToOne Ref<Buyer> buyer, @Embedded Place build, @OneToOne(mappedBy=\"order\") Ref<Memo> memo) { }");
+        sources.put("sh.Memo",imports+"@Entity(table=\"sh_memo\") public record Memo(@Id long id, String text, @OneToOne Ref<Order> order) { }");
+        // Compiled in the same pass as the entities, as application code is.
+        sources.put("sh.Use",imports+"class Use { static Buyer named(String n) { return BuyerBuilder.create().name(n).build(); } }");
+        compileEntities(sources,classes);
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        Map<String,String> check=new java.util.LinkedHashMap<String,String>();
+        check.put("sh.Check",imports+"import com.codename1.orm.session.*; public class Check { "
+            + "static StringBuilder f=new StringBuilder(); static void ok(boolean b,String m) { if(!b) f.append(m).append(\"; \"); } "
+            + "interface R { void run() throws Exception; } static void t(String n,R r) { try { r.run(); } catch(Throwable e) { f.append(n).append(\" threw \").append(e).append(\"; \"); } } "
+            + "public static String run(Session s) { f.setLength(0); s.createTables(); "
+            + "t(\"copy\",()->{ s.beginTransaction(); Buyer b=s.merge(BuyerBuilder.create().name(\"b\").build()); "
+            + "Order o=s.merge(OrderBuilder.create().note(\"n\").buyer(Ref.of(b)).build(new Place(\"c\",new Spot(1.5,\"x\"))).build()); s.commitTransaction(); s.clear(); "
+            + "s.beginTransaction(); Order found=s.find(Order.class,o.id()); Order dup=s.merge(OrderBuilder.of(found).id(0).note(\"d\").build()); s.commitTransaction(); "
+            + "ok(found.buyer().isPresent() && Long.valueOf(b.id()).equals(found.buyer().id()),\"original lost its ref \"+found.buyer()); s.clear(); "
+            + "Order back=s.find(Order.class,dup.id()); ok(back!=null && back.buyer().isPresent() && Long.valueOf(b.id()).equals(back.buyer().id()),\"copy saved without its key\"); "
+            + "Order first=s.find(Order.class,o.id()); ok(first.build()!=null && \"c\".equals(first.build().city()) && first.build().build().lat()==1.5 && \"x\".equals(first.build().build().of()),\"embedded build \"+first.build()); }); "
+            + "t(\"detached inverse\",()->{ s.beginTransaction(); Order o=s.merge(OrderBuilder.create().note(\"i\").build()); s.merge(MemoBuilder.create().text(\"m\").order(Ref.of(o)).build()); s.commitTransaction(); s.clear(); "
+            + "Order found=s.find(Order.class,o.id()); s.clear(); s.beginTransaction(); Order dup=s.merge(OrderBuilder.of(found).id(0).build()); s.commitTransaction(); s.clear(); "
+            + "ok(!s.find(Order.class,dup.id()).memo().isPresent(),\"new copy took the original's inverse\"); ok(s.find(Order.class,o.id()).memo().isPresent(),\"original lost its inverse\"); }); "
+            + "t(\"draft across transactions\",()->{ s.beginTransaction(); Buyer draft=BuyerBuilder.create().name(\"late\").build(); s.persist(draft); s.commitTransaction(); "
+            + "s.beginTransaction(); Order o=s.merge(OrderBuilder.create().note(\"t\").buyer(Ref.of(draft)).build()); s.commitTransaction(); s.clear(); "
+            + "Order back=s.find(Order.class,o.id()); Long n=s.createNativeQuery(\"SELECT COUNT(*) FROM sh_buyer WHERE name='late'\",Long.class).first(); "
+            + "ok(back.buyer().isPresent() && n.longValue()==1,\"draft from an earlier transaction: \"+back.buyer()+\" rows \"+n); }); "
+            + "return f.toString(); }}");
+        List<File> classpath=new ArrayList<File>(Arrays.asList(testClassesDir()));classpath.add(classes);
+        JavaSourceCompiler.compile(check,classes,classpath,"17");
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        String tag=backend?"backend: ":"client: ";
+        try {
+            String r=(String)loader.loadClass("sh.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+            if(r.length()>0) out.append(tag).append(r).append('\n');
+        }
+        catch(java.lang.reflect.InvocationTargetException error) { out.append(tag+error.getCause()+"\n"); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
     /// Adopts tables that existed before the application: explicit names, a key the
     /// database generates, native timestamp and date columns, a legacy epoch column and
     /// a tag set keyed by value. Runs on SQLite on both runtimes, and on the backend

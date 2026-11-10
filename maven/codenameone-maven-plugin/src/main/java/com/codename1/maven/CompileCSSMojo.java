@@ -245,6 +245,26 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
     }
 
     /**
+     * The cn1libs' cn1css bundles among the project's dependencies, in the
+     * order the build merges them ahead of the project's own theme.css.
+     */
+    protected List<CssCompiler.LibraryCss> libraryCss() {
+        List<CssCompiler.LibraryCss> libraries = new ArrayList<CssCompiler.LibraryCss>();
+        for (Artifact artifact : project.getArtifacts()) {
+            if (artifact.hasClassifier() && "cn1css".equals(artifact.getClassifier())) {
+                File zip = findArtifactFile(artifact);
+                if (zip == null || !zip.exists()) {
+                    continue;
+                }
+                libraries.add(new CssCompiler.LibraryCss(artifact.getGroupId(), artifact.getArtifactId(), zip,
+                        new File(zip.getParentFile(), zip.getName() + "-extracted"),
+                        artifact.isSnapshot(), getLastModified(artifact)));
+            }
+        }
+        return libraries;
+    }
+
+    /**
      * Gets the source CSS directory (src/main/css).  The theme.css file should be inside this directory.
      * @return
      */
@@ -335,18 +355,7 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         // The cn1libs' cn1css bundles, extracted beside the artifact in the local
         // repository, merged before the project's own theme.css. See CssCompiler,
         // which the Gradle plugin shares.
-        final List<CssCompiler.LibraryCss> libraries = new ArrayList<CssCompiler.LibraryCss>();
-        for (Artifact artifact : project.getArtifacts()) {
-            if (artifact.hasClassifier() && "cn1css".equals(artifact.getClassifier())) {
-                File zip = findArtifactFile(artifact);
-                if (zip == null || !zip.exists()) {
-                    continue;
-                }
-                libraries.add(new CssCompiler.LibraryCss(artifact.getGroupId(), artifact.getArtifactId(), zip,
-                        new File(zip.getParentFile(), zip.getName() + "-extracted"),
-                        artifact.isSnapshot(), getLastModified(artifact)));
-            }
-        }
+        final List<CssCompiler.LibraryCss> libraries = libraryCss();
         long sourcesModTime;
         try {
             sourcesModTime = Math.max(getCSSSourcesModificationTime(), getLocalizationModificationTime());

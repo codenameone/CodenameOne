@@ -8819,6 +8819,12 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Factory for the llama.cpp backend of `com.codename1.ai.LocalLlmClient`.
+    /// Returns `null` unless the port has the library linked in.
+    public LocalLlmImpl createLocalLlmImpl() {
+        return null;
+    }
+
     /// Factory for built-in on-device language services.
     public LanguageImpl createLanguageImpl() {
         return null;

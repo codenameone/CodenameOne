@@ -535,9 +535,9 @@ def package_info_java(pkg: str, facade: str, short_desc: str, long_desc: str) ->
         + f"/// `Native{facade}` interface holds the platform contract; iOS Obj-C and\n"
         + "/// Android Java implementations live in `nativeios.zip` / `nativeand.zip`\n"
         + f"/// inside the cn1lib bundle. References to `{facade}.*` are recognised\n"
-        + "/// by the Codename One build server's `AiDependencyTable`, which\n"
-        + "/// auto-injects the matching CocoaPod / Swift Package / Android Gradle\n"
-        + "/// dep / `Info.plist` usage strings / Android permissions on every\n"
+        + "/// by the builders' `PlatformFeatureCatalog`, which adds the matching\n"
+        + "/// native libraries, Android Gradle dependencies, Apple frameworks,\n"
+        + "/// `Info.plist` usage strings and Android permissions on every\n"
         + "/// build -- no manual build hints required.\n"
         + f"package {java_pkg(pkg)};\n"
     )
@@ -750,8 +750,8 @@ def required_props(artifact: str, hints: dict[str, str]) -> str:
     head = (
         "# Auto-installed build hints for " + artifact + ".\n"
         "# Loaded by the Codename One build server when this cn1lib is in the\n"
-        "# project classpath. The build-time AiDependencyTable scanner adds\n"
-        "# further per-class entries as needed.\n"
+        "# project classpath. Native libraries, frameworks and Gradle\n"
+        "# dependencies come from PlatformFeatureCatalog, not from here.\n"
     )
     body = "".join(f"{k}={v}\n" for k, v in hints.items())
     return head + body
@@ -930,10 +930,10 @@ def lib_whisper() -> Lib:
         test_mock_methods=test_mock_methods,
         js_method_keys=(("transcribe__java_lang_String_java_lang_String", 2),),
         win_decls="public string transcribe(string param, string param1) { return null; }",
-        build_hints={
-            "codename1.arg.ios.add_libs": "libwhisper.a",
-            "codename1.arg.ios.add_frameworks": "Accelerate",
-        },
+        # whisper.cpp itself (the cn1-whisper-ios xcframework and the
+        # cn1-whisper-android AAR) and its frameworks come from
+        # PlatformFeatureCatalog's com/codename1/ai/whisper/ entry.
+        build_hints={},
     )
 
 
@@ -1073,19 +1073,8 @@ WHISPER_OVERLAY_PATHS = (
     "lib/pom.xml",
     "android/pom.xml",
     "android/src/main/java/com/codename1/ai/whisper/NativeWhisperRecognizerImpl.java",
-    "android/src/main/resources/cn1-ai-whisper-android.aar",
-    "android-aar/.gitignore",
-    "android-aar/README.md",
-    "android-aar/build-aar.sh",
-    "android-aar/build.gradle",
-    "android-aar/settings.gradle",
-    "android-aar/cn1-ai-whisper-android/build.gradle",
-    "android-aar/cn1-ai-whisper-android/src/main/AndroidManifest.xml",
-    "android-aar/cn1-ai-whisper-android/src/main/cpp/CMakeLists.txt",
-    "android-aar/cn1-ai-whisper-android/src/main/cpp/native_whisper_jni.cpp",
     "common/src/main/java/com/codename1/ai/whisper/NativeWhisperRecognizer.java",
     "common/src/main/java/com/codename1/ai/whisper/WhisperRecognizer.java",
-    "common/src/test/java/com/codename1/ai/whisper/AndroidWhisperAarProjectTest.java",
     "common/src/test/java/com/codename1/ai/whisper/WhisperRecognizerTest.java",
     "ios/src/main/objectivec/com_codename1_ai_whisper_NativeWhisperRecognizerImpl.h",
     "ios/src/main/objectivec/com_codename1_ai_whisper_NativeWhisperRecognizerImpl.m",

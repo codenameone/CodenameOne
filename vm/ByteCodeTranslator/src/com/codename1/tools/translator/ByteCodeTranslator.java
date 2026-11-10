@@ -189,7 +189,11 @@ public class ByteCodeTranslator {
         }
         if(directoryList != null) {
             for(File f : directoryList) {
-                if(f.getName().endsWith(".bundle") || f.getName().endsWith(".xcdatamodeld")) {
+                // An xcframework is one unit to Xcode (it picks the device or
+                // simulator slice); flattening it like an ordinary directory
+                // would leave two libraries of one name in the project.
+                if(f.getName().endsWith(".bundle") || f.getName().endsWith(".xcdatamodeld")
+                        || f.getName().endsWith(".xcframework")) {
                     copyDir(f, outputDir);
                     continue;
                 }
@@ -1183,7 +1187,8 @@ public class ByteCodeTranslator {
             fileListEntry.append(file);
             fileListEntry.append(" */ = {isa = PBXFileReference; lastKnownFileType = ");
             fileListEntry.append(getFileType(file));
-            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || file.endsWith(".a")) {
+            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || file.endsWith(".a")
+                    || file.endsWith(".xcframework")) {
                 fileListEntry.append("; name = \"");
                 fileListEntry.append(file);
                 if(file.endsWith(".dylib") || file.endsWith(".tbd")) {
@@ -1191,7 +1196,7 @@ public class ByteCodeTranslator {
                     fileListEntry.append(file);
                     fileListEntry.append("\"; sourceTree = SDKROOT; };\n");
                 } else {
-                    if(file.endsWith(".a")) {
+                    if(file.endsWith(".a") || file.endsWith(".xcframework")) {
                         fileListEntry.append("\"; path = \"");
                         fileListEntry.append(appName);
                         fileListEntry.append("-src/");
@@ -1268,7 +1273,7 @@ public class ByteCodeTranslator {
                     fileThreeEntry.append(" */,\n");
                 }
             } else {
-                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
+                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".xcframework") || file.endsWith(".dylib") || file.endsWith(".tbd") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
                     frameworks.append("				0");
                     frameworks.append(referenceValue);
                     frameworks.append("18E9ABBC002F3D1D /* ");
@@ -1862,6 +1867,9 @@ public class ByteCodeTranslator {
     }
     
     private static String getFileType(String s) {
+        if(s.endsWith(".xcframework")) {
+            return "wrapper.xcframework";
+        }
         if(s.endsWith(".framework")) {
             return "wrapper.framework";
         }

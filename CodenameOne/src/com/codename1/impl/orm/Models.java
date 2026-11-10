@@ -43,6 +43,18 @@ public final class Models {
         }
         REGISTRY.put(model.type().getName(), model);
     }
+    /// The identifier of `entity` by its registered model; null for null, or
+    /// for a type with no model.
+    public static Object identifierOf(Object entity) {
+        if (entity == null) {
+            return null;
+        }
+        EntityModel model;
+        synchronized (Models.class) {
+            model = REGISTRY.get(entity.getClass().getName());
+        }
+        return model == null ? null : model.identifier(entity);
+    }
     /// Reads a relationship key without initializing it. Used by generated mappings.
     public static Object foreignKey(Object owner, int index, Object target) {
         if (owner instanceof ManagedEntity) {

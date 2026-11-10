@@ -1725,8 +1725,11 @@ const jvm = {
         }
       }
     }
-    const cacheKey = className + "|" + methodId;
-    let cached = this.resolvedVirtualCache[cacheKey];
+    // Partition by receiver class: hot inherited dispatches can reuse this map
+    // without allocating a concatenated class/method key on every invocation.
+    const receiverCache = this.resolvedVirtualCache[className]
+      || (this.resolvedVirtualCache[className] = Object.create(null));
+    let cached = receiverCache[methodId];
     if (cached) {
       return cached;
     }
@@ -1734,7 +1737,7 @@ const jvm = {
       const arrayCloneOverride = (function*(__cn1ThisObject) {
         return jvm.cloneArrayObject(__cn1ThisObject);
       });
-      this.resolvedVirtualCache[cacheKey] = arrayCloneOverride;
+      receiverCache[methodId] = arrayCloneOverride;
       return arrayCloneOverride;
     }
     const tail = this.methodTail(methodId);
@@ -1750,7 +1753,7 @@ const jvm = {
       if (cls && cls.methods) {
         if (cls.methods[methodId]) {
           cached = resolveMethodEntry(cls.methods, methodId);
-          this.resolvedVirtualCache[cacheKey] = cached;
+          receiverCache[methodId] = cached;
           return cached;
         }
         if (tail) {
@@ -1760,7 +1763,7 @@ const jvm = {
           }
           if (cls.methods[remappedId]) {
             cached = resolveMethodEntry(cls.methods, remappedId);
-            this.resolvedVirtualCache[cacheKey] = cached;
+            receiverCache[methodId] = cached;
             return cached;
           }
         }
@@ -1795,7 +1798,7 @@ const jvm = {
       if (iface.methods) {
         if (iface.methods[methodId]) {
           cached = resolveMethodEntry(iface.methods, methodId);
-          this.resolvedVirtualCache[cacheKey] = cached;
+          receiverCache[methodId] = cached;
           return cached;
         }
         if (tail) {
@@ -1805,7 +1808,7 @@ const jvm = {
           }
           if (iface.methods[remappedId]) {
             cached = resolveMethodEntry(iface.methods, remappedId);
-            this.resolvedVirtualCache[cacheKey] = cached;
+            receiverCache[methodId] = cached;
             return cached;
           }
         }
@@ -1818,12 +1821,12 @@ const jvm = {
     }
     const nativeOverride = this.nativeMethods[methodId];
     if (typeof nativeOverride === "function") {
-      this.resolvedVirtualCache[cacheKey] = nativeOverride;
+      receiverCache[methodId] = nativeOverride;
       return nativeOverride;
     }
     if (this.isJsoBridgeClass(className)) {
       cached = this.createJsoBridgeMethod(className, methodId);
-      this.resolvedVirtualCache[cacheKey] = cached;
+      receiverCache[methodId] = cached;
       return cached;
     }
     let virtualFailureCategory = "missing_class_method";
@@ -2289,6 +2292,20 @@ const jvm = {
     if (className == null || targetType == null) {
       return false;
     }
+    // Failed instanceof checks are common while painting (e.g. a Label is
+    // not a TextArea). Cache both answers, invalidating when defineClass adds
+    // a late superclass/interface. Keep this separate from assignableTo:
+    // that positive-only map is also enumerated to construct array types.
+    const root = this.classes[className];
+    let answers = null;
+    if (root) {
+      if (root.__ancestorEpoch !== this.__layoutEpoch) {
+        root.__ancestorEpoch = this.__layoutEpoch;
+        root.__ancestorAnswers = Object.create(null);
+      }
+      answers = root.__ancestorAnswers;
+      if (answers[targetType] !== undefined) return answers[targetType];
+    }
     const visited = Object.create(null);
     const queue = [className];
     while (queue.length) {
@@ -2298,6 +2315,7 @@ const jvm = {
       }
       visited[current] = true;
       if (current === targetType) {
+        if (answers) answers[targetType] = true;
         return true;
       }
       const cls = this.classes[current];
@@ -2305,6 +2323,7 @@ const jvm = {
         continue;
       }
       if (cls.assignableTo && cls.assignableTo[targetType]) {
+        if (answers) answers[targetType] = true;
         return true;
       }
       if (cls.baseClass) {
@@ -2316,6 +2335,7 @@ const jvm = {
         }
       }
     }
+    if (answers) answers[targetType] = false;
     return false;
   },
   findExceptionHandler(entries, pc, error) {
@@ -4878,6 +4898,10 @@ function cn1_ivResolve(target, mid) {
   if (typeof method === "string") {
     method = resolveMethodEntry(classDef.methods, mid);
   }
+  if (!method && target.__class) {
+    const inherited = jvm.resolvedVirtualCache[target.__class];
+    if (inherited) method = inherited[mid];
+  }
   if (!method) {
     // Diagnostic for chartDocumentStaleness (task #43): when virtual
     // dispatch falls through to resolveVirtual with no target.__class,
@@ -5040,62 +5064,59 @@ function* adaptVirtualResult(result) {
   }
   return result;
 }
-// adaptVirtualResult inlined into each cn1_iv* helper below to skip the
-// extra generator allocation per virtual call. The helper itself was a
-// ``function*`` -- every invocation allocated a generator object whose
-// only purpose was to forward via ``yield*`` to the resolved method (if
-// it was a generator) or return the value directly. Inlining halves
-// per-call allocator pressure on the hot virtual-dispatch path. Sync /
-// async resolution semantics are unchanged.
-// Budget check at every generator virtual dispatch: the per-method entry
-// check (emitted ``if(_Yc())yield _Yv``) cannot slice a loop that stays
-// INSIDE one method and only calls runtime functions -- e.g. the
-// Initializr's boot loop dispatching JSO-bridge methods via cn1_iv*,
-// which blocked the worker's event loop for 90s+ (no events, no timers,
-// no heartbeat, pointer input dead). _Yc is counter-amortised (clock
-// check every 256th call) so the hot-path cost is one increment+compare.
-function* cn1_iv0(target, mid) {
-  if (_Yc()) yield _Yv;
-  if (target == null) { yield* throwNullPointerException(); }
-  const r = cn1_ivResolve(target, mid)(target);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+// Return the callee iterator directly instead of nesting one extra generator at
+// every generated yield* dispatch. A synchronous return still needs an iterator;
+// the compiler's call-site contract is unchanged. The slow generator preserves
+// the budget hand-off and Java null failure before invoking the method.
+const completedVirtualResultPrototype = {
+  next() {
+    const value = this.value;
+    this.value = undefined;
+    return { value: value, done: true };
+  },
+  [Symbol.iterator]() { return this; }
+};
+function virtualResultIterator(result) {
+  if (result && typeof result.next === "function") return result;
+  const iterator = Object.create(completedVirtualResultPrototype);
+  iterator.value = result;
+  return iterator;
 }
-function* cn1_iv1(target, mid, a0) {
-  if (_Yc()) yield _Yv;
+function* invokeVirtualSlow(target, method, args, budget, direct) {
+  if (budget) yield _Yv;
   if (target == null) { yield* throwNullPointerException(); }
-  const r = cn1_ivResolve(target, mid)(target, a0);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+  const fn = direct ? method : cn1_ivResolve(target, method);
+  return yield* virtualResultIterator(fn.apply(null, [target].concat(args)));
 }
-function* cn1_iv2(target, mid, a0, a1) {
-  if (_Yc()) yield _Yv;
-  if (target == null) { yield* throwNullPointerException(); }
-  const r = cn1_ivResolve(target, mid)(target, a0, a1);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function cn1_iv0(target, mid) {
+  const budget = _Yc();
+  if (budget || target == null) return invokeVirtualSlow(target, mid, [], budget, false);
+  return virtualResultIterator(cn1_ivResolve(target, mid)(target));
 }
-function* cn1_iv3(target, mid, a0, a1, a2) {
-  if (_Yc()) yield _Yv;
-  if (target == null) { yield* throwNullPointerException(); }
-  const r = cn1_ivResolve(target, mid)(target, a0, a1, a2);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function cn1_iv1(target, mid, a0) {
+  const budget = _Yc();
+  if (budget || target == null) return invokeVirtualSlow(target, mid, [a0], budget, false);
+  return virtualResultIterator(cn1_ivResolve(target, mid)(target, a0));
 }
-function* cn1_iv4(target, mid, a0, a1, a2, a3) {
-  if (_Yc()) yield _Yv;
-  if (target == null) { yield* throwNullPointerException(); }
-  const r = cn1_ivResolve(target, mid)(target, a0, a1, a2, a3);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function cn1_iv2(target, mid, a0, a1) {
+  const budget = _Yc();
+  if (budget || target == null) return invokeVirtualSlow(target, mid, [a0, a1], budget, false);
+  return virtualResultIterator(cn1_ivResolve(target, mid)(target, a0, a1));
 }
-function* cn1_ivN(target, mid, args) {
-  if (_Yc()) yield _Yv;
-  if (target == null) { yield* throwNullPointerException(); }
-  const method = cn1_ivResolve(target, mid);
-  const r = method.apply(null, [target].concat(args));
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function cn1_iv3(target, mid, a0, a1, a2) {
+  const budget = _Yc();
+  if (budget || target == null) return invokeVirtualSlow(target, mid, [a0, a1, a2], budget, false);
+  return virtualResultIterator(cn1_ivResolve(target, mid)(target, a0, a1, a2));
+}
+function cn1_iv4(target, mid, a0, a1, a2, a3) {
+  const budget = _Yc();
+  if (budget || target == null) return invokeVirtualSlow(target, mid, [a0, a1, a2, a3], budget, false);
+  return virtualResultIterator(cn1_ivResolve(target, mid)(target, a0, a1, a2, a3));
+}
+function cn1_ivN(target, mid, args) {
+  const budget = _Yc();
+  if (budget || target == null) return invokeVirtualSlow(target, mid, args, budget, false);
+  return virtualResultIterator(cn1_ivResolve(target, mid).apply(null, [target].concat(args)));
 }
 // Synchronous virtual dispatch family (cn1_ivs0..4 / cn1_ivsN). Emitted
 // at INVOKEVIRTUAL / INVOKEINTERFACE call sites whose signature the
@@ -5215,47 +5236,35 @@ function cn1_ivsN(target, mid, args) {
 // runtime virtual dispatch). The ``fn`` argument is a bareword
 // function reference (minified/aliased in lockstep with its def), not
 // a string.
-function* _dv0(t, fn) {
-  if (_Yc()) yield _Yv;
-  if (t == null) { yield* throwNullPointerException(); }
-  const r = fn(t);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function _dv0(t, fn) {
+  const budget = _Yc();
+  if (budget || t == null) return invokeVirtualSlow(t, fn, [], budget, true);
+  return virtualResultIterator(fn(t));
 }
-function* _dv1(t, fn, a0) {
-  if (_Yc()) yield _Yv;
-  if (t == null) { yield* throwNullPointerException(); }
-  const r = fn(t, a0);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function _dv1(t, fn, a0) {
+  const budget = _Yc();
+  if (budget || t == null) return invokeVirtualSlow(t, fn, [a0], budget, true);
+  return virtualResultIterator(fn(t, a0));
 }
-function* _dv2(t, fn, a0, a1) {
-  if (_Yc()) yield _Yv;
-  if (t == null) { yield* throwNullPointerException(); }
-  const r = fn(t, a0, a1);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function _dv2(t, fn, a0, a1) {
+  const budget = _Yc();
+  if (budget || t == null) return invokeVirtualSlow(t, fn, [a0, a1], budget, true);
+  return virtualResultIterator(fn(t, a0, a1));
 }
-function* _dv3(t, fn, a0, a1, a2) {
-  if (_Yc()) yield _Yv;
-  if (t == null) { yield* throwNullPointerException(); }
-  const r = fn(t, a0, a1, a2);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function _dv3(t, fn, a0, a1, a2) {
+  const budget = _Yc();
+  if (budget || t == null) return invokeVirtualSlow(t, fn, [a0, a1, a2], budget, true);
+  return virtualResultIterator(fn(t, a0, a1, a2));
 }
-function* _dv4(t, fn, a0, a1, a2, a3) {
-  if (_Yc()) yield _Yv;
-  if (t == null) { yield* throwNullPointerException(); }
-  const r = fn(t, a0, a1, a2, a3);
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function _dv4(t, fn, a0, a1, a2, a3) {
+  const budget = _Yc();
+  if (budget || t == null) return invokeVirtualSlow(t, fn, [a0, a1, a2, a3], budget, true);
+  return virtualResultIterator(fn(t, a0, a1, a2, a3));
 }
-function* _dvN(t, fn, args) {
-  if (_Yc()) yield _Yv;
-  if (t == null) { yield* throwNullPointerException(); }
-  const r = fn.apply(null, [t].concat(args));
-  if (r && typeof r.next === "function") { return yield* r; }
-  return r;
+function _dvN(t, fn, args) {
+  const budget = _Yc();
+  if (budget || t == null) return invokeVirtualSlow(t, fn, args, budget, true);
+  return virtualResultIterator(fn.apply(null, [t].concat(args)));
 }
 function _dw0(t, fn) {
   if (t == null) { cn1_ivsNpe(); }

@@ -1,6 +1,6 @@
 name: Check Android dependency 16 KB alignment
 
-# check-16k-page-alignment.yml reads every TRACKED artifact. Most native code a
+# source-gates.yml (the 16 KB step) reads every TRACKED artifact. Most native code a
 # Codename One Android app ships is not tracked: the builder writes Maven
 # coordinates into the generated build.gradle (PlatformFeatureCatalog entries,
 # the play-services defaults) and Gradle downloads them on the build machine.
