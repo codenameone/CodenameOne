@@ -142,6 +142,8 @@ static volatile int cn1Running = 1;
  * waiting on the EDT, which may be the thread that called exit. */
 static atomic_int cn1Exiting = 0;
 
+int cn1EmbeddedExiting(void); /* cn1_linux_gpu.h, not included without the GPU */
+
 int cn1EmbeddedExiting(void) {
     return atomic_load(&cn1Exiting);
 }
