@@ -1709,6 +1709,10 @@ public class BackendBeansTest {
         if (amqp != null && amqp.length() > 0) {
             runs.add(new String[] {amqp, new File(dir, "d.db").getAbsolutePath()});
         }
+        String kafka = System.getenv("CN1_TEST_KAFKA");
+        if (kafka != null && kafka.length() > 0) {
+            runs.add(new String[] {kafka, new File(dir, "e.db").getAbsolutePath()});
+        }
         runs.add(new String[] {"memory:", new File(dir, "a.db").getAbsolutePath()});
         runs.add(new String[] {"db:", new File(dir, "b.db").getAbsolutePath()});
         String external = System.getenv("CN1_TEST_DB_URL");

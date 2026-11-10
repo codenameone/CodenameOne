@@ -29,6 +29,7 @@ import com.codename1.backend.messaging.MessageHandler;
 import com.codename1.backend.messaging.MessageTransport;
 import com.codename1.backend.messaging.Messaging;
 import com.codename1.backend.messaging.amqp.AmqpTransport;
+import com.codename1.backend.messaging.kafka.KafkaTransport;
 import com.codename1.backend.messaging.redis.RedisStreamTransport;
 import com.codename1.backend.messaging.Subscription;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class MsgCheck {
         // What the generated wiring does for a scheme application.properties names.
         Messaging.register("redis", new RedisStreamTransport.Factory());
         Messaging.register("amqp", new AmqpTransport.Factory());
+        Messaging.register("kafka", new KafkaTransport.Factory());
         run("memory:", null);
         String file = "msgcheck-" + Long.toString(System.nanoTime(), 36) + ".db";
         run("db:", file);
@@ -107,8 +109,10 @@ public class MsgCheck {
     }
 
     private static void order(String w, MessageTransport t, String q) throws Exception {
+        // One key: Kafka orders a partition, and spreads unkeyed records over all.
         for (int i = 0; i < 50; i++) {
-            t.send(new Message(q, ("m" + i).getBytes("UTF-8")));
+            t.send(new Message(q, "k", ("m" + i).getBytes("UTF-8"),
+                    new LinkedHashMap<String, String>()));
         }
         final List<String> got = Collections.synchronizedList(new ArrayList<String>());
         Subscription s = t.subscribe(q, "g", 1, new MessageHandler() {
@@ -163,10 +167,12 @@ public class MsgCheck {
         });
         waitFor(got, 2);
         s.close();
-        check(w + " binary", Boolean.TRUE, Boolean.valueOf(got.size() == 2
-                && java.util.Arrays.equals(all, got.get(0))));
-        check(w + " empty", Integer.valueOf(0), got.size() < 2 ? null
-                : Integer.valueOf(got.get(1).length));
+        // Two partitions need not deliver in send order: tell them apart by size.
+        byte[] big = got.size() < 2 ? null : got.get(0).length > 0 ? got.get(0) : got.get(1);
+        byte[] small = got.size() < 2 ? null : got.get(0).length > 0 ? got.get(1) : got.get(0);
+        check(w + " binary", Boolean.TRUE, Boolean.valueOf(java.util.Arrays.equals(all, big)));
+        check(w + " empty", Integer.valueOf(0), small == null ? null
+                : Integer.valueOf(small.length));
     }
 
     private static void competing(String w, MessageTransport t, String q) throws Exception {
