@@ -5457,6 +5457,11 @@ public class BytecodeMethod implements SignatureSet {
                 if (op == Opcodes.POP && cur == 0) {
                     break; // alias discarded on this path
                 }
+                if (op == Opcodes.CHECKCAST && cur >= 1) {
+                    // Casts a value above the ref, `sb.append((String) o)`:
+                    // the depth is unchanged and the ref is not touched.
+                    continue;
+                }
                 if (op == Opcodes.ASTORE && cur == 0 && c instanceof VarOp) {
                     int n = ((VarOp) c).getIndex();
                     if (storedLocal == -1) {

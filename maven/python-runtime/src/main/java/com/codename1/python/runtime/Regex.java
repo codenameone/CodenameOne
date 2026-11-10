@@ -987,23 +987,29 @@ final class Regex {
     /// the Python loop made one, and a generator step, for each.
     static Object subn(Prog p, String text, PyList template, int count) {
         int n = PyStr.codePoints(text);
-        StringBuilder out = null;
-        int last = 0;
-        int at = 0;
-        int forbid = -1;
-        int done = 0;
+        int[] regs = count >= 0 ? run(p, text, 0, n, 2, -1) : new int[0];
+        if (regs.length == 0) {
+            return Py.tuple(text, Long.valueOf(0));
+        }
+        // Made once, after the first match, and never reassigned: ParparVM
+        // keeps a builder on the stack only when its local holds nothing
+        // else and only StringBuilder methods receive it (no helper), and one
+        // on the heap pays a lock on every append. Without
+        // surrogates a code point index is the char index, so the pieces are
+        // appended straight from the text instead of as substrings.
+        StringBuilder out = new StringBuilder(text.length() + 16);
+        boolean plain = n == text.length();
         int parts = template.size();
-        while (at <= n && (count == 0 || done < count)) {
-            int[] regs = run(p, text, at, n, 2, forbid);
-            if (regs.length == 0) {
-                break;
-            }
+        int last = 0;
+        int done = 0;
+        while (true) {
             int s = regs[0];
             int e = regs[1];
-            if (out == null) {
-                out = new StringBuilder(text.length() + 16);
+            if (plain) {
+                out.append(text, last, s);
+            } else {
+                out.append(PyStr.substr(text, last, s));
             }
-            out.append(PyStr.substr(text, last, s));
             for (int k = 0; k < parts; k++) {
                 Object part = template.get(k);
                 if (part instanceof String) {
@@ -1013,19 +1019,29 @@ final class Regex {
                     int gs = regs[2 * g];
                     int ge = regs[2 * g + 1];
                     if (gs >= 0 && ge >= 0) {
-                        out.append(PyStr.substr(text, gs, ge));
+                        if (plain) {
+                            out.append(text, gs, ge);
+                        } else {
+                            out.append(PyStr.substr(text, gs, ge));
+                        }
                     }
                 }
             }
             last = e;
             done++;
-            forbid = s == e ? e : -1;
-            at = e;
+            if (e > n || count != 0 && done >= count) {
+                break;
+            }
+            regs = run(p, text, e, n, 2, s == e ? e : -1);
+            if (regs.length == 0) {
+                break;
+            }
         }
-        if (out == null) {
-            return Py.tuple(text, Long.valueOf(0));
+        if (plain) {
+            out.append(text, last, n);
+        } else {
+            out.append(PyStr.substr(text, last, n));
         }
-        out.append(PyStr.substr(text, last, n));
         return Py.tuple(out.toString(), Long.valueOf(done));
     }
 
