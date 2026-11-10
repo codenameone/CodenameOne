@@ -29,6 +29,7 @@ import com.codename1.backend.Transactions;
 import com.codename1.backend.sql.Dialect;
 import com.codename1.impl.backend.BackendAccess;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,10 @@ final class OutboxTransport extends MessageTransport {
     private final Object pause = new Object();
     private boolean created;
     private Thread sweeper;
+    /// Rows whose transaction committed, waiting for the outbox thread: a
+    /// commit callback may do no database work of its own, and the delete
+    /// that follows the send is database work.
+    private final List<Object[]> committed = new ArrayList<Object[]>();
 
     OutboxTransport(MessageTransport broker, DataSource db) {
         this(broker, db, 10000);
@@ -117,52 +122,50 @@ final class OutboxTransport extends MessageTransport {
         Transactions.registerSynchronization(new Transactions.Synchronization() {
             @Override
             public void afterCommit() {
-                relay(Long.valueOf(id), message);
+                synchronized (pause) {
+                    committed.add(new Object[] {Long.valueOf(id), message});
+                    pause.notifyAll();
+                }
             }
         });
     }
 
-    /// Sends one outbox row and deletes it. Claims it first, so the sweep of
-    /// another process and this commit cannot both send it.
+    /// Sends one outbox row, then deletes it. A process that dies between the
+    /// two leaves the row for a sweep to send again: twice, never zero times.
     private boolean relay(Object id, Message message) {
         try {
-            if (db.execute("DELETE FROM " + TABLE + " WHERE id = ?", new Object[]{id}) != 1) {
-                return false;
-            }
+            broker.send(message);
         } catch (IOException err) {
-            System.err.println("cn1: the outbox could not be updated; the sweep sends the "
-                    + "message later: " + err.getMessage());
+            System.err.println("cn1: a message to " + message.getDestination() + " stays in "
+                    + "the outbox until the broker takes it: " + err.getMessage());
             return false;
         }
         try {
-            broker.send(message);
-            return true;
+            db.execute("DELETE FROM " + TABLE + " WHERE id = ?", new Object[]{id});
         } catch (IOException err) {
-            // The row is gone, so put the message back for the sweep.
-            try {
-                db.execute("INSERT INTO " + TABLE + " (destination, msg_key, headers, payload,"
-                        + " created_at) VALUES (?, ?, ?, ?, ?)",
-                        new Object[]{message.getDestination(), message.getKey(),
-                            Json.write(message.headersForTransport()),
-                            Base64.encode(message.getPayload()), Long.valueOf(0)});
-            } catch (IOException again) {
-                System.err.println("cn1: a message to " + message.getDestination()
-                        + " was lost: the broker refused it (" + err.getMessage()
-                        + ") and the outbox could not keep it (" + again.getMessage() + ")");
-            }
-            return false;
+            System.err.println("cn1: a sent message stays in the outbox and will be sent "
+                    + "again: " + err.getMessage());
         }
+        return true;
     }
 
     /// Relays every row older than the sweep age; answers how many it sent.
     int sweep() throws IOException {
         ensureTable();
-        List rows = db.query("SELECT id, destination, msg_key, headers, payload FROM " + TABLE
+        long now = System.currentTimeMillis();
+        List rows = db.query("SELECT id, destination, msg_key, headers, payload, created_at FROM "
+                + TABLE
                 + " WHERE created_at <= ? ORDER BY id " + db.dialect().limit(100, 0),
-                new Object[]{Long.valueOf(System.currentTimeMillis() - sweepAfter)});
+                new Object[]{Long.valueOf(now - sweepAfter)});
         int sent = 0;
         for (Object o : rows) {
             Map row = (Map) o;
+            // Claimed by moving its time forward, so the sweep of another
+            // process leaves it alone for the next sweep age.
+            if (db.execute("UPDATE " + TABLE + " SET created_at = ? WHERE id = ? AND created_at = ?",
+                    new Object[]{Long.valueOf(now), row.get("id"), row.get("created_at")}) != 1) {
+                continue;
+            }
             Map<String, String> headers = new LinkedHashMap<String, String>();
             Object h = row.get("headers");
             if (h instanceof String) {
@@ -204,16 +207,29 @@ final class OutboxTransport extends MessageTransport {
     }
 
     private void sweepLoop() {
+        long nextSweep = 0;
         while (running.get()) {
-            try {
-                sweep();
-            } catch (IOException err) {
-                System.err.println("cn1: the outbox sweep failed: " + err.getMessage());
+            List<Object[]> batch;
+            synchronized (pause) {
+                batch = new ArrayList<Object[]>(committed);
+                committed.clear();
+            }
+            for (Object[] c : batch) {
+                relay(c[0], (Message) c[1]);
+            }
+            if (System.currentTimeMillis() >= nextSweep) {
+                try {
+                    sweep();
+                } catch (IOException err) {
+                    System.err.println("cn1: the outbox sweep failed: " + err.getMessage());
+                }
+                nextSweep = System.currentTimeMillis() + sweepAfter;
             }
             synchronized (pause) {
                 try {
-                    if (running.get()) {
-                        pause.wait(sweepAfter);
+                    long left = nextSweep - System.currentTimeMillis();
+                    if (running.get() && committed.isEmpty() && left > 0) {
+                        pause.wait(left);
                     }
                 } catch (InterruptedException err) {
                     Thread.currentThread().interrupt();

@@ -210,6 +210,7 @@ public abstract class PollingTransport extends MessageTransport {
         }
 
         void consume() {
+            boolean failing = false;
             while (running.get()) {
                 List<Delivery> batch;
                 try {
@@ -218,10 +219,18 @@ public abstract class PollingTransport extends MessageTransport {
                     if (!running.get()) {
                         return;
                     }
-                    System.err.println("cn1: polling " + destination + " failed: "
-                            + err.getMessage());
+                    if (!failing) {
+                        // Once per outage, not once a second for as long as it lasts.
+                        System.err.println("cn1: polling " + destination + " failed, retrying: "
+                                + err.getMessage());
+                        failing = true;
+                    }
                     pause(FAILURE_PAUSE);
                     continue;
+                }
+                if (failing) {
+                    System.err.println("cn1: polling " + destination + " works again");
+                    failing = false;
                 }
                 for (Delivery d : batch) {
                     dispatch(destination, group, handler, d);

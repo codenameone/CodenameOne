@@ -1767,8 +1767,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // a server the runtime builds a router for.
         boolean staticFiles = settings.values.containsKey("cn1.static.root")
                 || applicationPropertyKnown(ctx, "cn1.static.root");
+        // A worker that only consumes messages is a server too: nothing else
+        // would start its listeners.
         if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
-                && !beans.hasTools() && !beans.hasManaged() && !settings.management
+                && !beans.hasListeners() && !beans.hasTools() && !beans.hasManaged() && !settings.management
                 && !staticFiles) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning

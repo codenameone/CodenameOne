@@ -1605,6 +1605,34 @@ public class BackendBeansTest {
     /// letter and a send that rolls back, over `memory:` and `db:` -- the
     /// database a SQLite file, or `CN1_TEST_DB_URL` (PostgreSQL, MySQL) when set.
     @Test
+    public void messagingRegistersOnlyTheTransportsTheConfigurationNames() throws Exception {
+        String[][] cases = {
+            {"", ""},
+            {"cn1.messaging.url=redis://cache:6379\n", "redis"},
+            {"cn1.messaging.url=amqps://u:p@rabbit/%2F\n", "amqp"},
+            {"spring.rabbitmq.host=rabbit\n", "amqp"},
+            {"cn1.messaging.url=${BROKER}\n", "redis amqp"},
+        };
+        // A module of listeners alone is a server: it is the only thing that
+        // starts them.
+        for (String[] c : cases) {
+            Map<String, String> s = new LinkedHashMap<String, String>();
+            s.put("com.example.Inbox", PKG + "@Component public class Inbox {\n"
+                    + "    @MessageListener(\"q\") public void on(String text) { }\n"
+                    + "}\n");
+            File classes = compile(s);
+            writeProperties(classes, "application.properties", c[0]);
+            assertNoErrors(process(classes));
+            String wiring = new String(Files.readAllBytes(new File(classes,
+                    "com/example/BackendWiring.class").toPath()), "ISO-8859-1");
+            assertEquals(c[0], c[1].indexOf("redis") >= 0,
+                    wiring.indexOf("messaging/redis/RedisStreamTransport") >= 0);
+            assertEquals(c[0], c[1].indexOf("amqp") >= 0,
+                    wiring.indexOf("messaging/amqp/AmqpTransport") >= 0);
+        }
+    }
+
+    @Test
     public void messageListenersReceiveRetryAndDeadLetter() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Order", PKG + "public class Order {\n"
@@ -1666,9 +1694,21 @@ public class BackendBeansTest {
                 + "    }\n"
                 + "}\n");
         File classes = compile(s);
+        // A placeholder URL: the build cannot tell which broker, so it registers
+        // every transport, and each run below picks one.
+        writeProperties(classes, "application.properties",
+                "cn1.messaging.url=${CN1_MESSAGING_URL:memory:}\n");
         assertNoErrors(process(classes));
         List<String[]> runs = new ArrayList<String[]>();
         File dir = Files.createTempDirectory("cn1-msg").toFile();
+        String redis = System.getenv("CN1_TEST_REDIS");
+        if (redis != null && redis.length() > 0) {
+            runs.add(new String[] {redis, new File(dir, "c.db").getAbsolutePath()});
+        }
+        String amqp = System.getenv("CN1_TEST_AMQP");
+        if (amqp != null && amqp.length() > 0) {
+            runs.add(new String[] {amqp, new File(dir, "d.db").getAbsolutePath()});
+        }
         runs.add(new String[] {"memory:", new File(dir, "a.db").getAbsolutePath()});
         runs.add(new String[] {"db:", new File(dir, "b.db").getAbsolutePath()});
         String external = System.getenv("CN1_TEST_DB_URL");

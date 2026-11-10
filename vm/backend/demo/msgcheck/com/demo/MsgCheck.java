@@ -28,6 +28,8 @@ import com.codename1.backend.messaging.Message;
 import com.codename1.backend.messaging.MessageHandler;
 import com.codename1.backend.messaging.MessageTransport;
 import com.codename1.backend.messaging.Messaging;
+import com.codename1.backend.messaging.amqp.AmqpTransport;
+import com.codename1.backend.messaging.redis.RedisStreamTransport;
 import com.codename1.backend.messaging.Subscription;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,6 +50,9 @@ public class MsgCheck {
     private static final List<String> failures = new ArrayList<String>();
 
     public static void main(String[] args) throws Exception {
+        // What the generated wiring does for a scheme application.properties names.
+        Messaging.register("redis", new RedisStreamTransport.Factory());
+        Messaging.register("amqp", new AmqpTransport.Factory());
         run("memory:", null);
         String file = "msgcheck-" + Long.toString(System.nanoTime(), 36) + ".db";
         run("db:", file);
