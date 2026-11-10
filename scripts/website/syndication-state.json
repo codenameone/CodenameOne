@@ -3286,6 +3286,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-10T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5011482,
+        "url": "https://dev.to/codenameone/reel-your-own-streaming-service-or-course-platform-4i2d",
+        "syndicated_at": "2026-11-10T14:36:01+00:00"
       }
     }
   }
