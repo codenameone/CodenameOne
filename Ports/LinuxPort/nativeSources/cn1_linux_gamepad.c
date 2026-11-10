@@ -104,9 +104,17 @@ static int cn1PadIgnored(unsigned vid, unsigned pid) {
         return 0;
     }
     while (*p) {
-        unsigned v = 0, d = 0;
-        if (sscanf(p, "%x/%x", &v, &d) == 2 && v == vid && d == pid) {
-            return 1;
+        /* strtoul, not sscanf: glibc 2.38 headers rename sscanf to
+           __isoc23_sscanf, which the glibc 2.28 link target lacks, while
+           cn1_linux_glibc_compat.c covers the strto* family. */
+        char* end = NULL;
+        unsigned long v = strtoul(p, &end, 16);
+        if (end != p && *end == '/') {
+            const char* q = end + 1;
+            unsigned long d = strtoul(q, &end, 16);
+            if (end != q && v == vid && d == pid) {
+                return 1;
+            }
         }
         while (*p && *p != ',') {
             p++;

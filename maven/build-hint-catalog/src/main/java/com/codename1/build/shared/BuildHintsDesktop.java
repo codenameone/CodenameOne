@@ -288,7 +288,7 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .platform("linux")
                 .doc("A beta branch to set the uploaded build live on, such as `beta`. Empty (default) "
-                        + "uploads without setting it live. Valve does not allow setting the default branch "
+                        + "uploads without setting it live. Valve doesn't allow setting the default branch "
                         + "live from an upload: do that in the Steamworks partner site."));
 
         h.add(new Hint("steam.buildDescription")
