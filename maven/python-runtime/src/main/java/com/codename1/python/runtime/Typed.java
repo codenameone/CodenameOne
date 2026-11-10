@@ -418,7 +418,7 @@ public final class Typed {
 
     /// `len(l)` as a Java long; a missing list raises as `len` does.
     public static long llen(PyList l) {
-        return l != null ? l.size : Py.asLong(len(l));
+        return l != null ? l.size : Py.len(Py.NONE);
     }
 
     public static Object len(PyList l) {

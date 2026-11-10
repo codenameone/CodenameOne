@@ -1146,6 +1146,114 @@ final class TypedEmit {
     /// The abrupt answer follows javac's reachability exactly, as `block`
     /// requires: a try with handlers completes normally when its body or any
     /// handler does, and a finally is abrupt when its own block is.
+    /// The exception variable and the label of the try whose body is being
+    /// lowered as jumps (see `raiseOnly`); null elsewhere.
+    private String[] localRaise;
+
+    /// Builtin exception classes whose construction from plain values runs
+    /// no user code and cannot raise.
+    private static final Set<String> PLAIN_EXCEPTIONS = new HashSet<String>(Arrays.asList("ValueError", "KeyError",
+            "IndexError", "TypeError", "RuntimeError", "LookupError", "ArithmeticError", "ZeroDivisionError",
+            "AttributeError", "StopIteration", "Exception", "NotImplementedError", "AssertionError", "OverflowError"));
+
+    /// Whether `body` can raise only by a `raise C(args)` statement of its
+    /// own, with C a builtin exception: ifs, passes and raises over tests
+    /// and arguments of int and bool locals and constants, and at least one
+    /// raise. Such a try needs no Java try (see `tryStmt`).
+    private boolean raiseOnly(List<Stmt> body) {
+        boolean[] raises = {false};
+        return raiseOnly(body, raises) && raises[0];
+    }
+
+    private boolean raiseOnly(List<Stmt> body, boolean[] raises) {
+        for (Stmt s : body) {
+            if (s instanceof Pass) {
+                continue;
+            }
+            if (s instanceof If) {
+                If f = (If) s;
+                if (!noRaise(f.test) || !raiseOnly(f.body, raises) || !raiseOnly(f.orelse, raises)) {
+                    return false;
+                }
+                continue;
+            }
+            if (s instanceof Raise && ((Raise) s).cause == null && ((Raise) s).exc instanceof Call) {
+                Call c = (Call) ((Raise) s).exc;
+                if (!(c.func instanceof Name) || !PLAIN_EXCEPTIONS.contains(((Name) c.func).id)
+                        || binding(((Name) c.func).id) != Scope.Binding.BUILTIN || !c.keywords.isEmpty()) {
+                    return false;
+                }
+                for (Expr a : c.args) {
+                    if (!noRaise(a)) {
+                        return false;
+                    }
+                }
+                raises[0] = true;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether `e` cannot raise: constants, int and bool locals, and
+    /// comparisons, `not`, `and`/`or` and the overflow-safe int operators
+    /// of those (`%` and `//` only by a non-zero constant).
+    private boolean noRaise(Expr e) {
+        if (e instanceof Constant) {
+            Constant.Kind k = ((Constant) e).kind;
+            return k == Constant.Kind.INT || k == Constant.Kind.TRUE || k == Constant.Kind.FALSE || k == Constant.Kind.NONE;
+        }
+        if (e instanceof Name) {
+            String n = ((Name) e).id;
+            if (binding(n) != Scope.Binding.LOCAL || inlineArgs != null) {
+                return false;
+            }
+            Ty t = localType(n);
+            return (t.k == Ty.K.INT || t.k == Ty.K.BOOL) && !t.opt;
+        }
+        if (e instanceof UnaryOp) {
+            UnaryOp u = (UnaryOp) e;
+            return ("not".equals(u.op) || "-".equals(u.op)) && noRaise(u.operand);
+        }
+        if (e instanceof BoolOp) {
+            for (Expr v : ((BoolOp) e).values) {
+                if (!noRaise(v)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (e instanceof Compare) {
+            Compare c = (Compare) e;
+            for (String op : c.ops) {
+                if (!("==".equals(op) || "!=".equals(op) || "<".equals(op) || "<=".equals(op) || ">".equals(op)
+                        || ">=".equals(op))) {
+                    return false;
+                }
+            }
+            if (!noRaise(c.left)) {
+                return false;
+            }
+            for (Expr x : c.comparators) {
+                if (!noRaise(x)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (e instanceof BinOp) {
+            BinOp o = (BinOp) e;
+            if ("%".equals(o.op) || "//".equals(o.op)) {
+                Long k = intConstant(o.right);
+                return k != null && k.longValue() != 0 && noRaise(o.left);
+            }
+            return ("+".equals(o.op) || "-".equals(o.op) || "*".equals(o.op) || "&".equals(o.op) || "|".equals(o.op)
+                    || "^".equals(o.op)) && noRaise(o.left) && noRaise(o.right);
+        }
+        return false;
+    }
+
     private boolean tryStmt(Try t, StringBuilder b, int ind) {
         if (t.star) {
             throw new Unsupported("except*");
@@ -1178,24 +1286,49 @@ final class TypedEmit {
                 indent(b, ind);
                 b.append("boolean ").append(ok).append(" = false;\n");
             }
-            String tk = fresh();
-            indent(b, ind);
-            b.append("final int ").append(tk).append(" = Typed.taken();\n");
-            indent(b, ind);
-            b.append("try {\n");
-            boolean bodyAbrupt = block(t.body, b, ind + 1);
-            if (ok != null && !bodyAbrupt) {
-                indent(b, ind + 1);
-                b.append(ok).append(" = true;\n");
-            }
-            String th = fresh();
+            boolean jump = t.orelse.isEmpty() && raiseOnly(t.body);
             String pe = fresh();
-            indent(b, ind);
-            b.append("} catch (Throwable ").append(th).append(") {\n");
-            indent(b, ind + 1);
-            b.append("Typed.untake(").append(tk).append(");\n");
-            indent(b, ind + 1);
-            b.append("final PyException ").append(pe).append(" = Py.convert(").append(th).append(");\n");
+            boolean bodyAbrupt;
+            if (jump) {
+                // The body raises only by its own `raise` statements: each
+                // is a jump to the handlers, and no Java try (a setjmp on
+                // ParparVM) is entered at all.
+                String lbl = fresh();
+                indent(b, ind);
+                b.append("PyException ").append(pe).append(" = null;\n");
+                indent(b, ind);
+                b.append(lbl).append(": {\n");
+                String[] outer = localRaise;
+                localRaise = new String[] {pe, lbl};
+                try {
+                    block(t.body, b, ind + 1);
+                } finally {
+                    localRaise = outer;
+                }
+                indent(b, ind);
+                b.append("}\n");
+                indent(b, ind);
+                b.append("if (").append(pe).append(" != null) {\n");
+                bodyAbrupt = false;
+            } else {
+                String tk = fresh();
+                indent(b, ind);
+                b.append("final int ").append(tk).append(" = Typed.taken();\n");
+                indent(b, ind);
+                b.append("try {\n");
+                bodyAbrupt = block(t.body, b, ind + 1);
+                if (ok != null && !bodyAbrupt) {
+                    indent(b, ind + 1);
+                    b.append(ok).append(" = true;\n");
+                }
+                String th = fresh();
+                indent(b, ind);
+                b.append("} catch (Throwable ").append(th).append(") {\n");
+                indent(b, ind + 1);
+                b.append("Typed.untake(").append(tk).append(");\n");
+                indent(b, ind + 1);
+                b.append("final PyException ").append(pe).append(" = Py.convert(").append(th).append(");\n");
+            }
             handlers.add(pe);
             boolean catchAll = false;
             boolean allAbrupt = true;
@@ -1591,6 +1724,24 @@ final class TypedEmit {
                 b.append("throw ").append(handlers.get(handlers.size() - 1)).append(";\n");
             } else if (r.cause != null) {
                 b.append("throw Py.raise(").append(excRef(r.exc)).append(", ").append(excRef(r.cause)).append(");\n");
+            } else if (localRaise != null) {
+                // A jump to the handlers of the try around it (see `raiseOnly`).
+                // The class is looked up at run time and may have been
+                // rebound to one whose construction raises: that error is the
+                // one the handlers see. The Java try is entered only on this
+                // path, never on the one that does not raise.
+                String th = fresh();
+                b.append("try {\n");
+                indent(b, ind + 1);
+                b.append(localRaise[0]).append(" = Py.raise(").append(excRef(r.exc)).append(");\n");
+                indent(b, ind);
+                b.append("} catch (Throwable ").append(th).append(") {\n");
+                indent(b, ind + 1);
+                b.append(localRaise[0]).append(" = Py.convert(").append(th).append(");\n");
+                indent(b, ind);
+                b.append("}\n");
+                indent(b, ind);
+                b.append("break ").append(localRaise[1]).append(";\n");
             } else {
                 b.append("throw Py.raise(").append(excRef(r.exc)).append(");\n");
             }
@@ -2624,17 +2775,19 @@ final class TypedEmit {
         }
         String[] lo = sl.lower == null ? new String[] {"0L", "null"} : longPair(expr(sl.lower));
         String[] hi = sl.upper == null ? new String[] {"Long.MAX_VALUE", "null"} : longPair(expr(sl.upper));
-        if (lo == null || hi == null) {
+        if (lo.length == 0 || hi.length == 0) {
             return null;
         }
         return "Typed.sliceL(" + l.c + ", " + lo[0] + ", " + lo[1] + ", " + hi[0] + ", " + hi[1] + ")";
     }
 
+    private static final String[] NO_PAIR = new String[0];
+
     /// An int as a Java long and the object standing in for it (null when
-    /// the long is the value), both free of effects; or null.
+    /// the long is the value), both free of effects; or an empty array.
     private static String[] longPair(E e) {
         if (e.t.k != Ty.K.INT || e.t.opt || e.pk != null) {
-            return null;
+            return NO_PAIR;
         }
         if (e.ll != null && e.bg != null) {
             return new String[] {e.ll, e.bg};
@@ -2642,7 +2795,7 @@ final class TypedEmit {
         if (e.lc != null && (plain(e.lc) || literal(e.lc) || e.small)) {
             return new String[] {e.lc, "null"};
         }
-        return null;
+        return NO_PAIR;
     }
 
     private String sliceParts(Slice s) {
