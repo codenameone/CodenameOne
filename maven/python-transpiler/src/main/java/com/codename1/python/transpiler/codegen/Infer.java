@@ -124,6 +124,8 @@ final class Infer {
     final Set<Layouts.Cls> open = new HashSet<Layouts.Cls>();
     final Map<Expr, Integer> siteOf = new IdentityHashMap<Expr, Integer>();
     final List<Ty> siteElem = new ArrayList<Ty>();
+    /// The keys a dict site holds; `siteElem` holds its values.
+    final List<Ty> siteKey = new ArrayList<Ty>();
     final Set<Integer> escapedSites = new HashSet<Integer>();
     /// The type of each position of a tuple or list display, by allocation
     /// site (see [#slot]). A tuple's never change once made; a list's hold
@@ -572,7 +574,7 @@ final class Infer {
         if (!r.equals(cur)) {
             changed = true;
         }
-        if (r.k != Ty.K.LIST && r.k != Ty.K.TUPLE) {
+        if (r.k != Ty.K.LIST && r.k != Ty.K.TUPLE && r.k != Ty.K.DICT) {
             escape(v);
         }
         return r;
@@ -599,7 +601,7 @@ final class Infer {
             }
             return;
         }
-        if (v != null && v.k == Ty.K.LIST) {
+        if (v != null && (v.k == Ty.K.LIST || v.k == Ty.K.DICT)) {
             if (v.sites.length == 0) {
                 if (!allListsEscape) {
                     allListsEscape = true;
@@ -764,6 +766,61 @@ final class Infer {
         return r;
     }
 
+    /// `d[k] = v` on a dict of these sites.
+    private void storeDict(Ty d, Ty k, Ty v) {
+        if (d.sites.length == 0) {
+            escape(d);
+            escape(k);
+            escape(v);
+            return;
+        }
+        for (int s : d.sites) {
+            siteKey.set(s, joinInto(siteKey.get(s), k));
+            siteElem.set(s, joinInto(siteElem.get(s), v));
+        }
+    }
+
+    /// What a read of a dict of these sites answers.
+    Ty dictVal(Ty d) {
+        if (d.k != Ty.K.DICT || allListsEscape || d.sites.length == 0) {
+            return Ty.DYN;
+        }
+        Ty r = Ty.BOT;
+        for (int s : d.sites) {
+            if (escapedSites.contains(Integer.valueOf(s))) {
+                return Ty.DYN;
+            }
+            r = Ty.join(r, siteElem.get(s));
+        }
+        return r;
+    }
+
+    /// The dict methods that keep the values followed, or null for any
+    /// other, which lets the dict go.
+    private Ty dictMethod(Ty d, String m, List<Ty> args) {
+        switch (m) {
+            case "get":
+                if (args.size() == 1 || args.size() == 2) {
+                    escape(args.get(0));
+                    Ty dflt = args.size() == 2 ? args.get(1) : Ty.NONE;
+                    Ty r = Ty.join(dictVal(d), dflt);
+                    if (r.k == Ty.K.DYN) {
+                        escape(dflt);
+                    }
+                    return r;
+                }
+                return null;
+            case "setdefault":
+                if (args.size() == 2) {
+                    storeDict(d, args.get(0), args.get(1));
+                    return dictVal(d);
+                }
+                return null;
+            default:
+                return null;
+        }
+    }
+
     private void storeElem(Ty list, Ty v) {
         if (list.k != Ty.K.LIST || list.sites.length == 0) {
             escape(v);
@@ -869,6 +926,7 @@ final class Infer {
         if (s == null) {
             s = Integer.valueOf(siteElem.size());
             siteElem.add(Ty.BOT);
+            siteKey.add(Ty.BOT);
             siteOf.put(e, s);
         }
         return s.intValue();
@@ -1206,9 +1264,11 @@ final class Infer {
                     escape(v);
                 }
             } else {
-                type(s.index, fn, sc);
+                Ty kt = type(s.index, fn, sc);
                 int ci = constIndex(s.index);
-                if (r.k == Ty.K.LIST && ci >= 0 && slotCount(r) > ci) {
+                if (r.k == Ty.K.DICT) {
+                    storeDict(r, kt, v);
+                } else if (r.k == Ty.K.LIST && ci >= 0 && slotCount(r) > ci) {
                     // Same position, same length: the positions still hold.
                     for (int site : r.sites) {
                         siteElem.set(site, joinInto(siteElem.get(site), v));
@@ -1520,7 +1580,10 @@ final class Infer {
                     plain = false;
                 }
                 if ("in".equals(op) || "not in".equals(op)) {
-                    escape(r);
+                    if (r.k != Ty.K.DICT) {
+                        // A dict's `in` reads its keys and keeps nothing.
+                        escape(r);
+                    }
                     escape(l);
                 }
                 l = r;
@@ -1573,9 +1636,22 @@ final class Infer {
                 }
                 return ci >= 0 ? slot(r, ci) : tupleElem(r);
             }
+            if (r.k == Ty.K.DICT) {
+                // A key that is not there raises: the read is of the values.
+                escape(i);
+                return dictVal(r);
+            }
             escape(r);
             escape(i);
             return Ty.DYN;
+        }
+        if (e instanceof DictExpr && !((DictExpr) e).keys.contains(null)) {
+            DictExpr d = (DictExpr) e;
+            Ty t = Ty.dict(new int[] {site(d)});
+            for (int i = 0; i < d.keys.size(); i++) {
+                storeDict(t, type(d.keys.get(i), fn, sc), type(d.values.get(i), fn, sc));
+            }
+            return t;
         }
         if (e instanceof ListExpr) {
             ListExpr l = (ListExpr) e;
@@ -1854,6 +1930,12 @@ final class Infer {
 
     private Ty call(Call c, Fn fn, Scope sc) {
         boolean simple = c.keywords.isEmpty() && !anyStarred(c.args);
+        if (c.func instanceof Name && ((Name) c.func).id.startsWith("$")) {
+            Ty t = missIntrinsic(((Name) c.func).id, c, fn, sc);
+            if (t != null) {
+                return t;
+            }
+        }
         if (c.func instanceof Name && sc.resolve(((Name) c.func).id) == Scope.Binding.GLOBAL) {
             String n = ((Name) c.func).id;
             Fn f = globalFns.get(n);
@@ -1972,6 +2054,21 @@ final class Infer {
             if (r.k == Ty.K.LIST && !r.opt) {
                 return listMethod(r, a.attr, args);
             }
+            if (r.k == Ty.K.DICT && simple) {
+                Ty t = dictMethod(r, a.attr, args);
+                if (t != null) {
+                    return t;
+                }
+            }
+            if (r.k == Ty.K.STR && !r.opt && splitCall(a.attr, args, c)) {
+                // A fresh list of strs, from a site of its own: the call.
+                int s = site(c);
+                siteElem.set(s, joinInto(siteElem.get(s), Ty.STR));
+                if (unslotted.add(Integer.valueOf(s))) {
+                    changed = true;
+                }
+                return Ty.list(new int[] {s}, false);
+            }
             if (r.k == Ty.K.STR && !r.opt && c.keywords.isEmpty() && !hasStarred(c.args)) {
                 Ty t = strMethod(a.attr, args);
                 if (t != null) {
@@ -2002,7 +2099,7 @@ final class Infer {
             }
             if (simple && args.size() == 1 && ("len".equals(n) || "isinstance".equals(n) && false)) {
                 // len reads its argument and keeps nothing.
-                if (args.get(0).k != Ty.K.LIST && args.get(0).k != Ty.K.TUPLE) {
+                if (args.get(0).k != Ty.K.LIST && args.get(0).k != Ty.K.TUPLE && args.get(0).k != Ty.K.DICT) {
                     escape(args.get(0));
                 }
                 return Ty.INT;
@@ -2052,6 +2149,24 @@ final class Infer {
             escape(type(kw.value, fn, sc));
         }
         return Ty.DYN;
+    }
+
+    /// The hidden calls of a miss probe (`Parser.missProbe`): the probe is
+    /// the lookup or a marker, the re-read is the lookup.
+    private Ty missIntrinsic(String n, Call c, Fn fn, Scope sc) {
+        switch (n) {
+            case "$probe":
+                escape(type(c.args.get(0), fn, sc));
+                return Ty.DYN;
+            case "$unmiss":
+                type(c.args.get(0), fn, sc);
+                return type(c.args.get(1), fn, sc);
+            case "$ismiss":
+                type(c.args.get(0), fn, sc);
+                return Ty.BOOL;
+            default:
+                return null;
+        }
     }
 
     private Ty listMethod(Ty r, String m, List<Ty> args) {
@@ -2110,6 +2225,12 @@ final class Infer {
             }
         }
         return false;
+    }
+
+    /// `s.split()` or `s.split(sep)` with a str separator.
+    static boolean splitCall(String m, List<Ty> args, Call c) {
+        return "split".equals(m) && c.keywords.isEmpty() && !hasStarred(c.args)
+                && (args.isEmpty() || args.size() == 1 && args.get(0).k == Ty.K.STR && !args.get(0).opt);
     }
 
     /// The type of a str method TypedEmit calls directly (see its

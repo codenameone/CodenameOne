@@ -1376,6 +1376,9 @@ final class TypedEmit {
             store(n, new E(c, localType(n.id).nonNone()), b, ind);
             return false;
         }
+        if (s instanceof Assign && dictCount((Assign) s, b, ind)) {
+            return false;
+        }
         if (s instanceof Assign) {
             Assign a = (Assign) s;
             if (a.targets.size() == 1 && a.targets.get(0) instanceof TupleExpr && a.value instanceof TupleExpr) {
@@ -2078,7 +2081,7 @@ final class TypedEmit {
     private boolean compTargets(Expr t, Map<String, String> vars) {
         if (t instanceof Name) {
             String n = ((Name) t).id;
-            if (cur.locals.containsKey(n) || longLocals.contains(n) || compVar(n) != null) {
+            if (compVar(n) != null) {
                 return false;
             }
             vars.put(n, null);
@@ -2465,6 +2468,24 @@ final class TypedEmit {
             Subscript s = (Subscript) t;
             E l = expr(s.value);
             E i = expr(s.index);
+            if (l.t.k == Ty.K.DICT) {
+                // Python's order: the dict, the key, the read, the operand,
+                // the store; the dict and the key are each evaluated once.
+                String dv = fresh();
+                String kv = fresh();
+                indent(b, ind);
+                b.append("Object ").append(dv).append(" = ").append(l.c).append(";\n");
+                indent(b, ind);
+                b.append("Object ").append(kv).append(" = ").append(box(i)).append(";\n");
+                E old = dictRead("Typed.dgetv(" + dv + ", " + kv + ")", l.t);
+                String ov = fresh();
+                indent(b, ind);
+                b.append(jt(old.t)).append(' ').append(ov).append(" = ").append(old.c).append(";\n");
+                E v = binop(a.op, new E(ov, old.t), expr(a.value), a.value);
+                indent(b, ind);
+                b.append("Py.setitem(").append(dv).append(", ").append(kv).append(", ").append(box(v)).append(");\n");
+                return;
+            }
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
                 throw new Unsupported("subscript aug on " + l.t);
             }
@@ -2982,6 +3003,9 @@ final class TypedEmit {
             }
             E l = expr(s.value);
             E i = expr(s.index);
+            if (l.t.k == Ty.K.DICT) {
+                return dictRead("Typed.dgetv(" + l.c + ", " + box(i) + ")", l.t);
+            }
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
                 return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.DYN);
             }
@@ -3101,7 +3125,75 @@ final class TypedEmit {
             }
             return new E(sb.toString(), Ty.DYN);
         }
+        if (e instanceof Lambda && closedLambda((Lambda) e) && ((Lambda) e).args.defaults.isEmpty()
+                && ((Lambda) e).args.kwDefaults.stream().allMatch(x -> x == null)) {
+            // Nothing of this function in it: the function object the generic
+            // code makes, which reads no local of the frame it is made in.
+            return new E(em.lambdaValue((Lambda) e), Ty.DYN);
+        }
         throw new Unsupported(e.getClass().getSimpleName());
+    }
+
+    /// Whether lambda `l` reads nothing but its parameters, globals and
+    /// builtins, and opens no scope of its own.
+    private static boolean closedLambda(Lambda l) {
+        if (l.scope.hasYield || !l.scope.cells.isEmpty()) {
+            return false;
+        }
+        boolean[] ok = {true};
+        Infer.Visit[] v = new Infer.Visit[1];
+        v[0] = x -> {
+            if (x instanceof Lambda || x instanceof Comp || x instanceof NamedExpr || x instanceof Yield
+                    || x instanceof Await) {
+                ok[0] = false;
+            } else if (x instanceof Name) {
+                Scope.Binding b = l.scope.resolve(((Name) x).id);
+                ok[0] &= b == Scope.Binding.LOCAL || b == Scope.Binding.GLOBAL || b == Scope.Binding.BUILTIN;
+            } else if (ok[0]) {
+                Infer.children(x, v[0]);
+            }
+        };
+        v[0].on(l.body);
+        return ok[0];
+    }
+
+    /// The parameters of a lambda being expanded in place (`inlineLambda`),
+    /// each to its argument already in a local; read by `name` while `sc` is
+    /// that lambda's scope.
+    private Map<String, E> inlineArgs;
+    private Scope inlineScope;
+
+    /// `(lambda x, y: body)(a, b)` as `body`, in this function: the arguments
+    /// into locals before the statement, in order, then the body over them.
+    /// Null when that is not the same: the statement may not move its
+    /// evaluation, or the lambda reads this function's locals.
+    private E inlineLambda(Lambda l, Call c) {
+        Arguments la = l.args;
+        if (pre == null || !stmtPure || condDepth != 0 || inlineArgs != null || !c.keywords.isEmpty()
+                || la.vararg != null || la.kwarg != null || !la.kwonly.isEmpty() || !la.defaults.isEmpty()
+                || la.positional.size() != c.args.size() || !closedLambda(l)) {
+            return null;
+        }
+        Map<String, E> map = new HashMap<String, E>();
+        for (int i = 0; i < c.args.size(); i++) {
+            if (c.args.get(i) instanceof Starred) {
+                return null;
+            }
+        }
+        for (int i = 0; i < c.args.size(); i++) {
+            map.put(la.positional.get(i).name, spillTo(expr(c.args.get(i)), pre, preInd));
+        }
+        Scope saved = sc;
+        sc = l.scope;
+        inlineArgs = map;
+        inlineScope = l.scope;
+        try {
+            return expr(l.body);
+        } finally {
+            sc = saved;
+            inlineArgs = null;
+            inlineScope = null;
+        }
     }
 
     /// Parameters read as they arrived until the body's first statement
@@ -3110,9 +3202,18 @@ final class TypedEmit {
 
     private E name(Name nm) {
         String n = nm.id;
+        if (inlineArgs != null && sc == inlineScope && inlineArgs.containsKey(n)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return inlineArgs.get(n);
+        }
         switch (binding(n)) {
             case LOCAL: {
-                E alias = compVar(n) == null ? paramAlias.get(n) : null;
+                String cv = compVar(n);
+                if (cv != null) {
+                    // A comprehension's own target, in a temporary of its own
+                    // even where the function has a local of the same name.
+                    return new E(cv, Ty.DYN);
+                }
+                E alias = paramAlias.get(n);
                 if (alias != null) {
                     return alias;
                 }
@@ -4035,6 +4136,11 @@ final class TypedEmit {
         if (l.t.k == Ty.K.BOOL && r.t.k == Ty.K.BOOL && ("==".equals(op) || "!=".equals(op))) {
             return new E("(" + l.c + " " + op + " " + r.c + ")", Ty.BOOL);
         }
+        if (l.t.k == Ty.K.INT && r.t.k == Ty.K.INT && l.lc != null && r.lc != null && l.pk == null && r.pk == null
+                && !l.t.opt && !r.t.opt) {
+            // Both at hand as Java longs (a length, a counter, a constant).
+            return new E("(" + l.lc + " " + op + " " + r.lc + ")", Ty.BOOL);
+        }
         if (li && ri) {
             String f;
             switch (op) {
@@ -4304,8 +4410,15 @@ final class TypedEmit {
         }
         if ("$unmiss".equals(fn)) {
             String m = box(expr(c.args.get(0)));
-            return new E("(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : Py.unmissed(" + m + "))",
-                    Ty.DYN);
+            String v = "(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : Py.unmissed(" + m + "))";
+            Expr x = c.args.get(1);
+            if (x instanceof Subscript && ((Subscript) x).value instanceof Name) {
+                E d = expr(((Subscript) x).value);
+                if (d.t.k == Ty.K.DICT) {
+                    return dictRead(v, d.t);
+                }
+            }
+            return new E(v, Ty.DYN);
         }
         if ("$ismiss".equals(fn)) {
             return new E("Py.isMiss(" + box(expr(c.args.get(0))) + ", " + excRef(c.args.get(1)) + ", "
@@ -4313,6 +4426,49 @@ final class TypedEmit {
                     Ty.BOOL);
         }
         return null;
+    }
+
+    /// `d[k] = d.get(k, c) + e` on a dict local, with a name for a key and
+    /// int constants for c and e: one probe of `d`, as the generic code
+    /// does it. False, emitting nothing, when the statement is not that.
+    private boolean dictCount(Assign a, StringBuilder b, int ind) {
+        if (a.targets.size() != 1 || !(a.targets.get(0) instanceof Subscript) || !(a.value instanceof BinOp)) {
+            return false;
+        }
+        Subscript t = (Subscript) a.targets.get(0);
+        BinOp op = (BinOp) a.value;
+        if (!"+".equals(op.op) || !(t.value instanceof Name) || !(t.index instanceof Name) || !(op.left instanceof Call)
+                || intConstant(op.right) == null) {
+            return false;
+        }
+        Call c = (Call) op.left;
+        if (!(c.func instanceof Attribute) || !"get".equals(((Attribute) c.func).attr)
+                || !(((Attribute) c.func).value instanceof Name) || c.args.size() != 2 || !c.keywords.isEmpty()
+                || !(c.args.get(0) instanceof Name) || intConstant(c.args.get(1)) == null) {
+            return false;
+        }
+        String d = ((Name) t.value).id;
+        String k = ((Name) t.index).id;
+        if (!d.equals(((Name) ((Attribute) c.func).value).id) || !k.equals(((Name) c.args.get(0)).id)) {
+            return false;
+        }
+        E de = expr(t.value);
+        if (de.t.k != Ty.K.DICT || de.t.opt) {
+            return false;
+        }
+        indent(b, ind);
+        b.append("Py.dictCount(").append(de.c).append(", ").append(box(expr(t.index))).append(", ")
+                .append(box(expr(c.args.get(1)))).append(", ").append(box(expr(op.right))).append(");\n");
+        return true;
+    }
+
+    /// `c`, a read of a dict of type `d`, as the type its values have.
+    private E dictRead(String c, Ty d) {
+        Ty vt = in.dictVal(d);
+        if (vt.k == Ty.K.BOT) {
+            throw new Unsupported("value of an empty dict");
+        }
+        return vt.k == Ty.K.DYN || vt.isObject() ? new E(c, vt.k == Ty.K.DYN ? Ty.DYN : vt) : new E(unbox(c, vt), vt);
     }
 
     private String probeRead(Expr e, boolean probe) {
@@ -4325,6 +4481,12 @@ final class TypedEmit {
     }
 
     private E call0(Call c) {
+        if (c.func instanceof Lambda) {
+            E r = inlineLambda((Lambda) c.func, c);
+            if (r != null) {
+                return r;
+            }
+        }
         if (c.func instanceof Name && ((Name) c.func).id.startsWith("$")) {
             E miss = missIntrinsic(c);
             if (miss != null) {
@@ -4450,11 +4612,31 @@ final class TypedEmit {
             if (r.t.k == Ty.K.LIST && !r.t.opt) {
                 return listMethod(r, a.attr, args);
             }
+            if (r.t.k == Ty.K.STR && !r.t.opt && Infer.splitCall(a.attr, types(args), c)) {
+                Integer site = in.siteOf.get(c);
+                if (site != null) {
+                    return new E("Typed.split(" + r.c + ", " + (args.isEmpty() ? "Py.NONE" : args.get(0).c) + ")",
+                            Ty.list(new int[] {site.intValue()}, false));
+                }
+            }
             if (r.t.k == Ty.K.STR && !r.t.opt && c.keywords.isEmpty() && !Infer.hasStarred(c.args)) {
                 E s = strMethod(r, a.attr, args);
                 if (s != null) {
                     return s;
                 }
+            }
+            if (r.t.k == Ty.K.DICT && !r.t.opt && "get".equals(a.attr) && c.keywords.isEmpty()
+                    && !Infer.hasStarred(c.args) && (args.size() == 1 || args.size() == 2)) {
+                E def = args.size() == 2 ? args.get(1) : null;
+                Ty vt = Ty.join(in.dictVal(r.t), def == null ? Ty.NONE : def.t);
+                String g = "Typed.dgetd(" + r.c + ", " + box(args.get(0)) + ", " + (def == null ? "Py.NONE" : box(def)) + ")";
+                if (vt.k == Ty.K.BOT || vt.k == Ty.K.DYN || vt.opt) {
+                    return new E(g, Ty.DYN);
+                }
+                if (vt.isObject()) {
+                    return new E(g, vt);
+                }
+                return new E(unbox(g, vt), vt);
             }
             if (r.t.k != Ty.K.INST) {
                 String k = "get".equals(a.attr) && args.size() == 1 && c.keywords.isEmpty() ? intKey(args.get(0)) : null;
@@ -5339,6 +5521,14 @@ final class TypedEmit {
         return t.k == Ty.K.INT ? new E("Long.valueOf(" + c + ")", t, c) : new E(c, t);
     }
 
+    private static List<Ty> types(List<E> a) {
+        List<Ty> ts = new ArrayList<>();
+        for (E x : a) {
+            ts.add(x.t);
+        }
+        return ts;
+    }
+
     private E listMethod(E l, String m, List<E> a) {
         switch (m) {
             case "append":
@@ -5411,6 +5601,10 @@ final class TypedEmit {
                     break;
                 case NONE:
                     check = v + " == Py.NONE";
+                    arg = v;
+                    break;
+                case DICT:
+                    check = "Typed.isDict(" + v + ")";
                     arg = v;
                     break;
                 default:

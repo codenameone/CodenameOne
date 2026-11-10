@@ -1,0 +1,4 @@
+[('a', 3), ('b', 2), ('c', 1)] 4
+(None, 5, None, 7, True, False, 2)
+(1, 1)
+str! 5.0 s KeyError 3

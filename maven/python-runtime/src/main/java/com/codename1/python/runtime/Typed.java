@@ -505,6 +505,31 @@ public final class Typed {
     }
 
     /// `m[k] = v` for an int key.
+    /// `s.split()` / `s.split(sep)` on a str: a fresh list of strs.
+    public static PyList split(String s, Object sep) {
+        return TypeMethods.split(s, sep, -1);
+    }
+
+    /// `d[k]` on a dict the transpiler followed from a display: a plain
+    /// `PyDict`, so a key that is not there raises KeyError, as the generic
+    /// read does.
+    public static Object dgetv(Object d, Object k) {
+        Object v = ((PyDict) d).getOrNull(k);
+        return v != null ? v : Py.getitem(d, k);
+    }
+
+    /// `d.get(k, def)` on a plain `PyDict`: no attribute lookup, no call.
+    public static Object dgetd(Object d, Object k, Object def) {
+        Object v = ((PyDict) d).getOrNull(k);
+        return v != null ? v : def;
+    }
+
+    /// Whether `o` is a plain dict, of no subclass: what a typed function
+    /// taking a dict the transpiler followed may be entered with.
+    public static boolean isDict(Object o) {
+        return o != null && o.getClass() == PyDict.class;
+    }
+
     public static void dset(Object m, long k, Object v) {
         if (m instanceof PyDict) {
             ((PyDict) m).setLong(k, v);

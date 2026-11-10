@@ -41,6 +41,7 @@ import java.util.Arrays;
 /// | `INST` | the class's layout class | null when `opt` |
 /// | `LIST` | `PyList` | null when `opt` |
 /// | `TUPLE` | `Object` (the generic tuple) | -- |
+/// | `DICT` | `Object` (a `PyDict`) | -- |
 /// | `NONE`, `DYN`, `BOT` | `Object` | `Py.NONE` |
 ///
 /// An int stays an object because a Python int has no bound: overflowing a
@@ -48,7 +49,7 @@ import java.util.Arrays;
 /// On ParparVM a `Long` below 2^60 is a tagged immediate, so keeping it
 /// boxed allocates nothing.
 final class Ty {
-    enum K { BOT, NONE, BOOL, INT, FLOAT, STR, INST, LIST, TUPLE, DYN }
+    enum K { BOT, NONE, BOOL, INT, FLOAT, STR, INST, LIST, TUPLE, DICT, DYN }
 
     static final Ty BOT = new Ty(K.BOT, null, false, null);
     static final Ty NONE = new Ty(K.NONE, null, false, null);
@@ -91,6 +92,13 @@ final class Ty {
         return new Ty(K.TUPLE, null, false, sites);
     }
 
+    /// A dict from these allocation sites. It is held as the generic object;
+    /// what the kind adds is the type of its keys and values (see
+    /// `Infer.dictVal`), so a read of it gives a typed value.
+    static Ty dict(int[] sites) {
+        return new Ty(K.DICT, null, false, sites);
+    }
+
     Ty orNone() {
         switch (k) {
             case BOT:
@@ -116,7 +124,7 @@ final class Ty {
     }
 
     boolean isObject() {
-        return k == K.BOT || k == K.NONE || k == K.DYN || k == K.INT || k == K.TUPLE;
+        return k == K.BOT || k == K.NONE || k == K.DYN || k == K.INT || k == K.TUPLE || k == K.DICT;
     }
 
     static Ty join(Ty a, Ty b) {
@@ -155,6 +163,8 @@ final class Ty {
                 return list(union(a.sites, b.sites), opt);
             case TUPLE:
                 return tuple(union(a.sites, b.sites));
+            case DICT:
+                return dict(union(a.sites, b.sites));
             case STR:
                 return opt ? STR.orNone() : STR;
             default:
@@ -218,7 +228,8 @@ final class Ty {
     @Override
     public String toString() {
         String s = k == K.INST ? cls.def.name : k == K.LIST ? "list" + Arrays.toString(sites)
-                : k == K.TUPLE ? "tuple" + Arrays.toString(sites) : k.name();
+                : k == K.TUPLE ? "tuple" + Arrays.toString(sites)
+                : k == K.DICT ? "dict" + Arrays.toString(sites) : k.name();
         return opt ? s + "?" : s;
     }
 }

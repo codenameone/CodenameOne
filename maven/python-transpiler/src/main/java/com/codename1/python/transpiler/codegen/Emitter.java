@@ -1860,6 +1860,12 @@ public final class Emitter {
         return r.toString();
     }
 
+    /// Lambda `l` as a function object, for the typed code: one that reads
+    /// nothing of the frame it is made in (`TypedEmit.closedLambda`).
+    String lambdaValue(Lambda l) {
+        return function("<lambda>", l.args, l.scope, null, l.body);
+    }
+
     /// Set by call() for a lambda it calls in place: function() then answers the
     /// bare body lambda, with no PyFunction around it.
     private boolean inlineCalled;

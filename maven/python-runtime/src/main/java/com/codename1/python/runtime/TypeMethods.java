@@ -253,41 +253,50 @@ final class TypeMethods {
 
     static PyList split(String v, Object sepO, long max) {
         if (sepO == null || sepO == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
-            // Counted first, so the list is one array of the right size.
+            // One pass over a copy of the chars, the word bounds kept in
+            // pairs; the printable ASCII test is inline, the rest calls out.
             int n = v.length();
+            char[] cs = new char[n];
+            v.getChars(0, n, cs, 0);
+            int[] bounds = new int[16];
             int count = 0;
-            for (int i = 0; i < n;) {
-                while (i < n && isSpace(v.charAt(i))) {
-                    i++;
-                }
-                if (i >= n) {
-                    break;
-                }
-                count++;
-                if (max >= 0 && count > max) {
-                    break;
-                }
-                while (i < n && !isSpace(v.charAt(i))) {
-                    i++;
-                }
-            }
-            Object[] parts = new Object[count];
-            int k = 0;
             int i = 0;
-            while (k < count) {
-                while (isSpace(v.charAt(i))) {
+            while (i < n) {
+                char c = cs[i];
+                if ((c <= ' ' || c >= '\u0085') && isSpace(c)) {
                     i++;
+                    continue;
                 }
-                if (max >= 0 && k == max) {
-                    parts[k++] = strip(v.substring(i), null, false, true);
+                if (max >= 0 && count == max) {
                     break;
                 }
-                int j = i;
-                while (j < n && !isSpace(v.charAt(j))) {
+                int j = i + 1;
+                while (j < n) {
+                    char d = cs[j];
+                    if ((d <= ' ' || d >= '\u0085') && isSpace(d)) {
+                        break;
+                    }
                     j++;
                 }
-                parts[k++] = v.substring(i, j);
+                if (2 * count + 2 > bounds.length) {
+                    int[] g = new int[bounds.length * 2];
+                    System.arraycopy(bounds, 0, g, 0, bounds.length);
+                    bounds = g;
+                }
+                bounds[2 * count] = i;
+                bounds[2 * count + 1] = j;
+                count++;
                 i = j;
+            }
+            boolean rest = i < n;
+            Object[] parts = new Object[count + (rest ? 1 : 0)];
+            for (int k = 0; k < count; k++) {
+                parts[k] = v.substring(bounds[2 * k], bounds[2 * k + 1]);
+            }
+            if (rest) {
+                // `max` reached: the remainder as it is, trailing
+                // whitespace kept, as CPython keeps it.
+                parts[count] = v.substring(i);
             }
             return new PyList(parts);
         }
@@ -324,7 +333,7 @@ final class TypeMethods {
                     break;
                 }
                 if (rev.size() >= max) {
-                    rev.append(Py.str(strip(v.substring(0, j), null, true, false)));
+                    rev.append(Py.str(v.substring(0, j))); // leading whitespace kept, as in CPython
                     break;
                 }
                 int i = j;
