@@ -51,6 +51,7 @@ public final class ScopeBuilder {
         b.all.add(s);
         b.cur = s;
         Desugar.rewrite(m.body);
+        GenInline.rewrite(m.body);
         b.stmts(m.body);
         b.resolveCells();
         return s;

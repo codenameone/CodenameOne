@@ -833,7 +833,9 @@ final class TypedEmit {
         }
         if (b == Scope.Binding.FREE && sc.kind == Scope.Kind.COMPREHENSION) {
             Scope o = sc.owner(n);
-            if (o == cur.def.scope && in.compOnlyCell(o, n) || o != null && o.kind == Scope.Kind.COMPREHENSION //NOPMD CompareObjectsWithEquals - identity is meant
+            // A name Emitter.uncell took off the function's cells (only
+            // helper comprehensions read it) is a plain local of it too.
+            if (o == cur.def.scope && (in.compOnlyCell(o, n) || !o.cells.contains(n)) || o != null && o.kind == Scope.Kind.COMPREHENSION //NOPMD CompareObjectsWithEquals - identity is meant
                     && compVars.containsKey(o)) {
                 return Scope.Binding.LOCAL;
             }
