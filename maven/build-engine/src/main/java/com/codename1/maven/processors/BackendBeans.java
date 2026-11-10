@@ -1881,9 +1881,27 @@ final class BackendBeans {
     /// The broker transports the module's configuration names, as the factory
     /// classes the wiring registers: only those are compiled into the
     /// application. A URL the build cannot read -- a `${...}` -- includes
-    /// every one, since any could be meant.
+    /// every one, since any could be meant, and so does a configuration that
+    /// names no broker at all: the URL is then left to the deployment (an
+    /// environment variable, a file beside the server) and the build cannot
+    /// know which. `cn1.messaging.transports` -- `kafka,sqs` -- names the set
+    /// outright, for a deployment that wants the others left out.
     static List<String> messagingTransports(ProcessorContext ctx) {
         Set<String> schemes = new LinkedHashSet<String>();
+        for (String list : RestControllerAnnotationProcessor.applicationPropertyValues(ctx,
+                "cn1.messaging.transports")) {
+            int from = 0;
+            while (from <= list.length()) {
+                int comma = list.indexOf(',', from);
+                int end = comma < 0 ? list.length() : comma;
+                String name = list.substring(from, end).trim();
+                if (name.length() > 0) {
+                    schemes.add(name);
+                }
+                from = end + 1;
+            }
+        }
+        boolean named = !schemes.isEmpty();
         for (String url : RestControllerAnnotationProcessor.applicationPropertyValues(ctx,
                 "cn1.messaging.url")) {
             if (url.indexOf("${") >= 0) {
@@ -1905,6 +1923,10 @@ final class BackendBeans {
         if (RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
                 "spring.kafka.bootstrap-servers")) {
             schemes.add("kafka");
+        }
+        if (!named && schemes.isEmpty() && !RestControllerAnnotationProcessor
+                .applicationPropertyKnown(ctx, "cn1.messaging.url")) {
+            schemes.addAll(TRANSPORTS.keySet());
         }
         List<String> out = new ArrayList<String>();
         for (String scheme : schemes) {

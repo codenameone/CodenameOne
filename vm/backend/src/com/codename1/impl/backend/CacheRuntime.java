@@ -101,14 +101,14 @@ public final class CacheRuntime {
             return "";
         }
         if (parts.length == 1) {
-            return String.valueOf(parts[0]);
+            return part(parts[0]);
         }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) {
                 sb.append(',');
             }
-            String s = String.valueOf(parts[i]);
+            String s = part(parts[i]);
             for (int c = 0; c < s.length(); c++) {
                 char ch = s.charAt(c);
                 if (ch == ',' || ch == '\\') {
@@ -119,6 +119,19 @@ public final class CacheRuntime {
         }
         return sb.toString();
     }
+
+    /// One part of a key as text. A null is a lone NUL character, which no
+    /// other value's text is -- a value whose text starts with one gains a
+    /// second -- so `null` and `"null"` are two keys.
+    public static String part(Object value) {
+        if (value == null) {
+            return String.valueOf(NUL);
+        }
+        String s = String.valueOf(value);
+        return s.length() > 0 && s.charAt(0) == NUL ? NUL + s : s;
+    }
+
+    private static final char NUL = (char) 0;
 
     private static String entry(String cache, String key) {
         return PREFIX + cache + ':' + key;

@@ -1114,15 +1114,14 @@ public final class KafkaTransport extends PollingTransport {
                         continue;
                     }
                     List<KafkaConnection.Record> records = new ArrayList<KafkaConnection.Record>();
-                    KafkaConnection.records(set, p.fetchOffset, records);
-                    if (records.isEmpty()) {
-                        continue;
-                    }
+                    long next = KafkaConnection.records(set, p.fetchOffset, records);
                     synchronized (this) {
                         if (parts.get(p.name()) == p) { // NOPMD CompareObjectsWithEquals - still this member's
-                            p.buffer.addAll(records);
-                            p.fetchOffset = records.get(records.size() - 1).offset + 1;
-                            notifyAll();
+                            p.fetchOffset = Math.max(p.fetchOffset, next);
+                            if (!records.isEmpty()) {
+                                p.buffer.addAll(records);
+                                notifyAll();
+                            }
                         }
                     }
                 }

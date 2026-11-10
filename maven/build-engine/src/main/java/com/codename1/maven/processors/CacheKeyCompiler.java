@@ -77,6 +77,7 @@ final class CacheKeyCompiler {
                 if (i > 0) {
                     sb.append(", ");
                 }
+                keyable(args[i], "parameter " + (i + 1));
                 sb.append(box(args[i], "a" + i));
             }
             return sb.append("})").toString();
@@ -89,8 +90,8 @@ final class CacheKeyCompiler {
             }
             sb.append(term(term.trim()));
         }
-        // "" + makes a lone number or char a String.
-        return terms.size() == 1 ? "String.valueOf(" + sb + ")" : "(\"\" + " + sb + ")";
+        // "" + makes a lone literal a String; every parameter term is already one.
+        return terms.size() == 1 ? sb.toString() : "(\"\" + " + sb + ")";
     }
 
     /// The terms between top-level `+`, with quoted text kept whole.
@@ -130,6 +131,7 @@ final class CacheKeyCompiler {
         if (isNumber(t)) {
             return BackendSources.quote(t);
         }
+
         if (t.length() < 2 || t.charAt(0) != '#') {
             throw new Refused("\"" + t + "\" is not a parameter (#name), a quoted literal or "
                     + "#root.methodName");
@@ -162,7 +164,8 @@ final class CacheKeyCompiler {
             expr.append('.').append(step[0]);
             type = Type.getType(step[1]);
         }
-        return expr.toString();
+        keyable(type, "\"" + t + "\"");
+        return "com.codename1.impl.backend.CacheRuntime.part(" + box(type, expr.toString()) + ")";
     }
 
     private int parameter(String name) throws Refused {
@@ -181,6 +184,50 @@ final class CacheKeyCompiler {
                 + (names.isEmpty() ? "; the class was compiled without parameter names, so "
                         + "use #p0, #p1 ... or compile with -parameters" : ""));
     }
+
+    /// Refuses a key part whose text does not tell two values apart: an
+    /// array, or an object without a `toString()` of its own, keys by an
+    /// identity hash -- a new key on every call that never hits, and that
+    /// after a restart can be the key another object's result was kept under.
+    private void keyable(Type type, String what) throws Refused {
+        if (type.getSort() != Type.OBJECT && type.getSort() != Type.ARRAY) {
+            return;
+        }
+        String hint = "; key by one of its properties instead, for example key = \"#p0.id\"";
+        if (type.getSort() == Type.ARRAY) {
+            throw new Refused(what + " is an array, whose text is its identity" + hint);
+        }
+        String n = type.getInternalName();
+        if (VALUE_TYPES.contains(n)) {
+            return;
+        }
+        String current = n;
+        for (int depth = 0; current != null && !"java/lang/Object".equals(current)
+                && depth < 32; depth++) {
+            AnnotatedClass c = RestControllerAnnotationProcessor.resolveClass(ctx, current);
+            if (c == null) {
+                break;
+            }
+            if (c.isEnum() || c.isRecord()) {
+                return;
+            }
+            for (MethodInfo m : c.getMethods()) {
+                if ("toString".equals(m.getName()) && "()Ljava/lang/String;".equals(m.getDescriptor())
+                        && !m.isStatic()) {
+                    return;
+                }
+            }
+            current = c.getSuperInternalName();
+        }
+        throw new Refused(what + " is a " + type.getClassName() + ", which has no toString() "
+                + "of its own, so its text is its identity" + hint);
+    }
+
+    private static final java.util.Set<String> VALUE_TYPES = new java.util.HashSet<String>(
+            java.util.Arrays.asList("java/lang/String", "java/lang/Boolean", "java/lang/Character",
+                    "java/lang/Byte", "java/lang/Short", "java/lang/Integer", "java/lang/Long",
+                    "java/lang/Float", "java/lang/Double", "java/math/BigInteger",
+                    "java/math/BigDecimal", "java/util/UUID", "java/lang/CharSequence"));
 
     /// The Java member access reading `prop` of `owner` and its descriptor, or
     /// null when it has none the helper may read.

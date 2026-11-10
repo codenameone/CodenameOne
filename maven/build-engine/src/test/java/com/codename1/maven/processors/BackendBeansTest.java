@@ -1607,7 +1607,10 @@ public class BackendBeansTest {
     @Test
     public void messagingRegistersOnlyTheTransportsTheConfigurationNames() throws Exception {
         String[][] cases = {
-            {"", ""},
+            // Nothing named: the URL comes from the deployment, so all of them.
+            {"", "redis amqp"},
+            {"cn1.messaging.url=db:\n", ""},
+            {"cn1.messaging.transports=amqp\n", "amqp"},
             {"cn1.messaging.url=redis://cache:6379\n", "redis"},
             {"cn1.messaging.url=amqps://u:p@rabbit/%2F\n", "amqp"},
             {"spring.rabbitmq.host=rabbit\n", "amqp"},
@@ -1882,6 +1885,41 @@ public class BackendBeansTest {
         assertTrue(errors, errors.contains("\"#nope\" names no parameter"));
         assertTrue(errors, errors.contains("three returns nothing"));
         assertTrue(errors, errors.contains("only \"#result == null\" is supported"));
+    }
+
+    /// A key part whose text is its identity -- an array, an object with no
+    /// toString() of its own -- would key every call apart, and after a restart
+    /// could hit another object's entry, so the build refuses it. A value type,
+    /// a record, an enum or a property of the object is fine.
+    @Test
+    public void aCacheKeyThatIsAnIdentityFailsTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Query", PKG + "public class Query { public long id; }\n");
+        s.put("com.example.Named", PKG + "public class Named {\n"
+                + "    public String toString() { return \"n\"; }\n}\n");
+        s.put("com.example.Keys", PKG + "@Component public class Keys {\n"
+                + "    @Cacheable(\"c\") public String plain(Query q) { return \"\"; }\n"
+                + "    @Cacheable(\"c\") public String array(long[] ids) { return \"\"; }\n"
+                + "    @Cacheable(value = \"c\", key = \"#p0.id\")\n"
+                + "    public String byId(Query q) { return \"\"; }\n"
+                + "    @Cacheable(\"c\") public String named(Named n) { return \"\"; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("plain cannot be compiled"));
+        assertTrue(errors, errors.contains("array cannot be compiled"));
+        assertFalse(errors, errors.contains("byId"));
+        assertFalse(errors, errors.contains("named"));
+    }
+
+    /// `null` and the text "null" are two keys, alone and among others.
+    @Test
+    public void aNullKeyPartIsNotTheTextNull() throws Exception {
+        Class<?> rt = Class.forName("com.codename1.impl.backend.CacheRuntime");
+        java.lang.reflect.Method key = rt.getMethod("key", Object[].class);
+        assertFalse(key.invoke(null, new Object[] {new Object[] {null}})
+                .equals(key.invoke(null, new Object[] {new Object[] {"null"}})));
+        assertFalse(key.invoke(null, new Object[] {new Object[] {"a", null}})
+                .equals(key.invoke(null, new Object[] {new Object[] {"a", "null"}})));
     }
 
     /// A `@Repository` interface is injected like a bean: built once from the

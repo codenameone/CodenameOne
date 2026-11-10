@@ -135,14 +135,14 @@ final class OutboxTransport extends MessageTransport {
     private boolean relay(Object id, Message message) {
         try {
             broker.send(message);
-        } catch (IOException err) {
+        } catch (IOException | RuntimeException err) {
             System.err.println("cn1: a message to " + message.getDestination() + " stays in "
                     + "the outbox until the broker takes it: " + err.getMessage());
             return false;
         }
         try {
             db.execute("DELETE FROM " + TABLE + " WHERE id = ?", new Object[]{id});
-        } catch (IOException err) {
+        } catch (IOException | RuntimeException err) {
             System.err.println("cn1: a sent message stays in the outbox and will be sent "
                     + "again: " + err.getMessage());
         }
@@ -220,7 +220,9 @@ final class OutboxTransport extends MessageTransport {
             if (System.currentTimeMillis() >= nextSweep) {
                 try {
                     sweep();
-                } catch (IOException err) {
+                } catch (IOException | RuntimeException err) {
+                    // A row it cannot read must not end the thread every
+                    // committed message waits on.
                     System.err.println("cn1: the outbox sweep failed: " + err.getMessage());
                 }
                 nextSweep = System.currentTimeMillis() + sweepAfter;

@@ -203,13 +203,18 @@ final class KafkaConnection {
     /// off at the end of the set -- the fetch size ended inside it -- is left
     /// for the next fetch; control batches carry no records of the
     /// application's.
-    static void records(byte[] set, long from, List<Record> out) throws IOException {
+    /// @return the offset after the last whole batch read -- past control,
+    /// empty and already-read batches too, so a fetch position always moves
+    /// even when no record of the application's was in them -- or `from`
+    /// when the set held no whole batch
+    static long records(byte[] set, long from, List<Record> out) throws IOException {
+        long next = from;
         In in = new In(set);
         while (in.remaining() >= 12) {
             long base = in.int64();
             int length = in.int32();
             if (length < 0 || length > in.remaining()) {
-                return;
+                return next;
             }
             In batch = new In(in.take(length));
             batch.int32();
@@ -220,7 +225,8 @@ final class KafkaConnection {
             }
             batch.int32();
             int attributes = batch.int16();
-            batch.int32();
+            int lastDelta = batch.int32();
+            next = Math.max(next, base + lastDelta + 1);
             batch.int64();
             batch.int64();
             batch.int64();
@@ -261,6 +267,7 @@ final class KafkaConnection {
                 }
             }
         }
+        return next;
     }
 
     private static byte[] gunzip(byte[] data) throws IOException {

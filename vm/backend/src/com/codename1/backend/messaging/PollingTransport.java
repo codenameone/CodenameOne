@@ -150,7 +150,7 @@ public abstract class PollingTransport extends MessageTransport {
         }
         try {
             ack(destination, group, d);
-        } catch (IOException err) {
+        } catch (IOException | RuntimeException err) {
             System.err.println("cn1: a handled message of " + destination
                     + " could not be acknowledged and will be delivered again: "
                     + err.getMessage());
@@ -171,7 +171,7 @@ public abstract class PollingTransport extends MessageTransport {
                 redeliver(destination, group, d, attempt + 1,
                         System.currentTimeMillis() + retry.delayAfter(attempt));
             }
-        } catch (IOException io) {
+        } catch (IOException | RuntimeException io) {
             System.err.println("cn1: a failed message of " + destination
                     + " could not be rescheduled and will be delivered again: "
                     + io.getMessage());
@@ -215,7 +215,9 @@ public abstract class PollingTransport extends MessageTransport {
                 List<Delivery> batch;
                 try {
                     batch = poll(destination, group, 1, 1000);
-                } catch (IOException err) {
+                } catch (IOException | RuntimeException err) {
+                    // A RuntimeException is a reply or a row the transport could
+                    // not read: left uncaught it would end this consumer, silently.
                     if (!running.get()) {
                         return;
                     }
