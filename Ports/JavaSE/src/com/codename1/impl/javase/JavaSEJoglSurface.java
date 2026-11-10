@@ -58,6 +58,7 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
     private int lastW = -1;
     private int lastH = -1;
     private Timer timer;
+    private boolean continuous;
 
     JavaSEJoglSurface(RenderView view) {
         this.view = view;
@@ -182,7 +183,8 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
     }
 
     public void setContinuous(boolean continuous) {
-        if (continuous) {
+        this.continuous = continuous;
+        if (continuous && isDisplayable()) {
             if (timer == null) {
                 timer = new Timer(16, new ActionListener() {
                     public void actionPerformed(ActionEvent e) {
@@ -194,6 +196,28 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
         } else if (timer != null) {
             timer.stop();
         }
+    }
+
+    // A view taken off the screen kept repainting every 16ms, and Swing's
+    // timer queue held it, its renderer and the whole scene for good: every
+    // 3D view the simulator had shown stayed alive. The timer runs only while
+    // the surface is in a window; a view that comes back (a dialog over it
+    // removes it for a moment) picks up where it was.
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        if (continuous) {
+            setContinuous(true);
+        }
+    }
+
+    @Override
+    public void removeNotify() {
+        if (timer != null) {
+            timer.stop();
+            timer = null;
+        }
+        super.removeNotify();
     }
 
     public void requestRender() {

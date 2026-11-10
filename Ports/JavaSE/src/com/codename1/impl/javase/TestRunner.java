@@ -193,6 +193,15 @@ public class TestRunner {
             int passedTests = 0;
             int failedTests = 0;
 
+            // JavaCPP (FFmpeg) starts a deallocator thread on first use that
+            // never ends, and the thread keeps the security context of the
+            // code that started it: started from a test, it held that test's
+            // loader for the rest of the run. Start it here, before any.
+            try {
+                Class.forName("org.bytedeco.javacpp.Pointer");
+            } catch (Throwable notOnTheClassPath) {
+                // no FFmpeg support in this simulator
+            }
             if(cleanMode) {
                 for(String currentTestClass : tests) {
                     ClassLoader ldr = createClassLoader(files);
@@ -202,6 +211,7 @@ public class TestRunner {
                     // This test's Codename One is not used again: without this
                     // its threads keep everything it loaded in memory.
                     c.getDeclaredMethod("retire").invoke(null);
+                    releaseContextLoader(ldr);
                     if(passed) {
                         passedTests++;
                     } else {
@@ -243,6 +253,25 @@ public class TestRunner {
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(3);
+        }
+    }
+
+    /**
+     * A thread inherits the context class loader of the thread that started
+     * it, so a timer or pool a test started and nothing stops holds that
+     * test's loader, and with it everything the application loaded, for as
+     * long as the thread lives. Point the survivors at the runner's loader.
+     */
+    private static void releaseContextLoader(ClassLoader ldr) {
+        ClassLoader mine = TestRunner.class.getClassLoader();
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
+            try {
+                if (t.getContextClassLoader() == ldr) {
+                    t.setContextClassLoader(mine);
+                }
+            } catch (SecurityException ignored) {
+                // not ours to change
+            }
         }
     }
 

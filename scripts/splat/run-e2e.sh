@@ -74,7 +74,9 @@ fi
 # 3D battles hold enough textures that 768m ran out in the test after them.
 # Under xvfb, GL is Mesa's software renderer and every 3D view reads its frame
 # back into buffers on the Java heap, so 1536m ran out there in the tutorial.
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx2560m -Dsplat.server.url=http://localhost:$PORT -Dsplat.shots.dir=$SHOTS $VIDEO"
+# The MakeHuman operators' textures took a suite past 2560m there, after the
+# simulator's leaks of finished tests' 3D views and sound threads were fixed.
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx3072m -Dsplat.server.url=http://localhost:$PORT -Dsplat.shots.dir=$SHOTS $VIDEO"
 
 # On CI a test that hangs is killed by its timeout with nothing said about
 # where; every two minutes print the stacks of the simulator's busy threads,
