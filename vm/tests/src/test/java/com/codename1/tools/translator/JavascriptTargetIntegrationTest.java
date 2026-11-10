@@ -38,6 +38,8 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JavascriptTargetIntegrationTest {
@@ -70,6 +72,64 @@ class JavascriptTargetIntegrationTest {
         // must survive a CLOSED-world build for the browser's rAF bridge to call it.
         assertTrue(bundle.contains("cn1_s_onAnimationFrame_double:cn1_JsAnimationFrameApp_1_onAnimationFrame_double"),
                 "Host-only animation callback must retain its concrete virtual dispatch entry");
+    }
+
+    @org.junit.jupiter.api.Test
+    void writesSymbolMapForMinifiedFunctionsBesideTheBundle() throws Exception {
+        Parser.cleanup();
+        CompilerHelper.CompilerConfig config = BytecodeInstructionIntegrationTest.provideCompilerConfigs()
+                .findFirst().get();
+        Path sourceDir = Files.createTempDirectory("js-symbols-sources");
+        Path classesDir = Files.createTempDirectory("js-symbols-classes");
+        Path javaApiDir = Files.createTempDirectory("js-symbols-java-api");
+        Files.write(sourceDir.resolve("JsHello.java"), loadFixture("JsHello.java").getBytes(StandardCharsets.UTF_8));
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-symbols-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsHello", true);
+        Path distDir = outputDir.resolve("dist").resolve("JsHello-js");
+        Path sidecar = outputDir.resolve("dist");
+        String bundle = distDir.getFileName().toString();
+
+        // It names every minified function the bundle defines, so a profile or a
+        // stack trace (both name a function by its definition) can be read back. It sits
+        // beside the bundle with the other build artifacts.
+        Path symbols = sidecar.resolve(bundle + "-symbols.txt");
+        assertTrue(Files.exists(symbols), "the symbol map should be written beside the bundle");
+        assertFalse(Files.exists(distDir.resolve("symbols.txt")), "the symbol map must not be published in the web root");
+        java.util.Map<String, String> symbolMap = new java.util.HashMap<String, String>();
+        for (String line : Files.readAllLines(symbols, StandardCharsets.UTF_8)) {
+            String[] parts = line.split("\t");
+            assertEquals(2, parts.length, "malformed symbol map line: " + line);
+            assertTrue(parts[0].startsWith("$M") && parts[1].startsWith("cn1_"), line);
+            assertNull(symbolMap.put(parts[0], parts[1]), "duplicate short name " + parts[0]);
+        }
+        // Function definitions are spread over every translated_app*.js chunk.
+        StringBuilder allChunks = new StringBuilder();
+        try (java.util.stream.Stream<Path> files = Files.list(distDir)) {
+            for (Path p : (Iterable<Path>) files::iterator) {
+                String n = p.getFileName().toString();
+                if (n.startsWith("translated_app") && n.endsWith(".js")) {
+                    allChunks.append(new String(Files.readAllBytes(p), StandardCharsets.UTF_8)).append('\n');
+                }
+            }
+        }
+        String bundleJs = allChunks.toString();
+        java.util.regex.Matcher shortDef = java.util.regex.Pattern.compile("function\\*?\\s+(\\$M[a-z]+)\\s*\\(").matcher(bundleJs);
+        int shortDefs = 0;
+        while (shortDef.find()) {
+            shortDefs++;
+            String original = symbolMap.get(shortDef.group(1));
+            assertNotNull(original, "no symbol map entry for " + shortDef.group(1));
+            assertFalse(bundleJs.contains("function " + original + "("),
+                    original + " is mapped but still defined under its own name");
+        }
+        assertTrue(shortDefs > 0, "the bundle should define minified functions");
+
+        // A later build that does not minify must not leave this map behind to be read
+        // against a bundle whose names it does not describe.
+        runJavascriptTranslator(classesDir, outputDir, "JsHello", false);
+        assertFalse(Files.exists(symbols), "an unminified rebuild should delete the stale symbol map");
     }
 
     @ParameterizedTest
@@ -128,6 +188,10 @@ class JavascriptTargetIntegrationTest {
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         String runtime = new String(Files.readAllBytes(distDir.resolve("parparvm_runtime.js")), StandardCharsets.UTF_8);
         String worker = new String(Files.readAllBytes(distDir.resolve("worker.js")), StandardCharsets.UTF_8);
+
+        // Translated with minification off, so there is nothing to map -- and no map.
+        assertFalse(Files.exists(sidecar.resolve(bundle + "-symbols.txt")),
+                "an unminified build should not write a symbol map");
         String protocolDoc = new String(Files.readAllBytes(distDir.resolve("vm_protocol.md")), StandardCharsets.UTF_8);
         String index = new String(Files.readAllBytes(distDir.resolve("index.html")), StandardCharsets.UTF_8);
         String browserBridge = new String(Files.readAllBytes(distDir.resolve("browser_bridge.js")), StandardCharsets.UTF_8);
@@ -706,6 +770,10 @@ class JavascriptTargetIntegrationTest {
     }
 
     static void runJavascriptTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
+        runJavascriptTranslator(classesDir, outputDir, appName, false);
+    }
+
+    static void runJavascriptTranslator(Path classesDir, Path outputDir, String appName, boolean minify) throws Exception {
         Class<?> translatorClass = ByteCodeTranslator.class;
         // The fixtures assert on canonical ``cn1_*`` / Java method names in
         // the emitted bundle; the whole-bundle identifier renamer and the
@@ -715,8 +783,13 @@ class JavascriptTargetIntegrationTest {
         // (that each construct TRANSLATES) rather than the minifier.
         String prevMinify = System.getProperty("parparvm.js.minify.idents.off");
         String prevAlias = System.getProperty("parparvm.js.alias.off");
-        System.setProperty("parparvm.js.minify.idents.off", "1");
-        System.setProperty("parparvm.js.alias.off", "1");
+        if (minify) {
+            System.clearProperty("parparvm.js.minify.idents.off");
+            System.clearProperty("parparvm.js.alias.off");
+        } else {
+            System.setProperty("parparvm.js.minify.idents.off", "1");
+            System.setProperty("parparvm.js.alias.off", "1");
+        }
         try {
             java.lang.reflect.Field verboseField = translatorClass.getField("verbose");
             boolean originalVerbose = verboseField.getBoolean(null);
