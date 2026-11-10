@@ -223,7 +223,7 @@ See the https://developer.mozilla.org/en-You/docs/Web/CSS/var[MDN docs] for more
 
 === Auditing a theme
 
-A theme drifts as it grows. A color gets typed as `#3366ff` in a new rule when `--brand` already holds it, a variable outlives the last rule that read it, and a UIID stays styled long after the screen that used it is gone. The `css-audit` goal finds these without compiling anything:
+A theme drifts as it grows. A color gets typed as `#3366ff` in a new rule when `--brand` already holds it, a variable outlives the last rule that read it, and a UIID stays styled long after its last screen was removed. The `css-audit` goal finds these without compiling anything:
 
 [source,bash]
 ----
