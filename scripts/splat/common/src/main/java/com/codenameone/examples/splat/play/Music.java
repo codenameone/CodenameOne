@@ -46,6 +46,13 @@ public final class Music {
     private static int wanted;
     private static int playing;
     private static Media media;
+    /// Set once a player ended almost as soon as it started. A player that
+    /// cannot read its clip reports completion at once, and looping on that
+    /// built a new player several times a second until the simulator's
+    /// browser engine crashed; a player that failed once stays quiet.
+    private static boolean broken;
+    /// A clip shorter than this never loops: both run for many seconds.
+    private static final long SHORTEST_LOOP = 2000;
 
     private Music() {
     }
@@ -91,7 +98,7 @@ public final class Music {
     }
 
     private static void apply() {
-        if (muted || wanted == playing && media != null) {
+        if (muted || broken || wanted == playing && media != null) {
             return;
         }
         halt();
@@ -106,10 +113,16 @@ public final class Music {
         final byte[] wav = what == MENU ? menu : field;
         try {
             final Media[] self = new Media[1];
+            final long started = System.currentTimeMillis();
             self[0] = MediaManager.createMedia(new ByteArrayInputStream(wav), "audio/wav", () -> CN.callSerially(() -> {
                 // At the end, go round again: the clips are written to loop.
                 // halt() releases the finished player before the next starts.
                 if (media == self[0] && playing == what) {
+                    if (System.currentTimeMillis() - started < SHORTEST_LOOP) {
+                        broken = true;
+                        halt();
+                        return;
+                    }
                     playing = 0;
                     apply();
                 }

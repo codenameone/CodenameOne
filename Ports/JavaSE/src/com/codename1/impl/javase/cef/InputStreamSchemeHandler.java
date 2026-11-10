@@ -71,13 +71,21 @@ public class InputStreamSchemeHandler extends CefResourceHandlerAdapter {
         if (streamId != null) {
             stream = BrowserPanel.getStreamRegistry().getStream(streamId);
             
-            if (range != null) {
+            if (range != null && stream != null) {
                 if (range.indexOf("=") != -1) {
                     rangeRequest = true;
                     range = range.substring(range.indexOf("=")+1);
                     String startStr = range.substring(0, range.indexOf("-"));
                     long start = Long.parseLong(startStr);
                     rangeStart = start;
+                    if (stream.getOffset() > start && stream.getStream().markSupported()) {
+                        // A request for an earlier part (Chromium probes the
+                        // end and comes back): rewind a buffered stream.
+                        try {
+                            stream.getStream().reset();
+                            stream.setOffset(0);
+                        } catch (IOException ex) {}
+                    }
                     if (stream.getOffset() < start) {
                         InputStream inputStream = stream.getStream();
                         int seekTo = (int)(start- stream.getOffset());
@@ -93,7 +101,7 @@ public class InputStreamSchemeHandler extends CefResourceHandlerAdapter {
 
             }
         }
-        System.out.println("Stream found "+stream+" offset "+stream.getOffset());
+        System.out.println("Stream found "+stream+" offset "+(stream == null ? -1 : stream.getOffset()));
         
         callback.Continue();
         
