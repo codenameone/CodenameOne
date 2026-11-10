@@ -53,6 +53,15 @@ public final class AttrSite {
     /// one still takes the generic read, which finds the class's value.
     private static final int FIELD = 3;
     private static final int BUILTIN = 3;
+    /// The instance lacks the attribute: no slot, no field, nothing in the
+    /// class, and no `__getattribute__` or `__getattr__` that could answer
+    /// it. Only [#getOrMiss] answers from it; a plain read still raises.
+    private static final int MISSING = 5;
+    /// The layout [#getOrMiss] last found missing, checked before the ways:
+    /// a probe that misses usually misses on one class.
+    private PyType missType;
+    private Shape missShape;
+    private int missVersion;
 
     private final String name;
     /// A builtin method this site calls directly when the receiver is that
@@ -282,6 +291,48 @@ public final class AttrSite {
             return getSlow(i);
         }
         return Py.obj(o).getAttr(name);
+    }
+
+    /// `obj.name` for a miss probe (see [Py#MISS]): [Py#MISS] when the read
+    /// would raise AttributeError without running any code -- remembered per
+    /// class and shape like a hit -- and a caught AttributeError from code
+    /// that did run comes back as a miss carrying it.
+    public Object getOrMiss(Object o) {
+        if (o instanceof PyInstance) {
+            PyInstance i = (PyInstance) o;
+            PyType cls = i.cls;
+            Shape shape = i.shape;
+            if (missType == cls && missShape == shape && missVersion == PyType.version) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return Py.MISS;
+            }
+            int k = findGet(cls, shape);
+            if (k >= 0 && getKinds[k] == MISSING) {
+                missType = cls;
+                missShape = shape;
+                missVersion = PyType.version;
+                return Py.MISS;
+            }
+            // A dunder (`__dict__`, `__class__`) is answered by the object
+            // itself, never from the shape or the class: it cannot be proved
+            // missing here.
+            if (k < 0 && !name.startsWith("__") && !cls.hasCustomGetattribute() && cls.lookup("__getattr__") == null
+                    && i.fieldIndex(name) < 0 && (shape == null || shape.indexOf(name) < 0)
+                    && cls.lookup(name) == null) {
+                addGet(cls, shape, MISSING, 0, null);
+                missType = cls;
+                missShape = shape;
+                missVersion = PyType.version;
+                return Py.MISS;
+            }
+        }
+        try {
+            return get(o);
+        } catch (PyException e) {
+            if (e.matches(Py.ATTRIBUTE_ERROR)) {
+                return new Py.Miss(e);
+            }
+            throw e;
+        }
     }
 
     private Object getSlow(PyInstance i) {

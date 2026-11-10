@@ -125,6 +125,12 @@ final class Infer {
     final Map<Expr, Integer> siteOf = new IdentityHashMap<Expr, Integer>();
     final List<Ty> siteElem = new ArrayList<Ty>();
     final Set<Integer> escapedSites = new HashSet<Integer>();
+    /// The type of each position of a tuple or list display, by allocation
+    /// site (see [#slot]). A tuple's never change once made; a list's hold
+    /// only while nothing reorders or resizes it -- anything but a store at
+    /// a constant index puts its site in [#unslotted].
+    final Map<Integer, Ty[]> siteSlots = new HashMap<Integer, Ty[]>();
+    final Set<Integer> unslotted = new HashSet<Integer>();
     boolean allListsEscape;
 
     private boolean changed;
@@ -144,6 +150,7 @@ final class Infer {
             in.walkBlock(body, null, moduleScope);
             in.unify();
             if (!in.changed) {
+                in.done = true;
                 return in;
             }
         }
@@ -565,7 +572,7 @@ final class Infer {
         if (!r.equals(cur)) {
             changed = true;
         }
-        if (r.k != Ty.K.LIST) {
+        if (r.k != Ty.K.LIST && r.k != Ty.K.TUPLE) {
             escape(v);
         }
         return r;
@@ -573,6 +580,25 @@ final class Infer {
 
     /// A value went somewhere the pass does not follow.
     void escape(Ty v) {
+        if (done) {
+            return;
+        }
+        if (v != null && v.k == Ty.K.TUPLE) {
+            // The tuple itself cannot change; what it holds now goes where
+            // the pass does not follow.
+            for (int s : v.sites) {
+                if (escapedSites.add(Integer.valueOf(s))) {
+                    changed = true;
+                    Ty[] sl = siteSlots.get(Integer.valueOf(s));
+                    if (sl != null) {
+                        for (Ty x : sl) {
+                            escape(x);
+                        }
+                    }
+                }
+            }
+            return;
+        }
         if (v != null && v.k == Ty.K.LIST) {
             if (v.sites.length == 0) {
                 if (!allListsEscape) {
@@ -583,6 +609,12 @@ final class Infer {
                 for (int s : v.sites) {
                     if (escapedSites.add(Integer.valueOf(s))) {
                         changed = true;
+                        Ty[] sl = siteSlots.get(Integer.valueOf(s));
+                        if (sl != null) {
+                            for (Ty x : sl) {
+                                escape(x);
+                            }
+                        }
                     }
                 }
             }
@@ -701,6 +733,11 @@ final class Infer {
         }
     }
 
+    /// Set once the fixpoint holds: the emitters then only read the result.
+    /// An escape from a read of theirs would change types the pass already
+    /// handed out, after the code using them was decided.
+    private boolean done;
+
     Ty elem(Ty list) {
         if (list.k != Ty.K.LIST || allListsEscape || list.sites.length == 0) {
             return Ty.DYN;
@@ -712,6 +749,18 @@ final class Infer {
             }
             r = Ty.join(r, siteElem.get(s));
         }
+        if (r.k == Ty.K.DYN && !done) {
+            // A display's mixed positions read as one dynamic element: what
+            // they hold is no longer followed.
+            for (int s : list.sites) {
+                Ty[] sl = siteSlots.get(Integer.valueOf(s));
+                if (sl != null) {
+                    for (Ty x : sl) {
+                        escape(x);
+                    }
+                }
+            }
+        }
         return r;
     }
 
@@ -720,9 +769,99 @@ final class Infer {
             escape(v);
             return;
         }
+        unslot(list);
         for (int s : list.sites) {
             siteElem.set(s, joinInto(siteElem.get(s), v));
         }
+    }
+
+    /// The list may since have been reordered or resized: its positions no
+    /// longer say what is where.
+    private void unslot(Ty list) {
+        if (list.k != Ty.K.LIST) {
+            return;
+        }
+        for (int s : list.sites) {
+            if (unslotted.add(Integer.valueOf(s))) {
+                changed = true;
+            }
+        }
+    }
+
+    /// A display's position `i` takes `v`.
+    private void joinSlot(int site, int n, int i, Ty v, boolean tuple) {
+        Integer key = Integer.valueOf(site);
+        Ty[] sl = siteSlots.get(key);
+        if (sl == null || sl.length != n) {
+            if (sl != null) {
+                unslotted.add(key);
+            }
+            sl = new Ty[n];
+            java.util.Arrays.fill(sl, Ty.BOT);
+            siteSlots.put(key, sl);
+        }
+        Ty r = Ty.join(sl[i], v);
+        if (!r.equals(sl[i])) {
+            sl[i] = r;
+            changed = true;
+        }
+        if (tuple ? escapedSites.contains(key) : r.k != Ty.K.LIST && r.k != Ty.K.TUPLE) {
+            escape(v);
+        }
+    }
+
+    /// What position `i` of a tuple or list holds; for a list whose
+    /// positions are not known, its elements.
+    Ty slot(Ty t, int i) {
+        if (t.k == Ty.K.LIST && slotCount(t) <= i) {
+            return elem(t);
+        }
+        if (t.k != Ty.K.TUPLE && t.k != Ty.K.LIST || t.sites.length == 0 || i < 0) {
+            return Ty.DYN;
+        }
+        Ty r = Ty.BOT;
+        for (int s : t.sites) {
+            Ty[] sl = siteSlots.get(Integer.valueOf(s));
+            if (sl == null || i >= sl.length) {
+                return t.k == Ty.K.LIST ? elem(t) : Ty.DYN;
+            }
+            r = Ty.join(r, sl[i]);
+        }
+        return r;
+    }
+
+    /// How many positions every site of `t` has, when they agree and are
+    /// known; otherwise -1.
+    int slotCount(Ty t) {
+        if (t.k != Ty.K.TUPLE && t.k != Ty.K.LIST || t.sites.length == 0
+                || t.k == Ty.K.LIST && allListsEscape) {
+            return -1;
+        }
+        int n = -1;
+        for (int s : t.sites) {
+            Integer key = Integer.valueOf(s);
+            Ty[] sl = siteSlots.get(key);
+            if (sl == null || t.k == Ty.K.LIST && (unslotted.contains(key) || escapedSites.contains(key))
+                    || n >= 0 && n != sl.length) {
+                return -1;
+            }
+            n = sl.length;
+        }
+        return n;
+    }
+
+    /// Every position of a tuple, joined: what iterating it or a variable
+    /// index yields.
+    Ty tupleElem(Ty t) {
+        int n = slotCount(t);
+        if (n < 0) {
+            return Ty.DYN;
+        }
+        Ty r = Ty.BOT;
+        for (int i = 0; i < n; i++) {
+            r = Ty.join(r, slot(t, i));
+        }
+        return r;
     }
 
     private int site(Expr e) {
@@ -804,7 +943,10 @@ final class Infer {
             AugAssign a = (AugAssign) s;
             Ty cur = type(a.target, fn, sc);
             Ty v = type(a.value, fn, sc);
-            Ty r = binop(a.op, cur, v, a.value);
+            // As for a plain operator: an operand nothing reaches yet leaves
+            // the result to a later pass, where DYN now would stay for good.
+            Ty r = v.k == Ty.K.BOT || cur.k == Ty.K.BOT && !(a.target instanceof Name) ? Ty.BOT
+                    : binop(a.op, cur, v, a.value);
             if (cur.k == Ty.K.LIST && "+".equals(a.op)) {
                 storeElem(cur, elem(v));
                 r = cur;
@@ -993,6 +1135,9 @@ final class Infer {
         if (t.k == Ty.K.LIST) {
             return elem(t);
         }
+        if (t.k == Ty.K.TUPLE) {
+            return tupleElem(t);
+        }
         if (t.k == Ty.K.STR && !t.opt) {
             // A str yields one-character strs.
             return Ty.STR;
@@ -1013,6 +1158,25 @@ final class Infer {
         return c.func instanceof Name && "range".equals(((Name) c.func).id) && c.keywords.isEmpty()
                 && c.args.size() >= 1 && c.args.size() <= 3 && sc.resolve("range") == Scope.Binding.BUILTIN
                 && !moduleScope.hasStarImport && !anyStarred(c.args);
+    }
+
+    /// A literal int index (`x[2]`, `x[-1]`) as an int; Integer.MIN_VALUE
+    /// for anything else.
+    static int constIndex(Expr e) {
+        boolean neg = false;
+        if (e instanceof UnaryOp && "-".equals(((UnaryOp) e).op)) {
+            neg = true;
+            e = ((UnaryOp) e).operand;
+        }
+        if (!(e instanceof Constant) || ((Constant) e).kind != Constant.Kind.INT) {
+            return Integer.MIN_VALUE;
+        }
+        String t = ((Constant) e).text.replace("_", "");
+        if (t.length() > 6 || !t.matches("[0-9]+")) {
+            return Integer.MIN_VALUE;
+        }
+        int v = Integer.parseInt(t);
+        return neg ? -v : v;
     }
 
     private static boolean anyStarred(List<Expr> l) {
@@ -1043,7 +1207,14 @@ final class Infer {
                 }
             } else {
                 type(s.index, fn, sc);
-                if (r.k == Ty.K.LIST) {
+                int ci = constIndex(s.index);
+                if (r.k == Ty.K.LIST && ci >= 0 && slotCount(r) > ci) {
+                    // Same position, same length: the positions still hold.
+                    for (int site : r.sites) {
+                        siteElem.set(site, joinInto(siteElem.get(site), v));
+                        joinSlot(site, slotCount(r), ci, v, false);
+                    }
+                } else if (r.k == Ty.K.LIST) {
                     storeElem(r, v);
                 } else if (r.k != Ty.K.BOT) {
                     escape(v);
@@ -1061,9 +1232,23 @@ final class Infer {
                 }
                 return;
             }
+            if (!starred && (v.k == Ty.K.TUPLE || v.k == Ty.K.LIST) && slotCount(v) == elts.size()) {
+                // Each target takes its own position (a length that does
+                // not match raises when unpacking).
+                for (int i = 0; i < elts.size(); i++) {
+                    store(elts.get(i), slot(v, i), null, fn, sc);
+                }
+                return;
+            }
             Ty each = Ty.DYN;
             if (value != null && rangeCall(value, sc)) {
                 each = Ty.INT;
+            } else if (v.k == Ty.K.BOT) {
+                // Nothing reaches the value yet: a later pass decides, where
+                // DYN now would stay DYN for good.
+                each = Ty.BOT;
+            } else if (v.k == Ty.K.TUPLE) {
+                each = tupleElem(v);
             } else if (v.k == Ty.K.LIST) {
                 each = elem(v);
             } else {
@@ -1277,6 +1462,7 @@ final class Infer {
             Ty l = type(b.left, fn, sc);
             Ty r = type(b.right, fn, sc);
             if ("*".equals(b.op) && b.left instanceof ListExpr && l.k == Ty.K.LIST) {
+                unslot(l);
                 return Ty.list(l.sites, false);
             }
             if ("+".equals(b.op) && l.k == Ty.K.LIST && r.k == Ty.K.LIST) {
@@ -1287,7 +1473,7 @@ final class Infer {
             if (l.k == Ty.K.BOT || r.k == Ty.K.BOT) {
                 return Ty.BOT;
             }
-            Ty t = binop(b.op, l, r, b.right);
+            Ty t = realPow(b, l, r) ? Ty.FLOAT : binop(b.op, l, r, b.right);
             if (t.k == Ty.K.DYN) {
                 escape(l);
                 escape(r);
@@ -1344,7 +1530,15 @@ final class Infer {
         if (e instanceof IfExp) {
             IfExp i = (IfExp) e;
             type(i.test, fn, sc);
-            return Ty.join(type(i.body, fn, sc), type(i.orelse, fn, sc));
+            Ty a = type(i.body, fn, sc);
+            Ty b = type(i.orelse, fn, sc);
+            Ty r = Ty.join(a, b);
+            if (r.k == Ty.K.DYN) {
+                // Neither side is followed past here.
+                escape(a);
+                escape(b);
+            }
+            return r;
         }
         if (e instanceof Subscript) {
             Subscript s = (Subscript) e;
@@ -1352,6 +1546,8 @@ final class Infer {
             if (s.index instanceof Slice) {
                 anyChildren(s.index, fn, sc);
                 if (r.k == Ty.K.LIST && !r.opt) {
+                    // The slice shares the sites but not the positions.
+                    unslot(r);
                     return Ty.list(r.sites, false);
                 }
                 if (r.k == Ty.K.STR && !r.opt) {
@@ -1366,8 +1562,16 @@ final class Infer {
             if (r.k == Ty.K.BOT || r.k == Ty.K.NONE || i.k == Ty.K.BOT) {
                 return Ty.BOT;
             }
+            int ci = constIndex(s.index);
             if (r.k == Ty.K.LIST && (i.k == Ty.K.INT || i.k == Ty.K.BOOL)) {
-                return elem(r);
+                return ci >= 0 ? slot(r, ci) : elem(r);
+            }
+            if (r.k == Ty.K.TUPLE && (i.k == Ty.K.INT || i.k == Ty.K.BOOL)) {
+                int n = slotCount(r);
+                if (ci < 0 && ci != Integer.MIN_VALUE && n > 0 && n + ci >= 0) {
+                    ci = n + ci;
+                }
+                return ci >= 0 ? slot(r, ci) : tupleElem(r);
             }
             escape(r);
             escape(i);
@@ -1376,16 +1580,41 @@ final class Infer {
         if (e instanceof ListExpr) {
             ListExpr l = (ListExpr) e;
             int s = site(l);
-            for (Expr x : l.elts) {
+            boolean starred = anyStarred(l.elts);
+            if (starred && unslotted.add(Integer.valueOf(s))) {
+                changed = true;
+            }
+            for (int i = 0; i < l.elts.size(); i++) {
+                Expr x = l.elts.get(i);
                 if (x instanceof Starred) {
                     Ty t = type(((Starred) x).value, fn, sc);
                     siteElem.set(s, joinInto(siteElem.get(s), t.k == Ty.K.LIST ? elem(t) : Ty.DYN));
                     escape(t);
                 } else {
-                    siteElem.set(s, joinInto(siteElem.get(s), type(x, fn, sc)));
+                    Ty t = type(x, fn, sc);
+                    if (starred) {
+                        siteElem.set(s, joinInto(siteElem.get(s), t));
+                    } else {
+                        // The position follows the value; a read of the
+                        // joined elements escapes it if they lose it (elem).
+                        Ty j = Ty.join(siteElem.get(s), t);
+                        if (!j.equals(siteElem.get(s))) {
+                            siteElem.set(s, j);
+                            changed = true;
+                        }
+                        joinSlot(s, l.elts.size(), i, t, false);
+                    }
                 }
             }
             return Ty.list(new int[] {s}, false);
+        }
+        if (e instanceof TupleExpr && !anyStarred(((TupleExpr) e).elts)) {
+            TupleExpr tu = (TupleExpr) e;
+            int s = site(tu);
+            for (int i = 0; i < tu.elts.size(); i++) {
+                joinSlot(s, tu.elts.size(), i, type(tu.elts.get(i), fn, sc), true);
+            }
+            return Ty.tuple(new int[] {s});
         }
         if (e instanceof NamedExpr) {
             NamedExpr n = (NamedExpr) e;
@@ -1531,6 +1760,38 @@ final class Infer {
             escapeMethods(attr);
         }
         return Ty.DYN;
+    }
+
+    /// A float `**` whose answer is real: `binop` cannot see the operands,
+    /// and a negative base to a fractional power answers a complex. The
+    /// exponent is integral, or the base is a sum of squares (`dx * dx + ...`)
+    /// or a non-negative constant.
+    static boolean realPow(BinOp b, Ty l, Ty r) {
+        boolean ln = l.k == Ty.K.FLOAT || l.k == Ty.K.INT || l.k == Ty.K.BOOL;
+        boolean rn = r.k == Ty.K.FLOAT || r.k == Ty.K.INT || r.k == Ty.K.BOOL;
+        if (!"**".equals(b.op) || l.opt || r.opt || !ln || !rn || l.k != Ty.K.FLOAT && r.k != Ty.K.FLOAT) {
+            return false;
+        }
+        return r.k != Ty.K.FLOAT && r.k != Ty.K.BOT || nonNegative(b.left);
+    }
+
+    private static boolean nonNegative(Expr e) {
+        if (e instanceof Constant) {
+            Constant c = (Constant) e;
+            return (c.kind == Constant.Kind.INT || c.kind == Constant.Kind.FLOAT) && !c.text.startsWith("-");
+        }
+        if (e instanceof BinOp) {
+            BinOp b = (BinOp) e;
+            if ("+".equals(b.op)) {
+                return nonNegative(b.left) && nonNegative(b.right);
+            }
+            if ("*".equals(b.op)) {
+                return b.left instanceof Name && b.right instanceof Name
+                        && ((Name) b.left).id.equals(((Name) b.right).id)
+                        || nonNegative(b.left) && nonNegative(b.right);
+            }
+        }
+        return false;
     }
 
     static Ty binop(String op, Ty l, Ty r, Expr right) {
@@ -1741,7 +2002,7 @@ final class Infer {
             }
             if (simple && args.size() == 1 && ("len".equals(n) || "isinstance".equals(n) && false)) {
                 // len reads its argument and keeps nothing.
-                if (args.get(0).k != Ty.K.LIST) {
+                if (args.get(0).k != Ty.K.LIST && args.get(0).k != Ty.K.TUPLE) {
                     escape(args.get(0));
                 }
                 return Ty.INT;
@@ -1794,6 +2055,9 @@ final class Infer {
     }
 
     private Ty listMethod(Ty r, String m, List<Ty> args) {
+        if (!"index".equals(m) && !"count".equals(m) && !"copy".equals(m)) {
+            unslot(r);
+        }
         switch (m) {
             case "append":
                 if (args.size() == 1) {
@@ -1952,7 +2216,12 @@ final class Infer {
                     .append(definite.get(e.getKey())).append('\n');
         }
         b.append("globals ").append(globals).append("\nsites ").append(siteElem).append(" escaped ")
-                .append(escapedSites).append(allListsEscape ? " ALL" : "").append('\n');
+                .append(escapedSites).append(allListsEscape ? " ALL" : "").append(" unslotted ").append(unslotted)
+                .append('\n');
+        for (Map.Entry<Integer, Ty[]> e : siteSlots.entrySet()) {
+            b.append("  slots ").append(e.getKey()).append(' ').append(java.util.Arrays.toString(e.getValue()))
+                    .append('\n');
+        }
         return b.toString();
     }
 }

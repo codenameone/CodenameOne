@@ -2395,6 +2395,9 @@ public final class Emitter {
 
     /// A Java boolean expression for a Python condition.
     String cond(Expr e) {
+        if (e instanceof Call && ((Call) e).func instanceof Name && "$ismiss".equals(((Name) ((Call) e).func).id)) {
+            return missTest((Call) e);
+        }
         if (e instanceof Constant && ((Constant) e).kind == Constant.Kind.TRUE) {
             // Not the literal: javac would then reject the code after a
             // `while True` it cannot see a break out of.
@@ -2791,7 +2794,64 @@ public final class Emitter {
         return true;
     }
 
+    /// The hidden calls of a miss probe (`Parser.missProbe`); null for any
+    /// other call. `$` cannot start a Python name, so none is user code.
+    /// The re-read in `$unmiss` takes the operands directly: they are names
+    /// and constants, and only the lookup itself may run twice -- when it
+    /// ran no code the first time (`Py.MISS`).
+    private String missIntrinsic(Call c) {
+        if (!(c.func instanceof Name) || !((Name) c.func).id.startsWith("$")) {
+            return null;
+        }
+        String fn = ((Name) c.func).id;
+        if ("$probe".equals(fn)) {
+            return probeRead(c.args.get(0), true);
+        }
+        if ("$unmiss".equals(fn)) {
+            String m = expr(c.args.get(0));
+            return "(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : Py.unmissed(" + m + "))";
+        }
+        if ("$ismiss".equals(fn)) {
+            return "(" + missTest(c) + " ? Py.TRUE : Py.FALSE)";
+        }
+        return null;
+    }
+
+    /// `getattr(obj, "name", default)` with a literal name and a default that
+    /// is a name or constant, so reading it after the lookup changes nothing:
+    /// the attribute site's miss probe instead of a generic call that walks
+    /// the class on every miss.
+    static boolean getattrDefault(Call c) {
+        return c.func instanceof Name && "getattr".equals(((Name) c.func).id) && c.args.size() == 3
+                && c.keywords.isEmpty() && c.args.get(1) instanceof Constant
+                && ((Constant) c.args.get(1)).kind == Constant.Kind.STR
+                && (c.args.get(2) instanceof Name || c.args.get(2) instanceof Constant)
+                && !(c.args.get(0) instanceof Starred);
+    }
+
+    String missTest(Call c) {
+        return "Py.isMiss(" + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + ", "
+                + ("AttributeError".equals(((Name) c.args.get(1)).id) ? "Py.ATTRIBUTE_ERROR" : "Py.KEY_ERROR") + ")";
+    }
+
+    private String probeRead(Expr e, boolean probe) {
+        if (e instanceof Attribute) {
+            Attribute a = (Attribute) e;
+            return site(a.attr) + (probe ? ".getOrMiss(" : ".get(") + expr(a.value) + ")";
+        }
+        Subscript s = (Subscript) e;
+        return (probe ? "Py.getitemOrMiss(" : "Py.getitem(") + expr(s.value) + ", " + expr(s.index) + ")";
+    }
+
     private String call(Call c) {
+        String miss = missIntrinsic(c);
+        if (miss != null) {
+            return miss;
+        }
+        if (getattrDefault(c) && sc.resolve("getattr") == Scope.Binding.BUILTIN) {
+            return "Py.orDefault(" + site(((Constant) c.args.get(1)).text) + ".getOrMiss(" + expr(c.args.get(0)) + "), "
+                    + expr(c.args.get(2)) + ")";
+        }
         if (c.func instanceof Lambda && c.keywords.isEmpty()) {
             Lambda l = (Lambda) c.func;
             Arguments la = l.args;

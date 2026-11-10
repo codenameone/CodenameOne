@@ -2877,7 +2877,12 @@ final class TypedEmit {
                     return c;
                 }
             }
-            return binop(b.op, expr(b.left), expr(b.right), b.right);
+            E bl = expr(b.left);
+            E br = expr(b.right);
+            if (Infer.realPow(b, bl.t, br.t)) {
+                return new E("Typed.pow(" + toD(bl) + ", " + toD(br) + ")", Ty.FLOAT);
+            }
+            return binop(b.op, bl, br, b.right);
         }
         if (e instanceof UnaryOp) {
             UnaryOp u = (UnaryOp) e;
@@ -4290,7 +4295,46 @@ final class TypedEmit {
         return r;
     }
 
+    /// The hidden calls of a miss probe, as `Emitter.missIntrinsic` lowers
+    /// them.
+    private E missIntrinsic(Call c) {
+        String fn = ((Name) c.func).id;
+        if ("$probe".equals(fn)) {
+            return new E(probeRead(c.args.get(0), true), Ty.DYN);
+        }
+        if ("$unmiss".equals(fn)) {
+            String m = box(expr(c.args.get(0)));
+            return new E("(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : Py.unmissed(" + m + "))",
+                    Ty.DYN);
+        }
+        if ("$ismiss".equals(fn)) {
+            return new E("Py.isMiss(" + box(expr(c.args.get(0))) + ", " + excRef(c.args.get(1)) + ", "
+                    + ("AttributeError".equals(((Name) c.args.get(1)).id) ? "Py.ATTRIBUTE_ERROR" : "Py.KEY_ERROR") + ")",
+                    Ty.BOOL);
+        }
+        return null;
+    }
+
+    private String probeRead(Expr e, boolean probe) {
+        if (e instanceof Attribute) {
+            Attribute a = (Attribute) e;
+            return em.attrSite(a.attr) + (probe ? ".getOrMiss(" : ".get(") + box(expr(a.value)) + ")";
+        }
+        Subscript s = (Subscript) e;
+        return (probe ? "Py.getitemOrMiss(" : "Py.getitem(") + box(expr(s.value)) + ", " + box(expr(s.index)) + ")";
+    }
+
     private E call0(Call c) {
+        if (c.func instanceof Name && ((Name) c.func).id.startsWith("$")) {
+            E miss = missIntrinsic(c);
+            if (miss != null) {
+                return miss;
+            }
+        }
+        if (Emitter.getattrDefault(c) && binding("getattr") == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport()) {
+            return new E("Py.orDefault(" + em.attrSite(((Constant) c.args.get(1)).text) + ".getOrMiss("
+                    + box(expr(c.args.get(0))) + "), " + box(expr(c.args.get(2))) + ")", Ty.DYN);
+        }
         if (c.args.size() == 1 && c.args.get(0) instanceof Name && codePoints.containsKey(((Name) c.args.get(0)).id)
                 && ordOf(c, ((Name) c.args.get(0)).id)) {
             String l = "((long) " + codePoints.get(((Name) c.args.get(0)).id) + ")";

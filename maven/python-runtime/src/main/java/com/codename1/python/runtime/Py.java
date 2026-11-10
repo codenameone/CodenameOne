@@ -1383,6 +1383,66 @@ public final class Py {
         Py.obj(o).setAttr(name, v);
     }
 
+    // ---- lookups that miss without raising -----------------------------------
+    //
+    // `try: x += obj.attr / d[key]` with one `except AttributeError` /
+    // `except KeyError` is lowered by the parser into a probe, a branch and the
+    // original try (see Parser.missProbe): the probe answers MISS instead of
+    // raising, so the common miss builds no exception and unwinds nothing.
+
+    /// A probe found nothing and ran no code while looking: re-reading is
+    /// pure, so [#unmissed] may evaluate the original expression again.
+    public static final Object MISS = new Object();
+
+    /// A probe that caught the error it stands for, raised by code that ran
+    /// (a `__getitem__`, a property): that exception is rethrown rather than
+    /// evaluating the code a second time.
+    static final class Miss {
+        final PyException error;
+
+        Miss(PyException error) {
+            this.error = error;
+        }
+    }
+
+    /// `d[key]` for the probe: [#MISS] when an exact dict lacks the key, a
+    /// [Miss] for a KeyError raised anywhere else.
+    public static Object getitemOrMiss(Object o, Object key) {
+        if (o instanceof PyDict && o.getClass() == PyDict.class) {
+            Object v = ((PyDict) o).getOrNull(key);
+            return v == null ? MISS : v;
+        }
+        try {
+            return getitem(o, key);
+        } catch (PyException e) {
+            if (e.matches(KEY_ERROR)) {
+                return new Miss(e);
+            }
+            throw e;
+        }
+    }
+
+    /// Whether the probe missed AND the handler names the builtin it was
+    /// lowered for. A module that rebinds `KeyError` takes the original try,
+    /// where [#unmissed] raises the real error for its handler to match.
+    public static boolean isMiss(Object m, Object handlerType, Object builtin) {
+        return (m == MISS || m instanceof Miss) && handlerType == builtin; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// The probed value, or the error it stands for: a [Miss] rethrows its
+    /// exception; [#MISS] answers null and the caller re-reads.
+    public static Object unmissed(Object m) {
+        if (m instanceof Miss) {
+            throw ((Miss) m).error;
+        }
+        return m == MISS ? null : m; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// `getattr(obj, name, default)` over a probe.
+    public static Object orDefault(Object m, Object dflt) {
+        return m == MISS || m instanceof Miss ? dflt : m; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
     public static Object getitem(Object o, Object key) {
         if (o instanceof PyList) {
             PyList l = (PyList) o;

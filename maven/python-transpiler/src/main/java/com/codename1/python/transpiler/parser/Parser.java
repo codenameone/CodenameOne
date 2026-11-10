@@ -569,7 +569,224 @@ public final class Parser {
         if (handlers.isEmpty() && fin.isEmpty()) {
             throw err(peek(), "expected 'except' or 'finally' block");
         }
-        return new Try(body, handlers, orelse, fin, star).at(t.line, t.col);
+        Try parsed = new Try(body, handlers, orelse, fin, star).at(t.line, t.col);
+        Stmt probed = missProbe(parsed);
+        return probed != null ? probed : parsed;
+    }
+
+    /// Hidden locals of the miss probes, numbered per module.
+    private int missProbes;
+
+    /// `try: hits += d[key]` / `try: hits += obj.attr` with one bare
+    /// `except KeyError:` / `except AttributeError:` -- a dict miss or a
+    /// duck-typing probe, the commonest exception-as-control-flow there is --
+    /// as a branch:
+    ///
+    /// ```
+    /// $m = $probe(d[key])
+    /// if $ismiss($m, KeyError): <handler>
+    /// else: try: hits += $unmiss($m, d[key])  except KeyError: <handler>
+    /// ```
+    ///
+    /// The probe answers a sentinel instead of raising (`Py.getitemOrMiss`,
+    /// `AttrSite.getOrMiss`), so a miss allocates no exception and unwinds
+    /// nothing. The original try stays around the rest of the statement, so
+    /// the same error raised by anything else in it is still caught, and
+    /// `$ismiss` compares the handler's type with the builtin at run time: a
+    /// module that rebinds the name gets the original try, whose `$unmiss`
+    /// raises the real error. Only taken when the probe is the statement's
+    /// one lookup of its kind and the rest is operators on names and
+    /// constants (hoisting the probe then reorders nothing observable), and
+    /// when the handler calls nothing and raises nothing -- it runs without
+    /// the exception set, so it must not be able to observe it.
+    private Stmt missProbe(Try t) {
+        if (t.star || t.handlers.size() != 1 || !t.orelse.isEmpty() || t.body.size() != 1) {
+            return null;
+        }
+        ExceptHandler h = t.handlers.get(0);
+        if (h.name != null || !(h.type instanceof Name)) {
+            return null;
+        }
+        String err = ((Name) h.type).id;
+        boolean attr = "AttributeError".equals(err);
+        if (!attr && !"KeyError".equals(err)) {
+            return null;
+        }
+        for (Stmt hs : h.body) {
+            if (!quietStmt(hs)) {
+                return null;
+            }
+        }
+        Stmt st = t.body.get(0);
+        Expr value;
+        if (st instanceof AugAssign && ((AugAssign) st).target instanceof Name) {
+            value = ((AugAssign) st).value;
+        } else if (st instanceof Assign && allNames(((Assign) st).targets)) {
+            value = ((Assign) st).value;
+        } else if (st instanceof ExprStmt) {
+            value = ((ExprStmt) st).value;
+        } else {
+            return null;
+        }
+        if (!plainBody(value)) {
+            return null;
+        }
+        List<Expr> found = new ArrayList<Expr>();
+        lookups(value, attr, found);
+        if (found.size() != 1) {
+            return null;
+        }
+        Expr probe = found.get(0);
+        if (attr ? !sideEffectFree(((Attribute) probe).value)
+                : !sideEffectFree(((Subscript) probe).value) || !sideEffectFree(((Subscript) probe).index)) {
+            return null;
+        }
+        String m = "$m" + (++missProbes);
+        Call unmiss = new Call(new Name("$unmiss").at(probe.line, probe.col)).at(probe.line, probe.col);
+        unmiss.args.add(new Name(m).at(probe.line, probe.col));
+        unmiss.args.add(probe);
+        Expr replaced = replace(value, probe, unmiss);
+        Stmt rewritten;
+        if (st instanceof AugAssign) {
+            AugAssign a = (AugAssign) st;
+            rewritten = new AugAssign(a.target, a.op, replaced).at(st.line, st.col);
+        } else if (st instanceof Assign) {
+            rewritten = new Assign(((Assign) st).targets, replaced).at(st.line, st.col);
+        } else {
+            rewritten = new ExprStmt(replaced).at(st.line, st.col);
+        }
+        List<Stmt> guarded = new ArrayList<Stmt>();
+        guarded.add(rewritten);
+        List<Stmt> orig = new ArrayList<Stmt>();
+        orig.add(new Try(guarded, t.handlers, new ArrayList<Stmt>(), new ArrayList<Stmt>(), false).at(t.line, t.col));
+        Call probeCall = new Call(new Name("$probe").at(probe.line, probe.col)).at(probe.line, probe.col);
+        probeCall.args.add(probe);
+        List<Expr> targets = new ArrayList<Expr>();
+        targets.add(new Name(m).at(t.line, t.col));
+        Call isMiss = new Call(new Name("$ismiss").at(t.line, t.col)).at(t.line, t.col);
+        isMiss.args.add(new Name(m).at(t.line, t.col));
+        isMiss.args.add(h.type);
+        List<Stmt> out = new ArrayList<Stmt>();
+        out.add(new Assign(targets, probeCall).at(t.line, t.col));
+        out.add(new If(isMiss, h.body, orig).at(t.line, t.col));
+        // A try with no handlers is a plain block, or keeps its finally.
+        return new Try(out, new ArrayList<ExceptHandler>(), new ArrayList<Stmt>(), t.finalbody, false)
+                .at(t.line, t.col);
+    }
+
+    private static boolean allNames(List<Expr> targets) {
+        for (Expr e : targets) {
+            if (!(e instanceof Name)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A handler statement that cannot observe the exception: assignments
+    /// and expressions of operators, no call, no raise.
+    private boolean quietStmt(Stmt s) {
+        if (s instanceof Pass) {
+            return true;
+        }
+        if (s instanceof AugAssign) {
+            AugAssign a = (AugAssign) s;
+            return plainBody(a.target) && plainBody(a.value);
+        }
+        if (s instanceof Assign) {
+            Assign a = (Assign) s;
+            for (Expr e : a.targets) {
+                if (!plainBody(e)) {
+                    return false;
+                }
+            }
+            return plainBody(a.value);
+        }
+        return s instanceof ExprStmt && plainBody(((ExprStmt) s).value);
+    }
+
+    /// The attribute reads (or subscripts) in a [#plainBody] expression.
+    private static void lookups(Expr e, boolean attr, List<Expr> out) {
+        if (e instanceof Attribute) {
+            if (attr) {
+                out.add(e);
+            }
+            lookups(((Attribute) e).value, attr, out);
+        } else if (e instanceof Subscript) {
+            if (!attr) {
+                out.add(e);
+            }
+            lookups(((Subscript) e).value, attr, out);
+            lookups(((Subscript) e).index, attr, out);
+        } else if (e instanceof BinOp) {
+            lookups(((BinOp) e).left, attr, out);
+            lookups(((BinOp) e).right, attr, out);
+        } else if (e instanceof UnaryOp) {
+            lookups(((UnaryOp) e).operand, attr, out);
+        } else if (e instanceof Compare) {
+            lookups(((Compare) e).left, attr, out);
+            for (Expr x : ((Compare) e).comparators) {
+                lookups(x, attr, out);
+            }
+        } else if (e instanceof BoolOp) {
+            for (Expr x : ((BoolOp) e).values) {
+                lookups(x, attr, out);
+            }
+        } else if (e instanceof IfExp) {
+            lookups(((IfExp) e).test, attr, out);
+            lookups(((IfExp) e).body, attr, out);
+            lookups(((IfExp) e).orelse, attr, out);
+        } else if (e instanceof TupleExpr) {
+            for (Expr x : ((TupleExpr) e).elts) {
+                lookups(x, attr, out);
+            }
+        }
+    }
+
+    /// `e` with the node `from` (by identity) replaced by `to`.
+    private static Expr replace(Expr e, Expr from, Expr to) {
+        if (e == from) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return to;
+        }
+        Expr r = e;
+        if (e instanceof Attribute) {
+            Attribute a = (Attribute) e;
+            r = new Attribute(replace(a.value, from, to), a.attr);
+        } else if (e instanceof Subscript) {
+            Subscript a = (Subscript) e;
+            r = new Subscript(replace(a.value, from, to), replace(a.index, from, to));
+        } else if (e instanceof BinOp) {
+            BinOp b = (BinOp) e;
+            r = new BinOp(replace(b.left, from, to), b.op, replace(b.right, from, to));
+        } else if (e instanceof UnaryOp) {
+            UnaryOp u = (UnaryOp) e;
+            r = new UnaryOp(u.op, replace(u.operand, from, to));
+        } else if (e instanceof Compare) {
+            Compare c = (Compare) e;
+            Compare n = new Compare(replace(c.left, from, to));
+            n.ops.addAll(c.ops);
+            for (Expr x : c.comparators) {
+                n.comparators.add(replace(x, from, to));
+            }
+            r = n;
+        } else if (e instanceof BoolOp) {
+            BoolOp b = (BoolOp) e;
+            List<Expr> v = new ArrayList<Expr>();
+            for (Expr x : b.values) {
+                v.add(replace(x, from, to));
+            }
+            r = new BoolOp(b.isAnd, v);
+        } else if (e instanceof IfExp) {
+            IfExp i = (IfExp) e;
+            r = new IfExp(replace(i.test, from, to), replace(i.body, from, to), replace(i.orelse, from, to));
+        } else if (e instanceof TupleExpr) {
+            List<Expr> v = new ArrayList<Expr>();
+            for (Expr x : ((TupleExpr) e).elts) {
+                v.add(replace(x, from, to));
+            }
+            r = new TupleExpr(v);
+        }
+        return r == e ? e : r.at(e.line, e.col); //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     private Stmt withStmt(boolean isAsync) {

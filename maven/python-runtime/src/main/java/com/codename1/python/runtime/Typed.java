@@ -330,6 +330,22 @@ public final class Typed {
     }
 
     /// `a / b` of two ints.
+    /// `x ** y` for two floats the transpiler proved has a real answer (an
+    /// integral exponent, or a base that cannot be negative). The cases Python
+    /// raises on, a zero base to a negative power and an overflow, go through
+    /// the boxed operator so they raise as it does.
+    public static double pow(double x, double y) {
+        double r = Py.powd(x, y);
+        if (!Double.isNaN(r) && !Double.isInfinite(r)) {
+            return r;
+        }
+        Object o = Py.pow(Double.valueOf(x), Double.valueOf(y));
+        if (o instanceof Double) {
+            return ((Double) o).doubleValue();
+        }
+        throw Py.error(Py.TYPE_ERROR, "float ** float answered a complex");
+    }
+
     public static double truediv(Object a, Object b) {
         return Py.asDouble(Py.truediv(a, b));
     }
