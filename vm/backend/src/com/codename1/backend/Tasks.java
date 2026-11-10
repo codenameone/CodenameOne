@@ -95,6 +95,8 @@ public final class Tasks {
         /// a bean an authorization expression names -- or null. Kept here because
         /// this is what a thread carries of the server it works for.
         private Map namedBeans;
+        /// Resources opened on first use by [Tasks#resource], closed at shutdown.
+        private final Map resources = new LinkedHashMap();
 
         synchronized void namedBeans(Map beans) {
             this.namedBeans = beans;
@@ -178,6 +180,57 @@ public final class Tasks {
 
     /// The bean the wiring of the calling thread's server registered under
     /// `name`, or null.
+    /// The calling thread's server's configuration, or null.
+    static Config currentConfig() {
+        return current().config;
+    }
+
+    /// The calling thread's server's resource under `key`, opened on first use.
+    /// Opened outside the registry's lock, since opening one may take a network
+    /// round trip; two callers racing to open it keep the first and close the
+    /// other.
+    static Object resource(String key, com.codename1.impl.backend.BackendAccess.ResourceFactory
+            factory) throws java.io.IOException {
+        Registry r = current();
+        synchronized (r) {
+            if (r.shutdown) {
+                throw new java.io.IOException("The server is stopping");
+            }
+            Object existing = r.resources.get(key);
+            if (existing != null) {
+                return existing;
+            }
+        }
+        Object opened = factory.open(r.config == null
+                ? Config.of(new java.util.Properties(), null) : r.config);
+        synchronized (r) {
+            Object existing = r.resources.get(key);
+            if (existing == null && !r.shutdown) {
+                r.resources.put(key, opened);
+                return opened;
+            }
+        }
+        closeQuietly(opened);
+        Object existing;
+        synchronized (r) {
+            existing = r.resources.get(key);
+        }
+        if (existing == null) {
+            throw new java.io.IOException("The server is stopping");
+        }
+        return existing;
+    }
+
+    private static void closeQuietly(Object resource) {
+        if (resource instanceof java.io.Closeable) {
+            try {
+                ((java.io.Closeable) resource).close();
+            } catch (java.io.IOException | RuntimeException err) {
+                System.err.println("Closing " + resource + " failed: " + err);
+            }
+        }
+    }
+
     static Object namedBean(String name) {
         return current().namedBean(name);
     }
@@ -397,6 +450,17 @@ public final class Tasks {
         for (Object element : all) {
             long left = deadline - System.currentTimeMillis();
             ((TaskExecutor) element).shutdown(left > 0 ? left : 0);
+        }
+        // After the executors: work still finishing used these. Newest first,
+        // so a resource built over another (a listener container over its
+        // connection) goes before what it uses.
+        List resources;
+        synchronized (registry) {
+            resources = new ArrayList(registry.resources.values());
+            registry.resources.clear();
+        }
+        for (int i = resources.size() - 1; i >= 0; i--) {
+            closeQuietly(resources.get(i));
         }
     }
 }

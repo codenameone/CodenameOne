@@ -355,4 +355,15 @@ final class Access extends BackendAccess {
     public List executorsOf(Collection servers) {
         return Tasks.executorsOf(servers);
     }
+
+    @Override
+    public Object serverResource(String key, BackendAccess.ResourceFactory factory)
+            throws IOException {
+        return Tasks.resource(key, factory);
+    }
+
+    @Override
+    public Config currentConfig() {
+        return Tasks.currentConfig();
+    }
 }

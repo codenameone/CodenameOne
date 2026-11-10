@@ -319,12 +319,32 @@ public final class Management implements HttpServer.Handler {
                 db.put("idle", Integer.valueOf(backend.getDataSource().getIdleCount()));
                 out.put("database", db);
             }
+            keyValue(out);
         } else {
             // Not attached yet: the server is still being put together.
             up = false;
             out.put("status", "STARTING");
         }
         return request.respondJson(up ? 200 : 503, out);
+    }
+
+    /// The shared key/value store's reachability, when `cn1.kv.url` names one.
+    /// Reported, not judged: caching and rate limits carry on without the store,
+    /// so taking every replica out of the load balancer because Redis blinked
+    /// would turn a degraded service into no service.
+    private void keyValue(Map out) {
+        Map kv = new LinkedHashMap();
+        try {
+            if (!com.codename1.backend.kv.KeyValueStores.isConfigured(backend.getConfig())) {
+                return;
+            }
+            kv.put("status", com.codename1.backend.kv.KeyValueStores.current().ping()
+                    ? "UP" : "DOWN");
+        } catch (IOException err) {
+            kv.put("status", "DOWN");
+            kv.put("error", String.valueOf(err.getMessage()));
+        }
+        out.put("keyValue", kv);
     }
 
     /// Whether the process should be left running, as a liveness probe asks:

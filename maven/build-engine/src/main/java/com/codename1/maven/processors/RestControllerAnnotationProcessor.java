@@ -3940,6 +3940,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// `application-<profile>.properties` beside it -- what a build can know about
     /// a setting that Config will read at run time.
     static boolean applicationPropertyKnown(ProcessorContext ctx, String key) {
+        return applicationProperty(ctx, key) != null;
+    }
+
+    /// The first value `key` has in the module's `application.properties` or an
+    /// `application-<profile>.properties` beside it, or null for none.
+    static String applicationProperty(ProcessorContext ctx, String key) {
         for (File f : applicationPropertyFiles(ctx)) {
             java.util.Properties props = new java.util.Properties();
             InputStream in = null;
@@ -3957,11 +3963,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     }
                 }
             }
-            if (props.getProperty(key) != null) {
-                return true;
+            String v = props.getProperty(key);
+            if (v != null) {
+                return v;
             }
         }
-        return false;
+        return null;
     }
 
     /// The module's base `application.properties`, loaded, or null when it has

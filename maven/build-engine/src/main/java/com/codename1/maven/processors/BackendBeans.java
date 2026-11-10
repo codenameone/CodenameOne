@@ -97,6 +97,13 @@ final class BackendBeans {
     static final String MANAGED_OPERATION = PKG + "ManagedOperation;";
     static final String TIMED = PKG + "Timed;";
     static final String COUNTED = PKG + "Counted;";
+    static final String CACHEABLE = PKG + "Cacheable;";
+    static final String CACHE_PUT = PKG + "CachePut;";
+    static final String CACHE_EVICT = PKG + "CacheEvict;";
+    static final String ENABLE_CACHING = PKG + "EnableCaching;";
+    /// The caching annotations, and how each is written.
+    static final String[] CACHING = {CACHEABLE, CACHE_PUT, CACHE_EVICT};
+    static final String[] CACHING_SHOWN = {"@Cacheable", "@CachePut", "@CacheEvict"};
     static final String MCP_TOOL = PKG + "McpTool;";
     static final String MCP_PARAM = PKG + "McpParam;";
     static final String MVC_CONTROLLER = PKG + "Controller;";
@@ -127,7 +134,7 @@ final class BackendBeans {
                     PROFILE, ON_PROPERTY, ON_EXPRESSION, ON_MISSING,
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
-                    MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
+                    CACHEABLE, CACHE_PUT, CACHE_EVICT, ENABLE_CACHING, MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
                     ROLES_ALLOWED, PERMIT_ALL, DENY_ALL,
                     BackendExceptionHandlers.CONTROLLER_ADVICE,
                     BackendExceptionHandlers.REST_CONTROLLER_ADVICE)));
@@ -138,6 +145,7 @@ final class BackendBeans {
             BackendExceptionHandlers.REST_CONTROLLER_ADVICE};
 
     static final String CONFIG_TYPE = "com/codename1/backend/Config";
+    static final String KEY_VALUE_TYPE = "com/codename1/backend/kv/KeyValueStore";
     static final String DATASOURCE_TYPE = "com/codename1/backend/DataSource";
     static final String ENTITIES_TYPE = "com/codename1/backend/orm/EntityManager";
     static final String SESSION_TYPE = "com/codename1/orm/session/Session";
@@ -394,6 +402,17 @@ final class BackendBeans {
         AnnotationValues async;
         AnnotationValues timed;
         AnnotationValues counted;
+        /// The method's caching annotation, one of [BackendBeans#CACHING], or null.
+        AnnotationValues cache;
+        /// The cache's name, and the Java expression of the entry's key.
+        String cacheName;
+        String cacheKey;
+        /// The generic return type, and the codec statements reading it from
+        /// the parsed `j` into `target` and writing `result` into `out`; null for
+        /// an eviction.
+        String cacheType;
+        String cacheRead;
+        String cacheWrite;
         String asyncTaskBinary;
         /// The method's authorization check as a Java boolean expression, or
         /// null when it has none; see [MethodSecurityCompiler].
@@ -618,6 +637,7 @@ final class BackendBeans {
             for (MethodInfo m : cls.getMethods()) {
                 if (m.getAnnotation(TRANSACTIONAL) != null || m.getAnnotation(ASYNC) != null
                         || m.getAnnotation(TIMED) != null || m.getAnnotation(COUNTED) != null
+                        || caching(m) != null
                         || m.getAnnotation(SCHEDULED) != null
                         || methodSecurity(m.getAnnotations(), null, null) != null) {
                     ctx.error(cls, "@TestConfiguration " + cls.getSourceName() + "."
@@ -1785,11 +1805,27 @@ final class BackendBeans {
                         + "\", which is not a zone ID, UTC, or an offset such as +02:00.");
                 continue;
             }
-            if (job.lock.length() > 0) {
+            if (job.lock.length() > 0 && !declaresSharedStore(ctx)) {
+                // The lock is claimed in the database -- unless the module names
+                // a shared key/value store, which the scheduler then uses, and a
+                // server that needs no database is not given one for a lock.
                 needsDatabase = true;
             }
             bean.jobs.add(job);
         }
+    }
+
+    /// Whether the module's `application.properties` names a shared key/value
+    /// store -- `cn1.kv.url`, or Spring Boot's `spring.data.redis.url` or `.host`.
+    static boolean declaresSharedStore(ProcessorContext ctx) {
+        String url = RestControllerAnnotationProcessor.applicationProperty(ctx, "cn1.kv.url");
+        if (url != null) {
+            return !url.trim().startsWith("memory:");
+        }
+        return RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                "spring.data.redis.url")
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                "spring.data.redis.host");
     }
 
     private void collectTools(Bean bean) {
@@ -2332,6 +2368,10 @@ final class BackendBeans {
             p.builtin = "config";
             return;
         }
+        if (KEY_VALUE_TYPE.equals(type)) {
+            p.builtin = "keyValue";
+            return;
+        }
         if (DATASOURCE_TYPE.equals(type)) {
             p.builtin = "dataSource";
             needsDatabase = true;
@@ -2767,9 +2807,10 @@ final class BackendBeans {
     /// one answer that cannot be right.
     private void refuseInterfaceAspects(AnnotatedClass cls) {
         String[] names = {TRANSACTIONAL, ASYNC, TIMED, COUNTED, PRE_AUTHORIZE, SECURED,
-            ROLES_ALLOWED, PERMIT_ALL, DENY_ALL};
+            ROLES_ALLOWED, PERMIT_ALL, DENY_ALL, CACHEABLE, CACHE_PUT, CACHE_EVICT};
         String[] shown = {"@Transactional", "@Async", "@Timed", "@Counted", "@PreAuthorize",
-            "@Secured", "@RolesAllowed", "@PermitAll", "@DenyAll"};
+            "@Secured", "@RolesAllowed", "@PermitAll", "@DenyAll", "@Cacheable", "@CachePut",
+            "@CacheEvict"};
         for (int i = 0; i < names.length; i++) {
             if (cls.getClassAnnotation(names[i]) != null) {
                 ctx.error(cls, shown[i] + " on interface " + cls.getSourceName() + " is not "
@@ -2993,6 +3034,7 @@ final class BackendBeans {
                 }
                 AnnotationValues timed = m.getAnnotation(TIMED);
                 AnnotationValues counted = m.getAnnotation(COUNTED);
+                AnnotationValues cache = caching(m);
                 String where = cls.getSourceName() + "." + m.getName();
                 AnnotationValues security = methodSecurity(m.getAnnotations(), cls, null);
                 boolean lifecycle = m.getAnnotation(POST_CONSTRUCT) != null
@@ -3017,7 +3059,7 @@ final class BackendBeans {
                     security = null;
                 }
                 if (tx == null && async == null && timed == null && counted == null
-                        && security == null) {
+                        && security == null && cache == null) {
                     continue;
                 }
                 if (m.isAbstract() || (m.getAccess() & Opcodes.ACC_NATIVE) != 0) {
@@ -3051,6 +3093,9 @@ final class BackendBeans {
                 a.erased = erased.equals(m.getDescriptor()) ? null : erased;
                 if (security != null) {
                     compileSecurity(cls, m, security, a, where);
+                }
+                if (cache != null && !compileCache(cls, m, cache, a, where)) {
+                    continue;
                 }
                 a.transactional = tx;
                 a.async = async;
@@ -3284,6 +3329,120 @@ final class BackendBeans {
     }
 
     /// Turns `security` into the Java expression `a`'s woven check evaluates.
+    /// The one caching annotation on `m`, or null; two on one method is an error
+    /// reported by [#compileCache], so the first is answered here.
+    static AnnotationValues caching(MethodInfo m) {
+        for (String d : CACHING) {
+            AnnotationValues v = m.getAnnotation(d);
+            if (v != null) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /// Compiles `cache` onto `a`: its name, key, and the codecs of the return
+    /// type. Answers false, having reported why, when it cannot.
+    private boolean compileCache(AnnotatedClass cls, MethodInfo m, AnnotationValues cache,
+                                 Aspect a, String where) {
+        String d = cache.getDescriptor();
+        String shown = CACHING_SHOWN[java.util.Arrays.asList(CACHING).indexOf(d)];
+        int count = 0;
+        for (String other : CACHING) {
+            if (m.getAnnotation(other) != null) {
+                count++;
+            }
+        }
+        if (count > 1) {
+            ctx.error(cls, where + " carries more than one of @Cacheable, @CachePut and "
+                    + "@CacheEvict. Spring's @Caching is not supported; split the method.");
+            return false;
+        }
+        List<String> cacheNames = strings(cache.get("value"));
+        if (cacheNames.isEmpty()) {
+            cacheNames = strings(cache.get("cacheNames"));
+        }
+        if (cacheNames.isEmpty() || cacheNames.get(0).trim().length() == 0) {
+            ctx.error(cls, shown + " on " + where + " names no cache. Name one: "
+                    + shown + "(\"products\").");
+            return false;
+        }
+        if (cacheNames.size() > 1) {
+            ctx.error(cls, shown + " on " + where + " names " + cacheNames.size() + " caches; "
+                    + "one entry is kept per call here, so name one.");
+            return false;
+        }
+        String name = cacheNames.get(0).trim();
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c <= ' ' || c == ':' || c == '*' || c == '?' || c == '[' || c == ']'
+                    || c == '\\' || c > '~') {
+                ctx.error(cls, shown + " on " + where + " names the cache \"" + name
+                        + "\"; a cache name is printable ASCII without spaces, ':', or the "
+                        + "glob characters *?[]\\.");
+                return false;
+            }
+        }
+        String unless = cache.getStringOrDefault("unless", "").trim();
+        if (unless.length() > 0 && !unless.replace(" ", "").equals("#result==null")) {
+            ctx.error(cls, shown + " on " + where + " has unless = \"" + unless + "\"; only "
+                    + "\"#result == null\" is supported, and a null result is never kept "
+                    + "anyway.");
+            return false;
+        }
+        Type[] args = Type.getArgumentTypes(m.getDescriptor());
+        String key;
+        if (CACHE_EVICT.equals(d) && cache.getBoolOrDefault("allEntries", false)) {
+            key = null;
+        } else {
+            Map<String, Integer> names;
+            try {
+                names = MethodSecurityCompiler.parameterNames(cls, m);
+            } catch (MethodSecurityCompiler.Refused refused) {
+                names = Collections.<String, Integer>emptyMap();
+            }
+            try {
+                key = new CacheKeyCompiler(ctx, m, args, names)
+                        .compile(cache.getStringOrDefault("key", ""));
+            } catch (CacheKeyCompiler.Refused refused) {
+                ctx.error(cls, "The key of " + shown + " on " + where + " cannot be compiled: "
+                        + refused.getMessage() + ".");
+                return false;
+            }
+        }
+        a.cache = cache;
+        a.cacheName = name;
+        a.cacheKey = key;
+        if (CACHE_EVICT.equals(d)) {
+            return true;
+        }
+        Type ret = Type.getReturnType(m.getDescriptor());
+        if (ret.getSort() == Type.VOID) {
+            ctx.error(cls, shown + " on " + where + " returns nothing, so there is nothing to "
+                    + "keep. Return the value, or use @CacheEvict.");
+            return false;
+        }
+        String sig = m.getSignature();
+        String type = RestClientAnnotationProcessor.javaTypeFor(ret,
+                sig == null ? null : sig.substring(sig.lastIndexOf(')') + 1));
+        BackendJsonCodecs codecs = BackendJsonCodecs.of(ctx);
+        String why = codecs.checkWrite(type);
+        if (why == null) {
+            why = codecs.checkRead(type);
+        }
+        if (why != null) {
+            ctx.error(cls, shown + " on " + where + " returns " + type + ", which cannot be "
+                    + "kept as JSON: it holds " + why + ".");
+            return false;
+        }
+        a.cacheType = type;
+        a.cacheWrite = codecs.writeStatements(type, "result", "0", "");
+        a.cacheRead = codecs.readStatements(type, "j",
+                "com.codename1.impl.backend.JsonCodec.Path.ROOT", "null", "-1", "0", "target",
+                "");
+        return true;
+    }
+
     private void compileSecurity(AnnotatedClass cls, MethodInfo m, AnnotationValues security,
                                  Aspect a, String where) {
         String d = security.getDescriptor();
@@ -3470,6 +3629,12 @@ final class BackendBeans {
             if (b.managed != null) {
                 toolCodecs |= b.managed.operationWrites.size()
                         > Collections.frequency(b.managed.operationWrites, null);
+            }
+        }
+        for (Aspects a : aspects.values()) {
+            for (Aspect m : a.methods) {
+                // A cached value is written and read by the same codecs.
+                toolCodecs |= m.cacheType != null;
             }
         }
         if (toolCodecs) {

@@ -580,6 +580,11 @@ final class BackendWiringWriter {
             if ("session".equals(p.builtin)) {
                 return "transactionSession";
             }
+            if ("keyValue".equals(p.builtin)) {
+                // The server's own store, opened on first use and closed when
+                // the server stops.
+                return "com.codename1.backend.kv.KeyValueStores.current()";
+            }
             if ("repository".equals(p.builtin)) {
                 return model.repositories.get(p.type.getInternalName());
             }
