@@ -863,6 +863,24 @@ public final class Display extends CN1Constants {
         impl.vibrate(duration);
     }
 
+    /// Rumbles a game controller, when the port and the controller can.
+    ///
+    /// Applications call `com.codename1.gaming.Gamepad#rumble(float, float, int)`
+    /// rather than this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the controller, as `com.codename1.gaming.Gamepad#getIndex()`
+    ///
+    /// - `strong`: the low frequency motor, 0 to 1
+    ///
+    /// - `weak`: the high frequency motor, 0 to 1
+    ///
+    /// - `durationMillis`: how long to rumble
+    public void rumbleGamepad(int index, float strong, float weak, int durationMillis) {
+        impl.rumbleGamepad(index, strong, weak, durationMillis);
+    }
+
     /// Flash the backlight of the device for the given length of time
     ///
     /// #### Parameters

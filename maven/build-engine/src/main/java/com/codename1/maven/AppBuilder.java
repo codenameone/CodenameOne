@@ -2169,7 +2169,11 @@ public class AppBuilder {
                 } else if ("local-linux-device".equals(buildTarget)) {
                     // Native ParparVM Linux build (GTK3/Cairo, CMake/Ninja). Distinct
                     // from the JVM-bundled "linux-desktop" (javase) target.
-                    doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                    doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar, false);
+                } else if ("local-steam".equals(buildTarget)) {
+                    // The native Linux build laid out as a Steam depot, with the
+                    // SteamPipe scripts beside it (SteamDepotPackager).
+                    doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar, true);
                 } else if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
@@ -2971,9 +2975,11 @@ public class AppBuilder {
      * pkg-config present (and, for musl targets, a {@code zig}/musl toolchain);
      * elsewhere the builder fails fast with a clear message.
      */
-    private void doLinuxNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+    private void doLinuxNativeLocalBuild(File tmpProjectDir, Properties props, File distJar, boolean steam)
+            throws BuildExecutionException {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
         LinuxNativeBuilder e = new LinuxNativeBuilder();
+        e.setSteamPackaging(steam);
         e.setLogger(getLog());
         File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "linux-build");
         e.setBuildDirectory(buildDirectory);
@@ -3025,6 +3031,19 @@ public class AppBuilder {
                 kept.setExecutable(true);
                 getLog().info("Built native Linux executable: " + kept.getAbsolutePath());
             }
+            if (e.getSteamDepot() != null) {
+                // Kept with the depot tree, so cn1:steamUpload can run the scripts.
+                File out = new File(host.buildDirectory(), "steam");
+                try {
+                    copyTree(new File(e.getResultDir(), "steam"), out);
+                    java.nio.file.Files.copy(e.getSteamDepot().toPath(),
+                            new File(host.buildDirectory(), e.getSteamDepot().getName()).toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.io.IOException ioe) {
+                    throw new BuildExecutionException("Could not copy the Steam depot to " + out, ioe);
+                }
+                getLog().info("Steam depot: " + out.getAbsolutePath());
+            }
         } catch (com.codename1.builders.BuildException hardeningEx) {
             throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);
         } catch (org.apache.tools.ant.BuildException ex) {
@@ -3035,6 +3054,26 @@ public class AppBuilder {
             throw new BuildExecutionException("Failed to build Linux app", ex);
         } finally {
             e.cleanup();
+        }
+    }
+
+    /// Copies a tree, keeping the executable bit (the depot's binary and launch.sh).
+    private static void copyTree(File from, File to) throws java.io.IOException {
+        to.mkdirs();
+        File[] files = from.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            File t = new File(to, f.getName());
+            if (f.isDirectory()) {
+                copyTree(f, t);
+            } else {
+                java.nio.file.Files.copy(f.toPath(), t.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                if (f.canExecute()) {
+                    t.setExecutable(true, false);
+                }
+            }
         }
     }
 
