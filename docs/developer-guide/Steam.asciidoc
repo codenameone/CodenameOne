@@ -92,7 +92,7 @@ Add the hints to `codenameone_settings.properties`:
 include::../demos/common/src/main/snippets/developer-guide/steam.properties[tag=steam-properties-001,indent=0]
 ----
 
-and build:
+Then build:
 
 [source,bash]
 ----
