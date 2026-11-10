@@ -3151,7 +3151,7 @@ public class AppBuilder {
             // A symbol map left in the build directory by an earlier, minified build would be
             // read against this bundle's different names; this build's own map, if it wrote one,
             // is copied below.
-            File[] staleMaps = buildDirectory().listFiles();
+            File[] staleMaps = new File(buildDirectory()).listFiles();
             if (staleMaps != null) {
                 for (File stale : staleMaps) {
                     if (stale.isFile() && stale.getName().endsWith("-js-symbols.txt") && !stale.delete()) {
