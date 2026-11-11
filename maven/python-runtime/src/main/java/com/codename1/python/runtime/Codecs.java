@@ -179,7 +179,23 @@ final class Codecs {
             return encodeCp437(s, errors);
         }
         int limit = "ascii".equals(enc) ? 0x80 : 0x100;
-        ByteArrayOutputStream out = new ByteArrayOutputStream(s.length());
+        // Text that fits the encoding, which is nearly all of it, is one array
+        // filled in place. The stream below is for the error handlers, and it
+        // takes a monitor for every byte written.
+        int n = s.length();
+        byte[] plain = new byte[n];
+        int fit = 0;
+        while (fit < n) {
+            char c = s.charAt(fit);
+            if (c >= limit) {
+                break;
+            }
+            plain[fit++] = (byte) c;
+        }
+        if (fit == n) {
+            return plain;
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream(n);
         int i = 0;
         while (i < s.length()) {
             int cp = Character.codePointAt(s, i);

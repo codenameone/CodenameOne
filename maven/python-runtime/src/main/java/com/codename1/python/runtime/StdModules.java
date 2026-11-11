@@ -464,6 +464,42 @@ public final class StdModules {
     /// repeats when daylight time ends.
     static int utcOffset(java.util.TimeZone z, double t) {
         long ms = (long) Math.floor(t * 1000);
+        long second = ms >= 0 ? ms / 1000 : -((999 - ms) / 1000);
+        // The answer is the same for every instant of one second, and code
+        // that stamps things asks many times within one: an archive writer
+        // calls localtime(time()) for each entry. The calendar below asks the
+        // platform for the zone's rules three times over, which on a desktop
+        // reads the zone file each time.
+        OffsetAnswer last = lastOffset;
+        String id = z.getID();
+        if (id == null) {
+            return utcOffsetOf(z, ms);
+        }
+        if (last != null && last.second == second && last.zone.equals(id)) {
+            return last.offset;
+        }
+        int offset = utcOffsetOf(z, ms);
+        lastOffset = new OffsetAnswer(id, second, offset);
+        return offset;
+    }
+
+    /// The last answer of [#utcOffset], published whole so a second thread
+    /// reads either the old one or the new one.
+    private static final class OffsetAnswer {
+        final String zone;
+        final long second;
+        final int offset;
+
+        OffsetAnswer(String zone, long second, int offset) {
+            this.zone = zone;
+            this.second = second;
+            this.offset = offset;
+        }
+    }
+
+    private static OffsetAnswer lastOffset;
+
+    private static int utcOffsetOf(java.util.TimeZone z, long ms) {
         java.util.Calendar c = java.util.Calendar.getInstance(z);
         c.setTime(new java.util.Date(ms));
         long days = daysFromCivil(c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1,

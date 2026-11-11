@@ -472,14 +472,20 @@ public final class PyBytes extends PyObject {
             for (byte e : del) {
                 drop[e & 0xff] = true;
             }
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(v.length);
+            byte[] out = new byte[v.length];
+            int n = 0;
             for (byte el : v) {
                 int c = el & 0xff;
                 if (!drop[c]) {
-                    out.write(table == null ? c : table[c] & 0xff);
+                    out[n++] = table == null ? el : table[c];
                 }
             }
-            return new PyBytes(out.toByteArray());
+            if (n != out.length) {
+                byte[] cut = new byte[n];
+                System.arraycopy(out, 0, cut, 0, n);
+                out = cut;
+            }
+            return new PyBytes(out);
         }));
         t.define("isascii", PyBuiltin.method(t, "isascii", a -> {
             byte[] v = self(a[0]).value;

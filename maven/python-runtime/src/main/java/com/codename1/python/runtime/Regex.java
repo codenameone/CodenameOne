@@ -503,6 +503,33 @@ final class Regex {
             }
             return j;
         }
+        if (t.cps == null) {
+            // The kinds with no table, on the string itself: `.*` is a search
+            // for the next line end and a repeated literal a run of one char.
+            String s = t.s;
+            if (op.k == ANYALL) {
+                return limit;
+            }
+            if (op.k == ANY) {
+                if (limit == s.length()) {
+                    int nl = s.indexOf('\n', j);
+                    return nl < 0 ? limit : nl;
+                }
+                // A bounded repeat is walked: a search would read on to a line
+                // end that may be the whole text away, once per attempt.
+                while (j < limit && s.charAt(j) != '\n') {
+                    j++;
+                }
+                return j;
+            }
+            if (op.k == CHAR) {
+                int c = op.c;
+                while (j < limit && s.charAt(j) == c) {
+                    j++;
+                }
+                return j;
+            }
+        }
         while (j < limit && one(op, t.at(j))) {
             j++;
         }
@@ -952,6 +979,9 @@ final class Regex {
                 }
             }
             return -1;
+        }
+        if (first.length == 1 && t.cps == null && first[0].k == CHAR && endpos == t.s.length()) {
+            return t.s.indexOf(first[0].c, start);
         }
         for (int i = start; i < endpos; i++) {
             int c = t.at(i);
