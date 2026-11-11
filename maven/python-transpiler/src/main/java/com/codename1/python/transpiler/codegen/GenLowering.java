@@ -161,8 +161,14 @@ final class GenLowering {
             // several per resumption of a loop with an except in it. Here it
             // is entered once per resumption and once more after each caught
             // exception, which the outer loop routes back to the dispatch.
+            // The store before the dispatch loop is not idle: javac starts the
+            // try range at the loop head when nothing precedes it, and
+            // ParparVM sets the handler up at the range's first instruction,
+            // so every `continue d$` would jump back over the setjmp again.
+            r.append("                int entry$ = 0;\n");
             r.append("                while (true) {\n");
             r.append("                    try {\n");
+            r.append("                        entry$++;\n");
         }
         r.append("                d$: while (true) {\n");
         r.append("                        switch (pc) {\n");
