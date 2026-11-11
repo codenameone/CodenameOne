@@ -991,7 +991,9 @@ Commerce reuses the standard `build_key` that every Codename One cloud build alr
 
 The answers that decide what a customer owns -- customer information, purchase validation, offerings, the customer center and promotional offer signatures -- are signed by the service with an Ed25519 key. Each request carries a fresh random nonce, and the signature covers that nonce together with the response. An answer recorded earlier can't be replayed to a later request, and an answer forged by something between the device and the service doesn't verify.
 
-An answer is trusted only when it's signed and the signature verifies against the service's public key. An answer that's unsigned or wrongly signed is ignored, and so is every answer while the app knows no public key at all. The manager then becomes degraded and the app falls back to the stored answer and the store's receipts, exactly as it does when the network is down.
+An answer is trusted only when it's signed and the signature verifies against the service's public key. An answer that's unsigned or wrongly signed is ignored, and so is every answer while the app knows no public key at all. The manager then becomes degraded. With a key, the app falls back to the stored answer and the store's receipts, exactly as it does when the network is down. With no key, nothing was ever stored, so the app answers from the store's own receipts alone.
+
+A signed answer must also be the answer to this request: one that names another app user id, another application's package name or another endpoint is ignored, and a stored answer is checked the same way when it's loaded.
 
 The stored answer is kept as the service signed it, and its signature is checked again every time the app starts. A stored answer that no longer verifies, for example after the key changed, is deleted rather than used.
 

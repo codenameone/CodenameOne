@@ -549,6 +549,95 @@ class CommerceManagerTest extends UITestBase {
         implementation.addNetworkMockResponse(ENDPOINT + path, 200, "OK", body.getBytes(StandardCharsets.UTF_8));
     }
 
+    @FormTest
+    void interleavedCallsEachCacheTheirOwnEnvelope() {
+        mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "u1"), null));
+        mock("/offerings", envelope("{\"accepted\":true,\"current\":\"main\",\"offerings\":[]}", null));
+        final CommerceManager cm = CommerceManager.getInstance();
+        cm.setAppUserId("u1");
+        // The customer refresh runs on the EDT while the offerings request
+        // is out inside invokeAndBlock.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                cm.refresh();
+            }
+        });
+        cm.getOfferings();
+        flushSerialCalls();
+        String offeringsKey = "CN1CommerceOfferings_u1__" + Integer.toHexString("u1/".hashCode());
+        String customer = (String) Storage.getInstance().readObject(customerStorageKey("u1"));
+        String offerings = (String) Storage.getInstance().readObject(offeringsKey);
+        assertTrue(customer.contains("originalAppUserId"));
+        assertFalse(customer.contains("offerings"));
+        assertTrue(offerings.contains("offerings"));
+        assertFalse(offerings.contains("originalAppUserId"));
+    }
+
+    @FormTest
+    void answerForAnotherUserIsRejectedOnReceipt() {
+        mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "someone-else"), null));
+        CommerceManager cm = CommerceManager.getInstance();
+        cm.setAppUserId("u1");
+        cm.refresh();
+        assertTrue(cm.isDegraded());
+        assertFalse(cm.isEntitled("pro"));
+        assertFalse(Storage.getInstance().exists(customerStorageKey("u1")));
+    }
+
+    @FormTest
+    void answerForAnotherPackageIsRejected() {
+        mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "u1")
+                .replace("{\"accepted\"", "{\"packageName\":\"com.other\",\"accepted\""), null));
+        CommerceManager cm = CommerceManager.getInstance();
+        cm.setAppUserId("u1");
+        cm.refresh();
+        assertFalse(cm.isEntitled("pro"));
+    }
+
+    @FormTest
+    void matchingBindingFieldsAreAccepted() {
+        mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "u1").replace("{\"accepted\"",
+                "{\"packageName\":\"com.example.app\",\"endpoint\":\"/customer\",\"accepted\""), null));
+        CommerceManager cm = CommerceManager.getInstance();
+        cm.setAppUserId("u1");
+        cm.refresh();
+        assertTrue(cm.isEntitled("pro"));
+    }
+
+    @FormTest
+    void storedAnswerForAnotherUserIsRejectedOnLoad() {
+        storeSignedCustomer();
+        Object stored = Storage.getInstance().readObject(customerStorageKey("u1"));
+        Storage.getInstance().writeObject(customerStorageKey("u2"), stored);
+        CommerceManager.resetForTests();
+        implementation.clearNetworkMocks();
+        CommerceManager.getInstance().setAppUserId("u2");
+        assertFalse(CommerceManager.getInstance().isEntitled("pro"));
+        assertFalse(Storage.getInstance().exists(customerStorageKey("u2")));
+    }
+
+    @FormTest
+    void offeringsEnvelopeInTheCustomerSlotIsRejected() throws Exception {
+        String payload = PRO_CUSTOMER.replace("USER", "u1")
+                .replace("{\"accepted\"", "{\"endpoint\":\"/offerings\",\"accepted\"");
+        byte[] sig = Ed25519.sign(CommerceTestBase.testPrivateKey(), ("n1\n" + payload).getBytes(StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder("{\"nonce\":\"n1\",\"signature\":\"")
+                .append(Base64.encodeNoNewline(sig)).append("\",\"payload\":\"");
+        for (int i = 0; i < payload.length(); i++) {
+            char c = payload.charAt(i);
+            if (c == '"' || c == '\\') {
+                sb.append('\\');
+            }
+            sb.append(c);
+        }
+        sb.append("\"}");
+        Storage.getInstance().writeObject(customerStorageKey("u1"), sb.toString());
+        implementation.clearNetworkMocks();
+        CommerceManager.getInstance().setAppUserId("u1");
+        assertFalse(CommerceManager.getInstance().isEntitled("pro"));
+        assertFalse(Storage.getInstance().exists(customerStorageKey("u1")));
+    }
+
     /// The signed envelope of the contract: the payload travels as JSON text
     /// inside a string, since that text is what the signature covers.
     private static String envelope(String payload, String signature) {
