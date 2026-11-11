@@ -2880,14 +2880,95 @@ final class Infer {
         return call1(c, fn, sc, simple);
     }
 
+    /// `c`'s arguments as one positional list for `d`'s parameters from
+    /// `from` on, its keywords bound to the parameters they name, or null
+    /// when they cannot be bound before the call runs. The list stops at
+    /// the last parameter given; a gap before it takes the parameter's
+    /// default, which must be a constant. Keywords must name parameters in
+    /// the order they are written, so the list evaluates in source order.
+    static List<Expr> staticArgs(Call c, FunctionDef d, int from) {
+        return staticArgs(c, d, from, false);
+    }
+
+    /// [#staticArgs], with `full` running the list to the last parameter.
+    static List<Expr> staticArgs(Call c, FunctionDef d, int from, boolean full) {
+        if (c.keywords.isEmpty()) {
+            return c.args;
+        }
+        Node.Arguments a = d.args;
+        if (a.vararg != null || a.kwarg != null || !a.kwonly.isEmpty() || hasStarred(c.args)) {
+            return null;
+        }
+        int n = a.positional.size() - from;
+        int k = c.args.size();
+        if (n <= 0 || k > n) {
+            return null;
+        }
+        Expr[] slot = new Expr[n];
+        for (int i = 0; i < k; i++) {
+            slot[i] = c.args.get(i);
+        }
+        int last = k - 1;
+        int first = Math.max(a.positionalOnly - from, 0);
+        for (Keyword kw : c.keywords) {
+            if (kw.arg == null) {
+                return null;
+            }
+            int idx = -1;
+            for (int j = first; j < n; j++) {
+                if (a.positional.get(from + j).name.equals(kw.arg)) {
+                    idx = j;
+                    break;
+                }
+            }
+            if (idx < 0 || slot[idx] != null || idx < last) {
+                return null;
+            }
+            slot[idx] = kw.value;
+            last = idx;
+        }
+        int firstDefault = a.positional.size() - a.defaults.size();
+        List<Expr> r = new ArrayList<Expr>();
+        int end = full ? n - 1 : last;
+        for (int j = 0; j <= end; j++) {
+            Expr e = slot[j];
+            if (e == null) {
+                int di = from + j - firstDefault;
+                if (di < 0 || !(a.defaults.get(di) instanceof Constant)) {
+                    return null;
+                }
+                e = a.defaults.get(di);
+            }
+            r.add(e);
+        }
+        return r;
+    }
+
+    /// The `__init__` a call of class `k` runs, when it is typable.
+    private static FunctionDef typableInit(Layouts.Cls k) {
+        Layouts.Cls o = Layouts.resolver(k, "__init__");
+        return o == null ? null : o.typable.get("__init__");
+    }
+
     /// A call of function `f` or of class `k`, whichever is not null.
     private Ty callKnown(Call c, Fn f, Layouts.Cls k, Fn fn, Scope sc, boolean simple) {
+        List<Expr> given = c.args;
+        if (!c.keywords.isEmpty()) {
+            FunctionDef d = f != null ? f.def : typableInit(k);
+            List<Expr> b = d == null ? null : staticArgs(c, d, f != null ? 0 : 1);
+            if (b != null) {
+                given = b;
+                simple = true;
+            }
+        }
         List<Ty> args = new ArrayList<Ty>();
-        for (Expr a : c.args) {
+        for (Expr a : given) {
             args.add(a instanceof Starred ? Ty.DYN : type(a, fn, sc));
         }
-        for (Keyword kw : c.keywords) {
-            escape(type(kw.value, fn, sc));
+        if (given == c.args) { //NOPMD CompareObjectsWithEquals - identity is meant
+            for (Keyword kw : c.keywords) {
+                escape(type(kw.value, fn, sc));
+            }
         }
         if (f != null) {
             if (!callFn(f, args, 0, simple && args.size() <= f.params.length
@@ -3024,12 +3105,24 @@ final class Infer {
                 return Ty.DYN;
             }
             Ty r = type(a.value, fn, sc);
+            List<Expr> given = c.args;
+            if (!c.keywords.isEmpty() && r.k == Ty.K.INST && !open.contains(r.cls)) {
+                // One method it can be: keywords bound to its parameters.
+                List<FunctionDef> cand = candidates(r.cls, a.attr);
+                List<Expr> b = cand != null && cand.size() == 1 ? staticArgs(c, cand.get(0), 1, true) : null;
+                if (b != null) {
+                    given = b;
+                    simple = true;
+                }
+            }
             List<Ty> args = new ArrayList<Ty>();
-            for (Expr x : c.args) {
+            for (Expr x : given) {
                 args.add(x instanceof Starred ? Ty.DYN : type(x, fn, sc));
             }
-            for (Keyword kw : c.keywords) {
-                escape(type(kw.value, fn, sc));
+            if (given == c.args) { //NOPMD CompareObjectsWithEquals - identity is meant
+                for (Keyword kw : c.keywords) {
+                    escape(type(kw.value, fn, sc));
+                }
             }
             if (r.k == Ty.K.BOT || r.k == Ty.K.NONE) {
                 return Ty.BOT;

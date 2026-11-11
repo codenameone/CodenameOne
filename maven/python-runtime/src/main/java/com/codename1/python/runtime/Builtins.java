@@ -1046,13 +1046,18 @@ public final class Builtins {
             if (hasFallback) {
                 return fallback;
             }
-            if (it instanceof PyGenerator) {
-                // A finished generator's StopIteration carries its return value.
-                throw PyGenerator.stopIteration(((PyGenerator) it).returned());
-            }
-            throw new PyException(Py.STOP_ITERATION.call(Py.NO_ARGS, Py.NO_KW));
+            throw exhausted(it);
         }
         return v;
+    }
+
+    /// The StopIteration `next(it)` raises once `it` is exhausted.
+    static PyException exhausted(Object it) {
+        if (it instanceof PyGenerator) {
+            // A finished generator's StopIteration carries its return value.
+            return PyGenerator.stopIteration(((PyGenerator) it).returned());
+        }
+        return new PyException(Py.STOP_ITERATION.call(Py.NO_ARGS, Py.NO_KW));
     }
 
     static Object ord(Object x) {

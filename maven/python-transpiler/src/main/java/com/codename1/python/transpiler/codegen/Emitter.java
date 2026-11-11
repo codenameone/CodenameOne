@@ -3255,6 +3255,12 @@ public final class Emitter {
             if (builtin && "isinstance".equals(fn) && c.args.size() == 2) {
                 return "Py.isinstance(" + expr(c.func) + ", " + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + ")";
             }
+            if (builtin && "next".equals(fn) && (c.args.size() == 1 || c.args.size() == 2)) {
+                // The iterator's own next, with no argument array and no
+                // builtin dispatch between them.
+                return "Py.nextB(" + expr(c.func) + ", " + expr(c.args.get(0))
+                        + (c.args.size() == 2 ? ", " + expr(c.args.get(1)) : "") + ")";
+            }
             if (builtin && "dict".equals(fn) && c.args.size() == 1) {
                 return "Py.dict1(" + expr(c.func) + ", " + expr(c.args.get(0)) + ")";
             }

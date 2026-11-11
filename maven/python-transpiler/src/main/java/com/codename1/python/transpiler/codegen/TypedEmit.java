@@ -5182,8 +5182,22 @@ final class TypedEmit {
         if (!c.keywords.isEmpty()) {
             throw new Unsupported("keyword arguments");
         }
+        return exprs(c.args);
+    }
+
+    /// The arguments of `c`, a call of `f` from its parameter `from` on,
+    /// keywords bound to parameters as Infer bound them.
+    private List<E> args(Call c, FunctionDef f, int from) {
+        List<Expr> b = f == null ? null : Infer.staticArgs(c, f, from);
+        if (b == null) {
+            throw new Unsupported("keyword arguments");
+        }
+        return exprs(b);
+    }
+
+    private List<E> exprs(List<Expr> l) {
         List<E> r = new ArrayList<E>();
-        for (Expr a : c.args) {
+        for (Expr a : l) {
             if (a instanceof Starred) {
                 throw new Unsupported("starred argument");
             }
@@ -5522,7 +5536,7 @@ final class TypedEmit {
                             : new E(unbox(g, rt), rt);
                 }
                 if (f != null) {
-                    List<E> a = args(c);
+                    List<E> a = args(c, f.def, 0);
                     calls.add(f);
                     IntRanges.Iv[] lp = longParams.get(f);
                     String call = lp != null && IntRanges.within(IntRanges.longArgs(f, sites.get(c)), lp)
@@ -5541,7 +5555,9 @@ final class TypedEmit {
                 }
                 Layouts.Cls k = in.globalClasses.get(n);
                 if (k != null) {
-                    return construct(k, args(c));
+                    Layouts.Cls io = Layouts.resolver(k, "__init__");
+                    return construct(k, c.keywords.isEmpty() ? args(c)
+                            : args(c, io == null ? null : io.typable.get("__init__"), 1));
                 }
             }
             if (b == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport() && "list".equals(n)
@@ -5574,6 +5590,11 @@ final class TypedEmit {
                     // A Java boolean: no argument array, no bool to box and test.
                     return new E("Py.isinstanceB(" + em.builtinRef(n) + ", " + box(expr(c.args.get(0))) + ", "
                             + box(expr(c.args.get(1))) + ")", Ty.BOOL);
+                }
+                if ("next".equals(n) && (c.args.size() == 1 || c.args.size() == 2) && c.keywords.isEmpty()
+                        && !(c.args.get(0) instanceof Starred) && !(c.args.get(c.args.size() - 1) instanceof Starred)) {
+                    return new E("Py.nextB(" + em.builtinRef(n) + ", " + box(expr(c.args.get(0)))
+                            + (c.args.size() == 2 ? ", " + box(expr(c.args.get(1))) : "") + ")", Ty.DYN);
                 }
                 return genericCall(em.builtinRef(n), c);
             }
@@ -5609,7 +5630,7 @@ final class TypedEmit {
                 }
                 Infer.Fn f = in.fns.get(m);
                 calls.add(f);
-                return result(f, typed.get(f) + "(" + argList(f, 0, args(c)) + ")");
+                return result(f, typed.get(f) + "(" + argList(f, 0, args(c, m, 0)) + ")");
             }
             E r = expr(a.value);
             if (r.t.k == Ty.K.LIST && !r.t.opt && "extend".equals(a.attr) && c.keywords.isEmpty()
@@ -5622,7 +5643,19 @@ final class TypedEmit {
                 return new E("Typed.extendRepeat(" + r.c + ", " + box(left ? first : second) + ", "
                         + box(left ? second : first) + ")", Ty.NONE);
             }
-            List<E> args = args(c);
+            List<E> args;
+            if (!c.keywords.isEmpty() && r.t.k == Ty.K.INST) {
+                // One method it can be: keywords bound to its parameters,
+                // as Infer bound them.
+                List<FunctionDef> kc = in.candidates(r.t.cls, a.attr);
+                List<Expr> b = kc != null && kc.size() == 1 ? Infer.staticArgs(c, kc.get(0), 1, true) : null;
+                if (b == null) {
+                    throw new Unsupported("keyword arguments");
+                }
+                args = exprs(b);
+            } else {
+                args = args(c);
+            }
             if (r.t.k == Ty.K.LIST && !r.t.opt) {
                 return listMethod(r, a.attr, args);
             }

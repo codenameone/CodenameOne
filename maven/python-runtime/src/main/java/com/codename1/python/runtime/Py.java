@@ -2060,6 +2060,28 @@ public final class Py {
         throw typeError("iter() returned non-iterator of type '" + typeOf(r).name + "'");
     }
 
+    /// `next(it)`, where `f` is what the name `next` holds where it is
+    /// called: the builtin goes straight to the iterator.
+    public static Object nextB(Object f, Object it) {
+        if (f == Builtins.NEXT && it instanceof PyObject) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object v = ((PyObject) it).next();
+            if (v == null) {
+                throw Builtins.exhausted(it);
+            }
+            return v;
+        }
+        return call(f, it);
+    }
+
+    /// `next(it, default)`.
+    public static Object nextB(Object f, Object it, Object dflt) {
+        if (f == Builtins.NEXT && it instanceof PyObject) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object v = ((PyObject) it).next();
+            return v != null ? v : dflt;
+        }
+        return call(f, it, dflt);
+    }
+
     /// The next item of iterator `it`, or null when it is exhausted.
     public static Object next(Object it) {
         return ((PyObject) it).next();
