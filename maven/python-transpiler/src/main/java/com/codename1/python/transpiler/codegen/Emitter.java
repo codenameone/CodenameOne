@@ -4239,8 +4239,6 @@ public final class Emitter {
     /// program, most of it for code that never runs; a table is one call.
     private final List<StringBuilder> readSites = new ArrayList<StringBuilder>();
     private final List<StringBuilder> storeSites = new ArrayList<StringBuilder>();
-    private int tableFill;
-    private StringBuilder tableOpen;
 
     /// At most this many names to a table and this many chars: a string
     /// constant of a class file holds 65535 bytes.

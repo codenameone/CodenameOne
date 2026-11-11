@@ -54,7 +54,7 @@ public final class PyModule extends PyObject {
     public final Object[] slots;
     private final String[] slotNames;
     private static final int SCANNED = 6;
-    private java.util.HashMap<String, Integer> slotIndex;
+    private HashMap<String, Integer> slotIndex;
     private Map<String, Object> extra;
 
     /// The loaded module whose translated class is `javaClass` or encloses
@@ -153,6 +153,7 @@ public final class PyModule extends PyObject {
             }
             final int position = index++;
             LOADERS.put(names.substring(at, end), new Loader() {
+                @Override
                 public void exec(PyModule m) {
                     group.exec(position);
                 }
@@ -254,9 +255,9 @@ public final class PyModule extends PyObject {
         // Built by the first read by name: `json.dumps` and every other
         // `module.attr` comes here, and a scan compared the name with each
         // global of the module in turn.
-        java.util.HashMap<String, Integer> ix = slotIndex;
+        HashMap<String, Integer> ix = slotIndex;
         if (ix == null) {
-            ix = new java.util.HashMap<String, Integer>();
+            ix = new HashMap<String, Integer>();
             for (int i = slotNames.length - 1; i >= 0; i--) {
                 ix.put(slotNames[i], Integer.valueOf(i));
             }
