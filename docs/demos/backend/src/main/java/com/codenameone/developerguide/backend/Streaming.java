@@ -24,6 +24,7 @@ package com.codenameone.developerguide.backend;
 
 import com.codename1.backend.HttpProxy;
 import com.codename1.backend.HttpServer;
+import com.codename1.backend.Sse;
 import com.codename1.backend.Web;
 import com.codename1.backend.annotations.GetMapping;
 import com.codename1.backend.annotations.PostMapping;
@@ -76,6 +77,44 @@ public class Streaming {
         });
     }
     // end::backend-web-download-stream[]
+
+    // tag::backend-web-sse[]
+    @GetMapping("/prices")
+    public HttpServer.Response prices(HttpServer.Request request) {
+        return Sse.stream(request, events -> {
+            long last = parse(events.lastEventId());  // where a reconnect left off
+            for (int idle = 0; idle < 600; idle++) {
+                long newest = PriceBoard.newest();
+                if (newest > last) {
+                    events.event("price").id(Long.toString(newest)).json(PriceBoard.since(last));
+                    last = newest;
+                } else if (idle % 15 == 0) {
+                    events.ping();                    // keep proxies from closing it
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException stopped) {
+                    return;
+                }
+            }
+        });
+    }
+    // end::backend-web-sse[]
+
+    private static long parse(String id) {
+        return id == null ? 0 : Long.parseLong(id);
+    }
+
+    /// Stands in for wherever the application keeps its prices.
+    static final class PriceBoard {
+        static long newest() {
+            return 0;
+        }
+
+        static Map<String, Object> since(long version) {
+            return Collections.emptyMap();
+        }
+    }
 
     // tag::backend-web-exchange[]
     static long upload(InputStream file, long length) throws IOException {
