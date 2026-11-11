@@ -1992,6 +1992,18 @@ public final class Py {
         throw typeError("indices must be integers or slices, not " + Py.typeOf(o).name);
     }
 
+    /// The index in `seq[key]`. An int no `long` holds is past either end of
+    /// any sequence, and is an IndexError as every other such index is.
+    public static long subscript(Object key) {
+        if (key instanceof Long) {
+            return ((Long) key).longValue();
+        }
+        if (key instanceof PyInt && ((PyInt) key).big != null) {
+            throw indexError("cannot fit 'int' into an index-sized integer");
+        }
+        return index(key);
+    }
+
     // ---- iteration -------------------------------------------------------
 
     public static PyObject iter(Object o) {

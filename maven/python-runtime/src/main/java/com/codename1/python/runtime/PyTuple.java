@@ -154,7 +154,7 @@ public class PyTuple extends PyObject {
             }
             return new PyTuple(out);
         }
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += items.length;
         }

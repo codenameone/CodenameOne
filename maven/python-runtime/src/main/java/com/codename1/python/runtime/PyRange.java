@@ -158,6 +158,9 @@ public final class PyRange extends PyObject {
             int[] r = ((PySlice) key).indices((int) n);
             return new PyRange(start + r[0] * step, start + r[1] * step, step * r[2]);
         }
+        if (key instanceof PyInt && ((PyInt) key).big != null) {
+            throw Py.indexError("range object index out of range");
+        }
         long i = Py.index(key);
         if (i < 0) {
             i += n;

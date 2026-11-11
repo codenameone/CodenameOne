@@ -416,7 +416,7 @@ public final class PyStr extends PyObject {
             }
             return sb.toString();
         }
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += n;
         }

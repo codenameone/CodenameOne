@@ -400,7 +400,14 @@ final class DefAssign {
             }
             expr(c.elt, inner);
             expr(c.value, inner);
+        } else if (e instanceof JoinedStr) {
+            for (Expr part : ((JoinedStr) e).parts) {
+                expr(part, in);
+            }
+        } else if (e instanceof FormattedValue) {
+            expr(((FormattedValue) e).value, in);
+            expr(((FormattedValue) e).spec, in);
         }
-        // Lambdas, f-strings, await, yield: left checked.
+        // Lambdas, await, yield: left checked.
     }
 }

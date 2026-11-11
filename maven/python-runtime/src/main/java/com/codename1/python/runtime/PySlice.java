@@ -49,11 +49,11 @@ public final class PySlice extends PyObject {
         int lo;
         int hi;
         if (st > 0) {
-            lo = start == Py.NONE ? 0 : clamp(Py.index(start), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
-            hi = stop == Py.NONE ? length : clamp(Py.index(stop), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
+            lo = start == Py.NONE ? 0 : clamp(edge(start), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
+            hi = stop == Py.NONE ? length : clamp(edge(stop), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
         } else {
-            lo = start == Py.NONE ? length - 1 : clamp(Py.index(start), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
-            hi = stop == Py.NONE ? -1 : clamp(Py.index(stop), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
+            lo = start == Py.NONE ? length - 1 : clamp(edge(start), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
+            hi = stop == Py.NONE ? -1 : clamp(edge(stop), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
         }
         return new int[] {lo, hi, st};
     }
@@ -70,17 +70,17 @@ public final class PySlice extends PyObject {
     /// The first index a slice selects, as in [#indices(int)].
     static int lower(Object start, Object stop, int st, int length) {
         if (st > 0) {
-            return start == Py.NONE ? 0 : clamp(Py.index(start), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
+            return start == Py.NONE ? 0 : clamp(edge(start), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
         }
-        return start == Py.NONE ? length - 1 : clamp(Py.index(start), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
+        return start == Py.NONE ? length - 1 : clamp(edge(start), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     /// The bound a slice stops at, as in [#indices(int)].
     static int upper(Object stop, int st, int length) {
         if (st > 0) {
-            return stop == Py.NONE ? length : clamp(Py.index(stop), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
+            return stop == Py.NONE ? length : clamp(edge(stop), length, 0, length); //NOPMD CompareObjectsWithEquals - identity is meant
         }
-        return stop == Py.NONE ? -1 : clamp(Py.index(stop), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
+        return stop == Py.NONE ? -1 : clamp(edge(stop), length, -1, length - 1); //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     /// The number of indices from `lo` towards `hi` by `st`.
@@ -89,6 +89,16 @@ public final class PySlice extends PyObject {
             return hi > lo ? (hi - lo + st - 1) / st : 0;
         }
         return lo > hi ? (lo - hi - st - 1) / -st : 0;
+    }
+
+    /// A start or stop as a `long`. One no `long` holds is beyond either end
+    /// of any sequence, which is all a slice asks of it; the stand-in leaves
+    /// room for the length that `clamp` adds to a negative one.
+    private static long edge(Object o) {
+        if (o instanceof PyInt && ((PyInt) o).big != null) {
+            return ((PyInt) o).big.signum() < 0 ? Long.MIN_VALUE / 2 : Long.MAX_VALUE / 2;
+        }
+        return Py.index(o);
     }
 
     private static int clamp(long v, int length, int min, int max) {

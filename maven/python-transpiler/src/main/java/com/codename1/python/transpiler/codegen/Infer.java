@@ -129,6 +129,8 @@ final class Infer {
         final Map<Integer, Ty[]> siteSlots = new HashMap<Integer, Ty[]>();
         final Set<Integer> unslotted = new HashSet<Integer>();
         final Map<Call, Ty> siteRet = new HashMap<Call, Ty>();
+        /// Calls of a known function that go through its door (`callFn`).
+        final Set<Call> doors = new HashSet<Call>();
         final Map<FunctionDef, Fn> generic = new IdentityHashMap<FunctionDef, Fn>();
         /// The compiled functions something in the program reaches: by a
         /// direct call, as a value, or by a name the rest of the program
@@ -245,6 +247,7 @@ final class Infer {
     /// that call site, from the argument types there; where it is narrower
     /// than the function's own return type, typed code relabels the result.
     final Map<Call, Ty> siteRet;
+    final Set<Call> doors;
     /// Globals bound once, by `import math`: calls of its functions on
     /// numbers are typed (see `MATH_FNS`) and run as `PyMath` directly.
     final Set<String> mathNames = new HashSet<String>();
@@ -299,6 +302,7 @@ final class Infer {
         this.moduleScope = moduleScope;
         this.facts = facts;
         this.siteRet = p.siteRet;
+        this.doors = p.doors;
         this.fields = p.fields;
         this.definite = p.definite;
         this.open = p.open;
@@ -2499,6 +2503,10 @@ final class Infer {
                 // A byte is an int; a bad index raises.
                 return Ty.INT;
             }
+            if (r.k == Ty.K.STR && !r.opt && (i.k == Ty.K.INT || i.k == Ty.K.BOOL)) {
+                // A character is a str; a bad index raises.
+                return Ty.STR;
+            }
             if (r.k == Ty.K.DICT) {
                 // A key that is not there raises: the read is of the values.
                 escape(i);
@@ -2882,8 +2890,15 @@ final class Infer {
             escape(type(kw.value, fn, sc));
         }
         if (f != null) {
-            callFn(f, args, 0, simple && args.size() <= f.params.length
-                    && args.size() >= f.params.length - f.def.args.defaults.size());
+            if (!callFn(f, args, 0, simple && args.size() <= f.params.length
+                    && args.size() >= f.params.length - f.def.args.defaults.size())) {
+                // Through the door: the typed version's result when the
+                // arguments turn out to fit, the generic body's when not.
+                siteRet.remove(c);
+                doors.add(c);
+                Fn g = generic.get(f.def);
+                return g == null ? f.ret : mix(f.ret, g.ret);
+            }
             // An expression function of this module's: typed
             // code relabels the call's result (TypedEmit).
             Ty site = !shadow && simple && args.size() == f.params.length
@@ -3251,10 +3266,48 @@ final class Infer {
                 && (args.isEmpty() || args.size() == 1 && args.get(0).k == Ty.K.STR && !args.get(0).opt);
     }
 
+    /// Which of the tests of every character `m` is (`Typed.isAll`), or -1.
+    static int isAllKind(String m) {
+        switch (m) {
+            case "isspace":
+                return 0;
+            case "isdigit":
+                return 1;
+            case "isdecimal":
+                return 2;
+            case "isnumeric":
+                return 3;
+            case "isalpha":
+                return 4;
+            case "isalnum":
+                return 5;
+            default:
+                return -1;
+        }
+    }
+
     /// The type of a str method TypedEmit calls directly (see its
     /// `strMethod`, which must accept exactly these), or null.
     static Ty strMethod(String m, List<Ty> args) {
         int n = args.size();
+        if (n == 0 && isAllKind(m) >= 0) {
+            return Ty.BOOL;
+        }
+        if ((n == 2 || n == 3) && args.get(0).k == Ty.K.STR && !args.get(0).opt && args.get(1).k == Ty.K.INT
+                && (n == 2 || args.get(2).k == Ty.K.INT)) {
+            // With a start, and an end: bounds that are ints, clamped as a
+            // slice's are, so nothing here raises.
+            switch (m) {
+                case "find":
+                case "rfind":
+                    return Ty.INT;
+                case "startswith":
+                case "endswith":
+                    return Ty.BOOL;
+                default:
+                    return null;
+            }
+        }
         for (int i = 0; i < n; i++) {
             if (!"join".equals(m) && (args.get(i).k != Ty.K.STR || args.get(i).opt)) {
                 return null;
@@ -3284,8 +3337,28 @@ final class Infer {
         }
     }
 
-    /// Joins a call's arguments into `f`'s parameters, from `from` on.
-    private void callFn(Fn f, List<Ty> args, int from, boolean exact) {
+    /// The type the annotation of parameter `i` of `f` names, when it is one
+    /// the guard at the door can test for and a plain function's: or null.
+    /// Nothing trusts the annotation. It decides which calls enter the typed
+    /// version directly, and the guard decides the rest as they arrive.
+    static Ty pin(Fn f, int i) {
+        if (f.cls != null || i >= f.def.args.positional.size()) {
+            return null;
+        }
+        Expr a = f.def.args.positional.get(i).annotation;
+        if (!(a instanceof Name)) {
+            return null;
+        }
+        String n = ((Name) a).id;
+        return "str".equals(n) ? Ty.STR : "int".equals(n) ? Ty.INT : "bytes".equals(n) ? Ty.BYTES : null;
+    }
+
+    /// Joins a call's arguments into `f`'s parameters, from `from` on. False
+    /// when the call goes through the function's door instead: an argument
+    /// is not what the parameter's annotation says, so joining it would
+    /// leave the parameter holding anything for every caller. The parameter
+    /// keeps the annotated type, and this call is checked as it arrives.
+    private boolean callFn(Fn f, List<Ty> args, int from, boolean exact) {
         reach(f);
         if (shadow) {
             // A call the generic body makes goes through the callee's own
@@ -3301,18 +3374,39 @@ final class Infer {
                     escape(t);
                 }
             }
-            return;
+            return true;
         }
         if (!exact) {
             escapeFn(f);
             for (Ty t : args) {
                 escape(t);
             }
-            return;
+            return true;
+        }
+        if (f.cls == null && from == 0) {
+            boolean miss = false;
+            for (int i = 0; !miss && i < args.size(); i++) {
+                Ty pin = pin(f, i);
+                miss = pin != null && Ty.join(pin, args.get(i)).k != pin.k;
+            }
+            if (miss) {
+                for (int i = 0; i < f.params.length; i++) {
+                    Ty pin = pin(f, i);
+                    if (pin != null && f.params[i].k == Ty.K.BOT) {
+                        f.params[i] = joinInto(f.params[i], pin);
+                    }
+                }
+                escapeFn(f);
+                for (Ty t : args) {
+                    escape(t);
+                }
+                return false;
+            }
         }
         for (int i = 0; i < args.size(); i++) {
             f.params[from + i] = joinInto(f.params[from + i], args.get(i));
         }
+        return true;
     }
 
     // ---- reflection-free traversal ---------------------------------------

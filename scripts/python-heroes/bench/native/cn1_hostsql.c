@@ -117,6 +117,14 @@ JAVA_VOID com_pyhero_HostSql_finalizeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA
     sqlite3_finalize(STMT);
 }
 
+/* Ready to run again with nothing bound: a kept statement holds no lock and
+   no reference to the values of its last run. */
+JAVA_INT com_pyhero_HostSql_resetImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG st) {
+    int rc = sqlite3_reset(STMT);
+    sqlite3_clear_bindings(STMT);
+    return rc;
+}
+
 JAVA_LONG com_pyhero_HostSql_changesImpl___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG db) {
     return (JAVA_LONG)sqlite3_changes(DB);
 }

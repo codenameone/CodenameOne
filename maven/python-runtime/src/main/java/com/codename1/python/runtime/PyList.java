@@ -468,7 +468,7 @@ public final class PyList extends PyObject {
     }
 
     private int checkIndex(Object key) {
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += size;
         }

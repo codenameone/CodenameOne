@@ -369,28 +369,42 @@ final class TypeMethods {
     /// clamped here as slice indices clamp; anything else goes through
     /// [PySlice], which also raises for a bound that is not an index.
     private static long range(String self, Object[] a, int from) {
-        Object b0 = a.length > from ? a[from] : Py.NONE;
-        Object b1 = a.length > from + 1 ? a[from + 1] : Py.NONE;
-        if ((b0 == Py.NONE || b0 instanceof Long) //NOPMD CompareObjectsWithEquals - identity is meant
-                && (b1 == Py.NONE || b1 instanceof Long) //NOPMD CompareObjectsWithEquals - identity is meant
-                && PyStr.surrogates(self) == 0) {
-            int n = self.length();
-            int lo = b0 == Py.NONE ? 0 : clampIndex(((Long) b0).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
-            int hi = b1 == Py.NONE ? n : clampIndex(((Long) b1).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
-            return pack(lo, Math.max(lo, hi));
-        }
-        int n = PyStr.codePoints(self);
-        int[] r = new PySlice(b0, b1, Py.NONE).indices(n);
-        return pack(PyStr.offset(self, r[0]), PyStr.offset(self, Math.max(r[0], r[1])));
+        return range(self, a.length > from ? a[from] : Py.NONE, a.length > from + 1 ? a[from + 1] : Py.NONE);
     }
 
-    /// A slice bound clamped into `[0, n]`, a negative one counted from the end.
-    private static int clampIndex(long v, int n) {
+    private static long range(String self, Object b0, Object b1) {
+        boolean plain = PyStr.surrogates(self) == 0;
+        int n = plain ? self.length() : PyStr.codePoints(self);
+        long lo = b0 == Py.NONE ? 0 : bound(b0, n); //NOPMD CompareObjectsWithEquals - identity is meant
+        long hi = b1 == Py.NONE ? n : Math.min(n, bound(b1, n)); //NOPMD CompareObjectsWithEquals - identity is meant
+        if (lo > hi) {
+            // A start past the end matches nothing, the empty string
+            // included: "abc".find("", 5) is -1 where "abc"[5:] is "".
+            return NOWHERE;
+        }
+        return plain ? pack((int) lo, (int) hi) : pack(PyStr.offset(self, (int) lo), PyStr.offset(self, (int) hi));
+    }
+
+    /// A window no needle is in, whatever its length: `hi - lo` is negative.
+    private static final long NOWHERE = pack(1, 0);
+
+    /// A start or end argument counted from the end when negative and held
+    /// at zero below it. It is not held at `n` above it: only the end is.
+    private static long bound(Object b, int n) {
+        long v;
+        if (b instanceof Long) {
+            v = ((Long) b).longValue();
+        } else if (b instanceof PyInt && ((PyInt) b).big != null) {
+            // An int no long holds is past either end of any string.
+            return ((PyInt) b).big.signum() < 0 ? 0 : Long.MAX_VALUE;
+        } else {
+            v = Py.index(b);
+        }
         if (v < 0) {
             v += n;
-            return v < 0 ? 0 : (int) v;
+            return v < 0 ? 0 : v;
         }
-        return v > n ? n : (int) v;
+        return v;
     }
 
     private static long pack(int lo, int hi) {
@@ -412,8 +426,48 @@ final class TypeMethods {
     }
 
     private static int find(String self, Object[] a, boolean last) {
-        String sub = strArg(a[1], "find");
-        long r = range(self, a, 2);
+        return findIn(self, strArg(a[1], "find"), range(self, a, 2), last);
+    }
+
+    /// `self.find(sub, b0, b1)` and its `rfind`, for typed code: the bounds
+    /// as Python passed them, `None` for one left out.
+    static int findIn(String self, String sub, Object b0, Object b1, boolean last) {
+        return findIn(self, sub, range(self, b0, b1), last);
+    }
+
+    /// `self.startswith(c, b0, b1)` and its `endswith`, for typed code.
+    static boolean affixIn(String self, String c, Object b0, Object b1, boolean start) {
+        long r = range(self, b0, b1);
+        return affixAt(self, lo(r), hi(r), c, start);
+    }
+
+    /// `self.find(sub, start)` and its `rfind`, the start an int that fits a
+    /// `long`.
+    static int findFrom(String self, String sub, long start, boolean last) {
+        if (PyStr.surrogates(self) != 0) {
+            return findIn(self, sub, Long.valueOf(start), Py.NONE, last);
+        }
+        int n = self.length();
+        long lo = start < 0 ? Math.max(0, start + n) : start;
+        return lo > n ? -1 : findIn(self, sub, pack((int) lo, n), last);
+    }
+
+    /// `self.startswith(c, start)` and its `endswith`, likewise.
+    static boolean affixFrom(String self, String c, long start, boolean isStart) {
+        if (PyStr.surrogates(self) != 0) {
+            return affixIn(self, c, Long.valueOf(start), Py.NONE, isStart);
+        }
+        int n = self.length();
+        long lo = start < 0 ? Math.max(0, start + n) : start;
+        return lo <= n && affixAt(self, (int) lo, n, c, isStart);
+    }
+
+    /// Whether `v` is not empty and every char of it is of a class in `mask`.
+    static boolean allOf(String v, int mask) {
+        return all(v, mask);
+    }
+
+    private static int findIn(String self, String sub, long r, boolean last) {
         String v = self;
         if (hi(r) - lo(r) < sub.length()) {
             return -1;
@@ -728,6 +782,9 @@ final class TypeMethods {
             String self = s(a[0]);
             String sub = strArg(a[1], "count");
             long r = range(self, a, 2);
+            if (hi(r) < lo(r)) {
+                return PyInt.of(0);
+            }
             String v = self.substring(lo(r), hi(r));
             if (sub.length() == 0) {
                 return PyInt.of(PyStr.codePoints(v) + 1);

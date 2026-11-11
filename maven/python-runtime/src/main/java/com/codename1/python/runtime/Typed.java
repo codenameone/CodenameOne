@@ -697,6 +697,54 @@ public final class Typed {
         return TypeMethods.findWhole(s, sub, last);
     }
 
+    /// `s[i]` of a str: the one character there, counted in code points
+    /// and from the end when negative.
+    public static String sat(String s, long i) {
+        if (i >= 0 && i < s.length() && PyStr.surrogates(s) == 0) {
+            return ch(s.charAt((int) i));
+        }
+        return asStr(Py.getitem(s, Long.valueOf(i)));
+    }
+
+    /// `s.find(sub, start, end)` and `s.rfind(sub, start, end)`; a bound left
+    /// out is `Py.NONE`.
+    public static long find(String s, String sub, Object start, Object end, boolean last) {
+        return TypeMethods.findIn(s, sub, start, end, last);
+    }
+
+    /// `s.startswith(sub, start, end)` and `s.endswith(sub, start, end)`.
+    public static boolean affix(String s, String sub, Object start, Object end, boolean startsWith) {
+        return TypeMethods.affixIn(s, sub, start, end, startsWith);
+    }
+
+    /// `s.find(sub, start)` and `s.rfind(sub, start)`.
+    public static long find(String s, String sub, long start, boolean last) {
+        return TypeMethods.findFrom(s, sub, start, last);
+    }
+
+    /// `s.startswith(sub, start)` and `s.endswith(sub, start)`.
+    public static boolean affix(String s, String sub, long start, boolean startsWith) {
+        return TypeMethods.affixFrom(s, sub, start, startsWith);
+    }
+
+    /// `s.isspace()` and the other tests of every character, by name.
+    public static boolean isAll(String s, int kind) {
+        switch (kind) {
+            case 0:
+                return TypeMethods.allOf(s, Unicode.SPACE);
+            case 1:
+                return TypeMethods.allOf(s, Unicode.DIGIT);
+            case 2:
+                return TypeMethods.allOf(s, Unicode.DECIMAL);
+            case 3:
+                return TypeMethods.allOf(s, Unicode.NUMERIC);
+            case 4:
+                return TypeMethods.allOf(s, Unicode.ALPHA);
+            default:
+                return TypeMethods.allOf(s, Unicode.ALPHA | Unicode.DECIMAL | Unicode.DIGIT | Unicode.NUMERIC);
+        }
+    }
+
     /// `s.replace(old, new)` with no count.
     public static String replace(String v, String old, String nw) {
         if (old.length() == 0) {

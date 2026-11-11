@@ -1,0 +1,92 @@
+[('word', 'select'), ('ws', ' '), ('string', "'a b'"), ('ws', ' '), ('comment', '-- note\n'), ('word', 'from'), ('ws', ' '), ('string', '"t"'), ('ws', '  '), ('word', 'where'), ('ws', ' '), ('word', 'x')]
+[('word', 'plain'), ('ws', ' '), ('word', 'words'), ('ws', ' '), ('word', 'only')]
+[('word', 'a'), ('ws', ' '), ('string', "'b'"), ('ws', ' '), ('word', 'c')]
+ValueError: Unterminated ' quoted token
+TypeError
+TypeError
+AttributeError
+AttributeError
+'' [False, False, False, False, False, False]
+' \t\n' [True, False, False, False, False, False]
+'123' [False, True, True, True, False, True]
+'\xb2' [False, True, False, True, False, True]
+'\u0663' [False, True, True, True, False, True]
+'abc' [False, False, False, False, True, True]
+'abc1' [False, False, False, False, False, True]
+'a b' [False, False, False, False, False, False]
+'\xbd' [False, False, False, True, False, True]
+-20 -20 [0, 10, -1, -1, True, True, False, False] [0, 13, 0, 0, True, True, True, True] [1, 4, -1, -1, False, True, False, False]
+-20 -2 [0, 10, 0, 7, True, True, True, False] [0, 13, 0, 11, True, True, True, True] [1, 4, 1, 1, False, True, False, False]
+-20 0 [0, 10, -1, -1, True, True, False, False] [0, 13, 0, 0, True, True, True, True] [1, 4, -1, -1, False, True, False, False]
+-20 5 [0, 10, 0, 0, True, True, True, False] [0, 13, 0, 5, True, True, True, True] [1, 4, 1, 1, False, True, False, False]
+-20 13 [0, 10, 0, 10, True, True, True, True] [0, 13, 0, 13, True, True, True, True] [1, 4, 1, 4, False, True, False, True]
+-20 99 [0, 10, 0, 10, True, True, True, True] [0, 13, 0, 13, True, True, True, True] [1, 4, 1, 4, False, True, False, True]
+-3 -20 [10, 10, -1, -1, True, True, False, False] [10, 13, -1, -1, True, True, False, False] [4, 4, -1, -1, False, True, False, False]
+-3 -2 [10, 10, -1, -1, True, True, False, False] [10, 13, 10, 11, True, True, True, True] [4, 4, -1, -1, False, True, False, False]
+-3 0 [10, 10, -1, -1, True, True, False, False] [10, 13, -1, -1, True, True, False, False] [4, 4, -1, -1, False, True, False, False]
+-3 5 [10, 10, -1, -1, True, True, False, False] [10, 13, -1, -1, True, True, False, False] [4, 4, -1, -1, False, True, False, False]
+-3 13 [10, 10, 10, 10, True, True, True, True] [10, 13, 10, 13, True, True, True, True] [4, 4, 4, 4, False, True, False, True]
+-3 99 [10, 10, 10, 10, True, True, True, True] [10, 13, 10, 13, True, True, True, True] [4, 4, 4, 4, False, True, False, True]
+0 -20 [0, 10, -1, -1, True, True, False, False] [0, 13, 0, 0, True, True, True, True] [1, 4, -1, -1, False, True, False, False]
+0 -2 [0, 10, 0, 7, True, True, True, False] [0, 13, 0, 11, True, True, True, True] [1, 4, 1, 1, False, True, False, False]
+0 0 [0, 10, -1, -1, True, True, False, False] [0, 13, 0, 0, True, True, True, True] [1, 4, -1, -1, False, True, False, False]
+0 5 [0, 10, 0, 0, True, True, True, False] [0, 13, 0, 5, True, True, True, True] [1, 4, 1, 1, False, True, False, False]
+0 13 [0, 10, 0, 10, True, True, True, True] [0, 13, 0, 13, True, True, True, True] [1, 4, 1, 4, False, True, False, True]
+0 99 [0, 10, 0, 10, True, True, True, True] [0, 13, 0, 13, True, True, True, True] [1, 4, 1, 4, False, True, False, True]
+2 -20 [3, 10, -1, -1, False, True, False, False] [2, 13, -1, -1, True, True, False, False] [4, 4, -1, -1, False, True, False, False]
+2 -2 [3, 10, 3, 7, False, True, False, False] [2, 13, 2, 11, True, True, True, True] [4, 4, -1, -1, False, True, False, False]
+2 0 [3, 10, -1, -1, False, True, False, False] [2, 13, -1, -1, True, True, False, False] [4, 4, -1, -1, False, True, False, False]
+2 5 [3, 10, -1, -1, False, True, False, False] [2, 13, 2, 5, True, True, True, True] [4, 4, -1, -1, False, True, False, False]
+2 13 [3, 10, 3, 10, False, True, False, True] [2, 13, 2, 13, True, True, True, True] [4, 4, 4, 4, False, True, False, True]
+2 99 [3, 10, 3, 10, False, True, False, True] [2, 13, 2, 13, True, True, True, True] [4, 4, 4, 4, False, True, False, True]
+7 -20 [7, 10, -1, -1, True, True, False, False] [7, 13, -1, -1, True, True, False, False] [-1, -1, -1, -1, False, False, False, False]
+7 -2 [7, 10, 7, 7, True, True, True, False] [7, 13, 7, 11, True, True, True, True] [-1, -1, -1, -1, False, False, False, False]
+7 0 [7, 10, -1, -1, True, True, False, False] [7, 13, -1, -1, True, True, False, False] [-1, -1, -1, -1, False, False, False, False]
+7 5 [7, 10, -1, -1, True, True, False, False] [7, 13, -1, -1, True, True, False, False] [-1, -1, -1, -1, False, False, False, False]
+7 13 [7, 10, 7, 10, True, True, True, True] [7, 13, 7, 13, True, True, True, True] [-1, -1, -1, -1, False, False, False, False]
+7 99 [7, 10, 7, 10, True, True, True, True] [7, 13, 7, 13, True, True, True, True] [-1, -1, -1, -1, False, False, False, False]
+13 -20 [-1, -1, -1, -1, False, False, False, False] [13, 13, -1, -1, True, True, False, False] [-1, -1, -1, -1, False, False, False, False]
+13 -2 [-1, -1, -1, -1, False, False, False, False] [13, 13, -1, -1, True, True, False, False] [-1, -1, -1, -1, False, False, False, False]
+13 0 [-1, -1, -1, -1, False, False, False, False] [13, 13, -1, -1, True, True, False, False] [-1, -1, -1, -1, False, False, False, False]
+13 5 [-1, -1, -1, -1, False, False, False, False] [13, 13, -1, -1, True, True, False, False] [-1, -1, -1, -1, False, False, False, False]
+13 13 [-1, -1, -1, -1, False, False, False, False] [13, 13, 13, 13, True, True, True, True] [-1, -1, -1, -1, False, False, False, False]
+13 99 [-1, -1, -1, -1, False, False, False, False] [13, 13, 13, 13, True, True, True, True] [-1, -1, -1, -1, False, False, False, False]
+99 -20 [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False]
+99 -2 [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False]
+99 0 [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False]
+99 5 [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False]
+99 13 [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False]
+99 99 [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False] [-1, -1, -1, -1, False, False, False, False]
+[21, 21, 21, 21, False, False, False, False]
+'a' 'a'
+'c' 'IndexError: string index out of range'
+'\U0001f600' 'IndexError: string index out of range'
+'a' 'IndexError: string index out of range'
+'c' 'IndexError: string index out of range'
+'IndexError: string index out of range' 'IndexError: string index out of range'
+'c' 'c'
+'\U0001f600' 'IndexError: string index out of range'
+'a' 'IndexError: string index out of range'
+'IndexError: string index out of range' 'IndexError: string index out of range'
+"IndexError: cannot fit 'int' into an index-sized integer" "IndexError: cannot fit 'int' into an index-sized integer"
+'b' 'b'
+e TypeError 2
+ababab [1, 1] sesese
+258 11 6
+97 115
+99 108
+99 120
+IndexError: index out of range 101
+IndexError: index out of range 114
+IndexError: cannot fit 'int' into an index-sized integer IndexError: cannot fit 'int' into an index-sized integer
+98 101
+0 1 0 1
+bcdef ab  [1, 2, 3] (1, 2) b'xyz'
+IndexError: cannot fit 'int' into an index-sized integer
+IndexError: cannot fit 'int' into an index-sized integer
+IndexError: cannot fit 'int' into an index-sized integer
+IndexError: cannot fit 'int' into an index-sized integer
+IndexError: range object index out of range
+IndexError: range object index out of range
+IndexError: cannot fit 'int' into an index-sized integer
+IndexError: cannot fit 'int' into an index-sized integer

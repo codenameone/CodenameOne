@@ -108,7 +108,7 @@ public final class PyMemoryView extends PyObject {
     }
 
     private int index(Object key) {
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += length;
         }

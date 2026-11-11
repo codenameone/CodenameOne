@@ -3884,8 +3884,21 @@ final class TypedEmit {
                 return dictRead("Typed.dgetv(" + l.c + ", " + box(i) + ")", l.t);
             }
             if (l.t.k == Ty.K.BYTES && (i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
-                String c = "Typed.bat(" + l.c + ", " + (i.lc != null ? i.lc : "Py.asLong(" + box(i) + ")") + ")";
+                if (i.lc == null) {
+                    // As for a str below: the generic read raises what
+                    // CPython raises for an index no long holds.
+                    return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.INT);
+                }
+                String c = "Typed.bat(" + l.c + ", " + i.lc + ")";
                 return small(new E("Long.valueOf(" + c + ")", Ty.INT, c));
+            }
+            if (l.t.k == Ty.K.STR && !l.t.opt && (i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
+                // An index that is not a long in hand goes the generic way: one
+                // too big for a long is an IndexError there, as in CPython.
+                String slow = "Typed.asStr(Py.getitem(" + l.c + ", " + box(i) + "))";
+                return new E(i.lc != null ? "Typed.sat(" + l.c + ", " + i.lc + ")"
+                        : i.ll != null ? "(" + i.bg + " == null ? Typed.sat(" + l.c + ", " + i.ll + ") : " + slow + ")"
+                        : slow, Ty.STR);
             }
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
                 return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.DYN);
@@ -4016,7 +4029,51 @@ final class TypedEmit {
             // code makes, which reads no local of the frame it is made in.
             return new E(em.lambdaValue((Lambda) e), Ty.DYN);
         }
+        if (e instanceof JoinedStr) {
+            return new E(joined((JoinedStr) e), Ty.DYN);
+        }
         throw new Unsupported(e.getClass().getSimpleName());
+    }
+
+    /// An f-string, as the generic code builds it: every value is formatted
+    /// by the runtime, so a typed operand is boxed and nothing else differs.
+    private String joined(JoinedStr j) {
+        List<String> parts = new ArrayList<String>();
+        for (Expr p : j.parts) {
+            if (p instanceof Constant) {
+                parts.add(em.constant((Constant) p));
+                continue;
+            }
+            FormattedValue f = (FormattedValue) p;
+            String v = box(expr(f.value));
+            if (f.conversion == 'r') {
+                v = "Py.str(Py.toRepr(" + v + "))";
+            } else if (f.conversion == 's') {
+                v = "Py.str(Py.strOf(" + v + "))";
+            } else if (f.conversion == 'a') {
+                v = "Py.call(Builtins.ASCII, " + v + ")";
+            }
+            String spec;
+            if (f.spec == null || f.spec.parts.isEmpty()) {
+                spec = "\"\"";
+            } else if (f.spec.parts.size() == 1 && f.spec.parts.get(0) instanceof Constant) {
+                spec = Emitter.javaString(((Constant) f.spec.parts.get(0)).text);
+            } else {
+                spec = "Py.strOf(" + joined(f.spec) + ")";
+            }
+            parts.add("Py.format(" + v + ", " + spec + ")");
+        }
+        if (parts.isEmpty()) {
+            return "Py.str(\"\")";
+        }
+        if (parts.size() == 1) {
+            return parts.get(0);
+        }
+        StringBuilder sb = new StringBuilder("Py.concat(");
+        for (int i = 0; i < parts.size(); i++) {
+            sb.append(i == 0 ? "" : ", ").append(parts.get(i));
+        }
+        return sb.append(')').toString();
     }
 
     /// Whether lambda `l` reads nothing but its parameters, globals and
@@ -5455,6 +5512,15 @@ final class TypedEmit {
             Scope.Binding b = binding(n);
             if (b == Scope.Binding.GLOBAL) {
                 Infer.Fn f = in.globalFns.get(n);
+                if (f != null && in.doors.contains(c)) {
+                    // An argument is not known to be what a parameter's
+                    // annotation names (Infer.callFn): the function object
+                    // is called, and its guard picks the version to run.
+                    Ty rt = in.type(c, cur, sc);
+                    String g = genericCall("g(" + em.slot(n) + ")", c).c;
+                    return rt.k == Ty.K.DYN || rt.k == Ty.K.BOT || rt.isObject() ? new E(g, rt.k == Ty.K.BOT ? Ty.DYN : rt)
+                            : new E(unbox(g, rt), rt);
+                }
                 if (f != null) {
                     List<E> a = args(c);
                     calls.add(f);
@@ -6516,6 +6582,26 @@ final class TypedEmit {
         }
         String v = r.c;
         String c;
+        if (a.isEmpty() && Infer.isAllKind(m) >= 0) {
+            return new E("Typed.isAll(" + v + ", " + Infer.isAllKind(m) + ")", Ty.BOOL);
+        }
+        if (a.size() >= 2 && !"replace".equals(m)) {
+            String bounds = ", " + box(a.get(1)) + ", " + (a.size() == 3 ? box(a.get(2)) : "Py.NONE") + ", ";
+            String fn = t.k == Ty.K.BOOL ? "Typed.affix(" : "Typed.find(";
+            String tail = (t.k == Ty.K.BOOL ? "startswith".equals(m) : "rfind".equals(m)) + ")";
+            c = fn + v + ", " + a.get(0).c + bounds + tail;
+            String start = a.size() == 2 ? a.get(1).lc : null;
+            if (start != null) {
+                // The start as the long it is: nothing boxed.
+                c = fn + v + ", " + a.get(0).c + ", " + start + ", " + tail;
+            } else if (a.size() == 2 && a.get(1).ll != null) {
+                // Either way the receiver and the text are evaluated once,
+                // after a test that reads a local of this frame only.
+                c = "(" + a.get(1).bg + " == null ? " + fn + v + ", " + a.get(0).c + ", " + a.get(1).ll + ", " + tail
+                        + " : " + c + ")";
+            }
+            return t.k == Ty.K.BOOL ? new E(c, Ty.BOOL) : small(new E("Long.valueOf(" + c + ")", t, c));
+        }
         switch (m) {
             case "strip":
             case "lstrip":

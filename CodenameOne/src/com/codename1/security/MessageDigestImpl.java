@@ -1516,62 +1516,172 @@ abstract class MessageDigestImpl {
         }
 
         private void compress(byte[] b, int off, boolean last) {
+            if (big) {
+                compressBig(b, off, last);
+                return;
+            }
             for (int i = 0; i < 16; i++) {
-                m[i] = big ? le64(b, off + 8 * i) : le32(b, off + 4 * i) & 0xffffffffL;
+                m[i] = le32(b, off + 4 * i) & 0xffffffffL;
             }
             for (int i = 0; i < 8; i++) {
                 v[i] = h[i];
-                v[i + 8] = big ? IV_B[i] : IV_S[i] & 0xffffffffL;
+                v[i + 8] = IV_S[i] & 0xffffffffL;
             }
-            if (big) {
-                v[12] ^= t0;
-                v[13] ^= t1;
-                if (last) {
-                    v[14] = ~v[14];
-                }
-                for (int r = 0; r < 12; r++) {
-                    byte[] s = SIGMA[r % 10];
-                    gb(0, 4, 8, 12, m[s[0]], m[s[1]]);
-                    gb(1, 5, 9, 13, m[s[2]], m[s[3]]);
-                    gb(2, 6, 10, 14, m[s[4]], m[s[5]]);
-                    gb(3, 7, 11, 15, m[s[6]], m[s[7]]);
-                    gb(0, 5, 10, 15, m[s[8]], m[s[9]]);
-                    gb(1, 6, 11, 12, m[s[10]], m[s[11]]);
-                    gb(2, 7, 8, 13, m[s[12]], m[s[13]]);
-                    gb(3, 4, 9, 14, m[s[14]], m[s[15]]);
-                }
-            } else {
-                v[12] ^= t0 & 0xffffffffL;
-                v[13] ^= t0 >>> 32;
-                if (last) {
-                    v[14] ^= 0xffffffffL;
-                }
-                for (int r = 0; r < 10; r++) {
-                    byte[] s = SIGMA[r];
-                    gs(0, 4, 8, 12, m[s[0]], m[s[1]]);
-                    gs(1, 5, 9, 13, m[s[2]], m[s[3]]);
-                    gs(2, 6, 10, 14, m[s[4]], m[s[5]]);
-                    gs(3, 7, 11, 15, m[s[6]], m[s[7]]);
-                    gs(0, 5, 10, 15, m[s[8]], m[s[9]]);
-                    gs(1, 6, 11, 12, m[s[10]], m[s[11]]);
-                    gs(2, 7, 8, 13, m[s[12]], m[s[13]]);
-                    gs(3, 4, 9, 14, m[s[14]], m[s[15]]);
-                }
+            v[12] ^= t0 & 0xffffffffL;
+            v[13] ^= t0 >>> 32;
+            if (last) {
+                v[14] ^= 0xffffffffL;
+            }
+            for (int r = 0; r < 10; r++) {
+                byte[] s = SIGMA[r];
+                gs(0, 4, 8, 12, m[s[0]], m[s[1]]);
+                gs(1, 5, 9, 13, m[s[2]], m[s[3]]);
+                gs(2, 6, 10, 14, m[s[4]], m[s[5]]);
+                gs(3, 7, 11, 15, m[s[6]], m[s[7]]);
+                gs(0, 5, 10, 15, m[s[8]], m[s[9]]);
+                gs(1, 6, 11, 12, m[s[10]], m[s[11]]);
+                gs(2, 7, 8, 13, m[s[12]], m[s[13]]);
+                gs(3, 4, 9, 14, m[s[14]], m[s[15]]);
             }
             for (int i = 0; i < 8; i++) {
                 h[i] ^= v[i] ^ v[i + 8];
             }
         }
 
-        private void gb(int a, int b, int c, int d, long x, long y) {
-            v[a] = v[a] + v[b] + x;
-            v[d] = Long.rotateRight(v[d] ^ v[a], 32);
-            v[c] = v[c] + v[d];
-            v[b] = Long.rotateRight(v[b] ^ v[c], 24);
-            v[a] = v[a] + v[b] + y;
-            v[d] = Long.rotateRight(v[d] ^ v[a], 16);
-            v[c] = v[c] + v[d];
-            v[b] = Long.rotateRight(v[b] ^ v[c], 63);
+        /// BLAKE2b's compression with the sixteen words of the state in
+        /// locals and the mixing written out: the state lives in registers
+        /// for the whole of it, where a call per mix read and wrote an array
+        /// eight times.
+        private void compressBig(byte[] b, int off, boolean last) {
+            long[] mw = m;
+            long[] hw = h;
+            for (int i = 0; i < 16; i++) {
+                mw[i] = le64(b, off + 8 * i);
+            }
+            long v0 = hw[0];
+            long v1 = hw[1];
+            long v2 = hw[2];
+            long v3 = hw[3];
+            long v4 = hw[4];
+            long v5 = hw[5];
+            long v6 = hw[6];
+            long v7 = hw[7];
+            long v8 = IV_B[0];
+            long v9 = IV_B[1];
+            long v10 = IV_B[2];
+            long v11 = IV_B[3];
+            long v12 = IV_B[4] ^ t0;
+            long v13 = IV_B[5] ^ t1;
+            long v14 = last ? ~IV_B[6] : IV_B[6];
+            long v15 = IV_B[7];
+            long w;
+            for (int r = 0; r < 12; r++) {
+                byte[] s = SIGMA[r % 10];
+                v0 += v4 + mw[s[0]];
+                w = v12 ^ v0;
+                v12 = w >>> 32 | w << 32;
+                v8 += v12;
+                w = v4 ^ v8;
+                v4 = w >>> 24 | w << 40;
+                v0 += v4 + mw[s[1]];
+                w = v12 ^ v0;
+                v12 = w >>> 16 | w << 48;
+                v8 += v12;
+                w = v4 ^ v8;
+                v4 = w >>> 63 | w << 1;
+                v1 += v5 + mw[s[2]];
+                w = v13 ^ v1;
+                v13 = w >>> 32 | w << 32;
+                v9 += v13;
+                w = v5 ^ v9;
+                v5 = w >>> 24 | w << 40;
+                v1 += v5 + mw[s[3]];
+                w = v13 ^ v1;
+                v13 = w >>> 16 | w << 48;
+                v9 += v13;
+                w = v5 ^ v9;
+                v5 = w >>> 63 | w << 1;
+                v2 += v6 + mw[s[4]];
+                w = v14 ^ v2;
+                v14 = w >>> 32 | w << 32;
+                v10 += v14;
+                w = v6 ^ v10;
+                v6 = w >>> 24 | w << 40;
+                v2 += v6 + mw[s[5]];
+                w = v14 ^ v2;
+                v14 = w >>> 16 | w << 48;
+                v10 += v14;
+                w = v6 ^ v10;
+                v6 = w >>> 63 | w << 1;
+                v3 += v7 + mw[s[6]];
+                w = v15 ^ v3;
+                v15 = w >>> 32 | w << 32;
+                v11 += v15;
+                w = v7 ^ v11;
+                v7 = w >>> 24 | w << 40;
+                v3 += v7 + mw[s[7]];
+                w = v15 ^ v3;
+                v15 = w >>> 16 | w << 48;
+                v11 += v15;
+                w = v7 ^ v11;
+                v7 = w >>> 63 | w << 1;
+                v0 += v5 + mw[s[8]];
+                w = v15 ^ v0;
+                v15 = w >>> 32 | w << 32;
+                v10 += v15;
+                w = v5 ^ v10;
+                v5 = w >>> 24 | w << 40;
+                v0 += v5 + mw[s[9]];
+                w = v15 ^ v0;
+                v15 = w >>> 16 | w << 48;
+                v10 += v15;
+                w = v5 ^ v10;
+                v5 = w >>> 63 | w << 1;
+                v1 += v6 + mw[s[10]];
+                w = v12 ^ v1;
+                v12 = w >>> 32 | w << 32;
+                v11 += v12;
+                w = v6 ^ v11;
+                v6 = w >>> 24 | w << 40;
+                v1 += v6 + mw[s[11]];
+                w = v12 ^ v1;
+                v12 = w >>> 16 | w << 48;
+                v11 += v12;
+                w = v6 ^ v11;
+                v6 = w >>> 63 | w << 1;
+                v2 += v7 + mw[s[12]];
+                w = v13 ^ v2;
+                v13 = w >>> 32 | w << 32;
+                v8 += v13;
+                w = v7 ^ v8;
+                v7 = w >>> 24 | w << 40;
+                v2 += v7 + mw[s[13]];
+                w = v13 ^ v2;
+                v13 = w >>> 16 | w << 48;
+                v8 += v13;
+                w = v7 ^ v8;
+                v7 = w >>> 63 | w << 1;
+                v3 += v4 + mw[s[14]];
+                w = v14 ^ v3;
+                v14 = w >>> 32 | w << 32;
+                v9 += v14;
+                w = v4 ^ v9;
+                v4 = w >>> 24 | w << 40;
+                v3 += v4 + mw[s[15]];
+                w = v14 ^ v3;
+                v14 = w >>> 16 | w << 48;
+                v9 += v14;
+                w = v4 ^ v9;
+                v4 = w >>> 63 | w << 1;
+            }
+            hw[0] ^= v0 ^ v8;
+            hw[1] ^= v1 ^ v9;
+            hw[2] ^= v2 ^ v10;
+            hw[3] ^= v3 ^ v11;
+            hw[4] ^= v4 ^ v12;
+            hw[5] ^= v5 ^ v13;
+            hw[6] ^= v6 ^ v14;
+            hw[7] ^= v7 ^ v15;
         }
 
         private void gs(int a, int b, int c, int d, long x, long y) {

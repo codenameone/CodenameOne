@@ -273,7 +273,7 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(out);
         }
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += value.length;
         }

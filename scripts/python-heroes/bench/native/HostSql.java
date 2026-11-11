@@ -9,7 +9,10 @@ import com.codename1.python.runtime.PySql;
 import com.codename1.db.SqlFunction;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /// SQLite for a native benchmark binary: the runtime's `PySql` over the
 /// host's libsqlite3 (cn1_hostsql.c), where a device port answers with its
@@ -30,7 +33,14 @@ public final class HostSql extends PySql {
     }
 
     private static final class Conn extends PySql.Connection {
+        /// As many prepared statements as CPython's sqlite3 keeps for a
+        /// connection.
+        private static final int KEPT = 128;
         private long db;
+        /// Statements this connection ran and may run again, by their text,
+        /// the one used longest ago first. One that is running is not here,
+        /// so a function it calls that runs the same text prepares its own.
+        private final LinkedHashMap<String, Long> kept = new LinkedHashMap<String, Long>();
 
         Conn(long db) {
             this.db = db;
@@ -38,11 +48,13 @@ public final class HostSql extends PySql {
 
         @Override
         public Result run(String sql, Object[] params, boolean query) throws IOException {
-            long st = prepareImpl(db, sql);
+            Long was = kept.remove(sql);
+            long st = was != null ? was.longValue() : prepareImpl(db, sql);
             if (st == 0) {
                 throw new IOException(errorImpl(db));
             }
             Result r = new Result();
+            boolean done = false;
             try {
                 for (int i = 0; i < params.length; i++) {
                     Object p = params[i];
@@ -97,8 +109,21 @@ public final class HostSql extends PySql {
                     }
                     r.rows.add(row);
                 }
+                done = true;
             } finally {
-                finalizeImpl(st);
+                // One that failed is not run again: the next use prepares it
+                // and reports what is wrong with it afresh.
+                if (done && resetImpl(st) == 0) {
+                    kept.put(sql, Long.valueOf(st));
+                    if (kept.size() > KEPT) {
+                        Iterator<Map.Entry<String, Long>> it = kept.entrySet().iterator();
+                        long old = it.next().getValue().longValue();
+                        it.remove();
+                        finalizeImpl(old);
+                    }
+                } else {
+                    finalizeImpl(st);
+                }
             }
             r.changes = changesImpl(db);
             r.lastRowId = lastInsertRowIdImpl(db);
@@ -136,6 +161,10 @@ public final class HostSql extends PySql {
         @Override
         public void close() throws IOException {
             if (db != 0) {
+                for (Long st : kept.values()) {
+                    finalizeImpl(st.longValue());
+                }
+                kept.clear();
                 closeImpl(db);
                 db = 0;
             }
@@ -216,6 +245,7 @@ public final class HostSql extends PySql {
     private static native double columnDoubleImpl(long st, int index);
     private static native byte[] columnBlobImpl(long st, int index);
     private static native void finalizeImpl(long st);
+    private static native int resetImpl(long st);
     private static native long changesImpl(long db);
     private static native long lastInsertRowIdImpl(long db);
 }
