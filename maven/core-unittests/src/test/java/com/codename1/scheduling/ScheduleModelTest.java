@@ -268,6 +268,44 @@ class ScheduleModelTest extends UITestBase {
     }
 
     @FormTest
+    void aMeetingInTwoCalendarsIsEditedInTheOneThatWasHeld() {
+        // A source may give one meeting the same id in every calendar it
+        // is in. The copy that is edited is the one the caller holds.
+        ListSource source = new ListSource();
+        String[] ids = {"work", "home", "team", "club", "gym", "kids"};
+        List<CalendarEvent> copies = new ArrayList<CalendarEvent>();
+        CalendarScheduleModel m = new CalendarScheduleModel(source, UTC);
+        for (String id : ids) {
+            CalendarEvent e = event(id, "meeting", at(5, 9), at(5, 10));
+            copies.add(e);
+            source.events.add(e);
+            m.addCalendar(new CalendarInfo().setId(id).setName(id));
+        }
+        m.setVisibleRange(at(5, 0), at(6, 0));
+        flushSerialCalls();
+        // Each in turn, so that no order of the calendars passes by chance.
+        for (int i = 0; i < ids.length; i++) {
+            ScheduleItem held = null;
+            for (ScheduleItem each : items(m, at(5, 0), at(6, 0))) {
+                if (ids[i].equals(each.getResourceId())) {
+                    held = each;
+                }
+            }
+            assertNotNull(held);
+            assertSame(copies.get(i), CalendarScheduleModel.eventOf(held));
+            long start = at(5, 11 + i);
+            assertTrue(m.updateItem(held, start, start + 3600000L, ids[i]));
+            flushSerialCalls();
+            for (int j = 0; j < ids.length; j++) {
+                long expect = j <= i ? at(5, 11 + j) : at(5, 9);
+                assertEquals(expect, copies.get(j).getStart().getDateTime().toInstant().toEpochMilli(),
+                        ids[j] + " after " + ids[i] + " was edited");
+                assertEquals(ids[j], copies.get(j).getCalendarId());
+            }
+        }
+    }
+
+    @FormTest
     void anEditIsSavedAndPutBackWhenTheSourceRefuses() {
         ListSource source = new ListSource();
         CalendarEvent a = event("work", "a", at(5, 9), at(5, 10));

@@ -453,27 +453,56 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         if (item == null) {
             return null;
         }
-        // By its id, and failing that by the event behind it: an item that
-        // was created here has an id of its own making, and the load after
-        // it was saved has the source's. Every calendar is looked in, since
-        // the event may have been moved to another since.
+        // In its own calendar first: a source may give one meeting the same
+        // id in two calendars that are both shown, and the copy that was
+        // dragged is the one to change, not whichever comes first.
+        ScheduleItem own = sameId(items.get(item.getResourceId()), item);
+        if (own != null) {
+            return own;
+        }
+        // Then in every other, since the event may have been moved to
+        // another since; and failing its id by the event behind it: an item
+        // that was created here has an id of its own making, and the load
+        // after it was saved has the source's.
         CalendarEvent e = eventOf(item);
         String eventId = e == null ? null : e.getId();
         ScheduleItem sameEvent = null;
         for (List<ScheduleItem> list : items.values()) {
+            ScheduleItem found = sameId(list, item);
+            if (found != null) {
+                return found;
+            }
+            if (sameEvent != null || eventId == null) {
+                continue;
+            }
             for (ScheduleItem each : list) {
-                if (each == item || each.getId().equals(item.getId())) { //NOPMD CompareObjectsWithEquals - the very item is the common case
-                    return each;
-                }
-                if (sameEvent == null && eventId != null && !each.isRecurring()) {
+                if (!each.isRecurring()) {
                     CalendarEvent other = eventOf(each);
                     if (other != null && eventId.equals(other.getId())) {
                         sameEvent = each;
+                        break;
                     }
                 }
             }
         }
         return sameEvent;
+    }
+
+    // The item itself when the list has it, or else the one with its id.
+    private static ScheduleItem sameId(List<ScheduleItem> list, ScheduleItem item) {
+        if (list == null) {
+            return null;
+        }
+        ScheduleItem byId = null;
+        for (ScheduleItem each : list) {
+            if (each == item) { //NOPMD CompareObjectsWithEquals - the very item is the common case
+                return each;
+            }
+            if (byId == null && each.getId().equals(item.getId())) {
+                byId = each;
+            }
+        }
+        return byId;
     }
 
     // An answer to a load that was asked before an edit was made, and came

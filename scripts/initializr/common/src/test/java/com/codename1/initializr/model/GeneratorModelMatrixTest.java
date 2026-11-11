@@ -131,6 +131,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateFullStackTemplate();
         validateReelGate();
         validateSplatGate();
+        validateSlateGate();
         validateCommandLineProject();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
@@ -653,6 +654,18 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 GeneratorModel.SPLAT_SINCE, "Splat is not generated before its gate");
         assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
                 GeneratorModel.SPLAT_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.SPLAT)), "The page offers Splat from its gate on");
+    }
+
+    /// The booking template needs the scheduling views of a newer core: below
+    /// its own gate it is refused, and the page does not list it.
+    private void validateSlateGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.SLATE_SINCE),
+                "Slate's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.SLATE, "OldSlate",
+                "com.acme.oldslate", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.SLATE_SINCE, "Slate is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.SLATE_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.SLATE)), "The page offers Slate from its gate on");
     }
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {

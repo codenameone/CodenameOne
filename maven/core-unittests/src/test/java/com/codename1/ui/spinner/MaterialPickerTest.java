@@ -324,8 +324,10 @@ class MaterialPickerTest extends UITestBase {
             Form owner = picker.getComponentForm();
             new Form("Elsewhere", BoxLayout.y()).show();
             flushSerialCalls();
+            assertEquals(date(2026, 0, 5, 0, 0), picker.getDate(), "what was never confirmed is not the date");
             owner.show();
             flushSerialCalls();
+            assertEquals(date(2026, 0, 5, 0, 0), picker.getDate());
             open(picker);
             Dialog second = picker.getMaterialDialog();
             assertNotNull(second, "the picker opens again");

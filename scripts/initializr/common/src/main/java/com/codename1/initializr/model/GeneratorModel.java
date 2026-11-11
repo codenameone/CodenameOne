@@ -104,11 +104,19 @@ public class GeneratorModel {
     /// generated there.
     static final String JAVA_TIME_ENTITIES_SINCE = "7.0.280";
 
+    /// The first release whose core has the scheduling views the booking
+    /// template draws its day board and its calendars with
+    /// (`com.codename1.ui.scheduler` over `com.codename1.scheduling`). Before it
+    /// the template's app does not compile, so it is neither offered nor
+    /// generated.
+    static final String SLATE_SINCE = "7.0.282";
+
     /// The first release a template can be generated against.
     static String templateSince(Template template) {
         return template == Template.BASTION ? BASTION_SINCE
                 : template == Template.REEL ? REEL_SINCE
-                : template == Template.SPLAT ? SPLAT_SINCE : JAVA_TIME_ENTITIES_SINCE;
+                : template == Template.SPLAT ? SPLAT_SINCE
+                : template == Template.SLATE ? SLATE_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its

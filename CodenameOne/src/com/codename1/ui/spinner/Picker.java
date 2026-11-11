@@ -1202,6 +1202,12 @@ public class Picker extends Button {
 
     private void endMaterialDialog(Dialog dlg, InternalPickerWidget widget, boolean commit) {
         if (materialDialog != dlg) { //NOPMD CompareObjectsWithEquals - this very dialog, closed once
+            // One that was given up for a later opening while a dialog of
+            // the application lay over it, and is on screen again now that
+            // the others closed: its buttons close it and decide nothing.
+            if (Display.getInstance().getCurrent() == dlg) { //NOPMD CompareObjectsWithEquals - this very dialog
+                dlg.dispose();
+            }
             return;
         }
         materialDialog = null;
@@ -1650,10 +1656,22 @@ public class Picker extends Button {
     /// Returns the value currently visible to the user: the live spinner wheel value while
     /// the lightweight popup is showing, otherwise the committed `value` field.
     private Object currentValue() {
-        if (currentSpinner != null) {
-            return currentSpinner.getValue();
+        InternalPickerWidget shown = shownSpinner();
+        if (shown != null) {
+            return shown.getValue();
         }
         return value;
+    }
+
+    // The widget the user is choosing in. A Material dialog the application
+    // covered with something of its own is not that: nobody is looking at
+    // it, and what it showed was never confirmed.
+    private InternalPickerWidget shownSpinner() {
+        if (materialDialog != null
+                && Display.getInstance().getCurrent() != materialDialog) { //NOPMD CompareObjectsWithEquals - this very dialog
+            return null;
+        }
+        return currentSpinner;
     }
 
     /// Returns the date, this value is used both for type date/date and time. Notice that this
@@ -1672,8 +1690,9 @@ public class Picker extends Button {
         // If the popup is showing, the live wheel position wins regardless of
         // whether a default is configured - the user is in the middle of
         // editing and should see the in-flight value.
-        if (currentSpinner != null) {
-            return (Date) currentSpinner.getValue();
+        InternalPickerWidget shown = shownSpinner();
+        if (shown != null) {
+            return (Date) shown.getValue();
         }
         // No explicit setDate yet -> let the default getter take over so the
         // value returned here matches what the picker would show if opened now.

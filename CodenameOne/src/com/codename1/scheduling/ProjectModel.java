@@ -117,7 +117,9 @@ public class ProjectModel {
 
     /// Adds a task at a position among `parent`'s children; -1 is the end,
     /// and a null parent is the top level. A task that is in the project
-    /// already is moved.
+    /// already is moved. A task belongs to one project: one that is a task
+    /// of another is to be removed from that project first, with
+    /// `removeTask`, which also drops the links that project has to it.
     ///
     /// #### Throws
     ///
