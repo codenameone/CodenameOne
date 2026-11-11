@@ -1564,8 +1564,8 @@ public final class CommerceManager {
         Object e = payload.get("endpoint");
         if (e != null) {
             String ep = String.valueOf(e);
-            for (int i = 0; i < paths.length; i++) {
-                if (paths[i].equals(ep)) {
+            for (String path : paths) {
+                if (path.equals(ep)) {
                     return true;
                 }
             }
