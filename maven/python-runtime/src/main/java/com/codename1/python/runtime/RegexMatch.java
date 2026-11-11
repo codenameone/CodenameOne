@@ -131,13 +131,22 @@ final class RegexMatch extends PyObject {
         return s.length() - PyStr.surrogates(s);
     }
 
+    /// The last bytes object decoded and its text. A tokenizer (pdfminer's)
+    /// searches one buffer from position after position; decoding all of it
+    /// on every call made a PDF slower than the Python wrapper was. Bytes are
+    /// immutable, so identity is enough. Python runs under the [Gil].
+    private static PyBytes lastBytes;
+    private static String lastText;
+
     private static String latin1(PyBytes b) {
-        byte[] v = b.value;
-        char[] c = new char[v.length];
-        for (int i = 0; i < v.length; i++) {
-            c[i] = (char) (v[i] & 0xff);
+        if (b == lastBytes) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return lastText;
         }
-        return new String(c);
+        byte[] v = b.value;
+        String t = Codecs.latin1(v, 0, v.length);
+        lastBytes = b;
+        lastText = t;
+        return t;
     }
 
     // ---- groups ------------------------------------------------------------
