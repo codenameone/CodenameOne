@@ -801,7 +801,7 @@ public final class CommerceManager {
     public String getManagementUrl() {
         CustomerInfo info = getCustomerInfo();
         String user = getAppUserId();
-        if (portalUrl != null && paidOnWeb(info) && user != null && user.equals(portalUser)) {
+        if (portalUrl != null && paidOnWeb(info) && user.equals(portalUser)) {
             return portalUrl;
         }
         return info.getManagementUrl();

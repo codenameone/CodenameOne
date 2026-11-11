@@ -37,6 +37,9 @@ public interface PaywallListener {
 
     /// The cloud confirmed the purchase: the customer now owns the product
     /// of the package.
+    /// A paywall shown by [Paywall#show(Offering, PaywallListener)] has
+    /// already returned to the form it was shown over; a [PaywallView] in a
+    /// form of the application is still showing.
     ///
     /// #### Parameters
     ///
@@ -49,12 +52,16 @@ public interface PaywallListener {
 
     /// The customer information changed after the customer asked to restore
     /// purchases.
+    /// A paywall shown by [Paywall#show(Offering, PaywallListener)] has
+    /// already returned to the form it was shown over.
     ///
     /// #### Parameters
     ///
     /// - `info`: the customer information after the restore
     void restoreCompleted(CustomerInfo info);
 
-    /// The paywall was closed.
+    /// The paywall was closed: by the customer, or by itself after a
+    /// completed purchase or restore when [Paywall#show(Offering, PaywallListener)]
+    /// showed it.
     void closed();
 }

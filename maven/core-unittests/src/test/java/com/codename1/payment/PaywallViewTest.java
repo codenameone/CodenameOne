@@ -30,6 +30,7 @@ import com.codename1.payment.paywall.PaywallView;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.Tabs;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -228,5 +229,95 @@ class PaywallViewTest extends CommerceTestBase {
         view.close();
         view.close();
         assertEquals("[started:annual, cancelled, closed, handler]", heard.toString());
+    }
+
+    private static final String OWNS_ANNUAL =
+            "{\"accepted\":true,\"degraded\":false,\"serverTime\":1700000000000,"
+                    + "\"appUserId\":\"u1\",\"activeSubscriptions\":[\"pro_annual\"],"
+                    + "\"entitlements\":{}}";
+
+    private static PaywallListener recorder(final List<String> heard) {
+        return new PaywallListener() {
+            @Override
+            public void purchaseStarted(CommercePackage pkg) {
+                heard.add("started:" + pkg.getId());
+            }
+
+            @Override
+            public void purchaseCompleted(CustomerInfo info) {
+                heard.add("completed over " + Display.getInstance().getCurrent().getName());
+            }
+
+            @Override
+            public void purchaseCancelled() {
+                heard.add("cancelled");
+            }
+
+            @Override
+            public void restoreCompleted(CustomerInfo info) {
+                heard.add("restored");
+            }
+
+            @Override
+            public void closed() {
+                heard.add("closed");
+            }
+        };
+    }
+
+    @FormTest
+    void shownPaywallReturnsToThePreviousFormWhenThePurchaseCompletes() throws Exception {
+        Display.getInstance().setProperty("commerce.cloud.enabled", "true");
+        CommerceManager cm = CommerceManager.getInstance();
+        cm.setAppUserId("u1");
+        Form home = new Form("Home");
+        home.setName("home");
+        home.show();
+        com.codename1.ui.DisplayTest.flushEdt();
+
+        final List<String> heard = new ArrayList<String>();
+        PaywallView view = Paywall.show(offerings(OFFERING).getCurrent(), recorder(heard));
+        com.codename1.ui.DisplayTest.flushEdt();
+        assertSame(view.getComponentForm(), Display.getInstance().getCurrent());
+
+        view.purchase();
+        mock("/customer", OWNS_ANNUAL);
+        cm.refresh();
+        com.codename1.ui.DisplayTest.flushEdt();
+
+        assertEquals("[started:annual, completed over home, closed]", heard.toString());
+        assertSame(home, Display.getInstance().getCurrent());
+        // Already closed: closing again reports nothing.
+        view.close();
+        assertEquals(3, heard.size());
+    }
+
+    @FormTest
+    void embeddedViewStaysWhenThePurchaseCompletes() throws Exception {
+        Display.getInstance().setProperty("commerce.cloud.enabled", "true");
+        CommerceManager cm = CommerceManager.getInstance();
+        cm.setAppUserId("u1");
+        PaywallView view = new PaywallView(offerings(OFFERING).getCurrent());
+        Form own = new Form("Own", new com.codename1.ui.layouts.BorderLayout());
+        own.setName("own");
+        own.add(com.codename1.ui.layouts.BorderLayout.CENTER, view);
+        own.show();
+        com.codename1.ui.DisplayTest.flushEdt();
+
+        final List<String> heard = new ArrayList<String>();
+        view.setPaywallListener(recorder(heard));
+        view.setCloseHandler(new Runnable() {
+            @Override
+            public void run() {
+                heard.add("handler");
+            }
+        });
+        view.purchase();
+        mock("/customer", OWNS_ANNUAL);
+        cm.refresh();
+        com.codename1.ui.DisplayTest.flushEdt();
+
+        assertEquals("[started:annual, completed over own]", heard.toString());
+        assertSame(own, Display.getInstance().getCurrent());
     }
 }

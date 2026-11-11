@@ -130,6 +130,7 @@ public class PaywallView extends Container {
     private boolean closed;
     private PaywallListener listener;
     private Runnable closeHandler;
+    private boolean closeWhenDone;
     private ActionListener customerListener;
     private boolean webPurchaseStarted;
     private Form shownForm;
@@ -316,7 +317,7 @@ public class PaywallView extends Container {
             log("IMPRESSION", null);
         }
         Form form = getComponentForm();
-        if (form != null && shownForm != form) {
+        if (form != null && shownForm != form) { //NOPMD CompareObjectsWithEquals - the same form instance, not an equal one
             if (shownForm != null) {
                 shownForm.removeShowListener(showListener);
             }
@@ -333,12 +334,15 @@ public class PaywallView extends Container {
         if (!webPurchaseStarted || closed) {
             return;
         }
-        Display.getInstance().scheduleBackgroundTask(new Runnable() {
-            @Override
-            public void run() {
-                CommerceManager.getInstance().refresh();
-            }
-        });
+        Display.getInstance().scheduleBackgroundTask(new RefreshTask());
+    }
+
+    /// Asks the cloud for the customer again, off the EDT.
+    private static final class RefreshTask implements Runnable {
+        @Override
+        public void run() {
+            CommerceManager.getInstance().refresh();
+        }
     }
 
     // ---- purchase tracking ---------------------------------------------------
@@ -367,23 +371,60 @@ public class PaywallView extends Container {
     }
 
     private void customerChanged(CustomerInfo info) {
-        if (pending != null && owns(info, pending.getProductId())) {
-            CommercePackage bought = pending;
+        boolean bought = pending != null && owns(info, pending.getProductId());
+        boolean restored = restoring;
+        if (!bought && !restored) {
+            if (pending == null) {
+                stopWatchingCustomer();
+            }
+            return;
+        }
+        if (bought) {
+            log("PURCHASE", pending.getId());
             pending = null;
-            log("PURCHASE", bought.getId());
-            if (listener != null) {
-                listener.purchaseCompleted(info);
-            }
         }
-        if (restoring) {
-            restoring = false;
-            if (listener != null) {
-                listener.restoreCompleted(info);
-            }
-        }
+        restoring = false;
+        boolean left = false;
         if (pending == null) {
             stopWatchingCustomer();
+            left = leaveWhenDone();
         }
+        if (listener != null) {
+            if (bought) {
+                listener.purchaseCompleted(info);
+            }
+            if (restored) {
+                listener.restoreCompleted(info);
+            }
+            if (left) {
+                listener.closed();
+            }
+        }
+    }
+
+    /// A paywall that is a screen of its own has nothing left to offer once
+    /// the purchase or the restore went through, so it leaves before the
+    /// listener hears of it: the listener then runs over the form the
+    /// customer came from and may show one of its own. A view the
+    /// application embedded stays where it is; only the application knows
+    /// what its form should show next.
+    private boolean leaveWhenDone() {
+        if (!closeWhenDone || closed) {
+            return false;
+        }
+        closed = true;
+        log("CLOSE", null);
+        if (closeHandler != null) {
+            closeHandler.run();
+        }
+        return true;
+    }
+
+    /// Makes the view close itself, through its close handler, once a
+    /// purchase or a restore completes. [Paywall#show(Offering, PaywallListener)]
+    /// turns it on for the form it shows.
+    void setCloseWhenDone(boolean closeWhenDone) {
+        this.closeWhenDone = closeWhenDone;
     }
 
     private static boolean owns(CustomerInfo info, String productId) {

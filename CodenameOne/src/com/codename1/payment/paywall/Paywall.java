@@ -46,7 +46,9 @@ public final class Paywall {
 
     /// Shows the paywall of the offering in a new form over the current one.
     /// Closing the paywall, or going back, returns to the form that was
-    /// showing. An offering with no paywall document is shown with
+    /// showing, and so does a purchase or a restore that completes: the
+    /// paywall returns to that form first and the listener hears
+    /// `purchaseCompleted` or `restoreCompleted`, then `closed`, over it. An offering with no paywall document is shown with
     /// [the built-in one][#createDefault(Offering)]. The form's UIID is
     /// `PaywallForm`.
     ///
@@ -76,6 +78,7 @@ public final class Paywall {
                 }
             }
         });
+        view.setCloseWhenDone(true);
         form.setBackCommand(new Command("") {
             @Override
             public void actionPerformed(ActionEvent evt) {
