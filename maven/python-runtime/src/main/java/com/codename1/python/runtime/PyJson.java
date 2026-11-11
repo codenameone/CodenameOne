@@ -97,6 +97,8 @@ final class PyJson {
         /// each call, and an encoder appends several times per value.
         char[] buf = new char[256];
         int len;
+        /// The part of a string still to be escaped; see `quote`.
+        private char[] tail = new char[64];
         private boolean ascii;
         private boolean circular;
         private boolean allowNan;
@@ -131,6 +133,9 @@ final class PyJson {
             if (e.buf.length > 4096) {
                 // One large document must not stay held for the life of the program.
                 e.buf = new char[256];
+            }
+            if (e.tail.length > 4096) {
+                e.tail = new char[64];
             }
             e.other = null;
             spare = e;
@@ -227,14 +232,38 @@ final class PyJson {
                 buf[len++] = '"';
                 return;
             }
+            // The rest is read from a copy of what was just written, never from the string:
+            // a character read from a string is a call that asks which form the string is
+            // in, and a prompt with line breaks in it took that call for every character.
+            // Text between two escapes is moved as one block.
+            int t = end - i;
+            char[] src = tail;
+            if (src.length < t) {
+                src = new char[Math.max(t, src.length * 2)];
+                tail = src;
+            }
+            System.arraycopy(buf, i, src, 0, t);
             len = i;
-            int from = i - (end - n) ;
-            for (int k = from; k < n; k++) {
-                char c = s.charAt(k);
-                if (c >= 0x20 && c != '"' && c != '\\' && c < limit) {
-                    put(c);
-                    continue;
+            int k = 0;
+            while (k < t) {
+                int run = k;
+                while (run < t) {
+                    char r = src[run];
+                    if (r < 0x20 || r == '"' || r == '\\' || r >= limit) {
+                        break;
+                    }
+                    run++;
                 }
+                if (run > k) {
+                    room(run - k);
+                    System.arraycopy(src, k, buf, len, run - k);
+                    len += run - k;
+                    k = run;
+                    if (k == t) {
+                        break;
+                    }
+                }
+                char c = src[k++];
                 room(6);
                 buf[len++] = '\\';
                 switch (c) {

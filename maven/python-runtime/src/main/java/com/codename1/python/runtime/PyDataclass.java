@@ -91,6 +91,20 @@ final class PyDataclass {
         private final boolean frozen;
         private final PyObject slow;
 
+        /// Where each field of a new instance of `planCls` goes, worked out once per class
+        /// and kept while no class changes ([PyType#version]): the compiled field
+        /// (`planField`), or the position in the instance's slots (`planSlot`) with the
+        /// shape the instance has once that slot is filled (`planStep`). Storing a field
+        /// by name asks the class for `__setattr__` and for a descriptor of that name and
+        /// then walks a shape transition, three table lookups for a value whose place is
+        /// the same for every instance the constructor ever makes.
+        private PyType planCls;
+        private int planVersion;
+        private boolean planOk;
+        private int[] planField;
+        private int[] planSlot;
+        private Shape[] planStep;
+
         Init(String[] name, int[] position, boolean[] taken, int[] kind, Object[] fallback, int positional,
                 boolean frozen, PyObject slow) {
             this.name = name;
@@ -116,11 +130,12 @@ final class PyDataclass {
                     return slow.call(args, kwNames);
                 }
                 PyInstance to = (PyInstance) args[0];
+                boolean planned = plan(to);
                 for (int i = 0; i < n; i++) {
                     if (position[i] >= 0 && position[i] < given) {
-                        store(to, i, args[1 + position[i]]);
+                        store(to, i, args[1 + position[i]], planned);
                     } else {
-                        storeDefault(to, i);
+                        storeDefault(to, i, planned);
                     }
                 }
                 return Py.NONE;
@@ -155,6 +170,7 @@ final class PyDataclass {
                 return slow.call(args, kwNames);
             }
             PyInstance self = (PyInstance) args[0];
+            boolean planned = plan(self);
             for (int i = 0; i < n; i++) {
                 Object v;
                 if (at[i] != 0) {
@@ -166,11 +182,7 @@ final class PyDataclass {
                 } else {
                     continue;
                 }
-                if (frozen) {
-                    self.setAttrObject(name[i], v);
-                } else {
-                    self.setAttr(name[i], v);
-                }
+                store(self, i, v, planned);
             }
             return Py.NONE;
         }
@@ -194,30 +206,122 @@ final class PyDataclass {
         /// constructor call that has no argument array. The caller has asked
         /// [#positional(int)] first.
         void fill(PyInstance self, int given, Object a, Object b, Object c, Object d, Object e) {
+            boolean planned = plan(self);
             for (int i = 0; i < name.length; i++) {
                 int p = position[i];
                 if (p >= 0 && p < given) {
-                    store(self, i, p == 0 ? a : p == 1 ? b : p == 2 ? c : p == 3 ? d : e);
+                    store(self, i, p == 0 ? a : p == 1 ? b : p == 2 ? c : p == 3 ? d : e, planned);
                 } else {
-                    storeDefault(self, i);
+                    storeDefault(self, i, planned);
                 }
             }
         }
 
-        private void storeDefault(PyInstance self, int i) {
+        private void storeDefault(PyInstance self, int i, boolean planned) {
             if (kind[i] == 2) {
-                store(self, i, Py.obj(fallback[i]).call0());
+                store(self, i, Py.obj(fallback[i]).call0(), planned);
             } else if (kind[i] == 1) {
-                store(self, i, fallback[i]);
+                store(self, i, fallback[i], planned);
             }
         }
 
-        private void store(PyInstance self, int i, Object v) {
+        private void store(PyInstance self, int i, Object v, boolean planned) {
+            if (planned) {
+                int f = planField[i];
+                if (f >= 0) {
+                    self.setField(f, v);
+                    return;
+                }
+                int k = planSlot[i];
+                if (k >= 0) {
+                    // The shape moves with every store, not once at the end: a default
+                    // factory runs between two of them and may raise, and what is left
+                    // behind then is what storing by name would have left.
+                    self.slots[k] = v;
+                    self.shape = planStep[k];
+                    self.extra = true;
+                    return;
+                }
+            }
             if (frozen) {
                 self.setAttrObject(name[i], v);
             } else {
                 self.setAttr(name[i], v);
             }
+        }
+
+        /// Whether the stores of this call can follow the plan, which they can for an
+        /// instance with no attribute outside its compiled fields yet, of a class whose
+        /// stores are all plain. On a yes the instance has its slots, sized for the plan.
+        private boolean plan(PyInstance self) {
+            if (self.shape != null || self.extra) {
+                return false;
+            }
+            if (planCls != self.cls || planVersion != PyType.version) { //NOPMD CompareObjectsWithEquals - identity is meant
+                planOk = makePlan(self);
+                planCls = self.cls;
+                planVersion = PyType.version;
+            }
+            if (!planOk) {
+                return false;
+            }
+            int n = planStep.length;
+            if (n > 0) {
+                self.slots = new Object[n];
+            }
+            return true;
+        }
+
+        /// Works the plan out against `self`, which stands for every fresh instance of its
+        /// class, by following what [PyInstance#store] does with each field in turn: a
+        /// compiled field takes the value until the first attribute that has none, and
+        /// from there on everything is kept in the shape, which remembers the order.
+        private boolean makePlan(PyInstance self) {
+            PyType cls = self.cls;
+            if (!frozen) {
+                Object sa = cls.lookup("__setattr__");
+                if (sa != null && !(sa instanceof PyBuiltin)) {
+                    return false;
+                }
+            }
+            int n = name.length;
+            int[] field = new int[n];
+            int[] slot = new int[n];
+            java.util.Set<String> allowed = cls.slotNames();
+            java.util.ArrayList<Shape> steps = new java.util.ArrayList<Shape>();
+            Shape shape = Shape.EMPTY;
+            for (int i = 0; i < n; i++) {
+                field[i] = -1;
+                slot[i] = -1;
+                if (kind[i] == 0 && position[i] < 0 && !taken[i]) {
+                    // Never stored by the constructor.
+                    continue;
+                }
+                String nm = name[i];
+                if ("__dict__".equals(nm)) {
+                    return false;
+                }
+                Object clsAttr = cls.lookup(nm);
+                if (clsAttr instanceof PyProperty
+                        || clsAttr instanceof PyInstance && ((PyInstance) clsAttr).cls.lookup("__set__") != null) {
+                    return false;
+                }
+                int f = self.fieldIndex(nm);
+                if (f >= 0 && steps.isEmpty()) {
+                    field[i] = f;
+                    continue;
+                }
+                if (allowed != null && !allowed.contains(nm) || shape.indexOf(nm) >= 0) {
+                    return false;
+                }
+                shape = shape.with(nm);
+                slot[i] = steps.size();
+                steps.add(shape);
+            }
+            planField = field;
+            planSlot = slot;
+            planStep = steps.toArray(new Shape[0]);
+            return true;
         }
     }
 }

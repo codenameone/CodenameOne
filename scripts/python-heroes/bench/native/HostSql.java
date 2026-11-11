@@ -32,6 +32,18 @@ public final class HostSql extends PySql {
         return new Conn(db);
     }
 
+    /// A prepared statement and the names of its columns, which are the same every time
+    /// it runs until SQLite compiles it again.
+    private static final class Stmt {
+        final long st;
+        String[] columns;
+        int reprepares;
+
+        Stmt(long st) {
+            this.st = st;
+        }
+    }
+
     private static final class Conn extends PySql.Connection {
         /// As many prepared statements as CPython's sqlite3 keeps for a
         /// connection.
@@ -40,7 +52,7 @@ public final class HostSql extends PySql {
         /// Statements this connection ran and may run again, by their text,
         /// the one used longest ago first. One that is running is not here,
         /// so a function it calls that runs the same text prepares its own.
-        private final LinkedHashMap<String, Long> kept = new LinkedHashMap<String, Long>();
+        private final LinkedHashMap<String, Stmt> kept = new LinkedHashMap<String, Stmt>();
 
         Conn(long db) {
             this.db = db;
@@ -48,8 +60,11 @@ public final class HostSql extends PySql {
 
         @Override
         public Result run(String sql, Object[] params, boolean query) throws IOException {
-            Long was = kept.remove(sql);
-            long st = was != null ? was.longValue() : prepareImpl(db, sql);
+            Stmt held = kept.remove(sql);
+            if (held == null) {
+                held = new Stmt(prepareImpl(db, sql));
+            }
+            long st = held.st;
             if (st == 0) {
                 throw new IOException(errorImpl(db));
             }
@@ -74,18 +89,32 @@ public final class HostSql extends PySql {
                         throw new IOException(errorImpl(db));
                     }
                 }
-                int n = columnCountImpl(st);
-                r.columns = new String[n];
-                for (int i = 0; i < n; i++) {
-                    r.columns[i] = columnNameImpl(st, i);
-                }
+                int n = 0;
+                boolean first = true;
                 while (true) {
                     int rc = stepImpl(st);
+                    if (rc != DONE && rc != ROW) {
+                        throw new IOException(errorImpl(db));
+                    }
+                    if (first) {
+                        // The names are read after the first step, which is where SQLite
+                        // compiles a statement again if the schema changed under it, and
+                        // are kept with the statement until it does so.
+                        first = false;
+                        int compiled = repreparesImpl(st);
+                        if (held.columns == null || held.reprepares != compiled) {
+                            String[] names = new String[columnCountImpl(st)];
+                            for (int i = 0; i < names.length; i++) {
+                                names[i] = columnNameImpl(st, i);
+                            }
+                            held.columns = names;
+                            held.reprepares = compiled;
+                        }
+                        r.columns = held.columns;
+                        n = r.columns.length;
+                    }
                     if (rc == DONE) {
                         break;
-                    }
-                    if (rc != ROW) {
-                        throw new IOException(errorImpl(db));
                     }
                     Object[] row = new Object[n];
                     for (int i = 0; i < n; i++) {
@@ -114,10 +143,10 @@ public final class HostSql extends PySql {
                 // One that failed is not run again: the next use prepares it
                 // and reports what is wrong with it afresh.
                 if (done && resetImpl(st) == 0) {
-                    kept.put(sql, Long.valueOf(st));
+                    kept.put(sql, held);
                     if (kept.size() > KEPT) {
-                        Iterator<Map.Entry<String, Long>> it = kept.entrySet().iterator();
-                        long old = it.next().getValue().longValue();
+                        Iterator<Map.Entry<String, Stmt>> it = kept.entrySet().iterator();
+                        long old = it.next().getValue().st;
                         it.remove();
                         finalizeImpl(old);
                     }
@@ -161,8 +190,8 @@ public final class HostSql extends PySql {
         @Override
         public void close() throws IOException {
             if (db != 0) {
-                for (Long st : kept.values()) {
-                    finalizeImpl(st.longValue());
+                for (Stmt held : kept.values()) {
+                    finalizeImpl(held.st);
                 }
                 kept.clear();
                 closeImpl(db);
@@ -237,6 +266,7 @@ public final class HostSql extends PySql {
     private static native int bindNullImpl(long st, int index);
     private static native int bindBlobImpl(long st, int index, byte[] value);
     private static native int stepImpl(long st);
+    private static native int repreparesImpl(long st);
     private static native int columnCountImpl(long st);
     private static native String columnNameImpl(long st, int index);
     private static native int columnTypeImpl(long st, int index);

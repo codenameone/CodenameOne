@@ -76,6 +76,10 @@ JAVA_INT com_pyhero_HostSql_stepImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAV
     return sqlite3_step(STMT);
 }
 
+JAVA_INT com_pyhero_HostSql_repreparesImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG st) {
+    return sqlite3_stmt_status(STMT, SQLITE_STMTSTATUS_REPREPARE, 0);
+}
+
 JAVA_INT com_pyhero_HostSql_columnCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG st) {
     return sqlite3_column_count(STMT);
 }
