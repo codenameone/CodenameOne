@@ -4287,7 +4287,7 @@ public final class Emitter {
         }
     }
 
-    private String hoist(String type, String init) {
+    String hoist(String type, String init) {
         String key = type + " " + init;
         String f = constants.get(key);
         if (f == null) {

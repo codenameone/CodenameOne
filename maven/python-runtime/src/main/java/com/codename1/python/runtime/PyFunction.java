@@ -214,7 +214,8 @@ public final class PyFunction extends PyObject {
         if (body1 != null) {
             return body1.run(a);
         }
-        return widen(1) ? fill(1, a, null, null, null, null) : call(new Object[] {a}, Py.NO_KW);
+        return widen(1) ? fill(1, a, null, null, null, null)
+                : starOnly(1) ? star(1, a, null, null, null, null) : call(new Object[] {a}, Py.NO_KW);
     }
 
     @Override
@@ -222,7 +223,8 @@ public final class PyFunction extends PyObject {
         if (body2 != null) {
             return body2.run(a, b);
         }
-        return widen(2) ? fill(2, a, b, null, null, null) : call(new Object[] {a, b}, Py.NO_KW);
+        return widen(2) ? fill(2, a, b, null, null, null)
+                : starOnly(2) ? star(2, a, b, null, null, null) : call(new Object[] {a, b}, Py.NO_KW);
     }
 
     @Override
@@ -230,7 +232,8 @@ public final class PyFunction extends PyObject {
         if (body3 != null) {
             return body3.run(a, b, c);
         }
-        return widen(3) ? fill(3, a, b, c, null, null) : call(new Object[] {a, b, c}, Py.NO_KW);
+        return widen(3) ? fill(3, a, b, c, null, null)
+                : starOnly(3) ? star(3, a, b, c, null, null) : call(new Object[] {a, b, c}, Py.NO_KW);
     }
 
     @Override
@@ -238,7 +241,8 @@ public final class PyFunction extends PyObject {
         if (body4 != null) {
             return body4.run(a, b, c, d);
         }
-        return widen(4) ? fill(4, a, b, c, d, null) : call(new Object[] {a, b, c, d}, Py.NO_KW);
+        return widen(4) ? fill(4, a, b, c, d, null)
+                : starOnly(4) ? star(4, a, b, c, d, null) : call(new Object[] {a, b, c, d}, Py.NO_KW);
     }
 
     @Override
@@ -246,12 +250,44 @@ public final class PyFunction extends PyObject {
         if (body5 != null) {
             return body5.run(a, b, c, d, e);
         }
-        return widen(5) ? fill(5, a, b, c, d, e) : call(new Object[] {a, b, c, d, e}, Py.NO_KW);
+        return widen(5) ? fill(5, a, b, c, d, e)
+                : starOnly(5) ? star(5, a, b, c, d, e) : call(new Object[] {a, b, c, d, e}, Py.NO_KW);
     }
 
     @Override
     public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
         return body6 != null ? body6.run(a, b, c, d, e, f) : call(new Object[] {a, b, c, d, e, f}, Py.NO_KW);
+    }
+
+    /// Whether a positional call with `n` arguments binds as `f(*args)` does:
+    /// plain leading parameters and one `*args`, nothing keyword-only.
+    private boolean starOnly(int n) {
+        return varArgs && kwOnly == 0 && !varKw && n >= positional;
+    }
+
+    /// [#call] of `f(*args)` from a fixed-arity call: the leading arguments go
+    /// to their slots and the rest straight into the tuple, with no argument
+    /// array built first and copied out of.
+    private Object star(int n, Object a, Object b, Object c, Object d, Object e) {
+        Object[] slots = spareSlots;
+        spareSlots = null;
+        if (slots == null) {
+            slots = new Object[positional + 1];
+        }
+        int rest = n - positional;
+        Object[] items = rest == 0 ? null : new Object[rest];
+        for (int i = 0; i < n; i++) {
+            Object v = i == 0 ? a : i == 1 ? b : i == 2 ? c : i == 3 ? d : e;
+            if (i < positional) {
+                slots[i] = v;
+            } else {
+                items[i - positional] = v;
+            }
+        }
+        slots[positional] = items == null ? PyTuple.EMPTY : new PyTuple(items);
+        Object r = body.run(slots);
+        spareSlots = clear(slots);
+        return r;
     }
 
     /// Whether a positional call with `n` arguments can go straight to the

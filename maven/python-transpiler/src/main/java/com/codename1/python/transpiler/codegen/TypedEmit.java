@@ -6590,7 +6590,9 @@ final class TypedEmit {
             a.append(a.length() == 0 ? "" : ", ").append(box(expr(kw.value)));
             names.append(names.length() == 0 ? "" : ", ").append(Emitter.javaString(kw.arg));
         }
-        return new E("Py.callKw(" + f + ", new Object[] {" + a + "}, new String[] {" + names + "})", Ty.DYN);
+        // Hoisted: the callee caches its keyword binding by the array's identity.
+        String w = em.hoist("String[]", "new String[] {" + names + "}");
+        return new E("Py.callKw(" + f + ", new Object[] {" + a + "}, " + w + ")", Ty.DYN);
     }
 
     /// The count of `[v] * n` or `n * [v]` when it is an int, or null.
