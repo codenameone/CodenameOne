@@ -1087,12 +1087,30 @@ public class Parser extends ClassVisitor {
         // same test that decides whether its descriptor is written); the descriptor is the
         // macro's only reader. Three ids for every class put a program of 16,706 classes
         // past the 16-bit object header index (llm with its dependencies, translated whole).
+        //
+        // The ids are therefore NOT a function of the class id any more, and
+        // instanceofFunction used to compute an array's dimension and element class from
+        // its id by arithmetic. cn1RefArrayComponent replaces that: indexed by an array id
+        // less the first reference array id, it holds the id of the element type -- a class
+        // id for one dimension, the array of one dimension fewer otherwise. That array
+        // always has an id, because emitsArrayClass is true for every dimension below a
+        // used one.
+        StringBuilder components = new StringBuilder();
         for(ByteCodeClass bc : classes) {
             String n = bc.getClsName();
+            int below = bc.getClassOffset();
             for (int dim = 1; dim <= 3; dim++) {
                 if (!ByteCodeClass.emitsArrayClass(n.replace('/', '_').replace('$', '_').replace('-', '_'), dim)) {
+                    // Nothing deeper may have an id either, or its element would have none.
+                    below = -1;
                     continue;
                 }
+                if (below < 0) {
+                    throw new IllegalStateException("Array class of dimension " + dim + " of " + n
+                            + " has no element array class");
+                }
+                components.append(below).append(", ");
+                below = arrayId;
                 bld.append("#define cn1_array_").append(dim).append("_id_");
                 bld.append(n);
                 bld.append(" ");
@@ -1278,6 +1296,8 @@ public class Parser extends ClassVisitor {
             }
         }
         bldM.append("extern struct clazz ClazzClazz;\n");
+        // Read by instanceofFunction; the trailing entry keeps the array non-empty.
+        bldM.append("const int cn1RefArrayComponent[] = {").append(components).append("0};\n");
         // STATIC ENTRIES ONLY FOR OBJECTS NOBODY STAMPS. Every other entry is written the
         // first time an object of that class is stamped (cn1ObjSetClass), so the table no
         // longer references every class descriptor -- a reference that kept each class's

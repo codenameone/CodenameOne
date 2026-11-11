@@ -1998,6 +1998,12 @@ struct elementStruct* BC_DUP_X2_SSS(struct elementStruct* SP) {
 }
 
 
+// The element type id of each reference array class, indexed by the array's id less the
+// first reference array id (cn1_array_start_offset+100). Generated: a reference array
+// has an id only when the program has that array class, so neither its dimension nor its
+// element can be computed from the id.
+extern const int cn1RefArrayComponent[];
+
 int instanceofFunction(int sourceClass, int destId) {
     if(sourceClass == destId) {
         return JAVA_TRUE;
@@ -2026,27 +2032,26 @@ int instanceofFunction(int sourceClass, int destId) {
         if (sourceClass < refArrayStartOffset || destId < refArrayStartOffset) {
             if (sourceClass >= refArrayStartOffset) {
                 // We need to deal with things like (int[][] instanceof Object[])
-                int srcDim = (sourceClass - refArrayStartOffset)%3+1;
+                int srcDim = 1;
+                int element = cn1RefArrayComponent[sourceClass - refArrayStartOffset];
+                while (element >= refArrayStartOffset) {
+                    srcDim++;
+                    element = cn1RefArrayComponent[element - refArrayStartOffset];
+                }
                 int destDim = (destId - cn1_array_start_offset)%4;
                 
                 if (srcDim < destDim) {
-                    if (srcDim > 1) {
-                        sourceClass = sourceClass-1;
-                    } else {
-                        sourceClass =(sourceClass - refArrayStartOffset)/3;
-                    }
+                    sourceClass = cn1RefArrayComponent[sourceClass - refArrayStartOffset];
                     return instanceofFunction(sourceClass, destId-1);
                 }
             }
             // if either is primitive, then they must be the same type.
             return sourceClass == destId;
         }
-        int srcDimension = (sourceClass - refArrayStartOffset)%3+1;
-        int destDimension = (destId - refArrayStartOffset)%3+1;
-        
-        int sourceClassComponentTypeId = srcDimension > 1 ? sourceClass-1 : (sourceClass - refArrayStartOffset)/3;
-        int destClassComponentTypeId = destDimension > 1 ? destId-1 : (destId - refArrayStartOffset)/3;
-        return instanceofFunction(sourceClassComponentTypeId, destClassComponentTypeId);
+        // Element against element. An array of fewer dimensions reaches a class id while
+        // the other is still an array, and the tests above answer that.
+        return instanceofFunction(cn1RefArrayComponent[sourceClass - refArrayStartOffset],
+                cn1RefArrayComponent[destId - refArrayStartOffset]);
     }
     
     int* i = classInstanceOf[destId];
