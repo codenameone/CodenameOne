@@ -94,7 +94,7 @@ class SseTest {
 
     /// Fresh per test, so a rerun still proves the first event arrived early.
     private final CountDownLatch firstRead = new CountDownLatch(1);
-    private volatile HttpProxy proxy; //NOPMD AvoidUsingVolatile - written before the server starts, read by its worker
+    private HttpProxy proxy;
 
     private int start(boolean compression) throws Exception {
         ServerSocket s = new ServerSocket(0);

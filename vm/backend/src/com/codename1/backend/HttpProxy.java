@@ -326,7 +326,7 @@ public final class HttpProxy {
         // as a stream so that none is invented: the server never runs a HEAD's
         // writer, and closes it -- ending the exchange -- instead.
         HttpServer.Response response = HttpServer.Response.stream(status, contentType,
-                new Relay(exchange));
+                new Relay(exchange, described < 0 || isEventStream(contentType)));
         response.extraHeaders = out;
         return response;
     }
@@ -336,15 +336,22 @@ public final class HttpProxy {
     /// HTTP/2 stream it could not open), and the exchange must end either way.
     private static final class Relay implements HttpServer.BodyWriter, Closeable {
         private final Web.Exchange exchange;
+        private final boolean eachRead;
 
-        Relay(Web.Exchange exchange) {
+        /// - `eachRead`: pass every upstream read on at once. True for an event
+        ///   stream and for any body of undeclared length (a token feed, a log
+        ///   tail): those trickle small writes, and holding them until the 16 KB
+        ///   buffer filled delayed every event by minutes. A body of known length
+        ///   is a download, and keeps whole 16 KB chunks.
+        Relay(Web.Exchange exchange, boolean eachRead) {
             this.exchange = exchange;
+            this.eachRead = eachRead;
         }
 
         @Override
         public void writeTo(OutputStream output) throws IOException {
             try {
-                copy(exchange.getResponseBody(), output);
+                copy(exchange.getResponseBody(), output, eachRead);
             } finally {
                 // Complete, or cancelled: either way the upstream is done, and on
                 // a client that went away this is what stops it sending.
@@ -554,16 +561,27 @@ public final class HttpProxy {
     }
 
     private static void copy(InputStream in, OutputStream out) throws IOException {
+        copy(in, out, false);
+    }
+
+    /// Whether a Content-Type names `text/event-stream`, whatever its parameters.
+    static boolean isEventStream(String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        int semi = contentType.indexOf(';');
+        String type = (semi < 0 ? contentType : contentType.substring(0, semi)).trim();
+        return "text/event-stream".equalsIgnoreCase(type);
+    }
+
+    private static void copy(InputStream in, OutputStream out, boolean flushEachRead)
+            throws IOException {
         byte[] buffer = new byte[16 * 1024];
         int n;
         while ((n = in.read(buffer, 0, buffer.length)) >= 0) {
             if (n > 0) {
                 out.write(buffer, 0, n);
-                // Pass on what arrived once the upstream has nothing more ready:
-                // an event stream or a token feed trickles small writes, and
-                // holding them until 16 KB filled delayed every event by minutes.
-                // A bulk download keeps the buffer full and still sends full chunks.
-                if (in.available() <= 0) {
+                if (flushEachRead) {
                     out.flush();
                 }
             }

@@ -462,7 +462,8 @@ from time to time; the client never sees it. Wait with `Thread.sleep`, not
 `Object.wait`.
 
 To relay an event stream from another server unchanged, `HttpProxy` already
-streams it event by event. Compression never applies to a streamed response.
+streams it event by event, as it does any upstream body of undeclared
+length. Compression never applies to a streamed response.
 
 ==== Compression
 
