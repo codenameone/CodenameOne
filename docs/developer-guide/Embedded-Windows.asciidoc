@@ -1,0 +1,130 @@
+== Embedded Windows devices
+
+Panel PCs, point-of-sale terminals, self-service kiosks and arm64 IoT boards
+running *Windows 10/11 IoT Enterprise* run Codename One as the same native `.exe`
+the <<_working_with_the_native_windows_port,native Windows port>> builds. No JVM
+and no runtime installer go onto the device. Windows still owns the display, the
+input and the boot, so the embedded build doesn't change how the application draws.
+It changes what surrounds it: the window fills a screen and keeps it, the shell is
+the application, and the boards' buses are reachable from Java.
+
+Windows 10 IoT Core isn't a target. It runs UWP applications only and is no
+longer serviced.
+
+=== Building for a device
+
+Two build hints turn a native Windows build into an embedded one:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/embedded-windows.sh[tag=embedded-windows-properties-001,indent=0]
+----
+
+.Embedded Windows build hints
+|===
+|Name |Description
+
+|windows.embedded
+|`true`/`false` (default `false`). Builds the kiosk variant described here. Can't
+be combined with `windows.xbox`.
+
+|windows.embedded.board
+|The device profile: `generic-x64` (default, a touch panel PC), `generic-x64-mouse`,
+`generic-arm64`, `imx8` or `qualcomm-iot`. The profile sets the defaults below and
+the CPU architecture, so an arm64 board needs no `windows.arch`.
+
+|windows.embedded.rotation
+|`0`, `90`, `180` or `270`. The display is rotated when the application starts.
+
+|windows.embedded.dpi
+|The density the UI is laid out for. `0` (default) asks Windows.
+
+|windows.embedded.monitor
+|Which monitor the application takes, counting from `0`.
+
+|windows.embedded.cursor
+|`true` shows the mouse pointer. Touch profiles hide it.
+|===
+
+Each value can be changed on the device without a rebuild, through the matching
+environment variable: `CN1_ROTATION`, `CN1_DPI`, `CN1_MONITOR` and `CN1_CURSOR`
+(`true` or `1` shows the pointer, `false` or `0` hides it).
+
+=== What the embedded build does
+
+* The window has no frame, covers the chosen monitor and stays above every other
+  window.
+* The Windows key, Alt+Tab, Alt+Esc, Alt+F4 and Ctrl+Esc never reach the system
+  while the application has the screen. Ctrl+Alt+Del is handled by Windows before
+  any application sees it; the Keyboard Filter below blocks it.
+* Text is entered through Codename One's own on-screen keyboard, the one the
+  <<_embedded_linux_devices,embedded Linux>> build uses, rather than the Windows
+  touch keyboard, which is unreliable when the application is the shell.
+* Standard output and standard error go to the file `CN1_LOG_FILE` names, so a
+  device with no console still keeps a log.
+
+=== Deploying to a device
+
+`deploy-device` installs the application over SSH. Windows ships OpenSSH Server as
+an optional feature; enable it on the device and log in once as an administrator
+so its key is accepted:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/embedded-windows.sh[tag=embedded-windows-bash-001,indent=0]
+----
+
+The goal recognizes a Windows executable, checks that its architecture matches
+the device and copies it to `C:\ProgramData\CodenameOne`. It then makes the
+application the device's shell with *Shell Launcher*: it enables the feature
+if it's missing, restarts the application whenever it exits, and keeps Explorer
+as the shell for administrators, so the device can still be serviced. Enabling
+the feature takes a restart, which the goal performs.
+
+Options, as `cn1.device.*` properties:
+
+* `kioskUser` limits the kiosk shell to one account, `kiosk` for instance; other
+  users keep Explorer.
+* `keyboardFilter=true` enables the Keyboard Filter and blocks Ctrl+Alt+Del,
+  Ctrl+Shift+Esc, Win+L, the Windows key, Alt+Tab, Ctrl+Esc and Alt+F4.
+* `kioskMode=autostart` replaces no shell and starts the application at logon
+  instead, for every account, administrators included. Use it on a development
+  device, or on an edition without Shell Launcher.
+* `env` sets machine environment variables, `CN1_ROTATION=90` for instance. Windows
+  reads them at logon, so they apply from the next one.
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/embedded-windows.sh[tag=embedded-windows-bash-002,indent=0]
+----
+
+`cn1:device-logs` follows the application's log file over the same connection.
+As on Linux, the application runs with `CN1_PROFILE=device`, so a backend module's
+`@Profile("device")` beans are active on the device only.
+
+Assigned Access, the single-app kiosk of the Pro edition, isn't offered: it runs
+only packaged applications, under a restricted account that can't reach the
+hardware below.
+
+=== Hardware access
+
+`com.codename1.hardware` works on Windows through the device APIs Windows provides:
+
+|===
+|API |On Windows
+
+|Serial ports
+|Every `COM` port.
+
+|GPIO, I2C, SPI, PWM
+|The `Windows.Devices` APIs. They need a board whose vendor ships the bus drivers,
+which IoT boards do and most x64 panel PCs don't. Without one, the feature reports
+that it isn't available. I2C and SPI bus `N` is the board's `N`th controller.
+
+|Backlight
+|The monitor's brightness over DDC/CI, or the built-in panel's through WMI.
+
+|CAN, watchdog
+|Not available: Windows has no standard interface for either. Shell Launcher's
+restart takes the place of a supervisor.
+|===
