@@ -2026,6 +2026,21 @@ static inline void cn1InlSetRefField(JAVA_OBJECT target, size_t offset, JAVA_OBJ
     *addr = value;
 }
 
+// The same for a static: no owning object, so the generational half has nothing to
+// remember (CN1_GEN_REMEMBER tests its target for null) and the insertion and deletion
+// halves run exactly as the static setter ran them.
+static inline void cn1InlSetStaticRef(JAVA_OBJECT* addr, JAVA_OBJECT value) {
+#if defined(CN1_DISABLE_SATB)
+    if(__builtin_expect(cn1GcGenBarrier, 0)) {
+#else
+    if(__builtin_expect(gcSatbActive | cn1GcGenBarrier, 0)) {
+#endif
+        cn1SetRefFieldSlow(JAVA_NULL, addr, value);
+        return;
+    }
+    *addr = value;
+}
+
 // ---- java.lang.ref support -------------------------------------------------
 // A WeakReference's referent is NOT traced by the generated mark function. That
 // function calls cn1GcDiscoverReference instead (see ByteCodeClass), handing over
