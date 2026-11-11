@@ -94,9 +94,13 @@ public final class CommerceManager {
     // staging service can be verified with its own key.
     private static final String PROP_PUBLIC_KEY = "commerce.cloud.publicKey";
 
-    // The production key of the Codename One Commerce service. Empty until it
-    // is provisioned: while no key is known at all, unsigned answers are
-    // accepted, exactly as /validate answers always were.
+    // The production key of the Codename One Commerce service, base64 of the
+    // raw 32 byte Ed25519 key. This constant is the one place it goes. While
+    // it is empty and no PROP_PUBLIC_KEY is configured, no signed-envelope
+    // answer of the cloud is trusted: they are ignored, nothing is cached,
+    // the manager reports itself degraded and answers from the store
+    // directly. An unsigned answer is never taken, since anything between
+    // the device and the service could have written it.
     private static final String DEFAULT_PUBLIC_KEY = "";
 
     // Storage entry holding the last accepted customer payload, one per app
@@ -148,6 +152,14 @@ public final class CommerceManager {
     private final List pendingEvents = new ArrayList();
     private boolean eventFlushScheduled;
     private boolean degraded;
+
+    // Set once the missing public key was logged, so it is said once.
+    private boolean noKeyLogged;
+
+    // The envelope of the last answer postSigned verified, as the JSON text
+    // that is cached: the cache keeps what was signed, never a parsed copy,
+    // and verifies it again when it is loaded.
+    private String lastEnvelope;
     // The billing portal last fetched, and the customer it was fetched for.
     private String portalUrl;
     private String portalUser;
@@ -532,20 +544,16 @@ public final class CommerceManager {
         if (payload != null && accepted(payload)) {
             result = new Offerings(payload);
             try {
-                Storage.getInstance().writeObject(key, JSONParser.mapToJson(result.toMap()));
+                storeEnvelope(key);
             } catch (Throwable t) {
                 Log.p("CommerceManager: could not store the offerings: " + t);
             }
             fetchProducts(result);
         } else {
             result = new Offerings(null);
-            try {
-                Object stored = Storage.getInstance().readObject(key);
-                if (stored instanceof String && ((String) stored).length() > 0) {
-                    result = new Offerings(JSONParser.parseJSON((String) stored));
-                }
-            } catch (Throwable t) {
-                Log.p("CommerceManager: could not read the stored offerings: " + t);
+            Map stored = loadEnvelope(key);
+            if (stored != null) {
+                result = new Offerings(stored);
             }
         }
         attachProducts(result);
@@ -1377,7 +1385,7 @@ public final class CommerceManager {
         // said before it is superseded.
         entitlementCache.clear();
         try {
-            Storage.getInstance().writeObject(storageKey(STORAGE_CUSTOMER_PREFIX, getAppUserId()), JSONParser.mapToJson(next.toMap()));
+            storeEnvelope(storageKey(STORAGE_CUSTOMER_PREFIX, getAppUserId()));
         } catch (Throwable t) {
             Log.p("CommerceManager: could not store the customer: " + t);
         }
@@ -1408,13 +1416,9 @@ public final class CommerceManager {
             // Another user's receipts answered these.
             entitlementCache.clear();
         }
-        try {
-            Object stored = Storage.getInstance().readObject(storageKey(STORAGE_CUSTOMER_PREFIX, id));
-            if (stored instanceof String && ((String) stored).length() > 0) {
-                customerInfo = new CustomerInfo(JSONParser.parseJSON((String) stored));
-            }
-        } catch (Throwable t) {
-            Log.p("CommerceManager: could not read the stored customer: " + t);
+        Map stored = loadEnvelope(storageKey(STORAGE_CUSTOMER_PREFIX, id));
+        if (stored != null) {
+            customerInfo = new CustomerInfo(stored);
         }
     }
 
@@ -1449,12 +1453,23 @@ public final class CommerceManager {
     ///
     /// The signature is Ed25519 over the UTF-8 bytes of the request's nonce,
     /// a line feed and the payload text, so an answer recorded earlier
-    /// cannot be replayed to a later request. When a public key is known, an
-    /// answer that is unsigned or wrongly signed is ignored. When none is
-    /// known, an unsigned answer is accepted.
+    /// cannot be replayed to a later request. An answer that is unsigned or
+    /// wrongly signed is ignored, and while no public key is known at all
+    /// every answer is: the request is not even sent.
     private Map postSigned(String path, String extraFields) {
+        lastEnvelope = null;
         String url = endpoint();
         if (url == null) {
+            return null;
+        }
+        byte[] key = publicKey();
+        if (key == null) {
+            if (!noKeyLogged) {
+                noKeyLogged = true;
+                Log.p("CommerceManager: no public key for the commerce service is known ("
+                        + PROP_PUBLIC_KEY + "), so its answers cannot be verified and are not used;"
+                        + " answering from the store directly");
+            }
             return null;
         }
         String nonce = newNonce();
@@ -1470,20 +1485,78 @@ public final class CommerceManager {
             return null;
         }
         String text = (String) payload;
-        byte[] key = publicKey();
-        if (key != null) {
-            Object signature = envelope.get("signature");
-            if (!(signature instanceof String) || !verify(nonce, text, (String) signature, key)) {
-                Log.p("CommerceManager: ignored an answer of " + path + " with a missing or bad signature");
-                return null;
-            }
+        Object signature = envelope.get("signature");
+        if (!(signature instanceof String) || !verify(nonce, text, (String) signature, key)) {
+            Log.p("CommerceManager: ignored an answer of " + path + " with a missing or bad signature");
+            return null;
         }
+        String sigText = (String) signature;
+        Object keyIdValue = envelope.get("keyId");
+        String keyId = keyIdValue instanceof String ? (String) keyIdValue : null;
         try {
-            return JSONParser.parseJSON(text);
+            Map parsed = JSONParser.parseJSON(text);
+            StringBuilder sb = new StringBuilder("{");
+            appendField(sb, "nonce", nonce);
+            sb.append(',');
+            appendField(sb, "payload", text);
+            sb.append(',');
+            appendField(sb, "signature", sigText);
+            if (keyId != null) {
+                sb.append(',');
+                appendField(sb, "keyId", keyId);
+            }
+            sb.append('}');
+            lastEnvelope = sb.toString();
+            return parsed;
         } catch (Throwable t) {
             Log.p("CommerceManager" + path + " answered an unreadable payload: " + t);
             return null;
         }
+    }
+
+    /// Stores the envelope of the answer postSigned verified last under a
+    /// storage entry name.
+    private void storeEnvelope(String name) {
+        if (lastEnvelope == null) {
+            return;
+        }
+        try {
+            Storage.getInstance().writeObject(name, lastEnvelope);
+        } catch (Throwable t) {
+            Log.p("CommerceManager: could not store " + name + ": " + t);
+        }
+    }
+
+    /// The payload of a stored envelope whose signature still verifies
+    /// against the current key, or null. An entry that does not verify, was
+    /// written in an older format, or cannot be read is deleted.
+    private static Map loadEnvelope(String name) {
+        Storage st = Storage.getInstance();
+        if (!st.exists(name)) {
+            return null;
+        }
+        try {
+            Object stored = st.readObject(name);
+            byte[] key = publicKey();
+            if (key != null && stored instanceof String) {
+                Map env = JSONParser.parseJSON((String) stored);
+                Object nonce = env.get("nonce");
+                Object payload = env.get("payload");
+                Object signature = env.get("signature");
+                if (nonce instanceof String && payload instanceof String && signature instanceof String
+                        && verify((String) nonce, (String) payload, (String) signature, key)) {
+                    return JSONParser.parseJSON((String) payload);
+                }
+            }
+        } catch (Throwable t) {
+            Log.p("CommerceManager: could not read " + name + ": " + t);
+        }
+        try {
+            st.deleteStorageFile(name);
+        } catch (Throwable t) {
+            Log.p("CommerceManager: could not delete " + name + ": " + t);
+        }
+        return null;
     }
 
     /// Posts a JSON body and returns the parsed JSON answer, or null for an

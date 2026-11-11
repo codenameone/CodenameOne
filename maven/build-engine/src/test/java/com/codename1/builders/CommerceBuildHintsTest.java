@@ -25,7 +25,9 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CommerceBuildHintsTest {
 
@@ -94,5 +96,22 @@ public class CommerceBuildHintsTest {
                 CommerceBuildHints.stubProperties(request(
                         "commerce.cloud.endpoint", "http://localhost:8080/api/v2/commerce",
                         "commerce.cloud.enabled", "true")));
+    }
+
+    @Test
+    void plainHttpIsOnlyForLoopback() {
+        String[] ok = {"http://localhost/api", "http://LOCALHOST:8080/api", "http://127.0.0.1:9000",
+            "http://10.0.2.2:8080/api", "http://[::1]:8080/api", "https://commerce.example.com/api"};
+        for (String u : ok) {
+            assertTrue(CommerceBuildHints.isUsableEndpoint(u), u);
+        }
+        String[] bad = {"http://commerce.example.com/api", "http://localhost.evil.com/api",
+            "http://localhost@evil.com/api", "http://127.0.0.2/api", "http://10.0.2.3/api",
+            "http://[::1]evil/api"};
+        for (String u : bad) {
+            assertFalse(CommerceBuildHints.isUsableEndpoint(u), u);
+            assertThrows(IllegalArgumentException.class,
+                    () -> CommerceBuildHints.stubProperties(request("commerce.cloud.endpoint", u)));
+        }
     }
 }

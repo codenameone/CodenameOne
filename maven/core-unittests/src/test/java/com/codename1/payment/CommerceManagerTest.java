@@ -75,7 +75,8 @@ class CommerceManagerTest extends UITestBase {
         d.setProperty("package_name", "com.example.app");
         d.setProperty("commerce.cloud.endpoint", ENDPOINT);
         d.setProperty("commerce.cloud.enabled", "true");
-        d.setProperty("commerce.cloud.publicKey", "");
+        d.setProperty("commerce.cloud.publicKey", CommerceTestBase.testPublicKey());
+        CommerceTestBase.signAnswers(implementation);
         CommerceManager.resetForTests();
     }
 
@@ -229,13 +230,69 @@ class CommerceManagerTest extends UITestBase {
     }
 
     @FormTest
-    void unsignedAnswerIsAcceptedWhenNoKeyIsKnown() {
+    void noAnswerIsTrustedWhenNoKeyIsKnown() {
+        Display.getInstance().setProperty("commerce.cloud.publicKey", "");
+        implementation.setNetworkMockHandler(null);
         mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "u1"), null));
         CommerceManager cm = CommerceManager.getInstance();
         cm.setAppUserId("u1");
         cm.refresh();
-        assertFalse(cm.isDegraded());
-        assertTrue(cm.isEntitled("pro"));
+        assertTrue(cm.isDegraded());
+        assertFalse(cm.isEntitled("pro"));
+        assertNull(cm.getCustomerInfo().getAppUserId());
+
+        CommerceManager.resetForTests();
+        assertFalse(CommerceManager.getInstance().isEntitled("pro"));
+    }
+
+    private static String customerStorageKey(String id) {
+        return "CN1CommerceCustomer_" + id + "_" + Integer.toHexString(id.hashCode());
+    }
+
+    private void storeSignedCustomer() {
+        mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "u1"), null));
+        CommerceManager.getInstance().setAppUserId("u1");
+        CommerceManager.getInstance().refresh();
+        assertTrue(CommerceManager.getInstance().isEntitled("pro"));
+        CommerceManager.resetForTests();
+        implementation.clearNetworkMocks();
+    }
+
+    @FormTest
+    void signedCacheIsHonouredAtColdStart() {
+        storeSignedCustomer();
+        assertTrue(CommerceManager.getInstance().isEntitled("pro"));
+        assertEquals("u1", CommerceManager.getInstance().getCustomerInfo().getAppUserId());
+    }
+
+    @FormTest
+    void tamperedCacheIsDiscarded() throws Exception {
+        storeSignedCustomer();
+        String name = customerStorageKey("u1");
+        String stored = (String) Storage.getInstance().readObject(name);
+        assertTrue(stored.contains("u1"));
+        Storage.getInstance().writeObject(name, stored.replace("u1", "u2"));
+        assertFalse(CommerceManager.getInstance().isEntitled("pro"));
+        assertFalse(Storage.getInstance().exists(name));
+    }
+
+    @FormTest
+    void oldFormatCacheIsDiscarded() {
+        String name = customerStorageKey("u1");
+        Storage.getInstance().writeObject(name, PRO_CUSTOMER.replace("USER", "u1"));
+        CommerceManager.getInstance().setAppUserId("u1");
+        CommerceManager.resetForTests();
+        implementation.clearNetworkMocks();
+        assertFalse(CommerceManager.getInstance().isEntitled("pro"));
+        assertFalse(Storage.getInstance().exists(name));
+    }
+
+    @FormTest
+    void cacheIsDiscardedOnceTheKeyChanges() {
+        storeSignedCustomer();
+        Display.getInstance().setProperty("commerce.cloud.publicKey",
+                Base64.encodeNoNewline(Ed25519.publicKey(privateKey())));
+        assertFalse(CommerceManager.getInstance().isEntitled("pro"));
     }
 
     @FormTest

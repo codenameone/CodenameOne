@@ -79,6 +79,7 @@ class CommerceWebPurchaseTest extends CommerceTestBase {
                 if (out != null) {
                     bodies.add(new String(out, StandardCharsets.UTF_8));
                 }
+                signConnection(connection);
             }
         });
     }

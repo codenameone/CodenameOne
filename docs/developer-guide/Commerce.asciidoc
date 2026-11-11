@@ -961,11 +961,11 @@ Commerce reuses the standard `build_key` that every Codename One cloud build alr
 
 |`commerce.cloud.endpoint`
 |_(Codename One cloud)_
-|The base URL of the commerce service, for example `\https://commerce.example.com/api/v2/commerce`. It must be an `http` or `https` URL, and a build with any other value fails.
+|The base URL of the commerce service, for example `\https://commerce.example.com/api/v2/commerce`. It must be an `https` URL. Plain `http` is accepted only for a service on a loopback address -- `localhost`, `127.0.0.1`, `[::1]`, or `10.0.2.2`, the host machine as the Android emulator sees it -- for testing on your own machine. A build with any other value fails.
 
 |`commerce.cloud.publicKey`
 |_(Codename One cloud)_
-|The base64 encoded Ed25519 public key that responses of the service are verified against. Set it together with `commerce.cloud.endpoint` when the service signs with its own key.
+|The base64 encoded Ed25519 public key that responses of the service are verified against. A self-hosted service needs it: set it together with `commerce.cloud.endpoint`. While the app knows no public key, it uses no answer of the service.
 
 |`android.billing.store`
 |`play`
@@ -976,7 +976,9 @@ Commerce reuses the standard `build_key` that every Codename One cloud build alr
 
 The answers that decide what a customer owns -- customer information, offerings, the customer center and promotional offer signatures -- are signed by the service with an Ed25519 key. Each request carries a fresh random nonce, and the signature covers that nonce together with the response. An answer recorded earlier can't be replayed to a later request, and an answer forged by something between the device and the service doesn't verify.
 
-When the app knows the service's public key, an answer that's unsigned or wrongly signed is ignored. The manager becomes degraded and the app falls back to the stored answer and the store's receipts, exactly as it does when the network is down.
+An answer is trusted only when it's signed and the signature verifies against the service's public key. An answer that's unsigned or wrongly signed is ignored, and so is every answer while the app knows no public key at all. The manager then becomes degraded and the app falls back to the stored answer and the store's receipts, exactly as it does when the network is down.
+
+The stored answer is kept as the service signed it, and its signature is checked again every time the app starts. A stored answer that no longer verifies, for example after the key changed, is deleted rather than used.
 
 To run against a service of your own, set both hints:
 

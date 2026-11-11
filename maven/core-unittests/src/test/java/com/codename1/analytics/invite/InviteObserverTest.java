@@ -114,4 +114,23 @@ class InviteObserverTest extends UITestBase {
         });
         assertEquals(0, told[0]);
     }
+
+    @FormTest
+    void observerIsToldAgainAfterAttributionWasCleared() {
+        final int[] told = new int[1];
+        Analytics.setAttributionObserver(new Runnable() {
+            @Override
+            public void run() {
+                told[0]++;
+            }
+        });
+        Analytics.attributionAvailable(true);
+        assertEquals(1, told[0]);
+        Analytics.attributionAvailable(true);
+        assertEquals(1, told[0]);
+        Analytics.attributionAvailable(false);
+        Analytics.attributionAvailable(true);
+        assertEquals(2, told[0]);
+        Analytics.attributionAvailable(false);
+    }
 }

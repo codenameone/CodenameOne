@@ -529,6 +529,9 @@ public final class Analytics {
         attributionKnown = available;
         if (available) {
             tellAttributionObserver();
+        } else {
+            // A later attribution in this process is news to the observer.
+            attributionObserverTold = false;
         }
     }
 

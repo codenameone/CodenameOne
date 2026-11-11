@@ -80,7 +80,8 @@ class CommerceBuildHints {
         if (endpoint.length() > 0) {
             if (!isUsableEndpoint(endpoint)) {
                 throw new IllegalArgumentException(ENDPOINT + "=\"" + endpoint
-                        + "\" is not a usable endpoint. It must be an http or https url with no "
+                        + "\" is not a usable endpoint. It must be an https url (http only for localhost, "
+                        + "127.0.0.1, [::1] or 10.0.2.2) with no "
                         + "spaces, quotes or backslashes, for example "
                         + "https://commerce.example.com/api/v2/commerce");
             }
@@ -133,7 +134,51 @@ class CommerceBuildHints {
                 return false;
             }
         }
-        return true;
+        return !http || isLoopbackAuthority(value.substring(7));
+    }
+
+    /**
+     * Whether the authority at the start of an http url names this machine,
+     * or the host machine as the Android emulator sees it (10.0.2.2). Plain
+     * http is only for testing against a service on the developer's own
+     * machine; anywhere else, anything on the path could rewrite answers.
+     * A user-info part is refused, since "localhost@host" names "host".
+     *
+     * @param rest the url after "http://"
+     * @return true for localhost, 127.0.0.1, [::1] or 10.0.2.2, any port
+     */
+    static boolean isLoopbackAuthority(String rest) {
+        int end = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        String authority = rest.substring(0, end);
+        if (authority.indexOf('@') >= 0) {
+            return false;
+        }
+        String host = authority;
+        if (host.startsWith("[")) {
+            int close = host.indexOf(']');
+            if (close < 0) {
+                return false;
+            }
+            String tail = host.substring(close + 1);
+            if (tail.length() > 0 && !tail.startsWith(":")) {
+                return false;
+            }
+            host = host.substring(0, close + 1);
+        } else {
+            int colon = host.indexOf(':');
+            if (colon >= 0) {
+                host = host.substring(0, colon);
+            }
+        }
+        return host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1")
+                || host.equals("[::1]") || host.equals("10.0.2.2");
     }
 
     /**

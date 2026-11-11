@@ -29,6 +29,9 @@ import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.AnalyticsEvent;
 import com.codename1.analytics.ConsentMode;
 import com.codename1.io.JSONParser;
+import com.codename1.security.Ed25519;
+import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.util.Base64;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.junit.UITestBase;
@@ -65,7 +68,8 @@ public abstract class CommerceTestBase extends UITestBase {
         d.setProperty("package_name", "com.example.app");
         d.setProperty("commerce.cloud.endpoint", ENDPOINT);
         d.setProperty("commerce.cloud.enabled", "true");
-        d.setProperty("commerce.cloud.publicKey", "");
+        d.setProperty("commerce.cloud.publicKey", testPublicKey());
+        signAnswers(implementation);
         CommerceManager.resetForTests();
     }
 
@@ -165,6 +169,60 @@ public abstract class CommerceTestBase extends UITestBase {
 
     protected void mockFailure(String path) {
         implementation.addNetworkMockResponse(ENDPOINT + path, 500, "Error", new byte[0]);
+    }
+
+    /// The private key the faked cloud signs with.
+    public static byte[] testPrivateKey() {
+        byte[] priv = new byte[Ed25519.PRIVATE_KEY_LENGTH];
+        for (int i = 0; i < priv.length; i++) {
+            priv[i] = (byte) (i * 11 + 5);
+        }
+        return priv;
+    }
+
+    /// The public key matching [#testPrivateKey()], as the hint carries it.
+    public static String testPublicKey() {
+        return Base64.encodeNoNewline(Ed25519.publicKey(testPrivateKey()));
+    }
+
+    /// Makes the faked cloud sign every unsigned envelope it answers with,
+    /// over the nonce of the request it answers, as the real service does.
+    /// The client trusts no unsigned answer, so a mock written as a bare
+    /// envelope is signed here rather than in every test.
+    public static void signAnswers(TestCodenameOneImplementation impl) {
+        impl.setNetworkMockHandler(new TestCodenameOneImplementation.NetworkMockHandler() {
+            @Override
+            public void handle(TestCodenameOneImplementation.TestConnection connection) {
+                signConnection(connection);
+            }
+        });
+    }
+
+    public static void signConnection(TestCodenameOneImplementation.TestConnection connection) {
+        try {
+            byte[] in = connection.getInputData();
+            byte[] out = connection.getOutputData();
+            if (in == null || out == null) {
+                return;
+            }
+            String text = new String(in, StandardCharsets.UTF_8);
+            if (!text.contains("\"signature\":null")) {
+                return;
+            }
+            Object payload = JSONParser.parseJSON(text).get("payload");
+            Object nonce = JSONParser.parseJSON(new String(out, StandardCharsets.UTF_8)).get("nonce");
+            if (!(payload instanceof String) || !(nonce instanceof String)) {
+                return;
+            }
+            byte[] sig = Ed25519.sign(testPrivateKey(),
+                    (nonce + "\n" + payload).getBytes(StandardCharsets.UTF_8));
+            byte[] signed = text.replace("\"signature\":null",
+                    "\"signature\":\"" + Base64.encodeNoNewline(sig) + "\"").getBytes(StandardCharsets.UTF_8);
+            connection.setInputData(signed);
+            connection.setContentLength(signed.length);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /// The unsigned envelope of the contract around a payload.
