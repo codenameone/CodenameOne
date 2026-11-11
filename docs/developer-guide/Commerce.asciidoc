@@ -142,26 +142,26 @@ When the user signs in to your own account system, call `logIn` with your stable
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-log-in,indent=0]
 ----
 
-Purchases made under the anonymous id always move to the account. The original anonymous id stays available through `CustomerInfo.getOriginalAppUserId()`. `logIn` returns `false` and leaves the previous id in place when the service didn't accept the change, and you can call it again.
+Signing in moves purchases from the device's own anonymous id to the signed-in id, and only from there. It never moves purchases from one signed-in account to another, so logging in with someone else's id doesn't take their purchases. Pick app user ids that can't be guessed, such as a random identifier your account system issues, rather than an email address or a counter. The original anonymous id stays available through `CustomerInfo.getOriginalAppUserId()`. `logIn` returns `false` and leaves the previous id in place when the service didn't accept the change, and you can call it again.
 
 `setAppUserId` sets the id without telling the service anything. Use it when the id is known before the first purchase, for example when your app requires an account before it shows anything. Use `logIn` whenever an anonymous customer might already own something.
 
 ==== Transfer policies
 
-When a signed-in user logs in to an account while the device's purchases already belong to _another_ known account, the transfer policy of the app decides who keeps them. Set it on the *App settings* page of the console:
+A store purchase is tied to the store account on the device, not to your app user id. When a purchase is restored or validated under a different id than the one that owns it, for example after another user signs in on the same device and restores, the transfer policy of the app decides who keeps it. Set it on the *App settings* page of the console:
 
 [cols="2,5"]
 |===
 |Policy |Behavior
 
 |`TRANSFER`
-|The purchases move to the account that logged in last. This is the default, and it matches what the stores do when a device changes hands.
+|The purchase moves to the id that restored or validated it. This is the default, and it matches what the stores do when a device changes hands.
 
 |`KEEP_WITH_ORIGINAL`
-|The purchases stay with the account that made them. The new account gets nothing from this device's receipts.
+|The purchase stays with the id that owns it. The other id gets nothing from it.
 
 |`TRANSFER_IF_NO_ACTIVE`
-|The purchases move only when the account that holds them has no active entitlement of its own.
+|The purchase moves only when the id that owns it has no active entitlement from it.
 |===
 
 Every move is reported to your backend as a `TRANSFER` webhook event.
@@ -259,7 +259,7 @@ A paywall is the screen that sells an offering. You design it in the console as 
 
 ==== Showing a paywall
 
-`Paywall.show` opens the paywall of an offering in a form of its own, over the current form. Closing the paywall or going back returns to the form that was showing. So does a purchase or a restore that completes: the paywall returns to that form by itself and then tells the listener, so `purchaseCompleted` is the place to unlock the feature or show a form of your own. Call `Paywall.show` on the EDT:
+`Paywall.show` opens the paywall of an offering in a form of its own, over the current form. Closing the paywall or going back returns to the form that was showing. When a purchase or a restore completes, the paywall also returns to that form by itself and then tells the listener, so `purchaseCompleted` is the place to unlock the feature or show a form of your own. Call `Paywall.show` on the EDT:
 
 [source,java]
 ----
@@ -292,7 +292,7 @@ Every listener method is called on the EDT:
 
 An offering with no paywall document is shown with the built-in one: a close button, a title, the packages of the offering as a list, a purchase button, a restore button and a footer. It names no colors, so your theme decides them all. `Paywall.createDefault(offering)` returns that document as a map you can change before you hand it to a `PaywallView`.
 
-`PaywallView` is the component behind `Paywall.show`. Use it directly to embed a paywall in a form of your own, and tell it what closing means there. An embedded view never navigates by itself: after a completed purchase or restore it stays where it is and the listener decides what your form shows next.
+`PaywallView` is the component behind `Paywall.show`. Use it directly to embed a paywall in a form of your own, and tell it what closing means there. An embedded view never navigates by itself: after a completed purchase or restore it stays where it's and the listener decides what your form shows next.
 
 [source,java]
 ----
@@ -583,26 +583,41 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 
 ==== Segmenting by experiment
 
-Because the paywall and purchase events carry `experiment` and `variant`, any analytics report can be split by variant: how many customers of each variant opened the paywall, picked the annual package, or bought. `experiment_exposure` is sent once for each experiment and variant an install is given, which gives every variant its denominator even for a customer who never opens a paywall.
+Because the paywall and purchase events carry `experiment` and `variant`, any analytics report can be split by variant: how many customers of each variant opened the paywall, picked the annual package, or bought. `experiment_exposure` is sent once for each experiment and variant an installation is given, which gives every variant its denominator even for a customer who never opens a paywall.
 
 ==== Purchases by invited users
 
-The service knows which install belongs to which customer, so a purchase by a customer who arrived through an invite is attributed to the inviter. The revenue it reports for that invite is verified: it's the amount of the purchase the service validated with the store, and not a value the app claimed. You don't call `Invites.conversion` for a purchase. Keep it for the conversions the service can't see, such as finishing a tutorial.
+The service knows which install belongs to which customer, so a purchase by a customer who arrived through an invitation is attributed to the inviter. The revenue it reports for that invite is verified: it's the amount of the purchase the service validated with the store, and not a value the app claimed. You don't call `Invites.conversion` for a purchase. Keep it for the conversions the service can't see, such as finishing a tutorial.
 
 When the user logs in with `logIn`, the attribution follows the customer to the account. The app user id of commerce and the user id of analytics stay separate, and logging in here doesn't change the one you set with `Analytics.setUserId`.
 
 ==== Referral rewards
 
-A referral reward gives something to the inviter, the invited user, or both. You configure it in the console, where a reward grants either an entitlement or an amount of a virtual currency.
+A referral reward gives something to the inviter, the invited user, or both. Configure it on the *Referral rewards* page of the console. Each of the two rewards grants either an entitlement for a number of days or an amount of a virtual currency. Entitlement days stack: a second reward extends the first rather than replacing it.
 
-The service grants the reward, so there's nothing to deliver from the app. An entitlement reward answers `isEntitled` like a purchased one, and a currency reward is part of the balance. When an invite is matched to the install, commerce asks the service for the customer again in the background, and the customer information listener hears about the reward. `getReferralRewards()` lists what was granted and why, for example to thank the user:
+The trigger decides when the rewards are granted:
+
+[cols="2,5"]
+|===
+|Trigger |Behavior
+
+|First purchase
+|The default. The rewards are granted when the invited user makes a first purchase.
+
+|Claim
+|The rewards are granted when the invitation is matched to the installation. This trigger requires a cap on the number of rewards per inviter, and it skips invited people who were already users of the app.
+|===
+
+Each reward is granted once. The inviter's reward reaches the inviter's device once that device has used analytics, which ties it to the inviter's install. A refund of the invited user's purchase doesn't take a reward back.
+
+The service grants the reward, so there's nothing to deliver from the app. An entitlement reward answers `isEntitled` like a purchased one, and a currency reward is part of the balance. When an invitation is matched to the installation, commerce asks the service for the customer again in the background, and the customer information listener hears about the reward. `getReferralRewards()` lists what was granted and why, for example to thank the user:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-referral-rewards,indent=0]
 ----
 
-A reward has an entitlement id or a currency code, an amount for a currency, an expiry date that is 0 when it doesn't expire, and the reason the service recorded. The list is empty for a customer with no rewards.
+A reward has an entitlement id or a currency code, an amount for a currency, an expiry date of 0 when it doesn't expire, and the reason the service recorded. The list is empty for a customer with no rewards.
 
 === Subscriber attributes and virtual currency
 
@@ -653,7 +668,7 @@ include::../demos/common/src/main/snippets/developer-guide/commerce.properties[t
 
 The build then uses the Amazon Appstore SDK instead of the Play Billing Library, declares the receiver Amazon's client answers through, and leaves out the `com.android.vending.BILLING` permission, which the Amazon Appstore doesn't accept. The Google Play settings `android.licenseKey` and `android.billingclient.version` aren't used. Your code doesn't change: `Purchase` and `CommerceManager` behave the same, and receipts carry the store code `Receipt.STORE_CODE_AMAZON`.
 
-For validation, enter your Amazon shared secret (`commerce.amazon.sharedSecret`) on the *Stores* page of the console. The same page shows the notification address to register with Amazon. It ends in a token that identifies your app, so copy it as shown.
+For validation, enter your Amazon shared secret (`commerce.amazon.sharedSecret`) on the *Stores* page of the console, and set the Amazon SNS topic ARN in the Amazon store settings there. The same page shows the notification address to register with Amazon. It ends in a token that identifies your app, so copy it as shown.
 
 ==== Web billing with Stripe and Paddle
 
@@ -696,7 +711,7 @@ The console shows the link, including your app's token, next to the package. Ope
 
 ===== The management portal
 
-A customer who subscribed on the web manages the subscription in the billing portal of Stripe or Paddle. `fetchManagementUrl()` returns the right address for the customer's newest active entitlement: a fresh portal address when it was bought on the web, and the store's subscription page otherwise. A portal address is short lived, so ask for it when you're about to open it:
+A customer who subscribed on the web manages the subscription in the billing portal of Stripe or Paddle. `fetchManagementUrl()` returns the right address for the customer's newest active entitlement: a fresh portal address when it was bought on the web, and the store's subscription page otherwise. A portal address is short-lived, so ask for it when you're about to open it:
 
 [source,java]
 ----
@@ -909,7 +924,7 @@ An unknown customer answers `404`, and a request the service can't read answers 
 
 ==== Granting entitlements from the console
 
-The *Customers* page of the console has the same grant and revoke controls as the REST API. Pick an entitlement, optionally an expiry, and grant it. This is the way to give a customer access as a goodwill gesture, to unlock an account for a reviewer, or to give your team the paid features. A granted entitlement has the provenance `PROMOTIONAL`, is excluded from revenue, and reaches the app on its next `refresh()`.
+The *Customers* page of the console has the same controls to grant and revoke entitlements as the REST API. Pick an entitlement, optionally an expiry, and grant it. This is the way to give a customer access as a goodwill gesture, to unlock an account for a reviewer, or to give your team the paid features. A granted entitlement has the provenance `PROMOTIONAL`, is excluded from revenue, and reaches the app on its next `refresh()`.
 
 ==== Export and import
 
@@ -974,13 +989,15 @@ Commerce reuses the standard `build_key` that every Codename One cloud build alr
 
 ==== Response signing and self-hosting
 
-The answers that decide what a customer owns -- customer information, offerings, the customer center and promotional offer signatures -- are signed by the service with an Ed25519 key. Each request carries a fresh random nonce, and the signature covers that nonce together with the response. An answer recorded earlier can't be replayed to a later request, and an answer forged by something between the device and the service doesn't verify.
+The answers that decide what a customer owns -- customer information, purchase validation, offerings, the customer center and promotional offer signatures -- are signed by the service with an Ed25519 key. Each request carries a fresh random nonce, and the signature covers that nonce together with the response. An answer recorded earlier can't be replayed to a later request, and an answer forged by something between the device and the service doesn't verify.
 
 An answer is trusted only when it's signed and the signature verifies against the service's public key. An answer that's unsigned or wrongly signed is ignored, and so is every answer while the app knows no public key at all. The manager then becomes degraded and the app falls back to the stored answer and the store's receipts, exactly as it does when the network is down.
 
 The stored answer is kept as the service signed it, and its signature is checked again every time the app starts. A stored answer that no longer verifies, for example after the key changed, is deleted rather than used.
 
-To run against a service of your own, set both hints:
+The service address must use `https`. Plain `http` is accepted only on a loopback address -- `localhost`, `127.0.0.1`, `[::1]` or `10.0.2.2` -- for testing on your own machine.
+
+To run against a service of your own, set both hints. A self-hosted service needs `commerce.cloud.publicKey`; without it the app trusts none of its answers:
 
 [source,properties]
 ----
