@@ -56,10 +56,9 @@ public final class BoardForm extends LiveChannel.Adapter {
         heading.add(BorderLayout.CENTER, title);
         heading.add(BorderLayout.EAST, Ui.flat(FontImage.MATERIAL_CHEVRON_RIGHT, "Later",
                 "later", e -> move(1)));
-        // A lane per provider at a readable width; more providers than fit
-        // scroll sideways, a long day scrolls down.
-        columns.setScrollableX(true);
-        columns.setScrollableY(true);
+        // A lane per provider at a readable width. The board scrolls inside
+        // itself -- more providers than fit sideways, a long day down -- with
+        // the names and the hours staying in view, so nothing around it does.
         columns.setName("board");
         form.add(BorderLayout.NORTH, heading);
         form.add(BorderLayout.CENTER, columns);
@@ -112,8 +111,8 @@ public final class BoardForm extends LiveChannel.Adapter {
             for (int i = 0; i < s.appointments().size(); i++) {
                 final AppointmentDto a = s.appointments().get(i);
                 lane.add(new Timeline.Block(Timeline.kindOf(a.state()), a.start(),
-                        a.end(), a.serviceName(), Times.clock(a.start()) + Ui.DOT + a.clientName()
-                                + Ui.DOT + Appointments.state(a), null));
+                        a.end(), a.serviceName(), a.clientName() + Ui.DOT + Appointments.state(a),
+                        null));
             }
             lanes.add(lane);
         }

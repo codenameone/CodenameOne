@@ -327,13 +327,7 @@ final class ResourceTimeline extends ScrollSurface {
                     ? resources[r].getCalendar() : owner.getWorkCalendar();
             axis.paintOffHours(g, cal, off, x, top, h, cx, cx + cw);
         }
-        axis.paintGrid(g, Look.mix(grid.getBgColor(), grid.getFgColor(), 150), grid.getBgColor(), x, cy, ch, cx,
-                cx + cw);
-        g.setColor(Look.mix(grid.getBgColor(), grid.getFgColor(), 150));
-        for (int r = 1; r <= rowCount; r++) {
-            int ly = y + rowTop[r];
-            g.drawLine(cx, ly, cx + cw, ly);
-        }
+        // Background bands go under the grid lines, as the hours off do.
         ScheduleItemRenderer renderer = owner.getItemRenderer();
         for (Bar b : backgrounds) {
             int x0 = x + axis.x(b.item.getStart());
@@ -343,6 +337,13 @@ final class ResourceTimeline extends ScrollSurface {
             }
             renderer.paintItem(g, owner, b.item, x0, y + rowTop[b.row] + 1, x1 - x0, rowTop[b.row + 1] - rowTop[b.row]
                     - 1, ScheduleItemRenderer.HORIZONTAL | ScheduleItemRenderer.COMPACT);
+        }
+        axis.paintGrid(g, Look.mix(grid.getBgColor(), grid.getFgColor(), 150), grid.getBgColor(), x, cy, ch, cx,
+                cx + cw);
+        g.setColor(Look.mix(grid.getBgColor(), grid.getFgColor(), 150));
+        for (int r = 1; r <= rowCount; r++) {
+            int ly = y + rowTop[r];
+            g.drawLine(cx, ly, cx + cw, ly);
         }
         ScheduleItem selected = owner.getSelectedItem();
         for (Bar b : bars) {

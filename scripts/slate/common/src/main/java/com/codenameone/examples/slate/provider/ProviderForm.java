@@ -63,6 +63,10 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
     private final Form form = Ui.home("Provider");
     private final Menu menu = new Menu(form, Nav.PROVIDER);
     private final Container timeline = Ui.list("timeline");
+    // The day and the week are a grid that scrolls inside itself, so it takes
+    // the list's place rather than a row in it.
+    private final Container grid = new Container(new BorderLayout());
+    private final Container shell = new Container(new BorderLayout());
     private final Container heading = new Container(new BorderLayout());
     private final Label title = Ui.label("", "SvHeading");
     private String view = DAY;
@@ -105,7 +109,6 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
         heading.add(BorderLayout.CENTER, title);
         top.add(heading);
 
-        Container shell = new Container(new BorderLayout());
         shell.add(BorderLayout.NORTH, top);
         shell.add(BorderLayout.CENTER, timeline);
         Ui.pull(timeline, this::load);
@@ -140,22 +143,30 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
     private void load() {
         title.setText(days() == 1 ? Ui.weekday(from)
                 : Times.monthDay(from) + " - " + Times.monthDay(Times.addDays(from, days() - 1)));
-        Api.provider().schedule(from, days(), Net.to(this::show, Ui.failed(timeline, this::load)));
+        final Net.Failed failed = Ui.failed(timeline, this::load);
+        Api.provider().schedule(from, days(), Net.to(this::show, (status, message) -> {
+            // What went wrong is said in the list, so the list is what shows.
+            if (grid.getParent() == null || grid.getComponentCount() == 0) {
+                centre(timeline);
+            }
+            failed.failed(status, message);
+        }));
     }
 
     private void show(ScheduleDto s) {
         if (!Nav.isHome(form)) {
             return;
         }
-        timeline.removeAll();
         boolean agenda = AGENDA.equals(view);
         if (!agenda) {
-            timeline.add(grid(s));
-            timeline.add(Timeline.legend());
-            Layouts.broaden(timeline);
-            Ui.relayout(timeline);
+            grid.removeAll();
+            grid.add(BorderLayout.CENTER, grid(s));
+            grid.add(BorderLayout.SOUTH, Timeline.legend());
+            centre(grid);
             return;
         }
+        timeline.removeAll();
+        centre(timeline);
         int shown = 0;
         for (int d = 0; d < days(); d++) {
             long dayFrom = Times.addDays(from, d);
@@ -181,6 +192,18 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
         }
         Layouts.broaden(timeline);
         Ui.relayout(timeline);
+    }
+
+    // Puts the grid or the list in the middle of the page.
+    private void centre(Container shown) {
+        Container other = shown == grid ? timeline : grid;
+        if (other.getParent() != null) {
+            other.remove();
+        }
+        if (shown.getParent() == null) {
+            shell.add(BorderLayout.CENTER, shown);
+        }
+        Ui.relayout(shell);
     }
 
     /// The day or the week as a timeline: a lane per day, the shifts as bands,
@@ -215,8 +238,8 @@ public class ProviderForm extends LiveChannel.Adapter implements Nav.Home {
         }
         final AppointmentDto a = (AppointmentDto) o;
         return new Timeline.Block(Timeline.kindOf(a.state()), a.start(), a.end(),
-                a.serviceName(), Times.clock(a.start()) + Ui.DOT
-                        + (a.clientName() == null ? "" : a.clientName()), () -> booking(a));
+                a.serviceName(), a.clientName() == null ? "" : a.clientName(),
+                () -> booking(a));
     }
 
     /// Shifts, busy blocks and appointments that start in a day, in time order.

@@ -518,6 +518,17 @@ final class DayGrid extends ScrollSurface {
             }
         }
 
+        // A background band is part of the grid, as the shading of the hours
+        // off is: the hour lines are drawn over it, so an hour can still be
+        // read across a column that is all one band.
+        ScheduleItemRenderer renderer = owner.getItemRenderer();
+        for (Box b : backgrounds) {
+            int x0 = x + colX(b.col);
+            int x1 = x + colX(b.col + 1);
+            int top = y + minuteY(b.startMin);
+            renderer.paintItem(g, owner, b.item, x0 + 1, top, x1 - x0 - 1, y + minuteY(b.endMin) - top, 0);
+        }
+
         int line = Look.mix(grid.getBgColor(), grid.getFgColor(), 150);
         int faint = Look.mix(grid.getBgColor(), grid.getFgColor(), 60);
         boolean halves = hourH >= Look.mm(11);
@@ -541,13 +552,6 @@ final class DayGrid extends ScrollSurface {
             g.drawLine(lx, cy, lx, cy + ch);
         }
 
-        ScheduleItemRenderer renderer = owner.getItemRenderer();
-        for (Box b : backgrounds) {
-            int x0 = x + colX(b.col);
-            int x1 = x + colX(b.col + 1);
-            int top = y + minuteY(b.startMin);
-            renderer.paintItem(g, owner, b.item, x0 + 1, top, x1 - x0 - 1, y + minuteY(b.endMin) - top, 0);
-        }
         ScheduleItem selected = owner.getSelectedItem();
         Box selectedBox = null;
         for (Box b : boxes) {
