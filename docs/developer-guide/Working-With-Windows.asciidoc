@@ -113,6 +113,10 @@ and folding identical functions (`/OPT:ICF`). Set `true` to keep debug symbols (
 `.pdb` next to the exe) so a native crash address can be symbolized while you are
 developing. Optimizations stay on in either case.
 
+|windows.embedded
+|`true`/`false` (default `false`). Builds a kiosk `.exe` for a Windows IoT Enterprise
+device. See <<_embedded_windows_devices>>.
+
 |windows.xbox
 |Experimental. `true`/`false` (default `false`). Builds a UWP app for an Xbox in Developer Mode
 instead of a desktop `.exe`, packaged as an `.msix`. See

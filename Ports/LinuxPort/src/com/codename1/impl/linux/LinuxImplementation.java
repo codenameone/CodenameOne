@@ -2587,7 +2587,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
         if (Embedded.VALUE) {
-            LinuxEmbeddedEditor.edit(cmp, maxSize, constraint, text);
+            com.codename1.impl.EmbeddedTextEditor.edit(cmp, maxSize, constraint, text);
             return;
         }
         lowLevelTextInput.stopCurrent();

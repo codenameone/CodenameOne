@@ -1067,6 +1067,10 @@ static void cn1GpuPresentUnlocked(void) {
     if (!eglSwapBuffers(cn1gDpy, cn1gSurface)) {
         return;
     }
+    if (cn1EmbeddedExiting()) {
+        /* The console's CRTC is being put back; see cn1EmbeddedExiting. */
+        return;
+    }
     bo = gbm_surface_lock_front_buffer(cn1gGbmSurface);
     if (bo == 0) {
         return;
@@ -1232,6 +1236,24 @@ void cn1GpuShutdown(void) {
     cn1gUse();
     cn1GpuShutdownUnlocked();
     pthread_mutex_unlock(&cn1gUseLock);
+}
+
+void cn1GpuShutdownAtExit(void) {
+    /* Runs from exit() on whichever thread called System.exit, while the EDT
+     * may still be in the middle of a frame. Tearing the context down here
+     * freed the glyph atlas and terminated EGL under a texture upload in
+     * flight -- a segfault after the application had already finished. The
+     * process is going away, so its buffers are released by the kernel; only
+     * the screen state outlives it and needs putting back. */
+    /* Not even waiting out a pending flip: that runs the DRM event handler and
+     * swaps and releases the front and next buffers, which the EDT may be doing
+     * at this same moment in its own present -- the same race in a smaller
+     * window. Hiding the cursor plane is a single ioctl and touches no shared
+     * state; the display unit's drmModeSetCrtc then replaces the scanout
+     * whatever flip is still in flight. */
+    if (cn1gActive && cn1gScanout) {
+        cn1GpuCursor(0, 0, 0);
+    }
 }
 
 #endif /* CN1_LINUX_EMBEDDED && CN1_EMBEDDED_GPU */
