@@ -8532,6 +8532,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         final Element[] focus = new Element[1];
         final String[] before = new String[1];
         final boolean[] committedEdit = new boolean[1];
+        final boolean[] rolledBack = new boolean[1];
         final int rebuildsBefore = canvasRebuilds;
         String error = unattended(() -> {
             if (document == null) return "No active GUI document; open a form first";
@@ -8544,6 +8545,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 return "The developer is editing or dragging in the GUI Builder; try again when they finish";
             }
             before[0] = document.toXml();
+            final Element selectedBefore = document.selected();
             document.beginTransaction();
             boolean committed = false;
             try {
@@ -8554,8 +8556,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 focus[0] = document.selected();
                 return null;
             } finally {
-                if (committed) document.endTransaction();
-                else document.abortTransaction();
+                if (committed) {
+                    document.endTransaction();
+                } else if (before[0].equals(document.toXml())) {
+                    // Refused before anything changed. Closing the transaction records nothing for an
+                    // unchanged document, and unlike abortTransaction() it does not re-parse the XML,
+                    // which would replace every element object while the canvas, the selection and
+                    // the inspector still hold the old ones.
+                    document.endTransaction();
+                    document.select(selectedBefore);
+                } else {
+                    document.abortTransaction();
+                    rolledBack[0] = true;
+                }
             }
         });
         // An abandoned edit restores the document by re-parsing it, which can serialize attributes in
@@ -8563,7 +8576,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         boolean changed = committedEdit[0] && document != null && !before[0].equals(document.toXml());
         // Rebuilt only when the form changed, or when a step that measured the canvas rebuilt it for
         // an edit that was then abandoned; otherwise the canvas, selection and status are left alone.
-        if (changed || canvasRebuilds != rebuildsBefore) {
+        // A rollback re-parses the document into new element objects, so the canvas has to be rebuilt
+        // after one even though the form is back as it was: otherwise the canvas, the selection and
+        // the inspector keep editing elements that are no longer in the document.
+        if (changed || rolledBack[0] || canvasRebuilds != rebuildsBefore) {
             unattended(() -> {
                 if (document == null) return null;
                 if (changed && focus[0] != null && document.containsElement(focus[0])) {
@@ -9062,6 +9078,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         if (region == null) return "region must be one of "
                 + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.BORDER_REGIONS);
+        // Siblings without a constraint of their own take a region from their order, so changing this
+        // child's region would silently move them. Write down where each one is now first.
+        // A duplicate explicit region is moved the same way, so it is pinned too. Every region is read
+        // before any is written, because each write can change what the later siblings resolve to.
+        List<Element> siblings = componentChildren(parent);
+        List<String> regions = new ArrayList<String>();
+        for (Element sibling : siblings) regions.add(GuiDocument.effectiveBorderConstraint(parent, sibling));
+        for (int i = 0; i < siblings.size(); i++) {
+            Element sibling = siblings.get(i);
+            if (!regions.get(i).equals(GuiDocument.normalizeBorderConstraint(sibling.getAttribute("layoutConstraint")))) {
+                document.setAttribute(sibling, "layoutConstraint", regions.get(i));
+            }
+        }
         // The occupant trades places, as the inspector's picker and a drop do.
         Element occupant = null;
         for (Element sibling : componentChildren(parent)) {

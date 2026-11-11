@@ -129,6 +129,7 @@ class McpEditingToolsTest {
         assertTrue(String.valueOf(columns.get("error")).contains("columns"), String.valueOf(columns.get("error")));
         assertEquals(before, builder.documentForTest().toXml(), "the hint set before the bad value must be rolled back");
         assertEquals(undoDepth, undoDepth(builder), "a refused edit must not leave an undo step");
+        assertCanvasLinked(builder, "after an edit rolled back part way");
 
         Map<String, Object> unknown = call("guibuilder_set_properties",
                 "{\"component\":\"email\",\"properties\":{\"layout\":\"BoxLayout\"}}");
@@ -257,6 +258,25 @@ class McpEditingToolsTest {
         Map<String, Object> refusedEdit = call("guibuilder_set_properties", "{\"component\":\"nobody\",\"properties\":{\"text\":\"x\"}}");
         assertEquals(Boolean.FALSE, refusedEdit.get("success"));
         assertEquals(rebuildsBeforeRefusal, rebuilds.getInt(builder), "a refused edit changes nothing, so nothing is redrawn");
+        assertCanvasLinked(builder, "after an edit refused before it changed anything");
+    }
+
+    @Test
+    void settingOneBorderRegionMovesNoOtherChild() throws Exception {
+        // Children without a constraint of their own get a region from their order (Center, North,
+        // South, ...); changing one child's region must not reshuffle the others.
+        CodenameOneGUIBuilder builder = builder();
+        Map<String, Object> frame = call("guibuilder_insert_xml", "{\"xml\":" + quote("<component type=\"Container\""
+                + " name=\"frame\" layout=\"BorderLayout\"><component type=\"Label\" name=\"a\"/>"
+                + "<component type=\"Label\" name=\"b\"/><component type=\"Label\" name=\"c\"/></component>") + "}");
+        assertEquals(Boolean.TRUE, frame.get("success"), String.valueOf(frame.get("error")));
+        Element parent = element(builder, "frame");
+        assertEquals("North", GuiDocument.effectiveBorderConstraint(parent, element(builder, "b")));
+        Map<String, Object> moved = call("guibuilder_set_constraint", "{\"component\":\"a\",\"region\":\"West\"}");
+        assertEquals(Boolean.TRUE, moved.get("success"), String.valueOf(moved.get("error")));
+        assertEquals("West", GuiDocument.effectiveBorderConstraint(parent, element(builder, "a")));
+        assertEquals("North", GuiDocument.effectiveBorderConstraint(parent, element(builder, "b")), "b was not named");
+        assertEquals("South", GuiDocument.effectiveBorderConstraint(parent, element(builder, "c")), "c was not named");
     }
 
     @Test
@@ -418,6 +438,29 @@ class McpEditingToolsTest {
     }
 
     // --- helpers -------------------------------------------------------------------------------
+
+    /**
+     * Every preview on the canvas must be bound to an element the document still holds; one bound to
+     * a replaced element ignores clicks and takes inspector edits the save never sees.
+     */
+    private static void assertCanvasLinked(CodenameOneGUIBuilder builder, String when) throws Exception {
+        final List<String> stale = new ArrayList<String>();
+        Display.getInstance().callSeriallyAndWait(() -> collectStale(builder.canvasHostForTest(), builder.documentForTest(), stale));
+        assertTrue(stale.isEmpty(), "canvas previews bound to elements no longer in the document " + when + ": " + stale);
+        Element selected = builder.documentForTest().selected();
+        assertTrue(selected == null || builder.documentForTest().containsElement(selected), "selection is stale " + when);
+    }
+
+    private static void collectStale(Container root, GuiDocument document, List<String> stale) {
+        for (int i = 0; i < root.getComponentCount(); i++) {
+            Component child = root.getComponentAt(i);
+            Object bound = child.getClientProperty("gui.element");
+            if (bound instanceof Element && !document.containsElement((Element) bound)) {
+                stale.add(String.valueOf(((Element) bound).getAttribute("name")));
+            }
+            if (child instanceof Container) collectStale((Container) child, document, stale);
+        }
+    }
 
     private static TreeSet<String> expected(String type) {
         TreeSet<String> names = new TreeSet<String>();
