@@ -898,6 +898,18 @@ public final class GuiDocument {
         return true;
     }
 
+    /**
+     * Takes the last change back without offering it to Redo. For a change that must not come back --
+     * one the canvas could not show, which Redo would only reinstate to fail again.
+     *
+     * @return true when there was a change to take back
+     */
+    public boolean revertLastChange() {
+        if (!canUndo()) return false;
+        restore(undo.remove(undo.size() - 1));
+        return true;
+    }
+
     public boolean redo() {
         if (!canRedo()) return false;
         undo.add(capture());

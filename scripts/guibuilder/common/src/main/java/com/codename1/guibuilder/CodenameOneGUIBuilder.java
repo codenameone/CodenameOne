@@ -8610,7 +8610,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // would fail the same way. Take it back out rather than report it as done.
             final String failure = rebuildFailure;
             unattended(() -> {
-                if (document.undo()) refreshEditor();
+                // Not undo(): that would leave the change on the redo stack, and Redo would bring back
+                // a change the canvas has already shown it cannot draw.
+                if (document.revertLastChange()) refreshEditor();
                 return null;
             });
             error = "The canvas could not show that change, so it was undone: " + failure;
@@ -9450,8 +9452,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         document.select(element);
         refreshEditor();
-        if (componentForElement(canvasHost, element) == null || componentForElement(canvasHost, parent) == null) {
+        Component self = componentForElement(canvasHost, element);
+        Component parentPreview = componentForElement(canvasHost, parent);
+        if (self == null || !(parentPreview instanceof Container)) {
             return mcpName(element) + " is not visible on the canvas, so it cannot be measured";
+        }
+        // The helpers below return quietly when they find no reference on the canvas -- an invisible
+        // sibling, say -- so it is checked here, or the call would report success having done nothing.
+        if (needsReference && guidedReferenceComponent(element, (Container) parentPreview, self) == null) {
+            return "No reference component is visible next to " + mcpName(element)
+                    + "; set reference to a visible sibling, or make one visible";
         }
         if (horizontal != null) {
             document.select(element);
@@ -9713,6 +9723,37 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return null;
     }
 
+    /**
+     * Every simple name the generated companion and model sources import: com.codename1.ui.*,
+     * com.codename1.ui.layouts.*, com.codename1.properties.* and the single-type imports. A form
+     * class with one of these names shadows the import for everything in its package -- a form
+     * named Form extends itself, and one named Label turns every generated Label field into it.
+     * McpEditingToolsTest checks this list against the core jar.
+     */
+    static final String GENERATED_IMPORT_NAMES =
+            "|AbstractDialog|AbstractEditorComponent|AccessibilityColorVisionDeficiency|Accordion|ActionEvent|"
+            + "AnimationManager|AutoCompleteTextComponent|AutoCompleteTextField|Bind|BindAttr|Bindable|"
+            + "Binders|Binding|BlockingDisallowedException|BooleanProperty|BorderLayout|BoxLayout|"
+            + "BrowserComponent|BrowserWindow|Button|ButtonGroup|ByteProperty|CN|CN1Constants|CSSColor|"
+            + "Calendar|CharProperty|CheckBox|ClipboardContent|ClipboardDataProvider|CodeCompletion|"
+            + "CodeCompletionProvider|CodeDiagnostic|CodeEditor|CollectionProperty|ComboBox|Command|"
+            + "CommonProgressAnimations|Component|ComponentGroup|ComponentImage|ComponentSelector|"
+            + "ConicGradient|Container|ContextMenu|CoordinateLayout|Desktop|DevicePosture|Dialog|Dimension|"
+            + "Display|DoubleProperty|DynamicImage|EditField|Editable|EncodedImage|FloatProperty|FlowLayout|"
+            + "Font|FontImage|Form|GeneratedSVGImage|Gradient|Graphics|GridBagConstraints|GridBagLayout|"
+            + "GridLayout|GroupLayout|IconHolder|Image|ImageFactory|InfiniteContainer|InputComponent|Insets|"
+            + "InstantUI|IntProperty|InterFormContainer|Label|LayeredLayout|Layout|LayoutStyle|LinearGradient|"
+            + "LinearGradientPaint|List|ListProperty|LongProperty|MapAdapter|MapProperty|MenuBar|Monitor|"
+            + "MultipleGradientPaint|NativeDragAndDrop|NativeDragOperation|NativeDropEvent|NavigationCommand|"
+            + "NumericProperty|Paint|Painter|PeerComponent|PickerComponent|PreferencesObject|Property|"
+            + "PropertyBase|PropertyBusinessObject|PropertyChangeListener|PropertyIndex|RGBImage|"
+            + "RadialGradient|RadioButton|ReleasableComponent|RichTextArea|RichTextClipboardData|"
+            + "RichTextComponent|RichTextFormat|SQLMap|SelectableIconHolder|SetProperty|Sheet|SideMenuBar|"
+            + "Slider|SpanLabel|Stroke|SwipeableContainer|TableLayout|Tabs|TextArea|TextComponent|"
+            + "TextComponentPassword|TextField|TextHolder|TextInputClient|TextInputConfig|TextInputGeometry|"
+            + "TextInputState|TextModeLayout|TextSelection|Toolbar|TooltipManager|TopLevelContainer|Transform|"
+            + "UIFragment|URLImage|UiBinding|VirtualInputDevice|Window|";
+
     private static String mcpFormClassError(String className) {
         if (className == null || className.length() == 0) return "className is required, e.g. com.example.myapp.LoginForm";
         String[] parts = className.split("\\.");
@@ -9733,6 +9774,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 }
             }
             if (!mcpJavaIdentifier(part)) return part + " is a Java keyword";
+        }
+        String simple = parts[parts.length - 1];
+        if (GENERATED_IMPORT_NAMES.indexOf("|" + simple + "|") >= 0) {
+            return simple + " is the name of a Codename One class the generated source imports; choose another,"
+                    + " e.g. " + simple + "Form";
         }
         return null;
     }

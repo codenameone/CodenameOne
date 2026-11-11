@@ -460,6 +460,54 @@ class McpEditingToolsTest {
     }
 
     @Test
+    void aFormCannotBeNamedAfterAClassItsSourceImports() throws Exception {
+        builder();
+        for (String name : new String[]{"Form", "Label", "Button", "Container", "BorderLayout", "ActionEvent"}) {
+            Map<String, Object> result = call("guibuilder_create_form", "{\"className\":\"com.example.app." + name + "\"}");
+            assertEquals(Boolean.FALSE, result.get("success"), name + " would shadow the generated import");
+            assertFalse(Files.exists(project.resolve("src/main/guibuilder/com/example/app/" + name + ".gui")));
+        }
+    }
+
+    @Test
+    void theImportedNameListCoversTheCoreJar() throws Exception {
+        // GENERATED_IMPORT_NAMES is written out by hand because the builder cannot list a package at
+        // run time; this fails when core gains a public class the generated source would import.
+        java.io.File jar = new java.io.File(com.codename1.ui.Form.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        List<String> missing = new ArrayList<String>();
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar)) {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                String entry = entries.nextElement().getName();
+                String directory = entry.substring(0, Math.max(0, entry.lastIndexOf('/')));
+                if (!entry.endsWith(".class") || entry.indexOf('$') >= 0) continue;
+                if (!"com/codename1/ui".equals(directory) && !"com/codename1/ui/layouts".equals(directory)
+                        && !"com/codename1/properties".equals(directory)) continue;
+                String className = entry.substring(0, entry.length() - 6).replace('/', '.');
+                Class<?> type = Class.forName(className, false, getClass().getClassLoader());
+                if (!java.lang.reflect.Modifier.isPublic(type.getModifiers()) || "package-info".equals(type.getSimpleName())) continue;
+                if (CodenameOneGUIBuilder.GENERATED_IMPORT_NAMES.indexOf("|" + type.getSimpleName() + "|") < 0) {
+                    missing.add(type.getSimpleName());
+                }
+            }
+        }
+        assertTrue(missing.isEmpty(), "add these to CodenameOneGUIBuilder.GENERATED_IMPORT_NAMES: " + missing);
+    }
+
+    @Test
+    void guidedAlignmentWithoutAVisibleReferenceIsNotReportedAsDone() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"free\",\"layout\":{\"layout\":\"LayeredLayout\"}}");
+        call("guibuilder_add_component", "{\"type\":\"Button\",\"name\":\"hidden\",\"parent\":\"free\",\"properties\":{\"visible\":false}}");
+        call("guibuilder_add_component", "{\"type\":\"Button\",\"name\":\"go\",\"parent\":\"free\","
+                + "\"constraint\":{\"insets\":\"40px auto auto 40px\"}}");
+        String before = builder.documentForTest().toXml();
+        Map<String, Object> result = call("guibuilder_set_constraint", "{\"component\":\"go\",\"align\":[\"alignLeft\"]}");
+        assertFalse(Boolean.TRUE.equals(result.get("success")) && before.equals(builder.documentForTest().toXml()),
+                "success must mean something changed: " + result.get("error"));
+    }
+
+    @Test
     void tableCellsCannotOverlap() throws Exception {
         CodenameOneGUIBuilder builder = builder();
         call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"grid\","
