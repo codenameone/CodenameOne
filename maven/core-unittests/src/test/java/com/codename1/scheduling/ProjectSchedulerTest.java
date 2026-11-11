@@ -216,6 +216,28 @@ class ProjectSchedulerTest {
     }
 
     @Test
+    void aTaskCannotBePutUnderASummaryThatWaitsForIt() {
+        ProjectModel p = project();
+        GanttTask a = task(p, "a", 1);
+        GanttTask group = new GanttTask("group", "group");
+        p.addTask(group);
+        p.addTask(group, new GanttTask("inner", "inner", D));
+        p.link(a, group);
+        assertThrows(IllegalArgumentException.class, () -> p.addTask(group, a));
+        assertNull(a.getParent());
+        assertTrue(p.getRootTasks().contains(a));
+        assertTrue(p.contains(a));
+
+        GanttTask stranger = new GanttTask("stranger", "stranger", D);
+        assertFalse(p.contains(stranger));
+        assertFalse(p.canLink(a, stranger));
+        assertFalse(p.canLink(stranger, a));
+        p.removeTask(a);
+        assertFalse(p.contains(a));
+        p.update();
+    }
+
+    @Test
     void aMilestoneSitsWhereThePreviousTaskEnds() {
         ProjectModel p = project();
         GanttTask a = task(p, "a", 2);

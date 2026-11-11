@@ -89,9 +89,19 @@ public final class LevelingResult {
     }
 
     /// Writes the delays into the project and schedules it.
+    ///
+    /// The proposal describes the project as it was when it was made. If
+    /// tasks were added, removed or changed since, the delays are still
+    /// written for the tasks that remain and every other task gets none, but
+    /// `getFinishAfter` and `getUnresolved` no longer say what comes out:
+    /// level again to know.
     public void apply() {
+        model.clearLeveling();
         for (int i = 0; i < tasks.size(); i++) {
-            tasks.get(i).setLevelingDelay(delays.get(i).longValue());
+            GanttTask t = tasks.get(i);
+            if (model.contains(t)) {
+                t.setLevelingDelay(delays.get(i).longValue());
+            }
         }
         model.update();
     }

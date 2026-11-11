@@ -288,6 +288,14 @@ abstract class ScrollSurface extends Component {
     @Override
     protected void deinitialize() {
         stopFling();
+        if (gesture == EDIT) {
+            // Taken off the form in the middle of a drag: nothing is
+            // committed, and the view does not keep drawing what was dragged.
+            endEdit(false);
+        }
+        gesture = NONE;
+        pressed = false;
+        still = false;
         if (registered) {
             Form f = getComponentForm();
             if (f != null) {
@@ -355,7 +363,7 @@ abstract class ScrollSurface extends Component {
         try {
             prepare(w, h);
             int bw = Math.max(1, bodyWidth());
-            int bh = Math.max(1, bodyHeight());
+            int bh = Math.max(1, pageStep(bodyHeight()));
             int across = Math.max(1, (contentWidth() + bw - 1) / bw);
             int down = Math.max(1, (contentHeight() + bh - 1) / bh);
             return new int[]{across, down, bw, bh};
@@ -374,6 +382,18 @@ abstract class ScrollSurface extends Component {
     /// not move it back. Null for a view with no zoom.
     double[] saveZoom() {
         return null;
+    }
+
+    /// How far down a page of body height `bodyH` goes before the next one
+    /// starts. A view of rows answers a whole number of them, so that a page
+    /// does not end in the middle of one.
+    int pageStep(int bodyH) {
+        return bodyH;
+    }
+
+    /// Whether this is a page being painted and not the screen.
+    boolean isPrinting() {
+        return printing;
     }
 
     /// Puts back what `saveZoom` returned. Called with the view laid out at
@@ -413,6 +433,7 @@ abstract class ScrollSurface extends Component {
         setY(py);
         setWidth(w);
         setHeight(h);
+        printing = true;
         try {
             prepare(w, h);
             offX = contentX;
@@ -420,7 +441,7 @@ abstract class ScrollSurface extends Component {
             int bx = px + headerW;
             int by = py + headerH;
             int bw = Math.min(bodyWidth(), Math.max(0, contentWidth() - contentX));
-            int bh = Math.min(bodyHeight(), Math.max(0, contentHeight() - contentY));
+            int bh = Math.min(pageStep(bodyHeight()), Math.max(0, contentHeight() - contentY));
             g.clipRect(bx, by, bw, bh);
             paintBody(g, bx - contentX, by - contentY);
             g.setClip(cx, cy, cw, ch);
@@ -440,6 +461,7 @@ abstract class ScrollSurface extends Component {
                 g.setClip(cx, cy, cw, ch);
             }
         } finally {
+            printing = false;
             g.setClip(cx, cy, cw, ch);
             setX(ox);
             setY(oy);
@@ -463,6 +485,11 @@ abstract class ScrollSurface extends Component {
     @Override
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
+        if (gesture == EDIT) {
+            // The release of the last drag went somewhere else: a listener
+            // showed a dialog over this while it was held.
+            endEdit(false);
+        }
         layoutNow();
         stopFling();
         pressed = true;
@@ -533,11 +560,17 @@ abstract class ScrollSurface extends Component {
         autoY = 0;
         int g = gesture;
         gesture = NONE;
+        boolean rest = still;
+        still = false;
         if (g == EDIT) {
             endEdit(true);
             repaint();
         } else if (g == PAN) {
-            fling();
+            // A pinch or a cancelled edit ends where it is: the speed of the
+            // finger was not a scroll.
+            if (!rest) {
+                fling();
+            }
         } else {
             int lx = x - getAbsoluteX();
             int ly = y - getAbsoluteY();
@@ -556,6 +589,7 @@ abstract class ScrollSurface extends Component {
     void cancelEdit() {
         if (gesture == EDIT) {
             gesture = PAN;
+            still = true;
             autoX = 0;
             autoY = 0;
             endEdit(false);
@@ -632,6 +666,9 @@ abstract class ScrollSurface extends Component {
     }
 
     private float pinchBase;
+    // The gesture under way ends without a fling.
+    private boolean still;
+    private boolean printing;
 
     @Override
     protected boolean pinch(float scale) {
@@ -644,7 +681,15 @@ abstract class ScrollSurface extends Component {
         if (zoomBy(step, lastX, lastY)) {
             pinchBase = scale;
             pinching = true;
+            if (gesture == EDIT) {
+                // A second finger on a drag makes it a zoom; the drag is
+                // dropped, not left half made.
+                autoX = 0;
+                autoY = 0;
+                endEdit(false);
+            }
             gesture = PAN;
+            still = true;
             return true;
         }
         return false;

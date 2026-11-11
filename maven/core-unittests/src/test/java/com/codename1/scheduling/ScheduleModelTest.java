@@ -298,7 +298,12 @@ class ScheduleModelTest extends UITestBase {
         assertEquals("home", item.getResourceId());
         assertEquals("home", a.getCalendarId());
         assertEquals(at(5, 14), a.getStart().getDateTime().toInstant().toEpochMilli());
-        assertSame(item, find(items(m, at(5, 0), at(6, 0)), "a"));
+        // A refused save is followed by a load, which is what the source
+        // really holds: the event is found again by its id.
+        ScheduleItem again = find(items(m, at(5, 0), at(6, 0)), "a");
+        assertNotNull(again);
+        assertEquals(at(5, 14), again.getStart());
+        assertEquals("home", again.getResourceId());
 
         // A new event that is refused is taken out again.
         assertNull(m.createItem(at(5, 11), at(5, 12), "work"), "creation is off until it is asked for");

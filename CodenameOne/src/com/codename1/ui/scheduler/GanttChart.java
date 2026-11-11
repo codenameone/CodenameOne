@@ -52,6 +52,7 @@ final class GanttChart extends ScrollSurface {
     private final TimeAxis axis;
     private final ArrayList<GanttTask> rows = new ArrayList<GanttTask>();
     private final HashMap<GanttTask, Integer> rowOf = new HashMap<GanttTask, Integer>();
+    private GanttTask linkProbe;
     private boolean dirty = true;
     private boolean scaled;
     private boolean fit;
@@ -108,9 +109,18 @@ final class GanttChart extends ScrollSurface {
     /// Remembers where every bar is, so that the next layout slides them to
     /// their new dates and does not jump.
     void beginReflow() {
+        beginReflow(null);
+    }
+
+    /// As `beginReflow()`, leaving out the bar a hand has just put where it
+    /// is: that one is already at its place, and sliding it there from where
+    /// it was would take it back first.
+    void beginReflow(GanttTask held) {
         HashMap<GanttTask, long[]> from = new HashMap<GanttTask, long[]>();
         for (GanttTask t : rows) {
-            from.put(t, new long[]{t.getStart(), t.getEnd()});
+            if (t != held) { //NOPMD CompareObjectsWithEquals - the very task that was dragged
+                from.put(t, new long[]{t.getStart(), t.getEnd()});
+            }
         }
         reflowFrom = from;
         reflowStart = System.currentTimeMillis();
@@ -399,7 +409,8 @@ final class GanttChart extends ScrollSurface {
         }
         int firstRow = Math.max(0, (cy - y) / rowH);
         int lastRow = Math.min(rows.size() - 1, (cy + ch - y) / rowH);
-        GanttTask selected = owner.getSelectedTask();
+        // A page shows the project, not what a hand was doing to it.
+        GanttTask selected = isPrinting() ? null : owner.getSelectedTask();
         for (int r = firstRow; r <= lastRow; r++) {
             GanttTask t = rows.get(r);
             if (t == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object
@@ -473,9 +484,48 @@ final class GanttChart extends ScrollSurface {
                 paintHandles(g, selected, row.intValue(), x, y);
             }
         }
-        if (mode != 0) {
+        if (mode != 0 && !isPrinting()) {
             paintEdit(g, x, y);
         }
+    }
+
+    // A page ends between two rows, so that no row is cut in half by it.
+    @Override
+    int pageStep(int bodyH) {
+        return rowH > 0 && bodyH >= rowH ? bodyH - bodyH % rowH : bodyH;
+    }
+
+    // A drag is of a task that is in the project and on a row. One that was
+    // removed, or whose parent was folded, while it was held has no bar left
+    // to follow the pointer.
+    private boolean editGone() {
+        ProjectModel model = owner.getModel();
+        return editTask == null || model == null || !model.contains(editTask) || rowOf.get(editTask) == null;
+    }
+
+    // The start a move by `delta` gives. The distance is what snaps, not the
+    // start: a task that begins at one in the afternoon stays at one, and a
+    // press that goes nowhere moves nothing.
+    private long movedStart(GanttTask t, long delta) {
+        ProjectModel model = owner.getModel();
+        ZoneId zone = axis.getZone();
+        long start = t.getStart();
+        long to;
+        if (axis.snapsToDays()) {
+            long days = Math.round((double) delta / TimeMath.DAY);
+            if (days == 0) {
+                return start;
+            }
+            to = TimeMath.at(TimeMath.epochDay(start, zone) + days, TimeMath.minuteOfDay(start, zone), zone);
+        } else {
+            long step = 15 * TimeMath.MINUTE;
+            long steps = Math.round((double) delta / step);
+            if (steps == 0) {
+                return start;
+            }
+            to = start + steps * step;
+        }
+        return model.getCalendar().nextWorkingTime(to);
     }
 
     // Who a task is assigned to, written after its bar.
@@ -639,7 +689,8 @@ final class GanttChart extends ScrollSurface {
         int indent = Look.mm(3);
         int pad = Look.mm(1.2f);
         int arrow = Look.mm(1.1f);
-        GanttTask selected = owner.getSelectedTask();
+        // A page shows the project, not what a hand was doing to it.
+        GanttTask selected = isPrinting() ? null : owner.getSelectedTask();
         int line = Look.mix(rowStyle.getBgColor(), rowStyle.getFgColor(), 25);
         boolean aa = g.isAntiAliased();
         for (int r = firstRow; r <= lastRow; r++) {
@@ -722,20 +773,6 @@ final class GanttChart extends ScrollSurface {
         return cx >= rect[0] - slack && cx < rect[0] + rect[2] + slack ? t : null;
     }
 
-    private long snapStart(long time) {
-        ProjectModel model = owner.getModel();
-        ZoneId zone = axis.getZone();
-        long t;
-        if (axis.snapsToDays()) {
-            t = TimeMath.startOfDay(time + TimeMath.DAY / 2, zone);
-        } else {
-            long day = TimeMath.epochDay(time, zone);
-            int m = (TimeMath.minuteOfDay(time, zone) + 7) / 15 * 15;
-            t = TimeMath.at(day, Math.min(TimeMath.MINUTES_PER_DAY, m), zone);
-        }
-        return model.getCalendar().nextWorkingTime(t);
-    }
-
     private long snapEnd(long time) {
         ProjectModel model = owner.getModel();
         ZoneId zone = axis.getZone();
@@ -769,6 +806,7 @@ final class GanttChart extends ScrollSurface {
                 mode = LINK;
                 editTask = sel;
                 linkTarget = null;
+                linkProbe = null;
                 return true;
             }
             int px = rect[0] + rect[2] * sel.getPercentComplete() / 100;
@@ -804,12 +842,20 @@ final class GanttChart extends ScrollSurface {
         if (mode == 0) {
             return;
         }
+        if (editGone()) {
+            cancelEdit();
+            return;
+        }
         ProjectModel model = owner.getModel();
         int cx = Math.max(0, Math.min(contentWidth(), x - headerW + getOffX()));
         long pointer = axis.time(cx);
         if (mode == MOVE) {
-            editStart = snapStart(editTask.getStart() + pointer - grabTime);
-            editEnd = model.getCalendar().addWorkingTime(editStart, editTask.getDuration());
+            editStart = movedStart(editTask, pointer - grabTime);
+            // A task with dates of its own keeps the span it was given; it
+            // has no duration the calendar could lay out again.
+            editEnd = editStart == editTask.getStart() ? editTask.getEnd()
+                    : editTask.isManuallyScheduled() ? editStart + (editTask.getEnd() - editTask.getStart())
+                    : model.getCalendar().addWorkingTime(editStart, editTask.getDuration());
         } else if (mode == RESIZE_END) {
             long least = model.getCalendar().addWorkingTime(editStart, axis.snapsToDays()
                     ? Math.min(model.getCalendar().getMillisPerDay(), TimeMath.DAY) : 15 * TimeMath.MINUTE);
@@ -823,7 +869,12 @@ final class GanttChart extends ScrollSurface {
             linkX = getX() + x;
             linkY = getY() + y;
             GanttTask t = barAt(x, y);
-            linkTarget = t != null && t != editTask && model.canLink(editTask, t) ? t : null; //NOPMD CompareObjectsWithEquals
+            // Asking whether a link would close a loop orders the whole
+            // project, so it is asked once for each bar the pointer comes to.
+            if (t != linkProbe) { //NOPMD CompareObjectsWithEquals - the bar under the pointer last time
+                linkProbe = t;
+                linkTarget = t != null && t != editTask && model.canLink(editTask, t) ? t : null; //NOPMD CompareObjectsWithEquals
+            }
         }
     }
 
@@ -834,7 +885,8 @@ final class GanttChart extends ScrollSurface {
         mode = 0;
         editTask = null;
         ProjectModel model = owner.getModel();
-        if (!commit || t == null || model == null) {
+        if (!commit || t == null || model == null || !model.contains(t)) {
+            linkTarget = null;
             return;
         }
         if (m == LINK) {
@@ -845,26 +897,39 @@ final class GanttChart extends ScrollSurface {
             }
             linkTarget = null;
         } else if (m == PROGRESS) {
-            if (editPercent != t.getPercentComplete()) {
+            // Progress is a change like a new date, so it is offered the
+            // same way, with the dates the task keeps.
+            if (editPercent != t.getPercentComplete() && owner.viewChanging(t, t.getStart(), t.getEnd())) {
                 t.setPercentComplete(editPercent);
                 model.update();
                 owner.viewChanged(t);
             }
         } else if (m == MOVE) {
             if (editStart != t.getStart() && owner.viewChanging(t, editStart, editEnd)) {
-                beginReflow();
+                beginReflow(t);
                 if (t.isManuallyScheduled()) {
                     t.setDates(editStart, editEnd);
                 } else {
                     // A task that is scheduled goes where it is put only as
                     // far as its links allow, so the drag is a constraint.
-                    t.setConstraint(GanttTask.Constraint.START_NO_EARLIER_THAN, editStart);
+                    // One it already has keeps its kind and takes the new
+                    // date; a task with none is held from starting earlier.
+                    GanttTask.Constraint c = t.getConstraint();
+                    if (c == GanttTask.Constraint.MUST_START_ON || c == GanttTask.Constraint.START_NO_LATER_THAN) {
+                        t.setConstraint(c, editStart);
+                    } else if (c == GanttTask.Constraint.MUST_FINISH_ON
+                            || c == GanttTask.Constraint.FINISH_NO_LATER_THAN
+                            || c == GanttTask.Constraint.FINISH_NO_EARLIER_THAN) {
+                        t.setConstraint(c, editEnd);
+                    } else {
+                        t.setConstraint(GanttTask.Constraint.START_NO_EARLIER_THAN, editStart);
+                    }
                 }
                 model.update();
                 owner.viewChanged(t);
             }
         } else if (editEnd != t.getEnd() && owner.viewChanging(t, editStart, editEnd)) {
-            beginReflow();
+            beginReflow(t);
             long work = Math.max(TimeMath.MINUTE, model.getCalendar().workingTimeBetween(t.getStart(), editEnd));
             if (t.isManuallyScheduled()) {
                 t.setDates(t.getStart(), editEnd);

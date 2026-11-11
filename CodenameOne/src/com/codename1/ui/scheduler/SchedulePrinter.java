@@ -75,6 +75,7 @@ public final class SchedulePrinter {
     /// The most pages one print makes. A chart zoomed to hours over a year
     /// is thousands of pages nobody asked for.
     private static final int MAX_PAGES = 400;
+    private int[] held;
 
     private final Scheduler scheduler;
     private final Gantt gantt;
@@ -181,6 +182,9 @@ public final class SchedulePrinter {
     // the count is taken with a band and taken again without one only when a
     // single untitled page turns out not to need it.
     private int[] grid() {
+        if (held != null) {
+            return held;
+        }
         ScrollSurface s = surface();
         if (s == null) {
             return new int[]{0, 0, 0, 0, 0};
@@ -213,7 +217,10 @@ public final class SchedulePrinter {
     /// bottom.
     public Image renderPage(int page) {
         int[] g = grid();
-        int count = getPageCount();
+        long count = (long) g[0] * g[1];
+        if (count > MAX_PAGES) {
+            throw new IllegalStateException("The view is " + count + " pages; zoom out or use a larger page");
+        }
         if (page < 0 || page >= count) {
             throw new IllegalArgumentException("page " + page + " of " + count);
         }
@@ -291,6 +298,9 @@ public final class SchedulePrinter {
         }
         int count = getPageCount();
         OutputStream out = FileSystemStorage.getInstance().openOutputStream(path);
+        // The view does not change between one page and the next, so the
+        // pages are counted once for the document and not once for each.
+        held = grid();
         try {
             PdfPages pdf = new PdfPages(out, count);
             for (int i = 0; i < count; i++) {
@@ -301,6 +311,7 @@ public final class SchedulePrinter {
             }
             pdf.finish();
         } finally {
+            held = null;
             out.close();
         }
     }
@@ -342,10 +353,20 @@ public final class SchedulePrinter {
         }
         final FileSystemStorage fs = FileSystemStorage.getInstance();
         final String path = fs.getAppHomePath() + "cn1-schedule-print-temp.pdf";
+        boolean written = false;
         try {
             writePdf(path);
+            written = true;
         } catch (IOException err) {
             report(listener, PrintResult.failed(err.toString()));
+        } finally {
+            // Half a document is nobody's: whatever stopped the writing,
+            // the file does not stay behind in the application's home.
+            if (!written && fs.exists(path)) {
+                fs.delete(path);
+            }
+        }
+        if (!written) {
             return;
         }
         Printer.printPDF(path, new DeleteThenReport(fs, path, listener));

@@ -269,6 +269,45 @@ final class DayGrid extends ScrollSurface {
         return Math.round(minute * hourH / 60f);
     }
 
+    // The working hours of a calendar as minutes of a day of this view. They
+    // are the calendar's own when it keeps the scheduler's zone. Somebody
+    // who works in another zone has hours that fall elsewhere on this
+    // column, and partly on the days either side of it.
+    private int[] workingMinutes(WorkCalendar cal, long day) {
+        ZoneId zone = owner.getZone();
+        ZoneId theirs = cal.getZone();
+        if (theirs == null || theirs.equals(zone)) {
+            return cal.getWorkingHours(day);
+        }
+        long from = TimeMath.startOfEpochDay(day, zone);
+        long to = TimeMath.startOfEpochDay(day + 1, zone);
+        long first = TimeMath.epochDay(from, theirs);
+        long last = TimeMath.epochDay(to - 1, theirs);
+        int[] out = new int[0];
+        for (long d = first; d <= last; d++) {
+            int[] iv = cal.getWorkingHours(d);
+            for (int i = 0; i < iv.length; i += 2) {
+                long a = Math.max(from, TimeMath.at(d, iv[i], theirs));
+                long b = Math.min(to, TimeMath.at(d, iv[i + 1], theirs));
+                if (b <= a) {
+                    continue;
+                }
+                int start = (int) ((a - from) / TimeMath.MINUTE);
+                int end = b >= to ? TimeMath.MINUTES_PER_DAY : (int) ((b - from) / TimeMath.MINUTE);
+                if (out.length > 0 && start <= out[out.length - 1]) {
+                    out[out.length - 1] = Math.max(out[out.length - 1], end);
+                } else {
+                    int[] grown = new int[out.length + 2];
+                    System.arraycopy(out, 0, grown, 0, out.length);
+                    grown[out.length] = start;
+                    grown[out.length + 1] = end;
+                    out = grown;
+                }
+            }
+        }
+        return out;
+    }
+
     private int minuteAt(int cy) {
         return Math.max(0, Math.min(TimeMath.MINUTES_PER_DAY, (int) (cy * 60f / hourH)));
     }
@@ -504,7 +543,7 @@ final class DayGrid extends ScrollSurface {
             WorkCalendar cal = resources != null && resources.length > 0 && resources[c].getCalendar() != null
                     ? resources[c].getCalendar() : owner.getWorkCalendar();
             if (cal != null) {
-                int[] iv = cal.getWorkingHours(days[c]);
+                int[] iv = workingMinutes(cal, days[c]);
                 int cursor = 0;
                 for (int i = 0; i < iv.length; i += 2) {
                     if (iv[i] > cursor) {

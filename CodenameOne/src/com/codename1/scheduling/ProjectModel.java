@@ -116,7 +116,13 @@ public class ProjectModel {
     }
 
     /// Adds a task at a position among `parent`'s children; -1 is the end,
-    /// and a null parent is the top level.
+    /// and a null parent is the top level. A task that is in the project
+    /// already is moved.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the task would go under itself, or
+    ///   when its links would then run in a loop through the summary
     public ProjectModel addTask(GanttTask parent, int index, GanttTask task) {
         if (task == null || task == parent) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException("task");
@@ -124,6 +130,43 @@ public class ProjectModel {
         if (parent != null && parent.isDescendantOf(task)) {
             throw new IllegalArgumentException("A task cannot go under one of its own children");
         }
+        if (dependencies.isEmpty()) {
+            // Nothing is linked, so no place in the tree can close a loop.
+            place(parent, index, task);
+            return this;
+        }
+        boolean was = contains(task);
+        GanttTask oldParent = task.parent;
+        int oldIndex = was ? (oldParent == null ? roots : oldParent.children).indexOf(task) : -1;
+        place(parent, index, task);
+        if (ProjectScheduler.order(this) == null) {
+            // A link into a summary holds its children, so a task that is
+            // linked to its new parent would wait for itself.
+            if (was) {
+                place(oldParent, oldIndex, task);
+            } else {
+                detach(task);
+                task.parent = null;
+                flat = null;
+            }
+            throw new IllegalArgumentException("The links of " + task + " would run in a loop under " + parent);
+        }
+        return this;
+    }
+
+    /// Whether a task is in this project's tree.
+    public boolean contains(GanttTask task) {
+        if (task == null) {
+            return false;
+        }
+        GanttTask top = task;
+        while (top.parent != null) {
+            top = top.parent;
+        }
+        return roots.contains(top);
+    }
+
+    private void place(GanttTask parent, int index, GanttTask task) {
         detach(task);
         List<GanttTask> into = parent == null ? roots : parent.children;
         if (index < 0 || index > into.size()) {
@@ -133,7 +176,6 @@ public class ProjectModel {
         }
         task.parent = parent;
         flat = null;
-        return this;
     }
 
     /// Moves a task, with everything under it, to another place in the tree.
@@ -149,9 +191,9 @@ public class ProjectModel {
         GanttTask oldParent = task.parent;
         List<GanttTask> from = oldParent == null ? roots : oldParent.children;
         int oldIndex = from.indexOf(task);
-        addTask(newParent, index, task);
+        place(newParent, index, task);
         if (ProjectScheduler.order(this) == null) {
-            addTask(oldParent, oldIndex, task);
+            place(oldParent, oldIndex, task);
             return false;
         }
         return true;
@@ -240,11 +282,16 @@ public class ProjectModel {
     }
 
     /// Whether a link from `predecessor` to `successor` is possible: they are
-    /// two tasks, neither is inside the other, they are not linked already,
-    /// and the link would not close a loop.
+    /// two tasks of this project, neither is inside the other, they are not
+    /// linked already, and the link would not close a loop.
     public boolean canLink(GanttTask predecessor, GanttTask successor) {
         if (predecessor == null || successor == null || predecessor == successor //NOPMD CompareObjectsWithEquals
                 || predecessor.isDescendantOf(successor) || successor.isDescendantOf(predecessor)) {
+            return false;
+        }
+        // The engine finds a task by its place in the outline, which a task
+        // outside the project does not have.
+        if (!contains(predecessor) || !contains(successor)) {
             return false;
         }
         if (getDependency(predecessor, successor) != null) {

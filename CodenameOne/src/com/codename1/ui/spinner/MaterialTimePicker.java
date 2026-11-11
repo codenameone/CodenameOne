@@ -78,6 +78,8 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
     private int maxHour = -1;
     private boolean minutesShown;
     private boolean inputMode;
+    private boolean typedWrong;
+    private boolean pointedHour;
     private boolean updating;
 
     private final Label overline = new Label("", "PickerMaterialOverline");
@@ -214,24 +216,31 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
     }
 
     /// Sets the time. The hour is of the day, 0 to 23, whatever the face
-    /// shows; an hour outside the range is brought to the nearest one in it,
-    /// and the minute to a multiple of the step.
+    /// shows; an hour outside the range is brought to the nearest one in it.
+    /// The minute is kept as it is given: the step is where the hand stops
+    /// when it is turned, and a time that is only looked at is not changed
+    /// by having been shown.
     public void setTime(int hourOfDay, int minuteOfHour) {
         int h = Math.max(0, Math.min(23, hourOfDay));
         if (minHour >= 0 && maxHour > minHour) {
             h = Math.max(minHour, Math.min(maxHour - 1, h));
         }
         hour = h;
-        minute = snap(Math.max(0, Math.min(59, minuteOfHour)));
+        minute = Math.max(0, Math.min(59, minuteOfHour));
+        typedWrong = false;
         refresh();
     }
 
-    private int snap(int m) {
-        if (minuteStep <= 1) {
-            return m;
+    /// Whether what is typed is a time. When it is not, the fields are
+    /// written again with the time that is set, so that what is confirmed
+    /// next is what is read there and not something that was never shown.
+    boolean acceptInput() {
+        if (!inputMode || !typedWrong) {
+            return true;
         }
-        int s = (m + minuteStep / 2) / minuteStep * minuteStep;
-        return s >= 60 ? s - minuteStep : s;
+        typedWrong = false;
+        refresh();
+        return false;
     }
 
     /// The minutes since midnight, as an `Integer`.
@@ -267,7 +276,6 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
     /// The minutes the hand stops at: 5 for every five minutes, 1 for all.
     public void setMinuteStep(int step) {
         minuteStep = Math.max(1, Math.min(30, step));
-        minute = snap(minute);
         refresh();
     }
 
@@ -410,6 +418,7 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         }
         int h = number(hourInput.getText());
         int m = number(minuteInput.getText());
+        typedWrong = true;
         if (meridiem) {
             if (h < 1 || h > 12) {
                 return;
@@ -419,7 +428,9 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         if (h < 0 || h > 23 || m < 0 || m > 59 || !isEnabledHour(h)) {
             return;
         }
-        m = snap(m);
+        // A minute that is typed is the minute that is meant; the step is
+        // for the hand.
+        typedWrong = false;
         if (h != hour || m != minute) {
             hour = h;
             minute = m;
@@ -576,7 +587,8 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
                 boolean inside = dx * dx + dy * dy < (outer + inner) * (outer + inner) / 4;
                 h = inside ? (i == 0 ? 0 : i + 12) : (i == 0 ? 12 : i);
             }
-            if (h != hour && isEnabledHour(h)) {
+            pointedHour = isEnabledHour(h);
+            if (h != hour && pointedHour) {
                 hour = h;
                 refresh();
                 changed();
@@ -595,9 +607,11 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
 
         @Override
         public void pointerReleased(int x, int y) {
+            pointedHour = false;
             point(x, y);
-            if (!minutesShown) {
-                // The hour is chosen; the minute is what is asked next.
+            if (!minutesShown && pointedHour) {
+                // The hour is chosen; the minute is what is asked next. An
+                // hour that cannot be chosen leaves the question open.
                 showMinutes(true);
             }
         }

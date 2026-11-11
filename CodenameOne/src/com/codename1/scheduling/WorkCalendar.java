@@ -101,8 +101,11 @@ public final class WorkCalendar {
     /// The hours of one day of the week, which also makes it a working day.
     public WorkCalendar setWorkingHours(int isoDay, int[] startEndMinutes) {
         checkDay(isoDay);
-        dayHours[isoDay] = checked(startEndMinutes);
-        workingDays[isoDay] = dayHours[isoDay].length > 0;
+        int[] own = checked(startEndMinutes);
+        // No hours is a day off and not a day with hours of its own, so the
+        // day takes the default hours if it is made a working day again.
+        dayHours[isoDay] = own.length > 0 ? own : null;
+        workingDays[isoDay] = own.length > 0;
         return this;
     }
 

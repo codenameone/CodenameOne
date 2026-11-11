@@ -150,6 +150,8 @@ final class ResourceTimeline extends ScrollSurface {
             list.toArray(resources);
         }
         rowCount = Math.max(1, resources.length);
+        // A drag under way keeps a row that exists.
+        editRow = Math.min(editRow, rowCount - 1);
         int widest = 0;
         boolean detail = false;
         for (ScheduleResource r : resources) {
@@ -512,6 +514,10 @@ final class ResourceTimeline extends ScrollSurface {
         if (handlesOnly) {
             return false;
         }
+        if (resources.length > 0 && cy >= rowTop[rowCount]) {
+            // Under the last row there is nobody to book.
+            return false;
+        }
         mode = RANGE;
         editItem = null;
         editRow = rowAt(cy);
@@ -535,9 +541,21 @@ final class ResourceTimeline extends ScrollSurface {
         long pointer = axis.time(cx);
         long step = step();
         if (mode == MOVE) {
-            long length = editItem.getEnd() - editItem.getStart();
-            editStart = snap(editItem.getStart() + pointer - grabTime);
-            editEnd = editStart + length;
+            if (axis.snapsToDays()) {
+                // Whole days, at the hour it had: a booking at ten dragged to
+                // another row or another day is still at ten.
+                ZoneId zone = owner.getZone();
+                long delta = pointer - grabTime;
+                long days = (delta >= 0 ? delta + TimeMath.DAY / 2 : delta - TimeMath.DAY / 2) / TimeMath.DAY;
+                editStart = TimeMath.at(TimeMath.epochDay(editItem.getStart(), zone) + days,
+                        TimeMath.minuteOfDay(editItem.getStart(), zone), zone);
+                editEnd = TimeMath.at(TimeMath.epochDay(editItem.getEnd(), zone) + days,
+                        TimeMath.minuteOfDay(editItem.getEnd(), zone), zone);
+            } else {
+                long length = editItem.getEnd() - editItem.getStart();
+                editStart = snap(editItem.getStart() + pointer - grabTime);
+                editEnd = editStart + length;
+            }
             if (resources.length > 0) {
                 editRow = rowAt(cy);
             }
@@ -569,7 +587,9 @@ final class ResourceTimeline extends ScrollSurface {
         if (!commit) {
             return;
         }
-        String res = resources.length > 0 ? resources[editRow].getId() : item == null ? null : item.getResourceId();
+        // The model may have lost a resource while this was dragged.
+        String res = resources.length > 0 ? resources[Math.min(editRow, resources.length - 1)].getId()
+                : item == null ? null : item.getResourceId();
         if (m == RANGE) {
             owner.viewRange(editStart, editEnd, res);
         } else if (item != null && (editStart != item.getStart() || editEnd != item.getEnd()

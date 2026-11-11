@@ -250,6 +250,8 @@ public class Gantt extends Container {
         if (model == m) { //NOPMD CompareObjectsWithEquals - the same model object, not an equal one
             return;
         }
+        // A bar that is held belongs to the project that is leaving.
+        chart.cancelEdit();
         if (model != null && listening) {
             model.removeChangeListener(modelListener);
         }
@@ -567,26 +569,32 @@ public class Gantt extends Container {
         listeners.remove(l);
     }
 
+    // The listeners as they are now: one that removes itself while it is
+    // told must not make the next one miss the event, or its say on it.
+    private GanttListener[] told() {
+        return listeners.toArray(new GanttListener[listeners.size()]);
+    }
+
     void viewSelected(GanttTask task) {
         if (selected == task) { //NOPMD CompareObjectsWithEquals - the selection is this very object
             return;
         }
         selected = task;
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            listeners.get(i).taskSelected(this, task);
+        for (GanttListener l : told()) {
+            l.taskSelected(this, task);
         }
         chart.repaint();
     }
 
     void viewOpened(GanttTask task) {
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            listeners.get(i).taskOpened(this, task);
+        for (GanttListener l : told()) {
+            l.taskOpened(this, task);
         }
     }
 
     boolean viewChanging(GanttTask task, long start, long end) {
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            if (!listeners.get(i).taskChanging(this, task, start, end)) {
+        for (GanttListener l : told()) {
+            if (!l.taskChanging(this, task, start, end)) {
                 return false;
             }
         }
@@ -594,14 +602,14 @@ public class Gantt extends Container {
     }
 
     void viewChanged(GanttTask task) {
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            listeners.get(i).taskChanged(this, task);
+        for (GanttListener l : told()) {
+            l.taskChanged(this, task);
         }
     }
 
     boolean viewLinking(GanttTask predecessor, GanttTask successor) {
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            if (!listeners.get(i).linkCreating(this, predecessor, successor)) {
+        for (GanttListener l : told()) {
+            if (!l.linkCreating(this, predecessor, successor)) {
                 return false;
             }
         }

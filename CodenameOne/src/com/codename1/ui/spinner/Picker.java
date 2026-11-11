@@ -1071,8 +1071,10 @@ public class Picker extends Button {
     private void limit(MaterialTimePicker t) {
         t.setShowMeridiem(showMeridiem);
         t.setMinuteStep(minuteStep);
-        if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
-            t.setHourRange(minHour, maxHour);
+        if (minHour >= 0 && minHour < 24 && maxHour >= minHour) {
+            // The picker's last hour is one that can be chosen, as it is on
+            // the wheels; the face takes the hour after it.
+            t.setHourRange(minHour, Math.min(23, maxHour) + 1);
         }
     }
 
@@ -1109,7 +1111,24 @@ public class Picker extends Button {
         return currentSpinner;
     }
 
+    private static boolean acceptsInput(InternalPickerWidget widget) {
+        if (widget instanceof MaterialDatePicker) {
+            return ((MaterialDatePicker) widget).acceptInput();
+        }
+        if (widget instanceof MaterialTimePicker) {
+            return ((MaterialTimePicker) widget).acceptInput();
+        }
+        if (widget instanceof MaterialDateTimePicker) {
+            return ((MaterialDateTimePicker) widget).acceptInput();
+        }
+        return true;
+    }
+
     private void showMaterialDialog() {
+        if (materialDialog != null) {
+            // Asked to open while it is open: one dialog, one answer.
+            return;
+        }
         final InternalPickerWidget widget = createMaterialWidget();
         final Dialog dlg = new Dialog(new BorderLayout());
         // The picker's own surface over the form it belongs to, as the wheel
@@ -1135,7 +1154,11 @@ public class Picker extends Button {
         ok.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                endMaterialDialog(dlg, widget, true);
+                // Text that is not a date or a time is not confirmed: the
+                // value behind it is one the user is not looking at.
+                if (acceptsInput(widget)) {
+                    endMaterialDialog(dlg, widget, true);
+                }
             }
         });
         dlg.setBackCommand(new Command("") {
@@ -1175,6 +1198,15 @@ public class Picker extends Button {
         }
         if (commit) {
             value = widget.getValue();
+            if (type == Display.PICKER_TYPE_DATE_AND_TIME && value instanceof Date) {
+                // The month limits the day; the instant is limited here.
+                Date chosen = (Date) value;
+                if (startDate != null && chosen.getTime() < startDate.getTime()) {
+                    value = new Date(startDate.getTime());
+                } else if (endDate != null && chosen.getTime() > endDate.getTime()) {
+                    value = new Date(endDate.getTime());
+                }
+            }
             markDateExplicitlySetIfDateType();
         } else {
             value = preEditValue;

@@ -133,8 +133,13 @@ public class DefaultScheduleModel extends AbstractScheduleModel {
         if (end <= start) {
             end = start + defaultDuration;
         }
-        created++;
-        ScheduleItem item = new ScheduleItem("new-" + created, "", start, end).setResourceId(resourceId);
+        // The application chooses its own ids and may have chosen this one.
+        String id;
+        do {
+            created++;
+            id = "new-" + created;
+        } while (getItem(id) != null);
+        ScheduleItem item = new ScheduleItem(id, "", start, end).setResourceId(resourceId);
         items.add(item);
         fireChanged();
         return item;

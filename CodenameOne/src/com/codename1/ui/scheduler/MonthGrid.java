@@ -348,10 +348,15 @@ final class MonthGrid extends ScrollSurface {
             long b = firstDay + Math.max(anchorCell, editCell) + 1;
             owner.viewRange(TimeMath.startOfEpochDay(a, zone), TimeMath.startOfEpochDay(b, zone), null);
         } else if (item != null && editCell != grabCell) {
-            // The item keeps its time of day and its length on the new date.
-            long day = TimeMath.epochDay(item.getStart(), zone) + editCell - grabCell;
-            long start = TimeMath.at(day, TimeMath.minuteOfDay(item.getStart(), zone), zone);
-            owner.viewChanged(item, start, start + item.getEnd() - item.getStart(), item.getResourceId());
+            // Both ends keep their time of day and move the same number of
+            // dates. Adding the length in milliseconds would end an all-day
+            // item an hour into the next day when a clock change is crossed.
+            int by = editCell - grabCell;
+            long start = TimeMath.at(TimeMath.epochDay(item.getStart(), zone) + by,
+                    TimeMath.minuteOfDay(item.getStart(), zone), zone);
+            long end = TimeMath.at(TimeMath.epochDay(item.getEnd(), zone) + by,
+                    TimeMath.minuteOfDay(item.getEnd(), zone), zone);
+            owner.viewChanged(item, start, Math.max(end, start + TimeMath.MINUTE), item.getResourceId());
         }
     }
 

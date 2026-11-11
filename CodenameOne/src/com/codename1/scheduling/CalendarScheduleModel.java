@@ -75,6 +75,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
     private final Map<String, List<ScheduleItem>> busy = new HashMap<String, List<ScheduleItem>>();
     private final List<String> freeBusyOnly = new ArrayList<String>();
     private CalendarMutationScope mutationScope = CalendarMutationScope.THIS_INSTANCE;
+    private int created;
     private boolean creationEnabled;
     private String newEventTitle = "";
     private long loadedFrom;
@@ -233,6 +234,12 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
 
     /// Loads the events around the visible range again.
     public void reload() {
+        // A failure is reported until something is asked for again.
+        lastError = null;
+        load();
+    }
+
+    private void load() {
         if (wantedTo <= wantedFrom || calendars.isEmpty()) {
             return;
         }
@@ -265,7 +272,9 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         source.queryEvents(q).ready(new SuccessCallback<CalendarPage<CalendarEvent>>() {
             @Override
             public void onSucess(CalendarPage<CalendarEvent> page) {
-                if (asked != generation) {
+                if (asked != generation || !calendars.containsKey(calendarId)) {
+                    // Answered after a newer question, or for a calendar
+                    // that was taken away while it was asked.
                     return;
                 }
                 List<CalendarEvent> events = page.getItems();
@@ -280,7 +289,8 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                     loadPage(calendarId, from, to, next, into, asked);
                     return;
                 }
-                lastError = null;
+                // One calendar that answered says nothing about another that
+                // failed in the same load, so the error is left as it is.
                 items.put(calendarId, into);
                 fireChanged();
             }
@@ -294,7 +304,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 .ready(new SuccessCallback<List<FreeBusyInterval>>() {
                     @Override
                     public void onSucess(List<FreeBusyInterval> intervals) {
-                        if (asked != generation) {
+                        if (asked != generation || !calendars.containsKey(calendarId)) {
                             return;
                         }
                         List<ScheduleItem> list = new ArrayList<ScheduleItem>();
@@ -319,6 +329,10 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 if (asked == generation) {
                     lastError = err;
                     Log.e(err);
+                    // Nothing is loaded for this window, so the next range
+                    // asked for, even the same one, asks the source again.
+                    loadedFrom = 0;
+                    loadedTo = 0;
                     fireChanged();
                 }
             }
@@ -381,6 +395,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
             e.setEnd(CalendarDateTime.instant(Instant.ofEpochMilli(end), z));
         }
         e.setCalendarId(target);
+        final CalendarDateTime newS = e.getStart();
         item.setTime(start, end);
         move(item, oldResource, target);
         fireChanged();
@@ -398,10 +413,19 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
             public void onSucess(Throwable err) {
                 lastError = err;
                 Log.e(err);
-                e.setStart(oldS).setEnd(oldE).setCalendarId(oldResource);
-                item.setTime(oldStart, oldEnd);
-                move(item, target, oldResource);
+                // The item goes back at once, but only if this was the last
+                // edit of it and it is still what the model shows: a later
+                // edit has its own answer coming, and after a reload the
+                // item is a copy nobody draws. Either way the source is then
+                // asked what it has, which is the only thing known for sure.
+                List<ScheduleItem> shown = items.get(target);
+                if (e.getStart() == newS && shown != null && shown.contains(item)) { //NOPMD CompareObjectsWithEquals - this edit's own value
+                    e.setStart(oldS).setEnd(oldE).setCalendarId(oldResource);
+                    item.setTime(oldStart, oldEnd);
+                    move(item, target, oldResource);
+                }
                 fireChanged();
+                load();
             }
         });
         return true;
@@ -437,7 +461,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         final CalendarEvent e = new CalendarEvent().setCalendarId(calendarId).setTitle(newEventTitle)
                 .setStart(CalendarDateTime.instant(Instant.ofEpochMilli(start), zone))
                 .setEnd(CalendarDateTime.instant(Instant.ofEpochMilli(end), zone));
-        final ScheduleItem item = new ScheduleItem("new-" + start + "-" + generation, newEventTitle, start, end)
+        final ScheduleItem item = new ScheduleItem("new-" + (++created) + "-" + start, newEventTitle, start, end)
                 .setResourceId(calendarId).setUserObject(e);
         move(item, null, calendarId);
         fireChanged();
@@ -473,19 +497,34 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         }
         final String cal = item.getResourceId();
         final List<ScheduleItem> list = items.get(cal);
+        // A load since the caller was given this item made another object
+        // for the same event, so the one to take out is found by its id.
+        ScheduleItem held = null;
         if (list != null) {
-            list.remove(item);
+            for (ScheduleItem each : list) {
+                if (each.getId().equals(item.getId())) {
+                    held = each;
+                    break;
+                }
+            }
+            if (held != null) {
+                list.remove(held);
+            }
         }
+        final ScheduleItem taken = held;
         fireChanged();
         source.deleteEvent(cal, e.getId(), mutationScope, e.getVersion()).except(new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable err) {
                 lastError = err;
                 Log.e(err);
-                if (list != null) {
-                    list.add(item);
+                // Back at once if nothing was loaded in between, and then
+                // whatever the source really holds.
+                if (taken != null && items.get(cal) == list && !list.contains(taken)) { //NOPMD CompareObjectsWithEquals - the same list, not an equal one
+                    list.add(taken);
                 }
                 fireChanged();
+                load();
             }
         });
         return true;

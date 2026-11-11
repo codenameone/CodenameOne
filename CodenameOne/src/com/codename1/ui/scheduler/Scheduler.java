@@ -143,7 +143,24 @@ public class Scheduler extends Container {
     private final ScheduleChangeListener modelListener = new ScheduleChangeListener() {
         @Override
         public void scheduleChanged(ScheduleModel m) {
+            // A model that loads again makes new items for the same things:
+            // the selection follows the id, or is gone with the item.
+            if (selected != null) {
+                selected = again(m, selected);
+            }
             refresh();
+        }
+
+        private ScheduleItem again(ScheduleModel m, ScheduleItem was) {
+            List<ScheduleItem> near = new ArrayList<ScheduleItem>();
+            long span = Math.max(TimeMath.DAY, visibleEnd - visibleStart);
+            m.getItems(Math.min(visibleStart, was.getStart()) - span, Math.max(visibleEnd, was.getEnd()) + span, near);
+            for (ScheduleItem item : near) {
+                if (item == was || item.getId().equals(was.getId())) { //NOPMD CompareObjectsWithEquals - the very item is the common case
+                    return item;
+                }
+            }
+            return null;
         }
     };
 
@@ -316,6 +333,11 @@ public class Scheduler extends Container {
             model.addChangeListener(modelListener);
         }
         apply();
+        if (model != null && visibleEnd > visibleStart) {
+            // The range has not moved, so apply told nobody; but this model
+            // has never heard it, and one that loads would load nothing.
+            model.setVisibleRange(visibleStart - (visibleEnd - visibleStart), visibleEnd + (visibleEnd - visibleStart));
+        }
     }
 
     /// Reads the model again. A model that fires its change listeners needs
@@ -534,8 +556,8 @@ public class Scheduler extends Container {
                 // the next step is there before it is asked for.
                 model.setVisibleRange(from - (to - from), to + (to - from));
             }
-            for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-                listeners.get(i).visibleRangeChanged(this, from, to);
+            for (SchedulerListener l : told()) {
+                l.visibleRangeChanged(this, from, to);
             }
         }
         repaint();
@@ -586,9 +608,10 @@ public class Scheduler extends Container {
         if (z == null) {
             throw new IllegalArgumentException("zone");
         }
-        long at = getDate();
+        // The same date in the new zone. The instant that date started at
+        // in the old zone may be the day before in the new one, and going by
+        // it would step back a day with every change to a zone further west.
         zone = z;
-        anchorDay = TimeMath.epochDay(at, zone);
         apply();
     }
 
@@ -759,26 +782,33 @@ public class Scheduler extends Container {
         listeners.remove(l);
     }
 
+    // The listeners as they are now: one that removes itself, or another,
+    // while it is told does not make the loop skip the one after it, which
+    // for `itemChanging` would be a refusal nobody heard.
+    private SchedulerListener[] told() {
+        return listeners.toArray(new SchedulerListener[listeners.size()]);
+    }
+
     void viewSelected(ScheduleItem item) {
         if (selected == item) { //NOPMD CompareObjectsWithEquals - the selection is this very object
             return;
         }
         selected = item;
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            listeners.get(i).itemSelected(this, item);
+        for (SchedulerListener l : told()) {
+            l.itemSelected(this, item);
         }
         repaint();
     }
 
     void viewOpened(ScheduleItem item) {
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            listeners.get(i).itemOpened(this, item);
+        for (SchedulerListener l : told()) {
+            l.itemOpened(this, item);
         }
     }
 
     void viewRange(long start, long end, String resourceId) {
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            listeners.get(i).rangeSelected(this, start, end, resourceId);
+        for (SchedulerListener l : told()) {
+            l.rangeSelected(this, start, end, resourceId);
         }
         if (model != null) {
             ScheduleItem made = model.createItem(start, end, resourceId);
@@ -790,8 +820,8 @@ public class Scheduler extends Container {
     }
 
     boolean viewChanged(ScheduleItem item, long start, long end, String resourceId) {
-        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
-            if (!listeners.get(i).itemChanging(this, item, start, end, resourceId)) {
+        for (SchedulerListener l : told()) {
+            if (!l.itemChanging(this, item, start, end, resourceId)) {
                 repaint();
                 return false;
             }

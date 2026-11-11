@@ -95,6 +95,23 @@ class MaterialDateTimePicker extends Container implements InternalPickerWidget {
         revalidateLater();
     }
 
+    /// Whether what is typed in the date and in the time can be confirmed;
+    /// the part that cannot is the one shown.
+    boolean acceptInput() {
+        if (!date.acceptInput()) {
+            showTime(false);
+            return false;
+        }
+        if (!time.acceptInput()) {
+            showTime(true);
+            return false;
+        }
+        return true;
+    }
+
+    // A wall-clock time that does not exist on the day, the hour a clock
+    // skips in spring, becomes the instant the platform's calendar makes of
+    // it. That is the platform's rule for every date in the application.
     @Override
     public Object getValue() {
         Calendar c = Calendar.getInstance();

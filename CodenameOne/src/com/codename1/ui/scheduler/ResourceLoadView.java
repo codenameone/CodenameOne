@@ -145,7 +145,7 @@ final class ResourceLoadView extends ScrollSurface {
         return 28 * TimeMath.DAY;
     }
 
-    private void profile(ProjectModel model, List<ScheduleResource> resources, int left, int right) {
+    private void profile(List<ScheduleResource> resources, int left, int right) {
         TimeAxis axis = chart.axis();
         long bucket = bucketSize();
         long from = TimeMath.startOfDay(axis.time(Math.max(0, left)), axis.getZone());
@@ -160,11 +160,9 @@ final class ResourceLoadView extends ScrollSurface {
                 && bucket == profileBucket && count == profileCount) {
             return;
         }
-        float[][] p = new float[resources.size()][];
-        for (int i = 0; i < p.length; i++) {
-            p[i] = ResourceLeveler.loadProfile(model, resources.get(i).getId(), from, from + count * bucket, count);
-        }
-        profile = p;
+        // A row's load is worked out when the row is first painted: a
+        // project has more resources than a screen has rows.
+        profile = new float[resources.size()][];
         profileFrom = from;
         profileBucket = bucket;
         profileCount = count;
@@ -192,7 +190,7 @@ final class ResourceLoadView extends ScrollSurface {
         TimeAxis axis = chart.axis();
         axis.paintOffHours(g, model.getCalendar(), Look.style("SchedulerOffHours"), x, cy, ch, cx, cx + cw);
         axis.paintGrid(g, Look.mix(row.getBgColor(), row.getFgColor(), 45), row.getBgColor(), x, cy, ch, cx, cx + cw);
-        profile(model, resources, cx - x, cx + cw - x);
+        profile(resources, cx - x, cx + cw - x);
         int firstRow = Math.max(0, (cy - y) / rowH);
         int lastRow = Math.min(resources.size() - 1, (cy + ch - y) / rowH);
         int pad = Math.max(1, Look.mm(0.6f));
@@ -202,6 +200,11 @@ final class ResourceLoadView extends ScrollSurface {
             ScheduleResource res = resources.get(r);
             float capacity = res.getCapacity();
             float[] units = profile[r];
+            if (units == null) {
+                units = ResourceLeveler.loadProfile(model, res.getId(), profileFrom,
+                        profileFrom + profileCount * profileBucket, profileCount);
+                profile[r] = units;
+            }
             float peak = capacity;
             for (float unit : units) {
                 peak = Math.max(peak, unit);

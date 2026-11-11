@@ -143,8 +143,22 @@ class MaterialPickerTest extends UITestBase {
         assertTrue(p.errorText().length() > 0);
         p.inputField().setText("12");
         assertTrue(p.errorText().length() > 0);
+        assertFalse(p.acceptInput(), "text that is no date is not confirmed");
+        // A keyboard of digits has no separator: eight digits are a date.
+        String digits = p.typedForm(2026, 3, 14).replace("/", "").replace(".", "").replace("-", "");
+        if (digits.length() == 8) {
+            p.inputField().setText(digits);
+            assertEquals(date(2026, 3, 14, 8, 0), p.getDate());
+            assertTrue(p.acceptInput());
+        }
         p.setInputMode(false);
-        assertEquals(2, p.getShownMonth());
+        assertEquals(p.getDate().getTime() == date(2026, 3, 14, 8, 0).getTime() ? 3 : 2, p.getShownMonth());
+
+        // A date outside the years on offer brings them to it.
+        p.setDate(date(1850, 5, 15, 8, 0));
+        p.page(1);
+        assertEquals(1850, p.getShownYear());
+        assertEquals(6, p.getShownMonth());
     }
 
     @FormTest
@@ -217,6 +231,15 @@ class MaterialPickerTest extends UITestBase {
         assertEquals(5, p.getMinute());
         p.hourInputField().setText("31");
         assertEquals(21, p.getHour(), "no such hour");
+        assertFalse(p.acceptInput(), "what is typed is not a time");
+        assertEquals("21", p.hourInputField().getText(), "and the field says again what is set");
+        assertTrue(p.acceptInput());
+        // The step is for the hand: a minute that is typed, or set, is kept.
+        p.setMinuteStep(5);
+        p.minuteInputField().setText("07");
+        assertEquals(7, p.getMinute());
+        p.setTime(10, 7);
+        assertEquals(7, p.getMinute());
         p.setInputMode(false);
         assertFalse(p.dialPane().isHidden());
     }
@@ -330,6 +353,19 @@ class MaterialPickerTest extends UITestBase {
             tapComponent(named(time.getMaterialDialog(), "PickerMaterialOk"));
             flushSerialCalls();
             assertEquals(20 * 60 + 45, time.getTime());
+
+            // Looking at a time and confirming it changes nothing, and the
+            // last hour of the range is one that can be chosen.
+            time.setHourRange(9, 17);
+            time.setTime(17 * 60 + 32);
+            open(time);
+            Dialog first = time.getMaterialDialog();
+            open(time);
+            assertTrue(first == time.getMaterialDialog(), "asked twice, one dialog");
+            tapComponent(named(first, "PickerMaterialOk"));
+            flushSerialCalls();
+            assertNull(time.getMaterialDialog());
+            assertEquals(17 * 60 + 32, time.getTime());
 
             Picker both = new Picker();
             both.setUseLightweightPopup(true);

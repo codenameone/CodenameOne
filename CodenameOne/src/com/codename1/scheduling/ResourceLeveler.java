@@ -138,7 +138,8 @@ public final class ResourceLeveler {
         List<GanttTask> conflict = new ArrayList<GanttTask>();
         // Every step moves one task later, so this ends by itself; the limit
         // is for a calendar or a set of constraints that makes it crawl.
-        int limit = 200 + leaves.size() * leaves.size() * 4;
+        long steps = 200L + 4L * leaves.size() * leaves.size();
+        int limit = steps > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) steps;
         for (int step = 0; step < limit; step++) {
             ResourceOverallocation first = null;
             for (ScheduleResource resource : resources) {

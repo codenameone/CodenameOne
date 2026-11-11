@@ -247,6 +247,15 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
         c.setTime(date);
         read(c);
         clamp();
+        // The years on offer reach the date that is set, or its own month
+        // could not be paged to and its own text would not be a date.
+        if (year < startYear) {
+            startYear = year;
+            years = null;
+        } else if (year > endYear) {
+            endYear = year;
+            years = null;
+        }
         shownYear = year;
         shownMonth = month;
         refresh();
@@ -287,8 +296,25 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             maxKey = minKey;
         }
         clamp();
-        years = null;
+        newYears();
         refresh();
+    }
+
+    // The grid of years is built for the limits it had; one that is on
+    // screen is built again for the new ones.
+    private void newYears() {
+        years = null;
+        if (mode == YEARS) {
+            mode = DAYS;
+            show(YEARS);
+        }
+    }
+
+    /// Whether what is typed is a date that can be chosen. When it is not,
+    /// the message under the field says so and the date is the one from
+    /// before, which is not what the field reads.
+    boolean acceptInput() {
+        return mode != INPUT || error.getText().length() == 0;
     }
 
     /// The years the grid of years offers, 1900 to 2100 unless set. A date
@@ -296,7 +322,9 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
     public void setYearRange(int first, int last) {
         startYear = first;
         endYear = Math.max(first, last);
-        years = null;
+        shownYear = Math.max(startYear, Math.min(endYear, shownYear));
+        newYears();
+        refresh();
     }
 
     /// The day a week starts on, as `java.util.Calendar` numbers them:
@@ -552,6 +580,28 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             }
         }
         int[] o = order();
+        if (!bad && count == 1 && text.length() == 8) {
+            // A keyboard of digits only has no separator to type: eight
+            // digits are the three parts, the year four of them.
+            boolean digits = true;
+            for (int i = 0; i < 8; i++) {
+                char ch = text.charAt(i);
+                digits = digits && ch >= '0' && ch <= '9';
+            }
+            if (digits) {
+                int at = 0;
+                for (int part = 0; part < 3; part++) {
+                    int width = part == o[0] ? 4 : 2;
+                    int v = 0;
+                    for (int i = 0; i < width; i++) {
+                        v = v * 10 + (text.charAt(at + i) - '0');
+                    }
+                    numbers[part] = v;
+                    at += width;
+                }
+                count = 3;
+            }
+        }
         int y = numbers[o[0]];
         int m = numbers[o[1]] - 1;
         int d = numbers[o[2]];

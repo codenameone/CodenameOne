@@ -248,6 +248,114 @@ class GanttTest extends UITestBase {
     }
 
     @FormTest
+    void aMoveSnapsTheDistanceAndNotTheStart() {
+        ProjectModel p = project();
+        GanttTask a = new GanttTask("a", "a", D / 2);
+        p.addTask(a);
+        GanttTask b = task(p, null, "b", 1);
+        p.link(a, b);
+        p.update();
+        assertEquals(at(5, 13), b.getStart());
+        Gantt g = show(p);
+        GanttChart chart = g.surface();
+        int[] r = bar(chart, b);
+        int y = r[1] + r[3] / 4;
+        drag(chart, r[0] + r[2] / 2, y, r[0] + r[2] / 2 + dayPixels(chart) / 4, y);
+        assertEquals(at(5, 13), b.getStart(), "less than half a day is no move");
+        assertEquals(GanttTask.Constraint.AS_SOON_AS_POSSIBLE, b.getConstraint());
+
+        chart.scrollTo(0, 0);
+        r = bar(chart, b);
+        drag(chart, r[0] + r[2] / 2, y, r[0] + r[2] / 2 + dayPixels(chart), y);
+        assertEquals(at(6, 13), b.getStart(), "a day later, at the hour it started at");
+    }
+
+    @FormTest
+    void aManualTaskKeepsItsSpanWhenItIsMoved() {
+        ProjectModel p = project();
+        GanttTask m = new GanttTask("m", "m", 0);
+        m.setManuallyScheduled(true);
+        m.setDates(at(5, 9), at(6, 17));
+        p.addTask(m);
+        p.update();
+        Gantt g = show(p);
+        GanttChart chart = g.surface();
+        int[] r = bar(chart, m);
+        int y = r[1] + r[3] / 4;
+        drag(chart, r[0] + r[2] / 2, y, r[0] + r[2] / 2 + dayPixels(chart), y);
+        assertEquals(at(6, 9), m.getStart());
+        assertEquals(at(7, 17), m.getEnd());
+    }
+
+    @FormTest
+    void aMoveKeepsTheKindOfConstraintATaskHas() {
+        ProjectModel p = project();
+        GanttTask a = task(p, null, "a", 2);
+        a.setConstraint(GanttTask.Constraint.MUST_START_ON, at(5, 9));
+        p.update();
+        Gantt g = show(p);
+        GanttChart chart = g.surface();
+        int[] r = bar(chart, a);
+        int y = r[1] + r[3] / 4;
+        drag(chart, r[0] + r[2] / 2, y, r[0] + r[2] / 2 + dayPixels(chart), y);
+        assertEquals(GanttTask.Constraint.MUST_START_ON, a.getConstraint());
+        assertEquals(at(6, 9), a.getConstraintDate());
+        assertEquals(at(6, 9), a.getStart());
+    }
+
+    @FormTest
+    void aListenerRefusesProgressAndOneThatLeavesDoesNotSilenceTheNext() {
+        ProjectModel p = project();
+        GanttTask a = task(p, null, "a", 2);
+        p.update();
+        final Gantt g = show(p);
+        GanttChart chart = g.surface();
+        final int[] asked = new int[1];
+        g.addGanttListener(new GanttAdapter() {
+            @Override
+            public boolean taskChanging(Gantt gantt, GanttTask task, long start, long end) {
+                g.removeGanttListener(this);
+                return true;
+            }
+        });
+        g.addGanttListener(new GanttAdapter() {
+            @Override
+            public boolean taskChanging(Gantt gantt, GanttTask task, long start, long end) {
+                asked[0]++;
+                return false;
+            }
+        });
+        g.setSelectedTask(a);
+        int[] r = bar(chart, a);
+        int y = r[1] + r[3];
+        drag(chart, r[0], y, r[0] + r[2] / 2, y);
+        assertEquals(1, asked[0]);
+        assertEquals(0, a.getPercentComplete());
+    }
+
+    @FormTest
+    void aTaskRemovedWhileItIsHeldEndsTheDrag() {
+        ProjectModel p = project();
+        GanttTask a = task(p, null, "a", 2);
+        task(p, null, "b", 1);
+        p.update();
+        Gantt g = show(p);
+        GanttChart chart = g.surface();
+        int[] r = bar(chart, a);
+        int y = r[1] + r[3] / 4;
+        int ax = chart.getAbsoluteX();
+        int ay = chart.getAbsoluteY();
+        chart.pointerPressed(ax + r[0] + r[2] / 2, ay + y);
+        chart.pointerDragged(ax + r[0] + r[2] / 2 + dayPixels(chart) / 2, ay + y);
+        p.removeTask(a);
+        p.update();
+        chart.pointerDragged(ax + r[0] + r[2] / 2 + dayPixels(chart), ay + y);
+        chart.pointerReleased(ax + r[0] + r[2] / 2 + dayPixels(chart), ay + y);
+        assertFalse(chart.isDragEditing());
+        assertEquals(GanttTask.Constraint.AS_SOON_AS_POSSIBLE, a.getConstraint());
+    }
+
+    @FormTest
     void draggingTheEndOfABarChangesItsDuration() {
         ProjectModel p = project();
         GanttTask a = task(p, null, "a", 2);

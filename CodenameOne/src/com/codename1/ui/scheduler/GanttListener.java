@@ -33,7 +33,8 @@ public interface GanttListener {
     /// A task was double tapped, in the table or on the chart.
     void taskOpened(Gantt gantt, GanttTask task);
 
-    /// A task was dragged or resized and is about to be given new dates. The
+    /// A task was dragged or resized and is about to be given new dates, or
+    /// its progress was dragged, which offers the dates it already has. The
     /// project is scheduled again afterwards, so the dates it ends up with
     /// are these only where its links and its calendar allow them.
     ///
