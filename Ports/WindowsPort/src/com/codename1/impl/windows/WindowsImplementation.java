@@ -2278,6 +2278,13 @@ public class WindowsImplementation extends CodenameOneImplementation {
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        // The kiosk target edits through the shared on-screen keyboard: a panel
+        // usually has no physical keyboard, and the system touch keyboard is not
+        // dependable once Shell Launcher has replaced explorer.
+        if (Embedded.VALUE) {
+            com.codename1.impl.EmbeddedTextEditor.edit(cmp, maxSize, constraint, text);
+            return;
+        }
         // Tapping straight from one field into another: finish the first cleanly
         // before overlaying the new one, so two controls never float at once.
         if (editPeer != 0) {
@@ -4154,5 +4161,31 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return databaseName;
         }
         return resolveDatabasePath(databaseName);
+    }
+
+    /// True on the embedded (kiosk) target. Fixed at build time; the port's JVM
+    /// unit tests run with no native library, so a missing native reads as "not
+    /// embedded". Caught as LinkageError: the device class library has no
+    /// UnsatisfiedLinkError.
+    private static final class Embedded {
+        static final boolean VALUE = query();
+
+        private static boolean query() {
+            try {
+                return WindowsNative.isEmbeddedDisplay();
+            } catch (LinkageError notLinked) {
+                return false;
+            }
+        }
+    }
+
+    private WindowsHardware hardware;
+
+    @Override
+    public com.codename1.hardware.Hardware getHardware() {
+        if (hardware == null) {
+            hardware = new WindowsHardware();
+        }
+        return hardware;
     }
 }

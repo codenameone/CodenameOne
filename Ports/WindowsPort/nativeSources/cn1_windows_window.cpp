@@ -972,8 +972,22 @@ int cn1WinCreateWindow(const char* utf8Title, int width, int height) {
     /* WS_CLIPCHILDREN so the Direct2D present does not paint over native child
      * controls overlaid on the form (the WebView2 browser peer and the EDIT
      * control used for native text editing). */
-    cn1Win.hwnd = CreateWindowExW(0, L"CodenameOneWindow", wTitle,
-            WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+    DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN;
+    DWORD exStyle = 0;
+    int x = CW_USEDEFAULT;
+    int y = CW_USEDEFAULT;
+    /* The kiosk target covers a whole monitor with a borderless window
+     * (cn1_windows_embedded.cpp); the requested size is the desktop's. */
+    if (cn1WinEmbeddedActive() && !cn1Win.offscreenCapture) {
+        RECT rc;
+        cn1WinEmbeddedPlaceWindow(&style, &exStyle, &rc);
+        x = rc.left;
+        y = rc.top;
+        width = rc.right - rc.left;
+        height = rc.bottom - rc.top;
+    }
+    cn1Win.hwnd = CreateWindowExW(exStyle, L"CodenameOneWindow", wTitle,
+            style, x, y, width, height,
             NULL, NULL, hInstance, NULL);
     free(wTitle);
     return cn1Win.hwnd != NULL ? 1 : 0;
@@ -1120,6 +1134,10 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     }
 
 
+    if (cn1WinEmbeddedActive()) {
+        cn1WinEmbeddedRedirectLog();
+    }
+
     /* Headless screenshot mode: no window; render into an offscreen WIC bitmap
      * that headlessTick later encodes to PNG. The EDT paints through the same
      * getWindowGraphics + flushGraphics path as on-screen. */
@@ -1205,6 +1223,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     if (!cn1Win.offscreenCapture) {
         ShowWindow(cn1Win.hwnd, SW_SHOW);
         UpdateWindow(cn1Win.hwnd);
+        if (cn1WinEmbeddedActive()) {
+            cn1WinEmbeddedWindowShown(cn1Win.hwnd);
+        }
         cn1WindowsLog("initDisplay: window shown");
     } else {
         cn1WindowsLog("initDisplay: offscreen capture -- window kept hidden");
@@ -1219,6 +1240,12 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayWidth___R_int(CODENA
  * mm-based theme metrics correctly instead of using the mobile density
  * heuristic, which over-scales everything. */
 JAVA_INT com_codename1_impl_windows_WindowsNative_screenDpi___R_int(CODENAME_ONE_THREAD_STATE) {
+    /* A kiosk panel that misreports its size gets its density from the board
+     * profile or CN1_DPI instead (cn1_windows_embedded.cpp). */
+    int forced = cn1WinEmbeddedDpi();
+    if (forced > 0) {
+        return (JAVA_INT) forced;
+    }
     // LOGPIXELSX reports system DPI even for a per-monitor-aware window.
     typedef UINT (WINAPI *GetDpiFn)(HWND);
     GetDpiFn getDpi = (GetDpiFn)GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow");

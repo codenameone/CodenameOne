@@ -1491,7 +1491,19 @@ public class ByteCodeTranslator {
                 writer.append("            string(REPLACE \"/MDd\" \"/MTd\" ${CN1_FLAG_VAR} \"${${CN1_FLAG_VAR}}\")\n");
                 writer.append("        endforeach()\n");
                 writer.append("    else()\n");
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp advapi32 dwmapi)\n");
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp advapi32 dwmapi dxva2)\n");
+                writer.append("    endif()\n");
+                // CN1_WINDOWS_EMBEDDED (WindowsNativeBuilder passes it for
+                // windows.embedded=true) is the kiosk target: a borderless window
+                // over a whole monitor, the shell shortcuts filtered, the shared
+                // on-screen keyboard (cn1_windows_embedded.cpp). The board profile's
+                // defaults ride in CN1_WINDOWS_EMBEDDED_DEFINES as CN1_DEFAULT_*.
+                // dxva2, above, is the DDC/CI backlight of cn1_windows_hardware.cpp,
+                // which a desktop build answers through as well.
+                writer.append("    option(CN1_WINDOWS_EMBEDDED \"Build the embedded (kiosk) target\" OFF)\n");
+                writer.append("    set(CN1_WINDOWS_EMBEDDED_DEFINES \"\" CACHE STRING \"CN1_DEFAULT_* defaults of the kiosk target, semicolon separated\")\n");
+                writer.append("    if(CN1_WINDOWS_EMBEDDED AND NOT CN1_WINDOWS_UWP)\n");
+                writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_WINDOWS_EMBEDDED=1 ${CN1_WINDOWS_EMBEDDED_DEFINES})\n");
                 writer.append("    endif()\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a

@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.linux;
+package com.codename1.impl;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -35,13 +35,14 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 
-/// Text editing on the embedded Linux target, where there is no native text
-/// widget and usually no physical keyboard. A field being edited opens a
+/// Text editing on the embedded targets (Linux on DRM/fbdev, Windows in kiosk
+/// mode), where there is no native text widget or no system touch keyboard to
+/// rely on, and usually no physical keyboard. A field being edited opens a
 /// dialog holding a lightweight copy of it and an on-screen keyboard; a
 /// physical keyboard types into the same field, so a panel with one works the
 /// same way. Done delivers the text through `Display.onEditingComplete`,
 /// Cancel restores the original.
-final class LinuxEmbeddedEditor {
+public final class EmbeddedTextEditor {
     private static final String[][] LETTERS = {
         {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
         {"a", "s", "d", "f", "g", "h", "j", "k", "l", "'"},
@@ -53,10 +54,12 @@ final class LinuxEmbeddedEditor {
         {"!", "?", ";", "\"", "+", "=", "_", "<", ">", "~"}
     };
 
-    private LinuxEmbeddedEditor() {
+    private EmbeddedTextEditor() {
     }
 
-    static void edit(final Component cmp, int maxSize, int constraint, final String text) {
+    /// Opens the editor for `cmp`; the arguments are those of
+    /// `CodenameOneImplementation.editString`.
+    public static void edit(final Component cmp, int maxSize, int constraint, final String text) {
         final boolean multiLine = cmp instanceof TextArea && !((TextArea) cmp).isSingleLineTextArea();
         final TextField field = new TextField(text == null ? "" : text);
         field.setConstraint(constraint);
@@ -78,10 +81,10 @@ final class LinuxEmbeddedEditor {
             public void run() {
                 keys.removeAll();
                 String[][] rows = symbols[0] ? SYMBOLS : LETTERS;
-                for (int r = 0; r < rows.length; r++) {
-                    Container row = new Container(new GridLayout(1, rows[r].length));
-                    for (int k = 0; k < rows[r].length; k++) {
-                        String label = rows[r][k];
+                for (String[] keyRow : rows) {
+                    Container row = new Container(new GridLayout(1, keyRow.length));
+                    for (String key : keyRow) {
+                        String label = key;
                         if (shift[0] && !symbols[0]) {
                             label = upper(label);
                         }
@@ -150,6 +153,9 @@ final class LinuxEmbeddedEditor {
                 }
             }
         });
+        // Docked to the bottom edge by showPacked below: framework chrome, never an
+        // operating system window of its own, whatever the theme defaults to.
+        dlg.setNativeWindowMode(false);
         dlg.setDisposeWhenPointerOutOfBounds(false);
         dlg.setScrollable(false);
         dlg.getContentPane().setPreferredH(Display.getInstance().getDisplayHeight() / 2);

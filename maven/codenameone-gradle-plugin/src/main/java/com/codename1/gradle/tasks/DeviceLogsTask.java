@@ -44,7 +44,8 @@ public abstract class DeviceLogsTask extends DefaultTask {
         File buildDir = getProject().getLayout().getBuildDirectory().get().getAsFile();
         String binary = deviceProperty("binary");
         File bin = binary != null ? getProject().file(binary)
-                : DeviceDeployer.findBinary(buildDir, new File(buildDir, "linux-native"));
+                : DeviceDeployer.findBinary(buildDir, new File(buildDir, "linux-native"),
+                        new File(buildDir, "windows-native"));
         String port = deviceProperty("port");
         try {
             new DeviceDeployer(new GradleLog(getLogger())).host(deviceProperty("host")).user(deviceProperty("user"))

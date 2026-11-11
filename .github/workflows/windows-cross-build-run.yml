@@ -171,6 +171,10 @@ jobs:
           # HTTP/1.1, which avoids the framing errors) and let cargo retry.
           CARGO_NET_RETRY: "10"
           CARGO_HTTP_MULTIPLEXING: "false"
+        # --manifest-version 16 (SDK 10.0.22621): the current VS 17 manifest
+        # lists Win11SDK_10.0.26100 without the per-arch header packages xwin
+        # 0.9.0 looks for, so the default splat fails with "unable to find
+        # x86_64 headers". Every target here builds against 22621.
         run: |
           set -e
           # Retry the whole install/splat a few times for non-cargo download
@@ -178,7 +182,7 @@ jobs:
           n=0
           until [ "$n" -ge 3 ]; do
             cargo install xwin --version 0.9.0 --locked \
-              && xwin --accept-license --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk" \
+              && xwin --accept-license --manifest-version 16 --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk" \
               && break
             n=$((n+1))
             echo "xwin install/splat attempt $n failed; retrying after backoff..."
