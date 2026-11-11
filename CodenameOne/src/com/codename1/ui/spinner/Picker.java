@@ -140,6 +140,8 @@ public class Picker extends Button {
     /// so that setters propagate into the visible wheels and getters read the wheel
     /// position. Null whenever the popup is not showing.
     private InternalPickerWidget currentSpinner;
+    /// The Material dialog while it is open. See `showMaterialDialog`.
+    private Dialog materialDialog;
     /// Container for `currentSpinner` while the lightweight popup is visible.
     /// Public setters that stage a new live spinner value need to revalidate
     /// this container so Spinner3D recalculates and paints the new wheel state.
@@ -305,6 +307,16 @@ public class Picker extends Button {
                 // which resolves its host from the component and lands in the right
                 // one.
                 boolean inWindow = getTopLevelContainer() instanceof com.codename1.ui.Window;
+                // A theme that asks for Material pickers gets a calendar or a clock
+                // face in a dialog where it would have got wheels in a sheet. Not in
+                // a desktop window: the dialog is a form of the main surface, which
+                // is the very thing the comment above keeps a window's picker off.
+                if (!inWindow && isMaterialType(type) && isMaterialStyle()
+                        && (useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type))) {
+                    showMaterialDialog();
+                    evt.consume();
+                    return;
+                }
                 if ((useLightweightPopup || inWindow
                         || !Display.getInstance().isNativePickerTypeSupported(type))
                         && isLightweightModeSupportedForType(type)) {
@@ -1027,6 +1039,151 @@ public class Picker extends Button {
         updateValue();
     }
 
+    // ------------------------------------------------------ Material style
+
+    /// The theme constant that chooses what a lightweight date or time picker
+    /// looks like: `material` for a calendar and a clock face in a dialog,
+    /// anything else for wheels.
+    private boolean isMaterialStyle() {
+        return "material".equals(getUIManager().getThemeConstant("pickerStyle", "wheel"));
+    }
+
+    private static boolean isMaterialType(int type) {
+        return type == Display.PICKER_TYPE_DATE || type == Display.PICKER_TYPE_TIME
+                || type == Display.PICKER_TYPE_DATE_AND_TIME || type == Display.PICKER_TYPE_CALENDAR;
+    }
+
+    private void limit(MaterialDatePicker d) {
+        if (startDate != null || endDate != null) {
+            d.setDateRange(startDate, endDate);
+        }
+    }
+
+    private void limit(MaterialTimePicker t) {
+        t.setShowMeridiem(showMeridiem);
+        t.setMinuteStep(minuteStep);
+        if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
+            t.setHourRange(minHour, maxHour);
+        }
+    }
+
+    private InternalPickerWidget createMaterialWidget() {
+        InternalPickerWidget out;
+        if (type == Display.PICKER_TYPE_TIME) {
+            MaterialTimePicker t = new MaterialTimePicker();
+            limit(t);
+            out = t;
+            out.setValue(value instanceof Integer ? value : Integer.valueOf(0));
+        } else {
+            if (type == Display.PICKER_TYPE_DATE_AND_TIME) {
+                MaterialDateTimePicker dt = new MaterialDateTimePicker();
+                limit(dt.datePicker());
+                limit(dt.timePicker());
+                out = dt;
+            } else {
+                MaterialDatePicker d = new MaterialDatePicker();
+                limit(d);
+                out = d;
+            }
+            out.setValue(value instanceof Date ? value : new Date());
+        }
+        return out;
+    }
+
+    /// The Material dialog while it is open, or null.
+    Dialog getMaterialDialog() {
+        return materialDialog;
+    }
+
+    /// The widget of the popup or dialog that is open, or null.
+    InternalPickerWidget getOpenWidget() {
+        return currentSpinner;
+    }
+
+    private void showMaterialDialog() {
+        final InternalPickerWidget widget = createMaterialWidget();
+        final Dialog dlg = new Dialog(new BorderLayout());
+        dlg.setDialogUIID("PickerMaterialDialog");
+        dlg.getTitleArea().setHidden(true);
+        dlg.getTitleComponent().setHidden(true);
+        // Closed by its two buttons and by Back, each of which says whether the
+        // value is kept. A tap outside would close it saying neither.
+        dlg.setDisposeWhenPointerOutOfBounds(false);
+        dlg.add(BorderLayout.CENTER, (Component) widget);
+        Button cancel = new Button(getUIManager().localize("cancel", "Cancel"), "PickerMaterialButton");
+        Button ok = new Button(getUIManager().localize("ok", "OK"), "PickerMaterialButton");
+        cancel.setName("PickerMaterialCancel");
+        ok.setName("PickerMaterialOk");
+        cancel.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                endMaterialDialog(dlg, widget, false);
+            }
+        });
+        ok.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                endMaterialDialog(dlg, widget, true);
+            }
+        });
+        dlg.setBackCommand(new Command("") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                endMaterialDialog(dlg, widget, false);
+            }
+        });
+        Container buttons = new Container(new BorderLayout());
+        buttons.setUIID("PickerMaterialButtons");
+        if (widget instanceof MaterialTimePicker) {
+            // Material puts the keyboard switch on the row of the buttons.
+            Button mode = ((MaterialTimePicker) widget).getInputModeButton();
+            Container was = mode.getParent();
+            mode.remove();
+            if (was != null) {
+                was.setHidden(true);
+            }
+            buttons.add(BorderLayout.WEST, mode);
+        }
+        buttons.add(BorderLayout.EAST, BoxLayout.encloseX(cancel, ok));
+        dlg.add(BorderLayout.SOUTH, buttons);
+        currentSpinner = widget;
+        materialDialog = dlg;
+        dlg.showPacked(BorderLayout.CENTER, false);
+    }
+
+    private void endMaterialDialog(Dialog dlg, InternalPickerWidget widget, boolean commit) {
+        if (materialDialog != dlg) { //NOPMD CompareObjectsWithEquals - this very dialog, closed once
+            return;
+        }
+        materialDialog = null;
+        if (currentSpinner == widget) { //NOPMD CompareObjectsWithEquals
+            // Cleared before the value is read back, as endEditing does, so a
+            // listener sees the committed value and not the closing widget's.
+            currentSpinner = null;
+        }
+        if (commit) {
+            value = widget.getValue();
+            markDateExplicitlySetIfDateType();
+        } else {
+            value = preEditValue;
+            dateValueExplicitlySet = preEditDateValueExplicitlySet;
+        }
+        preEditValue = null;
+        preEditDateValueExplicitlySet = false;
+        updateValue();
+        dlg.dispose();
+        if (commit) {
+            // (-99, -99) tells the picker's own listener that this is the
+            // result and not another request to open. See ignoreActionEvent.
+            fireActionEvent(-99, -99);
+        }
+        if (stopEditingCallback != null) {
+            Runnable r = stopEditingCallback;
+            stopEditingCallback = null;
+            r.run();
+        }
+    }
+
     private Container createLightweightPopupButtonRow(int placement, boolean isTablet, Container spinnerContainer) {
         Container left = null;
         Container center = null;
@@ -1344,6 +1501,12 @@ public class Picker extends Button {
     @Override
     public void stopEditing(Runnable onFinish) {
         stopEditingCallback = onFinish;
+        if (materialDialog != null) {
+            // The Material dialog is no input device of the form; it is closed
+            // here, without keeping what it shows, and the callback run.
+            endMaterialDialog(materialDialog, currentSpinner, false);
+            return;
+        }
         // Through the top level, as registerAsInputDevice registers it: resolving a
         // Form here found nothing in a window, so stopEditing() did not close the
         // picker and never ran its callback.
