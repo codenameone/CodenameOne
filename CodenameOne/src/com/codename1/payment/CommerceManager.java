@@ -95,13 +95,18 @@ public final class CommerceManager {
     private static final String PROP_PUBLIC_KEY = "commerce.cloud.publicKey";
 
     // The production key of the Codename One Commerce service, base64 of the
-    // raw 32 byte Ed25519 key. This constant is the one place it goes. While
-    // it is empty and no PROP_PUBLIC_KEY is configured, no signed-envelope
-    // answer of the cloud is trusted: they are ignored, nothing is cached,
-    // the manager reports itself degraded and answers from the store
-    // directly. An unsigned answer is never taken, since anything between
-    // the device and the service could have written it.
-    private static final String DEFAULT_PUBLIC_KEY = "";
+    // raw 32 byte Ed25519 key. This constant is the one place it goes. With
+    // no key at all (a PROP_PUBLIC_KEY set to the empty string), no
+    // signed-envelope answer of the cloud is trusted: they are ignored,
+    // nothing is cached, the manager reports itself degraded and answers
+    // from the store directly. An unsigned answer is never taken, since
+    // anything between the device and the service could have written it.
+    private static final String DEFAULT_PUBLIC_KEY = "pIKY0AoLYMj6RbBSqTyDIlW7TQAlS6su/djHXTmoMP4=";
+
+    // The key used when PROP_PUBLIC_KEY is unset or empty. Always
+    // DEFAULT_PUBLIC_KEY in an application; the unit tests clear it to
+    // exercise the no-key path, which no shipped build can reach any more.
+    static String defaultPublicKey = DEFAULT_PUBLIC_KEY;
 
     // Storage entry holding the last accepted customer payload, one per app
     // user id.
@@ -406,6 +411,7 @@ public final class CommerceManager {
 
     /// Drops the shared instance so a test starts from a cold one.
     static synchronized void resetForTests() {
+        defaultPublicKey = DEFAULT_PUBLIC_KEY;
         instance = null;
         Analytics.setAttributionObserver(null);
     }
@@ -1660,7 +1666,7 @@ public final class CommerceManager {
     private static byte[] publicKey() {
         String k = Display.getInstance().getProperty(PROP_PUBLIC_KEY, DEFAULT_PUBLIC_KEY);
         if (k == null || k.length() == 0) {
-            k = DEFAULT_PUBLIC_KEY;
+            k = defaultPublicKey;
         }
         if (k.length() == 0) {
             return null;

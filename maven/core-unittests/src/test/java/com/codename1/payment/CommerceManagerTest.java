@@ -196,6 +196,7 @@ class CommerceManagerTest extends UITestBase {
     void withoutAKeyValidateIsSentAndItsAnswerIgnored() {
         Display.getInstance().setProperty("commerce.cloud.publicKey", "");
         CommerceManager.resetForTests();
+        CommerceManager.defaultPublicKey = "";
         List<String> bodies = recordValidate();
         mock("/validate", VALIDATE_ANSWER);
         validateOneReceipt();
@@ -309,6 +310,7 @@ class CommerceManagerTest extends UITestBase {
     @FormTest
     void noAnswerIsTrustedWhenNoKeyIsKnown() {
         Display.getInstance().setProperty("commerce.cloud.publicKey", "");
+        CommerceManager.defaultPublicKey = "";
         implementation.setNetworkMockHandler(null);
         mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "u1"), null));
         CommerceManager cm = CommerceManager.getInstance();
