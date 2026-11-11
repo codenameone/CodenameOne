@@ -320,6 +320,7 @@ public final class Management implements HttpServer.Handler {
                 out.put("database", db);
             }
             keyValue(out);
+            mail(out);
         } else {
             // Not attached yet: the server is still being put together.
             up = false;
@@ -345,6 +346,22 @@ public final class Management implements HttpServer.Handler {
             kv.put("error", String.valueOf(err.getMessage()));
         }
         out.put("keyValue", kv);
+    }
+
+    /// The mail transport's state, once this server has sent a mail. Reported,
+    /// not judged, for the reason the key/value store is: mail that cannot leave
+    /// waits in the outbox and is retried, and a replica is no better at
+    /// serving requests for being taken out of the load balancer meanwhile.
+    private void mail(Map out) {
+        MailRuntime.Probe probe = MailRuntime.probe();
+        if (probe == null) {
+            return;
+        }
+        Map mail = new LinkedHashMap();
+        mail.put("status", probe.isHealthy() ? "UP" : "DOWN");
+        mail.put("transport", probe.transport());
+        mail.put("pending", Integer.valueOf(probe.pending()));
+        out.put("mail", mail);
     }
 
     /// Whether the process should be left running, as a liveness probe asks:

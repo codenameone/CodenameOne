@@ -234,6 +234,30 @@ final class BackendWiringWriter {
                   .append(t.substring(space + 1)).append("());\n");
             }
         }
+        if (MvcTemplates.hasMailTemplates(model.ctx)) {
+            // The compiled templates are a class of the application's, which
+            // the mail support cannot name; this is how it reaches them.
+            sb.append("        com.codename1.impl.backend.MailRuntime.install(\n"
+                    + "                new com.codename1.impl.backend.MailRuntime.TemplateRenderer() {\n"
+                    + "                    @Override\n"
+                    + "                    public byte[] render(String view, "
+                    + "com.codename1.backend.mvc.Model model) {\n"
+                    + "                        return com.codename1.generated.mvc.Views.render(view, model);\n"
+                    + "                    }\n"
+                    + "                });\n");
+        }
+        if (model.usesMail()) {
+            // As for messaging: the outbox is kept in the server's data
+            // source, and only the transports the configuration names are
+            // referenced, so only those are compiled in.
+            sb.append("        com.codename1.backend.mail.Mailers.bindDataSource(dataSource);\n");
+            for (String t : model.mailTransports()) {
+                int space = t.indexOf(' ');
+                sb.append("        com.codename1.backend.mail.Mailers.register(")
+                  .append(BackendSources.quote(t.substring(0, space))).append(", new ")
+                  .append(t.substring(space + 1)).append("());\n");
+            }
+        }
         sb.append("        entities = environment.getEntityManager();\n");
         if (model.needsSession) {
             sb.append("        transactionSession = new com.codename1.impl.backend."
@@ -607,6 +631,9 @@ final class BackendWiringWriter {
             if ("session".equals(p.builtin)) {
                 return "transactionSession";
             }
+            if ("mailSender".equals(p.builtin)) {
+                return "new com.codename1.backend.mail.MailSender()";
+            }
             if ("messageTemplate".equals(p.builtin)) {
                 return "new com.codename1.backend.messaging.MessageTemplate()";
             }
@@ -859,6 +886,15 @@ final class BackendWiringWriter {
         }
         if (model.hasListeners()) {
             listeners(sb);
+        }
+        if (model.usesMail()) {
+            // Opened now and not at the first send: a mail the last run left
+            // in the outbox is sent by this one whether or not it sends any
+            // of its own.
+            sb.append("        if (dataSource != null "
+                    + "&& com.codename1.backend.mail.Mailers.isConfigured(config)) {\n"
+                    + "            com.codename1.backend.mail.Mailers.current();\n"
+                    + "        }\n");
         }
         // Then the runners, by @Order, and the ready listeners after them,
         // as Spring Boot runs them once the context is up.

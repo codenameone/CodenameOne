@@ -67,6 +67,18 @@ final class OutboxTransport extends MessageTransport {
         this.broker = broker;
         this.db = db;
         this.sweepAfter = Math.max(100, sweepAfterMillis);
+        // The table is made here, not by the first send. MySQL and MariaDB end
+        // the open transaction on any DDL, a CREATE TABLE IF NOT EXISTS of a
+        // table that exists included: a first send inside a transaction then
+        // wrote its row outside it, and a message the caller rolled back was
+        // relayed by the sweep. A database that is down now is tried again by
+        // the first send.
+        try {
+            ensureTable();
+        } catch (IOException | RuntimeException err) {
+            System.err.println("cn1: the messaging outbox table could not be created yet: "
+                    + err.getMessage());
+        }
     }
 
     @Override

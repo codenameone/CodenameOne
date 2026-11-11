@@ -1635,6 +1635,52 @@ public class BackendBeansTest {
         }
     }
 
+    /// Mail is wired by the same rule: the transport the configuration names
+    /// and no other, for a bean that is given a `MailSender` or a
+    /// configuration that names a mail server -- and nothing of it otherwise.
+    @Test
+    public void mailRegistersOnlyTheTransportsTheConfigurationNames() throws Exception {
+        String sender = PKG + "@Component public class Welcome {\n"
+                + "    private final com.codename1.backend.mail.MailSender mail;\n"
+                + "    public Welcome(com.codename1.backend.mail.MailSender mail) { this.mail = mail; }\n"
+                + "}\n";
+        // {injects a MailSender, properties, transports registered, wired at all}
+        String[][] cases = {
+            {"y", "", "smtp ses", "y"},
+            {"y", "cn1.mail.url=memory:\n", "", "y"},
+            {"y", "cn1.mail.url=smtp://mail.example.com:587\n", "smtp", "y"},
+            {"y", "cn1.mail.url=smtps://mail.example.com\n", "smtp", "y"},
+            {"y", "cn1.mail.url=ses://eu-west-1\n", "ses", "y"},
+            {"y", "spring.mail.host=mail.example.com\n", "smtp", "y"},
+            {"y", "cn1.mail.url=${MAIL_URL}\n", "smtp ses", "y"},
+            {"y", "cn1.mail.transports=ses\n", "ses", "y"},
+            // No bean takes one, and a server is named: MailSender.current()
+            // and the security flows still have to find it.
+            {"n", "cn1.mail.url=smtp://mail.example.com\n", "smtp", "y"},
+            {"n", "", "", "n"},
+        };
+        for (String[] c : cases) {
+            Map<String, String> s = new LinkedHashMap<String, String>();
+            s.put("com.example.Inbox", PKG + "@Component public class Inbox {\n"
+                    + "    @MessageListener(\"q\") public void on(String text) { }\n"
+                    + "}\n");
+            if ("y".equals(c[0])) {
+                s.put("com.example.Welcome", sender);
+            }
+            File classes = compile(s);
+            writeProperties(classes, "application.properties", c[1]);
+            assertNoErrors(process(classes));
+            String wiring = new String(Files.readAllBytes(new File(classes,
+                    "com/example/BackendWiring.class").toPath()), "ISO-8859-1");
+            String what = c[0] + " " + c[1];
+            assertEquals(what, c[2].indexOf("smtp") >= 0,
+                    wiring.indexOf("mail/smtp/SmtpTransport") >= 0);
+            assertEquals(what, c[2].indexOf("ses") >= 0,
+                    wiring.indexOf("mail/ses/SesTransport") >= 0);
+            assertEquals(what, "y".equals(c[3]), wiring.indexOf("backend/mail/Mailers") >= 0);
+        }
+    }
+
     @Test
     public void messageListenersReceiveRetryAndDeadLetter() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();

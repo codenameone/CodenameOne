@@ -338,7 +338,7 @@ public class MigrationGeneratorTest {
         try {
             assertEquals(Long.valueOf(0), pool.queryOne("SELECT COUNT(*) AS n FROM cn1_users", null)
                     .get("n"));
-            assertEquals(Long.valueOf(12), pool.queryOne(
+            assertEquals(Long.valueOf(13), pool.queryOne(
                     "SELECT COUNT(*) AS n FROM cn1_security_schema_history", null).get("n"));
             assertEquals(Long.valueOf(1), pool.queryOne("SELECT COUNT(*) AS n FROM profiles", null)
                     .get("n"));
@@ -393,24 +393,26 @@ public class MigrationGeneratorTest {
 
         File database = new File(tmp.newFolder(), "cli-library-only.db");
         String migrated = goal(database, "migrate");
-        // Each of the eleven under a name of its own.
+        // Each version under a name of its own.
         java.util.Set<String> names = new java.util.TreeSet<String>();
         for (String line : migrated.split("\n")) {
             if (line.startsWith("cn1: security: applied ")) {
                 names.add(line.substring("cn1: security: applied ".length()).trim());
             }
         }
-        assertEquals(migrated, 12, names.size());
+        assertEquals(migrated, 13, names.size());
         assertTrue(migrated, names.contains(
                 "com.codename1.backend.security.SecuritySchema.V5__rate_limits"));
         assertTrue(migrated, names.contains(
                 "com.codename1.backend.security.SecuritySchema.V11__remember_me_rotation_grace"));
         assertTrue(migrated, names.contains(
                 "com.codename1.backend.security.SecuritySchema.V12__remember_me_devices"));
-        assertTrue(migrated, migrated.contains("cn1: security: 12 applied, schema at version 12"));
+        assertTrue(migrated, names.contains(
+                "com.codename1.backend.security.SecuritySchema.V13__mail_tokens"));
+        assertTrue(migrated, migrated.contains("cn1: security: 13 applied, schema at version 13"));
 
         String info = goal(database, "info");
-        assertTrue(info, info.contains("cn1: security: 12 migration(s) in cn1_security_schema_history"));
+        assertTrue(info, info.contains("cn1: security: 13 migration(s) in cn1_security_schema_history"));
         assertTrue(goal(database, "validate"), goal(database, "validate").contains(
                 "cn1: security: the schema history matches this build's migrations"));
         assertTrue(goal(database, "migrate").contains("cn1: security: nothing to apply"));
