@@ -1669,18 +1669,28 @@ public final class CommerceManager {
     }
 
     /// Posts one receipt to the cloud /validate endpoint, folds the returned
-    /// entitlements into the cache, and returns {degraded} (or null on
-    /// failure).
+    /// entitlements into the cache, and returns {degraded} (or null when there
+    /// is no answer to trust).
+    ///
+    /// With a public key the request carries a nonce and the answer is the
+    /// signed envelope [#postSigned(String, String)] verifies, so an answer
+    /// forged on the network applies nothing. Without a key the request is
+    /// still sent, so the service records the purchase and the revenue of an
+    /// invite, but its unsigned answer is not used: the store-direct fallback
+    /// answers instead.
     private Boolean[] validateReceipt(Receipt r) {
         String url = endpoint();
         if (url == null || r == null) {
             return null;
         }
-        Object data = postForJson(url + "/validate", buildRequest(r));
-        if (!(data instanceof Map)) {
+        if (publicKey() == null) {
+            postForJson(url + "/validate", buildRequest(r));
             return null;
         }
-        Map result = (Map) data;
+        Map result = postSigned("/validate", receiptFields(r));
+        if (result == null) {
+            return null;
+        }
         applyEntitlements(result.get("entitlements"));
         boolean deg = asBoolean(result.get("degraded"));
         return new Boolean[] { deg ? Boolean.TRUE : Boolean.FALSE };
@@ -1702,6 +1712,8 @@ public final class CommerceManager {
         }
     }
 
+    /// The unsigned request of a client that knows no public key: no nonce,
+    /// so the service answers in the old unsigned shape.
     private String buildRequest(Receipt r) {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
@@ -1711,6 +1723,15 @@ public final class CommerceManager {
         sb.append(',');
         appendField(sb, "appUserId", getAppUserId());
         sb.append(',');
+        sb.append(receiptFields(r));
+        appendClientId(sb);
+        sb.append('}');
+        return sb.toString();
+    }
+
+    /// The fields that describe one receipt, without the enclosing braces.
+    private static String receiptFields(Receipt r) {
+        StringBuilder sb = new StringBuilder();
         appendField(sb, "store", storeOf(r));
         sb.append(',');
         // On StoreKit 2 the order data carries the signed transaction JWS; the
@@ -1718,8 +1739,6 @@ public final class CommerceManager {
         appendField(sb, "signedTransaction", r.getOrderData());
         sb.append(',');
         appendField(sb, "productId", r.getSku());
-        appendClientId(sb);
-        sb.append('}');
         return sb.toString();
     }
 

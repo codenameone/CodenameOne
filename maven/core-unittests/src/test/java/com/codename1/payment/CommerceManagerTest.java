@@ -127,6 +127,83 @@ class CommerceManagerTest extends UITestBase {
         assertNull(info.getEntitlement("missing"));
     }
 
+    private static final String VALIDATE_ANSWER =
+            "{\"degraded\":false,\"entitlements\":{\"vip\":{\"active\":true}}}";
+
+    /// Records the body of every request to /validate and signs answers as
+    /// the faked cloud does.
+    private List<String> recordValidate() {
+        final List<String> bodies = new ArrayList<String>();
+        implementation.setNetworkMockHandler(new TestCodenameOneImplementation.NetworkMockHandler() {
+            @Override
+            public void handle(TestCodenameOneImplementation.TestConnection connection) {
+                if (connection.getUrl().endsWith("/validate") && connection.getOutputData() != null) {
+                    bodies.add(new String(connection.getOutputData(), StandardCharsets.UTF_8));
+                }
+                CommerceTestBase.signConnection(connection);
+            }
+        });
+        return bodies;
+    }
+
+    private void validateOneReceipt() {
+        // No customer answer, so what /validate said is what isEntitled reads.
+        implementation.addNetworkMockResponse(ENDPOINT + "/customer", 500, "Error", new byte[0]);
+        Receipt r = new Receipt();
+        r.setStoreCode(Receipt.STORE_CODE_ITUNES);
+        r.setSku("vip_monthly");
+        r.setTransactionId("tx-v");
+        r.setOrderData("jws");
+        List<Receipt> receipts = new ArrayList<Receipt>();
+        receipts.add(r);
+        Receipt.registerExternalizable();
+        // The store the device's receipts are read from.
+        Storage.getInstance().writeObject("CN1SubscriptionsData.dat", receipts);
+        CommerceManager.getInstance().refresh();
+    }
+
+    @FormTest
+    void signedValidateAnswerApplies() {
+        List<String> bodies = recordValidate();
+        mock("/validate", envelope(VALIDATE_ANSWER, null));
+        validateOneReceipt();
+        assertTrue(CommerceManager.getInstance().isEntitled("vip"));
+        assertFalse(bodies.isEmpty());
+        assertTrue(bodies.get(bodies.size() - 1).contains("\"nonce\""));
+        assertTrue(bodies.get(bodies.size() - 1).contains("\"productId\":\"vip_monthly\""));
+    }
+
+    @FormTest
+    void forgedValidateAnswerAppliesNothing() {
+        recordValidate();
+        byte[] zeros = new byte[Ed25519.SIGNATURE_LENGTH];
+        mock("/validate", envelope(VALIDATE_ANSWER, Base64.encodeNoNewline(zeros)));
+        validateOneReceipt();
+        assertFalse(CommerceManager.getInstance().isEntitled("vip"));
+        assertTrue(CommerceManager.getInstance().isDegraded());
+    }
+
+    @FormTest
+    void unsignedValidateAnswerAppliesNothing() {
+        recordValidate();
+        mock("/validate", VALIDATE_ANSWER);
+        validateOneReceipt();
+        assertFalse(CommerceManager.getInstance().isEntitled("vip"));
+        assertTrue(CommerceManager.getInstance().isDegraded());
+    }
+
+    @FormTest
+    void withoutAKeyValidateIsSentAndItsAnswerIgnored() {
+        Display.getInstance().setProperty("commerce.cloud.publicKey", "");
+        CommerceManager.resetForTests();
+        List<String> bodies = recordValidate();
+        mock("/validate", VALIDATE_ANSWER);
+        validateOneReceipt();
+        assertFalse(bodies.isEmpty());
+        assertFalse(bodies.get(0).contains("\"nonce\""));
+        assertFalse(CommerceManager.getInstance().isEntitled("vip"));
+    }
+
     @FormTest
     void coldStartAnswersFromTheStoredCustomerBeforeAnyNetwork() {
         mock("/customer", envelope(PRO_CUSTOMER.replace("USER", "u1"), null));
