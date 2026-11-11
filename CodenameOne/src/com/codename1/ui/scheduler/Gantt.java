@@ -62,6 +62,8 @@ import java.util.List;
 /// form.show();
 /// ```
 ///
+/// ![A Gantt chart with its critical path](https://www.codenameone.com/developer-guide/img/generated/gantt-critical-path.png)
+///
 /// The chart draws its rows and keeps no component for each, so a plan of
 /// thousands of tasks scrolls as one of ten does. Time zooms with a pinch,
 /// with the wheel and the control key held, or with `zoomIn`, `zoomOut` and
@@ -84,12 +86,24 @@ import java.util.List;
 /// dragged. The table is not edited in place: a double tap is reported to
 /// `GanttListener#taskOpened`, for an application's own editor.
 ///
+/// Under a mouse the bar the pointer is over lights up together with the
+/// links into and out of it, the row is marked in the table and in the
+/// chart, the cursor says what a drag would do and a tooltip gives the
+/// task's dates and progress. A bar that is picked up lifts over a shadow.
+///
+/// ![A bar moved and the tasks after it following, as four stopped frames](https://www.codenameone.com/developer-guide/img/generated/gantt-drag-stages.png)
+///
+/// `setAnimationTime` stops the clock these run by, for a screenshot or a
+/// test of a moment in the middle of one.
+///
 /// #### Resources
 ///
 /// `setLoadVisible(true)` shows the load of every resource under the chart.
 /// A stretch over the resource's capacity is drawn in `GanttOverload`.
 /// `level()` delays tasks until no resource is asked for more than it has,
 /// as far as that can be done.
+///
+/// ![The load of each resource under the chart](https://www.codenameone.com/developer-guide/img/generated/gantt-load.png)
 ///
 /// #### Styling
 ///
@@ -118,7 +132,8 @@ public class Gantt extends Container {
     private ProjectModel model;
     private final GanttChart chart;
     private final ResourceLoadView load;
-    private final Container toolbar = new Container(new BorderLayout());
+    private final BarLayout bar = new BarLayout();
+    private final Container toolbar = new Container(bar);
     private final HashSet<GanttTask> collapsed = new HashSet<GanttTask>();
     private final ArrayList<GanttListener> listeners = new ArrayList<GanttListener>();
     private Column[] columns = {Column.START, Column.END};
@@ -225,8 +240,19 @@ public class Gantt extends Container {
                 level();
             }
         }));
-        toolbar.add(BorderLayout.WEST, zoom);
-        toolbar.add(BorderLayout.EAST, options);
+        toolbar.add(zoom);
+        toolbar.add(options);
+    }
+
+    /// The bar is a row where there is room for one, and two rows on a
+    /// screen as narrow as a phone's. It is decided here because this is
+    /// the first place the width is known.
+    @Override
+    public void layoutContainer() {
+        if (bar.fit(toolbar, getWidth() - getStyle().getHorizontalPadding())) {
+            toolbar.setShouldCalcPreferredSize(true);
+        }
+        super.layoutContainer();
     }
 
     /// Whether the bar of zoom buttons and options is shown above the chart.
@@ -475,6 +501,22 @@ public class Gantt extends Container {
     public void setCurrentTime(long millis) {
         fixedNow = millis;
         chart.modelChanged();
+    }
+
+    /// Stops the clock the chart animates by at a time, for a screenshot of
+    /// an animation or a test of one: the light of a hover, the rise of
+    /// an item that is picked up and the slide of
+    /// the bars to their new dates are drawn as far along as that time
+    /// makes them. A negative value returns to the clock.
+    ///
+    /// ```java
+    /// gantt.setAnimationTime(1000);  // nothing has started
+    /// // ... press, drag, release ...
+    /// gantt.setAnimationTime(1100);  // 100 milliseconds into what followed
+    /// ```
+    public void setAnimationTime(long millis) {
+        chart.setFixedClock(millis);
+        load.setFixedClock(millis);
     }
 
     long now() {

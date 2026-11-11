@@ -190,6 +190,10 @@ abstract class ScrollSurface extends Component {
             offY = ny;
             scrolled();
             repaint();
+            if (hoverX >= 0 && !pressed) {
+                // What is under a pointer that rests has changed.
+                hoverAt(hoverX, hoverY);
+            }
         }
     }
 
@@ -210,6 +214,226 @@ abstract class ScrollSurface extends Component {
             offX = nx;
             offY = ny;
             scrolled();
+        }
+    }
+
+    // ---- what the pointer is over, what is held, what was dropped ----
+
+    /// How long a hover takes to come up and to go, a held item to rise,
+    /// and a dropped one to reach its place.
+    static final int HOVER_MS = 140;
+    static final int LIFT_MS = 160;
+    static final int SETTLE_MS = 220;
+
+    private long fixedClock = -1;
+    private Object hoverKey;
+    private long hoverSince;
+    private Object leftKey;
+    private long leftSince;
+    private int hoverX = -1;
+    private int hoverY = -1;
+    private long liftSince;
+    private Object settleKey;
+    private final int[] settleFrom = new int[4];
+    private long settleSince;
+
+    /// The time the surface animates by: the clock, or the one it was
+    /// given to stand still at.
+    long tick() {
+        return fixedClock >= 0 ? fixedClock : System.currentTimeMillis();
+    }
+
+    void setFixedClock(long millis) {
+        fixedClock = millis;
+        repaint();
+    }
+
+    /// The pointer rests at a point of the surface without being pressed.
+    /// A view answers with `hover`, naming what is there and the cursor
+    /// that says what a press would do.
+    void hoverAt(int x, int y) {
+        hover(null, DEFAULT_CURSOR);
+    }
+
+    /// The pointer left, or nothing is known of it any more.
+    void hoverGone() {
+        hoverX = -1;
+        hoverY = -1;
+        hover(null, DEFAULT_CURSOR);
+    }
+
+    final void hover(Object key, int cursor) {
+        if (key == null ? hoverKey != null : !key.equals(hoverKey)) {
+            long now = tick();
+            if (hoverKey != null) {
+                leftKey = hoverKey;
+                leftSince = now;
+            }
+            if (key != null && key.equals(leftKey)) {
+                leftKey = null;
+            }
+            hoverKey = key;
+            hoverSince = now;
+            if (key == null) {
+                tip(null);
+            }
+            requestAnimation();
+            repaint();
+        }
+        if (getCursor() != cursor) {
+            setCursor(cursor);
+        }
+    }
+
+    /// What a tooltip says of the thing the pointer is on, for an
+    /// application that shows tooltips; null for nothing.
+    void tip(String text) {
+        String was = getTooltip();
+        if (text == null ? was != null : !text.equals(was)) {
+            setTooltip(text);
+        }
+    }
+
+    /// What the pointer has just left, while its light goes out.
+    Object fading() {
+        return printing ? null : leftKey;
+    }
+
+    /// What the pointer is over, as the view named it.
+    Object hovered() {
+        return hoverKey;
+    }
+
+    /// Whether anything is lit by the pointer or still fading: a view
+    /// that paints many items asks once before asking for each.
+    boolean anyHover() {
+        return !printing && (hoverKey != null || leftKey != null);
+    }
+
+    /// How far the hover of `key` has come up, from 0 to 1.
+    float hoverLevel(Object key) {
+        if (key == null || printing) {
+            return 0;
+        }
+        if (key.equals(hoverKey)) {
+            return ease(tick() - hoverSince, HOVER_MS);
+        }
+        if (key.equals(leftKey)) {
+            return 1 - ease(tick() - leftSince, HOVER_MS);
+        }
+        return 0;
+    }
+
+    /// How far the item that is being dragged has risen off the surface.
+    float liftLevel() {
+        return gesture == EDIT ? ease(tick() - liftSince, LIFT_MS) : 0;
+    }
+
+    /// An item was let go at a rectangle of the content, which is not
+    /// where it belongs: it is drawn travelling from there to its place.
+    void settleFrom(Object key, int x, int y, int w, int h) {
+        if (key == null || printing) {
+            return;
+        }
+        settleKey = key;
+        settleFrom[0] = x;
+        settleFrom[1] = y;
+        settleFrom[2] = w;
+        settleFrom[3] = h;
+        settleSince = tick();
+        requestAnimation();
+    }
+
+    /// Moves the rectangle of an item, in the content, to where it is on
+    /// its way from the place it was dropped. True while it travels.
+    boolean settle(Object key, int[] rect) {
+        if (settleKey == null || printing || !settleKey.equals(key)) {
+            return false;
+        }
+        long t = tick() - settleSince;
+        if (t >= SETTLE_MS) {
+            return false;
+        }
+        // Fast at first and slow into place, as a thing put down is.
+        float p = 1 - t / (float) SETTLE_MS;
+        p = 1 - p * p * p;
+        for (int i = 0; i < 4; i++) {
+            rect[i] = settleFrom[i] + Math.round((rect[i] - settleFrom[i]) * p);
+        }
+        return true;
+    }
+
+    private static float ease(long elapsed, int duration) {
+        if (elapsed >= duration) {
+            return 1;
+        }
+        if (elapsed <= 0) {
+            return 0;
+        }
+        float p = elapsed / (float) duration;
+        return p * p * (3 - 2 * p);
+    }
+
+    // Whether any of the three is still on its way. Never with a clock
+    // that stands still: nothing would ever arrive.
+    private boolean feedbackBusy() {
+        if (fixedClock >= 0) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        boolean busy = false;
+        if (leftKey != null) {
+            if (now - leftSince >= HOVER_MS) {
+                leftKey = null;
+            } else {
+                busy = true;
+            }
+        }
+        if (hoverKey != null && now - hoverSince < HOVER_MS) {
+            busy = true;
+        }
+        if (settleKey != null) {
+            if (now - settleSince >= SETTLE_MS) {
+                settleKey = null;
+            } else {
+                busy = true;
+            }
+        }
+        if (gesture == EDIT && now - liftSince < LIFT_MS) {
+            busy = true;
+        }
+        return busy;
+    }
+
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+        if (pressed || x == null || x.length == 0) {
+            return;
+        }
+        layoutNow();
+        hoverX = x[0] - getAbsoluteX();
+        hoverY = y[0] - getAbsoluteY();
+        hoverAt(hoverX, hoverY);
+    }
+
+    @Override
+    public void setHovered(boolean hovered) {
+        super.setHovered(hovered);
+        if (!hovered) {
+            hoverGone();
+        }
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        if (Display.getInstance().isDesktop()) {
+            // The cursor says what a press would do: move, stretch, link.
+            // A form shows the cursors of its components only when asked.
+            Form f = getComponentForm();
+            if (f != null && !f.isEnableCursors()) {
+                f.setEnableCursors(true);
+            }
         }
     }
 
@@ -274,6 +498,10 @@ abstract class ScrollSurface extends Component {
         }
         if (animateSurface()) {
             busy = true;
+        }
+        if (feedbackBusy()) {
+            busy = true;
+            repaint();
         }
         if (!busy && registered) {
             Form f = getComponentForm();
@@ -521,6 +749,10 @@ abstract class ScrollSurface extends Component {
                 return;
             }
             gesture = beginEdit(pressX, pressY, !dragEdits) ? EDIT : PAN;
+            if (gesture == EDIT) {
+                liftSince = tick();
+                requestAnimation();
+            }
         }
         if (gesture == EDIT) {
             editDragged(lx, ly);
@@ -542,6 +774,8 @@ abstract class ScrollSurface extends Component {
         int ly = y - getAbsoluteY();
         if (beginEdit(lx, ly, false)) {
             gesture = EDIT;
+            liftSince = tick();
+            requestAnimation();
             lastX = lx;
             lastY = ly;
             editDragged(lx, ly);

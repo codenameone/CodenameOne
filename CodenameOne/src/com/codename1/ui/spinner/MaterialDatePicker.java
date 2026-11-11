@@ -30,6 +30,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
@@ -65,6 +66,13 @@ import java.util.Date;
 /// form.show();
 /// ```
 ///
+/// ![The month of a Material date picker](https://www.codenameone.com/developer-guide/img/generated/picker-material-date.png)
+/// ![The years](https://www.codenameone.com/developer-guide/img/generated/picker-material-date-years.png)
+/// ![The date typed](https://www.codenameone.com/developer-guide/img/generated/picker-material-date-input.png)
+///
+/// Under a mouse the day the pointer is over is marked, and a month asked
+/// for with the arrows slides in over the one shown.
+///
 /// The value is a `Date`. Its time of day is kept as it was given, so a date
 /// chosen here does not move an appointment to midnight.
 ///
@@ -78,6 +86,8 @@ import java.util.Date;
 /// disabled style a day outside the range. `PickerMaterialYear` is a year in
 /// the grid, `PickerMaterialField` the text field and `PickerMaterialError`
 /// what is said about a date that cannot be read.
+///
+/// ![A date picker restyled from CSS](https://www.codenameone.com/developer-guide/img/generated/picker-material-date-css.png)
 public class MaterialDatePicker extends Container implements InternalPickerWidget {
     private static final int DAYS = 0;
     private static final int YEARS = 1;
@@ -111,6 +121,7 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
     private final Container navigation = new Container(new BorderLayout());
     private final DayPane days = new DayPane();
     private Container years;
+    private Component revealYear;
     private final TextField input = new TextField();
     private final Label error = new Label("", "PickerMaterialError");
     private final Container inputPane = new Container(BoxLayout.y());
@@ -189,6 +200,9 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             }
         });
         inputPane.add(input).add(error);
+        // In line with the headline over it, not against the dialog's edge.
+        inputPane.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        inputPane.getAllStyles().setPadding(1, 2, 3, 3);
 
         add(BorderLayout.NORTH, head);
         add(BorderLayout.CENTER, body);
@@ -401,6 +415,16 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
         return days;
     }
 
+    /// How far a month asked for has slid in, from 0 to 1.
+    float slideAt() {
+        return days.slide();
+    }
+
+    /// The day the pointer is over, or -1.
+    int overDay() {
+        return days.overDay;
+    }
+
     TextField inputField() {
         return input;
     }
@@ -409,12 +433,30 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
         return error.getText();
     }
 
+    private static final int SLIDE_MS = 220;
+    private long fixedClock = -1;
+
+    /// Stops the clock the months slide by at a time, for a screenshot of a
+    /// month coming in or a test of it. A negative value returns to the clock.
+    public void setAnimationTime(long millis) {
+        fixedClock = millis;
+        days.repaint();
+    }
+
+    private long clock() {
+        return fixedClock >= 0 ? fixedClock : System.currentTimeMillis();
+    }
+
     /// Shows the month before or after the one shown.
     void page(int months) {
         int m = shownYear * 12 + shownMonth + months;
         int lo = Math.max(startYear * 12, minKey == Integer.MIN_VALUE ? Integer.MIN_VALUE : minKey / 10000 * 12 + minKey / 100 % 100);
         int hi = Math.min(endYear * 12 + 11, maxKey == Integer.MAX_VALUE ? Integer.MAX_VALUE : maxKey / 10000 * 12 + maxKey / 100 % 100);
         m = Math.max(lo, Math.min(hi, m));
+        int was = shownYear * 12 + shownMonth;
+        if (m != was) {
+            days.slideFrom(shownYear, shownMonth, m > was ? 1 : -1);
+        }
         shownYear = m / 12;
         shownMonth = m % 12;
         refresh();
@@ -474,8 +516,24 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             int first = Math.max(startYear, minKey == Integer.MIN_VALUE ? startYear : minKey / 10000);
             int last = Math.min(endYear, maxKey == Integer.MAX_VALUE ? endYear : maxKey / 10000);
             last = Math.max(first, last);
-            Container grid = new Container(new GridLayout((last - first + 3) / 3, 3));
+            Container grid = new Container(new GridLayout((last - first + 3) / 3, 3)) {
+                @Override
+                protected void laidOut() {
+                    super.laidOut();
+                    // Open on the year shown. This is the first moment the
+                    // buttons have a place to scroll to.
+                    if (revealYear != null) {
+                        Component target = revealYear;
+                        revealYear = null;
+                        scrollComponentToVisible(target);
+                    }
+                }
+            };
             grid.setScrollableY(true);
+            // The list opens at the year, it does not travel there from
+            // the first one, a century of rows away.
+            grid.setSmoothScrolling(false);
+            grid.setScrollVisible(false);
             for (int y = first; y <= last; y++) {
                 final int value = y;
                 Button b = new Button(String.valueOf(y), "PickerMaterialYear");
@@ -498,6 +556,8 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             boolean current = b.getText().equals(String.valueOf(shownYear));
             b.setUIID(current ? "PickerMaterialYearSelected" : "PickerMaterialYear");
             if (current) {
+                revealYear = b;
+                years.setShouldCalcPreferredSize(true);
                 Display.getInstance().callSerially(new Reveal(years, b));
             }
         }
@@ -631,6 +691,7 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
     /// row of initials and six weeks.
     private final class DayPane extends Component {
         private int pressedDay;
+        private int overDay = -1;
 
         DayPane() {
             setUIID("PickerMaterialDays");
@@ -647,10 +708,14 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
 
         // Which cell of the grid the first of the month is in.
         private int lead() {
+            return lead(shownYear, shownMonth);
+        }
+
+        private int lead(int yr, int mo) {
             Calendar c = Calendar.getInstance();
             c.set(Calendar.DAY_OF_MONTH, 1);
-            c.set(Calendar.YEAR, shownYear);
-            c.set(Calendar.MONTH, shownMonth);
+            c.set(Calendar.YEAR, yr);
+            c.set(Calendar.MONTH, mo);
             int l = c.get(Calendar.DAY_OF_WEEK) - firstDayOfWeek;
             return l < 0 ? l + 7 : l;
         }
@@ -665,9 +730,6 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             int cw = w / 7;
             int chh = h / 7;
             x += (w - cw * 7) / 2;
-            Style dayStyle = getUIManager().getComponentStyle("PickerMaterialDay");
-            Style chosen = getUIManager().getComponentSelectedStyle("PickerMaterialDay");
-            Style off = getUIManager().getComponentCustomStyle("PickerMaterialDay", "dis");
             Style week = getUIManager().getComponentStyle("PickerMaterialWeekday");
             boolean aa = g.isAntiAliased();
             g.setAntiAliased(true);
@@ -680,12 +742,34 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
                 String initial = n == null || n.length() == 0 ? "" : n.substring(0, 1);
                 g.drawString(initial, x + i * cw + (cw - wf.stringWidth(initial)) / 2, y + (chh - wf.getHeight()) / 2);
             }
-            Calendar now = Calendar.getInstance();
-            int today = shownYear == now.get(Calendar.YEAR) && shownMonth == now.get(Calendar.MONTH)
-                    ? now.get(Calendar.DAY_OF_MONTH) : -1;
-            int lead = lead();
-            int count = daysIn(shownYear, shownMonth);
             int r = Math.min(cw, chh) / 2 - 1;
+            float p = slide();
+            if (p >= 1) {
+                paintMonth(g, shownYear, shownMonth, x, y, cw, chh, r, overDay);
+            } else {
+                // The month left goes out the way the one asked for comes in.
+                int cx0 = g.getClipX();
+                int cy0 = g.getClipY();
+                int cw0 = g.getClipWidth();
+                int ch0 = g.getClipHeight();
+                g.clipRect(x, y + chh, cw * 7, chh * 6);
+                int travel = Math.round(cw * 7 * p);
+                paintMonth(g, slideYear, slideMonth, x - slideWay * travel, y, cw, chh, r, -1);
+                paintMonth(g, shownYear, shownMonth, x + slideWay * (cw * 7 - travel), y, cw, chh, r, -1);
+                g.setClip(cx0, cy0, cw0, ch0);
+            }
+            g.setAntiAliased(aa);
+        }
+
+        private void paintMonth(Graphics g, int yr, int mo, int x, int y, int cw, int chh, int r, int over) {
+            Style dayStyle = getUIManager().getComponentStyle("PickerMaterialDay");
+            Style chosen = getUIManager().getComponentSelectedStyle("PickerMaterialDay");
+            Style off = getUIManager().getComponentCustomStyle("PickerMaterialDay", "dis");
+            Calendar now = Calendar.getInstance();
+            int today = yr == now.get(Calendar.YEAR) && mo == now.get(Calendar.MONTH)
+                    ? now.get(Calendar.DAY_OF_MONTH) : -1;
+            int lead = lead(yr, mo);
+            int count = daysIn(yr, mo);
             Font f = dayStyle.getFont();
             g.setFont(f);
             int alpha = g.getAlpha();
@@ -693,8 +777,15 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
                 int cell = lead + d - 1;
                 int cx = x + cell % 7 * cw + cw / 2;
                 int cy = y + (cell / 7 + 1) * chh + chh / 2;
-                boolean isChosen = d == day && shownMonth == month && shownYear == year;
-                boolean enabled = isEnabledDay(shownYear, shownMonth, d);
+                boolean isChosen = d == day && mo == month && yr == year;
+                boolean enabled = isEnabledDay(yr, mo, d);
+                if (d == over && enabled && !isChosen) {
+                    // The day a press would choose.
+                    g.setColor(dayStyle.getFgColor());
+                    g.setAlpha(alpha * 28 / 255);
+                    g.fillArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
+                    g.setAlpha(alpha);
+                }
                 if (isChosen) {
                     g.setColor(chosen.getBgColor());
                     g.fillArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
@@ -712,7 +803,70 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
                 g.drawString(s, cx - f.stringWidth(s) / 2, cy - f.getHeight() / 2);
                 g.setAlpha(alpha);
             }
-            g.setAntiAliased(aa);
+        }
+
+        // ---- the month before or after slides in ----
+
+        private int slideYear;
+        private int slideMonth;
+        private int slideWay;
+        private long slideSince = -1;
+        private boolean registered;
+
+        // How far the month asked for has come in, from 0 to 1.
+        private float slide() {
+            if (slideSince < 0) {
+                return 1;
+            }
+            long t = clock() - slideSince;
+            if (t >= SLIDE_MS) {
+                return 1;
+            }
+            float p = t <= 0 ? 0 : t / (float) SLIDE_MS;
+            return 1 - (1 - p) * (1 - p) * (1 - p);
+        }
+
+        void slideFrom(int yr, int mo, int way) {
+            if (!isInitialized()) {
+                return;
+            }
+            slideYear = yr;
+            slideMonth = mo;
+            slideWay = way;
+            slideSince = clock();
+            overDay = -1;
+            Form f = getComponentForm();
+            if (f != null && !registered) {
+                f.registerAnimated(this);
+                registered = true;
+            }
+        }
+
+        private void still() {
+            if (registered) {
+                Form f = getComponentForm();
+                if (f != null) {
+                    f.deregisterAnimated(this);
+                }
+                registered = false;
+            }
+        }
+
+        @Override
+        public boolean animate() {
+            boolean busy = slideSince >= 0 && fixedClock < 0 && clock() - slideSince < SLIDE_MS;
+            if (!busy) {
+                still();
+            }
+            return busy;
+        }
+
+        @Override
+        protected void deinitialize() {
+            still();
+            slideSince = -1;
+            overDay = -1;
+            super.deinitialize();
         }
 
         private int dayAt(int px, int py) {
@@ -733,6 +887,42 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
         @Override
         public void pointerPressed(int x, int y) {
             pressedDay = dayAt(x, y);
+        }
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            if (Display.getInstance().isDesktop()) {
+                Form f = getComponentForm();
+                if (f != null && !f.isEnableCursors()) {
+                    f.setEnableCursors(true);
+                }
+            }
+        }
+
+        @Override
+        public void pointerHover(int[] x, int[] y) {
+            if (x == null || x.length == 0) {
+                return;
+            }
+            int d = dayAt(x[0], y[0]);
+            if (d > 0 && !isEnabledDay(shownYear, shownMonth, d)) {
+                d = -1;
+            }
+            if (d != overDay) {
+                overDay = d;
+                setCursor(d > 0 ? HAND_CURSOR : DEFAULT_CURSOR);
+                repaint();
+            }
+        }
+
+        @Override
+        public void setHovered(boolean hovered) {
+            super.setHovered(hovered);
+            if (!hovered && overDay > 0) {
+                overDay = -1;
+                repaint();
+            }
         }
 
         @Override

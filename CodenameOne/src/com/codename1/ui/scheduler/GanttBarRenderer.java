@@ -34,6 +34,9 @@ public interface GanttBarRenderer {
     int CRITICAL = 2;
     /// The task is being dragged, and this is the copy under the pointer.
     int DRAGGED = 4;
+    /// The pointer of a desktop rests on the bar. The chart lights the
+    /// bar itself; a renderer that wants more can tell by this.
+    int HOVERED = 8;
 
     /// Paints `task` into a rectangle: the span of its dates across and the
     /// height of a bar. For a milestone the rectangle is the square its mark

@@ -46,6 +46,8 @@ final class DayGrid extends ScrollSurface {
     private static final int RESIZE_END = 3;
     private static final int RANGE = 4;
     private static final int MAX_ALL_DAY_ROWS = 3;
+    // A slot of the grid as a key of the hover: the column times this, and the minute.
+    private static final long SLOT_KEY = 10000L;
     // An item shorter than this is laid out as if it lasted this long, so
     // that it has room for a line of text and its neighbours stay off it.
     private static final int MIN_LAYOUT_MINUTES = 25;
@@ -223,7 +225,7 @@ final class DayGrid extends ScrollSurface {
         headerH = colHeaderH + allDayH;
         int bodyW = Math.max(0, width - headerW);
         int bodyH = Math.max(0, height - headerH);
-        int minCol = Look.mm(resources != null ? 24 : 7);
+        int minCol = Look.mm(resources != null ? 18 : 7);
         contentW = Math.max(bodyW, days.length * minCol);
         float least = Math.max(Look.mm(4), bodyH / 24f);
         if (hourH <= 0) {
@@ -231,7 +233,10 @@ final class DayGrid extends ScrollSurface {
         }
         hourH = Math.max(least, Math.min(Look.mm(40), hourH));
         if (pendingScrollMinute >= 0 && bodyH > 0) {
-            setOffsets(getOffX(), Math.round(pendingScrollMinute * hourH / 60f));
+            // Half a label higher than the hour asked for: its label is
+            // centred on its line, and would be cut in two by the header.
+            int room = Look.style("SchedulerTimeLabel").getFont().getHeight() / 2 + Look.mm(0.5f);
+            setOffsets(getOffX(), Math.max(0, Math.round(pendingScrollMinute * hourH / 60f) - room));
             pendingScrollMinute = -1;
         }
     }
@@ -563,6 +568,9 @@ final class DayGrid extends ScrollSurface {
             }
         }
 
+        paintSlot(g, x, y, hovered(), grid.getFgColor());
+        paintSlot(g, x, y, fading(), grid.getFgColor());
+
         // A background band is part of the grid, as the shading of the hours
         // off is: the hour lines are drawn over it, so an hour can still be
         // read across a column that is all one band.
@@ -574,8 +582,8 @@ final class DayGrid extends ScrollSurface {
             renderer.paintItem(g, owner, b.item, x0 + 1, top, x1 - x0 - 1, y + minuteY(b.endMin) - top, 0);
         }
 
-        int line = Look.mix(grid.getBgColor(), grid.getFgColor(), 150);
-        int faint = Look.mix(grid.getBgColor(), grid.getFgColor(), 60);
+        int line = Look.line(grid, 255);
+        int faint = Look.line(grid, 110);
         boolean halves = hourH >= Look.mm(11);
         for (int h = 0; h <= 24; h++) {
             int yy = y + minuteY(h * 60);
@@ -599,12 +607,26 @@ final class DayGrid extends ScrollSurface {
 
         ScheduleItem selected = owner.getSelectedItem();
         Box selectedBox = null;
+        boolean lit = anyHover();
+        float lift = mode == MOVE || mode == RESIZE_START || mode == RESIZE_END ? liftLevel() : 0;
+        int alpha = g.getAlpha();
         for (Box b : boxes) {
             boxRect(b, rect);
+            settle(b.item.getId(), rect);
             if (y + rect[1] > cy + ch || y + rect[1] + rect[3] < cy) {
                 continue;
             }
             int state = 0;
+            float over = lit ? hoverLevel(b.item.getId()) : 0;
+            if (over > 0) {
+                state |= ScheduleItemRenderer.HOVERED;
+            }
+            boolean held = lift > 0 && b.item == editItem; //NOPMD CompareObjectsWithEquals - the very item that is held
+            if (held) {
+                // What is left behind while the item is carried: where it
+                // was, and where it returns to if it is not let go.
+                g.setAlpha(Math.round(alpha * (1 - 0.6f * lift)));
+            }
             if (b.item == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object
                 state |= ScheduleItemRenderer.SELECTED;
                 selectedBox = b;
@@ -616,6 +638,11 @@ final class DayGrid extends ScrollSurface {
                 state |= ScheduleItemRenderer.ENDS_AFTER;
             }
             renderer.paintItem(g, owner, b.item, x + rect[0], y + rect[1], rect[2], rect[3], state);
+            if (held) {
+                g.setAlpha(alpha);
+            } else {
+                Look.glow(g, grid.getFgColor(), x + rect[0], y + rect[1], rect[2], rect[3], over);
+            }
         }
         if (selectedBox != null && owner.isEditable() && selectedBox.item.isResizable() && !isDragEdits()
                 && mode == 0) {
@@ -633,7 +660,7 @@ final class DayGrid extends ScrollSurface {
         int r = Look.mm(1.1f);
         boolean aa = g.isAntiAliased();
         g.setAntiAliased(true);
-        g.setColor(grid.getBgColor());
+        g.setColor(Look.under(grid));
         g.fillArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
         g.setColor(Look.style("SchedulerNow").getFgColor());
         g.drawArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
@@ -665,19 +692,27 @@ final class DayGrid extends ScrollSurface {
                 Look.fill(g, sel, x0, y + top, w, h);
                 g.setColor(sel.getFgColor());
                 g.drawRect(x0, y + top, w - 1, h - 1);
-                Font f = sel.getFont();
+                // The size of the hours beside the grid: a theme that gives
+                // the selection no font of its own would write the range
+                // in its default one, larger than anything else here.
+                Font f = Look.style("SchedulerTimeLabel").getFont();
                 if (h >= f.getHeight()) {
                     g.setFont(f);
                     g.drawString(Look.fit(owner.formatRange(editStart, editEnd), f, w - Look.mm(2)), x0 + Look.mm(1),
                             y + top + 1);
                 }
             } else {
+                Look.shadow(g, x0, y + top, w, h, liftLevel());
                 owner.getItemRenderer().paintItem(g, owner, editItem, x0, y + top, w, h,
                         ScheduleItemRenderer.DRAGGED | ScheduleItemRenderer.SELECTED);
-                Style sel = Look.style("SchedulerSelection");
-                Font f = sel.getFont();
+                // The time it would land on, over the item: in the colour
+                // and the size of the hours beside the grid, which it is
+                // read against. The colour of the grid's lines is too
+                // pale to read as text.
+                Style label = Look.style("SchedulerTimeLabel");
+                Font f = label.getFont();
                 g.setFont(f);
-                g.setColor(Look.style("SchedulerGrid").getFgColor());
+                g.setColor(label.getFgColor());
                 String s = owner.formatRange(editStart, editEnd);
                 int ty = y + top - f.getHeight();
                 if (ty > y + getOffY()) {
@@ -790,7 +825,12 @@ final class DayGrid extends ScrollSurface {
                 if (c.endsAfter) {
                     state |= ScheduleItemRenderer.ENDS_AFTER;
                 }
+                float over = hoverLevel(c.item.getId());
+                if (over > 0) {
+                    state |= ScheduleItemRenderer.HOVERED;
+                }
                 renderer.paintItem(g, owner, c.item, x + rect[0], y + rect[1], rect[2], rect[3], state);
+                Look.glow(g, header.getFgColor(), x + rect[0], y + rect[1], rect[2], rect[3], over);
             }
             if (allDayRows > MAX_ALL_DAY_ROWS) {
                 g.setFont(f);
@@ -974,6 +1014,11 @@ final class DayGrid extends ScrollSurface {
     void endEdit(boolean commit) {
         int m = mode;
         ScheduleItem item = editItem;
+        if (item != null && editRect(rect)) {
+            // From where it was let go to where it belongs, which is the
+            // place it came from when the move is refused or given up.
+            settleFrom(item.getId(), rect[0], rect[1], rect[2], rect[3]);
+        }
         mode = 0;
         editItem = null;
         if (!commit) {
@@ -985,6 +1030,100 @@ final class DayGrid extends ScrollSurface {
                 || !same(editResource, item.getResourceId()))) {
             owner.viewChanged(item, editStart, editEnd, editResource);
         }
+    }
+
+    // Where the item that is being dragged is drawn, in the content: the
+    // first column it shows in.
+    boolean editRect(int[] out) {
+        ZoneId zone = owner.getZone();
+        int col = -1;
+        long ds = 0;
+        long de = 0;
+        for (int c = 0; c < days.length && col < 0; c++) {
+            if (resources != null && c != resourceColumn(editResource)) {
+                continue;
+            }
+            ds = TimeMath.startOfEpochDay(days[c], zone);
+            de = TimeMath.startOfEpochDay(days[c] + 1, zone);
+            if (editEnd > ds && editStart < de) {
+                col = c;
+            }
+        }
+        if (col < 0) {
+            return false;
+        }
+        int top = editStart <= ds ? 0 : minuteY(TimeMath.minuteOfDay(editStart, zone));
+        int bottom = editEnd >= de ? contentHeight() : minuteY(TimeMath.minuteOfDay(editEnd, zone));
+        out[0] = colX(col) + 1;
+        out[1] = top;
+        out[2] = colX(col + 1) - colX(col) - 2;
+        out[3] = Math.max(Look.mm(2.6f), bottom - top);
+        return true;
+    }
+
+    // The slot of the grid a key of `hoverAt` names, lit.
+    private void paintSlot(Graphics g, int x, int y, Object key, int rgb) {
+        if (!(key instanceof Long) || days.length == 0) {
+            return;
+        }
+        long v = ((Long) key).longValue();
+        int col = (int) (v / SLOT_KEY);
+        int minute = (int) (v % SLOT_KEY);
+        if (col >= days.length) {
+            return;
+        }
+        int top = minuteY(minute);
+        Look.wash(g, rgb, x + colX(col) + 1, y + top, colX(col + 1) - colX(col) - 1,
+                minuteY(Math.min(TimeMath.MINUTES_PER_DAY, minute + slotMinutes())) - top, hoverLevel(key));
+    }
+
+    // A slot is a step of the snap, and half an hour when the steps are
+    // too fine to point at.
+    private int slotMinutes() {
+        return Math.max(30, owner.getSnapMinutes());
+    }
+
+    @Override
+    void hoverAt(int x, int y) {
+        if (days.length == 0 || x < headerW) {
+            hover(null, DEFAULT_CURSOR);
+            return;
+        }
+        if (y < headerH) {
+            Chip chip = chipAt(x, y);
+            hover(chip == null ? null : chip.item.getId(), chip == null ? DEFAULT_CURSOR : HAND_CURSOR);
+            tip(chip == null ? null : chip.item.getTitle());
+            return;
+        }
+        int cy = y - headerH + getOffY();
+        Box b = boxAt(x, y);
+        if (b != null) {
+            int cursor = HAND_CURSOR;
+            if (owner.isEditable() && isDragEdits()) {
+                boxRect(b, rect);
+                int edge = Math.min(rect[3] / 3, Look.mm(1.6f));
+                boolean bottom = !b.endsAfter && rect[1] + rect[3] - cy <= edge;
+                boolean top = !bottom && !b.startsBefore && cy - rect[1] <= edge;
+                if ((top || bottom) && b.item.isResizable()) {
+                    cursor = top ? N_RESIZE_CURSOR : S_RESIZE_CURSOR;
+                } else if (b.item.isMovable()) {
+                    cursor = MOVE_CURSOR;
+                }
+            }
+            hover(b.item.getId(), cursor);
+            tip(b.item.getTitle() + ", " + owner.formatRange(b.item.getStart(), b.item.getEnd()));
+            return;
+        }
+        tip(null);
+        if (!owner.isEditable()) {
+            hover(null, DEFAULT_CURSOR);
+            return;
+        }
+        // An empty slot, which a drag or a double click would fill.
+        int col = colAt(Math.max(0, Math.min(contentW - 1, x - headerW + getOffX())));
+        int slot = slotMinutes();
+        int minute = Math.max(0, Math.min(TimeMath.MINUTES_PER_DAY - 1, minuteAt(cy))) / slot * slot;
+        hover(Long.valueOf(col * SLOT_KEY + minute), DEFAULT_CURSOR);
     }
 
     private static boolean same(String a, String b) {

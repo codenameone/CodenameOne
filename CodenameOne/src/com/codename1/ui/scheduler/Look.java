@@ -93,6 +93,54 @@ final class Look {
         }
     }
 
+    /// The shadow of something held above the surface, `level` of the way
+    /// up from 0 to 1.
+    static void shadow(Graphics g, int x, int y, int w, int h, float level) {
+        if (level <= 0 || w <= 0 || h <= 0) {
+            return;
+        }
+        int a = g.getAlpha();
+        int reach = Math.max(2, mm(1.1f));
+        int drop = Math.round(mm(0.6f) * level);
+        int arc = mm(1.2f);
+        g.setColor(0);
+        // Each ring is drawn over the ones outside it, which is what makes
+        // the shadow darker towards the thing that casts it.
+        g.setAlpha(Math.max(1, Math.round(a * 0.2f * level / reach)));
+        for (int i = reach; i >= 1; i--) {
+            g.fillRoundRect(x - i, y - i + drop, w + 2 * i, h + 2 * i, arc + 2 * i, arc + 2 * i);
+        }
+        g.setAlpha(a);
+    }
+
+    /// The light of the pointer on what it is over: a wash of `rgb` and
+    /// a line around it, `level` of the way up from 0 to 1.
+    static void glow(Graphics g, int rgb, int x, int y, int w, int h, float level) {
+        if (level <= 0 || w <= 0 || h <= 0) {
+            return;
+        }
+        int a = g.getAlpha();
+        int arc = mm(0.8f);
+        g.setColor(rgb);
+        g.setAlpha(Math.round(a * 0.16f * level));
+        g.fillRoundRect(x, y, w, h, arc, arc);
+        g.setAlpha(Math.round(a * 0.55f * level));
+        g.drawRoundRect(x, y, w - 1, h - 1, arc, arc);
+        g.setAlpha(a);
+    }
+
+    /// The same wash with no line, for an empty place a press would fill.
+    static void wash(Graphics g, int rgb, int x, int y, int w, int h, float level) {
+        if (level <= 0 || w <= 0 || h <= 0) {
+            return;
+        }
+        int a = g.getAlpha();
+        g.setColor(rgb);
+        g.setAlpha(Math.round(a * 0.09f * level));
+        g.fillRect(x, y, w, h);
+        g.setAlpha(a);
+    }
+
     /// The longest start of `text` that fits `width`, ending in an ellipsis
     /// when anything was cut. Empty when not even that fits.
     static String fit(String text, Font f, int width) {
@@ -117,6 +165,22 @@ final class Look {
             }
         }
         return lo == 0 ? "" : text.substring(0, lo) + "...";
+    }
+
+    /// The colour a style's lines are drawn over. A grid style usually has
+    /// no background of its own, and the colour a theme leaves in a
+    /// transparent one is black: mixed with that, a pale line came out
+    /// nearly black. What is under such a grid is the component.
+    static int under(Style st) {
+        if ((st.getBgTransparency() & 0xff) == 0) {
+            return style("Scheduler").getBgColor();
+        }
+        return st.getBgColor();
+    }
+
+    /// A line of a grid, as strong as `amount` of 255.
+    static int line(Style grid, int amount) {
+        return mix(under(grid), grid.getFgColor(), amount);
     }
 
     /// Mixes two RGB colours: 0 is all `a`, 255 all `b`.

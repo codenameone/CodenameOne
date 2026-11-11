@@ -43,6 +43,9 @@ public interface ScheduleItemRenderer {
     int COMPACT = 16;
     /// Time runs across, as in the resource timeline, not down.
     int HORIZONTAL = 32;
+    /// The pointer of a desktop rests on the item. The view lights the
+    /// item itself; a renderer that wants more can tell by this.
+    int HOVERED = 64;
 
     /// Paints `item` into a rectangle. The clip is already inside the view;
     /// an implementation that sets one of its own restores it.

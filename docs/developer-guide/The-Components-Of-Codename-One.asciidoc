@@ -2393,13 +2393,46 @@ Button placement options are:
 
 The date, time and date & time pickers also come as Material 3 dialogs: a month grid with a year list and a field to type the date in, and a clock dial with a keyboard mode. They're lightweight, so they look the same in the simulator and on the device, follow the theme's colors in light and dark mode, and honor the 12 or 24 hour setting of the picker.
 
+.The date picker
+image::img/generated/picker-material-date.png["A dialog with the chosen date as its headline over a month grid, the chosen day in a filled circle and today in an outlined one",scaledwidth=30%]
+
+.A tap on the month opens the list of years
+image::img/generated/picker-material-date-years.png["The same dialog with a grid of years in place of the month, the chosen year in a filled pill",scaledwidth=30%]
+
+.The pencil swaps the grid for a field to type the date in
+image::img/generated/picker-material-date-input.png["The dialog with a single outlined text field holding the date",scaledwidth=30%]
+
+.A picker limited to a range of dates dims the days outside it
+image::img/generated/picker-material-date-range.png["The month grid with the first and the last days of the month pale and the days between them at full strength",scaledwidth=30%]
+
+.The time picker opens on the hour
+image::img/generated/picker-material-time.png["A dialog with the hour and the minute in two boxes, an AM and PM switch, and a clock dial with its hand on the hour",scaledwidth=30%]
+
+.Once the hour is chosen the dial shows minutes
+image::img/generated/picker-material-time-minutes.png["The dial numbered in steps of five minutes with the hand between two of them",scaledwidth=30%]
+
+.A 24 hour picker has an inner ring for the hours after noon
+image::img/generated/picker-material-time-24h.png["The dial with two rings of numbers and no AM and PM switch",scaledwidth=30%]
+
+.The keyboard button swaps the dial for two fields
+image::img/generated/picker-material-time-input.png["The dialog with a field for the hour and a field for the minute",scaledwidth=30%]
+
+The dialogs take their colors from the theme, so they follow its dark appearance, and they can be used in any theme:
+
+.The date picker in the dark appearance
+image::img/generated/picker-material-date-dark.png["The date picker on a dark surface",scaledwidth=30%]
+
+.The time picker in the dark appearance
+image::img/generated/picker-material-time-dark.png["The time picker on a dark surface",scaledwidth=30%]
+
+.The date picker asked for in the iOS theme
+image::img/generated/picker-material-date-ios.png["The date picker with the accent color of the iOS theme",scaledwidth=30%]
+
 The `pickerStyle` theme constant chooses them. The Android Material native theme sets it to `material`, so an application on that theme gets them with no code. Any other theme can ask for them in its CSS:
 
 [source,css]
 ----
-#Constants {
-    pickerStyle: "material";
-}
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=picker-material-constant,indent=0]
 ----
 
 A picker the application explicitly keeps native, with `setUseLightweightPopup(false)`, opens the platform's own dialog whatever the theme says. The string and duration pickers aren't affected by the constant.
@@ -2409,7 +2442,28 @@ A picker the application explicitly keeps native, with `setUseLightweightPopup(f
 include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/SchedulingSnippets.java[tag=picker-material,indent=0]
 ----
 
-The dialogs are styled through UIIDs that start with `PickerMaterial`, such as `PickerMaterialDialog`, `PickerMaterialHeader`, `PickerMaterialDay`, `PickerMaterialDial` and `PickerMaterialOk`.
+The dialogs are styled through UIIDs that start with `PickerMaterial`, such as `PickerMaterialDialog`, `PickerMaterialHeader`, `PickerMaterialDay`, `PickerMaterialDial` and `PickerMaterialOk`. The selected style of `PickerMaterialDay` and of `PickerMaterialDial` is the filled circle and the hand, so a few rules carry a brand through both dialogs:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=picker-material-css,indent=0]
+----
+
+.The date picker under those rules
+image::img/generated/picker-material-date-css.png["The date picker with a warm surface and the chosen day in a deep orange circle",scaledwidth=30%]
+
+.The time picker under those rules
+image::img/generated/picker-material-time-css.png["The time picker with a warm surface and a deep orange hand",scaledwidth=30%]
+
+With a mouse, the day or the number under the pointer is marked before it's pressed. Both dialogs animate what changes: the hand of the clock sweeps the shorter way round to a time it wasn't dragged to, moving between the rings of a 24 hour dial as it goes, and a month asked for with the arrows slides in from the side it lies on. A hand that's being dragged stays under the finger.
+
+.The hand sweeps to an hour it wasn't dragged to
+image::img/generated/picker-material-hand-stages.png["Three frames of the time picker: the hand on ten, the hand part of the way round after two was typed, and the hand on two",scaledwidth=100%]
+
+.The next month slides in
+image::img/generated/picker-material-month-stages.png["Three frames of the month grid: one month, the next pushing it out to the left, and the next month in place",scaledwidth=80%]
+
+`MaterialDatePicker` and `MaterialTimePicker` have a `setAnimationTime` that stops the clock of these animations at a moment, for a screenshot or a test, and a negative value hands it back.
 
 === SwipeableContainer
 

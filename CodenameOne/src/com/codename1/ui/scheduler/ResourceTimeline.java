@@ -340,20 +340,35 @@ final class ResourceTimeline extends ScrollSurface {
             renderer.paintItem(g, owner, b.item, x0, y + rowTop[b.row] + 1, x1 - x0, rowTop[b.row + 1] - rowTop[b.row]
                     - 1, ScheduleItemRenderer.HORIZONTAL | ScheduleItemRenderer.COMPACT);
         }
-        axis.paintGrid(g, Look.mix(grid.getBgColor(), grid.getFgColor(), 150), grid.getBgColor(), x, cy, ch, cx,
+        axis.paintGrid(g, Look.line(grid, 255), Look.under(grid), x, cy, ch, cx,
                 cx + cw);
-        g.setColor(Look.mix(grid.getBgColor(), grid.getFgColor(), 150));
+        g.setColor(Look.line(grid, 255));
         for (int r = 1; r <= rowCount; r++) {
             int ly = y + rowTop[r];
             g.drawLine(cx, ly, cx + cw, ly);
         }
+        paintRowHover(g, y, cx, cw, hovered(), grid.getFgColor());
+        paintRowHover(g, y, cx, cw, fading(), grid.getFgColor());
         ScheduleItem selected = owner.getSelectedItem();
+        boolean lit = anyHover();
+        float lift = mode == MOVE || mode == RESIZE_START || mode == RESIZE_END ? liftLevel() : 0;
+        int alpha = g.getAlpha();
         for (Bar b : bars) {
             barRect(b, rect);
+            settle(b.item.getId(), rect);
             if (x + rect[0] > cx + cw || x + rect[0] + rect[2] < cx) {
                 continue;
             }
             int state = ScheduleItemRenderer.HORIZONTAL | ScheduleItemRenderer.COMPACT;
+            float over = lit ? hoverLevel(b.item.getId()) : 0;
+            if (over > 0) {
+                state |= ScheduleItemRenderer.HOVERED;
+            }
+            boolean held = lift > 0 && b.item == editItem; //NOPMD CompareObjectsWithEquals - the very item that is held
+            if (held) {
+                // What is left behind while the item is carried.
+                g.setAlpha(Math.round(alpha * (1 - 0.6f * lift)));
+            }
             if (b.item == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object
                 state |= ScheduleItemRenderer.SELECTED;
             }
@@ -372,6 +387,12 @@ final class ResourceTimeline extends ScrollSurface {
             } else {
                 renderer.paintItem(g, owner, b.item, x + rect[0], y + rect[1], rect[2], rect[3], state);
             }
+            if (held) {
+                g.setAlpha(alpha);
+            } else {
+                Look.glow(g, grid.getFgColor(), Math.max(x + rect[0], cx - Look.mm(2)), y + rect[1],
+                        x + rect[0] + rect[2] - Math.max(x + rect[0], cx - Look.mm(2)), rect[3], over);
+            }
         }
         if (mode != 0) {
             int x0 = x + axis.x(editStart);
@@ -385,6 +406,7 @@ final class ResourceTimeline extends ScrollSurface {
                 g.setColor(sel.getFgColor());
                 g.drawRect(x0, top, w - 1, h - 1);
             } else {
+                Look.shadow(g, x0, y + rowTop[editRow] + rowPad, w, laneH - 1, liftLevel());
                 renderer.paintItem(g, owner, editItem, x0, y + rowTop[editRow] + rowPad, w, laneH - 1,
                         ScheduleItemRenderer.DRAGGED | ScheduleItemRenderer.SELECTED | ScheduleItemRenderer.HORIZONTAL
                                 | ScheduleItemRenderer.COMPACT);
@@ -527,6 +549,52 @@ final class ResourceTimeline extends ScrollSurface {
         return true;
     }
 
+    // The row a key of `hoverAt` names, lit from edge to edge.
+    private void paintRowHover(Graphics g, int y, int cx, int cw, Object key, int rgb) {
+        if (!(key instanceof Integer)) {
+            return;
+        }
+        int r = ((Integer) key).intValue();
+        if (r >= 0 && r < rowCount) {
+            Look.wash(g, rgb, cx, y + rowTop[r] + 1, cw, rowTop[r + 1] - rowTop[r] - 1, hoverLevel(key));
+        }
+    }
+
+    @Override
+    void hoverAt(int x, int y) {
+        if (x < headerW || y < headerH) {
+            hover(null, DEFAULT_CURSOR);
+            return;
+        }
+        int cx = x - headerW + getOffX();
+        int cy = y - headerH + getOffY();
+        Bar b = barAt(x, y);
+        if (b != null) {
+            int cursor = HAND_CURSOR;
+            if (owner.isEditable() && isDragEdits()) {
+                barRect(b, rect);
+                int edge = Math.min(rect[2] / 3, Look.mm(1.6f));
+                boolean right = rect[0] + rect[2] - cx <= edge;
+                boolean left = !right && cx - rect[0] <= edge;
+                if ((left || right) && b.item.isResizable()) {
+                    cursor = left ? W_RESIZE_CURSOR : E_RESIZE_CURSOR;
+                } else if (b.item.isMovable()) {
+                    cursor = MOVE_CURSOR;
+                }
+            }
+            hover(b.item.getId(), cursor);
+            tip(b.item.getTitle() + ", " + owner.formatRange(b.item.getStart(), b.item.getEnd()));
+            return;
+        }
+        tip(null);
+        // The row a drag or a double click would book.
+        if (rowCount > 0 && cy < rowTop[rowCount]) {
+            hover(Integer.valueOf(rowAt(cy)), DEFAULT_CURSOR);
+        } else {
+            hover(null, DEFAULT_CURSOR);
+        }
+    }
+
     private long defaultLength() {
         return axis.snapsToDays() ? TimeMath.DAY : owner.getDefaultMinutes() * TimeMath.MINUTE;
     }
@@ -582,6 +650,13 @@ final class ResourceTimeline extends ScrollSurface {
     void endEdit(boolean commit) {
         int m = mode;
         ScheduleItem item = editItem;
+        if (item != null && editRow < rowCount) {
+            // From where it was let go to where it belongs, which is the
+            // place it came from when the move is refused or given up.
+            int x0 = axis.x(editStart);
+            settleFrom(item.getId(), x0, rowTop[editRow] + rowPad, Math.max(Look.mm(1.5f), axis.x(editEnd) - x0),
+                    laneH - 1);
+        }
         mode = 0;
         editItem = null;
         if (!commit) {

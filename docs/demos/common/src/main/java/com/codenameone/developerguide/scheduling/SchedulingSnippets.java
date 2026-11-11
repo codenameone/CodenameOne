@@ -289,6 +289,29 @@ public class SchedulingSnippets {
         // end::schedule-print[]
     }
 
+    public void customRenderer(Scheduler scheduler) {
+        // tag::scheduler-renderer-use[]
+        scheduler.setItemRenderer(new CardItemRenderer());
+        // end::scheduler-renderer-use[]
+    }
+
+    public Image animationFrame(Scheduler scheduler, Runnable drag) {
+        // tag::scheduler-animation-time[]
+        // Stop the clock, do what starts the animation, then move the clock
+        // to the moment wanted: 80 milliseconds into picking an item up.
+        scheduler.setAnimationTime(1000);
+        drag.run();
+        scheduler.setAnimationTime(1080);
+
+        Image frame = Image.createImage(scheduler.getWidth(), scheduler.getHeight());
+        scheduler.paintComponent(frame.getGraphics(), true);
+
+        // Back to the real clock.
+        scheduler.setAnimationTime(-1);
+        // end::scheduler-animation-time[]
+        return frame;
+    }
+
     public void materialPicker() {
         // tag::picker-material[]
         Picker date = new Picker();

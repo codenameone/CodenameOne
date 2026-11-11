@@ -36,6 +36,15 @@ public final class GuideFigures {
     public static FigureVariant[] variants() {
         GuideFigure button = new ButtonFigure();
         GuideFigure appearance = new AppearanceFigure();
+        FigureVariant[] general = general(button, appearance);
+        FigureVariant[] scheduling = SchedulingFigures.variants();
+        FigureVariant[] all = new FigureVariant[general.length + scheduling.length];
+        System.arraycopy(general, 0, all, 0, general.length);
+        System.arraycopy(scheduling, 0, all, general.length, scheduling.length);
+        return all;
+    }
+
+    private static FigureVariant[] general(GuideFigure button, GuideFigure appearance) {
         return new FigureVariant[] {
             // The Components chapter shows the platforms side by side.
             new FigureVariant(button, FigureDevice.IOS, false, "components-button-ios.png"),

@@ -64,6 +64,15 @@ import java.util.List;
 /// form.show();
 /// ```
 ///
+/// ![A week of a schedule](https://www.codenameone.com/developer-guide/img/generated/scheduler-week.png)
+///
+/// The same items by the day, by the month and against the people they are
+/// booked for:
+///
+/// ![The day view](https://www.codenameone.com/developer-guide/img/generated/scheduler-day.png)
+/// ![The month view](https://www.codenameone.com/developer-guide/img/generated/scheduler-month.png)
+/// ![The resource timeline](https://www.codenameone.com/developer-guide/img/generated/scheduler-resource-timeline.png)
+///
 /// The views draw their items and keep no component for each, so a schedule
 /// of thousands of items scrolls as one of ten does. Time zooms with a pinch
 /// or with the wheel and the control key held.
@@ -77,6 +86,20 @@ import java.util.List;
 /// listeners first, then made through `ScheduleModel#updateItem`, and either
 /// may refuse. `setEditable(false)` makes the scheduler read only.
 ///
+/// #### Pointer and motion
+///
+/// Under a mouse the item the pointer is over lights up, free time shows
+/// the slot a drag would start in, the cursor says what a drag would do,
+/// and a tooltip gives the item's title and time. An item that is picked
+/// up lifts: a shadow comes up under it and the place it left dims. Let go,
+/// it glides from where it was dropped to where it belongs. Each takes
+/// under a quarter of a second.
+///
+/// ![An item picked up, carried and dropped, as five stopped frames](https://www.codenameone.com/developer-guide/img/generated/scheduler-drag-stages.png)
+///
+/// `setAnimationTime` stops the clock these run by, for a screenshot or a
+/// test of a moment in the middle of one.
+///
 /// #### Styling
 ///
 /// `SchedulerGrid` is the background, with its foreground the colour of the
@@ -87,6 +110,8 @@ import java.util.List;
 /// `SchedulerSelection` a range being dragged out. The bar above the views
 /// is `SchedulerToolbar`, `SchedulerTitle` and `SchedulerViewButton`. An item
 /// that names a UIID of its own is painted with that one.
+///
+/// ![A schedule restyled from CSS](https://www.codenameone.com/developer-guide/img/generated/scheduler-css.png)
 public class Scheduler extends Container {
     /// The ways a schedule is shown.
     public enum View {
@@ -123,6 +148,7 @@ public class Scheduler extends Container {
     private Boolean dragEdits;
     private boolean compactToolbar = !(Display.getInstance().isDesktop() || Display.getInstance().isTablet());
     private long fixedNow = -1;
+    private long animationTime = -1;
     private long anchorDay;
     private long visibleStart;
     private long visibleEnd;
@@ -135,7 +161,8 @@ public class Scheduler extends Container {
     private AgendaList agenda;
     private ResourceTimeline timeline;
     private Component current;
-    private final Container toolbar = new Container(new BorderLayout());
+    private final BarLayout bar = new BarLayout();
+    private final Container toolbar = new Container(bar);
     private final Label title = new Label("", "SchedulerTitle");
     private final Container viewButtons = new Container(BoxLayout.x());
     private UITimer clock;
@@ -217,10 +244,26 @@ public class Scheduler extends Container {
                 next();
             }
         }));
-        toolbar.add(BorderLayout.WEST, nav);
-        toolbar.add(BorderLayout.CENTER, title);
-        toolbar.add(BorderLayout.EAST, viewButtons);
+        // In this order: BarLayout takes the first as what leads, the last
+        // as what trails and the one between as what fills.
+        toolbar.add(nav);
+        toolbar.add(title);
+        toolbar.add(viewButtons);
+        // More views than a phone is wide are scrolled through.
+        viewButtons.setScrollableX(true);
+        viewButtons.setScrollVisible(false);
         buildViewButtons();
+    }
+
+    /// The bar is a row where there is room for one, and two rows on a
+    /// screen as narrow as a phone's. It is decided here because this is
+    /// the first place the width is known.
+    @Override
+    public void layoutContainer() {
+        if (bar.fit(toolbar, getWidth() - getStyle().getHorizontalPadding())) {
+            toolbar.setShouldCalcPreferredSize(true);
+        }
+        super.layoutContainer();
     }
 
     private String viewName(View v) {
@@ -470,6 +513,10 @@ public class Scheduler extends Container {
     }
 
     private void show(Component c) {
+        if (animationTime >= 0 && c instanceof ScrollSurface) {
+            // A view made after the clock was stopped stands at that time too.
+            ((ScrollSurface) c).setFixedClock(animationTime);
+        }
         if (current == c) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one
             return;
         }
@@ -760,6 +807,33 @@ public class Scheduler extends Container {
     public void setCurrentTime(long millis) {
         fixedNow = millis;
         repaint();
+    }
+
+    /// Stops the clock the scheduler animates by at a time, for a screenshot of
+    /// an animation or a test of one: the light of a hover, the rise of
+    /// an item that is picked up and the travel of one
+    /// that was dropped are drawn as far along as that time
+    /// makes them. A negative value returns to the clock.
+    ///
+    /// ```java
+    /// scheduler.setAnimationTime(1000);  // nothing has started
+    /// // ... press, drag, release ...
+    /// scheduler.setAnimationTime(1100);  // 100 milliseconds into what followed
+    /// ```
+    public void setAnimationTime(long millis) {
+        animationTime = millis;
+        if (dayGrid != null) {
+            dayGrid.setFixedClock(millis);
+        }
+        if (monthGrid != null) {
+            monthGrid.setFixedClock(millis);
+        }
+        if (agenda != null) {
+            agenda.setFixedClock(millis);
+        }
+        if (timeline != null) {
+            timeline.setFixedClock(millis);
+        }
     }
 
     long now() {

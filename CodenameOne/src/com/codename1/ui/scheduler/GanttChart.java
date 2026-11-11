@@ -130,7 +130,7 @@ final class GanttChart extends ScrollSurface {
             }
         }
         reflowFrom = from;
-        reflowStart = System.currentTimeMillis();
+        reflowStart = tick();
         requestAnimation();
     }
 
@@ -144,7 +144,7 @@ final class GanttChart extends ScrollSurface {
         if (reflowFrom == null) {
             return false;
         }
-        if (System.currentTimeMillis() - reflowStart >= REFLOW_MS) {
+        if (tick() - reflowStart >= REFLOW_MS) {
             reflowFrom = null;
         }
         repaint();
@@ -160,7 +160,7 @@ final class GanttChart extends ScrollSurface {
         if (from == null) {
             return now;
         }
-        float p = Math.min(1f, (System.currentTimeMillis() - reflowStart) / (float) REFLOW_MS);
+        float p = Math.min(1f, (tick() - reflowStart) / (float) REFLOW_MS);
         // Ease out: fast at first, settling at the end.
         p = 1 - (1 - p) * (1 - p);
         long was = from[end ? 1 : 0];
@@ -426,6 +426,7 @@ final class GanttChart extends ScrollSurface {
                 Look.fill(g, summaryRow, cx, y + r * rowH, cw, rowH);
             }
         }
+        paintRowHover(g, cx, y, cw, rowStyle.getFgColor());
         axis.paintOffHours(g, model.getCalendar(), Look.style("SchedulerOffHours"), x, cy, ch, cx, cx + cw);
         int lineColor = Look.mix(rowStyle.getBgColor(), rowStyle.getFgColor(), 45);
         axis.paintGrid(g, lineColor, rowStyle.getBgColor(), x, cy, ch, cx, cx + cw);
@@ -459,6 +460,8 @@ final class GanttChart extends ScrollSurface {
         Font f = rowStyle.getFont();
         boolean showCritical = owner.isShowCriticalPath();
         int alpha = g.getAlpha();
+        boolean lit = anyHover();
+        float lift = mode == MOVE || mode == RESIZE_END ? liftLevel() : 0;
         for (int r = firstRow; r <= lastRow; r++) {
             GanttTask t = rows.get(r);
             barRect(t, r, rect);
@@ -466,6 +469,15 @@ final class GanttChart extends ScrollSurface {
                 continue;
             }
             int state = 0;
+            float over = lit ? hoverLevel(t) : 0;
+            if (over > 0) {
+                state |= GanttBarRenderer.HOVERED;
+            }
+            boolean held = lift > 0 && t == editTask; //NOPMD CompareObjectsWithEquals - the very task that is held
+            if (held) {
+                // What is left behind while the bar is carried.
+                g.setAlpha(Math.round(alpha * (1 - 0.6f * lift)));
+            }
             if (t == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object
                 state |= GanttBarRenderer.SELECTED;
             }
@@ -474,7 +486,11 @@ final class GanttChart extends ScrollSurface {
             }
             if (x + rect[0] + rect[2] >= cx) {
                 renderer.paintBar(g, owner, t, x + rect[0], y + rect[1], rect[2], rect[3], state);
+                if (!held && !t.isMilestone()) {
+                    Look.glow(g, rowStyle.getFgColor(), x + rect[0], y + rect[1], rect[2], rect[3], over);
+                }
             }
+            g.setAlpha(alpha);
             String label = labelOf(model, t);
             if (label != null) {
                 g.setFont(f);
@@ -617,9 +633,11 @@ final class GanttChart extends ScrollSurface {
         int x1 = x + axis.x(editEnd);
         int top = y + row * rowH + (rowH - barH) / 2;
         if (editTask.isMilestone()) {
+            Look.shadow(g, x0 - barH / 2, top, barH, barH, liftLevel());
             owner.getBarRenderer().paintBar(g, owner, editTask, x0 - barH / 2, top, barH, barH,
                     GanttBarRenderer.DRAGGED);
         } else {
+            Look.shadow(g, x0, top, Math.max(2, x1 - x0), barH, liftLevel());
             owner.getBarRenderer().paintBar(g, owner, editTask, x0, top, Math.max(2, x1 - x0), barH,
                     GanttBarRenderer.DRAGGED);
         }
@@ -641,6 +659,8 @@ final class GanttChart extends ScrollSurface {
         boolean showCritical = owner.isShowCriticalPath();
         int stub = Look.mm(1.8f);
         int head = Math.max(3, Look.mm(1));
+        Object over = isPrinting() ? null : hovered();
+        int strong = Look.style("GanttRow").getFgColor();
         for (TaskDependency d : all) {
             Integer pr = rowOf.get(d.getPredecessor());
             Integer sr = rowOf.get(d.getSuccessor());
@@ -663,6 +683,10 @@ final class GanttChart extends ScrollSurface {
             int out = fx + dirF * stub;
             int in = tx - dirT * stub;
             g.setColor(showCritical && d.getPredecessor().isCritical() && d.getSuccessor().isCritical() ? hot : plain);
+            if (over != null && (over == d.getPredecessor() || over == d.getSuccessor())) { //NOPMD CompareObjectsWithEquals - the very task the pointer is on
+                // What the task under the pointer waits for, and what waits for it.
+                g.setColor(strong);
+            }
             if (dirF == dirT && (in - out) * dirF >= 0) {
                 g.drawLine(fx, fy, in, fy);
                 g.drawLine(in, fy, in, ty);
@@ -700,6 +724,9 @@ final class GanttChart extends ScrollSurface {
         GanttTask selected = isPrinting() ? null : owner.getSelectedTask();
         int line = Look.mix(rowStyle.getBgColor(), rowStyle.getFgColor(), 25);
         boolean aa = g.isAntiAliased();
+        boolean lit = anyHover();
+        int hot = lit ? hoverRow(hovered()) : -1;
+        int cold = lit ? hoverRow(fading()) : -1;
         for (int r = firstRow; r <= lastRow; r++) {
             GanttTask t = rows.get(r);
             int top = y + r * rowH;
@@ -708,6 +735,11 @@ final class GanttChart extends ScrollSurface {
                 Look.fill(g, rowSel, x, top, headerW, rowH);
             } else if (t.isSummary()) {
                 Look.fill(g, summaryRow, x, top, headerW, rowH);
+            }
+            if (r == hot) {
+                Look.wash(g, rowStyle.getFgColor(), x, top, headerW, rowH, hoverLevel(hovered()));
+            } else if (r == cold) {
+                Look.wash(g, rowStyle.getFgColor(), x, top, headerW, rowH, hoverLevel(fading()));
             }
             Font f = st.getFont();
             int tx = x + pad + t.getLevel() * indent;
@@ -761,6 +793,87 @@ final class GanttChart extends ScrollSurface {
     }
 
     // ------------------------------------------------------------ pointer
+
+    // The row the pointer is in, whether it is on the bar or beside it.
+    private int hoverRow(Object key) {
+        if (key instanceof Integer) {
+            return ((Integer) key).intValue();
+        }
+        if (key instanceof GanttTask) {
+            Integer r = rowOf.get(key);
+            return r == null ? -1 : r.intValue();
+        }
+        return -1;
+    }
+
+    // That row lit from edge to edge: the table and the chart are one row.
+    private void paintRowHover(Graphics g, int x, int y, int w, int rgb) {
+        if (!anyHover()) {
+            return;
+        }
+        Object now = hovered();
+        Object was = fading();
+        int r = hoverRow(now);
+        if (r >= 0 && r < rows.size()) {
+            Look.wash(g, rgb, x, y + r * rowH, w, rowH, hoverLevel(now));
+        }
+        int old = hoverRow(was);
+        if (old >= 0 && old < rows.size() && old != r) {
+            Look.wash(g, rgb, x, y + old * rowH, w, rowH, hoverLevel(was));
+        }
+    }
+
+    @Override
+    void hoverAt(int x, int y) {
+        int r = rowAt(y);
+        if (r < 0 || x < 0 || x >= getWidth()) {
+            hover(null, DEFAULT_CURSOR);
+            return;
+        }
+        if (x < headerW) {
+            // A click on the table picks the task or folds its children.
+            hover(Integer.valueOf(r), HAND_CURSOR);
+            return;
+        }
+        int cx = x - headerW + getOffX();
+        int cy = y - headerH + getOffY();
+        boolean edits = owner.isEditable();
+        GanttTask sel = owner.getSelectedTask();
+        Integer selRow = sel == null ? null : rowOf.get(sel);
+        if (edits && sel != null && selRow != null && !sel.isSummary()) {
+            // The two handles of the selected task, as beginEdit reads them.
+            barRect(sel, selRow.intValue(), rect);
+            int reach = Look.mm(2.6f);
+            if (Math.abs(cx - (rect[0] + rect[2] + Look.mm(2.2f))) <= reach
+                    && Math.abs(cy - (rect[1] + rect[3] / 2)) <= reach) {
+                hover(sel, CROSSHAIR_CURSOR);
+                return;
+            }
+            int px = rect[0] + rect[2] * sel.getPercentComplete() / 100;
+            if (!sel.isMilestone() && Math.abs(cx - px) <= reach && cy >= rect[1] + rect[3] / 2
+                    && cy <= rect[1] + rect[3] + reach) {
+                hover(sel, E_RESIZE_CURSOR);
+                return;
+            }
+        }
+        GanttTask t = barAt(x, y);
+        if (t == null) {
+            hover(Integer.valueOf(r), DEFAULT_CURSOR);
+            tip(null);
+            return;
+        }
+        ZoneId zone = axis.getZone();
+        tip(t.getName() + ", " + Dates.monthDay(TimeMath.epochDay(t.getStart(), zone)) + " - "
+                + Dates.monthDay(TimeMath.epochDay(Math.max(t.getStart(), t.getEnd() - 1), zone)) + ", "
+                + t.getPercentComplete() + "%");
+        int cursor = HAND_CURSOR;
+        if (edits && isDragEdits() && !t.isSummary()) {
+            barRect(t, r, rect);
+            int edge = Math.min(rect[2] / 3, Look.mm(1.6f));
+            cursor = !t.isMilestone() && rect[0] + rect[2] - cx <= edge ? E_RESIZE_CURSOR : MOVE_CURSOR;
+        }
+        hover(t, cursor);
+    }
 
     private int rowAt(int py) {
         int r = (py - headerH + getOffY()) / Math.max(1, rowH);

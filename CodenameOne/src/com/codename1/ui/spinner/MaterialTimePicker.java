@@ -30,6 +30,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
@@ -58,6 +59,17 @@ import com.codename1.util.MathUtil;
 ///
 /// With `setShowMeridiem(true)` the face has twelve hours and AM and PM
 /// beside the time; without, it has two rings, the afternoon inside.
+///
+/// ![The hours of a Material time picker](https://www.codenameone.com/developer-guide/img/generated/picker-material-time.png)
+/// ![The minutes](https://www.codenameone.com/developer-guide/img/generated/picker-material-time-minutes.png)
+/// ![Twenty four hours](https://www.codenameone.com/developer-guide/img/generated/picker-material-time-24h.png)
+///
+/// Under a mouse the number the pointer is over is marked. The hand follows
+/// a finger as it is dragged, and turns by the shorter way round to a time
+/// that is set any other way: the minutes after an hour is chosen, a time
+/// typed in, a call to `setTime`.
+///
+/// ![The hand turning from ten to two, as four stopped frames](https://www.codenameone.com/developer-guide/img/generated/picker-material-hand-stages.png)
 ///
 /// #### Styling
 ///
@@ -362,6 +374,16 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         return dial;
     }
 
+    /// Where the hand points now, in degrees clockwise from twelve.
+    float handAt() {
+        return dial.handAt();
+    }
+
+    /// The number of the face the pointer is over, or -1.
+    int overNumber() {
+        return dial.overIndex;
+    }
+
     TextField hourInputField() {
         return hourInput;
     }
@@ -447,6 +469,23 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
 
     // ----------------------------------------------------------- the face
 
+    private static final int SWEEP_MS = 220;
+    private long fixedClock = -1;
+
+    /// Stops the clock the hand turns by at a time, for a screenshot of
+    /// the turn or a test of it. A negative value returns to the clock.
+    public void setAnimationTime(long millis) {
+        // What changed before this is a turn that starts now.
+        dial.sync();
+        fixedClock = millis;
+        dial.sync();
+        dial.repaint();
+    }
+
+    private long clock() {
+        return fixedClock >= 0 ? fixedClock : System.currentTimeMillis();
+    }
+
     /// The clock face, painted.
     private final class Dial extends Component {
         Dial() {
@@ -466,6 +505,13 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
             return Math.min(getWidth() - s.getHorizontalPadding(), getHeight() - s.getVerticalPadding()) / 2;
         }
 
+        // The ring of the hours after noon, inside the ring at `outer`.
+        // Half way to the centre, as on the platform's own dial: any
+        // closer in and twelve two-digit numbers run into one another.
+        private int innerRing(int outer, int k) {
+            return outer - k * 3 / 2;
+        }
+
         private int knob(int r) {
             return Math.max(3, r * 19 / 100);
         }
@@ -483,33 +529,49 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
             int cy = getY() + getHeight() / 2;
             int k = knob(r);
             int outer = r - k - Math.max(1, r / 28);
-            int inner = outer - 2 * k + k / 5;
+            int inner = innerRing(outer, k);
             boolean aa = g.isAntiAliased();
             g.setAntiAliased(true);
             g.setColor(face.getBgColor());
             g.fillArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
 
             // The hand first, then the numbers over it.
-            int at;
-            int ring = outer;
-            if (minutesShown) {
-                at = minute * 6;
-            } else {
-                at = hour * 30 % 360;
-                if (!meridiem && (hour == 0 || hour > 12)) {
-                    ring = inner;
-                }
-            }
-            double a = Math.toRadians(at);
+            sync();
+            float p = sweep();
+            double a = Math.toRadians(fromAt + turn(fromAt, toAt) * p);
+            float inward = (fromIn ? 1 : 0) + ((toIn ? 1 : 0) - (fromIn ? 1 : 0)) * p;
+            int ring = outer - Math.round((outer - inner) * inward);
             int hx = cx + (int) Math.round(Math.sin(a) * ring);
             int hy = cy - (int) Math.round(Math.cos(a) * ring);
+            if (overIndex >= 0) {
+                // Where a press would put the hand.
+                double oa = Math.toRadians(overIndex * 30);
+                int or = overIn ? inner : outer;
+                int alpha0 = g.getAlpha();
+                g.setColor(face.getFgColor());
+                g.setAlpha(alpha0 * 28 / 255);
+                g.fillArc(cx + (int) Math.round(Math.sin(oa) * or) - k, cy - (int) Math.round(Math.cos(oa) * or) - k,
+                        2 * k, 2 * k, 0, 360);
+                g.setAlpha(alpha0);
+            }
             g.setColor(hand.getBgColor());
             g.drawLine(cx, cy, hx, hy);
             g.drawLine(cx + 1, cy, hx + 1, hy);
             g.fillArc(cx - k / 4, cy - k / 4, k / 2, k / 2, 0, 360);
             g.fillArc(hx - k, hy - k, 2 * k, 2 * k, 0, 360);
+            // A number is written in the hand's colour while the hand is
+            // on it, which during a sweep is not the number that is set:
+            // that one would be white on the pale face until the hand
+            // arrived.
+            knobX = hx;
+            knobY = hy;
+            knobNear = k * k * 2 / 5;
+            litColor = hand.getFgColor();
+            plainColor = face.getFgColor();
 
             Font f = face.getFont();
+            // The inner ring is shorter round, and its numbers smaller.
+            Font small = meridiem || minutesShown ? f : innerFont(f);
             g.setFont(f);
             int alpha = g.getAlpha();
             boolean marked = false;
@@ -531,7 +593,7 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
                     number(g, f, String.valueOf(morning), cx, cy, outer, i,
                             hour == morning ? hand.getFgColor() : isEnabledHour(morning) ? face.getFgColor() : off.getFgColor());
                     g.setAlpha(isEnabledHour(evening) ? alpha : alpha * 97 / 255);
-                    number(g, f, two(evening), cx, cy, inner, i,
+                    number(g, small, two(evening), cx, cy, inner, i,
                             hour == evening ? hand.getFgColor() : isEnabledHour(evening) ? face.getFgColor() : off.getFgColor());
                 }
                 g.setAlpha(alpha);
@@ -544,11 +606,212 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
             g.setAntiAliased(aa);
         }
 
+        private int knobX;
+        private int knobY;
+        private int knobNear;
+        private int litColor;
+        private int plainColor;
+        private Font innerOf;
+        private Font innerFont;
+
+        private Font innerFont(Font f) {
+            if (innerOf != f) { //NOPMD CompareObjectsWithEquals - the font the cached one was made from
+                innerOf = f;
+                innerFont = f.isTTFNativeFont() ? f.derive(f.getPixelSize() * 0.85f, f.getStyle()) : f;
+            }
+            return innerFont;
+        }
+
+        // ---- the hand turns to a time it was not dragged to ----
+
+        private boolean aimed;
+        private int aimedAt;
+        private boolean held;
+        private float fromAt;
+        private float toAt;
+        private boolean fromIn;
+        private boolean toIn;
+        private long sweepSince = -1;
+        private boolean registered;
+        private int overIndex = -1;
+        private boolean overIn;
+
+        // The shorter way round from one angle to another.
+        private float turn(float from, float to) {
+            float d = (to - from) % 360;
+            if (d > 180) {
+                d -= 360;
+            } else if (d < -180) {
+                d += 360;
+            }
+            return d;
+        }
+
+        // Points the hand at the time the picker has now.
+        void sync() {
+            if (minutesShown) {
+                aim(minute * 6, false);
+            } else {
+                aim(hour * 30 % 360, !meridiem && (hour == 0 || hour > 12));
+            }
+        }
+
+        float handAt() {
+            sync();
+            float a = (fromAt + turn(fromAt, toAt) * sweep()) % 360;
+            return a < 0 ? a + 360 : a;
+        }
+
+        // How far the hand has come, from 0 to 1.
+        private float sweep() {
+            if (sweepSince < 0) {
+                return 1;
+            }
+            long t = clock() - sweepSince;
+            if (t >= SWEEP_MS) {
+                return 1;
+            }
+            float p = t <= 0 ? 0 : t / (float) SWEEP_MS;
+            return p * p * (3 - 2 * p);
+        }
+
+        // The time the face shows has changed. Under a finger the hand is
+        // where the finger is; set any other way it turns there: the hour
+        // was chosen and the minutes are asked, a field was typed in, the
+        // half of the day was changed.
+        private void aim(int at, boolean in) {
+            if (aimed && at == aimedAt && in == toIn) {
+                return;
+            }
+            if (!aimed || held || !isInitialized()) {
+                sweepSince = -1;
+            } else {
+                float p = sweep();
+                fromAt = fromAt + turn(fromAt, toAt) * p;
+                // Halfway between the rings it starts from the nearer one.
+                fromIn = p < 0.5f ? fromIn : toIn;
+                sweepSince = clock();
+                Form f = getComponentForm();
+                if (f != null && !registered) {
+                    f.registerAnimated(this);
+                    registered = true;
+                }
+            }
+            if (sweepSince < 0) {
+                fromAt = at;
+                fromIn = in;
+            }
+            // The angle as it was given, to compare the next one with: two
+            // floats are not compared for equality.
+            aimedAt = at;
+            toAt = at;
+            toIn = in;
+            aimed = true;
+        }
+
+        @Override
+        public boolean animate() {
+            boolean busy = sweepSince >= 0 && fixedClock < 0 && clock() - sweepSince < SWEEP_MS;
+            if (!busy && registered) {
+                Form f = getComponentForm();
+                if (f != null) {
+                    f.deregisterAnimated(this);
+                }
+                registered = false;
+            }
+            return busy;
+        }
+
+        @Override
+        protected void deinitialize() {
+            if (registered) {
+                Form f = getComponentForm();
+                if (f != null) {
+                    f.deregisterAnimated(this);
+                }
+                registered = false;
+            }
+            sweepSince = -1;
+            held = false;
+            overIndex = -1;
+            super.deinitialize();
+        }
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            if (Display.getInstance().isDesktop()) {
+                Form f = getComponentForm();
+                if (f != null && !f.isEnableCursors()) {
+                    f.setEnableCursors(true);
+                }
+                setCursor(HAND_CURSOR);
+            }
+        }
+
+        @Override
+        public void pointerHover(int[] x, int[] y) {
+            int r = radius();
+            if (r <= 0 || x == null || x.length == 0) {
+                return;
+            }
+            int dx = x[0] - getAbsoluteX() - getWidth() / 2;
+            int dy = y[0] - getAbsoluteY() - getHeight() / 2;
+            int index = -1;
+            boolean in = false;
+            if (dx * dx + dy * dy <= r * r && (dx != 0 || dy != 0)) {
+                double deg = Math.toDegrees(MathUtil.atan2(dx, -dy));
+                if (deg < 0) {
+                    deg += 360;
+                }
+                index = (int) Math.round(deg / 30) % 12;
+                if (!minutesShown) {
+                    int h;
+                    if (meridiem) {
+                        h = index + (hour >= 12 ? 12 : 0);
+                    } else {
+                        int k = knob(r);
+                        int outer = r - k - Math.max(1, r / 28);
+                        int inner = innerRing(outer, k);
+                        in = dx * dx + dy * dy < (outer + inner) * (outer + inner) / 4;
+                        h = in ? (index == 0 ? 0 : index + 12) : (index == 0 ? 12 : index);
+                    }
+                    if (!isEnabledHour(h)) {
+                        index = -1;
+                    }
+                }
+            }
+            if (index != overIndex || in != overIn) {
+                overIndex = index;
+                overIn = in;
+                repaint();
+            }
+        }
+
+        @Override
+        public void setHovered(boolean hovered) {
+            super.setHovered(hovered);
+            if (!hovered && overIndex >= 0) {
+                overIndex = -1;
+                repaint();
+            }
+        }
+
         private void number(Graphics g, Font f, String s, int cx, int cy, int ring, int i, int color) {
             double a = Math.toRadians(i * 30);
             int x = cx + (int) Math.round(Math.sin(a) * ring);
             int y = cy - (int) Math.round(Math.cos(a) * ring);
-            g.setColor(color);
+            int dx = x - knobX;
+            int dy = y - knobY;
+            boolean under = dx * dx + dy * dy <= knobNear;
+            int shown = color;
+            if (under) {
+                shown = litColor;
+            } else if (color == litColor) {
+                shown = plainColor;
+            }
+            g.setColor(shown);
+            g.setFont(f);
             g.drawString(s, x - f.stringWidth(s) / 2, y - f.getHeight() / 2);
         }
 
@@ -585,7 +848,7 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
             } else {
                 int k = knob(r);
                 int outer = r - k - Math.max(1, r / 28);
-                int inner = outer - 2 * k + k / 5;
+                int inner = innerRing(outer, k);
                 boolean inside = dx * dx + dy * dy < (outer + inner) * (outer + inner) / 4;
                 h = inside ? (i == 0 ? 0 : i + 12) : (i == 0 ? 12 : i);
             }
@@ -599,6 +862,8 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
 
         @Override
         public void pointerPressed(int x, int y) {
+            held = true;
+            overIndex = -1;
             point(x, y);
         }
 
@@ -611,6 +876,9 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         public void pointerReleased(int x, int y) {
             pointedHour = false;
             point(x, y);
+            // The hand is where the finger left it before anything turns it.
+            sync();
+            held = false;
             if (!minutesShown && pointedHour) {
                 // The hour is chosen; the minute is what is asked next. An
                 // hour that cannot be chosen leaves the question open.
@@ -625,7 +893,7 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         int r = dial.radius();
         int k = dial.knob(r);
         int outer = r - k - Math.max(1, r / 28);
-        int inner = outer - 2 * k + k / 5;
+        int inner = dial.innerRing(outer, k);
         int ring = outer;
         double a;
         if (ofMinutes) {

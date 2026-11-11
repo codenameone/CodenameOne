@@ -32,6 +32,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling
 Give the scheduler the center of a `BorderLayout`. It scrolls inside the room
 it's given, so it doesn't belong in a container that scrolls too.
 
+.A week of a schedule
+image::img/generated/scheduler-week.png["A week with a column for each day, the hours down the side and items placed by their times",scaledwidth=70%]
+
 The toolbar above the grid moves to the previous or the next stretch, returns
 to today and switches between views. `setViews` chooses which views it offers,
 `setToolbarVisible(false)` removes it when the application has a heading of its
@@ -63,6 +66,37 @@ column's width, and items that last all day sit in a lane above the hours.
 on Monday unless `setFirstDayOfWeek` says otherwise, and a week that starts on
 the day the user asked from is the same view with that day as its first.
 
+The bar over the schedule is one row where there is room for it. On a screen
+as narrow as a phone's the buttons that pick the view move to a row of their
+own, as in the day view below, and `setCompactToolbar(true)` folds them into a
+single button with a menu.
+
+The figures that follow are one schedule, three people's month, in each view.
+
+.The day view: two meetings at the same time share the column
+image::img/generated/scheduler-day.png["A day with the hours down the side, a band of working time, two overlapping meetings side by side and a hatched blocked hour",scaledwidth=30%]
+
+.The work week
+image::img/generated/scheduler-work-week.png["Five columns, Monday to Friday, with an all-day item in the lane above Friday",scaledwidth=70%]
+
+.The month view
+image::img/generated/scheduler-month.png["A grid of the days of March with the first items of each day as chips",scaledwidth=30%]
+
+.The agenda
+image::img/generated/scheduler-agenda.png["A list of days, each followed by the items in it with their times",scaledwidth=30%]
+
+The views take their colors from the theme, so they follow its dark appearance
+and look at home on each platform with no code:
+
+.The day view in the dark appearance
+image::img/generated/scheduler-day-dark.png["The day view on a dark background with light text",scaledwidth=30%]
+
+.The month view in the dark appearance
+image::img/generated/scheduler-month-dark.png["The month grid on a dark background",scaledwidth=30%]
+
+.The day view in the iOS theme
+image::img/generated/scheduler-day-ios.png["The day view with the colors and the toolbar of the iOS theme",scaledwidth=30%]
+
 === Resources
 
 A `ScheduleResource` is anything work is booked against: a person, a room, a
@@ -79,6 +113,12 @@ such as the hours somebody is available. A `BLOCKED` item is time that's taken
 and isn't this application's to edit, such as busy time read from another
 calendar, and it's drawn hatched so it never reads as an event that lost its
 color.
+
+.`RESOURCE_DAY`: a column for each person
+image::img/generated/scheduler-resource-day.png["One day with a column each for Ana, Ben and Cy and their items under their names",scaledwidth=30%]
+
+.`RESOURCE_TIMELINE`: a row for each person
+image::img/generated/scheduler-resource-timeline.png["A row each for Ana, Ben and Cy with time running across and their items as bars",scaledwidth=70%]
 
 === Working hours
 
@@ -116,6 +156,47 @@ everything in memory; an application whose items live on a server implements
 `ScheduleModel`, or extends `AbstractScheduleModel`, loads the range the view
 asks for in `setVisibleRange`, and sends the edit in `updateItem`.
 
+==== What the pointer shows, and how things move
+
+A mouse says a lot before it's pressed, and the views answer it. The item
+under the pointer lights up, and over free time the slot a drag would start in
+is marked. The cursor says what a drag would do: an arrow cross over an item
+that can be moved, a resize arrow at an edge that can be pulled, a hand over
+something that can only be opened. A tooltip gives the title and the time of
+an item too small to show them. None of this appears on a touch screen, which
+has no pointer to rest.
+
+Edits are animated the same way with a mouse and with a finger. An item that's
+picked up lifts off the page: a shadow comes up under it, and the place it
+left dims to show where it'd return. Let go, it glides from where it was
+dropped to the time it snapped to, and takes its place beside whatever is
+already there. An edit a listener refuses glides back to where it started. Each
+of these takes under a quarter of a second.
+
+The figures that follow are those animations stopped at their stages.
+
+.An item is moved: pointed at, picked up, carried, dropped beside a meeting, and at rest
+image::img/generated/scheduler-drag-stages.png["Five frames of one day: an item lit under the pointer, lifted with a shadow, carried later, gliding into half the column, and settled",scaledwidth=100%]
+
+.An item is made longer by its lower edge
+image::img/generated/scheduler-resize-stages.png["Four frames of one day: the pointer on the lower edge of an item, the edge pulled down, the item settling, and at rest",scaledwidth=100%]
+
+.A drag over free time selects it
+image::img/generated/scheduler-range-stages.png["Three frames of one day: a free slot marked under the pointer, a range drawn out, and the range selected",scaledwidth=80%]
+
+.In the month an item is carried to another day
+image::img/generated/scheduler-month-drag-stages.png["Three frames of a month: an item lit under the pointer, carried over a later day, and in that day",scaledwidth=100%]
+
+An application that takes screenshots of its own, or tests an animation, stops
+the clock they run by. `setAnimationTime` fixes it at a number of milliseconds,
+whatever starts afterward starts at that moment, and moving the clock on shows
+the animation that far along. It's how the figures above were made.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/SchedulingSnippets.java[tag=scheduler-animation-time,indent=0]
+----
+
 === Showing a calendar
 
 `CalendarScheduleModel` is a `ScheduleModel` over a `CalendarSource` from the
@@ -147,6 +228,9 @@ project, and each task then answers `getStart()` and `getEnd()`.
 include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/SchedulingSnippets.java[tag=gantt-first,indent=0]
 ----
 
+.A project as a Gantt chart
+image::img/generated/gantt-chart.png["A table of tasks beside their bars on a time axis, with a bracket over a group of tasks, lines between linked bars and a diamond for the release",scaledwidth=70%]
+
 A task with children is a summary, drawn as a bracket over them, and a task
 with no duration is a milestone. A dependency is one of the four usual types,
 with a lag that may be negative:
@@ -177,6 +261,20 @@ slip before the project does, and `isCritical()` marks the tasks with none.
 `setShowCriticalPath(true)` draws those bars and the links between them in
 their own colors.
 
+.The critical path: the tasks with no slack, and the links between them
+image::img/generated/gantt-critical-path.png["The chart with the chain of tasks that decides the end of the project drawn in red and the task with slack left as it was",scaledwidth=70%]
+
+`captureBaseline()` keeps every task's dates as the plan of record, and
+`setShowBaseline(true)` draws them as a thin bar under each task, so a slip
+shows as a bar that has moved off its baseline. `setCollapsed` folds a summary
+over its tasks, as a tap on its arrow in the table does.
+
+.A baseline: the API took two days more than planned, and everything after it moved
+image::img/generated/gantt-baseline.png["The chart with a thin grey bar under each task where it was planned, and the later tasks drawn to the right of theirs",scaledwidth=70%]
+
+.A summary folded over its tasks
+image::img/generated/gantt-collapsed.png["The chart with the Build group collapsed to one bracket",scaledwidth=70%]
+
 A task can be held by a constraint, such as `START_NO_EARLIER_THAN` a date or
 `MUST_FINISH_ON` one, and `isConstraintViolated()` reports one the links made
 impossible. `setManuallyScheduled(true)` takes a task out of scheduling
@@ -192,6 +290,24 @@ again. A `GanttListener` can refuse any of them:
 include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/SchedulingSnippets.java[tag=gantt-events,indent=0]
 ----
 
+The chart answers a mouse as the scheduler does. The bar under the pointer
+lights up together with the links into and out of it, and its row is marked in
+the table and across the chart, so a task is easy to follow in a wide plan. The
+cursor shows what a drag would do, down to the end of a bar and the two handles
+of the selected one, and a tooltip gives the task's dates and progress. A bar
+that's picked up lifts over a shadow, and when it's let go the project is
+scheduled again and every bar the change moved slides to its new dates
+together.
+
+.A task is moved two days later and the tasks that depend on it follow
+image::img/generated/gantt-drag-stages.png["Four frames of a chart: a bar lit with its links, the bar carried to the right over a shadow, the bars after it halfway to their new places, and at rest",scaledwidth=45%]
+
+.A dependency is drawn from the selected bar to another
+image::img/generated/gantt-link-stages.png["Three frames of a chart: the pointer on the dot after a selected bar, a line pulled from it to another bar, and the other bar moved to follow the first",scaledwidth=45%]
+
+`Gantt` has the same `setAnimationTime` as `Scheduler`, which is how these
+frames were stopped.
+
 === Resource load and leveling
 
 A task is assigned to a resource in units: `assign("dev")` is one person
@@ -201,6 +317,9 @@ the tasks assigned to it add up to more, it's over-allocated.
 `setLoadVisible(true)` puts a histogram of each resource's load under the
 chart, on the same time axis, with the stretches over capacity in the error
 color.
+
+.The load of each resource under the chart: one developer has been given two tasks at once
+image::img/generated/gantt-load.png["A chart with a histogram under it, the developer row rising over its capacity line in red",scaledwidth=30%]
 
 `ResourceLeveler` resolves over-allocation by delaying tasks. It first uses the
 slack a task has, so the project's end doesn't move, and then delays by
@@ -214,6 +333,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling
 `getUnresolved()` lists what leveling couldn't fix, such as one task that needs
 more of a resource than there is. `ProjectModel.clearLeveling()` removes the
 delays again.
+
+.The same project leveled: the task that had slack was moved, and the load is within capacity
+image::img/generated/gantt-leveled.png["The chart with one task delayed and the histogram under it no higher than its capacity line",scaledwidth=30%]
 
 === Printing and export
 
@@ -278,3 +400,70 @@ tentative bookings differently. For anything further, `setItemRenderer` and
 `setBarRenderer` replace the painting of an item or a bar; extend
 `DefaultScheduleItemRenderer` or `DefaultGanttBarRenderer` to change one part
 of it.
+
+==== Restyling from CSS
+
+A rule for one of the UIIDs in the table changes that part and leaves the rest
+to the native theme. These rules give the schedule a brand color, and add a
+UIID of the application's own for bookings that aren't confirmed:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=scheduling-css-scheduler,indent=0]
+----
+
+The items that are tentative ask for that UIID with
+`item.setUIID("TentativeBooking")`.
+
+.The day view under those rules
+image::img/generated/scheduler-css.png["The day view with teal items, a pale teal band of working time and two amber tentative items",scaledwidth=30%]
+
+The Gantt chart is restyled the same way:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=scheduling-css-gantt,indent=0]
+----
+
+.The chart under those rules
+image::img/generated/gantt-css.png["The chart with blue bars, their done part darker, an orange critical path and a violet milestone",scaledwidth=70%]
+
+The chart follows the theme's appearance and platform like the scheduler:
+
+.The chart in the dark appearance
+image::img/generated/gantt-dark.png["The chart on a dark background",scaledwidth=70%]
+
+.The chart in the iOS theme
+image::img/generated/gantt-ios.png["The chart with the colors of the iOS theme",scaledwidth=70%]
+
+==== Colors from the data
+
+A color can come from the model instead of the theme. A resource with a color
+gives it to all its items, and an item with one of its own overrides that;
+the text turns black or white to stay readable on whichever it is.
+
+.A color for each person, and one item with a color of its own
+image::img/generated/scheduler-item-colors.png["A week in which the items of Ana are violet, those of Ben blue and those of Cy amber, with one green item",scaledwidth=70%]
+
+==== A renderer of your own
+
+A renderer is handed the item, its rectangle and a set of flags that say how
+it's being shown: `SELECTED`, `DRAGGED` while it's carried, `HOVERED` while
+the pointer rests on it, `COMPACT` in the month and the all-day lane. This one
+draws an event as a card with a stripe, and deepens it under the pointer:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/CardItemRenderer.java[tag=scheduler-renderer,indent=0]
+----
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/SchedulingSnippets.java[tag=scheduler-renderer-use,indent=0]
+----
+
+.The day view drawn by that renderer
+image::img/generated/scheduler-renderer.png["The day view with items drawn as pale cards with a solid stripe down their left edge",scaledwidth=30%]
+
+The views still draw the light, the shadow and the glide around what the
+renderer paints, so a custom item moves like a built-in one.

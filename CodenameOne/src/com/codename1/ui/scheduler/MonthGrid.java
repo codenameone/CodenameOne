@@ -215,9 +215,13 @@ final class MonthGrid extends ScrollSurface {
         long today = TimeMath.epochDay(owner.now(), zone);
         ScheduleItemRenderer renderer = owner.getItemRenderer();
         ScheduleItem selected = owner.getSelectedItem();
-        int line = Look.mix(grid.getBgColor(), grid.getFgColor(), 150);
+        int line = Look.line(grid, 255);
         int lo = Math.min(anchorCell, editCell);
         int hi = Math.max(anchorCell, editCell);
+        Object over = hovered();
+        Object left = fading();
+        float lift = mode == MOVE ? liftLevel() : 0;
+        int alpha = g.getAlpha();
         for (int cell = 0; cell < weeks * 7; cell++) {
             long day = firstDay + cell;
             int x0 = x + colX(cell % 7);
@@ -230,6 +234,11 @@ final class MonthGrid extends ScrollSurface {
             }
             if ((mode == MOVE && cell == editCell) || (mode == RANGE && cell >= lo && cell <= hi)) {
                 Look.fill(g, sel, x0, y0, x1 - x0, y1 - y0);
+            }
+            if (over instanceof Integer && ((Integer) over).intValue() == cell) {
+                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, hoverLevel(over));
+            } else if (left instanceof Integer && ((Integer) left).intValue() == cell) {
+                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, hoverLevel(left));
             }
             String num = String.valueOf(Dates.dayOfMonth(day));
             int nw = nf.stringWidth(num);
@@ -263,7 +272,21 @@ final class MonthGrid extends ScrollSurface {
                 if (TimeMath.epochDay(Math.max(item.getStart(), item.getEnd() - 1), zone) > day) {
                     state |= ScheduleItemRenderer.ENDS_AFTER;
                 }
+                float lit = over != null || left != null ? hoverLevel(item.getId()) : 0;
+                if (lit > 0) {
+                    state |= ScheduleItemRenderer.HOVERED;
+                }
+                boolean held = lift > 0 && item == editItem; //NOPMD CompareObjectsWithEquals - the very item that is held
+                if (held) {
+                    // What is left behind while the item is carried.
+                    g.setAlpha(Math.round(alpha * (1 - 0.6f * lift)));
+                }
                 renderer.paintItem(g, owner, item, x0 + 1, cy, x1 - x0 - 2, chipH - 1, state);
+                if (held) {
+                    g.setAlpha(alpha);
+                } else {
+                    Look.glow(g, grid.getFgColor(), x0 + 1, cy, x1 - x0 - 2, chipH - 1, lit);
+                }
                 cy += chipH;
             }
             if (list.size() > n) {
@@ -283,6 +306,32 @@ final class MonthGrid extends ScrollSurface {
         }
         for (int r = 1; r < weeks; r++) {
             g.drawLine(x, y + rowY(r), x + bw, y + rowY(r));
+        }
+        if (mode == MOVE && editItem != null && editCell != grabCell && capacity > 0) {
+            // The item itself, carried to the day it would land on.
+            int x0 = x + colX(editCell % 7) + 1;
+            int w = colX(editCell % 7 + 1) - colX(editCell % 7) - 2;
+            int top = y + rowY(editCell / 7) + numberH;
+            Look.shadow(g, x0, top, w, chipH - 1, lift);
+            renderer.paintItem(g, owner, editItem, x0, top, w, chipH - 1,
+                    ScheduleItemRenderer.COMPACT | ScheduleItemRenderer.DRAGGED | ScheduleItemRenderer.SELECTED);
+        }
+    }
+
+    @Override
+    void hoverAt(int x, int y) {
+        if (y < headerH || cells == null || x < 0 || x >= getWidth() || y >= getHeight()) {
+            hover(null, DEFAULT_CURSOR);
+            return;
+        }
+        ScheduleItem item = itemAt(x, y);
+        if (item != null) {
+            hover(item.getId(), owner.isEditable() && isDragEdits() && item.isMovable() ? MOVE_CURSOR : HAND_CURSOR);
+            tip(item.getTitle());
+        } else {
+            // The day a click opens and a drag starts a range from.
+            hover(Integer.valueOf(cellAt(x, y)), HAND_CURSOR);
+            tip(null);
         }
     }
 

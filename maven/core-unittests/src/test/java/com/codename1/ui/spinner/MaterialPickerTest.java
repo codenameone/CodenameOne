@@ -73,6 +73,88 @@ class MaterialPickerTest extends UITestBase {
         form.revalidate();
     }
 
+    @FormTest
+    void theHandTurnsToATimeItWasNotDraggedTo() {
+        MaterialTimePicker p = new MaterialTimePicker();
+        p.setShowMeridiem(true);
+        p.setTime(10, 10);
+        place(p);
+        p.setAnimationTime(1000);
+        assertEquals(300f, p.handAt(), 0.01f, "ten o'clock");
+        p.setTime(14, 10);
+        p.setAnimationTime(1000);
+        assertEquals(300f, p.handAt(), 0.01f, "the turn starts where the hand was");
+        p.setAnimationTime(1110);
+        assertEquals(0f, p.handAt() > 180 ? p.handAt() - 360 : p.handAt(), 1f,
+                "halfway, by the short way round through twelve");
+        p.setAnimationTime(1220);
+        assertEquals(60f, p.handAt(), 0.01f, "two o'clock");
+        p.setAnimationTime(-1);
+    }
+
+    @FormTest
+    void aDraggedHandIsWhereTheFingerIs() {
+        MaterialTimePicker p = new MaterialTimePicker();
+        p.setShowMeridiem(true);
+        p.setTime(10, 10);
+        place(p);
+        p.setAnimationTime(1000);
+        assertEquals(300f, p.handAt(), 0.01f);
+        int[] at = p.pointOf(2, false);
+        p.dialPane().pointerPressed(at[0], at[1]);
+        assertEquals(60f, p.handAt(), 0.01f, "no turn under a finger");
+        p.dialPane().pointerReleased(at[0], at[1]);
+        p.setAnimationTime(-1);
+    }
+
+    @FormTest
+    void thePointerMarksTheNumberAndTheDayItIsOver() {
+        MaterialTimePicker t = new MaterialTimePicker();
+        t.setShowMeridiem(true);
+        t.setTime(10, 10);
+        place(t);
+        int[] at = t.pointOf(7, false);
+        t.dialPane().pointerHover(new int[]{at[0]}, new int[]{at[1]});
+        assertEquals(7, t.overNumber());
+        t.dialPane().setHovered(false);
+        assertEquals(-1, t.overNumber(), "nothing is marked once the pointer has left");
+        t.remove();
+
+        MaterialDatePicker d = new MaterialDatePicker();
+        d.setDate(date(2026, 0, 5, 14, 30));
+        d.setDateRange(date(2026, 0, 3, 0, 0), date(2026, 0, 25, 0, 0));
+        place(d);
+        at = d.pointOfDay(20);
+        d.dayPane().pointerHover(new int[]{at[0]}, new int[]{at[1]});
+        assertEquals(20, d.overDay());
+        at = d.pointOfDay(28);
+        d.dayPane().pointerHover(new int[]{at[0]}, new int[]{at[1]});
+        assertEquals(-1, d.overDay(), "a day that cannot be chosen is not marked");
+        at = d.pointOfDay(20);
+        d.dayPane().pointerHover(new int[]{at[0]}, new int[]{at[1]});
+        d.dayPane().setHovered(false);
+        assertEquals(-1, d.overDay());
+    }
+
+    @FormTest
+    void aMonthAskedForSlidesIn() {
+        MaterialDatePicker p = new MaterialDatePicker();
+        p.setDate(date(2026, 0, 5, 14, 30));
+        place(p);
+        p.setAnimationTime(1000);
+        assertEquals(1f, p.slideAt(), 0.001f, "nothing moves until a month is asked for");
+        p.page(1);
+        assertEquals(0f, p.slideAt(), 0.001f);
+        p.setAnimationTime(1110);
+        assertTrue(p.slideAt() > 0.5f && p.slideAt() < 1f, "more than half way in half the time: it slows into place");
+        p.setAnimationTime(1220);
+        assertEquals(1f, p.slideAt(), 0.001f);
+        int[] at = p.pointOfDay(20);
+        tap(p.dayPane(), at);
+        assertEquals(date(2026, 1, 20, 14, 30), p.getDate(), "the month shown is the one a tap chooses in");
+        p.setAnimationTime(-1);
+    }
+
     private static final class Counter implements ActionListener {
         int count;
 

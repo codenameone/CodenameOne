@@ -51,6 +51,13 @@ public class DefaultScheduleItemRenderer implements ScheduleItemRenderer {
         if (own >= 0 && opacity == 0) {
             opacity = 255;
         }
+        if (own >= 0 && item.getKind() == ScheduleItem.Kind.BACKGROUND) {
+            // A band behind a day's items is a tint of the colour, not the
+            // colour: at full strength a person's working hours were the
+            // loudest thing in the view and hid the items over them.
+            opacity = Math.min(opacity, 48);
+            fg = st.getFgColor();
+        }
         if ((state & SELECTED) != 0 && own >= 0) {
             bg = Look.mix(bg, 0, 50);
         }
@@ -113,7 +120,13 @@ public class DefaultScheduleItemRenderer implements ScheduleItemRenderer {
         String title = item.getTitle();
         if (compact && !item.isAllDay() && item.getKind() == ScheduleItem.Kind.EVENT
                 && (state & HORIZONTAL) == 0) {
-            title = scheduler.formatTime(item.getStart()) + " " + title;
+            // The time goes first where there is room for both. In a
+            // narrow cell it would be all that fits, and a month of chips
+            // that say "09:00" tells nobody what is on.
+            String timed = scheduler.formatTime(item.getStart()) + " " + title;
+            if (font.stringWidth(timed) <= tw) {
+                title = timed;
+            }
         }
         g.drawString(Look.fit(title, font, tw), x + pad, ty);
         if (!compact && item.getKind() == ScheduleItem.Kind.EVENT) {

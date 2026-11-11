@@ -187,13 +187,17 @@ final class AgendaList extends ScrollSurface {
         long today = TimeMath.epochDay(owner.now(), zone);
         boolean h24 = owner.is24Hours();
         ScheduleItem selected = owner.getSelectedItem();
-        int line = Look.mix(grid.getBgColor(), grid.getFgColor(), 110);
+        int line = Look.line(grid, 200);
         int pad = Look.mm(1.5f);
         int alpha = g.getAlpha();
+        boolean lit = anyHover();
         for (Row r : rows) {
             int top = y + r.top;
             if (top > cy + ch || top + r.height < cy) {
                 continue;
+            }
+            if (lit) {
+                Look.wash(g, grid.getFgColor(), x, top, w, r.height, hoverLevel(Integer.valueOf(r.top)));
             }
             if (r.item == null) {
                 Look.fill(g, header, x, top, w, r.height);
@@ -263,6 +267,13 @@ final class AgendaList extends ScrollSurface {
             }
         }
         return null;
+    }
+
+    @Override
+    void hoverAt(int x, int y) {
+        // Every row answers a click: an item opens, a day is gone to.
+        Row r = x < 0 || x >= getWidth() || y < 0 || y >= getHeight() ? null : rowAt(y);
+        hover(r == null ? null : Integer.valueOf(r.top), r == null ? DEFAULT_CURSOR : HAND_CURSOR);
     }
 
     @Override
