@@ -256,6 +256,9 @@ public class Scheduler extends Container {
 
     private void showViewMenu(Button anchor) {
         final Dialog menu = new Dialog();
+        // Placed against the button that opens it. In a window of its own it
+        // would come out centred, wherever the theme's default points.
+        menu.setNativeWindowMode(false);
         menu.setLayout(BoxLayout.y());
         menu.setDisposeWhenPointerOutOfBounds(true);
         for (final View v : views) {

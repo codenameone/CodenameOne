@@ -1112,6 +1112,9 @@ public class Picker extends Button {
     private void showMaterialDialog() {
         final InternalPickerWidget widget = createMaterialWidget();
         final Dialog dlg = new Dialog(new BorderLayout());
+        // The picker's own surface over the form it belongs to, as the wheel
+        // popup and the modal picker are: never an operating system window.
+        dlg.setNativeWindowMode(false);
         dlg.setDialogUIID("PickerMaterialDialog");
         dlg.getTitleArea().setHidden(true);
         dlg.getTitleComponent().setHidden(true);
