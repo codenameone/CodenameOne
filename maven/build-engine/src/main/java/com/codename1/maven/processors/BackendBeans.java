@@ -105,6 +105,8 @@ final class BackendBeans {
     static final String[] LISTENERS = {MESSAGE_LISTENER, KAFKA_LISTENER, RABBIT_LISTENER,
         JMS_LISTENER};
     static final String MESSAGE_TEMPLATE_TYPE = "com/codename1/backend/messaging/MessageTemplate";
+    /// Injected to send mail; see [#usesMail].
+    static final String MAIL_SENDER_TYPE = "com/codename1/backend/mail/MailSender";
     static final String MESSAGE_TYPE = "com/codename1/backend/messaging/Message";
     static final String CACHEABLE = PKG + "Cacheable;";
     static final String CACHE_PUT = PKG + "CachePut;";
@@ -517,6 +519,7 @@ final class BackendBeans {
     boolean needsDatabase;
     /// Whether a bean injects the MessageTemplate.
     boolean usesMessageTemplate;
+    boolean usesMailSender;
     boolean needsEntities;
     boolean needsSession;
     /// The `@Repository` interfaces injected anywhere, by internal name, each
@@ -808,6 +811,24 @@ final class BackendBeans {
     /// must be given to the messaging transport before any bean is built.
     boolean usesMessaging() {
         return usesMessageTemplate || hasListeners();
+    }
+
+    /// Whether the module sends mail: a bean is given a `MailSender`, or the
+    /// configuration names a mail server -- which code that asks for
+    /// `MailSender.current()`, and the security flows that send, rely on with
+    /// no bean taking one.
+    boolean usesMail() {
+        return usesMailSender
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx, "cn1.mail.url")
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                "cn1.mail.transports")
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                "spring.mail.host");
+    }
+
+    /// [#mailTransports] of this module.
+    List<String> mailTransports() {
+        return mailTransports(ctx);
     }
 
     /// [#messagingTransports] of this module.
@@ -1938,6 +1959,66 @@ final class BackendBeans {
         return out;
     }
 
+    /// The mail transports the module's configuration names, as the factory
+    /// classes the wiring registers, by the rules of [#messagingTransports]:
+    /// the scheme of `cn1.mail.url`, SMTP for Spring Boot's `spring.mail.host`,
+    /// every one for a URL the build cannot read or a configuration that names
+    /// none, and exactly the set `cn1.mail.transports` lists when it is there.
+    static List<String> mailTransports(ProcessorContext ctx) {
+        Set<String> schemes = new LinkedHashSet<String>();
+        for (String list : RestControllerAnnotationProcessor.applicationPropertyValues(ctx,
+                "cn1.mail.transports")) {
+            int from = 0;
+            while (from <= list.length()) {
+                int comma = list.indexOf(',', from);
+                int end = comma < 0 ? list.length() : comma;
+                String name = list.substring(from, end).trim();
+                if (name.length() > 0) {
+                    schemes.add(name);
+                }
+                from = end + 1;
+            }
+        }
+        boolean named = !schemes.isEmpty();
+        for (String url : RestControllerAnnotationProcessor.applicationPropertyValues(ctx,
+                "cn1.mail.url")) {
+            if (url.indexOf("${") >= 0) {
+                schemes.addAll(MAIL_TRANSPORTS.keySet());
+                continue;
+            }
+            int colon = url.indexOf(':');
+            String scheme = colon < 0 ? url : url.substring(0, colon);
+            if (!MAIL_TRANSPORTS.containsKey(scheme) && scheme.endsWith("s")) {
+                scheme = scheme.substring(0, scheme.length() - 1);
+            }
+            schemes.add(scheme);
+        }
+        if (RestControllerAnnotationProcessor.applicationPropertyKnown(ctx, "spring.mail.host")) {
+            schemes.add("smtp");
+        }
+        if (!named && schemes.isEmpty() && !RestControllerAnnotationProcessor
+                .applicationPropertyKnown(ctx, "cn1.mail.url")) {
+            schemes.addAll(MAIL_TRANSPORTS.keySet());
+        }
+        List<String> out = new ArrayList<String>();
+        for (String scheme : schemes) {
+            String factory = MAIL_TRANSPORTS.get(scheme);
+            if (factory != null) {
+                out.add(scheme + " " + factory);
+            }
+        }
+        return out;
+    }
+
+    /// The mail transports by scheme. `memory:` and `log:` are part of the
+    /// mail package itself.
+    static final Map<String, String> MAIL_TRANSPORTS = new LinkedHashMap<String, String>();
+
+    static {
+        MAIL_TRANSPORTS.put("smtp", "com.codename1.backend.mail.smtp.SmtpTransport.Factory");
+        MAIL_TRANSPORTS.put("ses", "com.codename1.backend.mail.ses.SesTransport.Factory");
+    }
+
     /// The broker transports by scheme. `memory:` and `db:` are part of the
     /// messaging package itself.
     static final Map<String, String> TRANSPORTS = new LinkedHashMap<String, String>();
@@ -2633,6 +2714,11 @@ final class BackendBeans {
         if (MESSAGE_TEMPLATE_TYPE.equals(type)) {
             p.builtin = "messageTemplate";
             usesMessageTemplate = true;
+            return;
+        }
+        if (MAIL_SENDER_TYPE.equals(type)) {
+            p.builtin = "mailSender";
+            usesMailSender = true;
             return;
         }
         if (DATASOURCE_TYPE.equals(type)) {

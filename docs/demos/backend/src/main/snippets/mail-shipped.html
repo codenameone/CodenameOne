@@ -1,0 +1,9 @@
+<!-- tag::backend-mail-template-html[] -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+  <p>Hello <span th:text="${customer}">customer</span>,</p>
+  <p>Order <strong th:text="${orderId}">1</strong> is on its way.</p>
+</body>
+</html>
+<!-- end::backend-mail-template-html[] -->

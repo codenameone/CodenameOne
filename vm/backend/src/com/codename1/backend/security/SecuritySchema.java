@@ -81,6 +81,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /// | 10 | `cn1_rate_limit.window_end` | Expiry-aware cleanup for limiters with different periods |
 /// | 11 | `cn1_persistent_logins.previous_token_hash` | Concurrent remember-me rotation grace |
 /// | 12 | `cn1_persistent_logins.user_agent`, `cn1_persistent_logins.ip_address` | The device a remember-me sign-in came from |
+/// | 13 | `cn1_one_time_token`, `cn1_mfa_email`, `cn1_verified_email` | [com.codename1.backend.security.mail.JdbcOneTimeTokenRepository], [com.codename1.backend.security.mfa.JdbcEmailCodeRepository], [com.codename1.backend.security.mail.JdbcVerifiedEmailRepository] |
 ///
 /// #### Adopting an existing schema
 ///
@@ -120,7 +121,7 @@ public final class SecuritySchema {
 
     // The versions of this set. A version is never edited once released: a new
     // table, or a change to one, is a new version appended in migrations().
-    // The next takes 13. Each version is one method below that returns the
+    // The next takes 14. Each version is one method below that returns the
     // statements for an engine, a case in Tables.migrate, and a line in
     // migrations().
 
@@ -133,7 +134,8 @@ public final class SecuritySchema {
         "cn1_users", "cn1_authorities", "cn1_api_key", "cn1_persistent_logins", "cn1_mfa_totp",
         "cn1_mfa_recovery_code", "cn1_rate_limit", "cn1_federated_identity",
         "cn1_oauth2_registered_client", "cn1_oauth2_authorization", "cn1_oauth2_token",
-        "cn1_webauthn_user", "cn1_webauthn_credential"
+        "cn1_webauthn_user", "cn1_webauthn_credential", "cn1_one_time_token", "cn1_mfa_email",
+        "cn1_verified_email"
     };
 
     // Null until configured; then the default name -> configured name map.
@@ -266,7 +268,7 @@ public final class SecuritySchema {
         "users and authorities", "api keys", "persistent logins", "second factors",
         "rate limits", "federated identities", "oauth2 registered clients",
         "oauth2 authorizations", "passkeys", "rate limit expiry", "remember me rotation grace",
-        "remember me devices"
+        "remember me devices", "mail tokens"
     };
 
     /// The set, for `Migrations.register`.
@@ -324,6 +326,7 @@ public final class SecuritySchema {
                 case 10: statements = rateLimitExpiry(d); break;
                 case 11: statements = rememberMeRotationGrace(); break;
                 case 12: statements = rememberMeDevices(d); break;
+                case 13: statements = mailTokens(d); break;
                 default: throw new IOException("The security schema has no version " + version);
             }
             for (String statement : statements) {
@@ -492,5 +495,24 @@ public final class SecuritySchema {
                 + text(d) + ", label " + text(d) + ", created_at " + moment(d) + ", last_used "
                 + moment(d) + ")",
             "CREATE INDEX " + index("cn1_webauthn_credential", "user") + " ON " + table("cn1_webauthn_credential") + " (user_id)"};
+    }
+
+    /// What the mailed flows keep: a link's token (only its SHA-256, so a
+    /// copy of the table opens nothing), the code of a sign-in by mail, and
+    /// the address a user has proved to be theirs.
+    private static String[] mailTokens(Dialect d) {
+        return new String[] {
+            "CREATE TABLE " + table("cn1_one_time_token") + " (token_hash " + key(d)
+                + " NOT NULL PRIMARY KEY, purpose " + key(d) + " NOT NULL, username_key " + key(d)
+                + " NOT NULL, username " + text(d) + ", expires_at " + moment(d) + ")",
+            "CREATE INDEX " + index("cn1_one_time_token", "user") + " ON "
+                + table("cn1_one_time_token") + " (username_key, purpose)",
+            "CREATE TABLE " + table("cn1_mfa_email") + " (username_key " + key(d)
+                + " NOT NULL PRIMARY KEY, enabled " + flag(d) + ", code_hash " + text(d)
+                + ", expires_at " + moment(d) + ", attempts " + d.columnType(Dialect.INTEGER)
+                + " NOT NULL, sent_at " + moment(d) + ")",
+            "CREATE TABLE " + table("cn1_verified_email") + " (username_key " + key(d)
+                + " NOT NULL PRIMARY KEY, email " + text(d) + ", proof " + key(d)
+                + ", verified_at " + moment(d) + ")"};
     }
 }

@@ -278,6 +278,15 @@ interface the application never implements and gets the generated one.
 Both slices take `properties`, `profile` and `classes` as `@BackendTest` does, and
 both run compiled, as the next sections describe.
 
+=== Mail in a test
+
+A test's application sends no mail unless the test names a `cn1.mail.url`.
+Every mail is kept in memory instead, and `MailSender.sent()` returns them, so
+a test can assert on the recipient, the subject and the rendered body. The
+flows that mail a link or a code, such as a password reset, are tested the same
+way: read the link out of the captured mail and follow it. <<backend-mail>> has
+an example.
+
 === Turning production features on
 
 A test's application starts without the management endpoints, the MCP endpoint
