@@ -33,11 +33,25 @@ done
 W="$B/native"
 # A fresh output directory every run: the translator reads every C file under it as
 # a native source, and a previous run's output is tens of thousands of them.
+# The last build stays beside this one as out.previous: a kept build directory
+# (run_heroes.py --work) compiles again only what changed since. Anything older is
+# moved aside, never deleted from here.
+if [ -e "$W/out.previous" ]; then
+    mv "$W/out.previous" "$W/out.$$.stale"
+fi
 if [ -e "$W/out" ]; then
-    mv "$W/out" "$W/out.$$.stale"
+    mv "$W/out" "$W/out.previous"
+    export CN1_COMPILE_PREVIOUS="$W/out.previous"
+fi
+# The classes too: a kept build directory would hand the translator the previous
+# program's modules beside this one's.
+if [ -e "$W/jclasses" ]; then
+    mv "$W/jclasses" "$W/jclasses.$$.stale"
 fi
 mkdir -p "$W/jclasses" "$W/javaapi" "$W/out"
-(cd "$W/javaapi" && unzip -qo "$JAVAAPI" 'java/*')
+# JdkHost with the class library: it is what java.security.SecureRandom reads, and
+# core does not carry it.
+(cd "$W/javaapi" && unzip -qo "$JAVAAPI" 'java/*' 'com/codename1/impl/JdkHost*')
 # The runtime and all of core, as an application ships it. Dead-code elimination
 # keeps what the program reaches; the runtime's HTTP bridge names ConnectionRequest
 # and Display, so a partial core does not compile.
@@ -48,15 +62,24 @@ mkdir -p "$W/jclasses" "$W/javaapi" "$W/out"
     $(find "$REPO/scripts/python-bench/hostfs" -name '*.java')
 find "$B/gen" -name '*.java' > "$W/sources.txt"
 echo "$HERE/HostSql.java" >> "$W/sources.txt"
+echo "$HERE/HostEntropy.java" >> "$W/sources.txt"
 echo "$HERE/NativeMain.java" >> "$W/sources.txt"
 cp "$HERE"/cn1_hostsql.c "$W/jclasses/"
-"$J17/bin/javac" -nowarn --release 17 -cp "$W/jclasses" -d "$W/jclasses" @"$W/sources.txt"
+"$J17/bin/javac" -nowarn --release 17 -cp "$W/jclasses:$W/javaapi" -d "$W/jclasses" @"$W/sources.txt"
 "$J8/bin/java" -Xmx8g -cp "$TRANSLATOR" com.codename1.tools.translator.ByteCodeTranslator \
     clean "$W/javaapi;$W/jclasses" "$W/out" NativeMain com.pyhero NativeMain 1.0 clean none \
     > "$W/translate.log" 2>&1 || { tail -30 "$W/translate.log"; exit 1; }
 PYTHON=python3
 WINDOWS=0
 native_path() { echo "$1"; }
-CN1_SELFHOST_CFLAGS="-flto=thin -lsqlite3 ${CN1_SELFHOST_CFLAGS:-}"
+# One clang over every file is serial, and this is tens of thousands of files: compile
+# them on every core. HERO_NATIVE_LTO=0 leaves out link-time optimisation, most of what
+# is left of the build, for a binary a few percent slower (run_heroes.py --fast).
+export CN1_COMPILE_JOBS="${CN1_COMPILE_JOBS:-$(getconf _NPROCESSORS_ONLN)}"
+LTO="-flto=thin"
+if [ "${HERO_NATIVE_LTO:-1}" = 0 ]; then
+    LTO=""
+fi
+CN1_SELFHOST_CFLAGS="$LTO -lsqlite3 ${CN1_SELFHOST_CFLAGS:-}"
 . "$REPO/vm/selfhost/compile-dist.sh"
 cn1_compile_dist "$W/out/dist" NativeMain "$BIN" -O3 "$W/cc.log"

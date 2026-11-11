@@ -16,6 +16,7 @@ resident memory and the size of what each side ships.
     run_heroes.py --java-home J --build-cp B --runtime-jar R --core-jar C
                   --run-cp T --markitdown-tests DIR [--llm-tests DIR]
                   [--rounds 3] [--workload NAME] [--json out.json]
+                  [--work DIR] [--fast]
                   [--check | --write-baseline]
     run_heroes.py --fold python-heroes.json
 
@@ -131,6 +132,17 @@ def directives(workload):
 def build(name, program, reqs, work, harness, args, packages=(), rules=None):
     """Resolves, transpiles and compiles one program; answers its classes."""
     dest = os.path.join(work, name)
+    # A kept work directory (--work) is built into again: what the previous
+    # build generated goes, the resolved packages stay.
+    for stale in (os.path.join("common", "src"), "gen", "classes", "fs"):
+        shutil.rmtree(os.path.join(dest, stale), ignore_errors=True)
+    # What build_native.sh moved aside two builds ago: gigabytes each, and it keeps
+    # only the one before this for the objects it can use again.
+    native = os.path.join(dest, "native")
+    if os.path.isdir(native):
+        for stale in os.listdir(native):
+            if stale.endswith(".stale"):
+                shutil.rmtree(os.path.join(native, stale), ignore_errors=True)
     if rules:
         # Beside the program, where the application keeps it.
         root = os.path.join(dest, "common", "src", "main", "python")
@@ -162,8 +174,18 @@ def build(name, program, reqs, work, harness, args, packages=(), rules=None):
 def cpython_env(name, reqs, work, args, extra=(), python=None):
     python = python or args.python
     env = os.path.join(work, name + "-" + os.path.basename(python) + "-venv")
-    subprocess.run([python, "-m", "venv", env], check=True)
     py = os.path.join(env, "bin", "python")
+    installed = os.path.join(env, "installed.txt")
+    with open(reqs) as f:
+        wanted = f.read() + "\n".join(extra)
+    if os.path.exists(installed):
+        with open(installed) as f:
+            if f.read() == wanted:
+                # A kept work directory with the same pins already installed.
+                site = subprocess.run([py, "-c", "import sysconfig;print(sysconfig.get_paths()['purelib'])"],
+                                      stdout=subprocess.PIPE, universal_newlines=True, check=True).stdout.strip()
+                return py, site
+    subprocess.run([python, "-m", "venv", env], check=True)
     # CPython needs what the Codename One runtime provides itself (httpx,
     # pydantic, PyYAML...) and magika's real model; pip finds those as the
     # pinned packages' own dependencies.
@@ -181,6 +203,8 @@ def cpython_env(name, reqs, work, args, extra=(), python=None):
                        check=True)
     site = subprocess.run([py, "-c", "import sysconfig;print(sysconfig.get_paths()['purelib'])"],
                           stdout=subprocess.PIPE, universal_newlines=True, check=True).stdout.strip()
+    with open(installed, "w") as f:
+        f.write(wanted)
     return py, site
 
 
@@ -257,7 +281,8 @@ def measure(name, work, harness, args):
     binary = os.path.join(work, name, name + "-native")
     subprocess.run([os.path.join(HERE, "native", "build_native.sh"), os.path.join(work, name), binary],
                    check=True, env=dict(os.environ, JAVA17_HOME=args.java_home,
-                                        PYBENCH_RUNTIME=args.runtime_jar))
+                                        PYBENCH_RUNTIME=args.runtime_jar,
+                                        HERO_NATIVE_LTO="0" if args.fast else "1"))
     native_env = dict(theirs_env, CN1_RESOURCE_PATH=classes)
     sides["cn1_native"] = side([binary, str(args.rounds)], work, 1, native_env)
     if sides["cn1_native"]["result"] != sides["cpython"]["result"]:
@@ -445,6 +470,13 @@ def main():
                    help="label=interpreter, another Python measured beside CPython (pypy, graalpy)")
     p.add_argument("--rounds", type=int, default=3)
     p.add_argument("--workload", action="append")
+    p.add_argument("--work", help="build here and keep it: the next run reuses the resolved packages and the "
+                                  "CPython environments")
+    p.add_argument("--fast", action="store_true",
+                   help="link the native binary without LTO: minutes less to build, a few percent slower to "
+                        "run. For working on the runtime; published numbers come from a run without it")
+    p.add_argument("--no-suites", action="store_true",
+                   help="measure the workloads only: the upstream suites take most of a run")
     p.add_argument("--json")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--check", action="store_true")
@@ -456,7 +488,13 @@ def main():
     for key in ("build_cp", "run_cp"):
         setattr(args, key, os.pathsep.join(os.path.abspath(x) for x in getattr(args, key).split(os.pathsep)))
 
-    work = tempfile.mkdtemp(prefix="python-heroes-")
+    if (args.fast or args.no_suites) and (args.check or args.write_baseline):
+        p.error("--fast builds a slower binary than the one the baseline describes")
+    if args.work:
+        work = os.path.abspath(args.work)
+        os.makedirs(work, exist_ok=True)
+    else:
+        work = tempfile.mkdtemp(prefix="python-heroes-")
     harness = compile_harness(args, work)
     report = {"python": subprocess.run([args.python, "--version"], stdout=subprocess.PIPE,
                                        universal_newlines=True).stdout.strip(),
@@ -466,7 +504,7 @@ def main():
         report["workloads"][name] = measure(name, work, harness, args)
     print(render(report))
     suite_failures = []
-    if args.llm_tests:
+    if args.llm_tests and not args.no_suites:
         report["suites"] = {}
         for name in sorted(SUITES):
             print("running the %s suite" % name, file=sys.stderr)

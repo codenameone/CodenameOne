@@ -11,6 +11,8 @@
 #include <sqlite3.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
+#include <sys/random.h>
 
 #define STMT ((sqlite3_stmt*)(intptr_t)st)
 #define DB ((sqlite3*)(intptr_t)db)
@@ -196,4 +198,20 @@ JAVA_VOID com_pyhero_HostSql_resultErrorImpl___long_java_lang_String(CODENAME_ON
     JAVA_INT n = 0;
     const char* text = stringToUTF8Len(threadStateData, m, &n);
     sqlite3_result_error(CTX, text, n);
+}
+
+/* HostEntropy: getentropy answers at most 256 bytes a call. */
+JAVA_INT com_pyhero_HostEntropy_fillImpl___byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+    JAVA_ARRAY a = (JAVA_ARRAY)out;
+    unsigned char* p = (unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(a);
+    size_t left = (size_t)a->length;
+    while (left > 0) {
+        size_t n = left > 256 ? 256 : left;
+        if (getentropy(p, n) != 0) {
+            return 1;
+        }
+        p += n;
+        left -= n;
+    }
+    return 0;
 }

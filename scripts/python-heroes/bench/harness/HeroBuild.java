@@ -70,8 +70,17 @@ public final class HeroBuild {
         // names the runtime calls by itself, and leaves no unreached function out.
         List<File> classPath = new ArrayList<File>();
         for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
-            if (!entry.isEmpty() && new File(entry).exists()) {
-                classPath.add(new File(entry));
+            // A dependency of type pom puts its .pom on a Maven class path; javac skips
+            // it, and so does this.
+            File f = new File(entry);
+            // The backend runtime is on this class path for the harness only. Naming it
+            // to the transpiler would make every build a server's, with a server's image
+            // decoder and database in place of the application's.
+            if (f.getName().startsWith("codenameone-backend")) {
+                continue;
+            }
+            if (f.isDirectory() || (f.isFile() && entry.endsWith(".jar"))) {
+                classPath.add(f);
             }
         }
         new PythonProjectBuilder(python, new File(work, "gen"), "main", log).classPath(classPath)

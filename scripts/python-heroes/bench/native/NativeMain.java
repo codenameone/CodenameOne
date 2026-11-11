@@ -13,6 +13,7 @@ public final class NativeMain {
     }
 
     public static void main(String[] args) {
+        com.codename1.impl.JdkHost.install(new HostEntropy());
         com.codename1.python.runtime.PySql.install(new HostSql());
         com.codename1.python.runtime.Py.setArgv("main", args);
         System.exit(com.codename1.generated.python.PythonModules.runMain());
