@@ -852,6 +852,11 @@ public class Scheduler extends Container {
         super.deinitialize();
     }
 
+    /// The range the toolbar names, for a printed page's heading.
+    String titleText() {
+        return title.getText();
+    }
+
     /// The surface of the current view, for the tests of this package.
     Component surface() {
         return current;

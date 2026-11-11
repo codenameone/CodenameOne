@@ -336,6 +336,121 @@ abstract class ScrollSurface extends Component {
         g.setClip(cx, cy, cw, ch);
     }
 
+    // -------------------------------------------------------------- pages
+
+    /// How the content divides into pages of `w` by `h` pixels, headers
+    /// included on each: columns of pages, rows of pages, and the width and
+    /// height of content one page holds.
+    ///
+    /// The view is laid out at the page's size for the count, as it is for
+    /// the painting, and put back as it was.
+    int[] pageGrid(int w, int h) {
+        int ow = getWidth();
+        int oh = getHeight();
+        int sx = offX;
+        int sy = offY;
+        double[] zoom = saveZoom();
+        setWidth(w);
+        setHeight(h);
+        try {
+            prepare(w, h);
+            int bw = Math.max(1, bodyWidth());
+            int bh = Math.max(1, bodyHeight());
+            int across = Math.max(1, (contentWidth() + bw - 1) / bw);
+            int down = Math.max(1, (contentHeight() + bh - 1) / bh);
+            return new int[]{across, down, bw, bh};
+        } finally {
+            setWidth(ow);
+            setHeight(oh);
+            backToScreen(ow, oh, zoom);
+            offX = sx;
+            offY = sy;
+        }
+    }
+
+    /// The zoom a layout at another size may change: a view holds its scale
+    /// inside limits that depend on the room it has, so laying it out for a
+    /// page can move the scale, and laying it out for the screen again does
+    /// not move it back. Null for a view with no zoom.
+    double[] saveZoom() {
+        return null;
+    }
+
+    /// Puts back what `saveZoom` returned. Called with the view laid out at
+    /// its own size, so the limits are the screen's again.
+    void restoreZoom(double[] saved) {
+    }
+
+    private void backToScreen(int w, int h, double[] zoom) {
+        prepare(w, h);
+        if (zoom != null) {
+            restoreZoom(zoom);
+            prepare(w, h);
+        }
+    }
+
+    /// Paints one page: the content from `contentX`, `contentY` on, under
+    /// the headers that belong to it, at `px`, `py` in a page of `w` by `h`.
+    ///
+    /// This is the screen's own painting at another size and another scroll
+    /// position, so what prints is what the view draws. The overlay is left
+    /// out: it holds what a drag in progress shows. The body is clipped to
+    /// the content, so the last page of a row or column ends where the
+    /// content does and is not filled out with empty grid.
+    void paintPage(Graphics g, int px, int py, int w, int h, int contentX, int contentY) {
+        int ox = getX();
+        int oy = getY();
+        int ow = getWidth();
+        int oh = getHeight();
+        int sx = offX;
+        int sy = offY;
+        int cx = g.getClipX();
+        int cy = g.getClipY();
+        int cw = g.getClipWidth();
+        int ch = g.getClipHeight();
+        double[] zoom = saveZoom();
+        setX(px);
+        setY(py);
+        setWidth(w);
+        setHeight(h);
+        try {
+            prepare(w, h);
+            offX = contentX;
+            offY = contentY;
+            int bx = px + headerW;
+            int by = py + headerH;
+            int bw = Math.min(bodyWidth(), Math.max(0, contentWidth() - contentX));
+            int bh = Math.min(bodyHeight(), Math.max(0, contentHeight() - contentY));
+            g.clipRect(bx, by, bw, bh);
+            paintBody(g, bx - contentX, by - contentY);
+            g.setClip(cx, cy, cw, ch);
+            if (headerH > 0) {
+                g.clipRect(bx, py, bw, headerH);
+                paintTopHeader(g, bx - contentX, py);
+                g.setClip(cx, cy, cw, ch);
+            }
+            if (headerW > 0) {
+                g.clipRect(px, by, headerW, bh);
+                paintLeftHeader(g, px, by - contentY);
+                g.setClip(cx, cy, cw, ch);
+            }
+            if (headerW > 0 && headerH > 0) {
+                g.clipRect(px, py, headerW, headerH);
+                paintCorner(g, px, py);
+                g.setClip(cx, cy, cw, ch);
+            }
+        } finally {
+            g.setClip(cx, cy, cw, ch);
+            setX(ox);
+            setY(oy);
+            setWidth(ow);
+            setHeight(oh);
+            backToScreen(ow, oh, zoom);
+            offX = sx;
+            offY = sy;
+        }
+    }
+
     @Override
     protected Dimension calcPreferredSize() {
         // A view is given its size by the layout around it; this is what it

@@ -237,6 +237,16 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
+    double[] saveZoom() {
+        return new double[]{hourH};
+    }
+
+    @Override
+    void restoreZoom(double[] saved) {
+        hourH = (float) saved[0];
+    }
+
+    @Override
     int contentWidth() {
         return contentW;
     }

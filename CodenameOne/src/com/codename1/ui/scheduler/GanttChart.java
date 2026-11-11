@@ -339,6 +339,16 @@ final class GanttChart extends ScrollSurface {
     }
 
     @Override
+    double[] saveZoom() {
+        return new double[]{axis.getMillisPerPixel()};
+    }
+
+    @Override
+    void restoreZoom(double[] saved) {
+        axis.setMillisPerPixel(saved[0]);
+    }
+
+    @Override
     int contentWidth() {
         return axis.width();
     }
