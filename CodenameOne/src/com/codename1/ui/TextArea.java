@@ -2326,8 +2326,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// A field that asks for Next moves to the following field without calling
     /// this listener, and its keyboard usually has no Done to call it with. Set
     /// the listener on a field that offers Done, typically the last one.
-    /// `"nextButton"` on a field nothing follows is ignored, and `"doneButton"`
-    /// wins when both are set.
+    /// A field nothing follows offers Done even with `"nextButton"`, and
+    /// `"doneButton"` wins when both are set.
     ///
     /// #### Parameters
     ///

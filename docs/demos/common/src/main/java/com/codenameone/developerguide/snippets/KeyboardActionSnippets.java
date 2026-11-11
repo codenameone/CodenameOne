@@ -33,7 +33,7 @@ public class KeyboardActionSnippets {
         TextField quantity = new TextField("", "Quantity", 6, TextArea.NUMERIC);
         TextField price = new TextField("", "Price", 8, TextArea.DECIMAL);
 
-        // Numeric, and offering Next whatever else is set on the field
+        // Numeric, and offering Next even if the field has a Done listener
         quantity.putClientProperty("nextButton", Boolean.TRUE);
 
         // Offers Done even if another field follows it, and calls the listener

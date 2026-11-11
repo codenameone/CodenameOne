@@ -1643,11 +1643,6 @@ public class IOSImplementation extends CodenameOneImplementation {
                 TextEditUtil.setNextEditComponent(TextEditUtil.nextFor(cmp, parentTop.getTabIterator(cmp).getNext()));
             } else if (current != null) {
                 TextEditUtil.setNextEditComponent(TextEditUtil.nextFor(cmp, current.getNextComponent(cmp)));
-            } else {
-                // Nothing to ask, so nothing follows. Leaving the previous edit's
-                // successor here sent Next to a component of another form, and would
-                // now also make a "nextButton" field skip its Done listener for it.
-                TextEditUtil.setNextEditComponent(null);
             }
             TextEditUtil.setExplicitKeyboardAction(TextEditUtil.choosesKeyboardAction(cmp));
             Display.getInstance().callSerially(new Runnable() {

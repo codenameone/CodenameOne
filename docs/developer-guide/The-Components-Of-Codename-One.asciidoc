@@ -515,7 +515,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/K
 
 Both properties work on Android and iOS, and take effect ahead of the Done listener and the following field. On Android `searchField`, `sendButton` and `goButton` still come first.
 
-- `nextButton` offers #Next# and moves to the following editable field. It doesn't call the Done listener: #Next# moves on, #Done# finishes. On a field nothing follows it's ignored, so the last field of a form still offers #Done#.
+- `nextButton` offers #Next# and moves to the following editable field. It doesn't call the Done listener: #Next# moves on, #Done# finishes. On a field nothing follows there is no #Next# to offer, so the last field of a form still offers #Done#.
 - `doneButton` offers #Done# and ends editing, even when another field follows. It wins if both properties are set.
 
 WARNING: A field with `nextButton` usually has no #Done# on its keyboard, so a Done listener set on it isn't called when the user moves on. Set the listener on a field that offers #Done#, typically the last one.

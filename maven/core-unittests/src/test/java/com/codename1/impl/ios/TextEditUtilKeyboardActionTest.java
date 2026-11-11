@@ -23,11 +23,13 @@
 
 package com.codename1.impl.ios;
 
+import com.codename1.junit.FormTest;
 import com.codename1.ui.TextField;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
@@ -79,6 +81,76 @@ class TextEditUtilKeyboardActionTest extends com.codename1.junit.UITestBase {
         int end = text.indexOf("\n}", start);
         assertTrue(end > start, "unterminated method " + signature);
         return text.substring(start, end);
+    }
+
+    private static class NativeStub extends IOSNative {
+        @Override public boolean isAsyncEditMode() { return false; }
+        @Override void setNativeEditingComponentVisible(boolean b) { }
+    }
+
+    private static class Port extends IOSImplementation {
+        @Override public int getDisplayWidth() { return 800; }
+        @Override public int getDisplayHeight() { return 600; }
+    }
+
+    /// Ends an edit of field the way native code does and answers how many
+    /// times its Done listener ran. Drives IOSImplementation.editingUpdate
+    /// itself, so the wiring is held and not only the helpers it calls.
+    private int endEdit(Port port, TextField field, TextField following, int endCode) throws Exception {
+        final int[] fired = new int[1];
+        field.setDoneListener(e -> fired[0]++);
+        TextEditUtil.setNextEditComponent(TextEditUtil.nextFor(field, following));
+        Field editing = IOSImplementation.class.getDeclaredField("currentEditing");
+        editing.setAccessible(true);
+        editing.set(port, field);
+        IOSImplementation.editingUpdate("42", endCode, true);
+        flushSerialCalls();
+        assertNull(editing.get(port), "the edit must have ended");
+        assertEquals("42", field.getText());
+        return fired[0];
+    }
+
+    private static boolean editNext() throws Exception {
+        Field editNext = IOSImplementation.class.getDeclaredField("editNext");
+        editNext.setAccessible(true);
+        return editNext.getBoolean(null);
+    }
+
+    @FormTest
+    void editingUpdateFiresDoneForEveryEndingExceptAnExplicitNext() throws Exception {
+        IOSNative oldNative = IOSImplementation.nativeInstance;
+        IOSImplementation oldInstance = IOSImplementation.instance;
+        Port port = new Port();
+        try {
+            IOSImplementation.nativeInstance = new NativeStub();
+            IOSImplementation.instance = port;
+            TextField following = new TextField();
+
+            // no property: both codes fire and both advance, as the one code did
+            assertEquals(1, endEdit(port, new TextField(), following, RETURN_OR_NEXT));
+            assertTrue(editNext());
+            assertEquals(1, endEdit(port, new TextField(), following, DONE));
+            assertTrue(editNext());
+            assertEquals(0, endEdit(port, new TextField(), following, -1));
+            assertFalse(editNext());
+
+            // nextButton: advancing does not finish, the Done button does
+            TextField next = new TextField();
+            next.putClientProperty("nextButton", Boolean.TRUE);
+            assertEquals(0, endEdit(port, next, following, RETURN_OR_NEXT));
+            assertTrue(editNext());
+            assertEquals(1, endEdit(port, next, following, DONE));
+            assertEquals(1, endEdit(port, next, null, RETURN_OR_NEXT));
+
+            // doneButton: fires, and there is nowhere to advance to
+            TextField done = new TextField();
+            done.putClientProperty("doneButton", Boolean.TRUE);
+            assertEquals(1, endEdit(port, done, following, RETURN_OR_NEXT));
+            assertTrue(TextEditUtil.isLastEditComponent());
+        } finally {
+            IOSImplementation.nativeInstance = oldNative;
+            IOSImplementation.instance = oldInstance;
+        }
     }
 
     @Test
