@@ -466,26 +466,35 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         // after it was saved has the source's.
         CalendarEvent e = eventOf(item);
         String eventId = e == null ? null : e.getId();
-        ScheduleItem sameEvent = null;
+        // Its own calendar first here too, for the same reason.
+        ScheduleItem sameEvent = sameEvent(items.get(item.getResourceId()), eventId);
         for (List<ScheduleItem> list : items.values()) {
             ScheduleItem found = sameId(list, item);
             if (found != null) {
                 return found;
             }
-            if (sameEvent != null || eventId == null) {
-                continue;
-            }
-            for (ScheduleItem each : list) {
-                if (!each.isRecurring()) {
-                    CalendarEvent other = eventOf(each);
-                    if (other != null && eventId.equals(other.getId())) {
-                        sameEvent = each;
-                        break;
-                    }
-                }
+            if (sameEvent == null) {
+                sameEvent = sameEvent(list, eventId);
             }
         }
         return sameEvent;
+    }
+
+    // The item of the list that is the event with this id, and not one
+    // occurrence of many.
+    private static ScheduleItem sameEvent(List<ScheduleItem> list, String eventId) {
+        if (list == null || eventId == null) {
+            return null;
+        }
+        for (ScheduleItem each : list) {
+            if (!each.isRecurring()) {
+                CalendarEvent other = eventOf(each);
+                if (other != null && eventId.equals(other.getId())) {
+                    return each;
+                }
+            }
+        }
+        return null;
     }
 
     // The item itself when the list has it, or else the one with its id.

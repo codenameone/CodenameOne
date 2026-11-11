@@ -147,6 +147,9 @@ public class Picker extends Button {
     private InternalPickerWidget currentSpinner;
     /// The Material dialog while it is open. See `showMaterialDialog`.
     private Dialog materialDialog;
+    // Whether that dialog has been on screen: until its opening has played
+    // it is not the current form, and it is not one that was covered either.
+    private boolean materialSeen;
     /// Container for `currentSpinner` while the lightweight popup is visible.
     /// Public setters that stage a new live spinner value need to revalidate
     /// this container so Spinner3D recalculates and paints the new wheel state.
@@ -1197,6 +1200,15 @@ public class Picker extends Button {
         dlg.add(BorderLayout.SOUTH, buttons);
         currentSpinner = widget;
         materialDialog = dlg;
+        materialSeen = false;
+        dlg.addShowListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                if (materialDialog == dlg) { //NOPMD CompareObjectsWithEquals - this very dialog
+                    materialSeen = true;
+                }
+            }
+        });
         dlg.showPacked(BorderLayout.CENTER, false);
     }
 
@@ -1667,7 +1679,7 @@ public class Picker extends Button {
     // covered with something of its own is not that: nobody is looking at
     // it, and what it showed was never confirmed.
     private InternalPickerWidget shownSpinner() {
-        if (materialDialog != null
+        if (materialDialog != null && materialSeen
                 && Display.getInstance().getCurrent() != materialDialog) { //NOPMD CompareObjectsWithEquals - this very dialog
             return null;
         }
