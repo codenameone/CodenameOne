@@ -898,6 +898,21 @@ public final class PyType extends PyObject {
     /// The `__init__` of a plain class whatever it is, or null for a class that
     /// is not plain.
     private Object plainInitAny() {
+        if (plainInitVersion == version) {
+            return plainInitCache;
+        }
+        Object r = resolvePlainInit();
+        plainInitCache = r;
+        plainInitVersion = version;
+        return r;
+    }
+
+    /// [#plainInitAny()]'s answer, valid while [#plainInitVersion] equals
+    /// [#version]; any class change re-resolves it.
+    private Object plainInitCache;
+    private int plainInitVersion = -1;
+
+    private Object resolvePlainInit() {
         if (factory != null || this == Py.TYPE_TYPE || customMeta()) { //NOPMD CompareObjectsWithEquals - identity is meant
             return null;
         }

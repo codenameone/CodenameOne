@@ -104,20 +104,40 @@ public final class StoreSite {
             if (setVersion == PyType.version) {
                 PyType t = i.cls;
                 Shape s = i.shape;
-                if (ss0 == s && st0 == t && sto0 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si0] = v;
+                if (ss0 == s && st0 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (sto0 == null) {
+                        i.slots[si0] = v;
+                    } else {
+                        // A new attribute: the transition is cached too.
+                        i.append(sto0, v);
+                    }
                     return;
                 }
-                if (ss1 == s && st1 == t && sto1 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si1] = v;
+                if (ss1 == s && st1 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (sto1 == null) {
+                        i.slots[si1] = v;
+                    } else {
+                        // A new attribute: the transition is cached too.
+                        i.append(sto1, v);
+                    }
                     return;
                 }
-                if (ss2 == s && st2 == t && sto2 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si2] = v;
+                if (ss2 == s && st2 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (sto2 == null) {
+                        i.slots[si2] = v;
+                    } else {
+                        // A new attribute: the transition is cached too.
+                        i.append(sto2, v);
+                    }
                     return;
                 }
-                if (ss3 == s && st3 == t && sto3 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si3] = v;
+                if (ss3 == s && st3 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (sto3 == null) {
+                        i.slots[si3] = v;
+                    } else {
+                        // A new attribute: the transition is cached too.
+                        i.append(sto3, v);
+                    }
                     return;
                 }
             }
