@@ -7447,6 +7447,9 @@ public class AndroidGradleBuilder extends Executor {
                             + "            firstTime = false;\n"
                             + firebaseRegisterInstall
                             + inviteDomainProperty
+                            // Commerce reads its switch, endpoint and signing key through
+                            // Display.getProperty; this is the only thing that puts them there.
+                            + CommerceBuildHints.stubProperties(request)
                             + inviteRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"
