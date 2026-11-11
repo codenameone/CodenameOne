@@ -194,6 +194,72 @@ class McpEditingToolsTest {
     }
 
     @Test
+    void insertedXmlCannotTakeABorderRegionThatIsAlreadyUsed() throws Exception {
+        // effectiveBorderConstraint() moves a duplicate region to the first free one, so a clash has
+        // to be caught on the fragment's own constraint, before it lands.
+        CodenameOneGUIBuilder builder = builder();
+        call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"frame\",\"layout\":{\"layout\":\"BorderLayout\"}}");
+        call("guibuilder_add_component", "{\"type\":\"Label\",\"name\":\"body\",\"parent\":\"frame\","
+                + "\"constraint\":{\"region\":\"Center\"}}");
+        String before = builder.documentForTest().toXml();
+        Map<String, Object> clash = call("guibuilder_insert_xml", "{\"parent\":\"frame\",\"xml\":"
+                + quote("<component type=\"Label\" name=\"other\" layoutConstraint=\"center\"/>") + "}");
+        assertEquals(Boolean.FALSE, clash.get("success"), "two Center children must be refused, not shuffled");
+        assertTrue(String.valueOf(clash.get("error")).contains("body"), String.valueOf(clash.get("error")));
+        assertEquals(before, builder.documentForTest().toXml());
+        Map<String, Object> reorder = call("guibuilder_insert_xml", "{\"parent\":\"frame\",\"index\":0,\"xml\":"
+                + quote("<component type=\"Label\" name=\"top\"/>") + "}");
+        assertEquals(Boolean.FALSE, reorder.get("success"), "an index would push body out of Center");
+        assertEquals("Center", GuiDocument.effectiveBorderConstraint(element(builder, "frame"), element(builder, "body")));
+
+        Map<String, Object> free = call("guibuilder_insert_xml", "{\"parent\":\"frame\",\"xml\":"
+                + quote("<component type=\"Label\" name=\"top\"/>") + "}");
+        assertEquals(Boolean.TRUE, free.get("success"), String.valueOf(free.get("error")));
+        assertEquals("North", element(builder, "top").getAttribute("layoutConstraint"),
+                "a fragment without a region takes the first free one, written down so it stays there");
+        assertEquals("Center", GuiDocument.effectiveBorderConstraint(element(builder, "frame"), element(builder, "body")));
+    }
+
+    @Test
+    void readingDoesNotDisturbThePersonAtTheKeyboard() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        call("guibuilder_toolbar_commands", "{\"action\":\"add\",\"label\":\"Share\"}");
+        int undoDepth = undoDepth(builder);
+        Field status = CodenameOneGUIBuilder.class.getDeclaredField("status");
+        status.setAccessible(true);
+        String statusBefore = ((com.codename1.ui.Label) status.get(builder)).getText();
+        Field rebuilds = CodenameOneGUIBuilder.class.getDeclaredField("canvasRebuilds");
+        rebuilds.setAccessible(true);
+        int rebuildsBefore = rebuilds.getInt(builder);
+
+        Map<String, Object> listed = call("guibuilder_toolbar_commands", "{\"action\":\"list\"}");
+        assertEquals(1, ((List<?>) listed.get("commands")).size());
+        assertEquals(undoDepth, undoDepth(builder));
+        assertEquals(statusBefore, ((com.codename1.ui.Label) status.get(builder)).getText(), "listing modifies nothing");
+        assertEquals(rebuildsBefore, rebuilds.getInt(builder), "listing must not rebuild the canvas");
+
+        // While the developer is typing in place, an edit waits rather than committing their text.
+        Field inline = CodenameOneGUIBuilder.class.getDeclaredField("inlineEditor");
+        inline.setAccessible(true);
+        com.codename1.ui.TextField typing = new com.codename1.ui.TextField("half typ");
+        inline.set(builder, typing);
+        try {
+            Map<String, Object> refused = call("guibuilder_add_component", "{\"type\":\"Label\"}");
+            assertEquals(Boolean.FALSE, refused.get("success"));
+            assertTrue(String.valueOf(refused.get("error")).contains("editing"), String.valueOf(refused.get("error")));
+            assertSame(typing, inline.get(builder), "the developer's editor must be left open");
+            assertEquals(1, ((List<?>) call("guibuilder_toolbar_commands", "{}").get("commands")).size(),
+                    "reads still work while the developer types");
+        } finally {
+            inline.set(builder, null);
+        }
+        int rebuildsBeforeRefusal = rebuilds.getInt(builder);
+        Map<String, Object> refusedEdit = call("guibuilder_set_properties", "{\"component\":\"nobody\",\"properties\":{\"text\":\"x\"}}");
+        assertEquals(Boolean.FALSE, refusedEdit.get("success"));
+        assertEquals(rebuildsBeforeRefusal, rebuilds.getInt(builder), "a refused edit changes nothing, so nothing is redrawn");
+    }
+
+    @Test
     void tableCellsCannotOverlap() throws Exception {
         CodenameOneGUIBuilder builder = builder();
         call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"grid\","
@@ -313,6 +379,11 @@ class McpEditingToolsTest {
                 "an existing form is never overwritten");
         assertEquals(Boolean.FALSE, call("guibuilder_create_form", "{\"className\":\"LoginForm\"}").get("success"),
                 "a form needs a package");
+        Map<String, Object> panel = call("guibuilder_create_form", "{\"className\":\"com.example.Panel\",\"type\":\"Container\"}");
+        assertEquals(Boolean.TRUE, panel.get("success"), String.valueOf(panel.get("error")));
+        assertEquals("none", builder.documentForTest().root().getAttribute("bindingStrategy"),
+                "a Container root must not get a binding model either; set_binding cannot turn it off there");
+        assertFalse(Files.exists(project.resolve("src/main/java/com/example/PanelModel.java")));
         call("guibuilder_add_component", "{\"type\":\"Label\"}");
         Map<String, Object> dirty = call("guibuilder_create_form", "{\"className\":\"com.example.OtherForm\"}");
         assertEquals(Boolean.FALSE, dirty.get("success"), "unsaved edits must not be discarded by opening another form");

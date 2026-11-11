@@ -610,6 +610,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void refreshEditor() {
         if (document == null) return;
+        canvasRebuilds++;
         TooltipManager.hideTooltip();
         normalizeSelection();
         cancelDesignerDrag();
@@ -8489,6 +8490,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         final Map<String, Object> a = args == null ? new LinkedHashMap<String, Object>() : args;
         if ("component_types".equals(operation)) return com.codename1.guibuilder.model.ComponentCatalog.describe();
         if ("get_form_xml".equals(operation)) return mcpFormXml(a);
+        if ("toolbar_commands".equals(operation) && (a.get("action") == null || "list".equals(a.get("action")))) {
+            // Read only, so it never goes near the transaction: listing must not touch the person's
+            // edit, the canvas or the status line.
+            Map<String, Object> details = new LinkedHashMap<String, Object>();
+            if (document == null) details.put("error", "No active GUI document; open a form first");
+            else if (!isFormLike(mcpType(document.root()))) details.put("error", "Only a Form or Dialog has toolbar commands");
+            else details.put("commands", mcpCommandList());
+            return details;
+        }
         if ("create_form".equals(operation)) {
             Map<String, Object> details = new LinkedHashMap<String, Object>();
             String error = unattended(() -> mcpCreateFormImpl(a, details));
@@ -8514,20 +8524,33 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return mcpTransaction(operation, edit);
     }
 
+    /** Counts canvas rebuilds, so an abandoned edit knows whether the canvas showed part of it. */
+    private int canvasRebuilds;
+
     private Map<String, Object> mcpTransaction(String operation, McpEditOperation edit) {
         final Map<String, Object> details = new LinkedHashMap<String, Object>();
         final Element[] focus = new Element[1];
+        final String[] before = new String[1];
+        final boolean[] committedEdit = new boolean[1];
+        final int rebuildsBefore = canvasRebuilds;
         String error = unattended(() -> {
             if (document == null) return "No active GUI document; open a form first";
             if (canvasHost == null) return "The design canvas is not ready";
-            finishInlineEditor();
-            cancelDesignerDrag();
+            // The person at the keyboard comes first. Committing their half-typed text or cancelling
+            // their drag to make room for an agent's edit takes the canvas out from under them, so
+            // the edit waits instead.
+            if (inlineEditor != null || designerDragArmed || designerDragActive
+                    || guidedResizeArmed || guidedResizeActive) {
+                return "The developer is editing or dragging in the GUI Builder; try again when they finish";
+            }
+            before[0] = document.toXml();
             document.beginTransaction();
             boolean committed = false;
             try {
                 String refused = edit.apply(details);
                 if (refused != null) return refused;
                 committed = true;
+                committedEdit[0] = true;
                 focus[0] = document.selected();
                 return null;
             } finally {
@@ -8535,26 +8558,30 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 else document.abortTransaction();
             }
         });
-        // Rebuilt either way: an abandoned edit restores the document, and the canvas may already
-        // show part of it from a step that needed fresh bounds.
-        unattended(() -> {
-            if (document == null) return null;
-            if (focus[0] != null && document.containsElement(focus[0])) {
-                selectedElements.clear();
-                if (focus[0] != document.root()) selectedElements.add(focus[0]);
-                document.select(focus[0]);
-            }
-            refreshEditor();
-            return null;
-        });
+        // An abandoned edit restores the document by re-parsing it, which can serialize attributes in
+        // another order; only a committed edit can have changed anything.
+        boolean changed = committedEdit[0] && document != null && !before[0].equals(document.toXml());
+        // Rebuilt only when the form changed, or when a step that measured the canvas rebuilt it for
+        // an edit that was then abandoned; otherwise the canvas, selection and status are left alone.
+        if (changed || canvasRebuilds != rebuildsBefore) {
+            unattended(() -> {
+                if (document == null) return null;
+                if (changed && focus[0] != null && document.containsElement(focus[0])) {
+                    selectedElements.clear();
+                    if (focus[0] != document.root()) selectedElements.add(focus[0]);
+                    document.select(focus[0]);
+                }
+                refreshEditor();
+                return null;
+            });
+        }
         if (error != null) {
             details.clear();
             details.put("error", error);
             recordAction("mcp_edit_refused", "operation", operation, "error", error);
-            setStatus(error);
-        } else {
+        } else if (changed) {
             recordAction("mcp_edit", "operation", operation);
-            if (document != null) setStatus("Modified through MCP • " + relativeFormName(document.path()));
+            setStatus("Modified through MCP • " + relativeFormName(document.path()));
         }
         return details;
     }
@@ -8624,6 +8651,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         document.select(parent);
         Element added = document.addComponent(type);
         if (added == null) return "Nothing was added to " + mcpName(parent);
+        mcpPinBorderRegion(parent, added);
         Integer index = mcpInteger(args, "index");
         if (index != null) {
             String moved = mcpMoveToIndex(added, parent, index.intValue());
@@ -8679,6 +8707,22 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (GuiDocument.borderLayoutIsFull(parent)) {
             return mcpName(parent) + " is a BorderLayout and all five regions are taken";
         }
+        if ("BorderLayout".equals(value(parent, "layout", "BoxLayout"))) {
+            // Checked against the fragment's own constraint, before it lands: once it is in the
+            // document, effectiveBorderConstraint() moves a duplicate to the first free region, so
+            // asking the siblings afterwards can never find the clash.
+            String requested = parsed.getAttribute("layoutConstraint");
+            String region = GuiDocument.normalizeBorderConstraint(requested);
+            if (requested != null && requested.trim().length() > 0 && region == null) {
+                return "layoutConstraint must be one of "
+                        + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.BORDER_REGIONS);
+            }
+            if (region != null && GuiDocument.childAtBorderConstraint(parent, region, null) != null) {
+                return "The " + region + " region of " + mcpName(parent) + " is already taken by "
+                        + mcpName(GuiDocument.childAtBorderConstraint(parent, region, null))
+                        + "; give the fragment a free layoutConstraint";
+            }
+        }
         document.select(parent);
         Element inserted = document.pasteXml(xml);
         if (inserted == null) return "The fragment could not be inserted into " + mcpName(parent);
@@ -8688,22 +8732,37 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (moved != null) return moved;
         }
         if ("TableLayout".equals(value(parent, "layout", "BoxLayout"))) normalizeTableCells(parent);
-        if ("BorderLayout".equals(value(parent, "layout", "BoxLayout"))) {
-            String region = GuiDocument.effectiveBorderConstraint(parent, inserted);
-            for (Element sibling : componentChildren(parent)) {
-                if (sibling != inserted && region != null //NOPMD CompareObjectsWithEquals
-                        && region.equals(GuiDocument.effectiveBorderConstraint(parent, sibling))) {
-                    return "The fragment's region " + region + " is already taken in " + mcpName(parent)
-                            + "; give it a free layoutConstraint";
-                }
-            }
-        }
+        mcpPinBorderRegion(parent, inserted);
         document.select(inserted);
         List<Object> names = new ArrayList<Object>();
         for (Element element : allComponentsIn(inserted)) names.add(mcpName(element));
         details.put("component", mcpName(inserted));
         details.put("components", names);
         return null;
+    }
+
+    /**
+     * Gives a new BorderLayout child the region it landed in as an explicit constraint, so a later
+     * reorder or insertion cannot reassign it.
+     */
+    private void mcpPinBorderRegion(Element parent, Element child) {
+        if (!"BorderLayout".equals(value(parent, "layout", "BoxLayout"))) return;
+        document.setAttribute(child, "layoutConstraint", GuiDocument.effectiveBorderConstraint(parent, child));
+    }
+
+    private List<Object> mcpCommandList() {
+        List<Object> out = new ArrayList<Object>();
+        List<Element> current = document.commands();
+        for (int i = 0; i < current.size(); i++) {
+            Element command = current.get(i);
+            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            item.put("index", Integer.valueOf(i));
+            item.put("label", value(command, "name", "Command"));
+            item.put("placement", value(command, "placement", "right"));
+            item.put("handler", value(command, "actionEvent", null));
+            out.add(item);
+        }
+        return out;
     }
 
     private List<Element> allComponentsIn(Element element) {
@@ -8748,6 +8807,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (index < 0) return "index must be zero or more";
         if ("TableLayout".equals(value(parent, "layout", "BoxLayout"))) {
             return "Order in a TableLayout is its cells; set row and column with guibuilder_set_constraint instead of index";
+        }
+        if ("BorderLayout".equals(value(parent, "layout", "BoxLayout"))) {
+            // Reordering a BorderLayout's children reassigns the regions of any without one of
+            // their own, silently moving a component the caller never named.
+            return "Order in a BorderLayout is its regions; set region with guibuilder_set_constraint instead of index";
         }
         int count = componentChildren(parent).size();
         document.select(element);
@@ -9211,21 +9275,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 String refused = mcpApplyCommand(command, args);
                 if (refused != null) return refused;
             }
-        } else if (!"list".equals(action)) {
+        } else {
             return "action must be list, add, update or remove";
         }
-        List<Object> out = new ArrayList<Object>();
-        List<Element> current = document.commands();
-        for (int i = 0; i < current.size(); i++) {
-            Element command = current.get(i);
-            Map<String, Object> item = new LinkedHashMap<String, Object>();
-            item.put("index", Integer.valueOf(i));
-            item.put("label", value(command, "name", "Command"));
-            item.put("placement", value(command, "placement", "right"));
-            item.put("handler", value(command, "actionEvent", null));
-            out.add(item);
-        }
-        details.put("commands", out);
+        details.put("commands", mcpCommandList());
         return null;
     }
 
@@ -9318,8 +9371,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (isFormLike(type)) xml.append(" title=\"").append(simple).append('"');
         xml.append(" layout=\"").append(layout).append('"');
         if ("BoxLayout".equals(layout)) xml.append(" boxLayoutAxis=\"Y\"");
-        // No binding model unless asked for: a new form should compile on its own.
-        if (isFormLike(type)) xml.append(" bindingStrategy=\"none\"");
+        // No binding model unless asked for: a new form should compile on its own. Every root type,
+        // a Container included: the generator reads the strategy from any root, and set_binding only
+        // offers a way back for a Form or Dialog.
+        xml.append(" bindingStrategy=\"none\"");
         xml.append(">\n</component>\n");
         try {
             ProjectIO.write(guiPath, xml.toString());
