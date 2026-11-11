@@ -73,7 +73,15 @@ final class PyDataclass {
         return m;
     }
 
-    private static final class Init implements PyBuiltin.Impl {
+    /// The generated `__init__` behind `init`, or null when `init` is anything else.
+    static Init initOf(Object init) {
+        if (init instanceof PyBuiltin && ((PyBuiltin) init).impl instanceof Init) {
+            return (Init) ((PyBuiltin) init).impl;
+        }
+        return null;
+    }
+
+    static final class Init implements PyBuiltin.Impl {
         private final String[] name;
         private final int[] position;
         private final boolean[] taken;
@@ -102,6 +110,21 @@ final class PyDataclass {
                 return slow.call(args, kwNames);
             }
             int n = name.length;
+            if (kwNames.length == 0) {
+                // Nothing to match by name: a field's value is where its position says.
+                if (!positional(given)) {
+                    return slow.call(args, kwNames);
+                }
+                PyInstance to = (PyInstance) args[0];
+                for (int i = 0; i < n; i++) {
+                    if (position[i] >= 0 && position[i] < given) {
+                        store(to, i, args[1 + position[i]]);
+                    } else {
+                        storeDefault(to, i);
+                    }
+                }
+                return Py.NONE;
+            }
             // Where each field's value is in args: 0 for a field the caller left out.
             int[] at = new int[n];
             int matched = 0;
@@ -150,6 +173,51 @@ final class PyDataclass {
                 }
             }
             return Py.NONE;
+        }
+
+        /// Whether `given` positional arguments and no keywords are a call this
+        /// method answers itself: no more than it takes, and every field they do
+        /// not reach has a default.
+        boolean positional(int given) {
+            if (given < 0 || given > positional) {
+                return false;
+            }
+            for (int i = 0; i < name.length; i++) {
+                if (!(position[i] >= 0 && position[i] < given) && kind[i] == 0 && taken[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// The fields of `self` from at most five positional arguments, for a
+        /// constructor call that has no argument array. The caller has asked
+        /// [#positional(int)] first.
+        void fill(PyInstance self, int given, Object a, Object b, Object c, Object d, Object e) {
+            for (int i = 0; i < name.length; i++) {
+                int p = position[i];
+                if (p >= 0 && p < given) {
+                    store(self, i, p == 0 ? a : p == 1 ? b : p == 2 ? c : p == 3 ? d : e);
+                } else {
+                    storeDefault(self, i);
+                }
+            }
+        }
+
+        private void storeDefault(PyInstance self, int i) {
+            if (kind[i] == 2) {
+                store(self, i, Py.obj(fallback[i]).call0());
+            } else if (kind[i] == 1) {
+                store(self, i, fallback[i]);
+            }
+        }
+
+        private void store(PyInstance self, int i, Object v) {
+            if (frozen) {
+                self.setAttrObject(name[i], v);
+            } else {
+                self.setAttr(name[i], v);
+            }
         }
     }
 }

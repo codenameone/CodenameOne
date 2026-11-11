@@ -879,6 +879,13 @@ public final class PyType extends PyObject {
     /// The `__init__` of a plain class (no `__new__`, no builtin base), the
     /// case a positional constructor call takes without an argument array.
     Object plainInit() {
+        Object init = plainInitAny();
+        return init instanceof PyFunction ? init : null;
+    }
+
+    /// The `__init__` of a plain class whatever it is, or null for a class that
+    /// is not plain.
+    private Object plainInitAny() {
         if (factory != null || this == Py.TYPE_TYPE || customMeta()) { //NOPMD CompareObjectsWithEquals - identity is meant
             return null;
         }
@@ -886,8 +893,46 @@ public final class PyType extends PyObject {
         if (newFn != null && newFn != Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
             return null;
         }
-        Object init = lookup("__init__");
-        return init instanceof PyFunction ? init : null;
+        return lookup("__init__");
+    }
+
+    /// A positional constructor call of a plain class without an argument
+    /// array: `__init__` is a function, or the one a dataclass generated. Null
+    /// when the class is neither, and the caller builds the array after all.
+    private Object positionalNew(int n, Object a, Object b, Object c, Object d, Object e) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyFunction f = (PyFunction) init;
+            PyInstance o = newInstance();
+            switch (n) {
+                case 0:
+                    initReturned(f.call1(o));
+                    break;
+                case 1:
+                    initReturned(f.call2(o, a));
+                    break;
+                case 2:
+                    initReturned(f.call3(o, a, b));
+                    break;
+                case 3:
+                    initReturned(f.call4(o, a, b, c));
+                    break;
+                case 4:
+                    initReturned(f.call5(o, a, b, c, d));
+                    break;
+                default:
+                    initReturned(f.call6(o, a, b, c, d, e));
+                    break;
+            }
+            return o;
+        }
+        PyDataclass.Init fields = PyDataclass.initOf(init);
+        if (fields != null && fields.positional(n)) {
+            PyInstance o = newInstance();
+            fields.fill(o, n, a, b, c, d, e);
+            return o;
+        }
+        return null;
     }
 
     private static void initReturned(Object r) {
@@ -898,13 +943,8 @@ public final class PyType extends PyObject {
 
     @Override
     public Object call0() {
-        Object init = plainInit();
-        if (init == null) {
-            return super.call0();
-        }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call1(o));
-        return o;
+        Object o = positionalNew(0, null, null, null, null, null);
+        return o != null ? o : super.call0();
     }
 
     @Override
@@ -912,35 +952,32 @@ public final class PyType extends PyObject {
         if (unary != null) {
             return unary.create(a);
         }
-        Object init = plainInit();
-        if (init == null) {
-            return super.call1(a);
-        }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call2(o, a));
-        return o;
+        Object o = positionalNew(1, a, null, null, null, null);
+        return o != null ? o : super.call1(a);
     }
 
     @Override
     public Object call2(Object a, Object b) {
-        Object init = plainInit();
-        if (init == null) {
-            return super.call2(a, b);
-        }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call3(o, a, b));
-        return o;
+        Object o = positionalNew(2, a, b, null, null, null);
+        return o != null ? o : super.call2(a, b);
     }
 
     @Override
     public Object call3(Object a, Object b, Object c) {
-        Object init = plainInit();
-        if (init == null) {
-            return super.call3(a, b, c);
-        }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call4(o, a, b, c));
-        return o;
+        Object o = positionalNew(3, a, b, c, null, null);
+        return o != null ? o : super.call3(a, b, c);
+    }
+
+    @Override
+    public Object call4(Object a, Object b, Object c, Object d) {
+        Object o = positionalNew(4, a, b, c, d, null);
+        return o != null ? o : super.call4(a, b, c, d);
+    }
+
+    @Override
+    public Object call5(Object a, Object b, Object c, Object d, Object e) {
+        Object o = positionalNew(5, a, b, c, d, e);
+        return o != null ? o : super.call5(a, b, c, d, e);
     }
 
     @Override

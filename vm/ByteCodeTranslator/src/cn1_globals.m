@@ -8470,6 +8470,11 @@ static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
 static CN1BibopPage* _Atomic bibopSweepStack; // Treiber-ish (push CAS / swap); see above
 static pthread_mutex_t bibopMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
+/* Set as cn1BibopDoInit's last act. The allocation path reads it before it calls
+ * pthread_once: that call is a jump through a dyld stub, paid by every allocation of
+ * the program to learn what one load says. A thread that reads 0 takes pthread_once,
+ * which is what waits for an initialisation still under way. */
+static _Atomic int bibopReady = 0;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
 _Atomic long bibopBytesSinceGc = 0;
 _Atomic long bibopGcTriggerBytes = CN1_BIBOP_GC_TRIGGER_BYTES;
@@ -8592,6 +8597,7 @@ static void cn1BibopDoInit() {
         atexit(cn1BibopExitReport);
     }
 #endif
+    atomic_store_explicit(&bibopReady, 1, memory_order_release);
 }
 
 
@@ -12400,7 +12406,9 @@ JAVA_OBJECT cn1BibopAllocRecycledNoZero(CODENAME_ONE_THREAD_STATE, int size, str
 }
 
 static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
-    pthread_once(&bibopOnce, cn1BibopDoInit);
+    if(__builtin_expect(!atomic_load_explicit(&bibopReady, memory_order_acquire), 0)) {
+        pthread_once(&bibopOnce, cn1BibopDoInit);
+    }
     CN1_CLAZZ_REGISTER(parent);
     int ci = cn1BibopSizeToClass[size];
     if(ci < 0) {
@@ -18648,7 +18656,11 @@ JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz
  * Off unless CN1_ALLOC_SITES is set: one env read via pthread_once, then a
  * relaxed load, so a census build that does not ask for it pays a branch.
  */
+/* A power of two. A program of generated code has more sites than this; raise it with
+ * -DCN1_ALLOC_SITE_SLOTS when the report prints an overflow. */
+#ifndef CN1_ALLOC_SITE_SLOTS
 #define CN1_ALLOC_SITE_SLOTS 8192
+#endif
 #define CN1_ALLOC_SITE_PROBES 64
 struct CN1AllocSiteRow {
     _Atomic(void*) pc;
@@ -18728,7 +18740,12 @@ static void cn1ReportAllocSites(void) {
         snapPc[i] = atomic_load_explicit(&cn1AllocSiteRows[i].pc, memory_order_relaxed);
         snapCls[i] = atomic_load_explicit(&cn1AllocSiteRows[i].cls, memory_order_relaxed);
     }
-    for(int shown = 0 ; shown < 40 ; shown++) {
+    /* CN1_ALLOC_SITES=<n> prints n rows where 40 is not the whole story. */
+    int siteRows = getenv("CN1_ALLOC_SITES") != 0 ? atoi(getenv("CN1_ALLOC_SITES")) : 0;
+    if(siteRows < 40) {
+        siteRows = 40;
+    }
+    for(int shown = 0 ; shown < siteRows ; shown++) {
         int best = -1;
         long long bestBytes = 0;
         for(int i = 0 ; i < CN1_ALLOC_SITE_SLOTS ; i++) {
@@ -18771,6 +18788,28 @@ static void cn1ReportAllocSites(void) {
 }
 #endif
 
+#ifdef CN1_ALLOC_CENSUS
+/* CN1_ALLOC_SITES_ARRAY=<n>: name an array allocation by the return address n frames above
+ * allocArray, found by walking frame pointers, instead of by the build-time
+ * CN1_ALLOC_SITE_DEPTH. One build then answers "who calls the helper" and "who calls that"
+ * without a rebuild in between. Needs -fno-omit-frame-pointer, as the scalar walk does. */
+static int cn1AllocArrayDepth = -1;
+static void* cn1ArraySitePc(void** fp, void* fallback) {
+    int d;
+    if(cn1AllocArrayDepth < 0) {
+        const char* v = getenv("CN1_ALLOC_SITES_ARRAY");
+        cn1AllocArrayDepth = v != 0 ? atoi(v) : 0;
+    }
+    if(cn1AllocArrayDepth <= 0) {
+        return fallback;
+    }
+    for(d = 0; d < cn1AllocArrayDepth && fp != 0; d++) {
+        fp = (void**)fp[0];
+    }
+    return fp != 0 && fp[1] != 0 ? fp[1] : fallback;
+}
+#endif
+
 JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {
     // primitiveSize and dim are stored in a BYTE each (see struct JavaArrayPrototype).
     // Every in-tree caller passes a sizeof() of at most 8 and a dimension of at most 4, so
@@ -18783,7 +18822,8 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     // Size and address both come from CN1_ARRAY_* so they cannot drift apart; the
     // eight bytes this used to add on top were dead (see cn1_globals.h).
 #ifdef CN1_ALLOC_CENSUS
-    cn1RecordAllocSite(__builtin_return_address(CN1_ALLOC_SITE_DEPTH), type, CN1_ARRAY_ALLOC_BYTES(actualSize));
+    cn1RecordAllocSite(cn1ArraySitePc((void**)__builtin_frame_address(0), __builtin_return_address(CN1_ALLOC_SITE_DEPTH)),
+            type, CN1_ARRAY_ALLOC_BYTES(actualSize));
 #endif
     JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, (int)CN1_ARRAY_ALLOC_BYTES(actualSize), type);
     (*array).length = length;

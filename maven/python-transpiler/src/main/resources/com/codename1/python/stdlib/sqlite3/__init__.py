@@ -174,7 +174,7 @@ def _engine_error(e):
     return OperationalError(msg)
 
 
-def _skip_space(sql, i):
+def _skip_space(sql: str, i: int) -> int:
     n = len(sql)
     while i < n:
         c = sql[i]
@@ -191,7 +191,7 @@ def _skip_space(sql, i):
     return i
 
 
-def _first_word(sql):
+def _first_word(sql: str) -> str:
     i = _skip_space(sql, 0)
     j = i
     n = len(sql)
@@ -223,7 +223,7 @@ def _plain_free():
     return _plain_state[0]
 
 
-def _kind(stmt):
+def _kind(stmt: str):
     k = _KINDS.get(stmt)
     if k is None:
         if len(_KINDS) >= _SCANNED_MAX:
@@ -256,7 +256,7 @@ _SCANNED = {}
 _SCANNED_MAX = 2048
 
 
-def _scan(sql):
+def _scan(sql: str):
     """Splits off the first statement and finds its parameters.
 
     Answers (statement with every placeholder written as ``?``, the
@@ -273,7 +273,7 @@ def _scan(sql):
     return r
 
 
-def _scan_text(sql):
+def _scan_text(sql: str):
     trigger = _first_word(sql) == "CREATE" and _is_trigger(sql)
     # ASCII, nearly every statement, is scanned by _cn1sql, to the letter as below;
     # it answers None for any other text.
@@ -348,7 +348,7 @@ def _scan_text(sql):
     return "".join(out), params, "", trigger
 
 
-def _is_trigger(sql):
+def _is_trigger(sql: str) -> bool:
     words = []
     i = 0
     n = len(sql)
@@ -364,7 +364,7 @@ def _is_trigger(sql):
     return "TRIGGER" in words
 
 
-def _is_blank(sql):
+def _is_blank(sql: str) -> bool:
     return _skip_space(sql, 0) >= len(sql)
 
 

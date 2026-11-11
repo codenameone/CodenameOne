@@ -294,11 +294,15 @@ public final class PyStr extends PyObject {
     }
 
     static void hex(StringBuilder sb, int v, int digits) {
-        String h = Integer.toHexString(v);
-        for (int i = h.length(); i < digits; i++) {
-            sb.append('0');
+        // Digit by digit: this runs once per byte of every bytes.hex() and hexdigest(),
+        // and a string per byte was the largest source of character arrays in a run.
+        int n = 1;
+        while (n < 8 && v >>> (4 * n) != 0) {
+            n++;
         }
-        sb.append(h);
+        for (int i = Math.max(n, digits) - 1; i >= 0; i--) {
+            sb.append(i >= 8 ? '0' : "0123456789abcdef".charAt(v >>> (4 * i) & 15));
+        }
     }
 
     @Override
