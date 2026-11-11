@@ -150,6 +150,9 @@ class TextEditUtilKeyboardActionTest extends com.codename1.junit.UITestBase {
         } finally {
             IOSImplementation.nativeInstance = oldNative;
             IOSImplementation.instance = oldInstance;
+            Field editNext = IOSImplementation.class.getDeclaredField("editNext");
+            editNext.setAccessible(true);
+            editNext.setBoolean(null, false);
         }
     }
 
