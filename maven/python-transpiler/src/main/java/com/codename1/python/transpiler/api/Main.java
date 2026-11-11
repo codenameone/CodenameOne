@@ -75,8 +75,7 @@ public final class Main {
             args = rest;
         }
         // -packages: a second source root holding PyPI packages, translated
-        // with the application and treated as libraries (their unreachable
-        // dynamic code raises at run time rather than failing the build).
+        // with the application and with the same rules.
         Path packages = null;
         if (args.length >= 2 && "-packages".equals(args[0])) {
             packages = Paths.get(args[1]);
@@ -112,7 +111,7 @@ public final class Main {
             return;
         }
         for (String d : deferred) {
-            System.err.println("warning: " + d + " raises NotImplementedError if it is reached");
+            System.err.println("note: " + d);
         }
         for (Map.Entry<String, String> e : out.entrySet()) {
             Path f = Paths.get(args[1], e.getKey()).toAbsolutePath();
@@ -127,7 +126,10 @@ public final class Main {
     private static void readSources(Path root, Map<String, String> sources) throws IOException {
         List<Path> files;
         try (Stream<Path> s = Files.walk(root)) {
-            files = s.filter(p -> p.toString().endsWith(".py")).collect(Collectors.toCollection(ArrayList::new));
+            // The build directives sit at the root, beside the modules.
+            files = s.filter(p -> p.toString().endsWith(".py")
+                    || p.equals(root.resolve("cn1-python.properties")))
+                    .collect(Collectors.toCollection(ArrayList::new));
         }
         for (Path p : files) {
             sources.put(root.relativize(p).toString().replace(File.separatorChar, '/'),

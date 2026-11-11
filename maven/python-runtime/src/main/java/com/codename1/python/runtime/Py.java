@@ -463,17 +463,10 @@ public final class Py {
             Long.valueOf(start), Long.valueOf(end), str(reason)}, NO_KW));
     }
 
-    /// What a translated library's `eval`, `exec`, `__import__` or
-    /// `sys._getframe` evaluates to: the build let it through because the
-    /// library is a PyPI package whose call may never run, so reaching it
-    /// raises `NotImplementedError` here.
-    public static Object dynamicCode(String msg) {
-        throw error(NOT_IMPLEMENTED_ERROR, msg);
-    }
-
     /// What a translated library's `compile` is: it answers a code object
     /// that names its file and mode and holds nothing to run, since running
-    /// one is `eval` or `exec`, which raise ([#dynamicCode(String)]).
+    /// one is `eval` or `exec`, which a build refuses wherever the program
+    /// reaches them.
     public static final PyBuiltin UNCOMPILED = new PyBuiltin("compile", (args, kwNames) -> {
         if (args.length < 3) {
             throw typeError("compile() missing required argument 'mode'");

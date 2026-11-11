@@ -122,9 +122,20 @@ def compile_harness(args, work):
     return out
 
 
-def build(name, program, reqs, work, harness, args, packages=()):
+def directives(workload):
+    """The application's build directives, or None when it has none."""
+    path = os.path.join(os.path.dirname(WORKLOADS[workload]["requirements"]), "src", "cn1-python.properties")
+    return path if os.path.exists(path) else None
+
+
+def build(name, program, reqs, work, harness, args, packages=(), rules=None):
     """Resolves, transpiles and compiles one program; answers its classes."""
     dest = os.path.join(work, name)
+    if rules:
+        # Beside the program, where the application keeps it.
+        root = os.path.join(dest, "common", "src", "main", "python")
+        os.makedirs(root, exist_ok=True)
+        shutil.copy(rules, root)
     subprocess.run([java(args, "java"), "-cp", harness + os.pathsep + args.build_cp, "HeroBuild",
                     program, reqs, dest] + list(packages), check=True)
     classes = os.path.join(dest, "classes")
@@ -223,7 +234,8 @@ def differing_outputs(fs, ours, theirs, work, ours_env, theirs_env):
 
 def measure(name, work, harness, args):
     reqs = requirements(name, work)
-    classes = build(name, os.path.join(HERE, "workloads", name + ".py"), reqs, work, harness, args)
+    classes = build(name, os.path.join(HERE, "workloads", name + ".py"), reqs, work, harness, args,
+                    rules=directives(name))
     py, site = cpython_env(name, reqs, work, args, WORKLOADS[name].get("cpython", ()))
     fs = os.path.join(work, name, "fs")
     fixtures = os.path.join(fs, "fixtures")
@@ -304,7 +316,8 @@ def suite(name, work, harness, args):
         open(init, "w").close()
     reqs = requirements(spec["workload"], work)
     driver = os.path.join(HEROES, "tests", name + "_suite.py")
-    classes = build(name + "-suite", driver, reqs, work, harness, args, [tests])
+    classes = build(name + "-suite", driver, reqs, work, harness, args, [tests],
+                    rules=directives(spec["workload"]))
     fs = os.path.join(work, name + "-suite", "fs")
     run_cp = os.pathsep.join([classes, args.runtime_jar, args.core_jar, args.run_cp])
     ours = subprocess.run([java(args, "java"), "-cp", run_cp, "HeroMain", fs], cwd=work,

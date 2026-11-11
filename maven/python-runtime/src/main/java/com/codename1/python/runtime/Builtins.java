@@ -122,6 +122,14 @@ public final class Builtins {
     public static final Object DIVMOD = PyBuiltin.positional("divmod", a -> PyTuple.of(Py.floordiv(a[0], a[1]), Py.mod(a[0], a[1])));
     public static final Object POW = PyBuiltin.positional("pow", a -> pow(a));
     public static final Object ROUND = new PyBuiltin("round", (args, kw) -> round(new Args("round", args, kw).check(2, "number", "ndigits")));
+    /// What the body of a function the build removed is: it raises, with
+    /// the message the build wrote for it.
+    public static final Object CN1_REMOVED = PyBuiltin.positional("__cn1_removed__", a -> {
+        throw Py.runtimeError(String.valueOf(a[0]));
+    });
+    /// What the body of a function the build replaced calls: the Java
+    /// registered for its name, with the function's own arguments.
+    public static final Object CN1_REPLACED = PyBuiltin.positional("__cn1_replaced__", a -> NativeModule.replaced(a));
     public static final Object ISINSTANCE = PyBuiltin.positional("isinstance", a -> Py.bool(Py.isinstance(a[0], a[1])))
             .with2((x, t) -> Py.bool(Py.isinstance(x, t)));
     public static final Object ISSUBCLASS = PyBuiltin.positional("issubclass", a -> Py.bool(issubclass(a[0], a[1])))
@@ -796,7 +804,8 @@ public final class Builtins {
         NAMES.put("__debug__", Py.TRUE);
         Object[] fns = {PRINT, LEN, REPR, ASCII, HASH, ID, ABS, CALLABLE, ITER, NEXT, ORD, CHR, HEX, OCT, BIN,
             FORMAT, DIVMOD, POW, ROUND, ISINSTANCE, ISSUBCLASS, GETATTR, SETATTR, HASATTR, DELATTR, VARS, DIR,
-            SUM, MIN, MAX, ANY, ALL, SORTED, REVERSED, ENUMERATE, ZIP, MAP, FILTER, SUPER, INPUT, AITER, ANEXT};
+            SUM, MIN, MAX, ANY, ALL, SORTED, REVERSED, ENUMERATE, ZIP, MAP, FILTER, SUPER, INPUT, AITER, ANEXT,
+            CN1_REMOVED, CN1_REPLACED};
         for (Object fn : fns) {
             NAMES.put(((PyBuiltin) fn).name, fn);
         }

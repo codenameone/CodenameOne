@@ -236,9 +236,11 @@ installed into an application.
   Codename One's components, so it looks and behaves like the rest of the
   platform and needs no web view or bridge.
 * *Problems at build time.* What can't work on a device -- `exec` of a
-  string, a module imported by a computed name -- is reported by the build
-  with the file and line. The llm build lists, for example, the `exec` calls
-  in `sqlite_utils.cli`, a module the application never imports.
+  string, a module imported by a computed name -- fails the build when the
+  program reaches it, with every file and line in one message. Five
+  functions of llm and `sqlite-utils` run Python handed to them as text;
+  `llm-mobile/src/cn1-python.properties` leaves them out by name, with no
+  edit to either package (see <<python-directives>>).
 * *Data stays on the device.* MarkItDown converts documents locally, and llm
   can point at a model running on the local network.
 
@@ -251,9 +253,10 @@ installed into an application.
 * *Pin everything.* `requirements.txt` names every transitive dependency
   at the version the tests were run against. A floating version turns a
   working build into a different program.
-* *Read the build's warnings.* Each `exec`, `eval` or `__import__` it
-  reports is a line that raises if it's reached. Most are in command line
-  code that an application never imports. Check the rest.
+* *Decide what to leave out.* The build stops on each `exec`, `eval` or
+  `__import__` the program reaches and prints the `remove=` line for them.
+  Most are in command line code an application never needs. For one it
+  does need, `replace=` swaps the function for Java.
 * *Fix the platform, not the library.* An edit to a dependency must be
   repeated at every upgrade; a fix to the runtime is made once and helps the
   next project too.

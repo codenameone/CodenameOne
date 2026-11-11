@@ -429,7 +429,7 @@ final class TypedEmit {
         }
         for (Infer.Fn f : in.fns.values()) {
             byScope.put(f.def.scope, f);
-            if (f.cls != null && !f.def.name.equals("__init__")) {
+            if (f.cls != null && !f.def.name.equals("__init__") && !in.removed(f.def)) {
                 String key = f.def.name + "/" + (f.params.length - 1);
                 List<Infer.Fn> g = groups.get(key);
                 if (g == null) {
@@ -440,9 +440,16 @@ final class TypedEmit {
             }
         }
         Set<Infer.Fn> ok = new LinkedHashSet<Infer.Fn>(in.fns.values());
+        for (Infer.Fn f : in.fns.values()) {
+            // Nothing reaches it: there is no body to type, and no types
+            // its calls and stores were held to.
+            if (in.removed(f.def)) {
+                ok.remove(f);
+            }
+        }
         Map<Infer.Fn, Set<Infer.Fn>> deps = new HashMap<Infer.Fn, Set<Infer.Fn>>();
         Map<Infer.Fn, Set<String>> gdeps = new HashMap<Infer.Fn, Set<String>>();
-        for (Infer.Fn f : in.fns.values()) {
+        for (Infer.Fn f : ok) {
             typed.put(f, typedName(f));
         }
         boolean changed = true;
@@ -956,6 +963,10 @@ final class TypedEmit {
         da = new DefAssign();
         da.function(f.def.body, sc.params);
         soleStores = soleStores(f.def.body);
+        // A parameter is bound on entry as well: its one assignment in the
+        // body is a second store, and folding it gave every read the value
+        // only one path assigns.
+        soleStores.keySet().removeAll(sc.params);
         accLocals = accumulators(f);
         folded = new IdentityHashMap<Expr, Object>();
         recycled = ListRecycling.find(f.def.body, f.names, sc);
@@ -5001,9 +5012,12 @@ final class TypedEmit {
             } else if (isNone(l)) {
                 s = isNoneTest(r);
             } else if (l.t.k == Ty.K.INST && r.t.k == Ty.K.INST || l.t.k == Ty.K.LIST && r.t.k == Ty.K.LIST) {
-                s = "(" + l.c + " == " + r.c + ")";
+                // As objects: Java refuses `==` between two classes neither
+                // of which extends the other, and two such values are
+                // simply not the same object.
+                s = "((Object) " + l.c + " == (Object) " + r.c + ")";
             } else if (op.startsWith("is")) {
-                s = "(" + box(l) + " == " + box(r) + ")";
+                s = "((Object) " + box(l) + " == (Object) " + box(r) + ")";
             } else {
                 throw new Unsupported("== on " + l.t + ", " + r.t);
             }

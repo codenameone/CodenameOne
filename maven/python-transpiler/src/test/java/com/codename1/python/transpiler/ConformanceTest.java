@@ -151,6 +151,10 @@ class ConformanceTest {
         boolean client = stem.startsWith("pilclient_");
         List<File> classPath = new ArrayList<File>();
         classPath.add(new File(core));
+        // The runtime too, as an application has it: the build then leaves
+        // out what the program does not reach, and every program here runs
+        // without it.
+        classPath.add(new File(runtime));
         if (backend != null) {
             classPath.add(new File(backend));
         }

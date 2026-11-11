@@ -220,6 +220,35 @@ public class PythonProjectTest {
         }
     }
 
+    /// `replace=` in `cn1-python.properties`: the Java to fill in goes into
+    /// the project's own sources, once, and never into the generated ones,
+    /// where a second copy of the class would not compile.
+    @Test
+    public void replacedFunctionsGetAJavaClassTheProjectOwns() throws Exception {
+        File src = tmp.newFolder("py");
+        write(new File(src, "main.py"), "import tools\nprint(tools.run('1'))\n");
+        write(new File(src, "tools.py"), "def run(text):\n    return eval(text)\n");
+        File out = tmp.newFolder("gen");
+        File java = tmp.newFolder("java");
+        try {
+            builder(src, out, null).javaSources(java, new File(tmp.getRoot(), "scratch1")).run();
+            fail();
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("remove=tools.run"));
+        }
+        write(new File(src, PythonProjectBuilder.DIRECTIVES), "replace=tools.run\n");
+        assertTrue(builder(src, out, null).javaSources(java, new File(tmp.getRoot(), "scratch2")).run());
+        File shim = new File(java, "com/codename1/python/ext/ToolsShims.java");
+        assertTrue(read(shim), read(shim).contains("NativeModule.replace(\"tools.run\""));
+        assertFalse(new File(out, "com/codename1/python/ext/ToolsShims.java").exists());
+        assertTrue(read(new File(out, "com/codename1/generated/python/PythonModules.java"))
+                .contains("com.codename1.python.ext.ToolsShims.install()"));
+        write(shim, read(shim).replace("throw NativeModule.notReplaced(\"tools.run\");", "return args[0];"));
+        String mine = read(shim);
+        assertTrue(builder(src, out, null).javaSources(java, new File(tmp.getRoot(), "scratch3")).run());
+        assertEquals(mine, read(shim));
+    }
+
     private static File javaFor(File out, String module) {
         return new File(out, "com/codename1/generated/python/"
                 + com.codename1.python.transpiler.api.PythonTranspiler.className(module) + ".java");

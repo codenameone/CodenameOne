@@ -86,8 +86,157 @@ final class Infer {
         }
     }
 
+    /// What every module's pass shares: one heap for the whole program. A
+    /// field, a list site or a parameter has one type, whichever module
+    /// stores into it or calls it, and the fixpoint is over all of them.
+    /// One place where reached code reads or writes an attribute the build
+    /// cannot name on an object it cannot tell the class of.
+    static final class Problem {
+        final String module;
+        final int line;
+        /// `function` or `Class.method`, or null at module level.
+        final String function;
+        final String what;
+        /// Whether it is a store: that costs typed fields, where a read
+        /// only makes more functions reachable.
+        final boolean store;
+
+        Problem(String module, int line, String function, String what) {
+            this.module = module;
+            this.line = line;
+            this.function = function;
+            this.what = what;
+            this.store = !what.startsWith("reads");
+        }
+    }
+
+    static final class Program {
+        /// Dotted module name -> its view.
+        final Map<String, Infer> modules = new LinkedHashMap<String, Infer>();
+        final Map<FunctionDef, Fn> fns = new IdentityHashMap<FunctionDef, Fn>();
+        /// The module each compiled class and each typed function is in.
+        final Map<Layouts.Cls, Infer> home = new IdentityHashMap<Layouts.Cls, Infer>();
+        final Map<Fn, Infer> fnHome = new IdentityHashMap<Fn, Infer>();
+        /// Field name -> every compiled class of the program declaring it.
+        final Map<String, List<Layouts.Cls>> fieldOwners = new HashMap<String, List<Layouts.Cls>>();
+        final Map<Layouts.Cls, Map<String, Ty>> fields = new LinkedHashMap<Layouts.Cls, Map<String, Ty>>();
+        final Map<Layouts.Cls, Set<String>> definite = new HashMap<Layouts.Cls, Set<String>>();
+        final Set<Layouts.Cls> open = new HashSet<Layouts.Cls>();
+        final Map<Expr, Integer> siteOf = new IdentityHashMap<Expr, Integer>();
+        final List<Ty> siteElem = new ArrayList<Ty>();
+        final List<Ty> siteKey = new ArrayList<Ty>();
+        final Set<Integer> escapedSites = new HashSet<Integer>();
+        final Map<Integer, Ty[]> siteSlots = new HashMap<Integer, Ty[]>();
+        final Set<Integer> unslotted = new HashSet<Integer>();
+        final Map<Call, Ty> siteRet = new HashMap<Call, Ty>();
+        final Map<FunctionDef, Fn> generic = new IdentityHashMap<FunctionDef, Fn>();
+        /// The compiled functions something in the program reaches: by a
+        /// direct call, as a value, or by a name the rest of the program
+        /// or the runtime may look up. The body of any other is never
+        /// walked -- what it would store or call does not happen -- and
+        /// never emitted (see [Infer#removed]).
+        final Set<FunctionDef> reached = java.util.Collections.newSetFromMap(new IdentityHashMap<FunctionDef, Boolean>());
+        /// Every name the Java side of the program may look up in a
+        /// module or on an instance: the identifiers among the strings of
+        /// the runtime's classes. Null when the runtime was not at hand
+        /// to read, and then every function counts as reached.
+        Set<String> runtimeNames;
+        /// Functions the build was told to keep although nothing in the
+        /// Python sources reaches them: `module.function` and
+        /// `module.Class.method`.
+        final Set<String> keep = new HashSet<String>();
+        /// What reached code does that the build cannot hold to the types
+        /// it computed, by the place it happens: each is a build error
+        /// unless the function is replaced (see [Problem]).
+        final Map<Object, Problem> problems = new IdentityHashMap<Object, Problem>();
+        /// The classes an instance of which is held somewhere as a value
+        /// of no known class, with the classes related to them (see
+        /// [Infer#loosen]); and the ones the first set was built from.
+        final Set<Layouts.Cls> loose = java.util.Collections.newSetFromMap(new IdentityHashMap<Layouts.Cls, Boolean>());
+        final Set<Layouts.Cls> looseRoots = java.util.Collections.newSetFromMap(new IdentityHashMap<Layouts.Cls, Boolean>());
+        /// The modules held somewhere as a value, and whether reached code
+        /// can get at any module (`sys.modules`).
+        final Set<Infer> looseModules = java.util.Collections.newSetFromMap(new IdentityHashMap<Infer, Boolean>());
+        boolean allModulesLoose;
+        /// Whether reached code reads an attribute by a computed name from
+        /// an object of no known class: a method of a loose class, or a
+        /// function of a loose module, may be what it finds and calls.
+        boolean anyRead;
+        /// Whether reached code takes the class of an object of no known
+        /// class (`type(x)`, `x.__class__`) to do more with than name or
+        /// compare it: any loose class may then be constructed there.
+        boolean anyClassOf;
+        /// The scopes of methods of classes without a compiled layout:
+        /// their first parameter is never a compiled instance.
+        final Set<Scope> plainSelf = java.util.Collections.newSetFromMap(new IdentityHashMap<Scope, Boolean>());
+        final Map<Scope, Set<String>> compCells = new IdentityHashMap<Scope, Set<String>>();
+        boolean allListsEscape;
+        boolean changed;
+        /// Set once the fixpoint holds: the emitters then only read the
+        /// result (see [Infer#escape]).
+        boolean done;
+        int rounds;
+
+        /// Adds a module; every module is added before [#run].
+        Infer add(String name, boolean pkg, List<Stmt> body, Layouts layouts, Scope moduleScope,
+                WholeProgram.Module facts) {
+            Infer in = new Infer(this, name, pkg, body, layouts, moduleScope, facts);
+            modules.put(name, in);
+            return in;
+        }
+
+        /// Runs the pass over every module, to the fixpoint. The types only
+        /// ever widen and there are finitely many, so it ends; the bound is
+        /// there for a fault in the pass, which is reported, never worked
+        /// around by leaving the program untyped.
+        void run() {
+            for (Infer in : modules.values()) {
+                in.collect(in.body);
+            }
+            for (Infer in : modules.values()) {
+                in.bindImports();
+            }
+            for (rounds = 0; rounds < 2000; rounds++) {
+                changed = false;
+                for (Infer in : modules.values()) {
+                    in.walkBlock(in.body, null, in.moduleScope);
+                    in.unify();
+                }
+                if (!modules.isEmpty()) {
+                    modules.values().iterator().next().sweep();
+                }
+                if (!changed) {
+                    for (Infer in : modules.values()) {
+                        in.uncalled();
+                    }
+                }
+                if (!changed) {
+                    done = true;
+                    if (System.getProperty("cn1.python.dumpProblems") != null) {
+                        for (Problem q : problems.values()) {
+                            System.err.println("problem " + q.module + ":" + q.line + " " + q.function + ": " + q.what);
+                        }
+                        System.err.println("reached " + reached.size() + " of " + fns.size() + " functions; loose " + loose.size() + " of " + home.size() + " classes, " + looseModules.size() + " modules");
+                    }
+                    for (Infer in : modules.values()) {
+                        in.localize();
+                    }
+                    return;
+                }
+            }
+            throw new IllegalStateException("the Python type inference did not settle after " + rounds
+                    + " rounds; this is a fault in the transpiler");
+        }
+    }
+
+    final Program p;
+    final String moduleName;
+    /// Whether the module is a package's `__init__`.
+    final boolean pkg;
+    final List<Stmt> body;
     final Layouts layouts;
     final Scope moduleScope;
+    /// This module's own typed functions; `p.fns` has every module's.
     final Map<FunctionDef, Fn> fns = new LinkedHashMap<FunctionDef, Fn>();
     /// Stable global name -> the function or class it is bound to, once.
     final Map<String, Fn> globalFns = new HashMap<String, Fn>();
@@ -95,7 +244,7 @@ final class Infer {
     /// The type a call of an expression function (see `exprBody`) has at
     /// that call site, from the argument types there; where it is narrower
     /// than the function's own return type, typed code relabels the result.
-    final Map<Call, Ty> siteRet = new HashMap<Call, Ty>();
+    final Map<Call, Ty> siteRet;
     /// Globals bound once, by `import math`: calls of its functions on
     /// numbers are typed (see `MATH_FNS`) and run as `PyMath` directly.
     final Set<String> mathNames = new HashSet<String>();
@@ -119,52 +268,56 @@ final class Infer {
     }
     final Map<String, Ty> globals = new HashMap<String, Ty>();
     /// Field name -> type, per declaring class.
-    final Map<Layouts.Cls, Map<String, Ty>> fields = new LinkedHashMap<Layouts.Cls, Map<String, Ty>>();
+    final Map<Layouts.Cls, Map<String, Ty>> fields;
     /// Fields every instance has set once its `__init__` returned.
-    final Map<Layouts.Cls, Set<String>> definite = new HashMap<Layouts.Cls, Set<String>>();
+    final Map<Layouts.Cls, Set<String>> definite;
     /// Classes something the pass cannot see may subclass or patch.
-    final Set<Layouts.Cls> open = new HashSet<Layouts.Cls>();
-    final Map<Expr, Integer> siteOf = new IdentityHashMap<Expr, Integer>();
-    final List<Ty> siteElem = new ArrayList<Ty>();
+    final Set<Layouts.Cls> open;
+    final Map<Expr, Integer> siteOf;
+    final List<Ty> siteElem;
     /// The keys a dict site holds; `siteElem` holds its values.
-    final List<Ty> siteKey = new ArrayList<Ty>();
-    final Set<Integer> escapedSites = new HashSet<Integer>();
+    final List<Ty> siteKey;
+    final Set<Integer> escapedSites;
     /// The type of each position of a tuple or list display, by allocation
     /// site (see [#slot]). A tuple's never change once made; a list's hold
     /// only while nothing reorders or resizes it -- anything but a store at
     /// a constant index puts its site in [#unslotted].
-    final Map<Integer, Ty[]> siteSlots = new HashMap<Integer, Ty[]>();
-    final Set<Integer> unslotted = new HashSet<Integer>();
-    boolean allListsEscape;
+    final Map<Integer, Ty[]> siteSlots;
+    final Set<Integer> unslotted;
 
-    private boolean changed;
     private final Map<String, Integer> moduleBindings = new HashMap<String, Integer>();
 
     private final WholeProgram.Module facts;
 
-    private Infer(Layouts layouts, Scope moduleScope, WholeProgram.Module facts) {
+    private Infer(Program p, String moduleName, boolean pkg, List<Stmt> body, Layouts layouts,
+            Scope moduleScope, WholeProgram.Module facts) {
+        this.p = p;
+        this.moduleName = moduleName;
+        this.pkg = pkg;
+        this.body = body;
         this.layouts = layouts;
         this.moduleScope = moduleScope;
         this.facts = facts;
+        this.siteRet = p.siteRet;
+        this.fields = p.fields;
+        this.definite = p.definite;
+        this.open = p.open;
+        this.siteOf = p.siteOf;
+        this.siteElem = p.siteElem;
+        this.siteKey = p.siteKey;
+        this.escapedSites = p.escapedSites;
+        this.siteSlots = p.siteSlots;
+        this.unslotted = p.unslotted;
+        this.generic = p.generic;
+        this.compCells = p.compCells;
     }
 
-    /// Infers the module, or returns null when it gives up (no fixpoint).
+    /// Infers one module on its own: a program of that module alone.
     static Infer run(List<Stmt> body, Layouts layouts, Scope moduleScope, WholeProgram.Module facts) {
-        Infer in = new Infer(layouts, moduleScope, facts);
-        in.collect(body);
-        for (int round = 0; round < 60; round++) {
-            in.changed = false;
-            in.walkBlock(body, null, moduleScope);
-            in.unify();
-            if (!in.changed) {
-                in.uncalled();
-            }
-            if (!in.changed) {
-                in.done = true;
-                return in;
-            }
-        }
-        return null;
+        Program p = new Program();
+        Infer in = p.add("", false, body, layouts, moduleScope, facts);
+        p.run();
+        return in;
     }
 
     /// Gives a type to every parameter no call in the module reaches. The
@@ -188,7 +341,7 @@ final class Infer {
     /// (see [#genericView]).
     private boolean shadow;
     private boolean shadowMiss;
-    private final Map<FunctionDef, Fn> generic = new HashMap<FunctionDef, Fn>();
+    private final Map<FunctionDef, Fn> generic;
 
     /// Whether `f` can be entered by a call this pass does not see: one
     /// through a value, or one from another module. Such a call goes
@@ -196,6 +349,10 @@ final class Infer {
     /// the direct calls pass, the generic version of the body runs.
     private boolean entered(Fn f) {
         if (f.escapes) {
+            return true;
+        }
+        if (p.anyRead && (f.cls != null ? p.loose.contains(f.cls)
+                : p.allModulesLoose || p.looseModules.contains(p.fnHome.get(f)))) {
             return true;
         }
         String n = f.def.name;
@@ -236,13 +393,165 @@ final class Infer {
             g.params[0] = f.params[0];
         }
         for (int i = 0; i < g.params.length; i++) {
-            g.locals.put(g.names.get(i), Ty.join(g.locals.get(g.names.get(i)), g.params[i]));
+            g.locals.put(g.names.get(i), mix(g.locals.get(g.names.get(i)), g.params[i]));
         }
         shadow = true;
         try {
             walkBlock(f.def.body, g, f.def.scope);
         } finally {
             shadow = false;
+        }
+    }
+
+    // ---- other modules ----------------------------------------------------
+
+    /// A global of another module, read through an import.
+    static final class Extern {
+        final Infer module;
+        final String name;
+
+        Extern(Infer module, String name) {
+            this.module = module;
+            this.name = name;
+        }
+    }
+
+    /// Stable globals an `import` binds to a module of the program.
+    private final Map<String, Infer> moduleNames = new HashMap<String, Infer>();
+    /// Stable globals `from m import n` binds: the module, and the name there.
+    private final Map<String, Extern> importedNames = new HashMap<String, Extern>();
+
+    /// Records what the imports at the top of the module bind. A name bound
+    /// once here, to a name bound once there, is that module's function,
+    /// class or value for good: a call through it is a call of that
+    /// function, as direct as one inside its own module.
+    private void bindImports() {
+        if (moduleScope.hasStarImport) {
+            // A star import may bind any name again.
+            return;
+        }
+        for (Stmt s : body) {
+            if (s instanceof Import) {
+                for (Alias a : ((Import) s).names) {
+                    int dot = a.name.indexOf('.');
+                    String n = a.asname != null ? a.asname : dot < 0 ? a.name : a.name.substring(0, dot);
+                    Infer m = p.modules.get(a.asname != null || dot < 0 ? a.name : n);
+                    if (m != null && stable(n)) {
+                        moduleNames.put(n, m);
+                    }
+                }
+            } else if (s instanceof ImportFrom) {
+                ImportFrom f = (ImportFrom) s;
+                String from = f.level == 0 ? f.module : relative(f.level, f.module);
+                Infer m = from == null ? null : p.modules.get(from);
+                if (m == null) {
+                    continue;
+                }
+                for (Alias a : f.names) {
+                    String n = a.asname != null ? a.asname : a.name;
+                    if (!"*".equals(a.name) && stable(n)) {
+                        importedNames.put(n, new Extern(m, a.name));
+                    }
+                }
+            }
+        }
+    }
+
+    /// The absolute name of `from <dots><module> import`, or null when it
+    /// climbs out of the top-level package.
+    private String relative(int level, String module) {
+        String base = moduleName;
+        int up = pkg ? level - 1 : level;
+        for (int i = 0; i < up; i++) {
+            int dot = base.lastIndexOf('.');
+            if (dot < 0) {
+                return null;
+            }
+            base = base.substring(0, dot);
+        }
+        if (module == null) {
+            return base;
+        }
+        return base.isEmpty() ? module : base + "." + module;
+    }
+
+    /// What stable global `n` of this module is: an `Fn`, a `Layouts.Cls`,
+    /// an `Infer` (a module), a `Extern` (a value of another module's), or
+    /// null for a value of this module's own or one nothing is known of.
+    private Object resolve(String n, int depth) {
+        Fn f = globalFns.get(n);
+        if (f != null) {
+            return f;
+        }
+        Layouts.Cls k = globalClasses.get(n);
+        if (k != null) {
+            return k;
+        }
+        Infer m = moduleNames.get(n);
+        if (m != null) {
+            return m;
+        }
+        Extern g = importedNames.get(n);
+        return g == null || depth > 8 ? null : g.module.export(g.name, depth + 1);
+    }
+
+    /// What attribute `n` of this module is, to another module.
+    private Object export(String n, int depth) {
+        if (moduleScope.assigned.contains(n)) {
+            if (!stable(n) || moduleScope.hasStarImport) {
+                return null;
+            }
+            Object r = resolve(n, depth);
+            return r != null ? r : new Extern(this, n);
+        }
+        // Not a global of the package: a module in it.
+        return moduleScope.hasStarImport ? null : p.modules.get(moduleName.isEmpty() ? n : moduleName + "." + n);
+    }
+
+    /// What `e` names in another module, when `e` is an imported name or an
+    /// attribute of an imported module; otherwise null.
+    private Object foreign(Expr e, Scope sc) {
+        if (e instanceof Name) {
+            String n = ((Name) e).id;
+            if (sc.resolve(n) != Scope.Binding.GLOBAL || !importedNames.containsKey(n) && !moduleNames.containsKey(n)) {
+                return null;
+            }
+            return resolve(n, 0);
+        }
+        if (e instanceof Attribute) {
+            Object o = foreign(((Attribute) e).value, sc);
+            return o instanceof Infer ? ((Infer) o).export(((Attribute) e).attr, 0) : null;
+        }
+        return null;
+    }
+
+    /// `t` as this module's code holds it. An instance of a class another
+    /// module compiled is held as any object: the typed code of a module
+    /// names only its own classes. What the pass knows of such a value
+    /// still counts where it is stored -- only the code here does not use it.
+    private Ty loc(Ty t) {
+        return p.done && t != null && t.k == Ty.K.INST && p.home.get(t.cls) != this ? Ty.DYN : t; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// Rewrites what this module's own code declares -- parameters, locals,
+    /// results, fields, globals -- as that code holds it (see [#loc]).
+    private void localize() {
+        for (Fn f : fns.values()) {
+            for (int i = 0; i < f.params.length; i++) {
+                f.params[i] = loc(f.params[i]);
+            }
+            f.ret = loc(f.ret);
+            for (Map.Entry<String, Ty> e : f.locals.entrySet()) {
+                e.setValue(loc(e.getValue()));
+            }
+        }
+        for (Layouts.Cls k : layouts.classes.values()) {
+            for (Map.Entry<String, Ty> e : fields.get(k).entrySet()) {
+                e.setValue(loc(e.getValue()));
+            }
+        }
+        for (Map.Entry<String, Ty> e : globals.entrySet()) {
+            e.setValue(loc(e.getValue()));
         }
     }
 
@@ -272,6 +581,15 @@ final class Infer {
         }
         for (Layouts.Cls k : layouts.classes.values()) {
             fields.put(k, new LinkedHashMap<String, Ty>());
+            p.home.put(k, this);
+            for (String f : k.fields) {
+                List<Layouts.Cls> o = p.fieldOwners.get(f);
+                if (o == null) {
+                    o = new ArrayList<Layouts.Cls>();
+                    p.fieldOwners.put(f, o);
+                }
+                o.add(k);
+            }
             for (String f : k.fields) {
                 // A field stored from another module holds what that
                 // module puts there, which this pass does not see.
@@ -282,6 +600,8 @@ final class Infer {
                 Fn fn = new Fn(f, k);
                 fn.params[0] = Ty.inst(k, false);
                 fns.put(f, fn);
+                p.fns.put(f, fn);
+                p.fnHome.put(fn, this);
             }
         }
         for (Stmt s : body) {
@@ -294,6 +614,8 @@ final class Infer {
                     compCells.put(f.scope, cc);
                     Fn fn = new Fn(f, null);
                     fns.put(f, fn);
+                    p.fns.put(f, fn);
+                    p.fnHome.put(fn, this);
                     globalFns.put(f.name, fn);
                 }
             } else if (s instanceof ClassDef) {
@@ -676,10 +998,11 @@ final class Infer {
     /// Whether field `f` of class `k` (declared there or inherited) is set
     /// on every instance of `k` and of all its subclasses.
     boolean definitelySet(Layouts.Cls owner, String f) {
-        if (facts.dictViews || facts.deleted.contains(f)) {
+        Infer h = p.home.get(owner);
+        if (h.facts.dictViews || h.facts.deleted.contains(f)) {
             return false;
         }
-        for (Layouts.Cls k : layouts.classes.values()) {
+        for (Layouts.Cls k : h.layouts.classes.values()) {
             if (isSelfOrAncestor(owner, k) && !definite.get(k).contains(f)) {
                 return false;
             }
@@ -699,19 +1022,95 @@ final class Infer {
     // ---- joins -----------------------------------------------------------
 
     private Ty joinInto(Ty cur, Ty v) {
-        Ty r = Ty.join(cur, v);
+        Ty r = mix(cur, v);
         if (!r.equals(cur)) {
-            changed = true;
+            p.changed = true;
         }
-        if (r.k != Ty.K.LIST && r.k != Ty.K.TUPLE && r.k != Ty.K.DICT) {
+        if (r.k != Ty.K.LIST && r.k != Ty.K.TUPLE && r.k != Ty.K.DICT && r.k != Ty.K.INST) {
             escape(v);
         }
         return r;
     }
 
+    /// The join of two types. An instance that joins into a value of no
+    /// one class is from then on held where the pass does not follow it.
+    private Ty mix(Ty a, Ty b) {
+        Ty r = Ty.join(a, b);
+        if (r.k == Ty.K.DYN && !p.done) {
+            if (a != null && a.k == Ty.K.INST) {
+                loosen(a.cls);
+            }
+            if (b != null && b.k == Ty.K.INST) {
+                loosen(b.cls);
+            }
+        }
+        return r;
+    }
+
+    /// An instance of `k` reached code that holds it as a value of no
+    /// known class. What such code does to an object it cannot name the
+    /// class of -- read or store an attribute by a computed name -- it may
+    /// do to this one: to a field or a method of `k`, of a class it
+    /// derives from, or of one that derives from it.
+    /// What an escaped list or dict holds is read back as a value of no
+    /// known class.
+    private void sweep() {
+        if (p.anyClassOf) {
+            for (Layouts.Cls k : new ArrayList<Layouts.Cls>(p.loose)) {
+                Infer in = p.home.get(k);
+                if (in != null) {
+                    in.escapeClass(k);
+                }
+            }
+        }
+        if (p.anyRead) {
+            // A computed read from a module held as a value finds its
+            // classes and what its globals hold, not only its functions.
+            for (Map.Entry<Layouts.Cls, Infer> e : p.home.entrySet()) {
+                if (p.allModulesLoose || p.looseModules.contains(e.getValue())) {
+                    e.getValue().escapeClass(e.getKey());
+                }
+            }
+            for (Infer in : p.modules.values()) {
+                if (p.allModulesLoose || p.looseModules.contains(in)) {
+                    for (Ty g : in.globals.values()) {
+                        in.escape(g);
+                    }
+                }
+            }
+        }
+        for (int s = 0; s < siteElem.size(); s++) {
+            if (p.allListsEscape || escapedSites.contains(Integer.valueOf(s))) {
+                Ty e = siteElem.get(s);
+                if (e != null && e.k == Ty.K.INST) {
+                    loosen(e.cls);
+                }
+                Ty k = s < siteKey.size() ? siteKey.get(s) : null;
+                if (k != null && k.k == Ty.K.INST) {
+                    loosen(k.cls);
+                }
+            }
+        }
+    }
+
+    private void loosen(Layouts.Cls k) {
+        if (k == null || !p.looseRoots.add(k)) {
+            return;
+        }
+        for (Layouts.Cls o : p.home.keySet()) {
+            if ((isSelfOrAncestor(o, k) || isSelfOrAncestor(k, o)) && p.loose.add(o)) {
+                p.changed = true;
+            }
+        }
+    }
+
     /// A value went somewhere the pass does not follow.
     void escape(Ty v) {
-        if (done) {
+        if (p.done) {
+            return;
+        }
+        if (v != null && v.k == Ty.K.INST) {
+            loosen(v.cls);
             return;
         }
         if (v != null && v.k == Ty.K.TUPLE) {
@@ -719,7 +1118,7 @@ final class Infer {
             // the pass does not follow.
             for (int s : v.sites) {
                 if (escapedSites.add(Integer.valueOf(s))) {
-                    changed = true;
+                    p.changed = true;
                     Ty[] sl = siteSlots.get(Integer.valueOf(s));
                     if (sl != null) {
                         for (Ty x : sl) {
@@ -732,14 +1131,14 @@ final class Infer {
         }
         if (v != null && (v.k == Ty.K.LIST || v.k == Ty.K.DICT)) {
             if (v.sites.length == 0) {
-                if (!allListsEscape) {
-                    allListsEscape = true;
-                    changed = true;
+                if (!p.allListsEscape) {
+                    p.allListsEscape = true;
+                    p.changed = true;
                 }
             } else {
                 for (int s : v.sites) {
                     if (escapedSites.add(Integer.valueOf(s))) {
-                        changed = true;
+                        p.changed = true;
                         Ty[] sl = siteSlots.get(Integer.valueOf(s));
                         if (sl != null) {
                             for (Ty x : sl) {
@@ -752,10 +1151,242 @@ final class Infer {
         }
     }
 
+    // ---- attributes named at run time -----------------------------------
+
+    private void problem(Node at, Fn fn, Scope sc, String what) {
+        if (p.problems.containsKey(at)) {
+            return;
+        }
+        String q = null;
+        if (fn != null) {
+            q = (fn.cls != null ? fn.cls.def.name + "." : "") + fn.def.name;
+        } else if (sc != null && sc.kind != Scope.Kind.MODULE) {
+            q = (sc.enclosingClass != null && sc.enclosingClass.name != null ? sc.enclosingClass.name + "." : "") + sc.name;
+        }
+        p.problems.put(at, new Problem(moduleName, at.line, q, what));
+    }
+
+    /// Whether `e` is the receiver of a method of a class without a
+    /// compiled layout: an instance of such a class has no typed field.
+    private boolean plainReceiver(Expr e, Scope sc) {
+        if (!(e instanceof Name) || !p.plainSelf.contains(sc) || sc.params.isEmpty()) {
+            return false;
+        }
+        return sc.params.iterator().next().equals(((Name) e).id) && sc.resolve(((Name) e).id) == Scope.Binding.LOCAL;
+    }
+
+    /// The start every value of the str `e` has, when `e` is built on a
+    /// literal: `"visit_" + n`, an f-string, `"do_%s" % n`. Null otherwise,
+    /// and for an empty start.
+    private static String prefix(Expr e) {
+        String r = null;
+        if (e instanceof BinOp && ("+".equals(((BinOp) e).op) || "%".equals(((BinOp) e).op))
+                && ((BinOp) e).left instanceof Constant && ((Constant) ((BinOp) e).left).kind == Constant.Kind.STR) {
+            r = ((Constant) ((BinOp) e).left).text;
+            if ("%".equals(((BinOp) e).op)) {
+                int i = r.indexOf('%');
+                r = i < 0 ? r : r.substring(0, i);
+            }
+        } else if (e instanceof JoinedStr && !((JoinedStr) e).parts.isEmpty()
+                && ((JoinedStr) e).parts.get(0) instanceof Constant) {
+            r = ((Constant) ((JoinedStr) e).parts.get(0)).text;
+        }
+        return r == null || r.isEmpty() ? null : r;
+    }
+
+    private static final Set<String> DICT_READS = new HashSet<String>(java.util.Arrays.asList("items", "keys",
+            "values", "get", "copy", "__contains__", "__len__", "__iter__", "__getitem__"));
+    private static final Set<String> CLASS_FACTS = new HashSet<String>(java.util.Arrays.asList("__name__",
+            "__qualname__", "__module__", "__doc__"));
+
+    /// `x` when `e` is the attribute dict of `x` -- `x.__dict__` or
+    /// `vars(x)` -- and null otherwise. A store through it is a store of an
+    /// attribute by a computed name.
+    private Expr dictOwner(Expr e, Scope sc) {
+        if (e instanceof Attribute && "__dict__".equals(((Attribute) e).attr)) {
+            return ((Attribute) e).value;
+        }
+        if (e instanceof Call && ((Call) e).func instanceof Name && "vars".equals(((Name) ((Call) e).func).id)
+                && ((Call) e).args.size() == 1 && ((Call) e).keywords.isEmpty()
+                && !(((Call) e).args.get(0) instanceof Starred)
+                && sc.resolve("vars") == Scope.Binding.BUILTIN && !moduleScope.hasStarImport) {
+            return ((Call) e).args.get(0);
+        }
+        return null;
+    }
+
+    /// `x` when `e` is the class of `x`, `type(x)` or `x.__class__`.
+    private Expr classOwner(Expr e, Scope sc) {
+        if (e instanceof Attribute && "__class__".equals(((Attribute) e).attr)) {
+            return ((Attribute) e).value;
+        }
+        if (e instanceof Call && ((Call) e).func instanceof Name && "type".equals(((Name) ((Call) e).func).id)
+                && ((Call) e).args.size() == 1 && ((Call) e).keywords.isEmpty()
+                && !(((Call) e).args.get(0) instanceof Starred)
+                && sc.resolve("type") == Scope.Binding.BUILTIN && !moduleScope.hasStarImport) {
+            return ((Call) e).args.get(0);
+        }
+        return null;
+    }
+
+    private static boolean classOp(String op) {
+        return "is".equals(op) || "is not".equals(op) || "==".equals(op) || "!=".equals(op) || "in".equals(op)
+                || "not in".equals(op);
+    }
+
+    /// The uses of a class taken off an object that make nothing with it
+    /// -- its name, and a comparison -- and the comparisons of an attribute
+    /// dict, which only read it.
+    private final Set<Node> classFacts = java.util.Collections.newSetFromMap(new IdentityHashMap<Node, Boolean>());
+
+    /// The class of an object, held as a value: whoever holds it may make
+    /// instances of it, with arguments nobody tracks. `owner` is the object.
+    private void classOf(Expr at, Expr owner, Fn fn, Scope sc) {
+        if (classFacts.contains(at) || plainReceiver(owner, sc)) {
+            return;
+        }
+        Ty r = type(owner, fn, sc);
+        if (r.k == Ty.K.INST) {
+            for (Map.Entry<Layouts.Cls, Infer> e : new ArrayList<Map.Entry<Layouts.Cls, Infer>>(p.home.entrySet())) {
+                if (isSelfOrAncestor(e.getKey(), r.cls) || isSelfOrAncestor(r.cls, e.getKey())) {
+                    e.getValue().escapeClass(e.getKey());
+                }
+            }
+        } else if (r.k == Ty.K.DYN && !p.anyClassOf) {
+            // Whatever is loose by the end: the sweep asks again each round.
+            p.anyClassOf = true;
+            p.changed = true;
+        }
+    }
+
+    /// The attribute dict of `owner` used for anything but a read: handed
+    /// on, it may be written under any name.
+    private void dictOf(Expr at, Expr owner, Fn fn, Scope sc) {
+        if (classFacts.contains(at)) {
+            return;
+        }
+        if (owner instanceof Name && globalClasses.containsKey(((Name) owner).id)
+                && sc.resolve(((Name) owner).id) == Scope.Binding.GLOBAL) {
+            // A class's own dict is read-only, and holds no instance's
+            // attributes.
+            return;
+        }
+        computedStore(type(owner, fn, sc), owner, null, Ty.DYN, at, fn, sc,
+                "hands on the attribute dict of an object of no class the build can tell, through which any"
+                + " attribute may be set");
+    }
+
+    /// `setattr(recv, name, v)` and its other spellings. A literal name is
+    /// a store like `recv.name = v`. A computed one on an instance of a
+    /// known class may be any field of that class or of one related to it.
+    /// On an object of no known class it could be any field of the
+    /// program, and typing them all for that would type none: that is a
+    /// problem the build reports.
+    private void computedStore(Ty recv, Expr recvExpr, Expr name, Ty v, Node at, Fn fn, Scope sc) {
+        computedStore(recv, recvExpr, name, v, at, fn, sc,
+                "stores an attribute whose name is computed, on an object of no class the build can tell");
+    }
+
+    private void computedStore(Ty recv, Expr recvExpr, Expr name, Ty v, Node at, Fn fn, Scope sc, String what) {
+        escape(v);
+        if (recv.k != Ty.K.INST && recv.k != Ty.K.DYN || plainReceiver(recvExpr, sc)) {
+            return;
+        }
+        if (name instanceof Constant && ((Constant) name).kind == Constant.Kind.STR) {
+            storeField(recv, ((Constant) name).text, v);
+            return;
+        }
+        String pre = name == null ? null : prefix(name);
+        {
+            boolean cost = false;
+            for (Map.Entry<Layouts.Cls, Map<String, Ty>> e : fields.entrySet()) {
+                Layouts.Cls o = e.getKey();
+                if (recv.k == Ty.K.INST ? !isSelfOrAncestor(o, recv.cls) && !isSelfOrAncestor(recv.cls, o)
+                        : !p.loose.contains(o)) {
+                    continue;
+                }
+                cost |= recv.k != Ty.K.INST && pre == null && !e.getValue().isEmpty();
+                for (Map.Entry<String, Ty> f : e.getValue().entrySet()) {
+                    if (pre == null || f.getKey().startsWith(pre)) {
+                        f.setValue(joinInto(f.getValue(), v));
+                    }
+                }
+            }
+            if (cost) {
+                problem(at, fn, sc, what);
+            }
+        }
+    }
+
+    /// `getattr(recv, name)` with a computed name: what it finds may be
+    /// called, with anything. On an instance of a known class that is a
+    /// method of the class or of one related to it; with a name built on a
+    /// literal start, whatever is named so. Anything else could be every
+    /// function of the program.
+    private void computedRead(Ty recv, Expr recvExpr, Expr name, Node at, Fn fn, Scope sc) {
+        if (recv.k != Ty.K.INST && recv.k != Ty.K.DYN || plainReceiver(recvExpr, sc)) {
+            return;
+        }
+        String pre = prefix(name);
+        if (recv.k != Ty.K.INST && pre == null) {
+            // Whatever is loose by the end: `entered` asks again each round.
+            if (!p.anyRead) {
+                p.anyRead = true;
+                p.changed = true;
+            }
+            problem(at, fn, sc, "reads an attribute whose name is computed, on an object of no class the build can tell");
+            return;
+        }
+        for (Fn f : new ArrayList<Fn>(p.fns.values())) {
+            if (pre != null && !f.def.name.startsWith(pre)) {
+                continue;
+            }
+            if (recv.k == Ty.K.INST && (f.cls == null || !isSelfOrAncestor(f.cls, recv.cls) && !isSelfOrAncestor(recv.cls, f.cls))) {
+                continue;
+            }
+            escapeFn(f);
+        }
+    }
+
+    private static boolean plainMethod(FunctionDef m) {
+        for (Expr d : m.decorators) {
+            if (d instanceof Name && "staticmethod".equals(((Name) d).id)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void reach(Fn f) {
+        if (p.reached.add(f.def)) {
+            p.changed = true;
+        }
+    }
+
+    /// Whether `f` is reached by something this pass cannot follow to it:
+    /// a name another module or the Java runtime may look up, or the
+    /// build's own list.
+    private boolean rooted(Fn f) {
+        if (p.runtimeNames == null || entered(f) || p.runtimeNames.contains(f.def.name)) {
+            return true;
+        }
+        return p.keep.contains(moduleName + "." + (f.cls == null ? "" : f.cls.def.name + ".") + f.def.name);
+    }
+
+    /// Whether `d` is a compiled function nothing in the program reaches.
+    /// Its body is not emitted: the function raises, naming itself, if a
+    /// path this pass has no way to see calls it after all.
+    boolean removed(FunctionDef d) {
+        return p.done && p.fns.containsKey(d) && !p.reached.contains(d);
+    }
+
     private void escapeFn(Fn f) {
         if (f != null && !f.escapes) {
             f.escapes = true;
-            changed = true;
+            p.changed = true;
+        }
+        if (f != null) {
+            reach(f);
         }
         if (f != null) {
             // Callers through a value are unknown, but the typed version
@@ -848,16 +1479,18 @@ final class Infer {
     }
 
     private void escapeClass(Layouts.Cls k) {
+        // Whoever holds the class makes instances of it.
+        loosen(k);
         Layouts.Cls o = Layouts.resolver(k, "__init__");
         if (o != null && o.typable.get("__init__") != null) {
-            escapeFn(fns.get(o.typable.get("__init__")));
+            escapeFn(p.fns.get(o.typable.get("__init__")));
         }
     }
 
     /// Every compiled method `name` may be reached with arguments the pass
     /// cannot type.
     private void escapeMethods(String name) {
-        for (Fn f : fns.values()) {
+        for (Fn f : p.fns.values()) {
             if (f.cls != null && f.def.name.equals(name)) {
                 escapeFn(f);
             }
@@ -867,10 +1500,8 @@ final class Infer {
     /// Set once the fixpoint holds: the emitters then only read the result.
     /// An escape from a read of theirs would change types the pass already
     /// handed out, after the code using them was decided.
-    private boolean done;
-
     Ty elem(Ty list) {
-        if (list.k != Ty.K.LIST || allListsEscape || list.sites.length == 0) {
+        if (list.k != Ty.K.LIST || p.allListsEscape || list.sites.length == 0) {
             return Ty.DYN;
         }
         Ty r = Ty.BOT;
@@ -878,9 +1509,10 @@ final class Infer {
             if (escapedSites.contains(Integer.valueOf(s))) {
                 return Ty.DYN;
             }
-            r = Ty.join(r, siteElem.get(s));
+            r = mix(r, siteElem.get(s));
         }
-        if (r.k == Ty.K.DYN && !done) {
+        r = loc(r);
+        if (r.k == Ty.K.DYN && !p.done) {
             // A display's mixed positions read as one dynamic element: what
             // they hold is no longer followed.
             for (int s : list.sites) {
@@ -911,7 +1543,7 @@ final class Infer {
 
     /// What a read of a dict of these sites answers.
     Ty dictVal(Ty d) {
-        if (d.k != Ty.K.DICT || allListsEscape || d.sites.length == 0) {
+        if (d.k != Ty.K.DICT || p.allListsEscape || d.sites.length == 0) {
             return Ty.DYN;
         }
         Ty r = Ty.BOT;
@@ -919,9 +1551,9 @@ final class Infer {
             if (escapedSites.contains(Integer.valueOf(s))) {
                 return Ty.DYN;
             }
-            r = Ty.join(r, siteElem.get(s));
+            r = mix(r, siteElem.get(s));
         }
-        return r;
+        return loc(r);
     }
 
     /// The dict methods that keep the values followed, or null for any
@@ -932,7 +1564,7 @@ final class Infer {
                 if (args.size() == 1 || args.size() == 2) {
                     escape(args.get(0));
                     Ty dflt = args.size() == 2 ? args.get(1) : Ty.NONE;
-                    Ty r = Ty.join(dictVal(d), dflt);
+                    Ty r = mix(dictVal(d), dflt);
                     if (r.k == Ty.K.DYN) {
                         escape(dflt);
                     }
@@ -969,7 +1601,7 @@ final class Infer {
         }
         for (int s : list.sites) {
             if (unslotted.add(Integer.valueOf(s))) {
-                changed = true;
+                p.changed = true;
             }
         }
     }
@@ -986,10 +1618,10 @@ final class Infer {
             java.util.Arrays.fill(sl, Ty.BOT);
             siteSlots.put(key, sl);
         }
-        Ty r = Ty.join(sl[i], v);
+        Ty r = mix(sl[i], v);
         if (!r.equals(sl[i])) {
             sl[i] = r;
-            changed = true;
+            p.changed = true;
         }
         if (tuple ? escapedSites.contains(key) : r.k != Ty.K.LIST && r.k != Ty.K.TUPLE) {
             escape(v);
@@ -1011,16 +1643,16 @@ final class Infer {
             if (sl == null || i >= sl.length) {
                 return t.k == Ty.K.LIST ? elem(t) : Ty.DYN;
             }
-            r = Ty.join(r, sl[i]);
+            r = mix(r, sl[i]);
         }
-        return r;
+        return loc(r);
     }
 
     /// How many positions every site of `t` has, when they agree and are
     /// known; otherwise -1.
     int slotCount(Ty t) {
         if (t.k != Ty.K.TUPLE && t.k != Ty.K.LIST || t.sites.length == 0
-                || t.k == Ty.K.LIST && allListsEscape) {
+                || t.k == Ty.K.LIST && p.allListsEscape) {
             return -1;
         }
         int n = -1;
@@ -1045,7 +1677,7 @@ final class Infer {
         }
         Ty r = Ty.BOT;
         for (int i = 0; i < n; i++) {
-            r = Ty.join(r, slot(t, i));
+            r = mix(r, slot(t, i));
         }
         return r;
     }
@@ -1084,7 +1716,7 @@ final class Infer {
             for (int i = 1; i < n; i++) {
                 Ty j = Ty.BOT;
                 for (Fn f : g) {
-                    j = Ty.join(j, f.params[i]);
+                    j = mix(j, f.params[i]);
                 }
                 for (Fn f : g) {
                     f.params[i] = joinInto(f.params[i], j);
@@ -1092,7 +1724,7 @@ final class Infer {
             }
             Ty r = Ty.BOT;
             for (Fn f : g) {
-                r = Ty.join(r, f.ret);
+                r = mix(r, f.ret);
             }
             for (Fn f : g) {
                 f.ret = joinInto(f.ret, r);
@@ -1186,20 +1818,25 @@ final class Infer {
                 if (!d.decorators.isEmpty() || inner.cls == null && !globalFns.containsValue(inner)) {
                     escapeFn(inner);
                 }
-                for (int i = 0; i < inner.params.length; i++) {
-                    inner.locals.put(inner.names.get(i), Ty.join(inner.locals.get(inner.names.get(i)), inner.params[i]));
-                }
-                walkBlock(d.body, inner, d.scope);
-                if (!endsAbruptly(d.body)) {
-                    inner.ret = joinInto(inner.ret, Ty.NONE);
-                }
-                if (!shadow && entered(inner)) {
-                    genericView(inner);
-                }
                 if (inner.def.name.startsWith("__") && !"__init__".equals(inner.def.name)) {
                     // The runtime calls these itself, with anything.
                     escapeFn(inner);
                     inner.ret = joinInto(inner.ret, Ty.DYN);
+                }
+                if (!p.reached.contains(d) && rooted(inner)) {
+                    reach(inner);
+                }
+                if (p.reached.contains(d)) {
+                    for (int i = 0; i < inner.params.length; i++) {
+                        inner.locals.put(inner.names.get(i), mix(inner.locals.get(inner.names.get(i)), inner.params[i]));
+                    }
+                    walkBlock(d.body, inner, d.scope);
+                    if (!endsAbruptly(d.body)) {
+                        inner.ret = joinInto(inner.ret, Ty.NONE);
+                    }
+                    if (!shadow && entered(inner)) {
+                        genericView(inner);
+                    }
                 }
             } else {
                 walkBlock(d.body, null, d.scope);
@@ -1216,6 +1853,13 @@ final class Infer {
             }
             for (Expr d : c.decorators) {
                 type(d, fn, sc);
+            }
+            if (!layouts.classes.containsKey(c)) {
+                for (Stmt m : c.body) {
+                    if (m instanceof FunctionDef && plainMethod((FunctionDef) m)) {
+                        p.plainSelf.add(((FunctionDef) m).scope);
+                    }
+                }
             }
             walkBlock(c.body, null, c.scope);
             if (sc.kind == Scope.Kind.MODULE && !globalClasses.containsKey(c.name)) {
@@ -1385,6 +2029,12 @@ final class Infer {
             Attribute a = (Attribute) t;
             Ty r = type(a.value, fn, sc);
             storeField(r, a.attr, v);
+        } else if (t instanceof Subscript && !(((Subscript) t).index instanceof Slice)
+                && dictOwner(((Subscript) t).value, sc) != null) {
+            // `x.__dict__[k] = v`: setattr(x, k, v).
+            Expr owner = dictOwner(((Subscript) t).value, sc);
+            type(((Subscript) t).index, fn, sc);
+            computedStore(type(owner, fn, sc), owner, ((Subscript) t).index, v, t, fn, sc);
         } else if (t instanceof Subscript) {
             Subscript s = (Subscript) t;
             Ty r = type(s.value, fn, sc);
@@ -1483,7 +2133,7 @@ final class Infer {
         if (recv.k == Ty.K.BOT || recv.k == Ty.K.NONE) {
             return;
         }
-        List<Layouts.Cls> owners = layouts.fieldOwners.get(attr);
+        List<Layouts.Cls> owners = p.fieldOwners.get(attr);
         if (owners == null) {
             escape(v);
             return;
@@ -1514,7 +2164,7 @@ final class Infer {
 
     Ty fieldType(Layouts.Cls owner, String attr) {
         Ty t = fields.get(owner).get(attr);
-        return t == null ? Ty.DYN : t;
+        return t == null ? Ty.DYN : loc(t);
     }
 
     /// Compiled methods a call `recv.m(...)` on an instance of `k` may run:
@@ -1522,7 +2172,8 @@ final class Infer {
     /// when the name may resolve to anything else (a field, a class
     /// attribute that is not a compiled method).
     List<FunctionDef> candidates(Layouts.Cls k, String m) {
-        if (layouts.fieldOwners.containsKey(m)) {
+        Layouts home = p.home.get(k).layouts;
+        if (home.fieldOwners.containsKey(m)) {
             return null;
         }
         List<FunctionDef> r = new ArrayList<FunctionDef>();
@@ -1534,7 +2185,7 @@ final class Infer {
             }
             r.add(f);
         }
-        for (Layouts.Cls c : layouts.classes.values()) {
+        for (Layouts.Cls c : home.classes.values()) {
             if (c != k && isSelfOrAncestor(k, c) && c.bodyNames.contains(m)) { //NOPMD CompareObjectsWithEquals - identity is meant
                 FunctionDef f = c.typable.get(m);
                 if (f == null) {
@@ -1601,6 +2252,12 @@ final class Infer {
                     escapeClass(k);
                     return Ty.DYN;
                 }
+                if (importedNames.containsKey(n)) {
+                    Ty t = valueOf(resolve(n, 0));
+                    if (t != null) {
+                        return t;
+                    }
+                }
                 Ty t = globals.get(n);
                 return t == null ? Ty.BOT : t;
             }
@@ -1610,6 +2267,33 @@ final class Infer {
     }
 
     Ty type(Expr e, Fn fn, Scope sc) {
+        return loc(type0(e, fn, sc));
+    }
+
+    /// The type of a read of `o` (see [#resolve]) as a value, or null when
+    /// `o` says nothing. A function or a class read as a value goes where
+    /// the pass does not follow.
+    private Ty valueOf(Object o) {
+        if (o instanceof Fn) {
+            escapeFn((Fn) o);
+            return Ty.DYN;
+        }
+        if (o instanceof Layouts.Cls) {
+            escapeClass((Layouts.Cls) o);
+            return Ty.DYN;
+        }
+        if (o instanceof Infer && p.looseModules.add((Infer) o)) {
+            p.changed = true;
+        }
+        if (o instanceof Extern) {
+            Extern g = (Extern) o;
+            Ty t = g.module.globals.get(g.name);
+            return t == null ? Ty.BOT : loc(t);
+        }
+        return null;
+    }
+
+    private Ty type0(Expr e, Fn fn, Scope sc) {
         if (e instanceof Constant) {
             switch (((Constant) e).kind) {
                 case NONE:
@@ -1633,6 +2317,20 @@ final class Infer {
         if (e instanceof Name) {
             return nameType(((Name) e).id, fn, sc);
         }
+        if (e instanceof Attribute && "modules".equals(((Attribute) e).attr) && !p.allModulesLoose && !p.done) {
+            // `sys.modules`: every module of the program, as a value.
+            p.allModulesLoose = true;
+            p.changed = true;
+        }
+        if (e instanceof Attribute && CLASS_FACTS.contains(((Attribute) e).attr)
+                && classOwner(((Attribute) e).value, sc) != null) {
+            classFacts.add(((Attribute) e).value);
+        }
+        if (e instanceof Attribute && "__dict__".equals(((Attribute) e).attr)) {
+            dictOf(e, ((Attribute) e).value, fn, sc);
+        } else if (e instanceof Attribute && "__class__".equals(((Attribute) e).attr)) {
+            classOf(e, ((Attribute) e).value, fn, sc);
+        }
         if (e instanceof Attribute) {
             Attribute a = (Attribute) e;
             if (MATH_CONSTS.contains(a.attr) && isMath(a.value, sc)) {
@@ -1644,6 +2342,13 @@ final class Infer {
                 // with arguments nobody tracks.
                 escapeMethods(a.attr);
                 return Ty.DYN;
+            }
+            if (foreign(a.value, sc) instanceof Infer) {
+                // `module.name`.
+                Ty t = valueOf(foreign(a, sc));
+                if (t != null) {
+                    return t;
+                }
             }
             Ty r = type(a.value, fn, sc);
             return attrType(r, a.attr);
@@ -1661,7 +2366,7 @@ final class Infer {
             }
             if ("+".equals(b.op) && l.k == Ty.K.LIST && r.k == Ty.K.LIST) {
                 int s = site(b);
-                siteElem.set(s, joinInto(siteElem.get(s), Ty.join(elem(l), elem(r))));
+                siteElem.set(s, joinInto(siteElem.get(s), mix(elem(l), elem(r))));
                 return Ty.list(new int[] {s}, false);
             }
             if (l.k == Ty.K.BOT || r.k == Ty.K.BOT) {
@@ -1698,12 +2403,22 @@ final class Infer {
         if (e instanceof BoolOp) {
             Ty r = Ty.BOT;
             for (Expr v : ((BoolOp) e).values) {
-                r = Ty.join(r, type(v, fn, sc));
+                r = mix(r, type(v, fn, sc));
             }
             return r;
         }
         if (e instanceof Compare) {
             Compare c = (Compare) e;
+            for (int i = -1; i < c.ops.size(); i++) {
+                // `type(a) is B`, `type(a) == type(b)`: nothing is made.
+                Expr side = i < 0 ? c.left : c.comparators.get(i);
+                String op = c.ops.get(i < 0 ? 0 : i);
+                String next = i + 1 < c.ops.size() ? c.ops.get(i + 1) : op;
+                if (classOwner(side, sc) != null && classOp(op) && classOp(next) || dictOwner(side, sc) != null) {
+                    // A dict compared is a dict read.
+                    classFacts.add(side);
+                }
+            }
             Ty l = type(c.left, fn, sc);
             boolean plain = true;
             for (int i = 0; i < c.ops.size(); i++) {
@@ -1729,13 +2444,20 @@ final class Infer {
             type(i.test, fn, sc);
             Ty a = type(i.body, fn, sc);
             Ty b = type(i.orelse, fn, sc);
-            Ty r = Ty.join(a, b);
+            Ty r = mix(a, b);
             if (r.k == Ty.K.DYN) {
                 // Neither side is followed past here.
                 escape(a);
                 escape(b);
             }
             return r;
+        }
+        if (e instanceof Subscript && !(((Subscript) e).index instanceof Slice)
+                && dictOwner(((Subscript) e).value, sc) != null) {
+            // `x.__dict__[k]`: a read, which changes no attribute.
+            type(dictOwner(((Subscript) e).value, sc), fn, sc);
+            type(((Subscript) e).index, fn, sc);
+            return Ty.DYN;
         }
         if (e instanceof Subscript) {
             Subscript s = (Subscript) e;
@@ -1799,7 +2521,7 @@ final class Infer {
             int s = site(l);
             boolean starred = anyStarred(l.elts);
             if (starred && unslotted.add(Integer.valueOf(s))) {
-                changed = true;
+                p.changed = true;
             }
             for (int i = 0; i < l.elts.size(); i++) {
                 Expr x = l.elts.get(i);
@@ -1814,10 +2536,10 @@ final class Infer {
                     } else {
                         // The position follows the value; a read of the
                         // joined elements escapes it if they lose it (elem).
-                        Ty j = Ty.join(siteElem.get(s), t);
+                        Ty j = mix(siteElem.get(s), t);
                         if (!j.equals(siteElem.get(s))) {
                             siteElem.set(s, j);
-                            changed = true;
+                            p.changed = true;
                         }
                         joinSlot(s, l.elts.size(), i, t, false);
                     }
@@ -1866,7 +2588,7 @@ final class Infer {
     /// The function the comprehension being typed runs in, or null.
     private Fn compOuter;
 
-    private final Map<Scope, Set<String>> compCells = new IdentityHashMap<Scope, Set<String>>();
+    private final Map<Scope, Set<String>> compCells;
 
     /// Whether `n`, a cell of function scope `sc`, is captured only by
     /// comprehensions: those run where they stand and cannot rebind it, so
@@ -1941,12 +2663,12 @@ final class Infer {
             // A list of the element type, its length unknown (unslotted).
             int s = site(c);
             if (unslotted.add(Integer.valueOf(s))) {
-                changed = true;
+                p.changed = true;
             }
             Ty j = joinInto(siteElem.get(s), elt);
             if (!j.equals(siteElem.get(s))) {
                 siteElem.set(s, j);
-                changed = true;
+                p.changed = true;
             }
             return Ty.list(new int[] {s}, false);
         }
@@ -1977,7 +2699,7 @@ final class Infer {
     }
 
     private boolean anySubclassDefinesCompare(Layouts.Cls k) {
-        for (Layouts.Cls c : layouts.classes.values()) {
+        for (Layouts.Cls c : p.home.get(k).layouts.classes.values()) {
             if (isSelfOrAncestor(k, c)) {
                 for (String d : new String[] {"__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"}) {
                     if (c.bodyNames.contains(d)) {
@@ -2130,57 +2852,82 @@ final class Infer {
             String n = ((Name) c.func).id;
             Fn f = globalFns.get(n);
             Layouts.Cls k = globalClasses.get(n);
+            if (f == null && k == null) {
+                Object o = foreign(c.func, sc);
+                f = o instanceof Fn ? (Fn) o : null;
+                k = o instanceof Layouts.Cls ? (Layouts.Cls) o : null;
+            }
             if (f != null || k != null) {
-                List<Ty> args = new ArrayList<Ty>();
-                for (Expr a : c.args) {
-                    args.add(a instanceof Starred ? Ty.DYN : type(a, fn, sc));
-                }
-                for (Keyword kw : c.keywords) {
-                    escape(type(kw.value, fn, sc));
-                }
-                if (f != null) {
-                    callFn(f, args, 0, simple && args.size() <= f.params.length
-                            && args.size() >= f.params.length - f.def.args.defaults.size());
-                    Ty site = !shadow && simple && args.size() == f.params.length ? siteType(f, args) : null;
-                    if (site != null) {
-                        siteRet.put(c, site);
-                        return site;
-                    }
-                    if (!shadow) {
-                        siteRet.remove(c);
-                    }
-                    return f.ret;
-                }
-                if (open.contains(k)) {
-                    for (Ty a : args) {
-                        escape(a);
-                    }
-                    escapeClass(k);
-                    return Ty.DYN;
-                }
-                Layouts.Cls o = Layouts.resolver(k, "__init__");
-                FunctionDef init = o == null ? null : o.typable.get("__init__");
-                if (o != null && init == null) {
-                    for (Ty a : args) {
-                        escape(a);
-                    }
-                    return Ty.inst(k, false);
-                }
-                if (init != null) {
-                    Fn fi = fns.get(init);
-                    if (!shadow) {
-                        fi.params[0] = joinInto(fi.params[0], Ty.inst(k, false));
-                    }
-                    callFn(fi, args, 1, simple && args.size() + 1 <= fi.params.length
-                            && args.size() + 1 >= fi.params.length - init.args.defaults.size());
-                } else {
-                    for (Ty a : args) {
-                        escape(a);
-                    }
-                }
-                return Ty.inst(k, false);
+                return callKnown(c, f, k, fn, sc, simple);
             }
         }
+        if (c.func instanceof Attribute && foreign(((Attribute) c.func).value, sc) instanceof Infer) {
+            // `module.f(...)`, `module.Cls(...)`.
+            Object o = foreign(c.func, sc);
+            if (o instanceof Fn || o instanceof Layouts.Cls) {
+                return callKnown(c, o instanceof Fn ? (Fn) o : null,
+                        o instanceof Layouts.Cls ? (Layouts.Cls) o : null, fn, sc, simple);
+            }
+        }
+        return call1(c, fn, sc, simple);
+    }
+
+    /// A call of function `f` or of class `k`, whichever is not null.
+    private Ty callKnown(Call c, Fn f, Layouts.Cls k, Fn fn, Scope sc, boolean simple) {
+        List<Ty> args = new ArrayList<Ty>();
+        for (Expr a : c.args) {
+            args.add(a instanceof Starred ? Ty.DYN : type(a, fn, sc));
+        }
+        for (Keyword kw : c.keywords) {
+            escape(type(kw.value, fn, sc));
+        }
+        if (f != null) {
+            callFn(f, args, 0, simple && args.size() <= f.params.length
+                    && args.size() >= f.params.length - f.def.args.defaults.size());
+            // An expression function of this module's: typed
+            // code relabels the call's result (TypedEmit).
+            Ty site = !shadow && simple && args.size() == f.params.length
+                    && p.fnHome.get(f) == this ? siteType(f, args) : null; //NOPMD CompareObjectsWithEquals - identity is meant
+            if (site != null) {
+                siteRet.put(c, site);
+                return site;
+            }
+            if (!shadow) {
+                siteRet.remove(c);
+            }
+            return f.ret;
+        }
+        if (open.contains(k)) {
+            for (Ty a : args) {
+                escape(a);
+            }
+            escapeClass(k);
+            return Ty.DYN;
+        }
+        Layouts.Cls o = Layouts.resolver(k, "__init__");
+        FunctionDef init = o == null ? null : o.typable.get("__init__");
+        if (o != null && init == null) {
+            for (Ty a : args) {
+                escape(a);
+            }
+            return Ty.inst(k, false);
+        }
+        if (init != null) {
+            Fn fi = p.fns.get(init);
+            if (!shadow) {
+                fi.params[0] = joinInto(fi.params[0], Ty.inst(k, false));
+            }
+            callFn(fi, args, 1, simple && args.size() + 1 <= fi.params.length
+                    && args.size() + 1 >= fi.params.length - init.args.defaults.size());
+        } else {
+            for (Ty a : args) {
+                escape(a);
+            }
+        }
+        return Ty.inst(k, false);
+    }
+
+    private Ty call1(Call c, Fn fn, Scope sc, boolean simple) {
         if (isMathCall(c, sc)) {
             boolean numbers = true;
             for (Expr x : c.args) {
@@ -2188,6 +2935,49 @@ final class Infer {
                 numbers &= (t.k == Ty.K.INT || t.k == Ty.K.FLOAT) && !t.opt;
             }
             return numbers ? Ty.FLOAT : Ty.DYN;
+        }
+        if (c.func instanceof Attribute && dictOwner(((Attribute) c.func).value, sc) != null) {
+            // A method of `x.__dict__`: a read leaves the attributes as
+            // they are, anything else may set or remove any of them.
+            Attribute a = (Attribute) c.func;
+            Expr owner = dictOwner(a.value, sc);
+            List<Ty> args = new ArrayList<Ty>();
+            for (Expr x : c.args) {
+                args.add(x instanceof Starred ? Ty.DYN : type(x, fn, sc));
+            }
+            for (Keyword kw : c.keywords) {
+                escape(type(kw.value, fn, sc));
+            }
+            for (Ty t : args) {
+                escape(t);
+            }
+            Ty r = type(owner, fn, sc);
+            if (!DICT_READS.contains(a.attr)) {
+                boolean named = ("setdefault".equals(a.attr) || "__setitem__".equals(a.attr)) && c.args.size() == 2
+                        && !(c.args.get(0) instanceof Starred) && c.keywords.isEmpty();
+                computedStore(r, owner, named ? c.args.get(0) : null, named ? args.get(1) : Ty.DYN, c, fn, sc);
+            }
+            return Ty.DYN;
+        }
+        if (c.func instanceof Attribute && ("__setattr__".equals(((Attribute) c.func).attr)
+                || "__delattr__".equals(((Attribute) c.func).attr)) && c.keywords.isEmpty() && !anyStarred(c.args)) {
+            // `object.__setattr__(x, n, v)` and `x.__setattr__(n, v)`:
+            // setattr, past whatever the class defines for it. The call
+            // itself is typed as any other, below.
+            boolean set = "__setattr__".equals(((Attribute) c.func).attr);
+            int n = set ? 2 : 1;
+            if (c.args.size() == n + 1) {
+                computedStore(type(c.args.get(0), fn, sc), c.args.get(0), c.args.get(1),
+                        set ? type(c.args.get(2), fn, sc) : Ty.DYN, c, fn, sc);
+            } else if (c.args.size() == n) {
+                Expr owner = ((Attribute) c.func).value;
+                boolean viaSuper = owner instanceof Call && ((Call) owner).func instanceof Name
+                        && "super".equals(((Name) ((Call) owner).func).id);
+                if (!(viaSuper && p.plainSelf.contains(sc))) {
+                    computedStore(viaSuper ? Ty.DYN : type(owner, fn, sc), owner, c.args.get(0),
+                            set ? type(c.args.get(1), fn, sc) : Ty.DYN, c, fn, sc);
+                }
+            }
         }
         if (c.func instanceof Attribute) {
             Attribute a = (Attribute) c.func;
@@ -2205,7 +2995,7 @@ final class Infer {
                     escape(type(kw.value, fn, sc));
                 }
                 if (m != null && !open.contains(k)) {
-                    Fn f = fns.get(m);
+                    Fn f = p.fns.get(m);
                     callFn(f, args, 0, simple && args.size() <= f.params.length
                             && args.size() >= f.params.length - m.args.defaults.size());
                     return f.ret;
@@ -2214,7 +3004,7 @@ final class Infer {
                     escape(t);
                 }
                 if (m != null) {
-                    escapeFn(fns.get(m));
+                    escapeFn(p.fns.get(m));
                 }
                 return Ty.DYN;
             }
@@ -2234,13 +3024,13 @@ final class Infer {
                 if (cand != null) {
                     Ty ret = Ty.BOT;
                     for (FunctionDef m : cand) {
-                        Fn f = fns.get(m);
+                        Fn f = p.fns.get(m);
                         callFn(f, args, 1, simple && args.size() + 1 == f.params.length);
-                        ret = Ty.join(ret, f.ret);
+                        ret = mix(ret, f.ret);
                     }
                     if (Layouts.resolver(r.cls, a.attr) == null) {
                         // Not every instance has it: the rest raise.
-                        ret = Ty.join(ret, Ty.BOT);
+                        ret = mix(ret, Ty.BOT);
                     }
                     return ret;
                 }
@@ -2259,7 +3049,7 @@ final class Infer {
                 int s = site(c);
                 siteElem.set(s, joinInto(siteElem.get(s), Ty.STR));
                 if (unslotted.add(Integer.valueOf(s))) {
-                    changed = true;
+                    p.changed = true;
                 }
                 return Ty.list(new int[] {s}, false);
             }
@@ -2293,6 +3083,22 @@ final class Infer {
             }
             for (Keyword kw : c.keywords) {
                 escape(type(kw.value, fn, sc));
+            }
+            if ("setattr".equals(n) && c.args.size() == 3 && c.keywords.isEmpty()) {
+                computedStore(args.get(0), c.args.get(0), c.args.get(1), args.get(2), c, fn, sc);
+            } else if ("delattr".equals(n) && c.args.size() == 2 && c.keywords.isEmpty()
+                    && !(c.args.get(1) instanceof Constant)) {
+                // Whichever attribute it was is gone: no type holds for it.
+                computedStore(args.get(0), c.args.get(0), c.args.get(1), Ty.DYN, c, fn, sc);
+            } else if ("vars".equals(n) && c.args.size() == 1 && c.keywords.isEmpty()
+                    && !(c.args.get(0) instanceof Starred)) {
+                dictOf(c, c.args.get(0), fn, sc);
+            } else if ("type".equals(n) && c.args.size() == 1 && c.keywords.isEmpty()
+                    && !(c.args.get(0) instanceof Starred)) {
+                classOf(c, c.args.get(0), fn, sc);
+            } else if ("getattr".equals(n) && c.args.size() >= 2 && c.keywords.isEmpty()
+                    && !(c.args.get(1) instanceof Constant)) {
+                computedRead(args.get(0), c.args.get(0), c.args.get(1), c, fn, sc);
             }
             if (simple && args.size() == 1 && ("len".equals(n) || "isinstance".equals(n) && false)) {
                 // len reads its argument and keeps nothing.
@@ -2480,13 +3286,14 @@ final class Infer {
 
     /// Joins a call's arguments into `f`'s parameters, from `from` on.
     private void callFn(Fn f, List<Ty> args, int from, boolean exact) {
+        reach(f);
         if (shadow) {
             // A call the generic body makes goes through the callee's own
             // guard: it adds nothing to the callee's parameters, and has
             // the typed version's result only when its arguments fit it.
             boolean fit = exact;
             for (int i = 0; fit && i < args.size(); i++) {
-                fit = Ty.join(f.params[from + i], args.get(i)).equals(f.params[from + i]);
+                fit = mix(f.params[from + i], args.get(i)).equals(f.params[from + i]);
             }
             if (!fit) {
                 shadowMiss = true;
@@ -2565,7 +3372,7 @@ final class Infer {
                     .append(definite.get(e.getKey())).append('\n');
         }
         b.append("globals ").append(globals).append("\nsites ").append(siteElem).append(" escaped ")
-                .append(escapedSites).append(allListsEscape ? " ALL" : "").append(" unslotted ").append(unslotted)
+                .append(escapedSites).append(p.allListsEscape ? " ALL" : "").append(" unslotted ").append(unslotted)
                 .append('\n');
         for (Map.Entry<Integer, Ty[]> e : siteSlots.entrySet()) {
             b.append("  slots ").append(e.getKey()).append(' ').append(java.util.Arrays.toString(e.getValue()))

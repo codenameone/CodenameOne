@@ -13,14 +13,17 @@ runs at the speed of the equivalent Java.
 
 Two things follow from compiling ahead of time rather than interpreting:
 
-* The program is known in full at build time. In your own sources, a module
-  imported by a name computed while the program runs, `exec`, `eval` and
-  `compile` of a string, and the tracing hooks (`sys.settrace`,
-  `sys.setprofile`) are build errors that name the file and the line. In a
-  package installed from PyPI the build reports each one as a warning
-  instead, and the line raises `NotImplementedError` if it's reached:
-  libraries keep such calls in code an application seldom runs, such as a
-  command line option. `sys._getframe` works, answered from the call stack.
+* The program is known in full at build time. A module imported by a name
+  computed while the program runs, `exec` and `eval` of a string, and the
+  tracing hooks (`sys.settrace`, `sys.setprofile`) are build errors that
+  name the file and the line, in your own sources and in a package from
+  PyPI alike. They're errors only where the program reaches them: a
+  function nothing calls isn't compiled, and libraries keep most such calls
+  in code an application never runs, such as a command line option. For one
+  the program does reach, a line in `cn1-python.properties` leaves the
+  function out or replaces it with Java; see
+  <<python-directives,Leaving code out of a build>>. `sys._getframe` works,
+  answered from the call stack.
 * Packages with C extensions are supported. The package's Python is
   translated like your own code, and each compiled module is replaced by a
   Java class with the same functions; see <<python-c-extensions,C extensions>>.
@@ -271,6 +274,72 @@ delete its line from the lock, or the file itself, and import again.
 
 You can also copy a package's sources into the source directory by hand;
 they translate like the application's own modules.
+
+[[python-directives]]
+==== Leaving code out of a build
+
+The build translates the whole program at once, the application and every
+package together, so it knows which functions the program can reach. A
+function that nothing calls, names or can find by a computed name isn't
+compiled. Its body is replaced by one that raises, saying the function was
+left out, so a package's command line code or an optional feature costs
+nothing in an application that never uses it.
+
+Code the program does reach has to translate. `eval`, `exec`, `__import__`
+and the frame hooks of `sys` run or inspect Python that wasn't compiled
+with the program, so a function that uses one and is reached fails the
+build. The error lists every such place at once, and ends with the line
+that fixes it:
+
+[source,text]
+----
+llm/cli.py:4424:9: a translated program cannot run or inspect code that was not compiled with it, and this one reaches code that does:
+  llm/cli.py:4424:9: exec() in llm.cli._tools_from_code
+  sqlite_utils/utils.py:534:9: exec() in sqlite_utils.utils._compile_code
+Name each of those functions in cn1-python.properties, beside the Python sources. To leave them out (each then raises if it is called):
+  remove=llm.cli._tools_from_code,sqlite_utils.utils._compile_code
+----
+
+`cn1-python.properties` sits in `src/main/python`. Each line names
+functions as `module.function` or `module.Class.method`, separated by
+commas, and a key can appear on as many lines as you like. It reaches into
+any package, however deep, without an edit to the package.
+
+[cols="1,3",options="header"]
+|===
+| Line | Meaning
+| `remove=` | Leaves the function out. It raises `RuntimeError`, naming
+  itself, if something calls it after all.
+| `replace=` | Replaces the function's body with Java you write. Everything
+  else about the function stays: its name, its decorators, its place in the
+  class.
+| `keep=` | Compiles a function the build would leave out, for one that's
+  only reached from Java or in a way the build can't see.
+|===
+
+A name that matches no function of the program is an error, so a directive
+never goes stale without the build saying so.
+
+For `replace=`, the build writes a class per module into the project's Java
+sources, `com.codename1.python.ext.<Module>Shims`, with a stub for each
+function. The comment over a stub lists the values it receives:
+
+[source,java]
+----
+public final class SqliteUtilsUtilsShims {
+    public static void install() {
+        // args: code, imports, column
+        NativeModule.replace("sqlite_utils.utils._compile_code", args -> {
+            throw NativeModule.notReplaced("sqlite_utils.utils._compile_code");
+        });
+    }
+}
+----
+
+The file is yours. The build writes it once and never overwrites it. Until
+you fill a stub in, calling its function raises `NotImplementedError` with
+the function's name. When you add a function to `replace=` for a module
+whose class already exists, add its `NativeModule.replace` call by hand.
 
 [[python-c-extensions]]
 ==== C extensions

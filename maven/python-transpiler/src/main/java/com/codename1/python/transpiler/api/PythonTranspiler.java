@@ -169,16 +169,20 @@ public final class PythonTranspiler {
     }
 
     /// @param libraries the source paths that came from PyPI rather than the
-    ///        application. In those, `eval`, `exec`, `compile`, `__import__`
-    ///        and the `sys` frame hooks raise `NotImplementedError` where they
-    ///        run instead of failing the build: libraries keep them in helpers
-    ///        an application never calls, and a port should not edit them
-    /// @param deferred receives `file:line:col: what` for each such use, for
-    ///        the build to report; may be null
+    ///        application. They are compiled as the application's own:
+    ///        code that cannot be translated (`eval`, `exec`, `__import__`,
+    ///        the `sys` frame hooks) fails the build wherever the program
+    ///        reaches it, with the `cn1-python.properties` line that removes
+    ///        or replaces the function it is in. The one difference is
+    ///        `compile`, a build error in the application and, in a package,
+    ///        an object that holds nothing to run
+    /// @param deferred receives `module:line: what` for each place where
+    ///        reached code stores an attribute under a computed name on an
+    ///        object of no known class, which costs the typed fields of
+    ///        every class such an object may be; may be null
     public static Map<String, String> transpile(Map<String, String> sources, String mainModule,
             List<java.io.File> classPath, Map<String, String> nativeModules, int virtualThreadStack,
             Set<String> libraries, List<String> deferred) {
-        List<String> notes = deferred == null ? new ArrayList<String>() : deferred;
         if (virtualThreadStack <= 0) {
             throw new IllegalArgumentException("virtual thread stack must be positive: " + virtualThreadStack);
         }
@@ -245,7 +249,22 @@ public final class PythonTranspiler {
         }
         // After the standard library was added: its modules are part of
         // the program, typed like any other and counted like any other.
+        // Before anything reads the trees: a function the build was told
+        // to remove or replace has, from here on, the body that stands for
+        // it, and is analysed and compiled as that.
+        com.codename1.python.transpiler.codegen.Directives directives =
+                com.codename1.python.transpiler.codegen.Directives.parse(
+                        sources.get(com.codename1.python.transpiler.codegen.Directives.FILE));
+        Map<String, Node.Module> byName = new LinkedHashMap<String, Node.Module>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            byName.put(moduleOf(e.getKey()), e.getValue());
+        }
+        directives.apply(byName);
         WholeProgram program = WholeProgram.of(moduleBodies(trees));
+        // Every module is planned and entered into the program before any
+        // is emitted: the types are inferred over all of them at once, so
+        // a call from one module into another is as direct as one inside.
+        Map<String, Emitter> emitters = new LinkedHashMap<String, Emitter>();
         for (Map.Entry<String, String> e : sources.entrySet()) {
             String path = e.getKey().replace('\\', '/');
             if (!path.endsWith(".py")) {
@@ -264,13 +283,43 @@ public final class PythonTranspiler {
             Node.Module tree = trees.get(path);
             Scope scope = ScopeBuilder.build(tree, path);
             Emitter emitter = new Emitter(path, module, isPackage, PACKAGE, cls, scope).facts(program.module(module));
-            if (libraries.contains(path)) {
-                emitter.deferDynamic(notes);
-            }
-            String java = emitter.emit(tree);
-            java = withLineMap(java, path.replace('\\', '/'));
-            out.put(PACKAGE.replace('.', '/') + "/" + cls + ".java", java);
+            emitter.prepare(tree, program);
+            emitters.put(path, emitter);
             classes.put(module, cls);
+        }
+        try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
+                new com.codename1.python.transpiler.codegen.ClassPathReader(classPath)) {
+            // What Java may look up by name keeps a function in the build:
+            // the runtime's own classes, and the modules written in Java.
+            Set<String> names = cp.find("com/codename1/python/runtime/Py") == null ? null
+                    : cp.names("com/codename1/python/");
+            if (names != null) {
+                for (String cls : nativeModules.values()) {
+                    Set<String> more = cp.names(cls.replace('.', '/'));
+                    if (more != null) {
+                        names.addAll(more);
+                    }
+                }
+            }
+            program.roots(names, directives.keep());
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
+        }
+        program.infer();
+        if (deferred != null) {
+            deferred.addAll(program.notes());
+        }
+        List<Emitter.DynamicUse> dynamic = new ArrayList<Emitter.DynamicUse>();
+        for (Map.Entry<String, Emitter> e : emitters.entrySet()) {
+            String path = e.getKey();
+            String java = e.getValue().dynamicUses(dynamic).library(libraries.contains(path))
+                    .emit(trees.get(path));
+            java = withLineMap(java, path);
+            out.put(PACKAGE.replace('.', '/') + "/" + classes.get(moduleOf(path)) + ".java", java);
+        }
+        PythonSyntaxError unsupported = Emitter.dynamicCodeError(dynamic);
+        if (unsupported != null) {
+            throw unsupported;
         }
         if (mainModule != null && !classes.containsKey(mainModule)) {
             throw new IllegalArgumentException("main module '" + mainModule + "' is not among the sources");
@@ -287,8 +336,17 @@ public final class PythonTranspiler {
         if (serverImage) {
             out.put(PACKAGE.replace('.', '/') + "/BackendImage.java", backendImage());
         }
+        // The classes of Java replacements are installed like the modules
+        // written in Java, and their stubs go out with the generated
+        // sources: whoever writes those keeps a class the project already
+        // has (see Directives.shims).
+        Map<String, String> installed = new java.util.TreeMap<String, String>(nativeModules);
+        for (String cls : directives.shimClasses()) {
+            installed.put("replace " + cls, cls);
+        }
+        out.putAll(directives.shims());
         out.put(PACKAGE.replace('.', '/') + "/PythonModules.java", registry(classes, mainModule, interop != null, server, db,
-                image, serverImage, nativeModules));
+                image, serverImage, installed));
         return out;
     }
 

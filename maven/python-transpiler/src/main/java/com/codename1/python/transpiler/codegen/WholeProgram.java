@@ -63,10 +63,21 @@ import java.util.Set;
 /// the Java class of every argument. Importing `copy`, `dataclasses` or
 /// `inspect` changes nothing either -- what they do to an instance goes
 /// through the same stores as any other code. A store whose name is
-/// computed (`setattr(o, name, v)`, `o.__dict__[k] = v`) goes through the
-/// generic store of the field, which checks the value against the field's
-/// type and raises when it does not fit: such a store is reported where it
-/// happens, never read back as a value of the wrong type.
+/// computed (`setattr(o, name, v)`, `o.__dict__[k] = v`,
+/// `object.__setattr__`, a write through `vars(o)`) is followed like any
+/// other: the inference joins what it stores into every field it could
+/// name -- those of the receiver's class and the classes related to it,
+/// or, for a receiver of no known class, those of every class whose
+/// instances are held that way (`Infer.computedStore`). The build notes
+/// each such store that cost a field its type. The generic store of a
+/// field still checks the value against the field's type, so a store the
+/// inference could not see raises where it happens and is never read back
+/// as a value of the wrong type.
+///
+/// The same pass decides what the program reaches (`Infer.Program.reached`):
+/// a function nothing calls, names or can find by a computed name is left
+/// out of the build, with a body that says so. `Directives` is how a build
+/// overrides that by name, in either direction.
 public final class WholeProgram {
     /// `unittest.mock`'s patchers, which store an attribute named by a
     /// string: `patch`, `patch.object`, `patch.multiple`.
@@ -136,13 +147,44 @@ public final class WholeProgram {
 
     private final Map<String, Module> modules = new HashMap<String, Module>();
 
-    private WholeProgram() {
+    WholeProgram() {
     }
 
     /// The facts of `module`; of a module the program does not have, none.
     public Module module(String module) {
         Module m = modules.get(module);
         return m == null ? new Module() : m;
+    }
+
+    /// The types of the whole program: every module's pass over one heap.
+    final Infer.Program types = new Infer.Program();
+
+    /// Infers the types of every module entered (`Emitter.prepare`).
+    /// What the Java side of the program may look up by name (see
+    /// `ClassPathReader.names`), and the functions the build keeps on
+    /// request. Without the first, no function is left out.
+    public void roots(Set<String> runtimeNames, java.util.Collection<String> keep) {
+        types.runtimeNames = runtimeNames;
+        types.keep.addAll(keep);
+    }
+
+    /// One line for each place where reached code does to an object of
+    /// no known class what the typed fields of every class it may be have
+    /// to allow for: `module:line: function stores ...`.
+    public List<String> notes() {
+        List<String> out = new java.util.ArrayList<String>();
+        for (Infer.Problem q : types.problems.values()) {
+            if (q.store) {
+                out.add(q.module + ":" + q.line + ": " + (q.function == null ? "the module" : q.function) + " "
+                        + q.what);
+            }
+        }
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    public void infer() {
+        types.run();
     }
 
     /// Reads every module of the program (dotted name to body).

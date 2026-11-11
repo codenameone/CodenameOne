@@ -165,36 +165,127 @@ public final class Emitter {
     private static final Set<String> FRAME_HOOKS = new HashSet<String>(Arrays.asList("settrace", "setprofile",
             "gettrace", "getprofile"));
 
-    private PythonSyntaxError dynamicCode(Node n, String what) {
-        return new PythonSyntaxError(file, n.line, n.col, what
-                + " is not supported: a translated program cannot run or inspect code that was not compiled with it");
+    /// One use of dynamic code the program reaches: what a build has to be
+    /// told to remove or replace before it can succeed.
+    public static final class DynamicUse {
+        public final String file;
+        public final int line;
+        public final int col;
+        /// What was used, `eval()` say.
+        public final String what;
+        /// The module the use is in.
+        public final String module;
+        /// The outermost function it is in, as a directive names it, or
+        /// null when it runs as the module is imported.
+        public final String function;
+
+        DynamicUse(String file, int line, int col, String what, String module, String function) {
+            this.file = file;
+            this.line = line;
+            this.col = col;
+            this.what = what;
+            this.module = module;
+            this.function = function;
+        }
     }
 
-    /// Whether dynamic code in this module is deferred to run time (see
-    /// [#deferDynamic(List)]), and where each deferral is reported.
-    private List<String> deferredNotes;
+    private List<DynamicUse> dynamicUses;
+    private boolean library;
 
-    /// Makes `eval`, `exec`, `compile`, `__import__` and the `sys` frame
-    /// hooks raise `NotImplementedError` where they run, instead of failing
-    /// the build. Only for a package installed from PyPI: real libraries keep
-    /// such calls in helpers an application never reaches (a CLI's
-    /// `--convert` option, a warning that names its caller), and the port
-    /// should not have to edit them. The application's own sources keep the
-    /// build error. Each deferral is added to `notes` as `file:line:col: what`.
-    public Emitter deferDynamic(List<String> notes) {
-        this.deferredNotes = notes;
+    /// Marks the module as one of a PyPI package, not the application's
+    /// own: its `compile()` answers a code object that holds nothing to
+    /// run, where the application's own is a build error.
+    public Emitter library(boolean packaged) {
+        library = packaged;
         return this;
     }
 
-    /// The expression that stands for a dynamic-code use, or throws the build
-    /// error when this module does not defer it.
-    private String dynamicCodeAtRuntime(Node n, String what) {
-        if (deferredNotes == null) {
-            throw dynamicCode(n, what);
+    /// Where this module's reached uses of dynamic code are recorded. The
+    /// driver gives every module one list and fails the build once, with
+    /// all of them: a program that has one usually has several, in packages
+    /// it did not write, and a build that named them one at a time would
+    /// take as many builds to fix.
+    public Emitter dynamicUses(List<DynamicUse> into) {
+        dynamicUses = into;
+        return this;
+    }
+
+    /// The one build error for every use in `uses`, or null when there are
+    /// none. It ends in the lines to paste into the directives file.
+    public static PythonSyntaxError dynamicCodeError(List<DynamicUse> uses) {
+        if (uses.isEmpty()) {
+            return null;
         }
-        deferredNotes.add(file + ":" + n.line + ":" + n.col + ": " + what);
-        return "Py.dynamicCode(" + javaString(what + " is not supported in a translated program (" + file + ":"
-                + n.line + ")") + ")";
+        StringBuilder sb = new StringBuilder("a translated program cannot run or inspect code that was not"
+                + " compiled with it, and this one reaches code that does:");
+        Set<String> functions = new java.util.TreeSet<String>();
+        boolean moduleLevel = false;
+        for (DynamicUse u : uses) {
+            sb.append("\n  ").append(u.file).append(':').append(u.line).append(':').append(u.col).append(": ")
+                    .append(u.what);
+            if (u.function == null) {
+                moduleLevel = true;
+                sb.append(", as ").append(u.module).append(" is imported");
+            } else {
+                functions.add(u.function);
+                sb.append(" in ").append(u.function);
+            }
+        }
+        if (!functions.isEmpty()) {
+            StringBuilder names = new StringBuilder();
+            for (String f : functions) {
+                names.append(names.length() == 0 ? "" : ",").append(f);
+            }
+            sb.append("\nName each of those functions in ").append(Directives.FILE)
+                    .append(", beside the Python sources. To leave them out (each then raises if it is called):")
+                    .append("\n  remove=").append(names)
+                    .append("\nFor one the program needs, write replace= in place of remove=: its body is then"
+                            + " Java, in a class the build generates for you to fill in.");
+        }
+        if (moduleLevel) {
+            sb.append("\nA use that runs as its module is imported is in no function, so nothing can be left out"
+                    + " for it: that module has to change, or be written in Java.");
+        }
+        DynamicUse first = uses.get(0);
+        return new PythonSyntaxError(first.file, first.line, first.col, sb.toString());
+    }
+
+    private DynamicUse dynamicUse(Node n, String what) {
+        // The outermost function the code is in: the unit a build removes
+        // or replaces.
+        List<Scope> chain = new ArrayList<Scope>();
+        for (Scope s = sc; s != null && s.kind != Scope.Kind.MODULE; s = s.parent) {
+            chain.add(0, s);
+        }
+        StringBuilder q = new StringBuilder(moduleName);
+        boolean function = false;
+        for (Scope s : chain) {
+            if (s.kind != Scope.Kind.CLASS && s.kind != Scope.Kind.FUNCTION || s.name == null) {
+                break;
+            }
+            q.append('.').append(s.name);
+            if (s.kind == Scope.Kind.FUNCTION) {
+                function = true;
+                break;
+            }
+        }
+        return new DynamicUse(file, n.line, n.col, what, moduleName, function ? q.toString() : null);
+    }
+
+    /// The expression that stands for a dynamic-code use the program
+    /// reaches. There is none: the use is recorded and the build fails
+    /// after every module was read (see [#dynamicUses]); what is returned
+    /// only lets this module finish. A function nothing reaches is not
+    /// emitted and never gets here.
+    private String dynamicCodeAtRuntime(Node n, String what) {
+        DynamicUse u = dynamicUse(n, what);
+        if (dynamicUses == null) {
+            List<DynamicUse> one = new ArrayList<DynamicUse>();
+            one.add(u);
+            throw dynamicCodeError(one);
+        }
+        dynamicUses.add(u);
+        return "Py.NONE";
     }
 
     /// Whether a class body annotates a name anywhere it runs as the body --
@@ -248,7 +339,14 @@ public final class Emitter {
 
     // ---- module ----------------------------------------------------------
 
-    public String emit(Node.Module m) {
+    /// The module's part in the program's type inference, once [#prepare]
+    /// ran.
+    private Infer infer;
+
+    /// Plans the module's classes and enters it into `program`, whose types
+    /// are inferred over every module at once (`WholeProgram.infer`) before
+    /// any of them is emitted.
+    public void prepare(Node.Module m, WholeProgram program) {
         Scope ms = moduleScope;
         slot("__name__");
         slot("__doc__");
@@ -259,22 +357,29 @@ public final class Emitter {
         }
         frame = new Frame(id(ms), ms);
         sc = ms;
+        uncell(ms);
+        findDirectLong(m.body);
+        layouts = Layouts.plan(m.body, "", ms.attrStores);
+        infer = program.types.add(moduleName, isPackage, m.body, layouts, ms, facts);
+    }
+
+    public String emit(Node.Module m) {
+        if (infer == null) {
+            // A module emitted on its own is a program of one.
+            WholeProgram alone = new WholeProgram();
+            prepare(m, alone);
+            alone.infer();
+        }
         StringBuilder body = new StringBuilder();
         List<Stmt> stmts = m.body;
         if (!stmts.isEmpty() && isDocstring(stmts.get(0))) {
             body.append("        G[1] = ").append(constant((Constant) ((ExprStmt) stmts.get(0)).value)).append(";\n");
         }
-        uncell(ms);
-        findDirectLong(stmts);
-        layouts = Layouts.plan(stmts, "", ms.attrStores);
-        Infer infer = Infer.run(stmts, layouts, ms, facts);
-        if (infer != null && System.getProperty("cn1.python.dumpTypes") != null) {
+        if (System.getProperty("cn1.python.dumpTypes") != null) {
             System.err.println(infer.dump());
         }
-        if (infer != null) {
-            typedEmit = new TypedEmit(this, infer, layouts);
-            typedEmit.plan();
-        }
+        typedEmit = new TypedEmit(this, infer, layouts);
+        typedEmit.plan();
         block(stmts, body, 2);
 
         StringBuilder out = new StringBuilder();
@@ -423,11 +528,11 @@ public final class Emitter {
             return inlineParams.get(n);
         }
         if (DYNAMIC_CODE.contains(n) && sc.resolve(n) == Scope.Binding.BUILTIN) {
-            if ("compile".equals(n) && deferredNotes != null) {
+            if ("compile".equals(n) && library) {
                 // Compiling is harmless; running what it made is eval or
-                // exec, which raise. A library that compiles a snippet up
-                // front (anyio's subinterpreter worker) still imports.
-                deferredNotes.add(file + ":" + nm.line + ":" + nm.col + ": compile()");
+                // exec, which do not build. A package that compiles a
+                // snippet as it is imported (anyio's subinterpreter
+                // worker) is in no function a build could leave out.
                 return "Py.UNCOMPILED";
             }
             return dynamicCodeAtRuntime(nm, n + "()");
@@ -802,6 +907,7 @@ public final class Emitter {
             nextAsync = f.isAsync;
             staticBody = layouts.staticNames.get(f);
             staticClass = layouts.methodClass.get(f);
+            removedBody = infer != null && infer.removed(f) ? removedNote(f) : null;
             String fn = withMetadata(f, function(f.name, f.args, f.scope, f.body, null));
             storeName(f.name, decorate(f.decorators, fn), out, ind);
         } else if (s instanceof ClassDef) {
@@ -1908,12 +2014,29 @@ public final class Emitter {
     private boolean inlineCalled;
     private int paramNames;
 
+    /// Set by the statement of a function nothing in the program reaches,
+    /// for [#function] to emit in place of its body: the message it raises
+    /// with when something calls it after all.
+    private String removedBody;
+
+    private String removedNote(FunctionDef f) {
+        String q = (sc.kind == Scope.Kind.CLASS && sc.name != null ? sc.name + "." : "") + f.name;
+        return moduleName + "." + q + " was left out of this build: nothing in the program calls it or"
+                + " takes it as a value. If it is reached in a way the build cannot see (by a computed name,"
+                + " or from Java), add the line keep=" + moduleName + "." + q + " to cn1-python.properties";
+    }
+
     private String function(String name, Arguments args, Scope fs, List<Stmt> body, Expr exprBody) {
+        String removed = removedBody;
+        removedBody = null;
+        if (removed != null && body != null) {
+            body = java.util.Collections.<Stmt>emptyList();
+        }
         boolean bodyOnly = inlineCalled;
         inlineCalled = false;
         boolean async = nextAsync;
         nextAsync = false;
-        boolean generator = body != null && (async || fs.hasYield);
+        boolean generator = body != null && removed == null && (async || fs.hasYield);
         GenLowering savedGen = gen;
         gen = null;
         if (body != null) {
@@ -2019,6 +2142,10 @@ public final class Emitter {
             gen.plain = !async;
             b.append(resolveRegions(gen.step(body)));
         } else {
+            if (removed != null) {
+                indent(b, ind);
+                b.append("if (true) throw Py.runtimeError(").append(javaString(removed)).append(");\n");
+            }
             block(body, b, ind);
             indent(b, ind);
             b.append("return Py.NONE;\n");
@@ -3538,8 +3665,7 @@ public final class Emitter {
     // ---- compiled class layouts (see Layouts) -----------------------------
 
     private Layouts layouts = new Layouts();
-    /// The typed code of the module; null only when `Infer` reached no
-    /// fixpoint.
+    /// The typed code of the module; null until it is emitted.
     private TypedEmit typedEmit;
     private WholeProgram.Module facts = new WholeProgram.Module();
 

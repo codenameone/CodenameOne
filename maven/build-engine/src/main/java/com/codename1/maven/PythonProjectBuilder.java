@@ -207,11 +207,17 @@ public final class PythonProjectBuilder {
         }
         Map<String, String> sources = new TreeMap<String, String>();
         Map<String, String> nativeModules = new TreeMap<String, String>();
-        // The PyPI packages' paths: their unreachable dynamic code is
-        // deferred to run time rather than failing the build.
+        // The PyPI packages' paths.
         java.util.Set<String> libraries = new java.util.TreeSet<String>();
         try {
             collect(sourceDir, "", sources);
+            // What to keep, leave out or replace with Java, read by the
+            // transpiler with the modules.
+            File directives = new File(sourceDir, DIRECTIVES);
+            if (directives.isFile()) {
+                sources.put(DIRECTIVES, new String(Files.readAllBytes(directives.toPath()),
+                        StandardCharsets.UTF_8));
+            }
             // PyPI packages import resolved beside the project; the
             // project's own file wins where both have one.
             File packages = new File(sourceDir.getParentFile(), PythonPackageResolver.PACKAGES_DIR);
@@ -247,9 +253,9 @@ public final class PythonProjectBuilder {
             out = PythonTranspiler.transpile(sources, entry, withProjectClasses(sources), nativeModules,
                     stackBytes(), libraries, deferred);
             for (String d : deferred) {
-                log.warn("python-packages/" + d + " cannot run in a translated program; it raises"
-                        + " NotImplementedError if it is reached");
+                log.info("Python: " + d);
             }
+            installShims(out);
         } catch (PythonSyntaxError e) {
             throw new BuildException("src/main/python/" + e.file + ":" + e.line + ":" + e.col + ": " + e.reason, e);
         } catch (IllegalArgumentException e) {
@@ -264,6 +270,46 @@ public final class PythonProjectBuilder {
                     + " file(s) changed)");
         }
         return true;
+    }
+
+    /// The file of build directives, in the Python source root.
+    static final String DIRECTIVES = "cn1-python.properties";
+
+    private static final String SHIM_DIR = "com/codename1/python/ext/";
+
+    /// Moves the Java a `replace=` directive asks for out of the generated
+    /// sources and into the project's own, where the developer fills it in.
+    /// A class the project already has is left exactly as it is: a function
+    /// it does not yet answer for says so, by name, when it is called.
+    private void installShims(Map<String, String> out) throws BuildException {
+        List<String> shims = new ArrayList<String>();
+        for (String k : out.keySet()) {
+            if (k.startsWith(SHIM_DIR) && k.endsWith("Shims.java")) {
+                shims.add(k);
+            }
+        }
+        for (String k : shims) {
+            String text = out.remove(k);
+            if (javaSourceDir == null) {
+                throw new BuildException(DIRECTIVES + " has a replace= line, and this build has no Java"
+                        + " source directory to write " + k + " into");
+            }
+            File f = new File(javaSourceDir, k.replace('/', File.separatorChar));
+            if (f.isFile()) {
+                continue;
+            }
+            try {
+                File dir = f.getParentFile();
+                if (dir != null) {
+                    Files.createDirectories(dir.toPath());
+                }
+                Files.write(f.toPath(), text.getBytes(StandardCharsets.US_ASCII));
+            } catch (IOException e) {
+                throw new BuildException("Could not write " + f + ": " + e.getMessage(), e);
+            }
+            log.warn("Wrote " + f + ": the Java that replaces Python named by replace= in " + DIRECTIVES
+                    + ". Fill it in; until then those functions raise when they are called.");
+        }
     }
 
     private static void collect(File dir, String prefix, Map<String, String> into) throws IOException {
