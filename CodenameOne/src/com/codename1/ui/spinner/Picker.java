@@ -1132,14 +1132,16 @@ public class Picker extends Button {
             }
             // The application showed another form over it: it was never
             // answered and is not coming back, which is a cancel.
+            // The value was never taken from it, and what Cancel puts back
+            // is what was noted when this opening was asked for, so there
+            // is nothing to restore; whoever waited for it to close is told.
             materialDialog = null;
             currentSpinner = null;
-            if (preEditValue != null) {
-                value = preEditValue;
-                dateValueExplicitlySet = preEditDateValueExplicitlySet;
+            if (stopEditingCallback != null) {
+                Runnable r = stopEditingCallback;
+                stopEditingCallback = null;
+                r.run();
             }
-            preEditValue = null;
-            preEditDateValueExplicitlySet = false;
         }
         final InternalPickerWidget widget = createMaterialWidget();
         final Dialog dlg = new Dialog(new BorderLayout());

@@ -897,9 +897,10 @@ final class GanttChart extends ScrollSurface {
             return;
         }
         if (m == LINK) {
-            // Asked once more: a listener, or the project changing under the
-            // pointer, may have made the link one that cannot be.
-            if (linkTarget != null && owner.viewLinking(t, linkTarget) && model.canLink(t, linkTarget)) {
+            // Asked once more, and before the listeners are: the project
+            // changing under the pointer may have made the link one that
+            // cannot be, and a listener is not asked about one of those.
+            if (linkTarget != null && model.canLink(t, linkTarget) && owner.viewLinking(t, linkTarget)) {
                 beginReflow();
                 model.link(t, linkTarget);
                 model.update();

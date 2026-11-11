@@ -122,9 +122,8 @@ public class ProjectModel {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: when the task would go under itself,
-    ///   when the parent is not in this project or the task is still in
-    ///   another, or when its links would then run in a loop through the
-    ///   summary
+    ///   when the parent is not in this project, or when its links would
+    ///   then run in a loop through the summary
     public ProjectModel addTask(GanttTask parent, int index, GanttTask task) {
         if (task == null || task == parent) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException("task");
@@ -134,10 +133,6 @@ public class ProjectModel {
         }
         if (parent != null && !contains(parent)) {
             throw new IllegalArgumentException("The parent is not a task of this project");
-        }
-        if (task.parent != null && !contains(task)) {
-            // Its place in the other tree is not this project's to take.
-            throw new IllegalArgumentException("The task is in another project; remove it there first");
         }
         if (dependencies.isEmpty()) {
             // Nothing is linked, so no place in the tree can close a loop.
@@ -191,10 +186,14 @@ public class ProjectModel {
     ///
     /// #### Returns
     ///
-    /// false when the move would put the task under itself or would close a
-    /// loop of links through a summary
+    /// false when the move would put the task under itself, under a task
+    /// that is not in this project, or would close a loop of links through
+    /// a summary
     public boolean moveTask(GanttTask task, GanttTask newParent, int index) {
         if (task == newParent || (newParent != null && newParent.isDescendantOf(task))) { //NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        if (newParent != null && !contains(newParent)) {
             return false;
         }
         GanttTask oldParent = task.parent;

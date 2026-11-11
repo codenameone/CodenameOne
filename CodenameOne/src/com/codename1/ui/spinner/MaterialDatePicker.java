@@ -249,8 +249,9 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
         clamp();
         // The years on offer reach the date that is set, or its own month
         // could not be paged to and its own text would not be a date.
-        reachYear();
         shownYear = year;
+        shownMonth = month;
+        reachYear();
         shownMonth = month;
         refresh();
     }

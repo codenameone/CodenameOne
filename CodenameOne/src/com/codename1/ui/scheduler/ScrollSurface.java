@@ -297,6 +297,7 @@ abstract class ScrollSurface extends Component {
         pressed = false;
         still = false;
         pinching = false;
+        pinchBase = 0;
         if (registered) {
             Form f = getComponentForm();
             if (f != null) {
@@ -493,6 +494,7 @@ abstract class ScrollSurface extends Component {
         }
         // A pinch whose end went elsewhere is over as well.
         pinching = false;
+        pinchBase = 0;
         still = false;
         layoutNow();
         stopFling();

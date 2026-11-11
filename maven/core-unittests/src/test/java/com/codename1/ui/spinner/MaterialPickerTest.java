@@ -309,6 +309,37 @@ class MaterialPickerTest extends UITestBase {
     }
 
     @FormTest
+    void aDialogTheApplicationCoveredIsACancelAndThePickerOpensAgain() {
+        style("material");
+        try {
+            Picker picker = new Picker();
+            picker.setUseLightweightPopup(true);
+            picker.setType(Display.PICKER_TYPE_DATE);
+            picker.setDate(date(2026, 0, 5, 0, 0));
+            open(picker);
+            Dialog first = picker.getMaterialDialog();
+            assertNotNull(first);
+            ((MaterialDatePicker) picker.getOpenWidget()).choose(2026, 0, 9);
+            // The application goes somewhere else and comes back.
+            Form owner = picker.getComponentForm();
+            new Form("Elsewhere", BoxLayout.y()).show();
+            flushSerialCalls();
+            owner.show();
+            flushSerialCalls();
+            open(picker);
+            Dialog second = picker.getMaterialDialog();
+            assertNotNull(second, "the picker opens again");
+            assertTrue(first != second);
+            tapComponent(named(second, "PickerMaterialCancel"));
+            flushSerialCalls();
+            assertNull(picker.getMaterialDialog());
+            assertEquals(date(2026, 0, 5, 0, 0), picker.getDate(), "and Cancel keeps the date it had");
+        } finally {
+            style("wheel");
+        }
+    }
+
+    @FormTest
     void aPickerOpensTheMaterialDialogWhenTheThemeAsksForIt() {
         style("material");
         try {

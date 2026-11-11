@@ -77,6 +77,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
     private CalendarMutationScope mutationScope = CalendarMutationScope.THIS_INSTANCE;
     private int created;
     private int loads;
+    private int pending;
     private boolean creationEnabled;
     private String newEventTitle = "";
     private long loadedFrom;
@@ -254,6 +255,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         loadedFrom = from;
         loadedTo = to;
         final int asked = ++generation;
+        pending = resources.size();
         for (ScheduleResource resource : resources) {
             String id = resource.getId();
             if (freeBusyOnly.contains(id)) {
@@ -278,6 +280,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 if (asked != generation || !calendars.containsKey(calendarId)) {
                     // Answered after a newer question, or for a calendar
                     // that was taken away while it was asked.
+                    answered(asked);
                     return;
                 }
                 List<CalendarEvent> events = page.getItems();
@@ -295,6 +298,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 // One calendar that answered says nothing about another that
                 // failed in the same load, so the error is left as it is.
                 items.put(calendarId, into);
+                answered(asked);
                 loads++;
                 fireChanged();
             }
@@ -308,6 +312,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 .ready(new SuccessCallback<List<FreeBusyInterval>>() {
                     @Override
                     public void onSucess(List<FreeBusyInterval> intervals) {
+                        answered(asked);
                         if (asked != generation || !calendars.containsKey(calendarId)) {
                             return;
                         }
@@ -330,6 +335,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         return new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable err) {
+                answered(asked);
                 if (asked == generation && calendars.containsKey(calendarId)) {
                     lastError = err;
                     Log.e(err);
@@ -447,23 +453,44 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         if (item == null) {
             return null;
         }
-        List<ScheduleItem> list = items.get(item.getResourceId());
-        if (list != null) {
+        // By its id, and failing that by the event behind it: an item that
+        // was created here has an id of its own making, and the load after
+        // it was saved has the source's. Every calendar is looked in, since
+        // the event may have been moved to another since.
+        CalendarEvent e = eventOf(item);
+        String eventId = e == null ? null : e.getId();
+        ScheduleItem sameEvent = null;
+        for (List<ScheduleItem> list : items.values()) {
             for (ScheduleItem each : list) {
                 if (each == item || each.getId().equals(item.getId())) { //NOPMD CompareObjectsWithEquals - the very item is the common case
                     return each;
                 }
+                if (sameEvent == null && eventId != null && !each.isRecurring()) {
+                    CalendarEvent other = eventOf(each);
+                    if (other != null && eventId.equals(other.getId())) {
+                        sameEvent = each;
+                    }
+                }
             }
         }
-        return null;
+        return sameEvent;
     }
 
     // An answer to a load that was asked before an edit was made, and came
     // after it, drew the event where it was. The edit has now been saved,
     // so what the source holds is asked for once more.
     private void loadIfOvertaken(int seen) {
-        if (loads != seen) {
+        // One that has answered, or one that is still to answer: either
+        // way what it says was read before the edit.
+        if (loads != seen || pending > 0) {
             load();
+        }
+    }
+
+    // One calendar of the load that is under way has given its last answer.
+    private void answered(int asked) {
+        if (asked == generation && pending > 0) {
+            pending--;
         }
     }
 

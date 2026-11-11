@@ -23,9 +23,11 @@
 package com.codename1.ui.scheduler;
 
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.printing.PrintResult;
 import com.codename1.printing.PrintResultListener;
 import com.codename1.printing.Printer;
+import com.codename1.scheduling.TimeMath;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -75,6 +77,7 @@ public final class SchedulePrinter {
     /// The most pages one print makes. A chart zoomed to hours over a year
     /// is thousands of pages nobody asked for.
     private static final int MAX_PAGES = 400;
+    private static final String TEMP_PREFIX = "cn1-schedule-print-";
     private int[] held;
 
     private final Scheduler scheduler;
@@ -355,7 +358,8 @@ public final class SchedulePrinter {
         final FileSystemStorage fs = FileSystemStorage.getInstance();
         // A name of its own: a document that is still at the printer is not
         // written over, or deleted, by the next one.
-        final String path = fs.getAppHomePath() + "cn1-schedule-print-" + System.currentTimeMillis() + ".pdf";
+        sweep(fs);
+        final String path = fs.getAppHomePath() + TEMP_PREFIX + System.currentTimeMillis() + ".pdf";
         boolean written = false;
         try {
             writePdf(path);
@@ -373,6 +377,36 @@ public final class SchedulePrinter {
             return;
         }
         Printer.printPDF(path, new DeleteThenReport(fs, path, listener));
+    }
+
+    // A document whose print never reported back, because the application
+    // was closed with the dialog up, is taken away by a later print. One
+    // from the last day is left: it may be at the printer now.
+    private static void sweep(FileSystemStorage fs) {
+        String home = fs.getAppHomePath();
+        long now = System.currentTimeMillis();
+        try {
+            String[] names = fs.listFiles(home);
+            for (int i = 0; names != null && i < names.length; i++) {
+                String name = names[i];
+                if (name == null || !name.startsWith(TEMP_PREFIX) || !name.endsWith(".pdf")) {
+                    continue;
+                }
+                long made = 0;
+                boolean number = name.length() > TEMP_PREFIX.length() + 4;
+                for (int c = TEMP_PREFIX.length(); number && c < name.length() - 4; c++) {
+                    char ch = name.charAt(c);
+                    number = ch >= '0' && ch <= '9' && made < Long.MAX_VALUE / 100;
+                    made = made * 10 + (ch - '0');
+                }
+                if (number && now - made > TimeMath.DAY) {
+                    fs.delete(home + name);
+                }
+            }
+        } catch (IOException err) {
+            // Nothing to clean, or no way to look; the print goes on.
+            Log.e(err);
+        }
     }
 
     // The file is the printer's for as long as it prints, and nobody's after.
