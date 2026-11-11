@@ -121,14 +121,23 @@ public class ProjectModel {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: when the task would go under itself, or
-    ///   when its links would then run in a loop through the summary
+    /// - `IllegalArgumentException`: when the task would go under itself,
+    ///   when the parent is not in this project or the task is still in
+    ///   another, or when its links would then run in a loop through the
+    ///   summary
     public ProjectModel addTask(GanttTask parent, int index, GanttTask task) {
         if (task == null || task == parent) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException("task");
         }
         if (parent != null && parent.isDescendantOf(task)) {
             throw new IllegalArgumentException("A task cannot go under one of its own children");
+        }
+        if (parent != null && !contains(parent)) {
+            throw new IllegalArgumentException("The parent is not a task of this project");
+        }
+        if (task.parent != null && !contains(task)) {
+            // Its place in the other tree is not this project's to take.
+            throw new IllegalArgumentException("The task is in another project; remove it there first");
         }
         if (dependencies.isEmpty()) {
             // Nothing is linked, so no place in the tree can close a loop.

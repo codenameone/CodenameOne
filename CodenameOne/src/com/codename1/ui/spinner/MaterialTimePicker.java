@@ -335,6 +335,8 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
             return;
         }
         inputMode = v;
+        // The fields are written again with the time that is set.
+        typedWrong = false;
         dial.setHidden(v);
         buildTime();
         refresh();

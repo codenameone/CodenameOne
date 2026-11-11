@@ -292,8 +292,14 @@ final class DayGrid extends ScrollSurface {
                 if (b <= a) {
                     continue;
                 }
-                int start = (int) ((a - from) / TimeMath.MINUTE);
-                int end = b >= to ? TimeMath.MINUTES_PER_DAY : (int) ((b - from) / TimeMath.MINUTE);
+                // Minutes of this column's own clock, which is what the
+                // column is laid out in: on a day the clock changes they are
+                // not the minutes that have passed since midnight.
+                int start = a <= from ? 0 : TimeMath.minuteOfDay(a, zone);
+                int end = b >= to ? TimeMath.MINUTES_PER_DAY : TimeMath.minuteOfDay(b, zone);
+                if (end <= start) {
+                    continue;
+                }
                 if (out.length > 0 && start <= out[out.length - 1]) {
                     out[out.length - 1] = Math.max(out[out.length - 1], end);
                 } else {

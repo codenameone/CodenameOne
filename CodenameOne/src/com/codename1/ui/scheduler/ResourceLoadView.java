@@ -85,7 +85,8 @@ final class ResourceLoadView extends ScrollSurface {
             return -1;
         }
         long i = (time - profileFrom) / profileBucket;
-        return i < 0 || i >= profileCount ? -1 : profile[resourceIndex][(int) i];
+        float[] row = profile[resourceIndex];
+        return row == null || i < 0 || i >= profileCount ? -1 : row[(int) i];
     }
 
     @Override

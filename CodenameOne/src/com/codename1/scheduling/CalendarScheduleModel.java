@@ -76,6 +76,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
     private final List<String> freeBusyOnly = new ArrayList<String>();
     private CalendarMutationScope mutationScope = CalendarMutationScope.THIS_INSTANCE;
     private int created;
+    private int loads;
     private boolean creationEnabled;
     private String newEventTitle = "";
     private long loadedFrom;
@@ -187,7 +188,9 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         return this;
     }
 
-    /// The failure of the last load or save, or null when it worked.
+    /// The last failure of a load, a save or a delete, or null. It stays
+    /// until `reload` is called or a later save or delete works: one
+    /// calendar that loads says nothing of another that did not.
     public Throwable getLastError() {
         return lastError;
     }
@@ -292,9 +295,10 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 // One calendar that answered says nothing about another that
                 // failed in the same load, so the error is left as it is.
                 items.put(calendarId, into);
+                loads++;
                 fireChanged();
             }
-        }).except(failed(asked));
+        }).except(failed(asked, calendarId));
     }
 
     private void loadBusy(final String calendarId, long from, long to, final int asked) {
@@ -319,14 +323,14 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                         busy.put(calendarId, list);
                         fireChanged();
                     }
-                }).except(failed(asked));
+                }).except(failed(asked, calendarId));
     }
 
-    private SuccessCallback<Throwable> failed(final int asked) {
+    private SuccessCallback<Throwable> failed(final int asked, final String calendarId) {
         return new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable err) {
-                if (asked == generation) {
+                if (asked == generation && calendars.containsKey(calendarId)) {
                     lastError = err;
                     Log.e(err);
                     // Nothing is loaded for this window, so the next range
@@ -375,11 +379,15 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
     }
 
     @Override
-    public boolean updateItem(final ScheduleItem item, long start, long end, String resourceId) {
-        final CalendarEvent e = eventOf(item);
+    public boolean updateItem(ScheduleItem given, long start, long end, String resourceId) {
+        // A load since the caller was given its item made another object
+        // for the same event, and that one is what the views draw.
+        final ScheduleItem item = held(given);
+        final CalendarEvent e = item == null ? null : eventOf(item);
         if (e == null || !item.isMovable()) {
             return false;
         }
+        final int seen = loads;
         final long oldStart = item.getStart();
         final long oldEnd = item.getEnd();
         final String oldResource = item.getResourceId();
@@ -406,6 +414,8 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 // Changing a series moves occurrences that are not this item.
                 if (item.isRecurring() && mutationScope != CalendarMutationScope.THIS_INSTANCE) {
                     reload();
+                } else {
+                    loadIfOvertaken(seen);
                 }
             }
         }).except(new SuccessCallback<Throwable>() {
@@ -429,6 +439,32 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
             }
         });
         return true;
+    }
+
+    // The item the model holds for the event of `item`: the same object,
+    // or the one a later load made for the same id. Null when it is gone.
+    private ScheduleItem held(ScheduleItem item) {
+        if (item == null) {
+            return null;
+        }
+        List<ScheduleItem> list = items.get(item.getResourceId());
+        if (list != null) {
+            for (ScheduleItem each : list) {
+                if (each == item || each.getId().equals(item.getId())) { //NOPMD CompareObjectsWithEquals - the very item is the common case
+                    return each;
+                }
+            }
+        }
+        return null;
+    }
+
+    // An answer to a load that was asked before an edit was made, and came
+    // after it, drew the event where it was. The edit has now been saved,
+    // so what the source holds is asked for once more.
+    private void loadIfOvertaken(int seen) {
+        if (loads != seen) {
+            load();
+        }
     }
 
     private void move(ScheduleItem item, String from, String to) {
@@ -466,6 +502,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         move(item, null, calendarId);
         fireChanged();
         final String cal = calendarId;
+        final int seen = loads;
         source.saveEvent(e, CalendarMutationScope.ALL).ready(new SuccessCallback<CalendarEvent>() {
             @Override
             public void onSucess(CalendarEvent saved) {
@@ -473,6 +510,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                 if (saved != null) {
                     item.setUserObject(saved);
                 }
+                loadIfOvertaken(seen);
             }
         }).except(new SuccessCallback<Throwable>() {
             @Override
@@ -490,11 +528,15 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
     }
 
     @Override
-    public boolean removeItem(final ScheduleItem item) {
+    public boolean removeItem(ScheduleItem given) {
+        // The held item has the version the source gave last.
+        final ScheduleItem found = held(given);
+        final ScheduleItem item = found == null ? given : found;
         final CalendarEvent e = eventOf(item);
         if (e == null || !item.isMovable()) {
             return false;
         }
+        final int seen = loads;
         final String cal = item.getResourceId();
         final List<ScheduleItem> list = items.get(cal);
         // A load since the caller was given this item made another object
@@ -513,7 +555,13 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         }
         final ScheduleItem taken = held;
         fireChanged();
-        source.deleteEvent(cal, e.getId(), mutationScope, e.getVersion()).except(new SuccessCallback<Throwable>() {
+        source.deleteEvent(cal, e.getId(), mutationScope, e.getVersion()).ready(new SuccessCallback<Boolean>() {
+            @Override
+            public void onSucess(Boolean done) {
+                lastError = null;
+                loadIfOvertaken(seen);
+            }
+        }).except(new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable err) {
                 lastError = err;

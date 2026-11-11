@@ -146,7 +146,14 @@ public class Scheduler extends Container {
             // A model that loads again makes new items for the same things:
             // the selection follows the id, or is gone with the item.
             if (selected != null) {
-                selected = again(m, selected);
+                ScheduleItem now = again(m, selected);
+                if (now == null) {
+                    // Gone with the item, and the listeners hear of it as
+                    // they hear of any other change of the selection.
+                    viewSelected(null);
+                } else {
+                    selected = now;
+                }
             }
             refresh();
         }

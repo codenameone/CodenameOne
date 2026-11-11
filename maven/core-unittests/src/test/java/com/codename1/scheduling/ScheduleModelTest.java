@@ -305,6 +305,21 @@ class ScheduleModelTest extends UITestBase {
         assertEquals(at(5, 14), again.getStart());
         assertEquals("home", again.getResourceId());
 
+        // The caller still holds the item from before that load. An edit of
+        // it is an edit of the one that is drawn, not of a copy.
+        source.failSave = false;
+        assertTrue(m.updateItem(item, at(5, 15), at(5, 16), "home"));
+        flushSerialCalls();
+        assertEquals(at(5, 15), find(items(m, at(5, 0), at(6, 0)), "a").getStart());
+        int drawn = 0;
+        for (ScheduleItem each : items(m, at(5, 0), at(6, 0))) {
+            if ("a".equals(each.getId())) {
+                drawn++;
+            }
+        }
+        assertEquals(1, drawn, "drawn once");
+        source.failSave = true;
+
         // A new event that is refused is taken out again.
         assertNull(m.createItem(at(5, 11), at(5, 12), "work"), "creation is off until it is asked for");
         m.setCreationEnabled(true, "New");

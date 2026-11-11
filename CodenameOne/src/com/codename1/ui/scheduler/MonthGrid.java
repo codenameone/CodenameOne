@@ -356,7 +356,7 @@ final class MonthGrid extends ScrollSurface {
                     TimeMath.minuteOfDay(item.getStart(), zone), zone);
             long end = TimeMath.at(TimeMath.epochDay(item.getEnd(), zone) + by,
                     TimeMath.minuteOfDay(item.getEnd(), zone), zone);
-            owner.viewChanged(item, start, Math.max(end, start + TimeMath.MINUTE), item.getResourceId());
+            owner.viewChanged(item, start, Math.max(end, start), item.getResourceId());
         }
     }
 

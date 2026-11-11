@@ -249,13 +249,7 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
         clamp();
         // The years on offer reach the date that is set, or its own month
         // could not be paged to and its own text would not be a date.
-        if (year < startYear) {
-            startYear = year;
-            years = null;
-        } else if (year > endYear) {
-            endYear = year;
-            years = null;
-        }
+        reachYear();
         shownYear = year;
         shownMonth = month;
         refresh();
@@ -300,6 +294,16 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
         refresh();
     }
 
+    private void reachYear() {
+        if (year < startYear) {
+            startYear = year;
+            newYears();
+        } else if (year > endYear) {
+            endYear = year;
+            newYears();
+        }
+    }
+
     // The grid of years is built for the limits it had; one that is on
     // screen is built again for the new ones.
     private void newYears() {
@@ -322,6 +326,7 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
     public void setYearRange(int first, int last) {
         startYear = first;
         endYear = Math.max(first, last);
+        reachYear();
         shownYear = Math.max(startYear, Math.min(endYear, shownYear));
         newYears();
         refresh();

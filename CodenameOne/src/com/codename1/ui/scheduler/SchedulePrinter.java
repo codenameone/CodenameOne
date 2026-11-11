@@ -297,10 +297,11 @@ public final class SchedulePrinter {
             throw new IOException("JPEG encoding is not available on this platform");
         }
         int count = getPageCount();
-        OutputStream out = FileSystemStorage.getInstance().openOutputStream(path);
         // The view does not change between one page and the next, so the
         // pages are counted once for the document and not once for each.
-        held = grid();
+        int[] counted = grid();
+        OutputStream out = FileSystemStorage.getInstance().openOutputStream(path);
+        held = counted;
         try {
             PdfPages pdf = new PdfPages(out, count);
             for (int i = 0; i < count; i++) {
@@ -352,7 +353,9 @@ public final class SchedulePrinter {
             return;
         }
         final FileSystemStorage fs = FileSystemStorage.getInstance();
-        final String path = fs.getAppHomePath() + "cn1-schedule-print-temp.pdf";
+        // A name of its own: a document that is still at the printer is not
+        // written over, or deleted, by the next one.
+        final String path = fs.getAppHomePath() + "cn1-schedule-print-" + System.currentTimeMillis() + ".pdf";
         boolean written = false;
         try {
             writePdf(path);

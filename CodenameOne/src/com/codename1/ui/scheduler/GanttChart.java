@@ -102,6 +102,11 @@ final class GanttChart extends ScrollSurface {
     }
 
     void modelChanged() {
+        // What could be linked a moment ago is asked again.
+        linkProbe = null;
+        if (mode == LINK) {
+            linkTarget = null;
+        }
         dirty = true;
         repaint();
     }
@@ -109,16 +114,18 @@ final class GanttChart extends ScrollSurface {
     /// Remembers where every bar is, so that the next layout slides them to
     /// their new dates and does not jump.
     void beginReflow() {
-        beginReflow(null);
+        beginReflow(null, 0, 0);
     }
 
-    /// As `beginReflow()`, leaving out the bar a hand has just put where it
-    /// is: that one is already at its place, and sliding it there from where
-    /// it was would take it back first.
-    void beginReflow(GanttTask held) {
+    /// As `beginReflow()`, with one bar starting from where a hand left it
+    /// and not from its dates: the project may put it somewhere else again,
+    /// and it slides there from under the hand, not from where it was.
+    void beginReflow(GanttTask held, long heldStart, long heldEnd) {
         HashMap<GanttTask, long[]> from = new HashMap<GanttTask, long[]>();
         for (GanttTask t : rows) {
-            if (t != held) { //NOPMD CompareObjectsWithEquals - the very task that was dragged
+            if (t == held) { //NOPMD CompareObjectsWithEquals - the very task that was dragged
+                from.put(t, new long[]{heldStart, heldEnd});
+            } else {
                 from.put(t, new long[]{t.getStart(), t.getEnd()});
             }
         }
@@ -890,7 +897,9 @@ final class GanttChart extends ScrollSurface {
             return;
         }
         if (m == LINK) {
-            if (linkTarget != null && owner.viewLinking(t, linkTarget)) {
+            // Asked once more: a listener, or the project changing under the
+            // pointer, may have made the link one that cannot be.
+            if (linkTarget != null && owner.viewLinking(t, linkTarget) && model.canLink(t, linkTarget)) {
                 beginReflow();
                 model.link(t, linkTarget);
                 model.update();
@@ -906,19 +915,21 @@ final class GanttChart extends ScrollSurface {
             }
         } else if (m == MOVE) {
             if (editStart != t.getStart() && owner.viewChanging(t, editStart, editEnd)) {
-                beginReflow(t);
+                beginReflow(t, editStart, editEnd);
                 if (t.isManuallyScheduled()) {
                     t.setDates(editStart, editEnd);
                 } else {
                     // A task that is scheduled goes where it is put only as
                     // far as its links allow, so the drag is a constraint.
-                    // One it already has keeps its kind and takes the new
-                    // date; a task with none is held from starting earlier.
+                    // A constraint that places the task keeps its kind and
+                    // takes the new date. One that only says how late the
+                    // task may be places nothing, so a task that has it, or
+                    // none, is held from starting earlier: the bar has to
+                    // end up where it was put.
                     GanttTask.Constraint c = t.getConstraint();
-                    if (c == GanttTask.Constraint.MUST_START_ON || c == GanttTask.Constraint.START_NO_LATER_THAN) {
+                    if (c == GanttTask.Constraint.MUST_START_ON) {
                         t.setConstraint(c, editStart);
                     } else if (c == GanttTask.Constraint.MUST_FINISH_ON
-                            || c == GanttTask.Constraint.FINISH_NO_LATER_THAN
                             || c == GanttTask.Constraint.FINISH_NO_EARLIER_THAN) {
                         t.setConstraint(c, editEnd);
                     } else {
@@ -929,7 +940,7 @@ final class GanttChart extends ScrollSurface {
                 owner.viewChanged(t);
             }
         } else if (editEnd != t.getEnd() && owner.viewChanging(t, editStart, editEnd)) {
-            beginReflow(t);
+            beginReflow(t, t.getStart(), editEnd);
             long work = Math.max(TimeMath.MINUTE, model.getCalendar().workingTimeBetween(t.getStart(), editEnd));
             if (t.isManuallyScheduled()) {
                 t.setDates(t.getStart(), editEnd);

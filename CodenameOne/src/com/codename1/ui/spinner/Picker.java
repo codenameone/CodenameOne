@@ -1071,7 +1071,7 @@ public class Picker extends Button {
     private void limit(MaterialTimePicker t) {
         t.setShowMeridiem(showMeridiem);
         t.setMinuteStep(minuteStep);
-        if (minHour >= 0 && minHour < 24 && maxHour >= minHour) {
+        if (minHour >= 0 && minHour < 24 && maxHour > minHour) {
             // The picker's last hour is one that can be chosen, as it is on
             // the wheels; the face takes the hour after it.
             t.setHourRange(minHour, Math.min(23, maxHour) + 1);
@@ -1126,8 +1126,20 @@ public class Picker extends Button {
 
     private void showMaterialDialog() {
         if (materialDialog != null) {
-            // Asked to open while it is open: one dialog, one answer.
-            return;
+            if (Display.getInstance().getCurrent() == materialDialog) { //NOPMD CompareObjectsWithEquals - this very dialog
+                // Asked to open while it is open: one dialog, one answer.
+                return;
+            }
+            // The application showed another form over it: it was never
+            // answered and is not coming back, which is a cancel.
+            materialDialog = null;
+            currentSpinner = null;
+            if (preEditValue != null) {
+                value = preEditValue;
+                dateValueExplicitlySet = preEditDateValueExplicitlySet;
+            }
+            preEditValue = null;
+            preEditDateValueExplicitlySet = false;
         }
         final InternalPickerWidget widget = createMaterialWidget();
         final Dialog dlg = new Dialog(new BorderLayout());
@@ -1201,10 +1213,10 @@ public class Picker extends Button {
             if (type == Display.PICKER_TYPE_DATE_AND_TIME && value instanceof Date) {
                 // The month limits the day; the instant is limited here.
                 Date chosen = (Date) value;
+                // The last day is one that can be chosen, all of it, as it
+                // is in the month; only the first day has a first moment.
                 if (startDate != null && chosen.getTime() < startDate.getTime()) {
                     value = new Date(startDate.getTime());
-                } else if (endDate != null && chosen.getTime() > endDate.getTime()) {
-                    value = new Date(endDate.getTime());
                 }
             }
             markDateExplicitlySetIfDateType();
