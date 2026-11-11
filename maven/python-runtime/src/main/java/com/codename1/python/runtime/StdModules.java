@@ -110,6 +110,10 @@ public final class StdModules {
             PyModule.registerModule(thread());
             return true;
         }
+        if ("_cn1dataclass".equals(name)) {
+            PyModule.registerModule(PyDataclass.module());
+            return true;
+        }
         if ("_cn1hash".equals(name)) {
             PyModule.registerModule(PyHashlib.module());
             return true;

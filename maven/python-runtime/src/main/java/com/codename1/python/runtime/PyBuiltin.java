@@ -61,6 +61,14 @@ public final class PyBuiltin extends PyObject {
     private Three three;
     /// The builtin type a [#method] belongs to; null for a function.
     private final PyType owner;
+    /// `__qualname__` where it is not the name: a method made for a class in Python.
+    private String qual;
+
+    /// Names the class this is a method of, for `__qualname__`.
+    PyBuiltin qual(String qualifiedName) {
+        qual = qualifiedName;
+        return this;
+    }
 
     public PyBuiltin(String name, Impl impl) {
         this(name, impl, null);
@@ -252,6 +260,9 @@ public final class PyBuiltin extends PyObject {
 
     @Override
     public Object getAttrOrNull(String attr) {
+        if ("__qualname__".equals(attr) && qual != null) {
+            return qual;
+        }
         if ("__name__".equals(attr) || "__qualname__".equals(attr)) {
             return name;
         }

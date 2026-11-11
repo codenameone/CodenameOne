@@ -7,6 +7,7 @@ CPython builds these methods by exec'ing source text; the methods here are
 closures over the field list instead, since no source is compiled at run time.
 """
 
+import _cn1dataclass
 import copy as _copy
 
 __all__ = ["dataclass", "field", "Field", "FrozenInstanceError", "InitVar", "KW_ONLY", "MISSING", "fields",
@@ -257,6 +258,12 @@ def _make_init(cls, fields, std_fields, kw_only_fields, frozen, has_post_init):
                     extra.append(next(f.default for f in fields if f.name == name))
             self.__post_init__(*extra)
     __init__.__qualname__ = qualname
+    if not has_post_init and not initvars:
+        # The same method in the runtime, for a call that is right; any other comes
+        # back to the one above, which says what is wrong with it.
+        return _cn1dataclass.init(qualname, tuple([p[0] for p in plan]), tuple([p[1] for p in plan]),
+                                  tuple([p[2] for p in plan]), tuple([p[3] for p in plan]),
+                                  tuple([p[4] for p in plan]), frozen, __init__)
     return __init__
 
 
