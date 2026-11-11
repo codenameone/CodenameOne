@@ -559,6 +559,13 @@ public final class HttpProxy {
         while ((n = in.read(buffer, 0, buffer.length)) >= 0) {
             if (n > 0) {
                 out.write(buffer, 0, n);
+                // Pass on what arrived once the upstream has nothing more ready:
+                // an event stream or a token feed trickles small writes, and
+                // holding them until 16 KB filled delayed every event by minutes.
+                // A bulk download keeps the buffer full and still sends full chunks.
+                if (in.available() <= 0) {
+                    out.flush();
+                }
             }
         }
     }

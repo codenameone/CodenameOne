@@ -102,7 +102,13 @@ public class Streaming {
     // end::backend-web-sse[]
 
     private static long parse(String id) {
-        return id == null ? 0 : Long.parseLong(id);
+        // The header is whatever the client sent; a bad one starts over
+        // rather than failing a stream whose headers are already out.
+        try {
+            return id == null ? 0 : Math.max(0, Long.parseLong(id.trim()));
+        } catch (NumberFormatException notOurs) {
+            return 0;
+        }
     }
 
     /// Stands in for wherever the application keeps its prices.

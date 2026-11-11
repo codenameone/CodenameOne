@@ -92,7 +92,9 @@ class SseTest {
         assertThrows(IllegalArgumentException.class, () -> events.retry(-1));
     }
 
-    private static final CountDownLatch FIRST_READ = new CountDownLatch(1);
+    /// Fresh per test, so a rerun still proves the first event arrived early.
+    private final CountDownLatch firstRead = new CountDownLatch(1);
+    private volatile HttpProxy proxy; //NOPMD AvoidUsingVolatile - written before the server starts, read by its worker
 
     private int start(boolean compression) throws Exception {
         ServerSocket s = new ServerSocket(0);
@@ -105,13 +107,16 @@ class SseTest {
             settings.setProperty(Compression.MIN_SIZE, "0");
             settings.setProperty(Compression.MIME_TYPES, "text/event-stream");
         }
+        proxy = new HttpProxy("http://127.0.0.1:" + port);
         backend = Backend.builder(Config.of(settings, "test")).quiet().handler(request ->
-                Sse.stream(request, events -> {
+                request.getTarget().startsWith("/proxy")
+                ? proxy.forward(request, "/events")
+                : Sse.stream(request, events -> {
                     events.id("1").data("first " + events.lastEventId());
                     // Held until the client has read the first event: a server that
                     // buffered to the end would deadlock here and the test time out.
                     try {
-                        if (!FIRST_READ.await(20, TimeUnit.SECONDS)) {
+                        if (!firstRead.await(20, TimeUnit.SECONDS)) {
                             throw new IOException("first event never reached the client");
                         }
                     } catch (InterruptedException err) {
@@ -122,7 +127,7 @@ class SseTest {
         return port;
     }
 
-    private static String exchange(int port, String request, boolean signal) throws IOException {
+    private String exchange(int port, String request, boolean signal) throws IOException {
         try (Socket socket = new Socket("127.0.0.1", port)) {
             socket.setSoTimeout(30000);
             OutputStream out = socket.getOutputStream();
@@ -135,7 +140,7 @@ class SseTest {
             while ((n = in.read(buffer)) > 0) {
                 seen.append(new String(buffer, 0, n, StandardCharsets.UTF_8));
                 if (signal && seen.indexOf("first ") >= 0 && seen.indexOf("\n\n", seen.indexOf("first ")) >= 0) {
-                    FIRST_READ.countDown();
+                    firstRead.countDown();
                 }
             }
             return seen.toString();
@@ -154,6 +159,16 @@ class SseTest {
         // Compression is on for this type with no minimum, and still not applied.
         assertFalse(reply.toLowerCase().contains("content-encoding"), reply);
         assertTrue(reply.contains("id: 1\ndata: first 41\n\n"), reply);
+        assertTrue(reply.contains("event: done\ndata: second\n\n"), reply);
+    }
+
+    @Test
+    void theProxyRelaysEachEventAsItArrives() throws Exception {
+        int port = start(false);
+        String reply = exchange(port, "GET /proxy HTTP/1.1\r\nHost: x\r\n"
+                + "Last-Event-ID: 5\r\nConnection: close\r\n\r\n", true);
+        assertTrue(reply.startsWith("HTTP/1.1 200"), reply);
+        assertTrue(reply.contains("id: 1\ndata: first 5\n\n"), reply);
         assertTrue(reply.contains("event: done\ndata: second\n\n"), reply);
     }
 }
