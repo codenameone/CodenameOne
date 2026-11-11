@@ -612,7 +612,19 @@ public class JavaCEFSEPort extends JavaSEPort {
             }
         }
         
-        StreamWrapper stream = new StreamWrapper(inputStream, mimeType , -1);
+        // Chromium's media pipeline asks for the length and may re-read from
+        // the start (range requests), which a one-shot stream of unknown
+        // length cannot answer: the player failed with "data source error".
+        // Buffer it, so the length is known and InputStreamSchemeHandler can
+        // seek back.
+        StreamWrapper stream;
+        try {
+            byte[] data = com.codename1.io.Util.readInputStream(inputStream);
+            stream = new StreamWrapper(new java.io.ByteArrayInputStream(data), mimeType, data.length);
+        } catch (IOException ex) {
+            out.error(ex);
+            return out;
+        }
         String id = BrowserPanel.getStreamRegistry().registerStream(stream);
         String uriAddress = "https://cn1app/streams/"+id;
         try {

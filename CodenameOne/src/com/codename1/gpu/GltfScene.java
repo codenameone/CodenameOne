@@ -295,6 +295,9 @@ public final class GltfScene {
         final int image;
         final boolean doubleSided;
         final boolean blend;
+        float metallic = 1f;
+        float roughness = 1f;
+        int emissive = 0xff000000;
 
         MaterialInfo(String name, int baseColor, int image, boolean doubleSided, boolean blend) {
             this.name = name;
@@ -302,6 +305,21 @@ public final class GltfScene {
             this.image = image;
             this.doubleSided = doubleSided;
             this.blend = blend;
+        }
+
+        /// The metallic factor, from 0 to 1; glTF's default is 1.
+        public float getMetallic() {
+            return metallic;
+        }
+
+        /// The roughness factor, from 0 to 1; glTF's default is 1.
+        public float getRoughness() {
+            return roughness;
+        }
+
+        /// The emissive factor as an opaque ARGB colour, black for none.
+        public int getEmissive() {
+            return emissive;
         }
 
         /// The material's name, or an empty string.

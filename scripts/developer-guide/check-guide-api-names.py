@@ -75,12 +75,16 @@ APP_ROOTS = [
 #
 # scripts/dash is the same for the Dash implementor's guide: its Outfit, the
 # runner's colours, is two letters from Output.
+#
+# scripts/splat is the same for the Splat implementor's guide: its Mission,
+# the player-built field, is a near miss for Session.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                     for d in ('CodenameOne', 'Ports', 'vm', 'maven',
                               os.path.join('docs', 'demos'),
                               os.path.join('scripts', 'wayline'),
                               os.path.join('scripts', 'bastion'),
-                              os.path.join('scripts', 'dash'))]
+                              os.path.join('scripts', 'dash'),
+                              os.path.join('scripts', 'splat'))]
 # '.py' because the Python support ships real Python packages under maven/
 # (starlette's TestClient is one edit from RestClient and is a real class).
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',

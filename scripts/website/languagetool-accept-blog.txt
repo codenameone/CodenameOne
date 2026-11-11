@@ -137,3 +137,7 @@ retrolambda
 \bWayline\b
 # Rust GUI toolkit named in the Java vs Rust comparison.
 \begui\b
+minimap
+killfeed
+paintballs
+Paintballs

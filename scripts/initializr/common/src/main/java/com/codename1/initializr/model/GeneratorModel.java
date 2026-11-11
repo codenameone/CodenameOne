@@ -85,6 +85,12 @@ public class GeneratorModel {
     /// template's app does not compile, so it is neither offered nor generated.
     static final String REEL_SINCE = "7.0.280";
 
+    /// The first release whose core has the 3D engine the shooter template draws
+    /// its field with: PBR materials, shadow maps, fog and the post-processing
+    /// chain (`com.codename1.gpu`). Before it the template's app does not
+    /// compile, so it is neither offered nor generated.
+    static final String SPLAT_SINCE = "7.0.282";
+
     /// The first release whose framework has what the banking template's app calls:
     /// timed clipboard clearing, the P-256 key and signature API it signs requests
     /// with, and the `BigDecimal` arithmetic its ledger rounds with. Against an
@@ -101,7 +107,8 @@ public class GeneratorModel {
     /// The first release a template can be generated against.
     static String templateSince(Template template) {
         return template == Template.BASTION ? BASTION_SINCE
-                : template == Template.REEL ? REEL_SINCE : JAVA_TIME_ENTITIES_SINCE;
+                : template == Template.REEL ? REEL_SINCE
+                : template == Template.SPLAT ? SPLAT_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its
@@ -120,6 +127,9 @@ public class GeneratorModel {
 
     /// The runner template's accent, used for its icon: it has no `--brand`.
     public static final int DASH_BRAND = 0xff4d5e;
+
+    /// The paintball template's accent, used for its icon: it has no `--brand`.
+    public static final int SPLAT_BRAND = 0xff7a1f;
 
     /// The messaging template's `--brand`, held to its theme.css the same way.
     public static final int PARLEY_BRAND = 0x0a7d6b;
@@ -153,7 +163,8 @@ public class GeneratorModel {
         }
         return template == Template.SAVOR ? SAVOR_BRAND
                 : template == Template.SKIRMISH ? SKIRMISH_BRAND
-                : template == Template.DASH ? DASH_BRAND : FULL_STACK_BRAND;
+                : template == Template.DASH ? DASH_BRAND
+                : template == Template.SPLAT ? SPLAT_BRAND : FULL_STACK_BRAND;
     }
 
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
@@ -1175,7 +1186,7 @@ public class GeneratorModel {
                 "dependency on the shared module");
         requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), dependency,
                 "dependency on the shared module");
-        if (template == Template.SKIRMISH || template == Template.DASH) {
+        if (template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT) {
             // The rules pom takes its group and version from the parent, so its
             // coordinates are the parent's and its artifact id.
             requirePomFragment("rules/pom.xml", normalizedPom(entries, "rules/pom.xml"),
@@ -1661,7 +1672,8 @@ public class GeneratorModel {
             content = replaceTagValue(content, "cn1.plugin.version", pluginVersion);
             content = replaceTagValue(content, "cn1.version", pluginVersion);
             if (template.isFullStack() && !options.isGradle() && !isMavenBackendOnly()) {
-                content = addSharedModule(content, template == Template.SKIRMISH || template == Template.DASH);
+                content = addSharedModule(content, template == Template.SKIRMISH || template == Template.DASH
+                        || template == Template.SPLAT);
             }
             if (mavenLayoutsEnabled() && !isMavenBackendOnly()) {
                 content = guardModuleProfiles(content, !includesPlatformModules());
@@ -2100,6 +2112,22 @@ public class GeneratorModel {
                     .append("and the server they talk to.\n\n")
                     .append("- `rules/` is the game: a deterministic simulation with no dependencies, which the app ")
                     .append("runs, the server re-simulates to verify scores and the replay viewer re-runs.\n")
+                    .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
+                    .append("- `backend/` is the server.\n")
+                    .append("- `common/` is the app.\n\n")
+                    .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                    .append("./run-server.sh\n")
+                    .append("./run.sh\n```\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
+        } else if (template == Template.SPLAT) {
+            out.append("## The game and its server\n\n")
+                    .append("This project is a working team paintball shooter: first-person 3D matches against bots ")
+                    .append("or other players, a server that referees every match while the phone predicts, parties ")
+                    .append("with voice, crews, replays and an admin console, and the server they talk to.\n\n")
+                    .append("- `rules/` is the game: a deterministic simulation with no dependencies, which the app ")
+                    .append("predicts with, the server runs as the authority and the replay viewer re-runs.\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
                     .append("- `backend/` is the server.\n")
                     .append("- `common/` is the app.\n\n")

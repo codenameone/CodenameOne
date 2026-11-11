@@ -18,6 +18,7 @@ on:
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
       - 'scripts/slate/**'
+      - 'scripts/splat/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'
       - 'scripts/hellocodenameone/common/src/main/kmp/**'

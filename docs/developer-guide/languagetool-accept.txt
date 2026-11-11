@@ -906,4 +906,8 @@ transpiles
 Redis
 Valkey
 zstd
+minimap
+killfeed
+paintballs
+Paintballs
 gamepad
