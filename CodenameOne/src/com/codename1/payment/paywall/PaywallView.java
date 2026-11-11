@@ -36,6 +36,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.Tabs;
@@ -130,6 +131,14 @@ public class PaywallView extends Container {
     private PaywallListener listener;
     private Runnable closeHandler;
     private ActionListener customerListener;
+    private boolean webPurchaseStarted;
+    private Form shownForm;
+    private final ActionListener showListener = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            formShown();
+        }
+    };
 
     /// Builds the paywall of an offering from the offering's own document,
     /// or from [the built-in one][Paywall#createDefault(Offering)] when it
@@ -243,7 +252,16 @@ public class PaywallView extends Container {
             listener.purchaseStarted(pkg);
         }
         watchCustomer();
-        CommerceManager.getInstance().purchase(pkg);
+        CommerceManager cm = CommerceManager.getInstance();
+        if (cm.isWebPurchase(pkg)) {
+            // The customer pays in the browser and nothing reports back:
+            // the cloud is asked again when this form is next shown.
+            if (cm.purchaseOnWeb(pkg)) {
+                webPurchaseStarted = true;
+            }
+            return;
+        }
+        cm.purchase(pkg);
     }
 
     /// Restores the purchases of the store account, as the restore button
@@ -297,6 +315,30 @@ public class PaywallView extends Container {
             impressionLogged = true;
             log("IMPRESSION", null);
         }
+        Form form = getComponentForm();
+        if (form != null && shownForm != form) {
+            if (shownForm != null) {
+                shownForm.removeShowListener(showListener);
+            }
+            shownForm = form;
+            form.addShowListener(showListener);
+        }
+    }
+
+    /// Asks the cloud again once the form is back after a web checkout was
+    /// opened, which is how a purchase made in the browser is learned of.
+    /// The refresh blocks on the network, so it runs in the background; the
+    /// customer information listener hears the answer.
+    void formShown() {
+        if (!webPurchaseStarted || closed) {
+            return;
+        }
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                CommerceManager.getInstance().refresh();
+            }
+        });
     }
 
     // ---- purchase tracking ---------------------------------------------------

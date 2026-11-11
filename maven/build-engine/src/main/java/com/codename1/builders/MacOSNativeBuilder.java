@@ -882,6 +882,9 @@ public class MacOSNativeBuilder extends Executor {
                 // makes the uploaded mapping unreachable -- the failure is a
                 // stack trace nobody can retrace, months later.
                 + hardeningRuntimeProperties(request)
+                // The commerce switch, endpoint and signing key, which CommerceManager reads
+                // through Display.getProperty and nothing else puts there.
+                + CommerceBuildHints.stubProperties(request)
                 + desktopTitleBarStubProperty(request)
                 + svgRegistryInstall
                 + "            i.init(this);\n"

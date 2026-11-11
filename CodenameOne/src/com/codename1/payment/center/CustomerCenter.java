@@ -251,9 +251,17 @@ public final class CustomerCenter {
             store.manageSubscriptions(sku);
             return;
         }
-        String url = CommerceManager.getInstance().getManagementUrl();
-        if (url != null && url.length() > 0) {
-            Display.getInstance().execute(url);
+        // A web subscription is managed in a billing portal the cloud has
+        // to be asked for, which must not happen on the EDT.
+        final String[] url = new String[1];
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                url[0] = CommerceManager.getInstance().fetchManagementUrl();
+            }
+        });
+        if (url[0] != null && url[0].length() > 0) {
+            Display.getInstance().execute(url[0]);
         }
     }
 
@@ -315,7 +323,13 @@ public final class CustomerCenter {
                         string(config, "offer.accept", "Accept offer"),
                         string(config, "offer.decline", "No thanks"));
                 if (accepted) {
-                    cm.subscribe(productId);
+                    // An offer that names a promotional offer is sold under
+                    // it where the store has such offers and the cloud signs
+                    // it; anywhere else the product is sold as it is.
+                    String offerId = text(((Map) offer).get("offerId"));
+                    if (offerId == null || !cm.purchaseWithPromotionalOffer(productId, offerId)) {
+                        cm.subscribe(productId);
+                    }
                     return;
                 }
             }

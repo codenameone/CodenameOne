@@ -59,7 +59,9 @@ public final class Offering {
         if (pkgs instanceof List) {
             for (Object o : (List) pkgs) {
                 if (o instanceof Map) {
-                    packages.add(new CommercePackage((Map) o));
+                    CommercePackage pkg = new CommercePackage((Map) o);
+                    pkg.setOfferingId(CustomerInfo.asString(m.get("id")));
+                    packages.add(pkg);
                 }
             }
         }

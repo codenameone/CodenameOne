@@ -16807,6 +16807,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             return defaultValue;
         }
+        if ("commerce.cloud.enabled".equals(key) || "commerce.cloud.endpoint".equals(key)
+                || "commerce.cloud.publicKey".equals(key)) {
+            // A builder stamps these into the device stub; nothing does for the simulator, so
+            // the hints are resolved here and a project pointed at its own service can be run.
+            // Display.setProperty still wins: Display answers its own properties first.
+            String commerce = buildHint(key);
+            if (commerce != null && commerce.trim().length() > 0) {
+                return commerce.trim();
+            }
+            return defaultValue;
+        }
         if(key.equalsIgnoreCase("cn1_push_prefix") 
                 || key.equalsIgnoreCase("cellId") 
                 || key.equalsIgnoreCase("IMEI") 

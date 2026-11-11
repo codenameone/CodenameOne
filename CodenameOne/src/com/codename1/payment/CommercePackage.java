@@ -59,6 +59,7 @@ public final class CommercePackage {
     private final String introPeriod;
     private final boolean eligibleForIntro;
     private Product product;
+    private String offeringId;
 
     /// Builds a package from the parsed JSON object of the service's
     /// offerings payload.
@@ -77,6 +78,18 @@ public final class CommercePackage {
 
     private static String emptyAsNull(String s) {
         return s == null || s.length() == 0 ? null : s;
+    }
+
+    /// The id of the offering this package was listed in, or null for a
+    /// package that came from no offering. A web checkout names the package
+    /// by both ids.
+    public String getOfferingId() {
+        return offeringId;
+    }
+
+    /// Set by the offering that lists this package.
+    void setOfferingId(String offeringId) {
+        this.offeringId = offeringId;
     }
 
     /// The id of the package inside its offering.

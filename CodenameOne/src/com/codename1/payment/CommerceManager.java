@@ -122,6 +122,9 @@ public final class CommerceManager {
     private final List pendingEvents = new ArrayList();
     private boolean eventFlushScheduled;
     private boolean degraded;
+    // The billing portal last fetched, and the customer it was fetched for.
+    private String portalUrl;
+    private String portalUser;
     private String appUserId;
 
     // The last customer the cloud answered with, or the stored one.
@@ -574,7 +577,14 @@ public final class CommerceManager {
     /// - `pkg`: the package to buy; null or a package with no product does
     ///   nothing
     public void purchase(CommercePackage pkg) {
-        if (pkg == null || pkg.getProductId() == null) {
+        if (pkg == null) {
+            return;
+        }
+        if (isWebPurchase(pkg)) {
+            purchaseOnWeb(pkg);
+            return;
+        }
+        if (pkg.getProductId() == null) {
             return;
         }
         if (pkg.isSubscription()) {
@@ -584,11 +594,259 @@ public final class CommerceManager {
         }
     }
 
-    /// The page where the customer manages the subscription with the store,
-    /// from the last [customer information][#getCustomerInfo()], or null
-    /// when there is none.
+    /// Whether [#purchase(CommercePackage)] sells a package through a web
+    /// checkout: the package has no product of this platform's store, and
+    /// the platform has no store to sell one -- the browser and the desktop,
+    /// where [Purchase] supports neither managed payments nor subscriptions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package asked about
+    ///
+    /// #### Returns
+    ///
+    /// true when buying the package opens a hosted checkout page
+    public boolean isWebPurchase(CommercePackage pkg) {
+        if (pkg == null || !isCloudEnabled()) {
+            return false;
+        }
+        String productId = pkg.getProductId();
+        if (productId != null && productId.length() > 0) {
+            return false;
+        }
+        try {
+            Purchase store = Purchase.getInAppPurchase();
+            return store == null || !(store.isManagedPaymentSupported() || store.isSubscriptionSupported());
+        } catch (Throwable t) {
+            // a port with no store object at all has no native store
+            return true;
+        }
+    }
+
+    /// Asks the cloud for a hosted checkout page that sells a package for
+    /// its web price.
+    ///
+    /// Blocking network call -- invoke off the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package to sell
+    ///
+    /// - `successUrl`: where the checkout sends the customer after paying,
+    ///   or null for the service's own page
+    ///
+    /// - `cancelUrl`: where the checkout sends a customer who gave up, or
+    ///   null for the service's own page
+    ///
+    /// #### Returns
+    ///
+    /// the address of the checkout page, or null when the cloud is not
+    /// enabled in this build, could not be reached, or has no web price for
+    /// the package
+    public String getWebPurchaseUrl(CommercePackage pkg, String successUrl, String cancelUrl) {
+        if (pkg == null || !isCloudEnabled()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        appendField(sb, "offeringId", pkg.getOfferingId());
+        sb.append(',');
+        appendField(sb, "packageId", pkg.getId());
+        if (successUrl != null) {
+            sb.append(',');
+            appendField(sb, "successUrl", successUrl);
+        }
+        if (cancelUrl != null) {
+            sb.append(',');
+            appendField(sb, "cancelUrl", cancelUrl);
+        }
+        return urlOf(postSigned("/web-purchase", sb.toString()));
+    }
+
+    /// Sells a package through a hosted checkout page, opened with
+    /// [Display#execute(String)]. The customer pays outside the
+    /// application, so nothing reports the outcome here: once the
+    /// application is back in the foreground the caller runs [#refresh()]
+    /// off the EDT, and the customer information listeners hear what was
+    /// bought. [com.codename1.payment.paywall.PaywallView] does that itself.
+    ///
+    /// May be called on the EDT, which keeps dispatching events while the
+    /// cloud is asked for the page.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package to sell
+    ///
+    /// #### Returns
+    ///
+    /// true when a checkout page was opened, false when there was none
+    public boolean purchaseOnWeb(final CommercePackage pkg) {
+        final String[] url = new String[1];
+        blocking(new Runnable() {
+            @Override
+            public void run() {
+                url[0] = getWebPurchaseUrl(pkg, null, null);
+            }
+        });
+        if (url[0] == null) {
+            return false;
+        }
+        Display.getInstance().execute(url[0]);
+        return true;
+    }
+
+    /// Buys a subscription under one of its App Store promotional offers.
+    /// The cloud signs the offer for this customer and the store is then
+    /// asked to sell the product with that signature, as
+    /// [Purchase#purchase(String, PromotionalOffer)] does.
+    ///
+    /// May be called on the EDT, which keeps dispatching events while the
+    /// cloud is asked for the signature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `productId`: the subscription product
+    ///
+    /// - `offerId`: the promotional offer of that product, as App Store
+    ///   Connect names it
+    ///
+    /// #### Returns
+    ///
+    /// true when the store was asked to sell the offer; false when no
+    /// signature is available -- the platform's store has no promotional
+    /// offers, the cloud is not enabled or it refused -- in which case
+    /// nothing was bought
+    public boolean purchaseWithPromotionalOffer(final String productId, final String offerId) {
+        if (productId == null || offerId == null || !isCloudEnabled() || !promotionalOffersSupported()) {
+            return false;
+        }
+        final ApplePromotionalOffer[] offer = new ApplePromotionalOffer[1];
+        blocking(new Runnable() {
+            @Override
+            public void run() {
+                offer[0] = fetchPromotionalOffer(productId, offerId);
+            }
+        });
+        if (offer[0] == null) {
+            return false;
+        }
+        try {
+            Purchase.getInAppPurchase().purchase(productId, offer[0]);
+        } catch (RuntimeException e) {
+            // thrown by a store that does not sell promotional offers
+            Log.p("CommerceManager: the store refused the promotional offer: " + e);
+            return false;
+        }
+        return true;
+    }
+
+    /// Promotional offers are an App Store feature.
+    private static boolean promotionalOffersSupported() {
+        String platform = Display.getInstance().getPlatformName();
+        return "ios".equalsIgnoreCase(platform) || "mac".equalsIgnoreCase(platform);
+    }
+
+    /// The signed promotional offer of a product, or null when the cloud
+    /// gave no usable signature. Blocking.
+    private ApplePromotionalOffer fetchPromotionalOffer(String productId, String offerId) {
+        StringBuilder sb = new StringBuilder();
+        appendField(sb, "productId", productId);
+        sb.append(',');
+        appendField(sb, "offerId", offerId);
+        Map payload = postSigned("/promo-offer-signature", sb.toString());
+        if (payload == null || !asBoolean(payload.get("accepted"))) {
+            return null;
+        }
+        String keyId = CustomerInfo.asString(payload.get("keyId"));
+        String offerNonce = CustomerInfo.asString(payload.get("nonce"));
+        String signature = CustomerInfo.asString(payload.get("signature"));
+        if (keyId == null || offerNonce == null || signature == null
+                || keyId.length() == 0 || offerNonce.length() == 0 || signature.length() == 0) {
+            return null;
+        }
+        ApplePromotionalOffer offer = new ApplePromotionalOffer();
+        offer.setOfferIdentifier(offerId);
+        offer.setKeyIdentifier(keyId);
+        offer.setNonce(offerNonce);
+        offer.setSignature(signature);
+        offer.setTimestamp(CustomerInfo.asLong(payload.get("timestamp")));
+        return offer;
+    }
+
+    /// Runs a network call to its end: through `invokeAndBlock` on the EDT,
+    /// directly on any other thread.
+    private static void blocking(Runnable r) {
+        Display d = Display.getInstance();
+        if (d.isEdt()) {
+            d.invokeAndBlock(r);
+        } else {
+            r.run();
+        }
+    }
+
+    /// The `url` of an accepted answer, or null.
+    private static String urlOf(Map payload) {
+        if (payload == null || !asBoolean(payload.get("accepted"))) {
+            return null;
+        }
+        String url = CustomerInfo.asString(payload.get("url"));
+        return url == null || url.length() == 0 ? null : url;
+    }
+
+    /// The page where the customer manages the subscription, or null when
+    /// there is none. Never touches the network: for a subscription bought
+    /// on the web it is the billing portal [#fetchManagementUrl()] last
+    /// answered, and otherwise -- or before that was ever asked -- the
+    /// store's page from the last
+    /// [customer information][#getCustomerInfo()].
     public String getManagementUrl() {
-        return getCustomerInfo().getManagementUrl();
+        CustomerInfo info = getCustomerInfo();
+        String user = getAppUserId();
+        if (portalUrl != null && paidOnWeb(info) && user != null && user.equals(portalUser)) {
+            return portalUrl;
+        }
+        return info.getManagementUrl();
+    }
+
+    /// The page where the customer manages the subscription, asking the
+    /// cloud for a billing portal when the newest active entitlement -- the
+    /// one that expires last -- was bought on the web (`stripe` or
+    /// `paddle`). A portal address is short lived, so it is asked for when
+    /// it is about to be opened. For a store subscription this is
+    /// [#getManagementUrl()] and nothing is asked.
+    ///
+    /// Blocking network call -- invoke off the EDT.
+    ///
+    /// #### Returns
+    ///
+    /// the address, or null when there is none
+    public String fetchManagementUrl() {
+        CustomerInfo info = getCustomerInfo();
+        if (isCloudEnabled() && paidOnWeb(info)) {
+            String url = urlOf(postSigned("/web-portal", null));
+            if (url != null) {
+                portalUrl = url;
+                portalUser = getAppUserId();
+                return url;
+            }
+        }
+        return getManagementUrl();
+    }
+
+    /// Whether the active entitlement that expires last was bought on the
+    /// web. One that never expires counts as the last only when no other is
+    /// active.
+    static boolean paidOnWeb(CustomerInfo info) {
+        EntitlementInfo newest = null;
+        for (EntitlementInfo e : info.getActiveEntitlements()) {
+            if (newest == null || e.getExpiresDate() > newest.getExpiresDate()) {
+                newest = e;
+            }
+        }
+        if (newest == null) {
+            return false;
+        }
+        String store = newest.getStore();
+        return "stripe".equalsIgnoreCase(store) || "paddle".equalsIgnoreCase(store);
     }
 
     /// The customer center the console configured for this application, as
@@ -1082,7 +1340,9 @@ public final class CommerceManager {
     static String storeOf(Receipt r) {
         String code = r.getStoreCode();
         if (Receipt.STORE_CODE_ITUNES.equals(code)) {
-            return "apple";
+            // The Mac App Store reports the same store code and is a store
+            // of its own to the service, with its own products and keys.
+            return "mac".equalsIgnoreCase(Display.getInstance().getPlatformName()) ? "mac" : "apple";
         }
         if (Receipt.STORE_CODE_PLAY.equals(code)) {
             return "google";
