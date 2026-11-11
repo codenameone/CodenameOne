@@ -58,6 +58,76 @@ class AndroidCameraFrameConverterTest {
         if (loader != null) loader.close();
     }
 
+    private int[] analysisSize(int width, int height, boolean raw, boolean portrait)
+            throws Exception {
+        Method pick = convert.getDeclaringClass().getDeclaredMethod("analysisSize",
+                int.class, int.class, boolean.class, boolean.class);
+        pick.setAccessible(true);
+        return (int[]) pick.invoke(null, width, height, raw, portrait);
+    }
+
+    @Test
+    void rawSessionWithNoPreviewSizeIsAnalysedAt1080Lines() throws Exception {
+        // 640x480 was the default, and too coarse for a dense PDF417. 4:3, as
+        // the preview is, so the analysed field is the one on screen.
+        assertArrayEquals(new int[] {1440, 1080}, analysisSize(0, 0, true, false));
+    }
+
+    @Test
+    void defaultAnalysisSizeFollowsThePortraitDisplay() throws Exception {
+        // CameraX reads the size in the display's orientation.
+        assertArrayEquals(new int[] {1080, 1440}, analysisSize(0, 0, true, true));
+        assertArrayEquals(new int[] {480, 640}, analysisSize(0, 0, false, true));
+    }
+
+    @Test
+    void jpegSessionKeepsTheSmallDefault() throws Exception {
+        // Every JPEG frame is compressed on the analysis thread.
+        assertArrayEquals(new int[] {640, 480}, analysisSize(0, 0, false, false));
+    }
+
+    @Test
+    void requestedAnalysisSizeIsPassedThrough() throws Exception {
+        assertArrayEquals(new int[] {640, 480}, analysisSize(640, 480, true, true));
+        assertArrayEquals(new int[] {1280, 720}, analysisSize(1280, 720, false, false));
+    }
+
+    @Test
+    void halfARequestGetsTheWholeDefault() throws Exception {
+        assertArrayEquals(new int[] {1440, 1080}, analysisSize(1920, 0, true, false));
+        assertArrayEquals(new int[] {480, 640}, analysisSize(0, 480, false, true));
+    }
+
+    private byte[] packInto(byte[] reuse) throws Exception {
+        Method reusing = convert.getDeclaringClass().getDeclaredMethod("toNV21", int.class, int.class,
+                ByteBuffer.class, int.class, int.class, ByteBuffer.class, int.class,
+                int.class, ByteBuffer.class, int.class, int.class, byte[].class);
+        reusing.setAccessible(true);
+        return (byte[]) reusing.invoke(null, 4, 4, ByteBuffer.wrap(new byte[] {
+                1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}), 4, 1,
+                ByteBuffer.wrap(new byte[] {21,22,23,24}), 2, 1,
+                ByteBuffer.wrap(new byte[] {31,32,33,34}), 2, 1, reuse);
+    }
+
+    @Test
+    void arrayOfTheRightSizeIsReusedAndFullyOverwritten() throws Exception {
+        byte[] previous = new byte[24];
+        java.util.Arrays.fill(previous, (byte) 99);
+        byte[] packed = packInto(previous);
+        assertSame(previous, packed);
+        assertArrayEquals(expected(), packed);
+    }
+
+    @Test
+    void arrayOfAnotherSizeIsNotReused() throws Exception {
+        // The analysis size changes when a session is reopened.
+        byte[] previous = new byte[25];
+        byte[] packed = packInto(previous);
+        assertNotSame(previous, packed);
+        assertArrayEquals(expected(), packed);
+        assertArrayEquals(expected(), packInto(null));
+    }
+
     private byte[] pack(ByteBuffer y, int ys, ByteBuffer u, int us, int up,
                         ByteBuffer v, int vs, int vp) throws Exception {
         return (byte[]) convert.invoke(null, 4, 4, y, ys, 1, u, us, up, v, vs, vp);

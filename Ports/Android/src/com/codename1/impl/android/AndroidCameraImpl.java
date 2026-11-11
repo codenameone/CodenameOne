@@ -118,6 +118,13 @@ public class AndroidCameraImpl extends CameraImpl {
     private Object imageAnalysis;
     private View previewView;
     private final AtomicBoolean listenerBusy = new AtomicBoolean();
+    /**
+     * The NV21 array of the last frame, handed back to the converter for the
+     * next one. Only touched while listenerBusy is held, which is one frame
+     * at a time. CameraFrame documents its arrays as valid only during
+     * onFrame, which is what makes handing the same one out again legal.
+     */
+    private byte[] nv21Buffer;
     private volatile FrameListener frameListener;
     private volatile FrameFormat frameFormat = FrameFormat.JPEG;
     private volatile long frameIntervalNanos;
@@ -232,10 +239,7 @@ public class AndroidCameraImpl extends CameraImpl {
             Object iaBuilder = clsImageAnalysisBuilder.getConstructor().newInstance();
             clsImageAnalysisBuilder.getMethod("setTargetResolution",
                     Class.forName("android.util.Size"))
-                    .invoke(iaBuilder,
-                            new android.util.Size(
-                                    options.getPreviewWidth() > 0 ? options.getPreviewWidth() : 640,
-                                    options.getPreviewHeight() > 0 ? options.getPreviewHeight() : 480));
+                    .invoke(iaBuilder, analysisTargetSize(options));
             // STRATEGY_KEEP_ONLY_LATEST = 0 in CameraX
             try {
                 clsImageAnalysisBuilder.getMethod("setBackpressureStrategy", int.class)
@@ -471,7 +475,10 @@ public class AndroidCameraImpl extends CameraImpl {
                 Image img = (Image) imageProxy.getClass().getMethod("getImage").invoke(imageProxy);
                 Object imageInfo = imageProxy.getClass().getMethod("getImageInfo").invoke(imageProxy);
                 int rotation = (Integer) imageInfo.getClass().getMethod("getRotationDegrees").invoke(imageInfo);
-                frame = img == null ? null : createFrame(img, rotation, now, frameFormat);
+                frame = img == null ? null : createFrame(img, rotation, now, frameFormat, nv21Buffer);
+                if (frame != null && frame.getRawBytes() != null) {
+                    nv21Buffer = frame.getRawBytes();
+                }
             } catch (Throwable t) {
                 Log.w(TAG, "Frame conversion failed: " + t.getMessage());
                 return;
@@ -486,6 +493,46 @@ public class AndroidCameraImpl extends CameraImpl {
         }
     }
 
+    /**
+     * The resolution frames are analysed at when the session names none.
+     *
+     * A session that asks for NV21 frames -- every Vision scanner -- used to
+     * get 640x480, which is too few pixels per module for a dense code such
+     * as a PDF417: it read on a phone with a sharp lens and failed on others.
+     * It now gets 1440x1080. That is 4:3 on purpose: the Preview use case is
+     * 4:3 by default, so what is analysed stays exactly what is shown and a
+     * rectangle a detector reports still maps onto the preview. 1080p would
+     * crop the analysed field to 16:9 for no more pixels across a code that
+     * fills the short side. This is a request, not a guarantee: CameraX picks
+     * the nearest size the device supports for the three use cases bound
+     * together, so a limited camera answers with less.
+     *
+     * Every other session keeps 640x480: JPEG, and RGBA8888, which this port
+     * answers with JPEG. Each of their frames is compressed on the analysis
+     * thread whether or not anyone reads it closely.
+     *
+     * CameraX reads the size in the display's current rotation, not the
+     * sensor's, so the default is turned to match. The display is asked, not
+     * the window: in split screen a window can be wider than tall on a
+     * display that is portrait. A size the application asked for is passed
+     * through as it always was.
+     */
+    private android.util.Size analysisTargetSize(CameraSessionOptions options) {
+        boolean portrait = false;
+        try {
+            android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+            activity.getWindowManager().getDefaultDisplay().getRealMetrics(metrics);
+            portrait = metrics.heightPixels > metrics.widthPixels;
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not read the display orientation: " + t);
+        }
+        int[] size = AndroidCameraFrameConverter.analysisSize(
+                options.getPreviewWidth(), options.getPreviewHeight(),
+                options.getFrameFormat() == FrameFormat.NV21,
+                portrait);
+        return new android.util.Size(size[0], size[1]);
+    }
+
     private static void closeImageProxy(Object imageProxy) {
         try {
             imageProxy.getClass().getMethod("close").invoke(imageProxy);
@@ -493,7 +540,7 @@ public class AndroidCameraImpl extends CameraImpl {
     }
 
     private static CameraFrame createFrame(Image image, int rotation, long timestamp,
-                                           FrameFormat requested) {
+                                           FrameFormat requested, byte[] reuse) {
         final int w = image.getWidth();
         final int h = image.getHeight();
         if (image.getFormat() == ImageFormat.JPEG) {
@@ -509,7 +556,8 @@ public class AndroidCameraImpl extends CameraImpl {
         final byte[] nv21 = AndroidCameraFrameConverter.toNV21(w, h,
                 planes[0].getBuffer(), planes[0].getRowStride(), planes[0].getPixelStride(),
                 planes[1].getBuffer(), planes[1].getRowStride(), planes[1].getPixelStride(),
-                planes[2].getBuffer(), planes[2].getRowStride(), planes[2].getPixelStride());
+                planes[2].getBuffer(), planes[2].getRowStride(), planes[2].getPixelStride(),
+                reuse);
         CameraFrame.JpegEncoder encoder = new CameraFrame.JpegEncoder() {
             public byte[] encode() {
                 YuvImage yuv = new YuvImage(nv21, ImageFormat.NV21, w, h, null);
