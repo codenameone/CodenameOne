@@ -1,6 +1,6 @@
 == Commerce
 
-Commerce is an optional service that validates in-app purchases and subscriptions server-side and gives your app a single, store-agnostic question to ask: _does this user have this entitlement right now?_ It answers that question for a customer on every platform at once, so a subscription bought on an iPhone unlocks the same account on Android, on the desktop and on the web. On top of entitlements it adds offerings you configure remotely, paywalls and a customer center you design in the console, targeting and experiments, lifecycle webhooks, integrations and a revenue console.
+Commerce is an optional service that validates in-app purchases and subscriptions server-side and gives your app a single, store-agnostic question to ask: _does this user have this entitlement right now?_ It answers that question for a customer on every platform at once, so a subscription bought on an iPhone unlocks the same account on Android, on the desktop and on the web. On top of entitlements it adds offerings you configure remotely, paywalls and a customer center you design in the console, targeting and experiments, lifecycle webhooks, integrations and revenue reports.
 
 Commerce wraps the `Purchase` API (see the <<Monetization,monetization chapter>>) and doesn't replace it. Purchases still go through the platform store, and code that talks to `Purchase` directly keeps working unchanged. When the service can't answer -- commerce is switched off in the build, the device is offline, or the account is over its plan -- the app falls back to the store's own receipts, so a paying user keeps access.
 
@@ -10,7 +10,7 @@ Codename One doesn't process payments and never touches your money. The stores, 
 
 Every cloud build is ready to use the service: there is nothing to add to the build. Three steps take you from nothing to a working paywall.
 
-. In the console, open *Commerce*, create an entitlement such as `pro`, and attach your store products to it. Then create an offering with a package for each product you want to sell.
+. In the console, open *Commerce*. On the *Products* page, create an entitlement such as `pro` and attach your store products to it. Then, on the *Offerings* page, create an offering with a package for each product you want to sell.
 . Install a receipt store in your `init` method, as the next section shows.
 . Check the entitlement, and show the paywall when the customer doesn't have it:
 
@@ -32,7 +32,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 ==== Mapping products to entitlements
 
-The *Products & Entitlements* page of the console holds the mapping. Each row names a store, a product id in that store and the entitlement the product grants. One entitlement usually has several products: a monthly and an annual subscription in each store, and perhaps a lifetime purchase. Changing the entitlement of a product moves the product's existing grants with it, so customers who already bought it follow the new mapping.
+The *Products* page of the console holds the mapping. Each row names a store, a product id in that store and the entitlement the product grants. One entitlement usually has several products: a monthly and an annual subscription in each store, and perhaps a lifetime purchase. Changing the entitlement of a product moves the product's existing grants with it, so customers who already bought it follow the new mapping.
 
 An entitlement is active when *any* of its granting products is active. A promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single rule -- the latest expiry over the active grants, evaluated against the service's clock -- so a device clock set back can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access by itself.
 
@@ -148,7 +148,7 @@ Purchases made under the anonymous id always move to the account. The original a
 
 ==== Transfer policies
 
-When a signed-in user logs in to an account while the device's purchases already belong to _another_ known account, the transfer policy of the app decides who keeps them. Set it on the *Commerce* settings page of the console:
+When a signed-in user logs in to an account while the device's purchases already belong to _another_ known account, the transfer policy of the app decides who keeps them. Set it on the *App settings* page of the console:
 
 [cols="2,5"]
 |===
@@ -228,7 +228,7 @@ Targeting and experiments decide which offering `getCurrent()` returns for a giv
 
 ==== Targeting rules
 
-A targeting rule on the *Offerings* page names an offering and the conditions under which a customer gets it. A rule can match on:
+A targeting rule on the *Targeting* page names an offering and the conditions under which a customer gets it. A rule can match on:
 
 - *Country* -- one or more store countries.
 - *Platform* -- the platform the app is running on.
@@ -251,7 +251,7 @@ The app can read which variant it was given, for example to tag its own analytic
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-experiment,indent=0]
 ----
 
-The results page reports, for each variant, the number of customers who saw a paywall of its offering, the number who went on to buy, and the conversion rate between the two. The counts come from the paywall events described in the next section, so an experiment needs the built-in paywall or your own `logEvent` calls to produce results.
+The *Experiments* page reports, for each variant, the number of customers who saw a paywall of its offering, the number who went on to buy, and the conversion rate between the two. The counts come from the paywall events described in the next section, so an experiment needs the built-in paywall or your own `logEvent` calls to produce results.
 
 === Paywalls
 
@@ -259,7 +259,7 @@ A paywall is the screen that sells an offering. You design it in the console as 
 
 ==== Showing a paywall
 
-`Paywall.show` opens the paywall of an offering in a form of its own, over the current form. Closing the paywall or going back returns to the form that was showing. Call it on the EDT:
+`Paywall.show` opens the paywall of an offering in a form of its own, over the current form. Closing the paywall or going back returns to the form that was showing. So does a purchase or a restore that completes: the paywall returns to that form by itself and then tells the listener, so `purchaseCompleted` is the place to unlock the feature or show a form of your own. Call `Paywall.show` on the EDT:
 
 [source,java]
 ----
@@ -276,23 +276,23 @@ Every listener method is called on the EDT:
 |The customer pressed the purchase button and the store was asked to sell the package.
 
 |`purchaseCompleted(CustomerInfo)`
-|The service confirmed the purchase. The customer now owns the product of the package.
+|The service confirmed the purchase. The customer now owns the product of the package. A paywall opened with `Paywall.show` has already returned to the previous form.
 
 |`purchaseCancelled()`
 |The paywall was closed after a purchase was started and before the service confirmed it.
 
 |`restoreCompleted(CustomerInfo)`
-|The customer information changed after the customer asked to restore purchases.
+|The customer information changed after the customer asked to restore purchases. A paywall opened with `Paywall.show` has already returned to the previous form.
 
 |`closed()`
-|The paywall was closed.
+|The paywall was closed: by the customer, or by itself after a completed purchase or restore.
 |===
 
 ==== The built-in paywall
 
 An offering with no paywall document is shown with the built-in one: a close button, a title, the packages of the offering as a list, a purchase button, a restore button and a footer. It names no colors, so your theme decides them all. `Paywall.createDefault(offering)` returns that document as a map you can change before you hand it to a `PaywallView`.
 
-`PaywallView` is the component behind `Paywall.show`. Use it directly to embed a paywall in a form of your own, and tell it what closing means there:
+`PaywallView` is the component behind `Paywall.show`. Use it directly to embed a paywall in a form of your own, and tell it what closing means there. An embedded view never navigates by itself: after a completed purchase or restore it stays where it is and the listener decides what your form shows next.
 
 [source,java]
 ----
@@ -475,7 +475,7 @@ The customer center is a ready-made form where a customer sees their active subs
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-customer-center,indent=0]
 ----
 
-The *Customer Center* page of the console decides which paths the form offers and in what order:
+The *Customer center* page of the console decides which paths the form offers and in what order:
 
 [cols="1,5"]
 |===
@@ -520,7 +520,7 @@ It may be called on the EDT. It returns `false`, and buys nothing, when no signa
 
 ==== Attributes
 
-Attributes are name and value pairs you attach to a customer. Targeting rules read them, the console shows them on the customer's page, and integrations use some of them to identify the customer in another system.
+Attributes are name and value pairs you attach to a customer. Targeting rules read them, the console shows them on the *Customers* page, and integrations use some of them to identify the customer in another system.
 
 [source,java]
 ----
@@ -546,7 +546,7 @@ Spending is a server-side operation, so that a modified app can't grant itself c
 
 ==== Apple App Store, on iOS and on the Mac
 
-iOS purchases work with no setup beyond the receipt store. A native Mac build sells through the Mac App Store with the same code, and the service validates its receipts with the same Apple credentials. If the Mac app's bundle id differs from the package name of the project, enter it as the Mac bundle id in the app's commerce settings so that its receipts are accepted.
+iOS purchases work with no setup beyond the receipt store. A native Mac build sells through the Mac App Store with the same code, and the service validates its receipts with the same Apple credentials. If the Mac app's bundle id differs from the package name of the project, enter it as the Mac bundle id on the *App settings* page of the console so that its receipts are accepted.
 
 Point App Store Server Notifications V2 at `https://cloud.codenameone.com/api/v2/commerce/notifications/apple` in App Store Connect, so that renewals, cancellations, refunds and billing problems reach the service when they happen.
 
@@ -565,7 +565,7 @@ include::../demos/common/src/main/snippets/developer-guide/commerce.properties[t
 
 The build then uses the Amazon Appstore SDK instead of the Play Billing Library, declares the receiver Amazon's client answers through, and leaves out the `com.android.vending.BILLING` permission, which the Amazon Appstore doesn't accept. The Google Play settings `android.licenseKey` and `android.billingclient.version` aren't used. Your code doesn't change: `Purchase` and `CommerceManager` behave the same, and receipts carry the store code `Receipt.STORE_CODE_AMAZON`.
 
-For validation, store your Amazon shared secret as `commerce.amazon.sharedSecret`. The Amazon page of the console shows the notification address to register with Amazon. It ends in a token that identifies your app, so copy it as shown.
+For validation, enter your Amazon shared secret (`commerce.amazon.sharedSecret`) on the *Stores* page of the console. The same page shows the notification address to register with Amazon. It ends in a token that identifies your app, so copy it as shown.
 
 ==== Web billing with Stripe and Paddle
 
@@ -573,9 +573,10 @@ On platforms with no store -- the browser and the desktop -- the service sells t
 
 To set it up:
 
-. Store the credentials of your account in the console: `commerce.stripe.secretKey` and `commerce.stripe.webhookSecret` for Stripe, or `commerce.paddle.apiKey` and `commerce.paddle.notificationSecret` for Paddle.
-. Register the notification address the console shows for your app as a webhook in the Stripe or Paddle dashboard. It ends in a token that identifies your app.
+. Enter the credentials of your account on the *Stores* page of the console: `commerce.stripe.secretKey` and `commerce.stripe.webhookSecret` for Stripe, or `commerce.paddle.apiKey` and `commerce.paddle.notificationSecret` for Paddle.
+. Register the notification address the *Stores* page shows for your app as a webhook in the Stripe or Paddle dashboard. It ends in a token that identifies your app.
 . On each package that should be sold on the web, enter its Stripe price id or its Paddle price id.
+. On the *App settings* page, enter the web URLs of your app that the checkout returns the customer to.
 
 In the app, `purchase(CommercePackage)` does the right thing on every platform. Where the platform has a store it sells the store product. Where it has none, and the package has a web price, it opens the hosted checkout in the browser. `isWebPurchase` tells you which of the two will happen, and `purchaseOnWeb` opens the checkout explicitly:
 
@@ -619,7 +620,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 [[commerce-store-credentials]]
 ==== Store credentials
 
-By default the service validates the store-signed receipt the device presents. For Apple that's enough to gate features and it works with no setup. For _server-authoritative_ validation, where the service calls the stores' own server APIs to confirm the real subscription state, provide your credentials on the *Secrets* page of the console:
+By default the service validates the store-signed receipt the device presents. For Apple that's enough to gate features and it works with no setup. For _server-authoritative_ validation, where the service calls the stores' own server APIs to confirm the real subscription state, provide your credentials in the console. Apple and Google credentials are entered on the *Setup* page; Amazon, Stripe and Paddle credentials on the *Stores* page:
 
 [cols="2,3,4"]
 |===
@@ -762,7 +763,7 @@ The attribution services identify a device by their own id, which only their SDK
 
 ==== The REST API
 
-Your backend can read and change customers through a REST API. Create a secret key on the *API Keys* page. A key starts with `sk_`, belongs to one app, and is shown once when you create it, so store it then. Send it as a bearer token to `https://cloud.codenameone.com/api/v2/commerce/v1`:
+Your backend can read and change customers through a REST API. Create a secret key on the *API keys* page. A key starts with `sk_`, belongs to one app, and is shown once when you create it, so store it then. Send it as a bearer token to `https://cloud.codenameone.com/api/v2/commerce/v1`:
 
 [source,bash]
 ----
@@ -820,7 +821,7 @@ An unknown customer answers `404`, and a request the service can't read answers 
 
 ==== Granting entitlements from the console
 
-The customer page of the console has the same grant and revoke controls as the REST API. Pick an entitlement, optionally an expiry, and grant it. This is the way to give a customer access as a goodwill gesture, to unlock an account for a reviewer, or to give your team the paid features. A granted entitlement has the provenance `PROMOTIONAL`, is excluded from revenue, and reaches the app on its next `refresh()`.
+The *Customers* page of the console has the same grant and revoke controls as the REST API. Pick an entitlement, optionally an expiry, and grant it. This is the way to give a customer access as a goodwill gesture, to unlock an account for a reviewer, or to give your team the paid features. A granted entitlement has the provenance `PROMOTIONAL`, is excluded from revenue, and reaches the app on its next `refresh()`.
 
 ==== Export and import
 
@@ -839,7 +840,7 @@ The *Export* page downloads two CSV files on demand, and can also deliver both e
 
 For a scheduled export, choose the destination, the bucket and a prefix, and for S3 the region. S3 takes an access key id and a secret access key, and Google Cloud Storage takes a service account key. The files are named `transactions-<day>.csv` and `subscribers-<day>.csv` under the prefix.
 
-Import brings existing customers into the service, for example when you add Commerce to an app that already has subscribers. Upload a CSV file on the *Import* page, or post it to `/receipts/import`. The first line must be this header:
+Import brings existing customers into the service, for example when you add Commerce to an app that already has subscribers. Upload a CSV file in the console, or post it to `/receipts/import`. The first line must be this header:
 
 ----
 app_user_id,store,product_id,receipt
@@ -914,7 +915,7 @@ The build key is stamped by the build server, and the simulator has none. Until 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-simulator,indent=0]
 ----
 
-With that in place the simulator fetches offerings, paywalls and the customer center from the service, and the purchases you make in the simulated store are sent for validation as `Receipt.STORE_CODE_SIMULATOR` receipts. You can also grant the test customer an entitlement from the console and watch `refresh()` pick it up. `getAppUserId()` returns the id to look for.
+With that in place the simulator fetches offerings, paywalls and the customer center from the service, and the purchases you make in the simulated store are sent for validation as `Receipt.STORE_CODE_SIMULATOR` receipts. You can also grant the test customer an entitlement on the *Customers* page of the console and watch `refresh()` pick it up. `getAppUserId()` returns the id to look for.
 
 === Privacy
 
@@ -922,9 +923,9 @@ Commerce stores entitlement state and transaction metadata (store, product id, e
 
 === Setup checklist
 
-. Map your store products to entitlements in the console, and create an offering with a package for each product you sell.
+. Map your store products to entitlements on the *Products* page of the console, and create an offering with a package for each product you sell on the *Offerings* page.
 . In the app, install a receipt store, call `refresh()` off the EDT on start, and gate features with `isEntitled(...)`.
 . Show the offering with `Paywall.show(...)`, and add `CustomerCenter.show()` to your settings screen.
 . Call `logIn(...)` when the user signs in to your account system and `logOut()` when they sign out.
-. Point the stores' server notifications at the service, and store your store credentials on the *Secrets* page.
+. Point the stores' server notifications at the service, and enter your store credentials on the *Setup* and *Stores* pages.
 . Optionally, set a webhook URL and secret to receive lifecycle events on your backend, and enable the integrations you use.
