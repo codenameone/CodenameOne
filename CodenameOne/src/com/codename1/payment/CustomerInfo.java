@@ -41,6 +41,7 @@ public final class CustomerInfo {
     private final Map<String, EntitlementInfo> entitlements = new HashMap<String, EntitlementInfo>();
     private final List<String> activeSubscriptions = new ArrayList<String>();
     private final Map<String, String> attributes = new HashMap<String, String>();
+    private final Map<String, Long> currencies = new HashMap<String, Long>();
 
     /// Builds a customer from the parsed JSON object of the service's
     /// customer payload.
@@ -80,6 +81,15 @@ public final class CustomerInfo {
                 Map.Entry e = (Map.Entry) o;
                 if (e.getKey() != null && e.getValue() != null) {
                     attributes.put(String.valueOf(e.getKey()), String.valueOf(e.getValue()));
+                }
+            }
+        }
+        Object cur = m.get("currencies");
+        if (cur instanceof Map) {
+            for (Object o : ((Map) cur).entrySet()) {
+                Map.Entry e = (Map.Entry) o;
+                if (e.getKey() != null) {
+                    currencies.put(String.valueOf(e.getKey()), Long.valueOf(asLong(e.getValue())));
                 }
             }
         }
@@ -169,6 +179,32 @@ public final class CustomerInfo {
         return new HashMap<String, String>(attributes);
     }
 
+    /// The customer's balance of a virtual currency.
+    ///
+    /// #### Parameters
+    ///
+    /// - `code`: the code of the currency, as defined in the console
+    ///
+    /// #### Returns
+    ///
+    /// the balance, or 0 when the customer holds none of that currency
+    public long getCurrencyBalance(String code) {
+        if (code == null) {
+            return 0;
+        }
+        Long balance = currencies.get(code);
+        return balance == null ? 0 : balance.longValue();
+    }
+
+    /// The customer's virtual currency balances, by currency code.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change
+    public Map<String, Long> getCurrencies() {
+        return new HashMap<String, Long>(currencies);
+    }
+
     /// This customer as the JSON object it was built from, for storage.
     /// Passing the result to the constructor gives an equal customer.
     ///
@@ -188,6 +224,7 @@ public final class CustomerInfo {
         out.put("entitlements", ents);
         out.put("activeSubscriptions", new ArrayList<String>(activeSubscriptions));
         out.put("attributes", new HashMap<String, Object>(attributes));
+        out.put("currencies", new HashMap<String, Object>(currencies));
         return out;
     }
 

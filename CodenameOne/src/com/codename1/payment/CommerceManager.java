@@ -1,10 +1,24 @@
 /*
- * Codename One - cross-platform commerce (subscription/IAP validation) SDK.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
  *
- * Optional client facade over the existing Purchase API that adds cloud-side
- * receipt validation and store-agnostic entitlement checks backed by the
- * Codename One Commerce service. The framework itself is free; this talks to
- * the paid cloud service when the app is built with it enabled.
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.payment;
 
@@ -86,6 +100,10 @@ public final class CommerceManager {
     // user id.
     private static final String STORAGE_CUSTOMER_PREFIX = "CN1CommerceCustomer_";
 
+    // Storage entry holding the last accepted offerings payload, one per app
+    // user id and placement.
+    private static final String STORAGE_OFFERINGS_PREFIX = "CN1CommerceOfferings_";
+
     private static final String HEX = "0123456789abcdef";
 
     // Seeded with the time, and with an object's identity so two installs
@@ -97,6 +115,12 @@ public final class CommerceManager {
 
     private final Map entitlementCache = new HashMap();
     private final EventDispatcher customerInfoListeners = new EventDispatcher();
+    // Store products by SKU, as the store last listed them.
+    private final Map productCache = new HashMap();
+    // Paywall events not sent yet, each a JSON object as text. Touched on the
+    // EDT only.
+    private final List pendingEvents = new ArrayList();
+    private boolean eventFlushScheduled;
     private boolean degraded;
     private String appUserId;
 
@@ -405,6 +429,311 @@ public final class CommerceManager {
         return out;
     }
 
+    // ---- offerings ----------------------------------------------------------------
+
+    /// The offerings the cloud configured for this customer. Same as
+    /// [#getOfferings(String)] with no placement.
+    ///
+    /// #### Returns
+    ///
+    /// the offerings; never null, and empty when there is nothing to answer
+    /// from
+    public Offerings getOfferings() {
+        return getOfferings(null);
+    }
+
+    /// The offerings the cloud configured for this customer at a placement,
+    /// a named place in the application (`"onboarding"`, `"settings"`) that
+    /// the console can give an offering of its own.
+    ///
+    /// Blocking network call -- invoke off the EDT. The last accepted answer
+    /// is stored on the device and is what this returns when the cloud
+    /// cannot be reached. After a fresh answer the store is asked for the
+    /// products of the packages, when the platform lists products, and each
+    /// is attached to its [CommercePackage].
+    ///
+    /// #### Parameters
+    ///
+    /// - `placement`: the placement, or null for the default offerings
+    ///
+    /// #### Returns
+    ///
+    /// the offerings; never null, and empty when the cloud is not enabled in
+    /// this build or there is nothing to answer from
+    public Offerings getOfferings(String placement) {
+        if (!isCloudEnabled()) {
+            return new Offerings(null);
+        }
+        String key = storageKey(STORAGE_OFFERINGS_PREFIX,
+                getAppUserId() + "/" + (placement == null ? "" : placement));
+        Display d = Display.getInstance();
+        StringBuilder extra = new StringBuilder();
+        appendField(extra, "platform", d.getPlatformName());
+        String language = null;
+        String country = null;
+        try {
+            language = d.getLocalizationManager().getLanguage();
+            country = d.getLocalizationManager().getLocale();
+        } catch (Throwable t) {
+            // a port with no localization answers the default offerings
+        }
+        extra.append(',');
+        appendField(extra, "country", country);
+        extra.append(',');
+        appendField(extra, "appVersion", d.getProperty("AppVersion", null));
+        extra.append(',');
+        String locale = language;
+        if (language != null && country != null && country.length() > 0) {
+            locale = language + "_" + country;
+        }
+        appendField(extra, "locale", locale);
+        if (placement != null) {
+            extra.append(',');
+            appendField(extra, "placement", placement);
+        }
+        Map payload = postSigned("/offerings", extra.toString());
+        Offerings result;
+        if (payload != null && accepted(payload)) {
+            result = new Offerings(payload);
+            try {
+                Storage.getInstance().writeObject(key, JSONParser.mapToJson(result.toMap()));
+            } catch (Throwable t) {
+                Log.p("CommerceManager: could not store the offerings: " + t);
+            }
+            fetchProducts(result);
+        } else {
+            result = new Offerings(null);
+            try {
+                Object stored = Storage.getInstance().readObject(key);
+                if (stored instanceof String && ((String) stored).length() > 0) {
+                    result = new Offerings(JSONParser.parseJSON((String) stored));
+                }
+            } catch (Throwable t) {
+                Log.p("CommerceManager: could not read the stored offerings: " + t);
+            }
+        }
+        attachProducts(result);
+        return result;
+    }
+
+    /// Asks the store for the products of every package, when the platform
+    /// lists products. A store that fails to answer leaves the packages
+    /// without a product, and they are then shown with their own text.
+    private void fetchProducts(Offerings offerings) {
+        List skus = new ArrayList();
+        for (Offering o : offerings.getAll()) {
+            for (CommercePackage p : o.getPackages()) {
+                if (p.getProductId() != null && !skus.contains(p.getProductId())) {
+                    skus.add(p.getProductId());
+                }
+            }
+        }
+        if (skus.isEmpty()) {
+            return;
+        }
+        try {
+            Purchase store = Purchase.getInAppPurchase();
+            if (store == null || !store.isItemListingSupported()) {
+                return;
+            }
+            String[] arr = new String[skus.size()];
+            for (int i = 0; i < arr.length; i++) {
+                arr[i] = String.valueOf(skus.get(i));
+            }
+            // A store that answers null lands in the catch below, like any
+            // other store failure.
+            for (Product p : store.getProducts(arr)) {
+                if (p != null && p.getSku() != null) {
+                    productCache.put(p.getSku(), p);
+                }
+            }
+        } catch (Throwable t) {
+            Log.p("CommerceManager: the store did not list the products: " + t);
+        }
+    }
+
+    private void attachProducts(Offerings offerings) {
+        for (Offering o : offerings.getAll()) {
+            for (CommercePackage p : o.getPackages()) {
+                Object product = productCache.get(p.getProductId());
+                if (product instanceof Product) {
+                    p.setProduct((Product) product);
+                }
+            }
+        }
+    }
+
+    /// Buys a package through the platform store: a subscription for every
+    /// package that [is one][CommercePackage#isSubscription()], a one time
+    /// purchase otherwise. The outcome arrives the way every store purchase
+    /// does, and through the customer information listeners once the cloud
+    /// validated it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package to buy; null or a package with no product does
+    ///   nothing
+    public void purchase(CommercePackage pkg) {
+        if (pkg == null || pkg.getProductId() == null) {
+            return;
+        }
+        if (pkg.isSubscription()) {
+            subscribe(pkg.getProductId());
+        } else {
+            purchase(pkg.getProductId());
+        }
+    }
+
+    /// The page where the customer manages the subscription with the store,
+    /// from the last [customer information][#getCustomerInfo()], or null
+    /// when there is none.
+    public String getManagementUrl() {
+        return getCustomerInfo().getManagementUrl();
+    }
+
+    /// The customer center the console configured for this application, as
+    /// parsed JSON: the `paths` to offer, the support address and the cancel
+    /// reasons. [com.codename1.payment.center.CustomerCenter] presents it.
+    ///
+    /// Blocking network call -- invoke off the EDT.
+    ///
+    /// #### Returns
+    ///
+    /// the configuration, or null when the cloud is not enabled in this
+    /// build, could not be reached or refused to answer
+    public Map getCustomerCenterConfiguration() {
+        if (!isCloudEnabled()) {
+            return null;
+        }
+        Map payload = postSigned("/customer-center", null);
+        if (payload == null || !asBoolean(payload.get("accepted"))) {
+            return null;
+        }
+        return payload;
+    }
+
+    // ---- events --------------------------------------------------------------------
+
+    /// Reports a paywall event to the cloud, where the console charts the
+    /// funnel of each offering and paywall. Same as
+    /// [#logEvent(String, String, String, String, String)] with no reason.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event, such as `IMPRESSION`, `PURCHASE_START`,
+    ///   `PURCHASE` or `CLOSE`
+    ///
+    /// - `offeringId`: the offering shown, or null
+    ///
+    /// - `paywallId`: the paywall shown, or null
+    ///
+    /// - `packageId`: the package concerned, or null
+    public void logEvent(String type, String offeringId, String paywallId, String packageId) {
+        logEvent(type, offeringId, paywallId, packageId, null);
+    }
+
+    /// Reports an event to the cloud. The call returns at once on any
+    /// thread: events are collected and sent together from a background
+    /// thread, and an event that cannot be sent is dropped. Reporting never
+    /// delays or fails a purchase. Safe no-op when the cloud is not enabled
+    /// in this build.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event, such as `IMPRESSION` or `CANCEL_REASON`
+    ///
+    /// - `offeringId`: the offering shown, or null
+    ///
+    /// - `paywallId`: the paywall shown, or null
+    ///
+    /// - `packageId`: the package concerned, or null
+    ///
+    /// - `reason`: the id of the reason chosen, for a `CANCEL_REASON` event,
+    ///   or null
+    public void logEvent(String type, String offeringId, String paywallId, String packageId, String reason) {
+        if (type == null || !isCloudEnabled()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        appendField(sb, "type", type);
+        sb.append(',');
+        appendField(sb, "offeringId", offeringId);
+        sb.append(',');
+        appendField(sb, "paywallId", paywallId);
+        sb.append(',');
+        appendField(sb, "packageId", packageId);
+        if (reason != null) {
+            sb.append(',');
+            appendField(sb, "reason", reason);
+        }
+        sb.append(",\"time\":").append(System.currentTimeMillis()).append('}');
+        final String event = sb.toString();
+        // The queue belongs to the EDT, so no two threads ever touch it.
+        if (Display.getInstance().isEdt()) {
+            queueEvent(event);
+        } else {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    queueEvent(event);
+                }
+            });
+        }
+    }
+
+    private void queueEvent(String event) {
+        pendingEvents.add(event);
+        if (eventFlushScheduled) {
+            return;
+        }
+        eventFlushScheduled = true;
+        // Sent on the next EDT cycle, so the events of one user action --
+        // a purchase start right after an impression -- travel together.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                final String body = drainEvents();
+                if (body == null) {
+                    return;
+                }
+                Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            quiet(Rest.post(endpoint() + "/events")).body(body).getAsString();
+                        } catch (Throwable t) {
+                            // analytics only: dropped
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    /// Empties the event queue into the body of one `/events` request.
+    ///
+    /// #### Returns
+    ///
+    /// the request body, or null when nothing is waiting
+    String drainEvents() {
+        eventFlushScheduled = false;
+        if (pendingEvents.isEmpty() || endpoint() == null) {
+            pendingEvents.clear();
+            return null;
+        }
+        StringBuilder events = new StringBuilder("\"events\":[");
+        for (int i = 0; i < pendingEvents.size(); i++) {
+            if (i > 0) {
+                events.append(',');
+            }
+            events.append(pendingEvents.get(i));
+        }
+        events.append(']');
+        pendingEvents.clear();
+        return baseRequest(newNonce(), events.toString());
+    }
+
     // ---- cloud refresh -------------------------------------------------------
 
     /// Validates the device's current receipts with the cloud, then asks the
@@ -480,7 +809,7 @@ public final class CommerceManager {
         // said before it is superseded.
         entitlementCache.clear();
         try {
-            Storage.getInstance().writeObject(storageKey(getAppUserId()), JSONParser.mapToJson(next.toMap()));
+            Storage.getInstance().writeObject(storageKey(STORAGE_CUSTOMER_PREFIX, getAppUserId()), JSONParser.mapToJson(next.toMap()));
         } catch (Throwable t) {
             Log.p("CommerceManager: could not store the customer: " + t);
         }
@@ -509,7 +838,7 @@ public final class CommerceManager {
             entitlementCache.clear();
         }
         try {
-            Object stored = Storage.getInstance().readObject(storageKey(id));
+            Object stored = Storage.getInstance().readObject(storageKey(STORAGE_CUSTOMER_PREFIX, id));
             if (stored instanceof String && ((String) stored).length() > 0) {
                 customerInfo = new CustomerInfo(JSONParser.parseJSON((String) stored));
             }
@@ -520,7 +849,7 @@ public final class CommerceManager {
 
     private void deleteStoredCustomer(String id) {
         try {
-            Storage.getInstance().deleteStorageFile(storageKey(id));
+            Storage.getInstance().deleteStorageFile(storageKey(STORAGE_CUSTOMER_PREFIX, id));
         } catch (Throwable t) {
             Log.p("CommerceManager: could not delete the stored customer: " + t);
         }
@@ -529,8 +858,8 @@ public final class CommerceManager {
     /// A storage entry name for an app user id. The id is the application's
     /// and may hold characters a file name cannot, so those are replaced and
     /// the id's hash keeps two ids that then look alike apart.
-    private static String storageKey(String id) {
-        StringBuilder sb = new StringBuilder(STORAGE_CUSTOMER_PREFIX);
+    private static String storageKey(String prefix, String id) {
+        StringBuilder sb = new StringBuilder(prefix);
         for (int i = 0; i < id.length(); i++) {
             char c = id.charAt(i);
             boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
