@@ -86,6 +86,10 @@ public final class PyStr extends PyObject {
     private static final Count[] COUNTS = new Count[256];
     private static final Count[] LONG_COUNTS = new Count[64];
     private static final int LONG = 1024;
+    /// Strings up to this long are counted, never cached: a Latin-1 one --
+    /// nearly all of them -- answers from its storage flag, and any other is
+    /// one vector scan, cheaper than hashing its identity into a table.
+    private static final int SHORT = 256;
 
     private static int slot(String s, int size) {
         int h = System.identityHashCode(s);
@@ -100,7 +104,7 @@ public final class PyStr extends PyObject {
     /// not a pair; it is one char and one code point.
     static int surrogates(String s) {
         int len = s.length();
-        if (len <= 32) {
+        if (len <= SHORT) {
             // codePointCount counts a pair as one code point, as scan does, and
             // answers a Latin-1 string -- nearly every short one -- from its
             // storage without reading a char, on ParparVM and on a JDK alike.
@@ -122,7 +126,7 @@ public final class PyStr extends PyObject {
     /// saved and a Latin-1 string answers without one.
     static int cachedSurrogates(String s) {
         int len = s.length();
-        if (len <= 32) {
+        if (len <= SHORT) {
             return -1;
         }
         Count[] table = len >= LONG ? LONG_COUNTS : COUNTS;
@@ -134,7 +138,7 @@ public final class PyStr extends PyObject {
     /// decoder), so `len` and indexing do not scan for it.
     static void knownSurrogates(String s, int n) {
         int len = s.length();
-        if (len > 32) {
+        if (len > SHORT) {
             Count[] table = len >= LONG ? LONG_COUNTS : COUNTS;
             table[slot(s, table.length)] = new Count(s, n);
         }

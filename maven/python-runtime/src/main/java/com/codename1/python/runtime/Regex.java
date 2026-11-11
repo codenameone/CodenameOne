@@ -704,30 +704,42 @@ final class Regex {
         int[] a = NO_INTS;
         int n;
 
-        void push(int v) {
-            if (n == a.length) {
-                int[] b = new int[n == 0 ? 24 : n * 2];
+        /// The array with room for `need` entries in all; grown when short.
+        int[] room(int need) {
+            int[] b = a;
+            if (need > b.length) {
+                int cap = b.length == 0 ? 24 : b.length * 2;
+                b = new int[cap < need ? need : cap];
                 System.arraycopy(a, 0, b, 0, n);
                 a = b;
             }
-            a[n++] = v;
+            return b;
         }
     }
 
     private static final int FRAME = 6;
 
+    // A choice frame is six ints and a trail entry two, written at once after
+    // one capacity check: one call per push made these the engine's hottest
+    // lines, several per character a repeat gives back.
     private static void choice(Ints st, int kind, int x, int y, int z, int w, int v) {
-        st.push(kind);
-        st.push(x);
-        st.push(y);
-        st.push(z);
-        st.push(w);
-        st.push(v);
+        int n = st.n;
+        int[] a = st.room(n + FRAME);
+        a[n] = kind;
+        a[n + 1] = x;
+        a[n + 2] = y;
+        a[n + 3] = z;
+        a[n + 4] = w;
+        a[n + 5] = v;
+        st.n = n + FRAME;
     }
 
-    private static void log(Ints trail, int[] regs, int n) {
-        trail.push(n);
-        trail.push(regs[n]);
+    private static void log(Ints trail, int[] regs, int r) {
+        int n = trail.n;
+        int[] a = trail.room(n + 2);
+        a[n] = r;
+        a[n + 1] = regs[r];
+        trail.n = n + 2;
     }
 
     /// Runs `prog` from `start`; the end position, or -1.
