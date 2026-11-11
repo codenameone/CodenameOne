@@ -39,8 +39,10 @@ jobs:
         os: [ubuntu-24.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     # macOS runners take ~37 s per generated download, and there are past
-    # thirty of them now: twenty minutes cancelled a run that was passing.
-    timeout-minutes: 40
+    # thirty of them now: twenty minutes cancelled a run that was passing, and
+    # then forty did -- passing runs finish in 35 to 39 on macOS, and the nightly
+    # was cancelled at the limit with nothing wrong.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
