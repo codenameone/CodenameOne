@@ -100,6 +100,8 @@ public class Calendar extends Container implements ActionSource {
     private long originalCurrentDay = -1;
     private boolean multipleSelectionEnabled = false;
     private String selectedDaysUIID = "CalendarMultipleDay";
+    private String todayUIID;
+    private boolean todayUIIDSet;
 
     /// Creates a new instance of Calendar set to the given date based on time
     /// since epoch (the Date convention)
@@ -771,6 +773,56 @@ public class Calendar extends Container implements ActionSource {
         this.selectedDaysUIID = uiid;
     }
 
+    /// The UIID today's cell is drawn with while it is not the selected day,
+    /// or null when today is drawn like any other day.
+    ///
+    /// Unless `setTodayUIID` was called this is the theme constant
+    /// `calendarTodayUIID`, which the modern native themes set to
+    /// `CalendarToday`. A theme without the constant marks nothing, so a
+    /// calendar in an existing application looks as it did.
+    ///
+    /// #### Returns
+    ///
+    /// the UIID of today's cell, or null
+    public String getTodayUIID() {
+        if (todayUIIDSet) {
+            return todayUIID;
+        }
+        return getUIManager().getThemeConstant("calendarTodayUIID", null);
+    }
+
+    /// Sets the UIID today's cell is drawn with while it is not the selected
+    /// day. A highlighted or multiply selected day keeps its own UIID.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the UIID, or null to draw today like any other day
+    public void setTodayUIID(String uiid) {
+        todayUIID = uiid;
+        todayUIIDSet = true;
+        // restyle the month that is showing, which need not be the selected
+        // day's
+        mv.setCurrentDay(mv.currentDay, true);
+    }
+
+    /// The UIID of a day of the shown month that is neither selected nor
+    /// highlighted.
+    private String plainDayUIID(long date) {
+        String today = getTodayUIID();
+        if (today == null || today.length() == 0) {
+            return "CalendarDay";
+        }
+        java.util.Calendar now = java.util.Calendar.getInstance(tmz);
+        java.util.Calendar day = java.util.Calendar.getInstance(tmz);
+        day.setTime(new Date(date));
+        if (now.get(java.util.Calendar.YEAR) == day.get(java.util.Calendar.YEAR)
+                && now.get(java.util.Calendar.MONTH) == day.get(java.util.Calendar.MONTH)
+                && now.get(java.util.Calendar.DAY_OF_MONTH) == day.get(java.util.Calendar.DAY_OF_MONTH)) {
+            return today;
+        }
+        return "CalendarDay";
+    }
+
     /// Highlights a date on the calendar using the supplied uiid. (Selected
     /// dates uiid takes precedence over highlighted dates uiid)
     ///
@@ -1142,7 +1194,7 @@ public class Calendar extends Container implements ActionSource {
                         setDayUIID(components[j], "CalendarSelectedDay");
                         selected = components[j];
                     } else {
-                        setDayUIID(components[j], "CalendarDay");
+                        setDayUIID(components[j], plainDayUIID(dates[j]));
                     }
 
                     for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
@@ -1321,7 +1373,7 @@ public class Calendar extends Container implements ActionSource {
                                 if (SELECTED_DAY == dates[iter]) {
                                     setDayUIID(components[iter], "CalendarSelectedDay");
                                 } else {
-                                    setDayUIID(components[iter], "CalendarDay");
+                                    setDayUIID(components[iter], plainDayUIID(dates[iter]));
                                 }
                                 if (!highlightGroup.isEmpty()) {
                                     for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
@@ -1339,7 +1391,14 @@ public class Calendar extends Container implements ActionSource {
                             }
                         } else {
                             if (selected != null) {
-                                setDayUIID(selected, "CalendarDay");
+                                String was = "CalendarDay";
+                                for (int k = 0; k < components.length; k++) {
+                                    if (components[k] == selected) { //NOPMD CompareObjectsWithEquals
+                                        was = plainDayUIID(dates[k]);
+                                        break;
+                                    }
+                                }
+                                setDayUIID(selected, was);
                                 java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
                                 cal.setTime(new Date(currentDay));
                                 cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(getDayText(selected).trim()));

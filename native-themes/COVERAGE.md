@@ -76,7 +76,8 @@ SwitchMorph (droplet stretch/squash).
 | UIActivityIndicatorView | InfiniteProgress | not started (UIID exists, untested) |
 | UIPageControl | Tabs page indicator | not started |
 | UIDatePicker (wheels) | Picker (date/time spinner) | partially themed (DateSpinner UIIDs), not in suite |
-| UIDatePicker (calendar) | Calendar | not started |
+| UIDatePicker (calendar) | Calendar | themed (`Calendar*` UIIDs, today marker through `calendarTodayUIID`), not in suite |
+| Calendar app day/week/month | Scheduler | themed (`Scheduler*` UIIDs), not in suite |
 | UIMenu / context menu | ActionSheet / Command menu | not started |
 | Action sheet (bottom) | Sheet / ActionSheet | not started |
 | Bottom sheet (detents) | Sheet | not started |
@@ -141,7 +142,8 @@ SwitchMorph (droplet stretch/squash).
 | Top app bar variants (center/medium/large) | Toolbar variants | not started |
 | Snackbar | ToastBar | not started |
 | BottomSheet | Sheet | not started |
-| DatePicker / TimePicker dialogs | Picker | not started |
+| DatePicker / TimePicker dialogs | Picker (`pickerStyle: material`), `MaterialDatePicker`, `MaterialTimePicker` | themed (`PickerMaterial*` UIIDs), lightweight, on by default; not in suite |
+| DatePicker month grid | Calendar | themed (`Calendar*` UIIDs, today marker through `calendarTodayUIID`), not in suite |
 | Badge | Tabs/Button badge | not started |
 | SearchBar / SearchView | Toolbar search mode | not started |
 | CircularProgressIndicator | InfiniteProgress | not started |

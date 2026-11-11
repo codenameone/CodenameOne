@@ -133,6 +133,11 @@ public class Picker extends Button {
     /// Flag to indicate that the picker should prefer lightweight components
     /// rather than native components.
     private boolean useLightweightPopup;
+    /// Whether the application chose lightweight or native itself. A theme
+    /// that asks for the Material style gets it on a platform whose default
+    /// is the native dialog, but never over an explicit
+    /// `setUseLightweightPopup(false)`.
+    private boolean lightweightPopupSet;
     private Runnable stopEditingCallback;
     private boolean suppressPaint;
     private final ArrayList<LightweightPopupButton> lightweightPopupButtons = new ArrayList<LightweightPopupButton>();
@@ -312,7 +317,8 @@ public class Picker extends Button {
                 // a desktop window: the dialog is a form of the main surface, which
                 // is the very thing the comment above keeps a window's picker off.
                 if (!inWindow && isMaterialType(type) && isMaterialStyle()
-                        && (useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type))) {
+                        && (useLightweightPopup || !lightweightPopupSet
+                        || !Display.getInstance().isNativePickerTypeSupported(type))) {
                     showMaterialDialog();
                     evt.consume();
                     return;
@@ -1041,9 +1047,12 @@ public class Picker extends Button {
 
     // ------------------------------------------------------ Material style
 
-    /// The theme constant that chooses what a lightweight date or time picker
-    /// looks like: `material` for a calendar and a clock face in a dialog,
-    /// anything else for wheels.
+    /// The theme constant that chooses what a date or time picker looks like:
+    /// `material` for a lightweight calendar and clock face in a dialog,
+    /// anything else for the platform's own picker or the wheels. The
+    /// constant alone is enough on a platform that defaults to its native
+    /// dialog; `lightweightPickerBool` is not needed and would also move the
+    /// string and duration pickers off the native ones.
     private boolean isMaterialStyle() {
         return "material".equals(getUIManager().getThemeConstant("pickerStyle", "wheel"));
     }
@@ -1480,6 +1489,7 @@ public class Picker extends Button {
     /// - `useLightweightPopup`
     public void setUseLightweightPopup(boolean useLightweightPopup) {
         this.useLightweightPopup = useLightweightPopup;
+        lightweightPopupSet = true;
     }
 
     /// Check to see if the built-in action listener should ignore a given

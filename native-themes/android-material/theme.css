@@ -70,6 +70,8 @@
  */
 
 #Constants {
+    /* Calendar draws today with this UIID while it is not the chosen day. */
+    calendarTodayUIID: "CalendarToday";
     /* Marks bundled defaults eligible for optional OS settings inheritance. */
     nativeThemeDefaultsBool: true;
     --text-color: #1d1b20;
@@ -134,6 +136,11 @@
     pullToRefreshModernBool: true;
     pullToRefreshIndicatorDiameterMm: 8;
     pullToRefreshIndicatorStrokeMm: "0.6";
+    /* Date and time pickers open the lightweight Material 3 calendar and
+       clock dial instead of the platform dialog. An application gets the
+       platform dialog back with Picker.setUseLightweightPopup(false). String
+       and duration pickers are not affected. */
+    pickerStyle: "material";
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.47";
     switchThumbOffScaleY: "1.03";
@@ -898,6 +905,123 @@ TableHeader.disabled { margin: 0; font-size: 2.5mm; color: var(--text-secondary-
    so the control drops its whole appearance for the duration of that state.
    Where a state is meant to differ it is declared above and left alone here. */
 
+/* ---------------------------------------------------------------------
+   Calendar: the month grid. The chosen day is a filled circle, today an
+   outlined one (the calendarTodayUIID constant turns that marker on), and
+   a day of a multiple selection sits on the tonal fill.
+   --------------------------------------------------------------------- */
+Calendar { background-color: var(--window-bg-color, #fef7ff); color: var(--text-color, #1d1b20); padding: 1mm; margin: 0; }
+CalendarTitleArea { background-color: transparent; padding: 0; margin: 0; }
+CalendarDayArea { background-color: transparent; padding: 0; margin: 0; }
+CalendarTitle { color: var(--text-secondary-color, #49454f); background-color: transparent; padding: 0.5mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2mm; }
+CalendarDate { background-color: transparent; padding: 1mm; margin: 0; }
+CalendarDateLabel { color: var(--text-color, #1d1b20); background-color: transparent; padding: 1mm; margin: 0; text-align: center; font-family: "native:MainBold"; font-size: 3mm; }
+CalendarLeft { color: var(--text-secondary-color, #49454f); background-color: transparent; padding: 1.5mm; margin: 0; }
+CalendarLeft.selected { color: var(--text-secondary-color, #49454f); background-color: transparent; padding: 1.5mm; margin: 0; }
+CalendarLeft.pressed { color: var(--accent-color, #6750a4); background-color: transparent; padding: 1.5mm; margin: 0; }
+CalendarRight { color: var(--text-secondary-color, #49454f); background-color: transparent; padding: 1.5mm; margin: 0; }
+CalendarRight.selected { color: var(--text-secondary-color, #49454f); background-color: transparent; padding: 1.5mm; margin: 0; }
+CalendarRight.pressed { color: var(--accent-color, #6750a4); background-color: transparent; padding: 1.5mm; margin: 0; }
+CalendarDay { color: var(--text-color, #1d1b20); background-color: transparent; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarDay.selected { color: var(--text-color, #1d1b20); background-color: transparent; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarDay.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarDay.disabled { color: #a5a0ab; background-color: transparent; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarSelectedDay { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarSelectedDay.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarSelectedDay.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarToday { color: var(--accent-color, #6750a4); background-color: transparent; border: 0.25mm solid var(--accent-color, #6750a4); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarToday.selected { color: var(--accent-color, #6750a4); background-color: transparent; border: 0.25mm solid var(--accent-color, #6750a4); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarToday.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); border: 0.25mm solid var(--accent-color, #6750a4); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarMultipleDay { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarMultipleDay.selected { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+CalendarMultipleDay.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+
+/* ---------------------------------------------------------------------
+   Scheduler, Gantt chart and the Material date and time pickers.
+
+   Most of these UIIDs are never set on a component: the scheduler and the
+   chart paint thousands of items straight from the style's colours and
+   font, and so do the picker's month grid and clock dial. Only the
+   toolbar, the dialog and the picker's fields and buttons are components.
+   A UIID named here is taken whole from this file; the framework's own
+   fallback styles apply only to a theme that does not mention it.
+   --------------------------------------------------------------------- */
+Scheduler { background-color: var(--window-bg-color, #fef7ff); color: var(--text-color, #1d1b20); padding: 0; margin: 0; }
+SchedulerGrid { color: #cac4d0; background-color: transparent; }
+SchedulerOffHours { background-color: #f3edf7; color: var(--text-secondary-color, #49454f); }
+SchedulerHeader { background-color: var(--window-bg-color, #fef7ff); color: var(--text-secondary-color, #49454f); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerHeaderToday { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerTimeLabel { background-color: var(--window-bg-color, #fef7ff); color: var(--text-secondary-color, #49454f); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerItem { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerBackgroundItem { background-color: rgba(234,221,255,0.5); color: var(--accent-on-container-color, #21005d); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerBlocked { background-color: rgba(202,196,208,0.55); color: var(--text-secondary-color, #49454f); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerNow { color: #b3261e; background-color: #b3261e; }
+SchedulerSelection { color: var(--accent-color, #6750a4); background-color: rgba(103,80,164,0.24); }
+SchedulerMonthDay { background-color: var(--window-bg-color, #fef7ff); color: var(--text-color, #1d1b20); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerMonthOther { background-color: #f3edf7; color: var(--text-secondary-color, #49454f); font-family: "native:MainRegular"; font-size: 2mm; }
+SchedulerAgendaItem { background-color: var(--window-bg-color, #fef7ff); color: var(--text-color, #1d1b20); font-family: "native:MainRegular"; font-size: 2.5mm; }
+SchedulerToolbar { background-color: var(--window-bg-color, #fef7ff); color: var(--text-color, #1d1b20); padding: 1mm; margin: 0; }
+SchedulerTitle { background-color: transparent; color: var(--text-color, #1d1b20); padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainBold"; font-size: 3mm; }
+SchedulerViewButton { color: var(--accent-color, #6750a4); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+SchedulerViewButton.selected { color: var(--accent-color, #6750a4); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+SchedulerViewButton.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+SchedulerViewButton.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+Gantt { background-color: var(--window-bg-color, #fef7ff); color: var(--text-color, #1d1b20); padding: 0; margin: 0; }
+GanttHeader { background-color: var(--window-bg-color, #fef7ff); color: var(--text-secondary-color, #49454f); font-family: "native:MainRegular"; font-size: 2mm; }
+GanttRow { background-color: var(--window-bg-color, #fef7ff); color: var(--text-color, #1d1b20); font-family: "native:MainRegular"; font-size: 2.5mm; }
+GanttRow.selected { background-color: var(--accent-container-color, #eaddff); color: var(--accent-on-container-color, #21005d); font-family: "native:MainRegular"; font-size: 2.5mm; }
+GanttSummaryRow { background-color: #f3edf7; color: var(--text-color, #1d1b20); font-family: "native:MainBold"; font-size: 2.5mm; }
+GanttBar { background-color: #b69df8; color: var(--text-color, #1d1b20); font-family: "native:MainRegular"; font-size: 2mm; }
+GanttBarProgress { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+GanttBarCritical { background-color: #b3261e; color: var(--text-color, #1d1b20); font-family: "native:MainRegular"; font-size: 2mm; }
+GanttSummaryBar { background-color: var(--text-secondary-color, #49454f); color: var(--window-bg-color, #fef7ff); font-family: "native:MainRegular"; font-size: 2mm; }
+GanttMilestone { background-color: var(--text-color, #1d1b20); color: var(--window-bg-color, #fef7ff); font-family: "native:MainRegular"; font-size: 2mm; }
+GanttBaseline { background-color: #cac4d0; color: var(--text-secondary-color, #49454f); }
+GanttLink { color: var(--text-secondary-color, #49454f); background-color: transparent; }
+GanttLinkCritical { color: #b3261e; background-color: transparent; }
+GanttLoad { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+GanttOverload { background-color: #b3261e; color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+PickerMaterial { background-color: #ece6f0; color: var(--text-color, #1d1b20); padding: 0; margin: 0; }
+PickerMaterialDialog { background-color: #ece6f0; color: var(--text-color, #1d1b20); padding: 2mm; margin: 0; border-radius: 4.4mm; }
+PickerMaterialHeader { background-color: transparent; color: var(--text-color, #1d1b20); padding: 2mm 3mm 2mm 3mm; margin: 0; }
+PickerMaterialOverline { background-color: transparent; color: var(--text-secondary-color, #49454f); padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2mm; }
+PickerMaterialHeadline { background-color: transparent; color: var(--text-color, #1d1b20); padding: 1mm 0 0 0; margin: 0; font-family: "native:MainRegular"; font-size: 5mm; }
+PickerMaterialButton { color: var(--accent-color, #6750a4); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialButton.selected { color: var(--accent-color, #6750a4); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialButton.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialButton.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialButtons { background-color: transparent; color: var(--text-color, #1d1b20); padding: 1mm 2mm 1mm 2mm; margin: 0; }
+PickerMaterialDays { background-color: transparent; color: var(--text-color, #1d1b20); padding: 0 2mm 1mm 2mm; margin: 0; }
+PickerMaterialDay { color: var(--text-color, #1d1b20); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialDay.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialDay.disabled { color: #a5a0ab; background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialWeekday { color: var(--text-secondary-color, #49454f); background-color: transparent; font-family: "native:MainRegular"; font-size: 2mm; }
+PickerMaterialYear { color: var(--text-color, #1d1b20); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialYear.selected { color: var(--text-color, #1d1b20); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialYear.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialYearSelected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialYearSelected.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialYearSelected.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialField { cn1-derive: TextField; }
+PickerMaterialField.selected { cn1-derive: TextField; }
+PickerMaterialField.pressed { cn1-derive: TextField; }
+PickerMaterialField.disabled { cn1-derive: TextField; }
+PickerMaterialError { color: #b3261e; background-color: transparent; padding: 0 3mm 1mm 3mm; margin: 0; font-family: "native:MainRegular"; font-size: 2mm; }
+PickerMaterialTimeField { color: var(--text-color, #1d1b20); background-color: #e6e0e9; border-radius: 1.3mm; padding: 2mm 3mm 2mm 3mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 5mm; }
+PickerMaterialTimeField.selected { color: var(--text-color, #1d1b20); background-color: #e6e0e9; border-radius: 1.3mm; padding: 2mm 3mm 2mm 3mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 5mm; }
+PickerMaterialTimeField.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); border-radius: 1.3mm; padding: 2mm 3mm 2mm 3mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 5mm; }
+PickerMaterialTimeSeparator { color: var(--text-color, #1d1b20); background-color: transparent; padding: 0 1mm 0 1mm; margin: 0; font-family: "native:MainRegular"; font-size: 5mm; }
+PickerMaterialPeriod { color: var(--text-secondary-color, #49454f); background-color: #e6e0e9; border-radius: 1.3mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialPeriod.selected { color: var(--text-secondary-color, #49454f); background-color: #e6e0e9; border-radius: 1.3mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialPeriod.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); border-radius: 1.3mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialDialPane { background-color: transparent; color: var(--text-color, #1d1b20); padding: 1mm 2mm 1mm 2mm; margin: 0; }
+PickerMaterialDial { color: var(--text-color, #1d1b20); background-color: #e6e0e9; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialDial.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialDial.disabled { color: #a5a0ab; background-color: #e6e0e9; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialTab { color: var(--text-secondary-color, #49454f); background-color: transparent; padding: 2mm 2mm 2mm 2mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialTab.selected { color: var(--text-secondary-color, #49454f); background-color: transparent; padding: 2mm 2mm 2mm 2mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PickerMaterialTab.pressed { color: var(--accent-color, #6750a4); background-color: var(--accent-container-color, #eaddff); padding: 2mm 2mm 2mm 2mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+
 @media (prefers-color-scheme: dark) {
     Component { color: var(--text-color-dark, #e6e0e9); background-color: var(--window-bg-color-dark, #141218); }
     Form { background-color: var(--window-bg-color-dark, #141218); padding: 0; margin: 0; }
@@ -1079,4 +1203,108 @@ TableHeader.disabled { margin: 0; font-size: 2.5mm; color: var(--text-secondary-
     ToggleButtonOnly.selected { color: var(--text-color-dark, #e6e0e9); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid var(--accent-color-dark, #d0bcff); padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonOnly.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonOnly.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+
+    /* Calendar */
+    Calendar { background-color: var(--window-bg-color-dark, #141218); color: var(--text-color-dark, #e6e0e9); padding: 1mm; margin: 0; }
+    CalendarTitleArea { background-color: transparent; padding: 0; margin: 0; }
+    CalendarDayArea { background-color: transparent; padding: 0; margin: 0; }
+    CalendarTitle { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; padding: 0.5mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2mm; }
+    CalendarDate { background-color: transparent; padding: 1mm; margin: 0; }
+    CalendarDateLabel { color: var(--text-color-dark, #e6e0e9); background-color: transparent; padding: 1mm; margin: 0; text-align: center; font-family: "native:MainBold"; font-size: 3mm; }
+    CalendarLeft { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; padding: 1.5mm; margin: 0; }
+    CalendarLeft.selected { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; padding: 1.5mm; margin: 0; }
+    CalendarLeft.pressed { color: var(--accent-color-dark, #d0bcff); background-color: transparent; padding: 1.5mm; margin: 0; }
+    CalendarRight { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; padding: 1.5mm; margin: 0; }
+    CalendarRight.selected { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; padding: 1.5mm; margin: 0; }
+    CalendarRight.pressed { color: var(--accent-color-dark, #d0bcff); background-color: transparent; padding: 1.5mm; margin: 0; }
+    CalendarDay { color: var(--text-color-dark, #e6e0e9); background-color: transparent; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarDay.selected { color: var(--text-color-dark, #e6e0e9); background-color: transparent; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarDay.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarDay.disabled { color: #5c5967; background-color: transparent; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarSelectedDay { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarSelectedDay.selected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarSelectedDay.pressed { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarToday { color: var(--accent-color-dark, #d0bcff); background-color: transparent; border: 0.25mm solid var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarToday.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; border: 0.25mm solid var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarToday.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); border: 0.25mm solid var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarMultipleDay { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarMultipleDay.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    CalendarMultipleDay.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-round-border; padding: 1.6mm 0.5mm 1.6mm 0.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    /* Scheduler, Gantt chart and Material pickers: every rule repeats its
+       shape, as the buttons above do. */
+    Scheduler { background-color: var(--window-bg-color-dark, #141218); color: var(--text-color-dark, #e6e0e9); padding: 0; margin: 0; }
+    SchedulerGrid { color: #49454f; background-color: transparent; }
+    SchedulerOffHours { background-color: #211f26; color: var(--text-secondary-color-dark, #cac4d0); }
+    SchedulerHeader { background-color: var(--window-bg-color-dark, #141218); color: var(--text-secondary-color-dark, #cac4d0); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerHeaderToday { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerTimeLabel { background-color: var(--window-bg-color-dark, #141218); color: var(--text-secondary-color-dark, #cac4d0); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerItem { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerBackgroundItem { background-color: rgba(79,55,139,0.5); color: var(--accent-on-container-color-dark, #eaddff); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerBlocked { background-color: rgba(73,69,79,0.55); color: var(--text-secondary-color-dark, #cac4d0); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerNow { color: #f2b8b5; background-color: #f2b8b5; }
+    SchedulerSelection { color: var(--accent-color-dark, #d0bcff); background-color: rgba(208,188,255,0.24); }
+    SchedulerMonthDay { background-color: var(--window-bg-color-dark, #141218); color: var(--text-color-dark, #e6e0e9); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerMonthOther { background-color: #211f26; color: var(--text-secondary-color-dark, #cac4d0); font-family: "native:MainRegular"; font-size: 2mm; }
+    SchedulerAgendaItem { background-color: var(--window-bg-color-dark, #141218); color: var(--text-color-dark, #e6e0e9); font-family: "native:MainRegular"; font-size: 2.5mm; }
+    SchedulerToolbar { background-color: var(--window-bg-color-dark, #141218); color: var(--text-color-dark, #e6e0e9); padding: 1mm; margin: 0; }
+    SchedulerTitle { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainBold"; font-size: 3mm; }
+    SchedulerViewButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    SchedulerViewButton.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    SchedulerViewButton.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    SchedulerViewButton.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    Gantt { background-color: var(--window-bg-color-dark, #141218); color: var(--text-color-dark, #e6e0e9); padding: 0; margin: 0; }
+    GanttHeader { background-color: var(--window-bg-color-dark, #141218); color: var(--text-secondary-color-dark, #cac4d0); font-family: "native:MainRegular"; font-size: 2mm; }
+    GanttRow { background-color: var(--window-bg-color-dark, #141218); color: var(--text-color-dark, #e6e0e9); font-family: "native:MainRegular"; font-size: 2.5mm; }
+    GanttRow.selected { background-color: var(--accent-container-color-dark, #4f378b); color: var(--accent-on-container-color-dark, #eaddff); font-family: "native:MainRegular"; font-size: 2.5mm; }
+    GanttSummaryRow { background-color: #211f26; color: var(--text-color-dark, #e6e0e9); font-family: "native:MainBold"; font-size: 2.5mm; }
+    GanttBar { background-color: #4f378b; color: var(--text-color-dark, #e6e0e9); font-family: "native:MainRegular"; font-size: 2mm; }
+    GanttBarProgress { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); font-family: "native:MainRegular"; font-size: 2mm; }
+    GanttBarCritical { background-color: #f2b8b5; color: var(--text-color-dark, #e6e0e9); font-family: "native:MainRegular"; font-size: 2mm; }
+    GanttSummaryBar { background-color: var(--text-secondary-color-dark, #cac4d0); color: var(--window-bg-color-dark, #141218); font-family: "native:MainRegular"; font-size: 2mm; }
+    GanttMilestone { background-color: var(--text-color-dark, #e6e0e9); color: var(--window-bg-color-dark, #141218); font-family: "native:MainRegular"; font-size: 2mm; }
+    GanttBaseline { background-color: #49454f; color: var(--text-secondary-color-dark, #cac4d0); }
+    GanttLink { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; }
+    GanttLinkCritical { color: #f2b8b5; background-color: transparent; }
+    GanttLoad { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); font-family: "native:MainRegular"; font-size: 2mm; }
+    GanttOverload { background-color: #f2b8b5; color: var(--accent-on-color-dark, #381e72); font-family: "native:MainRegular"; font-size: 2mm; }
+    PickerMaterial { background-color: #2b2930; color: var(--text-color-dark, #e6e0e9); padding: 0; margin: 0; }
+    PickerMaterialDialog { background-color: #2b2930; color: var(--text-color-dark, #e6e0e9); padding: 2mm; margin: 0; border-radius: 4.4mm; }
+    PickerMaterialHeader { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 2mm 3mm 2mm 3mm; margin: 0; }
+    PickerMaterialOverline { background-color: transparent; color: var(--text-secondary-color-dark, #cac4d0); padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2mm; }
+    PickerMaterialHeadline { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 1mm 0 0 0; margin: 0; font-family: "native:MainRegular"; font-size: 5mm; }
+    PickerMaterialButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialButton.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialButton.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialButton.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialButtons { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 1mm 2mm 1mm 2mm; margin: 0; }
+    PickerMaterialDays { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 0 2mm 1mm 2mm; margin: 0; }
+    PickerMaterialDay { color: var(--text-color-dark, #e6e0e9); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialDay.selected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialDay.disabled { color: #5c5967; background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialWeekday { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; font-family: "native:MainRegular"; font-size: 2mm; }
+    PickerMaterialYear { color: var(--text-color-dark, #e6e0e9); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialYear.selected { color: var(--text-color-dark, #e6e0e9); background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialYear.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialYearSelected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialYearSelected.selected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialYearSelected.pressed { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialField { cn1-derive: TextField; }
+    PickerMaterialField.selected { cn1-derive: TextField; }
+    PickerMaterialField.pressed { cn1-derive: TextField; }
+    PickerMaterialField.disabled { cn1-derive: TextField; }
+    PickerMaterialError { color: #f2b8b5; background-color: transparent; padding: 0 3mm 1mm 3mm; margin: 0; font-family: "native:MainRegular"; font-size: 2mm; }
+    PickerMaterialTimeField { color: var(--text-color-dark, #e6e0e9); background-color: #36343b; border-radius: 1.3mm; padding: 2mm 3mm 2mm 3mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 5mm; }
+    PickerMaterialTimeField.selected { color: var(--text-color-dark, #e6e0e9); background-color: #36343b; border-radius: 1.3mm; padding: 2mm 3mm 2mm 3mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 5mm; }
+    PickerMaterialTimeField.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); border-radius: 1.3mm; padding: 2mm 3mm 2mm 3mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 5mm; }
+    PickerMaterialTimeSeparator { color: var(--text-color-dark, #e6e0e9); background-color: transparent; padding: 0 1mm 0 1mm; margin: 0; font-family: "native:MainRegular"; font-size: 5mm; }
+    PickerMaterialPeriod { color: var(--text-secondary-color-dark, #cac4d0); background-color: #36343b; border-radius: 1.3mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialPeriod.selected { color: var(--text-secondary-color-dark, #cac4d0); background-color: #36343b; border-radius: 1.3mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialPeriod.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); border-radius: 1.3mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0.5mm; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialDialPane { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 1mm 2mm 1mm 2mm; margin: 0; }
+    PickerMaterialDial { color: var(--text-color-dark, #e6e0e9); background-color: #36343b; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialDial.selected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialDial.disabled { color: #5c5967; background-color: #36343b; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialTab { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; padding: 2mm 2mm 2mm 2mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialTab.selected { color: var(--text-secondary-color-dark, #cac4d0); background-color: transparent; padding: 2mm 2mm 2mm 2mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    PickerMaterialTab.pressed { color: var(--accent-color-dark, #d0bcff); background-color: var(--accent-container-color-dark, #4f378b); padding: 2mm 2mm 2mm 2mm; margin: 0; text-align: center; font-family: "native:MainRegular"; font-size: 2.5mm; }
 }

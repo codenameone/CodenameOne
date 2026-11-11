@@ -24,6 +24,7 @@ package com.codename1.ui.spinner;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -253,6 +254,35 @@ class MaterialPickerTest extends UITestBase {
         picker.pointerReleased(picker.getAbsoluteX() + 1, picker.getAbsoluteY() + 1);
         flushSerialCalls();
         return picker;
+    }
+
+    /// Android's default is the platform dialog. The theme's style still
+    /// wins there, because the theme is what an application chose; only an
+    /// explicit `setUseLightweightPopup(false)` keeps the platform's.
+    @FormTest
+    void theMaterialStyleWinsOverANativePickerUnlessTheApplicationOptsOut() {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        style("material");
+        impl.setNativePickerTypeSupported(Boolean.TRUE);
+        try {
+            Picker byDefault = new Picker();
+            byDefault.setType(Display.PICKER_TYPE_TIME);
+            open(byDefault);
+            Dialog dlg = byDefault.getMaterialDialog();
+            assertNotNull(dlg, "the theme's style opens with no setter called");
+            tapComponent(named(dlg, "PickerMaterialCancel"));
+            flushSerialCalls();
+            assertNull(byDefault.getMaterialDialog());
+
+            Picker optedOut = new Picker();
+            optedOut.setUseLightweightPopup(false);
+            optedOut.setType(Display.PICKER_TYPE_TIME);
+            open(optedOut);
+            assertNull(optedOut.getMaterialDialog(), "an explicit opt-out keeps the platform dialog");
+        } finally {
+            impl.setNativePickerTypeSupported((Boolean[]) null);
+            style("wheel");
+        }
     }
 
     @FormTest
