@@ -151,6 +151,10 @@ jobs:
       # the step above filled as its remote, and fails on a port, on an ffmpeg
       # native for another platform, or on the total passing its budget.
       - name: Check what a new project's first build downloads
+        # What a developer runs the simulator on. JAVA_HOME is the JDK 8 the
+        # framework builds with, which the plugin refuses for a simulator build.
+        env:
+          JAVA_HOME: ${{ env.CN1_BACKEND_PACKAGE_JDK }}
         run: python3 scripts/check-first-build-footprint.py --repo "$HOME/.m2/repository"
       - name: Run archetype simulator smoke (auto-bundle pref forced on)
         env:
