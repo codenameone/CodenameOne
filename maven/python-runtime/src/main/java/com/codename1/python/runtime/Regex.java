@@ -449,7 +449,16 @@ final class Regex {
             case CHAR:
                 return c == op.c;
             case CHARI:
-                return c == op.c || c == op.c2 || TypeMethods.mapCase(str(c), 0).equals(op.lower);
+                if (c == op.c || c == op.c2) {
+                    return true;
+                }
+                if (c < 128) {
+                    // An ASCII char lowers to one ASCII char, which equals the
+                    // pattern's lower case form only when that form is this
+                    // one code point; no strings are made to find out.
+                    return (c >= 'A' && c <= 'Z' ? c + 32 : c) == op.c;
+                }
+                return TypeMethods.mapCase(str(c), 0).equals(op.lower);
             case ANY:
                 return c != '\n';
             case ANYALL:
