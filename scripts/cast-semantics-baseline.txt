@@ -32,7 +32,6 @@ com/codename1/location/GeofenceManager#getExpiryTimes(Z)Ljava/util/Map;|cast to 
 com/codename1/location/GeofenceManager#getListener()Lcom/codename1/location/GeofenceListener;|cast to com.codename1.location.GeofenceListener inside catch(java.lang.Throwable)
 com/codename1/maps/vector/MapStyle#fromJson(Ljava/lang/String;)Lcom/codename1/maps/vector/MapStyle;|cast to java.util.List inside catch(java.lang.Throwable)
 com/codename1/maps/vector/MapStyle#fromJson(Ljava/lang/String;)Lcom/codename1/maps/vector/MapStyle;|cast to java.util.Map inside catch(java.lang.Throwable)
-com/codename1/payment/CommerceManager#validateReceipt(Lcom/codename1/payment/Receipt;)[Ljava/lang/Boolean;|cast to java.util.Map inside catch(java.lang.Throwable)
 com/codename1/properties/InstantUI#createEntryForProperty(Lcom/codename1/properties/PropertyBase;Lcom/codename1/ui/Container;Ljava/util/ArrayList;Lcom/codename1/properties/UiBinding;)V|cast to com.codename1.ui.Component inside catch(java.lang.RuntimeException)
 com/codename1/properties/SQLMap#selectImpl(Lcom/codename1/properties/PropertyBusinessObject;Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;Lcom/codename1/properties/Property;ZII)Ljava/util/List;|cast to com.codename1.properties.PropertyBase inside catch(java.lang.Throwable)
 com/codename1/properties/SQLMap#selectImpl(Lcom/codename1/properties/PropertyBusinessObject;Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;Lcom/codename1/properties/Property;ZII)Ljava/util/List;|cast to com.codename1.properties.PropertyBusinessObject inside catch(java.lang.Throwable)

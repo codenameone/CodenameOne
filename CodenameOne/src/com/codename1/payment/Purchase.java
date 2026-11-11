@@ -817,6 +817,12 @@ public abstract class Purchase {
             synchronizeReceipts(0, null);
             return;
         }
+        if (Boolean.TRUE.equals(fetchSucceeded)) {
+            // The receipts are settled: every pending one was submitted and
+            // the list was fetched. Cloud commerce asks its service again, on
+            // a background thread of its own; a build without it does nothing.
+            CommerceManager.receiptsSynchronized();
+        }
         fireSynchronizeReceiptsCallbacks(Boolean.TRUE.equals(fetchSucceeded));
     }
 
