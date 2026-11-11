@@ -267,7 +267,7 @@ public final class Emitter {
         uncell(ms);
         findDirectLong(stmts);
         layouts = Layouts.plan(stmts, "", ms.attrStores);
-        Infer infer = closed ? Infer.run(stmts, layouts, ms) : null;
+        Infer infer = Infer.run(stmts, layouts, ms, facts);
         if (infer != null && System.getProperty("cn1.python.dumpTypes") != null) {
             System.err.println(infer.dump());
         }
@@ -3538,13 +3538,16 @@ public final class Emitter {
     // ---- compiled class layouts (see Layouts) -----------------------------
 
     private Layouts layouts = new Layouts();
-    /// Whole-program types, when the program is closed (see `Closed`).
+    /// The typed code of the module; null only when `Infer` reached no
+    /// fixpoint.
     private TypedEmit typedEmit;
-    private boolean closed;
+    private WholeProgram.Module facts = new WholeProgram.Module();
 
-    /// Whether the program this module belongs to passed `Closed.check`.
-    public Emitter closed(boolean c) {
-        closed = c;
+    /// What the rest of the program does to this module (see
+    /// `WholeProgram`). Without it the module is taken to be the whole
+    /// program.
+    public Emitter facts(WholeProgram.Module f) {
+        facts = f;
         return this;
     }
     /// The static method name the next `function` call puts its body in.

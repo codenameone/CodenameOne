@@ -26,7 +26,7 @@ package com.codename1.python.transpiler.api;
 import com.codename1.python.transpiler.analyze.ScopeBuilder;
 import com.codename1.python.transpiler.ast.Node;
 import com.codename1.python.transpiler.ast.Scope;
-import com.codename1.python.transpiler.codegen.Closed;
+import com.codename1.python.transpiler.codegen.WholeProgram;
 import com.codename1.python.transpiler.codegen.Emitter;
 import com.codename1.python.transpiler.parser.Parser;
 
@@ -185,16 +185,13 @@ public final class PythonTranspiler {
         Map<String, String> out = new LinkedHashMap<String, String>();
         Map<String, String> classes = new LinkedHashMap<String, String>();
         Map<String, Node.Module> trees = new LinkedHashMap<String, Node.Module>();
-        List<List<Node.Stmt>> bodies = new ArrayList<List<Node.Stmt>>();
         for (Map.Entry<String, String> e : sources.entrySet()) {
             String path = e.getKey().replace('\\', '/');
             if (path.endsWith(".py")) {
                 Node.Module tree = Parser.parse(e.getValue(), path);
                 trees.put(path, tree);
-                bodies.add(tree.body);
             }
         }
-        boolean closed = Closed.check(bodies);
         String interop = null;
         if (com.codename1.python.transpiler.codegen.JavaInteropGenerator.usesJava(trees.values())) {
             try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
@@ -204,7 +201,7 @@ public final class PythonTranspiler {
                 throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
             }
         }
-        Set<String> stdlib = addStdlib(sources, trees);
+        addStdlib(sources, trees);
         boolean server = false;
         boolean db = false;
         boolean image = false;
@@ -246,7 +243,9 @@ public final class PythonTranspiler {
                 throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
             }
         }
-        Set<String> reached = closed ? Closed.reachedInto(moduleBodies(trees)) : null;
+        // After the standard library was added: its modules are part of
+        // the program, typed like any other and counted like any other.
+        WholeProgram program = WholeProgram.of(moduleBodies(trees));
         for (Map.Entry<String, String> e : sources.entrySet()) {
             String path = e.getKey().replace('\\', '/');
             if (!path.endsWith(".py")) {
@@ -264,12 +263,7 @@ public final class PythonTranspiler {
             String cls = className(module);
             Node.Module tree = trees.get(path);
             Scope scope = ScopeBuilder.build(tree, path);
-            // The standard library is left out of the program's closed-world
-            // check: a module of it that is not closed would open every
-            // program importing it. Each is typed on its own instead.
-            Emitter emitter = new Emitter(path, module, isPackage, PACKAGE, cls, scope)
-                    .closed(closed && !reached.contains(module)
-                            && (!stdlib.contains(path) || typedLibrary(module, tree, reached)));
+            Emitter emitter = new Emitter(path, module, isPackage, PACKAGE, cls, scope).facts(program.module(module));
             if (libraries.contains(path)) {
                 emitter.deferDynamic(notes);
             }
@@ -296,14 +290,6 @@ public final class PythonTranspiler {
         out.put(PACKAGE.replace('.', '/') + "/PythonModules.java", registry(classes, mainModule, interop != null, server, db,
                 image, serverImage, nativeModules));
         return out;
-    }
-
-    /// Whether the standard library module `module` gets whole-program types
-    /// in a closed program: when it is closed by itself, and no other module
-    /// of the program subclasses its classes or stores onto it.
-    private static boolean typedLibrary(String module, Node.Module tree, Set<String> reached) {
-        String why = Closed.reason(java.util.Collections.singletonList(tree.body), true);
-        return why == null && !reached.contains(module) && !reached.contains("*");
     }
 
     /// Each module's dotted name to its body.

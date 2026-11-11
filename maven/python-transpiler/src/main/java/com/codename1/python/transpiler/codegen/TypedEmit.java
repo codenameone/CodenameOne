@@ -404,9 +404,6 @@ final class TypedEmit {
 
     void plan() {
         findPure();
-        if (!in.open.isEmpty()) {
-            return;
-        }
         for (Layouts.Cls k : layouts.classes.values()) {
             Map<String, Ty> m = new LinkedHashMap<String, Ty>();
             for (String f : k.fields) {
@@ -416,6 +413,19 @@ final class TypedEmit {
                 }
             }
             typedFields.put(k, m);
+        }
+        // A typed field no generic code may reach directly: the generic
+        // code goes through getField/setField, which box. Done before any
+        // body is written: a typed function holding a nested def writes
+        // that def's generic code as part of its own.
+        for (Map.Entry<Layouts.Cls, Map<String, Ty>> e : typedFields.entrySet()) {
+            for (String f : e.getValue().keySet()) {
+                List<Layouts.Cls> o = layouts.fieldOwners.get(f);
+                o.remove(e.getKey());
+                if (o.isEmpty()) {
+                    layouts.fieldOwners.remove(f);
+                }
+            }
         }
         for (Infer.Fn f : in.fns.values()) {
             byScope.put(f.def.scope, f);
@@ -475,17 +485,6 @@ final class TypedEmit {
             }
         }
         usedGroups.retainAll(liveGroups(ok));
-        // A typed field no generic code may reach directly: the generic
-        // code goes through getField/setField, which box.
-        for (Map.Entry<Layouts.Cls, Map<String, Ty>> e : typedFields.entrySet()) {
-            for (String f : e.getValue().keySet()) {
-                List<Layouts.Cls> o = layouts.fieldOwners.get(f);
-                o.remove(e.getKey());
-                if (o.isEmpty()) {
-                    layouts.fieldOwners.remove(f);
-                }
-            }
-        }
     }
 
     private Set<String> liveGroups(Set<Infer.Fn> ok) {

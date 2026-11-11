@@ -226,6 +226,10 @@ class ConformanceTest {
                 }
             } catch (InvocationTargetException e) {
                 failure = String.valueOf(e.getCause());
+                if (System.getProperty("conformance.only") != null) {
+                    // One program asked for by name: the whole trace.
+                    e.getCause().printStackTrace(savedErr);
+                }
                 if (!failure.startsWith("com.codename1.python.runtime.PyException")) {
                     // A Java failure: name the frames that recur, which is
                     // where a runaway recursion is.

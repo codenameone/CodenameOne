@@ -66,7 +66,12 @@ public final class Typed {
     }
 
     public static PyException mismatch(Object o) {
-        return Py.runtimeError("internal error: typed code received a value of type '" + Py.typeOf(o).name + "'");
+        // Reached when a value arrives by a path the compiler could not
+        // see by name -- a computed setattr, a write through __dict__, a
+        // method found with a computed getattr -- and is not of the type
+        // every path it did see gives. Raised where the value is read.
+        return Py.typeError("a value of type '" + Py.typeOf(o).name
+                + "' reached compiled code through a computed attribute name, where every named use holds another type");
     }
 
     public static boolean asBool(Object o) {

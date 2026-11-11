@@ -38,14 +38,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/// Whole-module type inference over a closed program.
+/// Whole-module type inference, for every module of every program.
 ///
-/// Runs only when `Closed` found nothing in the application that could
-/// change a class, an instance's attributes or a module global behind the
-/// compiler's back. Then every value that reaches a parameter, a field, a
-/// list element or a global is one this pass sees, and the types it gives
-/// are sound: typed code never needs to check them again, and a function
-/// is entered typed after one check of its arguments at the door.
+/// The transpiler compiles the whole application, so what other modules
+/// do to this one is known: `WholeProgram` hands in the attribute names
+/// stored from outside and whether the module's namespace is read as a
+/// dict, and those names are left untyped. Every other value that reaches
+/// a parameter, a field, a list element or a global is one this pass
+/// sees, and the types it gives are sound: typed code never needs to
+/// check them again, and a function is entered typed after one check of
+/// its arguments at the door.
 ///
 /// It is a flow-insensitive fixpoint. Each round walks the whole module --
 /// nested functions, lambdas and class bodies included, where names are
@@ -138,19 +140,25 @@ final class Infer {
     private boolean changed;
     private final Map<String, Integer> moduleBindings = new HashMap<String, Integer>();
 
-    private Infer(Layouts layouts, Scope moduleScope) {
+    private final WholeProgram.Module facts;
+
+    private Infer(Layouts layouts, Scope moduleScope, WholeProgram.Module facts) {
         this.layouts = layouts;
         this.moduleScope = moduleScope;
+        this.facts = facts;
     }
 
     /// Infers the module, or returns null when it gives up (no fixpoint).
-    static Infer run(List<Stmt> body, Layouts layouts, Scope moduleScope) {
-        Infer in = new Infer(layouts, moduleScope);
+    static Infer run(List<Stmt> body, Layouts layouts, Scope moduleScope, WholeProgram.Module facts) {
+        Infer in = new Infer(layouts, moduleScope, facts);
         in.collect(body);
         for (int round = 0; round < 60; round++) {
             in.changed = false;
             in.walkBlock(body, null, moduleScope);
             in.unify();
+            if (!in.changed) {
+                in.uncalled();
+            }
             if (!in.changed) {
                 in.done = true;
                 return in;
@@ -159,15 +167,115 @@ final class Infer {
         return null;
     }
 
+    /// Gives a type to every parameter no call in the module reaches. The
+    /// function is still called: from another module, or through a value.
+    /// Those calls enter through the guard that checks every argument
+    /// (TypedEmit.entry), which is what makes a parameter's type sound
+    /// whoever calls -- but only a parameter that has a type is checked, so
+    /// one left without would take whatever arrives as whatever its uses
+    /// went on to assume.
+    private void uncalled() {
+        for (Fn f : fns.values()) {
+            for (int i = f.cls != null ? 1 : 0; i < f.params.length; i++) {
+                if (f.params[i].k == Ty.K.BOT) {
+                    f.params[i] = joinInto(f.params[i], guess(f.def, f.names.get(i)));
+                }
+            }
+        }
+    }
+
+    /// Set while a function body is walked as its generic version runs it
+    /// (see [#genericView]).
+    private boolean shadow;
+    private boolean shadowMiss;
+    private final Map<FunctionDef, Fn> generic = new HashMap<FunctionDef, Fn>();
+
+    /// Whether `f` can be entered by a call this pass does not see: one
+    /// through a value, or one from another module. Such a call goes
+    /// through the guard at the door, and when its arguments are not what
+    /// the direct calls pass, the generic version of the body runs.
+    private boolean entered(Fn f) {
+        if (f.escapes) {
+            return true;
+        }
+        String n = f.def.name;
+        if (f.cls == null) {
+            return facts.reachable(n);
+        }
+        if ("__init__".equals(n)) {
+            // Constructed by whoever can name the class or get at it.
+            if (facts.classValues) {
+                return true;
+            }
+            for (Layouts.Cls k : layouts.classes.values()) {
+                if (isSelfOrAncestor(f.cls, k) && facts.reachable(k.def.name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // The runtime calls a special method itself, with anything.
+        return n.startsWith("__") || facts.calledByName(n);
+    }
+
+    /// Walks the body of `f` as its generic version runs it: with
+    /// parameters that hold anything. The typed version is sound whatever
+    /// reaches the door, since the guard there sends what does not fit to
+    /// the generic one -- which then stores those values into fields, lists
+    /// and globals all the same. This walk is what puts them there.
+    private void genericView(Fn f) {
+        Fn g = generic.get(f.def);
+        if (g == null) {
+            g = new Fn(f.def, f.cls);
+            for (int i = 0; i < g.params.length; i++) {
+                g.params[i] = i == 0 && f.cls != null ? f.params[0] : Ty.DYN;
+            }
+            generic.put(f.def, g);
+        }
+        if (f.cls != null) {
+            g.params[0] = f.params[0];
+        }
+        for (int i = 0; i < g.params.length; i++) {
+            g.locals.put(g.names.get(i), Ty.join(g.locals.get(g.names.get(i)), g.params[i]));
+        }
+        shadow = true;
+        try {
+            walkBlock(f.def.body, g, f.def.scope);
+        } finally {
+            shadow = false;
+        }
+    }
+
     // ---- setup -----------------------------------------------------------
 
     private void collect(List<Stmt> body) {
         countBindings(body);
+        for (String n : moduleScope.assigned) {
+            // A global another module stores (`mod.n = v`), or any global
+            // of a module that hands its namespace out as a dict, is bound
+            // more often than this module shows and holds anything.
+            if (facts.namespace || facts.patched(n)) {
+                moduleBindings.put(n, Integer.valueOf(99));
+                globals.put(n, Ty.DYN);
+            }
+        }
         intConstants(body);
+        for (Layouts.Cls k : layouts.classes.values()) {
+            // A method name stored on a class or an instance somewhere is
+            // looked up per call, as one the class's own methods store on
+            // `self` is (Layouts.plan).
+            for (java.util.Iterator<String> it = k.typable.keySet().iterator(); it.hasNext();) {
+                if (facts.patched(it.next())) {
+                    it.remove();
+                }
+            }
+        }
         for (Layouts.Cls k : layouts.classes.values()) {
             fields.put(k, new LinkedHashMap<String, Ty>());
             for (String f : k.fields) {
-                fields.get(k).put(f, Ty.BOT);
+                // A field stored from another module holds what that
+                // module puts there, which this pass does not see.
+                fields.get(k).put(f, facts.foreign(f) ? Ty.DYN : Ty.BOT);
             }
             for (FunctionDef f : k.typable.values()) {
                 compCells.put(f.scope, compOnlyCells(f));
@@ -471,6 +579,10 @@ final class Infer {
 
     // ---- definite assignment of fields ------------------------------------
 
+    /// In the answer of `initDefinite`: the `__init__` went on to store an
+    /// attribute outside the fields. Not a name an attribute can have.
+    private static final String EXTRA = "<extra>";
+
     private Set<String> initDefinite(Layouts.Cls k, Set<Layouts.Cls> seen) {
         Set<String> r = new HashSet<String>();
         Layouts.Cls owner = Layouts.resolver(k, "__init__");
@@ -494,6 +606,16 @@ final class Infer {
                 Expr t = a.targets.get(0);
                 if (t instanceof Attribute && ((Attribute) t).value instanceof Name
                         && ((Name) ((Attribute) t).value).id.equals(self) && !mentions(a.value, self)) {
+                    if (!k.allFields.contains(((Attribute) t).attr)) {
+                        // An attribute kept outside the fields. From here
+                        // on the instance lists its attributes in the
+                        // order they were set, and a field first set after
+                        // this one is kept with them, not in the Java
+                        // field (PyInstance.store): typed code, which reads
+                        // the field without asking, must not count on it.
+                        r.add(EXTRA);
+                        break;
+                    }
                     r.add(((Attribute) t).attr);
                     continue;
                 }
@@ -509,7 +631,11 @@ final class Infer {
                         clean = !mentions(c.args.get(i), self);
                     }
                     if (clean) {
-                        r.addAll(initDefinite(base, seen));
+                        Set<String> up = initDefinite(base, seen);
+                        r.addAll(up);
+                        if (up.contains(EXTRA)) {
+                            break;
+                        }
                         continue;
                     }
                 }
@@ -550,6 +676,9 @@ final class Infer {
     /// Whether field `f` of class `k` (declared there or inherited) is set
     /// on every instance of `k` and of all its subclasses.
     boolean definitelySet(Layouts.Cls owner, String f) {
+        if (facts.dictViews || facts.deleted.contains(f)) {
+            return false;
+        }
         for (Layouts.Cls k : layouts.classes.values()) {
             if (isSelfOrAncestor(owner, k) && !definite.get(k).contains(f)) {
                 return false;
@@ -1063,6 +1192,9 @@ final class Infer {
                 walkBlock(d.body, inner, d.scope);
                 if (!endsAbruptly(d.body)) {
                     inner.ret = joinInto(inner.ret, Ty.NONE);
+                }
+                if (!shadow && entered(inner)) {
+                    genericView(inner);
                 }
                 if (inner.def.name.startsWith("__") && !"__init__".equals(inner.def.name)) {
                     // The runtime calls these itself, with anything.
@@ -1975,6 +2107,18 @@ final class Infer {
     }
 
     private Ty call(Call c, Fn fn, Scope sc) {
+        if (!shadow) {
+            return call0(c, fn, sc);
+        }
+        boolean saved = shadowMiss;
+        shadowMiss = false;
+        Ty t = call0(c, fn, sc);
+        boolean miss = shadowMiss;
+        shadowMiss = saved;
+        return miss ? Ty.DYN : t;
+    }
+
+    private Ty call0(Call c, Fn fn, Scope sc) {
         boolean simple = c.keywords.isEmpty() && !anyStarred(c.args);
         if (c.func instanceof Name && ((Name) c.func).id.startsWith("$")) {
             Ty t = missIntrinsic(((Name) c.func).id, c, fn, sc);
@@ -1997,12 +2141,14 @@ final class Infer {
                 if (f != null) {
                     callFn(f, args, 0, simple && args.size() <= f.params.length
                             && args.size() >= f.params.length - f.def.args.defaults.size());
-                    Ty site = simple && args.size() == f.params.length ? siteType(f, args) : null;
+                    Ty site = !shadow && simple && args.size() == f.params.length ? siteType(f, args) : null;
                     if (site != null) {
                         siteRet.put(c, site);
                         return site;
                     }
-                    siteRet.remove(c);
+                    if (!shadow) {
+                        siteRet.remove(c);
+                    }
                     return f.ret;
                 }
                 if (open.contains(k)) {
@@ -2022,7 +2168,9 @@ final class Infer {
                 }
                 if (init != null) {
                     Fn fi = fns.get(init);
-                    fi.params[0] = joinInto(fi.params[0], Ty.inst(k, false));
+                    if (!shadow) {
+                        fi.params[0] = joinInto(fi.params[0], Ty.inst(k, false));
+                    }
                     callFn(fi, args, 1, simple && args.size() + 1 <= fi.params.length
                             && args.size() + 1 >= fi.params.length - init.args.defaults.size());
                 } else {
@@ -2332,6 +2480,22 @@ final class Infer {
 
     /// Joins a call's arguments into `f`'s parameters, from `from` on.
     private void callFn(Fn f, List<Ty> args, int from, boolean exact) {
+        if (shadow) {
+            // A call the generic body makes goes through the callee's own
+            // guard: it adds nothing to the callee's parameters, and has
+            // the typed version's result only when its arguments fit it.
+            boolean fit = exact;
+            for (int i = 0; fit && i < args.size(); i++) {
+                fit = Ty.join(f.params[from + i], args.get(i)).equals(f.params[from + i]);
+            }
+            if (!fit) {
+                shadowMiss = true;
+                for (Ty t : args) {
+                    escape(t);
+                }
+            }
+            return;
+        }
         if (!exact) {
             escapeFn(f);
             for (Ty t : args) {
