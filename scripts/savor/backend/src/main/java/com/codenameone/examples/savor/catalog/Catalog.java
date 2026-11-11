@@ -20,7 +20,6 @@ package com.codenameone.examples.savor.catalog;
 
 import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
-import com.codename1.backend.annotations.Cacheable;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.session.Identifier;
@@ -293,13 +292,6 @@ public class Catalog {
     }
 
     /// A photo, to anyone: menus are public.
-    ///
-    /// Kept in the `photos` cache, which every instance shares once
-    /// `cn1.kv.url` names a Redis: a photo is never changed, only replaced by
-    /// a new one, and the one it replaced is deleted only when no menu names
-    /// it any more -- so an entry can only go stale for a photo nobody asks
-    /// for, and lives `cn1.cache.photos.ttl` seconds.
-    @Cacheable(value = "photos", key = "#p0")
     @Transactional(readOnly = true)
     public PhotoDto photo(String id) {
         Photo photo = id == null || id.length() > 32 ? null : photos.findById(id);
