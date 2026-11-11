@@ -1083,27 +1083,23 @@ public class Parser extends ClassVisitor {
         // leave space for primitive arrays
         arrayId += 100;
         
+        // An id only for an array class the program has (ByteCodeClass.emitsArrayClass, the
+        // same test that decides whether its descriptor is written); the descriptor is the
+        // macro's only reader. Three ids for every class put a program of 16,706 classes
+        // past the 16-bit object header index (llm with its dependencies, translated whole).
         for(ByteCodeClass bc : classes) {
-            bld.append("#define cn1_array_1_id_");
-            bld.append(bc.getClsName());
-            bld.append(" ");
-            bld.append(arrayId);
-            bld.append("\n");
-            arrayId++;
-
-            bld.append("#define cn1_array_2_id_");
-            bld.append(bc.getClsName());
-            bld.append(" ");
-            bld.append(arrayId);
-            bld.append("\n");
-            arrayId++;
-
-            bld.append("#define cn1_array_3_id_");
-            bld.append(bc.getClsName());
-            bld.append(" ");
-            bld.append(arrayId);
-            bld.append("\n");
-            arrayId++;
+            String n = bc.getClsName();
+            for (int dim = 1; dim <= 3; dim++) {
+                if (!ByteCodeClass.emitsArrayClass(n.replace('/', '_').replace('$', '_').replace('-', '_'), dim)) {
+                    continue;
+                }
+                bld.append("#define cn1_array_").append(dim).append("_id_");
+                bld.append(n);
+                bld.append(" ");
+                bld.append(arrayId);
+                bld.append("\n");
+                arrayId++;
+            }
         }
 
         // THE HIGHEST CLASS ID THIS TRANSLATION CAN PRODUCE, emitted rather than guessed.
