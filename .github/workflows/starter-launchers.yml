@@ -7,6 +7,17 @@ on:
     paths:
       - 'scripts/test-starter-launchers.py'
       - 'scripts/sync-initializr-launchers.py'
+      # The launchers this workflow compares, and their copies: a change to one
+      # without the other is the drift it exists to report.
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/build.*'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/run.*'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/mvnw*'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/mvnconfig.toml'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/.vscode/**'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/tools/**'
+      - 'maven/cli/src/main/batsh/build.batsh'
+      - 'scripts/initializr/common/src/main/resources/*.zip'
+      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/maven/intellij/workspace.xml'
       - '.github/workflows/starter-launchers.yml'
   workflow_dispatch:
   schedule:

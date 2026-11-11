@@ -98,6 +98,19 @@ public class JavaSEExecutableJarMojo extends AbstractCN1Mojo {
                 FileUtils.copyFileToDirectory(file, distLibs);
                 classPath.add("libs/" + file.getName());
             }
+            for (String[] gav : missingDesktopNatives(project.getArtifacts())) {
+                File file = resolveExact(gav[0], gav[1], gav[2], gav[3], "so the desktop app plays media on "
+                        + gav[3]);
+                if (file == null) {
+                    throw new MojoExecutionException("Could not resolve " + gav[0] + ":" + gav[1] + ":" + gav[2]
+                            + ":" + gav[3] + ". The desktop app is one zip for every desktop platform, and"
+                            + " this is the ffmpeg it plays media with on " + gav[3] + ". It is downloaded"
+                            + " the first time this goal runs, so that run cannot be offline.");
+                }
+                FileUtils.copyFileToDirectory(file, libs);
+                FileUtils.copyFileToDirectory(file, distLibs);
+                classPath.add("libs/" + file.getName());
+            }
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to copy the desktop app's dependencies", ex);
         }
@@ -126,6 +139,50 @@ public class JavaSEExecutableJarMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("Failed to write the desktop jar " + jar, ex);
         }
         getLog().info("Desktop app: " + jar);
+    }
+
+    /** The platforms a desktop app is run on, as org.bytedeco names its natives. */
+    static final String[] DESKTOP_NATIVE_PLATFORMS = {
+        "linux-arm64", "linux-x86_64", "macosx-arm64", "macosx-x86_64", "windows-x86_64"
+    };
+
+    /**
+     * The org.bytedeco natives the desktop app needs and the project does not have, each as
+     * group, artifact, version, classifier.
+     *
+     * <p>The project's own class path carries ffmpeg for the machine it is built on and no
+     * other: that is what a simulator runs with, and what keeps a first build from
+     * downloading every platform's. The zip this goal writes is run somewhere else -- built
+     * on a Mac, started on Windows -- so it takes the rest here. Only for a library the
+     * project already has, at the version it has it: an application without ffmpeg gets
+     * none.</p>
+     */
+    static List<String[]> missingDesktopNatives(java.util.Collection<Artifact> artifacts) {
+        List<String[]> missing = new ArrayList<String[]>();
+        for (String library : new String[] {"ffmpeg", "javacpp"}) {
+            String version = null;
+            Set<String> present = new HashSet<String>();
+            for (Artifact a : artifacts) {
+                if (!"org.bytedeco".equals(a.getGroupId()) || !library.equals(a.getArtifactId())
+                        || !"jar".equals(a.getType())) {
+                    continue;
+                }
+                if (a.getClassifier() == null || a.getClassifier().length() == 0) {
+                    version = a.getBaseVersion();
+                } else {
+                    present.add(a.getClassifier());
+                }
+            }
+            if (version == null) {
+                continue;
+            }
+            for (String platform : DESKTOP_NATIVE_PLATFORMS) {
+                if (!present.contains(platform)) {
+                    missing.add(new String[] {"org.bytedeco", library, version, platform});
+                }
+            }
+        }
+        return missing;
     }
 
     /** {@code myapp-common} is packaged as {@code myapp-javase-<version>}, the javase module's name. */

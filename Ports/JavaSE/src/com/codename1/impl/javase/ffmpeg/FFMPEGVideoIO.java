@@ -40,7 +40,7 @@ import java.util.Map;
 
 /// `com.codename1.media.VideoIO` implementation for the JavaSE simulator backed by the
 /// `ffmpeg`/`ffprobe` executables (resolved by `FFMPEGMedia`, which bundles a binary via
-/// the optional `org.bytedeco:ffmpeg-platform` dependency). This is a fully functional
+/// the optional `org.bytedeco:ffmpeg` dependency). This is a fully functional
 /// reference implementation: it encodes application frames + audio, decodes clips to
 /// frame accurate RGBA frames + PCM, and enumerates the codecs the local ffmpeg build
 /// exposes.

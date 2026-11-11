@@ -33,4 +33,50 @@ with zipfile.ZipFile(archive) as source:
     elif stale:
         raise SystemExit('Initializr launcher drift: ' + ', '.join(stale)
                          + '. Run python scripts/sync-initializr-launchers.py --write')
+# The desktop jar runs on machines other than the one that built it, so every
+# command that builds one asks for every desktop platform's media natives. The
+# IDE launchers are separate copies of the archetype's and nothing regenerates
+# them, so a copy that builds the jar without the flag is reported here.
+FLAG = b'cn1.ffmpeg.allPlatforms'
+resources = archive.parent
+host_only = []
+
+
+def builds_without_flag(data):
+    """True when a command in this launcher builds the desktop jar without the flag."""
+    if b'<action>' in data:
+        # NetBeans: one file, several actions, each a command of its own.
+        # An action that only cleans resolves no media and needs no flag.
+        return any(b'executable-jar' in action and FLAG not in action
+                   and action.count(b'<goal>') != action.count(b'<goal>clean</goal>')
+                   for action in data.split(b'<action>'))
+    lines = [line for line in data.splitlines() if b'-Pexecutable-jar' in line]
+    if lines:
+        return any(FLAG not in line for line in lines)
+    return b'executable-jar' in data and FLAG not in data
+
+
+for ide in ('eclipse.zip', 'idea.zip', 'netbeans.zip', 'vscode.zip', 'common.zip'):
+    with zipfile.ZipFile(resources / ide) as source:
+        for entry in source.infolist():
+            if entry.is_dir() or entry.filename.endswith('pom.xml'):
+                continue
+            data = source.read(entry.filename)
+            if builds_without_flag(data):
+                host_only.append(ide + '!' + entry.filename)
+# The archetype's own copies, which no archive above is built from.
+for name in ['.vscode/settings.json', 'mvnconfig.toml', 'tools/eclipse', 'tools/netbeans']:
+    path = archetype / name
+    for file in ([path] if path.is_file() else sorted(p for p in path.rglob('*') if p.is_file())):
+        if builds_without_flag(file.read_bytes()):
+            host_only.append(str(file.relative_to(root)))
+if builds_without_flag((root / 'maven/cli/src/main/batsh/build.batsh').read_bytes()):
+    host_only.append('maven/cli/src/main/batsh/build.batsh')
+run_profiles = root / 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/maven/intellij/workspace.xml'
+if FLAG not in run_profiles.read_bytes():
+    host_only.append(str(run_profiles.relative_to(root)))
+if host_only:
+    raise SystemExit('These build the desktop jar without -D' + FLAG.decode()
+                     + '=true, so it would carry media natives for the build machine only: '
+                     + ', '.join(host_only))
 print('Initializr launcher parity OK')

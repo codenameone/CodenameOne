@@ -87,7 +87,7 @@ call "%MVNW%" package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTar
 
 goto :finish
 :jar
-call "%MVNW%" -Pexecutable-jar package -Dcodename1.platform^=javase -DskipTests -U -e
+call "%MVNW%" -Pexecutable-jar package -Dcodename1.platform^=javase -Dcn1.ffmpeg.allPlatforms^=true -DskipTests -U -e
 
 goto :finish
 :help

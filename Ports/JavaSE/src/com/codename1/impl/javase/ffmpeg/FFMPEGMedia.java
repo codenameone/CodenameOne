@@ -133,7 +133,7 @@ public final class FFMPEGMedia {
 
     /**
      * Resolves an ffmpeg/ffprobe executable bundled by the
-     * {@code org.bytedeco:ffmpeg-platform} dependency, so simulator media
+     * {@code org.bytedeco:ffmpeg} dependency, so simulator media
      * playback works with no externally installed ffmpeg. The bytedeco binaries
      * are full builds whose native decoders cover H.264/AAC/MP3 (those require
      * no GPL/x264 encoder), which is what the codec-free upstream CEF can no

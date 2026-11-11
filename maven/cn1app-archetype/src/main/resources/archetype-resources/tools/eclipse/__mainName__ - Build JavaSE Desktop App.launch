@@ -11,6 +11,7 @@
         <listEntry value="jansi.strip=false"/>
         <listEntry value="jansi.force=false"/>
         <listEntry value="codename1.platform=javase"/>
+        <listEntry value="cn1.ffmpeg.allPlatforms=true"/>
     </listAttribute>
     <stringAttribute key="M2_RUNTIME" value="EMBEDDED"/>
     <booleanAttribute key="M2_SKIP_TESTS" value="true"/>

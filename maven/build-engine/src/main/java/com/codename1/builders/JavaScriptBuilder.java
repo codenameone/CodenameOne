@@ -249,7 +249,7 @@ public class JavaScriptBuilder extends Executor {
                         public void log(String message) {
                             JavaScriptBuilder.this.log(message);
                         }
-                    });
+                    }, this);
             jsOutputZip = new File(buildDir, request.getMainClass() + "-js.zip");
             // Zip the dist FLAT. The bundle is meant to be unpacked directly
             // into a web root, so a "<MainClass>-js/" wrapper only forces every
@@ -269,7 +269,7 @@ public class JavaScriptBuilder extends Executor {
     private void stageJavaApi(File stageClasses) throws IOException {
         InputStream is = getResourceAsStream("/parparvm-java-api.jar");
         if (is == null) {
-            throw new IOException("parparvm-java-api.jar resource is missing from the plugin classpath");
+            throw new IOException("parparvm-java-api.jar is missing from the codenameone-parparvm bundle this build resolved");
         }
         try {
             unzip(is, stageClasses, stageClasses, stageClasses);

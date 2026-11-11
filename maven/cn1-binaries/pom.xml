@@ -15,10 +15,234 @@
     <name>cn1-binaries-javase</name>
     <description>Desktop runtime binaries sourced from standard Maven dependencies</description>
 
+    <!--
+        ffmpeg for the machine that is running the build, and no other.
+
+        This used to be one dependency on org.bytedeco:ffmpeg-platform, which
+        is every platform bytedeco builds: seven native jars, two of them
+        Android, 157 MB. It was 45% of what the first build of a new project
+        downloaded, and the simulator on a Mac can run exactly one of them.
+        The Maven plugin depends on this artifact too, so it was fetched
+        before the first goal of any project ran.
+
+        The Java half (ffmpeg, javacpp) is unconditional; the natives are
+        chosen by the profiles below, which Maven activates from the JVM
+        running the build. That works in a published pom: profile activation
+        in a dependency's pom is evaluated on the consumer's machine, against
+        its os.name and os.arch. This pom is therefore published as it is
+        written. Do not flatten it or resolve its profiles at release time:
+        the release runs on Linux, and every Mac and Windows developer would
+        get Linux natives.
+
+        A Mac gets both architectures. The JVM that runs Maven and the one
+        that runs the simulator are routinely different there: an x64 JDK 8
+        under Rosetta beside an arm64 JDK 17 is this project's own setup.
+        Elsewhere the two agree.
+
+        A platform with no profile gets no natives. FFMPEGMedia then falls
+        back to ffmpeg.dir and to PATH, as it does whenever the bundled
+        binary cannot be loaded.
+
+        -Dcn1.ffmpeg.allPlatforms adds every desktop platform (not Android's,
+        which the aggregator also brought and no desktop can load), for a
+        desktop distribution assembled on one OS and run on another. A
+        generated project's "build the desktop jar" commands pass it, and the
+        javase-executable-jar goal resolves the same natives without it.
+
+        Gradle evaluates none of these profiles. The Gradle plugin adds the
+        host natives to its simulator configuration itself (AppSupport), at
+        the versions this pom is built with.
+
+        scripts/check-first-build-footprint.py holds the result: it fails
+        when a foreign platform's natives are back in a project's first
+        download.
+    -->
     <dependencies>
         <dependency>
             <groupId>org.bytedeco</groupId>
-            <artifactId>ffmpeg-platform</artifactId>
+            <artifactId>ffmpeg</artifactId>
+            <version>${ffmpeg.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacpp</artifactId>
+            <version>${cn1.javacpp.version}</version>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <profile>
+            <id>ffmpeg-macosx</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>macosx-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>macosx-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>macosx-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>macosx-x86_64</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ffmpeg-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>windows-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>windows-x86_64</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ffmpeg-linux-x86_64</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>linux-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>linux-x86_64</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ffmpeg-linux-arm64</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>linux-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>linux-arm64</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>ffmpeg-all-platforms</id>
+            <activation>
+                <property>
+                    <name>cn1.ffmpeg.allPlatforms</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>linux-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>linux-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>linux-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>linux-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>macosx-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>macosx-arm64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>macosx-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>macosx-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                    <version>${ffmpeg.version}</version>
+                    <classifier>windows-x86_64</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${cn1.javacpp.version}</version>
+                    <classifier>windows-x86_64</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

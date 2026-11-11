@@ -69,6 +69,10 @@
         <jcefmaven.version>146.0.10</jcefmaven.version>
         <jcef.version>jcef-d3de827+cef-146.0.10+g8219561+chromium-146.0.7680.179</jcef.version>
         <ffmpeg.version>7.1-1.5.11</ffmpeg.version>
+        <!-- The JavaCPP release ffmpeg.version was built against: its second
+             half. Bump the two together. cn1-binaries-javase and the Gradle
+             plugin both name the host's native jars at these versions. -->
+        <cn1.javacpp.version>1.5.11</cn1.javacpp.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
@@ -186,11 +190,6 @@
                 <groupId>me.friwi</groupId>
                 <artifactId>jcefmaven</artifactId>
                 <version>${jcefmaven.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>ffmpeg-platform</artifactId>
-                <version>${ffmpeg.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>

@@ -27,6 +27,10 @@ on:
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
       - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'scripts/check-first-build-footprint.py'
+      # Any module's dependencies can land on the class path a first build
+      # downloads; the footprint gate has to see the change that adds one.
+      - 'maven/*/pom.xml'
       - 'maven/integration-tests/backend-cn1lib-test.sh'
       - 'scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml'
       - 'scripts/initializr/common/src/main/resources/backend-only-pom.xml'
@@ -55,6 +59,10 @@ on:
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
       - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'scripts/check-first-build-footprint.py'
+      # Any module's dependencies can land on the class path a first build
+      # downloads; the footprint gate has to see the change that adds one.
+      - 'maven/*/pom.xml'
       - 'maven/integration-tests/backend-cn1lib-test.sh'
       - 'scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml'
       - 'scripts/initializr/common/src/main/resources/backend-only-pom.xml'
@@ -135,6 +143,15 @@ jobs:
           cd maven
           mvn archetype:update-local-catalog -Plocal-dev-javase
           mvn archetype:crawl -Plocal-dev-javase
+      # What `./run.sh` downloads on a machine that has never built anything.
+      # The plugin's class path is resolved whole before its first goal, so one
+      # dependency added to it (or to build-engine) is megabytes on every new
+      # developer's first run and changes no test anywhere. The script builds a
+      # generated project into an empty local repository, with the repository
+      # the step above filled as its remote, and fails on a port, on an ffmpeg
+      # native for another platform, or on the total passing its budget.
+      - name: Check what a new project's first build downloads
+        run: python3 scripts/check-first-build-footprint.py --repo "$HOME/.m2/repository"
       - name: Run archetype simulator smoke (auto-bundle pref forced on)
         env:
           # The packaging check must not be skipped on a runner that has clang.

@@ -83,4 +83,61 @@ public final class GradleHostFactory {
         return new GradleProjectHost(log, layout, finalName, groupId, projectProperties, userProperties, elements,
                 sourceRoots, artifacts, framework, codenameOneVersion);
     }
+
+    /// A host for a task that may build a target locally, which reads port jars
+    /// (`AppBuilder.portArtifacts`).
+    ///
+    /// @param ports what the task's build target reads, as `artifactId[:classifier]`
+    /// @param portJars the files of exactly those, from a configuration of their own
+    ///        that nothing resolves until this task runs
+    public static ProjectHost create(Task task, Log log, ProjectLayout layout, String finalName, String groupId,
+                                     Map<String, String> projectProperties, Map<String, String> userProperties,
+                                     FileCollection classpath, List<String> sourceRoots, List<String> artifacts,
+                                     FileCollection frameworkJars, String codenameOneVersion,
+                                     List<String> ports, FileCollection portJars) {
+        GradleProjectHost host = (GradleProjectHost) create(task, log, layout, finalName, groupId,
+                projectProperties, userProperties, classpath, sourceRoots, artifacts, frameworkJars,
+                codenameOneVersion);
+        if (ports != null && portJars != null && !ports.isEmpty()) {
+            Map<String, File> resolved = new LinkedHashMap<String, File>();
+            for (File f : portJars) {
+                String port = portOf(f.getName(), ports);
+                if (port != null) {
+                    resolved.put(port, f);
+                }
+            }
+            host.portJars(resolved);
+        }
+        return host;
+    }
+
+    /// Which of `ports` the file `name` is. The most specific artifact id wins, so
+    /// `codenameone-android-compat-1.jar` is never taken for `codenameone-android`.
+    static String portOf(String name, List<String> ports) {
+        String best = null;
+        int bestLength = -1;
+        for (String port : ports) {
+            int colon = port.indexOf(':');
+            String artifactId = colon < 0 ? port : port.substring(0, colon);
+            String classifier = colon < 0 ? null : port.substring(colon + 1);
+            if (!name.startsWith(artifactId + "-") || !name.endsWith(".jar")) {
+                continue;
+            }
+            // What follows the artifact id is the version, then the classifier.
+            // A version starts with a digit; "compat-1.0" does not.
+            String rest = name.substring(artifactId.length() + 1, name.length() - ".jar".length());
+            if (rest.length() == 0 || !Character.isDigit(rest.charAt(0))) {
+                continue;
+            }
+            boolean classified = classifier != null && rest.endsWith("-" + classifier);
+            if (classifier != null ? !classified : rest.endsWith("-bundle")) {
+                continue;
+            }
+            if (artifactId.length() > bestLength) {
+                best = port;
+                bestLength = artifactId.length();
+            }
+        }
+        return best;
+    }
 }

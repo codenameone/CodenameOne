@@ -305,6 +305,63 @@ scripts/check-build-hint-catalog.sh            # every hint the code reads is de
 means a hint went in undeclared. Do not re-run `tools/build-hint-bootstrap/`; it
 seeded the catalog once and would overwrite hand edits.
 
+### A new project's first build is a download, and it is gated
+
+The first thing a developer does is run a project from the initializr on a
+machine that has never built one. Maven resolves a plugin's **whole** class path
+before its first goal, so every runtime dependency of `codenameone-maven-plugin`
+and `codenameone-build-engine` is downloaded by a Hello World in the simulator.
+That was 346 MB: 55 MB of ports nothing in a simulator run opens, and 157 MB of
+ffmpeg for seven platforms. No test fails when it grows.
+
+- **The ports are not dependencies of the build tools.** `codenameone-ios`,
+  `-android`, `-mac`, `-windows`, `-linux` and `-parparvm` are `provided` and
+  `optional` in both poms (reactor order and the test class path keep them).
+  `AppBuilder.LocalBuild` names the ports each local target reads,
+  `ProjectHost.getPortJar` resolves one at the build tool's own version when
+  that target is built, and `Executor.getResourceAsStream` reads the class path
+  first and those jars second. A builder must read a port **through the
+  Executor**, never `SomeClass.class.getResourceAsStream`: that sees the class
+  path alone and finds nothing in a customer build while passing every test
+  here, where the ports are on the test class path.
+- **A new local target, or a new port, is a row in `LocalBuild`** and in
+  `LocalBuildPortsTest`, and a new port also in `PORT_ARTIFACTS` in the script
+  below.
+- **Ports are resolved at the plugin's own version**, by both build tools, and a
+  port the *project* depends on is never used: a builder paired with an older
+  port writes a project that builds and does not start. A port under the plugin
+  declaration's own `<dependencies>` still wins, which is how one is pinned.
+- **ffmpeg is the host's alone.** `maven/cn1-binaries/pom.xml` selects the
+  natives with OS-activated profiles, which Maven evaluates on the machine that
+  resolves the pom -- so that pom must never be flattened. Gradle does not
+  evaluate them; `PluginInfo.hostFfmpegPlatforms` is the same table there.
+- **The desktop jar is the exception, because it runs somewhere else.**
+  `javase-executable-jar` resolves the other desktop platforms' natives itself
+  (`missingDesktopNatives`). A project with a `javase` module packages straight
+  from its class path, so its generated launch commands pass
+  `-Dcn1.ffmpeg.allPlatforms=true` (Maven only), and
+  `generate-desktop-app-wrapper` warns when an older project's do not. Those
+  commands exist in several copies nothing regenerates: the archetype's
+  scripts and IDE launchers, the Initializr's `common.zip` and per-IDE zips,
+  the plugin's IntelliJ `workspace.xml`, and `cn1:buildExecutableJar`, which
+  sends the property to its child build. `scripts/sync-initializr-launchers.py`
+  (`starter-launchers.yml`) fails on a copy that builds the jar without it.
+- **`codename1.stageOnly` resolves the target's ports** although it never runs
+  the builder, so the staging tests cover resolution for every target they stage.
+
+`scripts/check-first-build-footprint.py` (`archetype-smoke.yml`) generates a
+project, builds what `run.sh` builds into an **empty** local repository with the
+workspace's repository as a `file://` remote, and fails on a port, on an
+`org.bytedeco` native for another platform, on a host with no ffmpeg at all, or
+on the total passing `BUDGET_MB`. CI runs it on Linux only, so it first holds
+the profile of *every* host in that pom to a table (`HOST_PROFILES`). It
+measures a floor: the Maven wrapper's distribution and what the simulator
+fetches once running are not in a local repository.
+
+```bash
+scripts/check-first-build-footprint.py --repo "$PWD/.m2-repo"
+```
+
 ### The CSS compiler is headless, and has to stay that way
 
 Compiling `css/theme.css` to `theme.res` opens no window, boots no JavaSE port

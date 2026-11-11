@@ -58,6 +58,7 @@ final class GradleProjectHost implements ProjectHost {
     private final List<BuildArtifact> artifacts;
     private final Map<String, File> frameworkJars;
     private final String codenameOneVersion;
+    private Map<String, File> portJars = Collections.<String, File>emptyMap();
 
     GradleProjectHost(Log log, ProjectLayout layout, String finalName, String groupId,
                       Map<String, String> projectProperties, Map<String, String> userProperties,
@@ -232,6 +233,17 @@ final class GradleProjectHost implements ProjectHost {
     @Override
     public File getJar(BuildArtifact artifact) {
         return artifact.getFile();
+    }
+
+    /// The ports the task's own configuration resolved for its build target.
+    void portJars(Map<String, File> resolved) {
+        this.portJars = resolved;
+    }
+
+    @Override
+    public File getPortJar(String artifactId, String classifier) {
+        File f = portJars.get(classifier == null ? artifactId : artifactId + ":" + classifier);
+        return f != null ? f : getJar("com.codenameone", artifactId, classifier);
     }
 
     @Override

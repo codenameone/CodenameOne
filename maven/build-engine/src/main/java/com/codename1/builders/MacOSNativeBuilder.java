@@ -300,9 +300,9 @@ public class MacOSNativeBuilder extends Executor {
             }
             stageThemeResources(nativeSources, buildinRes);
         } catch (Exception ex) {
-            throw new BuildException("Failed to stage the MacPort native layer. The codenameone "
-                    + "maven plugin must provide the codenameone-mac 'bundle' artifact "
-                    + "(MacPort.jar + nativemac.jar) on its classpath.", ex);
+            throw new BuildException("Failed to stage the MacPort native layer. The codenameone-mac "
+                    + "'bundle' artifact this build resolved must carry MacPort.jar and "
+                    + "nativemac.jar; a truncated download or a bundle of another version does not.", ex);
         }
 
         DatabaseUsage databaseUsage;

@@ -113,6 +113,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     
     @Parameter(required = true, readonly = true, defaultValue = "${localRepository}")
     protected MavenArtifactRepository localRepository;
+
+    /// This plugin's own version, for the ports it resolves on demand.
+    @Parameter(readonly = true, defaultValue = "${plugin.version}")
+    private String pluginVersion;
     
     @Parameter(required = true, readonly = true, defaultValue = "${project.remoteArtifactRepositories}")
     protected List<MavenArtifactRepository> remoteRepositories;
@@ -552,6 +556,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
 
         @Override
+        public File getPortJar(String artifactId, String classifier) {
+            return AbstractCN1Mojo.this.resolvePortJar(artifactId, classifier);
+        }
+
+        @Override
         public long sessionStartTime() {
             return getSession() != null && getSession().getRequest() != null
                     && getSession().getRequest().getStartTime() != null
@@ -900,6 +909,102 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return out;
     }
     
+    /// Resolves a port a local build reads -- `com.codenameone:artifactId[:classifier]`
+    /// at this plugin's version -- downloading it on the first build of a target that
+    /// needs it. See `ProjectHost.getPortJar` for why the plugin does not simply depend
+    /// on them.
+    ///
+    /// A port the plugin itself carries answers first: that is the documented way to
+    /// pin one (a `<dependencies>` entry under the plugin declaration), and it is what
+    /// a plugin released before the ports left its class path looks like. A port the
+    /// *project* depends on is deliberately not consulted. It is at `cn1.version`,
+    /// which a project may hold behind the plugin, and a builder paired with an older
+    /// port writes a project that builds and does not start.
+    protected File resolvePortJar(String artifactId, String classifier) {
+        if (pluginArtifacts != null) {
+            for (Artifact a : pluginArtifacts) {
+                if (GROUP_ID.equals(a.getGroupId()) && artifactId.equals(a.getArtifactId())
+                        && Objects.equals(emptyToNull(a.getClassifier()), classifier)
+                        && a.getFile() != null && a.getFile().isFile()) {
+                    return a.getFile();
+                }
+            }
+        }
+        String version = ownVersion();
+        if (version == null) {
+            return null;
+        }
+        return resolveExact(GROUP_ID, artifactId, version, classifier, "for this build target");
+    }
+
+    private static String emptyToNull(String s) {
+        return s == null || s.length() == 0 ? null : s;
+    }
+
+    /// Resolves one jar by its coordinates, without its dependencies, or answers null
+    /// having logged why. The plugin repositories are searched as well as the
+    /// project's: a project is free to declare the Codename One repository for plugins
+    /// alone. Mirrors, proxies and credentials are those of the repositories, which
+    /// Maven hands over already configured.
+    protected File resolveExact(String groupId, String artifactId, String version, String classifier,
+                                String why) {
+        if (repositorySystem == null) {
+            return null;
+        }
+        Artifact artifact = classifier == null
+                ? repositorySystem.createArtifact(groupId, artifactId, version, "jar")
+                : repositorySystem.createArtifactWithClassifier(groupId, artifactId, version, "jar",
+                        classifier);
+        List<org.apache.maven.artifact.repository.ArtifactRepository> repositories =
+                new ArrayList<org.apache.maven.artifact.repository.ArtifactRepository>();
+        if (remoteRepositories != null) {
+            repositories.addAll(remoteRepositories);
+        }
+        if (project != null && project.getPluginArtifactRepositories() != null) {
+            for (org.apache.maven.artifact.repository.ArtifactRepository r : project.getPluginArtifactRepositories()) {
+                if (!repositories.contains(r)) {
+                    repositories.add(r);
+                }
+            }
+        }
+        getLog().info("Resolving " + groupId + ":" + artifactId + ":" + version
+                + (classifier == null ? "" : ":" + classifier) + " " + why);
+        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
+                .setOffline(offline)
+                .setLocalRepository(localRepository)
+                .setRemoteRepositories(repositories)
+                .setResolveTransitively(false)
+                .setArtifact(artifact));
+        File file = artifact.getFile();
+        if (!result.isSuccess() || file == null || !file.isFile()) {
+            for (Exception ex : result.getExceptions()) {
+                getLog().error(String.valueOf(ex.getMessage()));
+            }
+            return null;
+        }
+        return file.getAbsoluteFile();
+    }
+
+    /// The version this plugin was built at, which is the version its ports were
+    /// published at. Not `cn1.plugin.version`: that is a property a project sets by
+    /// convention, and a project that names the plugin's version directly has none.
+    private String ownVersion() {
+        if (pluginVersion != null && pluginVersion.length() > 0) {
+            return pluginVersion;
+        }
+        // A mojo built by hand (a test) has no descriptor; the build engine it runs
+        // with was released in the same reactor, at the same version.
+        if (pluginArtifacts != null) {
+            for (Artifact a : pluginArtifacts) {
+                if (GROUP_ID.equals(a.getGroupId()) && "codenameone-build-engine".equals(a.getArtifactId())) {
+                    return a.getBaseVersion();
+                }
+            }
+        }
+        String declared = project == null ? null : project.getProperties().getProperty("cn1.plugin.version");
+        return declared == null || declared.length() == 0 ? null : declared;
+    }
+
     protected File getJar(Artifact artifact) {
         File[] out = new File[1];
         out[0] = artifact.getFile();
@@ -1393,7 +1498,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     protected void setupFFmpeg() {
         // The simulator resolves ffmpeg/ffprobe from the bundled
-        // org.bytedeco:ffmpeg-platform binaries at runtime (see FFMPEGMedia), so
+        // org.bytedeco:ffmpeg binaries at runtime (see FFMPEGMedia), so
         // we no longer stage an externally installed ffmpeg here. Staging a copy
         // of a PATH executable is fragile -- e.g. on Windows it picks up a
         // chocolatey shimgen shim that does not work once copied out of place,

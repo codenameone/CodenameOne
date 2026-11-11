@@ -274,10 +274,22 @@
             <artifactId>cn1-builder-resources-android</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- The ports a local build reads.
+             Provided and optional, like the compatibility runtimes above: the
+             build needs this module built first, and its tests read the port
+             from the class path, but nothing that RUNS the build tool may
+             inherit it. A plugin's whole class path is downloaded before its
+             first goal, so as a runtime dependency every port was part of the
+             first build of every project, simulator runs included. The host
+             resolves a port when a target that reads it is built
+             (AppBuilder.portArtifacts, ProjectHost.getPortJar);
+             scripts/check-first-build-footprint.py fails the build if one
+             comes back. -->
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-android</artifactId>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
         <!-- remap-android ships this runtime inside every application with
@@ -316,14 +328,16 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-ios</artifactId>
             <classifier>bundle</classifier>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-parparvm</artifactId>
             <classifier>bundle</classifier>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
 
@@ -335,7 +349,8 @@
             <artifactId>codenameone-windows</artifactId>
             <classifier>bundle</classifier>
             <version>${project.version}</version>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
         <!-- MacPort 'bundle' (MacPort.jar + nativemac.jar) supplies the native macOS
@@ -348,7 +363,8 @@
             <artifactId>codenameone-mac</artifactId>
             <classifier>bundle</classifier>
             <version>${project.version}</version>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
         <!-- LinuxPort 'bundle' (LinuxPort.jar + nativelinux.jar) supplies the native
@@ -359,7 +375,8 @@
             <artifactId>codenameone-linux</artifactId>
             <classifier>bundle</classifier>
             <version>${project.version}</version>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
         <dependency>

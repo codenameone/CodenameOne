@@ -168,7 +168,7 @@ public class JavaScriptProxyPackagerTest {
                     public void log(String message) {
                         log.add(message);
                     }
-                });
+                }, new JavaScriptBuilder());
     }
 
     private String readIndex() throws Exception {
