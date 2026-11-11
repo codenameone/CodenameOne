@@ -12,6 +12,7 @@ thread stack, and undoes group captures through a trail when it backtracks.
 from enum import IntFlag as _IntFlag
 from re import _parser
 from re import _engine
+import _cn1re
 
 __all__ = ["match", "fullmatch", "search", "sub", "subn", "split", "findall", "finditer", "compile",
            "purge", "escape", "error", "Pattern", "Match", "A", "I", "L", "M", "S", "X", "U",
@@ -72,6 +73,7 @@ class Pattern:
         self.groups = code.groups
         self.groupindex = dict(code.groupindex)
         self._templates = {}
+        self._prog = _engine.native(code)
 
     def __repr__(self):
         p = repr(self.pattern)
@@ -97,48 +99,27 @@ class Pattern:
         elif isinstance(string, str):
             raise TypeError("cannot use a bytes pattern on a string-like object")
 
-    def _run(self, string, pos, endpos, mode):
-        self._check(string)
-        n = len(string)
-        if endpos is None or endpos > n:
-            endpos = n
-        if endpos < 0:
-            endpos = 0
-        if pos < 0:
-            pos = 0
-        if pos > endpos:
-            return None
-        text = string
-        if not isinstance(string, str):
-            text = string.decode("latin-1")
-        regs = _engine.run(self._code, text, pos, endpos, mode)
-        if regs is None:
-            return None
-        return Match(self, string, pos, endpos, regs)
-
+    # One call into the runtime each: the checks, the bounds, the run and the
+    # Match are all Java (_cn1re.match), as sre's are C.
     def match(self, string, pos=0, endpos=None):
-        return self._run(string, pos, endpos, 0)
+        return _cn1re.match(self._prog, self, string, pos, endpos, 0)
 
     def fullmatch(self, string, pos=0, endpos=None):
-        return self._run(string, pos, endpos, 1)
+        return _cn1re.match(self._prog, self, string, pos, endpos, 1)
 
     def search(self, string, pos=0, endpos=None):
-        return self._run(string, pos, endpos, 2)
+        return _cn1re.match(self._prog, self, string, pos, endpos, 2)
 
     def finditer(self, string, pos=0, endpos=None):
-        self._check(string)
-        n = len(string)
-        if endpos is None or endpos > n:
-            endpos = n
-        text = string if isinstance(string, str) else string.decode("latin-1")
+        prog = self._prog
         forbid = -1
-        at = pos
-        while at <= endpos:
-            regs = _engine.run(self._code, text, at, endpos, 2, forbid)
-            if regs is None:
+        at = pos if pos > 0 else 0
+        while True:
+            m = _cn1re.iter(prog, self, string, pos, endpos, at, forbid)
+            if m is None:
                 return
-            yield Match(self, string, pos, endpos, regs)
-            s, e = regs[0], regs[1]
+            yield m
+            s, e = m.span()
             # After an empty match the next one may not be empty at the
             # same place; after a non-empty one it may.
             forbid = e if s == e else -1
@@ -178,16 +159,16 @@ class Pattern:
         out.append(string[last:])
         return out
 
+    # A str template over a str is Java's from end to end (_cn1re.sub), with
+    # the template compiled once per pattern as sre caches it; _subn is the
+    # general loop for a callable or bytes.
     def subn(self, repl, string, count=0):
-        if isinstance(repl, str) and isinstance(string, str) and isinstance(self.pattern, str):
-            # A template on a str: compiled once per pattern, as sre caches it,
-            # and the loop in Java, without a Match per hit.
-            template = self._templates.get(repl)
-            if template is None:
-                template = _compile_template(self, repl)
-                if len(self._templates) < 64:
-                    self._templates[repl] = template
-            return _engine.subn(self._code, string, template, count)
+        return _cn1re.sub(self._prog, self, repl, string, count, True)
+
+    def sub(self, repl, string, count=0):
+        return _cn1re.sub(self._prog, self, repl, string, count, False)
+
+    def _subn(self, repl, string, count):
         if callable(repl):
             fn = repl
         else:
@@ -211,9 +192,6 @@ class Pattern:
         out.append(string[last:])
         return string[:0].join(out), n
 
-    def sub(self, repl, string, count=0):
-        return self.subn(repl, string, count)[0]
-
     def scanner(self, string, pos=0, endpos=None):
         raise NotImplementedError("Pattern.scanner is not supported")
 
@@ -224,82 +202,7 @@ class Pattern:
         return self
 
 
-class Match:
-    def __init__(self, pattern, string, pos, endpos, regs):
-        self.re = pattern
-        self.string = string
-        self.pos = pos
-        self.endpos = endpos
-        self._regs = regs
-        last = regs[-1]
-        self.lastindex = last if last > 0 else None
-        self.lastgroup = None
-        if self.lastindex is not None:
-            for name, idx in pattern.groupindex.items():
-                if idx == self.lastindex:
-                    self.lastgroup = name
-
-    def _index(self, g):
-        if isinstance(g, int):
-            if 0 <= g <= self.re.groups:
-                return g
-        elif isinstance(g, str):
-            idx = self.re.groupindex.get(g)
-            if idx is not None:
-                return idx
-        raise IndexError("no such group")
-
-    def _get(self, idx, default=None):
-        s = self._regs[2 * idx]
-        e = self._regs[2 * idx + 1]
-        if s < 0 or e < 0:
-            return default
-        return self.string[s:e]
-
-    def group(self, *groups):
-        if not groups:
-            return self._get(0)
-        if len(groups) == 1:
-            return self._get(self._index(groups[0]))
-        return tuple(self._get(self._index(g)) for g in groups)
-
-    def __getitem__(self, g):
-        return self._get(self._index(g))
-
-    def groups(self, default=None):
-        return tuple(self._get(i, default) for i in range(1, self.re.groups + 1))
-
-    def groupdict(self, default=None):
-        return {name: self._get(idx, default) for name, idx in self.re.groupindex.items()}
-
-    def start(self, group=0):
-        return self._regs[2 * self._index(group)]
-
-    def end(self, group=0):
-        return self._regs[2 * self._index(group) + 1]
-
-    def span(self, group=0):
-        i = self._index(group)
-        return (self._regs[2 * i], self._regs[2 * i + 1])
-
-    @property
-    def regs(self):
-        return tuple((self._regs[2 * i], self._regs[2 * i + 1]) for i in range(self.re.groups + 1))
-
-    def expand(self, template):
-        return _expand(_compile_template(self.re, template), self)
-
-    def __repr__(self):
-        return "<re.Match object; span=%r, match=%r>" % (self.span(), self.group())
-
-    def __bool__(self):
-        return True
-
-    def __copy__(self):
-        return self
-
-    def __deepcopy__(self, memo):
-        return self
+Match = _cn1re.Match
 
 
 _cache = {}
@@ -471,3 +374,7 @@ def _expand(template, m):
         else:
             out.append(p)
     return empty.join(out)
+
+
+_cn1re.set_hooks(lambda m, template: _expand(_compile_template(m.re, template), m), _compile_template,
+                 Pattern._subn)

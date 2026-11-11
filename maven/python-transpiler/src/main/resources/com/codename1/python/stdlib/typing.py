@@ -25,6 +25,27 @@ def _type_repr(obj):
     return repr(obj)
 
 
+# Subscriptions are memoized, as CPython's typing does with _tp_cache: code
+# that writes cast(List[X], v) in a loop builds the alias once. The type of
+# the parameters is part of the key (Literal[1] is not Literal[True]), and an
+# unhashable subscription is simply not cached.
+_tp_cache = {}
+
+
+def _cached(kind, owner, params, make):
+    key = (kind, owner, params, type(params))
+    try:
+        hit = _tp_cache.get(key)
+    except TypeError:
+        return make()
+    if hit is None:
+        hit = make()
+        if len(_tp_cache) >= 4096:
+            _tp_cache.clear()
+        _tp_cache[key] = hit
+    return hit
+
+
 class _Final:
     __slots__ = ()
 
@@ -70,7 +91,7 @@ class _SpecialForm(_Final):
     def __getitem__(self, params):
         if self._getitem is None:
             raise TypeError(self._name + " is not subscriptable")
-        return self._getitem(self, params)
+        return _cached(0, self, params, lambda: self._getitem(self, params))
 
     def __call__(self, *args, **kwds):
         raise TypeError("Cannot instantiate " + repr(self))
@@ -123,6 +144,9 @@ class _GenericAlias(_Final):
         return result
 
     def __getitem__(self, params):
+        return _cached(1, self, params, lambda: self._subscript(params))
+
+    def _subscript(self, params):
         if not isinstance(params, tuple):
             params = (params,)
         subst = dict(zip(self.__parameters__, params))
@@ -242,6 +266,9 @@ class _SpecialGenericAlias(_Final):
         return "typing." + self._name
 
     def __getitem__(self, params):
+        return _cached(2, self, params, lambda: self._subscript(params))
+
+    def _subscript(self, params):
         if self._name == "Callable" and isinstance(params, tuple) and len(params) == 2:
             args, result = params
             if args is ...:
@@ -409,14 +436,18 @@ class Generic:
     __slots__ = ()
 
     def __class_getitem__(cls, params):
-        if not isinstance(params, tuple):
-            params = (params,)
-        if cls is Generic or cls is Protocol:
-            return _GenericAlias(cls, params, cls.__name__)
-        return _GenericAlias(cls, params)
+        return _cached(3, cls, params, lambda: _generic_alias(cls, params))
 
     def __init_subclass__(cls, *args, **kwargs):
         super().__init_subclass__(*args, **kwargs)
+
+
+def _generic_alias(cls, params):
+    if not isinstance(params, tuple):
+        params = (params,)
+    if cls is Generic or cls is Protocol:
+        return _GenericAlias(cls, params, cls.__name__)
+    return _GenericAlias(cls, params)
 
 
 class _ProtocolMeta(type(_abc.Sized)):

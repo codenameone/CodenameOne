@@ -142,6 +142,11 @@ final class Regex {
         /// at a time, and a run never releases it. Taken (left null) for the
         /// run, so a run nested in another builds its own.
         Scratch scratch;
+        /// 1 for a str pattern, 2 for bytes, 0 until [RegexMatch] first asks.
+        int kind;
+        /// Compiled replacement templates by text, as sre caches them; at
+        /// most [RegexMatch#TEMPLATES].
+        java.util.HashMap<String, PyList> templates;
 
         @Override
         public PyType type() {
@@ -169,6 +174,18 @@ final class Regex {
             return p;
         }));
         m.setAttr("run", new RunFn());
+        m.setAttr("match", new MatchFn());
+        m.setAttr("iter", PyBuiltin.positional("iter", a -> RegexMatch.search(prog(a[0]), a[1], a[2], a[3],
+                a[4], (int) Py.index(a[5]), 2, (int) Py.index(a[6]))));
+        m.setAttr("set_hooks", PyBuiltin.positional("set_hooks", a -> {
+            RegexMatch.expandHook = a[0];
+            RegexMatch.templateHook = a[1];
+            RegexMatch.subHook = a[2];
+            return Py.NONE;
+        }));
+        m.setAttr("sub", PyBuiltin.positional("sub", a -> RegexMatch.sub(prog(a[0]), a[1], a[2], a[3],
+                a[4], Py.isTrue(a[5]))));
+        m.setAttr("Match", RegexMatch.TYPE);
         m.setAttr("subn", PyBuiltin.positional("subn", a -> subn(prog(a[0]), Py.toStr(a[1]),
                 (PyList) a[2], (int) Py.index(a[3]))));
         m.setAttr("findall", PyBuiltin.positional("findall", a -> findall(prog(a[0]), Py.toStr(a[1]),
@@ -195,6 +212,13 @@ final class Regex {
                 seen[pc] = true;
                 Op op = ops[pc];
                 if (op.k == CHAR || op.k == CHARI || op.k == ANY || op.k == ANYALL || op.k == SET) {
+                    out.add(op);
+                    break;
+                }
+                if (op.k == AT) {
+                    // Zero width: a match starting here needs the assertion
+                    // to hold here. markdownify's `(\s|^)...` escapes have
+                    // one, and ran the program at every offset without it.
                     out.add(op);
                     break;
                 }
@@ -480,6 +504,7 @@ final class Regex {
             case CHARI:
             case ANY:
             case ANYALL:
+            case AT:
                 return null;
             default:
                 break;
@@ -642,6 +667,32 @@ final class Regex {
         @Override
         public String repr() {
             return "<built-in function run>";
+        }
+    }
+
+    /// `_cn1re.match(prog, pattern, string, pos, endpos, mode)`: see [RegexMatch].
+    private static final class MatchFn extends PyObject {
+        @Override
+        public PyType type() {
+            return Py.BUILTIN_TYPE;
+        }
+
+        @Override
+        public Object call6(Object prog, Object pattern, Object string, Object pos, Object endpos, Object mode) {
+            return RegexMatch.match(prog, pattern, string, pos, endpos, (int) Py.index(mode));
+        }
+
+        @Override
+        public Object call(Object[] args, String[] kwNames) {
+            if (args.length != 6 || kwNames.length != 0) {
+                throw Py.typeError("_cn1re.match() takes exactly 6 positional arguments");
+            }
+            return call6(args[0], args[1], args[2], args[3], args[4], args[5]);
+        }
+
+        @Override
+        public String repr() {
+            return "<built-in function match>";
         }
     }
 
@@ -989,13 +1040,36 @@ final class Regex {
             }
             return -1;
         }
+        if (first.length == 2 && t.cps == null && first[1].k == AT && table(first[0]) != null) {
+            // One class or an assertion: `(\s|^)`.
+            Op op = first[0];
+            boolean[] g = table(op);
+            Op a = first[1];
+            String s = t.s;
+            for (int i = start; i <= endpos; i++) {
+                if (i < endpos) {
+                    char c = s.charAt(i);
+                    if (c < 128 ? g[c] : set(op, c)) {
+                        return i;
+                    }
+                }
+                if (at(a.at, t, i, endpos, a.unicode)) {
+                    return i;
+                }
+            }
+            return -1;
+        }
         if (first.length == 1 && t.cps == null && first[0].k == CHAR && endpos == t.s.length()) {
             return t.s.indexOf(first[0].c, start);
         }
-        for (int i = start; i < endpos; i++) {
-            int c = t.at(i);
+        for (int i = start; i <= endpos; i++) {
+            int c = i < endpos ? t.at(i) : -1;
             for (Op op : first) {
-                if (op.k == CHAR ? c == op.c : one(op, c)) {
+                if (op.k == AT) {
+                    if (at(op.at, t, i, endpos, op.unicode)) {
+                        return i;
+                    }
+                } else if (c >= 0 && (op.k == CHAR ? c == op.c : one(op, c))) {
                     return i;
                 }
             }
