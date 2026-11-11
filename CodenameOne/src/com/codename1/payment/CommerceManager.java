@@ -1077,13 +1077,20 @@ public final class CommerceManager {
         return sb.toString();
     }
 
-    private static String storeOf(Receipt r) {
+    /// The store name the service knows a receipt's store code by. Package
+    /// private so the mapping can be tested without a network round trip.
+    static String storeOf(Receipt r) {
         String code = r.getStoreCode();
         if (Receipt.STORE_CODE_ITUNES.equals(code)) {
             return "apple";
         }
         if (Receipt.STORE_CODE_PLAY.equals(code)) {
             return "google";
+        }
+        if (Receipt.STORE_CODE_AMAZON.equals(code)) {
+            // Named rather than left to the fall through below: the service
+            // routes on this word, so it must not move if the code ever does.
+            return "amazon";
         }
         return code == null ? "" : code;
     }

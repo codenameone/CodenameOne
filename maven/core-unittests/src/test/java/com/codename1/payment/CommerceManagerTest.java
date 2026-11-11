@@ -392,6 +392,25 @@ class CommerceManagerTest extends UITestBase {
         assertFalse(CommerceManager.getInstance().setAttributes(attrs));
     }
 
+    /// The service picks a verifier by store name; a receipt whose store it
+    /// does not recognise is one it cannot validate.
+    @FormTest
+    void receiptsAreSentUnderTheStoreNameTheServiceRoutesOn() {
+        Receipt amazon = new Receipt();
+        amazon.setStoreCode(Receipt.STORE_CODE_AMAZON);
+        assertEquals("amazon", CommerceManager.storeOf(amazon));
+
+        Receipt play = new Receipt();
+        play.setStoreCode(Receipt.STORE_CODE_PLAY);
+        assertEquals("google", CommerceManager.storeOf(play));
+
+        Receipt apple = new Receipt();
+        apple.setStoreCode(Receipt.STORE_CODE_ITUNES);
+        assertEquals("apple", CommerceManager.storeOf(apple));
+
+        assertEquals("", CommerceManager.storeOf(new Receipt()));
+    }
+
     private void mock(String path, String body) {
         implementation.addNetworkMockResponse(ENDPOINT + path, 200, "OK", body.getBytes(StandardCharsets.UTF_8));
     }

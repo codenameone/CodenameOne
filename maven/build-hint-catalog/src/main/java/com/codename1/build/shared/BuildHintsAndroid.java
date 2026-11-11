@@ -260,6 +260,25 @@ final class BuildHintsAndroid {
                 .def("false")
                 .platform("android"));
 
+        h.add(new Hint("android.billing.store")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("play")
+                .platform("android")
+                .doc("The store an in-app-purchase app is built for: `play` (the default) or "
+                        + "`amazon`. An app is built for one store. `amazon` builds against the "
+                        + "Amazon Appstore SDK instead of the Play Billing Library, declares the "
+                        + "receiver Amazon's client answers through, and leaves out the "
+                        + "`com.android.vending.BILLING` permission, which the Amazon Appstore "
+                        + "does not accept. `android.licenseKey` and "
+                        + "`android.billingclient.version` are Google Play settings and are not "
+                        + "used. Receipts carry the store code `amazon`, the Amazon receipt id "
+                        + "as the transaction id, and the receipt id, user id and SKU as order "
+                        + "data for server-side verification. The Appstore SDK also requires "
+                        + "the app's public key from the Amazon developer console, "
+                        + "`AppstoreAuthenticationKey.pem`, among the app's Android assets. Any "
+                        + "other value fails the build."));
+
         h.add(new Hint("android.billingclient.version")
                 .group(HintGroup.ANDROID)
                 .type(HintType.VERSION)
