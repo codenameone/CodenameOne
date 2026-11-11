@@ -148,7 +148,6 @@ final class GenLowering {
             }
         }
         StringBuilder r = new StringBuilder();
-        r.append("                d$: while (true) {\n");
         // A body with no except or finally has nothing to route an exception
         // to, and gets no try: on ParparVM every try costs a setjmp on entry,
         // which a generator pays on every resumption. What escapes is a Java
@@ -156,14 +155,23 @@ final class GenLowering {
         // see it exactly as they see one from any other call.
         boolean any = handlers.length() > 0;
         if (any) {
+            // The try is outside the dispatch loop, not inside it: every jump
+            // between states is a `continue d$`, and with the try in the loop
+            // each one entered it again -- a setjmp per state transition,
+            // several per resumption of a loop with an except in it. Here it
+            // is entered once per resumption and once more after each caught
+            // exception, which the outer loop routes back to the dispatch.
+            r.append("                while (true) {\n");
             r.append("                    try {\n");
         }
+        r.append("                d$: while (true) {\n");
         r.append("                        switch (pc) {\n");
         r.append(out);
         r.append("                            }\n");
         r.append("                            default:\n");
         r.append("                                throw new IllegalStateException();\n");
         r.append("                        }\n");
+        r.append("                }\n");
         if (any) {
             r.append("                    } catch (Throwable t$) {\n");
             r.append("                        final PyException x$ = Py.convert(t$);\n");
@@ -174,8 +182,8 @@ final class GenLowering {
             r.append("                        }\n");
             r.append("                        exc = x$;\n");
             r.append("                    }\n");
+            r.append("                }\n");
         }
-        r.append("                }\n");
         return r.toString();
     }
 
