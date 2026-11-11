@@ -302,4 +302,17 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 
 @end
 
+/// Starts observing the payment queue. Called from applicationDidFinishLaunching,
+/// which is when StoreKit asks for the observer: a transaction left unfinished by
+/// the last run, or one bought outside the application, is delivered as soon as
+/// an observer exists and is lost to this launch if none does. A function here
+/// rather than a line in the delegate because CN1_USE_STOREKIT is switched in
+/// CodenameOne_GLViewController.h, which the delegate does not import; without
+/// the define this is empty and names nothing from StoreKit.
+void CN1MacInstallStoreKitObserver(void) {
+#ifdef CN1_USE_STOREKIT
+    [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
+#endif
+}
+
 #endif

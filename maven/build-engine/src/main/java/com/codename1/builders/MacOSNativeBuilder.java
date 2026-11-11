@@ -330,10 +330,11 @@ public class MacOSNativeBuilder extends Executor {
         final boolean[] usesPush = {false};
         final boolean[] usesLocation = {false};
         final boolean[] usesAppReview = {false};
+        final boolean[] usesPurchase = {false};
         try {
             scanClassesForPermissions(classesDir, new NativeFeatureScanner(usesCrypto,
                     usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
-                    usesLocation, usesAppReview));
+                    usesLocation, usesAppReview, usesPurchase));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
@@ -342,7 +343,7 @@ public class MacOSNativeBuilder extends Executor {
             // returns a constant is the worst failure in this file.
             scanClassesForPermissions(buildinRes, new NativeFeatureScanner(usesCrypto,
                     usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
-                    usesLocation, usesAppReview));
+                    usesLocation, usesAppReview, usesPurchase));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
@@ -433,6 +434,7 @@ public class MacOSNativeBuilder extends Executor {
         boolean calendarEnabled = usesCalendar[0];
         boolean locationEnabled = usesLocation[0];
         boolean appReviewEnabled = usesAppReview[0];
+        boolean purchaseEnabled = usesPurchase[0];
         // Unconditional, for the reason the capability scan above explains at
         // length: com/codename1/camera/Camera#open is invoked by the framework's
         // own Camera class, so no scan can tell an application using the low
@@ -521,6 +523,27 @@ public class MacOSNativeBuilder extends Executor {
             }
         }
         log("App review " + (appReviewEnabled ? "enabled" : "disabled"));
+
+        // In-app purchase. The StoreKit natives are the iOS port's own, shared:
+        // without the define every one of them is an empty body, so
+        // Purchase.getInAppPurchase() answers "payments unavailable" and a
+        // purchase call returns without a callback.
+        if (purchaseEnabled) {
+            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
+            if (!controllerHeader.exists()) {
+                throw new BuildException("The application uses com.codename1.payment but "
+                        + "CodenameOne_GLViewController.h is missing from the staged native "
+                        + "sources at " + controllerHeader.getAbsolutePath());
+            }
+            try {
+                replaceInFile(controllerHeader, "//#define CN1_USE_STOREKIT",
+                        "#define CN1_USE_STOREKIT");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable in-app purchase in "
+                        + "CodenameOne_GLViewController.h", ex);
+            }
+        }
+        log("In-app purchase " + (purchaseEnabled ? "enabled" : "disabled"));
 
         if (locationEnabled) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
@@ -612,6 +635,15 @@ public class MacOSNativeBuilder extends Executor {
             extraFrameworks.add("CoreBluetooth.framework");
         }
         log("Bluetooth " + (bluetoothEnabled ? "enabled" : "disabled"));
+        // Declared, never left to an autolink hint. Both defines make the
+        // natives import StoreKit, and with modules on that import links the
+        // framework by itself -- so the review prompt linked on the builds
+        // that had modules and nothing said why. A project that named it in
+        // its own libraries already has it.
+        if ((purchaseEnabled || appReviewEnabled)
+                && !extraFrameworks.contains("StoreKit.framework")) {
+            extraFrameworks.add("StoreKit.framework");
+        }
         if (calendarEnabled) {
             File iosNative = new File(nativeSources, "IOSNative.m");
             if (!iosNative.exists()) {
@@ -1593,10 +1625,12 @@ public class MacOSNativeBuilder extends Executor {
         private final boolean[] usesPush;
         private final boolean[] usesLocation;
         private final boolean[] usesAppReview;
+        private final boolean[] usesPurchase;
 
         NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications,
                 boolean[] usesMicrophone, boolean[] usesBluetooth, boolean[] usesCalendar,
-                boolean[] usesPush, boolean[] usesLocation, boolean[] usesAppReview) {
+                boolean[] usesPush, boolean[] usesLocation, boolean[] usesAppReview,
+                boolean[] usesPurchase) {
             this.usesCrypto = usesCrypto;
             this.usesLocalNotifications = usesLocalNotifications;
             this.usesMicrophone = usesMicrophone;
@@ -1605,6 +1639,7 @@ public class MacOSNativeBuilder extends Executor {
             this.usesPush = usesPush;
             this.usesLocation = usesLocation;
             this.usesAppReview = usesAppReview;
+            this.usesPurchase = usesPurchase;
         }
 
         @Override
@@ -1664,6 +1699,9 @@ public class MacOSNativeBuilder extends Executor {
             if (cls.startsWith("com/codename1/appreview")) {
                 usesAppReview[0] = true;
             }
+            if (usesPurchaseApi(cls)) {
+                usesPurchase[0] = true;
+            }
             if (!cls.startsWith("com/codename1/security/")) {
                 return;
             }
@@ -1711,6 +1749,17 @@ public class MacOSNativeBuilder extends Executor {
                 usesBluetooth[0] = true;
             }
         }
+    }
+
+    /**
+     * Whether a referenced class belongs to the in-app purchase API.
+     *
+     * <p>The test IPhoneBuilder applies, so one application enables StoreKit
+     * on both targets or on neither. By package, with the separator: the
+     * prefix alone would also match an unrelated {@code com.codename1.paymentsx}.</p>
+     */
+    static boolean usesPurchaseApi(String cls) {
+        return cls != null && cls.startsWith("com/codename1/payment/");
     }
 
     /**

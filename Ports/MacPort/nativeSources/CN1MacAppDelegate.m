@@ -659,11 +659,15 @@ void CN1MacDeliverWindowMiniaturized(BOOL miniaturized) {
 // isAppSuspended is set whether or not Java is up: it is C state the shared
 // paint path reads, and it has to be right from the first frame.
 
+/// CN1MacViewController.m. Empty unless the build enabled in-app purchase.
+extern void CN1MacInstallStoreKitObserver(void);
+
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     // Normally a no-op: CN1MacBuildMainWindowBeforeRun released it before
     // [NSApp run]. This is the backstop for a generated main that never calls
     // that, so held menu commands cannot stay held for good.
     CN1MacReleaseStartupMenu();
+    CN1MacInstallStoreKitObserver();
     // Installed unconditionally, and this early. A scheduled notification is
     // delivered through this delegate whether it fires while the application is
     // frontmost or the user opens it from Notification Center, so without it a
