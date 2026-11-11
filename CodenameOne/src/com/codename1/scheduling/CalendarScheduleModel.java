@@ -54,9 +54,14 @@ import java.util.Map;
 /// when the view moves outside what it has or the source reports a change.
 ///
 /// ```java
+/// LocalCalendarSource source = LocalCalendarSource.getInstance();
 /// CalendarScheduleModel model = new CalendarScheduleModel(source, ZoneId.systemDefault());
-/// model.addCalendar(calendarInfo);
-/// scheduler.setModel(model);
+/// source.listCalendars(CalendarInfo.ContentType.EVENTS, null).ready(page -> {
+///     for (CalendarInfo calendar : page.getItems()) {
+///         model.addCalendar(calendar);
+///     }
+/// });
+/// Scheduler scheduler = new Scheduler(model);
 /// ```
 ///
 /// An edit is shown at once and saved in the background; if the source

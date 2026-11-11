@@ -2389,6 +2389,28 @@ Button placement options are:
 - `Picker.LightweightPopupButtonPlacement.ABOVE_SPINNER`
 - `Picker.LightweightPopupButtonPlacement.BELOW_SPINNER`
 
+==== Material date and time pickers
+
+The date, time and date & time pickers also come as Material 3 dialogs: a month grid with a year list and a field to type the date in, and a clock dial with a keyboard mode. They're lightweight, so they look the same in the simulator and on the device, follow the theme's colors in light and dark mode, and honor the 12 or 24 hour setting of the picker.
+
+The `pickerStyle` theme constant chooses them. The Android Material native theme sets it to `material`, so an application on that theme gets them with no code. Any other theme can ask for them in its CSS:
+
+[source,css]
+----
+#Constants {
+    pickerStyle: "material";
+}
+----
+
+A picker the application explicitly keeps native, with `setUseLightweightPopup(false)`, opens the platform's own dialog whatever the theme says. The string and duration pickers aren't affected by the constant.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/SchedulingSnippets.java[tag=picker-material,indent=0]
+----
+
+The dialogs are styled through UIIDs that start with `PickerMaterial`, such as `PickerMaterialDialog`, `PickerMaterialHeader`, `PickerMaterialDay`, `PickerMaterialDial` and `PickerMaterialOk`.
+
 === SwipeableContainer
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/SwipeableContainer.html[SwipeableContainer] allows you to place a component such as a https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton] on top of more "options"
@@ -2583,7 +2605,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Calendar.html[Calendar] class allows you to display a traditional calendar picker and optionally highlight days in various ways.
 
-NOTE: Prefer the <<picker-section,Picker UI>> over the calendar for picking a date. It looks better on the devices.
+NOTE: Prefer the <<picker-section,Picker UI>> over the calendar for picking a date. It looks better on the devices. To show events in time, use the <<scheduling-and-gantt,Scheduler>>.
+
+The calendar can mark today's date. `setTodayUIID` names the style today is drawn with while it isn't the selected day, and the `calendarTodayUIID` theme constant does the same for every calendar in the application. The native themes set it to `CalendarToday`.
 
 Simple usage of the `Calendar` class looks something like this:
 

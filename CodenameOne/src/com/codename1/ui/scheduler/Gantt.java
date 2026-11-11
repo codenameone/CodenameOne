@@ -47,13 +47,19 @@ import java.util.List;
 /// them, and under them how much of every resource the plan asks for.
 ///
 /// ```java
-/// ProjectModel project = new ProjectModel(new WorkCalendar(), start);
+/// WorkCalendar calendar = new WorkCalendar();
+/// // A duration is working time: a day of it is the calendar's hours.
+/// long day = calendar.getMillisPerDay();
+/// ProjectModel project = new ProjectModel(calendar, System.currentTimeMillis());
 /// GanttTask design = new GanttTask("design", "Design", 5 * day);
 /// GanttTask build = new GanttTask("build", "Build", 10 * day);
 /// project.addTask(design).addTask(build);
 /// project.link(design, build);
 /// project.update();
+///
+/// Form form = new Form("Plan", new BorderLayout());
 /// form.add(BorderLayout.CENTER, new Gantt(project));
+/// form.show();
 /// ```
 ///
 /// The chart draws its rows and keeps no component for each, so a plan of

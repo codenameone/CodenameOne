@@ -53,11 +53,15 @@ import java.util.List;
 /// as an agenda, or by resource.
 ///
 /// ```java
+/// long start = System.currentTimeMillis();
 /// DefaultScheduleModel model = new DefaultScheduleModel();
-/// model.addItem(new ScheduleItem("1", "Design review", start, end));
+/// model.addItem(new ScheduleItem("1", "Design review", start, start + TimeMath.HOUR));
 /// Scheduler scheduler = new Scheduler(model);
 /// scheduler.setView(Scheduler.View.WEEK);
+///
+/// Form form = new Form("Schedule", new BorderLayout());
 /// form.add(BorderLayout.CENTER, scheduler);
+/// form.show();
 /// ```
 ///
 /// The views draw their items and keep no component for each, so a schedule

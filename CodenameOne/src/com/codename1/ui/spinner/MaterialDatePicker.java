@@ -58,8 +58,11 @@ import java.util.Date;
 /// ```java
 /// MaterialDatePicker picker = new MaterialDatePicker();
 /// picker.setDate(new Date());
-/// picker.addActionListener(e -> show(picker.getDate()));
-/// form.add(picker);
+/// picker.addActionListener(e -> Log.p("Chosen: " + picker.getDate()));
+///
+/// Form form = new Form("Date", new BorderLayout());
+/// form.add(BorderLayout.CENTER, picker);
+/// form.show();
 /// ```
 ///
 /// The value is a `Date`. Its time of day is kept as it was given, so a date

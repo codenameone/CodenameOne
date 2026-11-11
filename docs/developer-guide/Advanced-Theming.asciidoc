@@ -120,6 +120,9 @@ Internally, Codename One has many built-in constants, and the list keeps growing
 |buttonRippleBool
 |`true` to activate the material design ripple effect on the buttons. This effect draws a growing circle from the point of touch onwards. This is `false` by default except for Android where it defaults to `true`. This is equivalent to `setButtonRippleEffectDefault(bool)` in the `Button` class
 
+|calendarTodayUIID
+|The UIID https://www.codenameone.com/javadoc/com/codename1/ui/Calendar.html[Calendar] draws today's date with while it isn't the selected day. Unset, today isn't marked. The native themes set it to `CalendarToday`
+
 |capsButtonTextBool
 |`true` to activate the caps text mode in the buttons. When activated `setText` on `Button` and all the constructors will invoke `upcase()` on all the strings effectively making the application buttons use uppercase exclusively. This is `false` by default except for Android where it defaults to `true`. It's equivalent to `Button.setCapsTextDefault(boolean)` and can be tuned to an individual `Component` via `Component.setRippleEffect(boolean)`
 
@@ -419,6 +422,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |rightSideMenuPressImage
 |Optional pressed-state icon for the right-side toolbar menu button
+
+|pickerStyle
+|`material` to open the date, time and date & time pickers of https://www.codenameone.com/javadoc/com/codename1/ui/spinner/Picker.html[Picker] as lightweight Material 3 dialogs: a month grid and a clock dial. Any other value leaves them as the platform's own picker or the wheels. The Android Material native theme sets it to `material`
 
 |popupCancelBodyBool
 |Indicates that a cancel button should appear within the combo box popup

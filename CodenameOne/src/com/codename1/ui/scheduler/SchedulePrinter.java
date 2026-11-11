@@ -48,8 +48,9 @@ import java.io.OutputStream;
 /// the resources or the task table down the side.
 ///
 /// ```java
-/// SchedulePrinter printer = new SchedulePrinter(gantt);
-/// printer.setTitle("Release plan");
+/// Scheduler scheduler = new Scheduler();
+/// SchedulePrinter printer = new SchedulePrinter(scheduler);
+/// printer.setTitle("This week");
 /// printer.print(new PrintResultListener() {
 ///     public void onResult(PrintResult result) {
 ///         if (result.isFailed()) {
