@@ -13,5 +13,12 @@ public interface PurchaseTestSink extends NativeInterface {
 
     String recordedSubmissions();
 
+    /**
+     * Records the outcome of the commerce check the app runs once a purchase
+     * has synchronized: "OK ..." or "FAIL ...". The iOS implementation stores
+     * it where the hosted XCTest reads it back.
+     */
+    void recordCommerceResult(String result);
+
     void reset();
 }

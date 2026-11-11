@@ -24,6 +24,10 @@ public class PurchaseTestSinkImpl {
         }
     }
 
+    public void recordCommerceResult(String result) {
+        // Android asserts on the CN1SS:IAP:COMMERCE logcat line the app prints.
+    }
+
     public void reset() {
         synchronized (SUBMITTED) { SUBMITTED.clear(); }
     }

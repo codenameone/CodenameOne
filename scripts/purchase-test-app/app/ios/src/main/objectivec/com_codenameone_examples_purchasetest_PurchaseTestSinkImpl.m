@@ -5,6 +5,9 @@
 // purchase through SKTestSession. Key is shared with the test.
 static NSString * const CN1IAPTestSubmittedKey = @"CN1IAPTestSubmittedReceipts";
 
+// Outcome of the commerce check that runs after the purchase synchronized.
+static NSString * const CN1IAPTestCommerceKey = @"CN1IAPTestCommerceResult";
+
 @implementation com_codenameone_examples_purchasetest_PurchaseTestSinkImpl
 
 -(void)recordSubmittedReceipt:(NSString*)transactionId {
@@ -21,7 +24,14 @@ static NSString * const CN1IAPTestSubmittedKey = @"CN1IAPTestSubmittedReceipts";
     return existing ? [existing componentsJoinedByString:@","] : @"";
 }
 
+-(void)recordCommerceResult:(NSString*)result {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:(result != nil ? result : @"<null>") forKey:CN1IAPTestCommerceKey];
+    [defaults synchronize];
+}
+
 -(void)reset {
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:CN1IAPTestCommerceKey];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:CN1IAPTestSubmittedKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }

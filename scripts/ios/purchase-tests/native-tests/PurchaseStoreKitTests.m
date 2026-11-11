@@ -29,6 +29,7 @@
 
 static NSString * const kProductId = @"com.codenameone.hello.pro";
 static NSString * const kSinkKey = @"CN1IAPTestSubmittedReceipts";
+static NSString * const kCommerceKey = @"CN1IAPTestCommerceResult";
 
 @interface PurchaseStoreKitTests : XCTestCase
 @end
@@ -43,6 +44,7 @@ static NSString * const kSinkKey = @"CN1IAPTestSubmittedReceipts";
     [super setUp];
     self.continueAfterFailure = NO;
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kSinkKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCommerceKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
@@ -107,6 +109,17 @@ static NSString * const kSinkKey = @"CN1IAPTestSubmittedReceipts";
             @"Recorded submissions: '%@'. This means the StoreKit purchase did not "
             @"flow through the CN1 observer into the receipt-sync engine and the "
             @"installed ReceiptStore.", [self recordedSubmissions]);
+
+        // Once the purchase synchronized, the app refreshes CommerceManager,
+        // asks it for the entitlement (store-direct: a local build has no
+        // cloud commerce) and builds the bundled paywall and customer center.
+        // See CommerceCheck in scripts/purchase-test-app.
+        BOOL checked = [self waitUntil:^BOOL{
+            return [[NSUserDefaults standardUserDefaults] stringForKey:kCommerceKey] != nil;
+        } timeout:60.0];
+        NSString *commerce = [[NSUserDefaults standardUserDefaults] stringForKey:kCommerceKey];
+        XCTAssertTrue(checked, @"The app never reported its commerce check after the purchase.");
+        XCTAssertEqualObjects(commerce, @"OK", @"Commerce check after the purchase failed: %@", commerce);
     } else {
         XCTSkip("StoreKitTest requires iOS 14+");
     }

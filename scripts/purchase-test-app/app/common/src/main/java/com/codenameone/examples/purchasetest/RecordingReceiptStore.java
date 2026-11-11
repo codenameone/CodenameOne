@@ -1,9 +1,14 @@
 package com.codenameone.examples.purchasetest;
 
+import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.payment.ReceiptStore;
 import com.codename1.system.NativeLookup;
 import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 /**
  * Test ReceiptStore installed at startup. Does no networking: it reports
@@ -17,6 +22,7 @@ import com.codename1.util.SuccessCallback;
  */
 public class RecordingReceiptStore implements ReceiptStore {
     private final PurchaseTestSink sink;
+    private final List<Receipt> submitted = new ArrayList<Receipt>();
 
     public RecordingReceiptStore() {
         PurchaseTestSink s = NativeLookup.create(PurchaseTestSink.class);
@@ -29,10 +35,36 @@ public class RecordingReceiptStore implements ReceiptStore {
         }
         System.out.println("CN1SS:IAP:SUBMITTED "
                 + (receipt == null ? "null" : receipt.getTransactionId()));
+        if (receipt != null) {
+            submitted.add(receipt);
+            final String sku = receipt.getSku();
+            // A synchronization is in progress here, so this only registers
+            // the callback: it fires once the receipt was taken off the
+            // pending queue and the list below was fetched, which is the
+            // state a commerce refresh reads.
+            Purchase.getInAppPurchase().synchronizeReceipts(0, new SuccessCallback<Boolean>() {
+                public void onSucess(Boolean ok) {
+                    CommerceCheck.run(sink, sku);
+                }
+            });
+        }
         callback.onSucess(Boolean.TRUE);
     }
 
+    /**
+     * Answers what was submitted, as a receipt server would: with an expiry
+     * date. The store's own receipt carries none, and the expiry is what the
+     * store-direct entitlement signal (Purchase.isSubscribed) is computed
+     * from, so without it no purchase could ever read as entitled here.
+     */
     public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
-        callback.onSucess(new Receipt[0]);
+        Receipt[] out = new Receipt[submitted.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = submitted.get(i);
+            if (out[i].getExpiryDate() == null) {
+                out[i].setExpiryDate(new Date(System.currentTimeMillis() + 24L * 60 * 60 * 1000));
+            }
+        }
+        callback.onSucess(out);
     }
 }
