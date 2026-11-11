@@ -1,0 +1,100 @@
+package com.codenameone.examples.hellocodenameone.tests;
+
+import com.codename1.scheduling.DefaultScheduleModel;
+import com.codename1.scheduling.GanttTask;
+import com.codename1.scheduling.ProjectModel;
+import com.codename1.scheduling.ScheduleItem;
+import com.codename1.scheduling.ScheduleResource;
+import com.codename1.scheduling.TaskDependency;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.scheduler.Scheduler;
+
+import java.time.ZoneId;
+
+/// The schedule and the project the scheduling screenshot tests show: fixed
+/// dates in a fixed zone, and a fixed "now", so a capture is the same on any
+/// day and on any device.
+final class SchedulingFixtures {
+    /// Monday 2026-03-09, as a count of days since 1970-01-01.
+    static final long MONDAY = 20521L;
+
+    private SchedulingFixtures() {
+    }
+
+    static ZoneId zone() {
+        return ZoneId.of("UTC");
+    }
+
+    static long at(int day, int hour, int minute) {
+        return TimeMath.at(MONDAY + day, hour * 60 + minute, zone());
+    }
+
+    /// A week of items for three people: plain events, one that overlaps
+    /// another, an all-day one, a band of working time and a blocked stretch.
+    static DefaultScheduleModel schedule() {
+        DefaultScheduleModel m = new DefaultScheduleModel();
+        m.addResource(new ScheduleResource("ana", "Ana").setDetail("Design"));
+        m.addResource(new ScheduleResource("ben", "Ben").setDetail("Build"));
+        m.addResource(new ScheduleResource("cy", "Cy").setDetail("Test"));
+        m.addItem(new ScheduleItem("shift", "", at(0, 8, 0), at(0, 16, 0))
+                .setResourceId("ana").setKind(ScheduleItem.Kind.BACKGROUND));
+        m.addItem(new ScheduleItem("standup", "Stand-up", at(0, 9, 0), at(0, 9, 30))
+                .setResourceId("ana"));
+        m.addItem(new ScheduleItem("review", "Design review", at(0, 10, 0), at(0, 11, 30))
+                .setResourceId("ana").setDetail("Room 2"));
+        m.addItem(new ScheduleItem("pairing", "Pairing", at(0, 10, 30), at(0, 12, 0))
+                .setResourceId("ben"));
+        m.addItem(new ScheduleItem("busy", "Busy", at(0, 13, 0), at(0, 14, 0))
+                .setResourceId("cy").setKind(ScheduleItem.Kind.BLOCKED));
+        m.addItem(new ScheduleItem("release", "Release", at(1, 11, 0), at(1, 12, 0))
+                .setResourceId("ben").setColor(0x12805c));
+        m.addItem(new ScheduleItem("workshop", "Workshop", at(2, 9, 0), at(2, 12, 30))
+                .setResourceId("cy"));
+        m.addItem(new ScheduleItem("retro", "Retrospective", at(3, 14, 0), at(3, 15, 0))
+                .setResourceId("ana"));
+        m.addItem(new ScheduleItem("offsite", "Offsite", TimeMath.startOfEpochDay(MONDAY + 4, zone()),
+                TimeMath.startOfEpochDay(MONDAY + 5, zone())).setAllDay(true).setResourceId("ben"));
+        return m;
+    }
+
+    /// A scheduler on the fixed week, at ten past ten on its Monday.
+    static Scheduler scheduler(Scheduler.View view) {
+        Scheduler s = new Scheduler(schedule());
+        s.setZone(zone());
+        s.setWorkCalendar(new WorkCalendar(zone()));
+        s.set24Hours(true);
+        s.setCurrentTime(at(0, 10, 10));
+        s.setInitialMinute(8 * 60);
+        s.setView(view);
+        s.setDate(at(0, 0, 0));
+        return s;
+    }
+
+    /// A small project: a summary over two linked tasks, a task the same
+    /// person is double booked on, and a milestone at the end.
+    static ProjectModel project() {
+        WorkCalendar calendar = new WorkCalendar(zone());
+        ProjectModel p = new ProjectModel(calendar, at(0, 0, 0));
+        p.addResource(new ScheduleResource("dev", "Developer"));
+        p.addResource(new ScheduleResource("qa", "Tester"));
+        long day = calendar.getMillisPerDay();
+        GanttTask build = new GanttTask("build", "Build");
+        GanttTask api = new GanttTask("api", "API", 3 * day).assign("dev").setPercentComplete(60);
+        GanttTask screens = new GanttTask("screens", "Screens", 4 * day).assign("dev");
+        GanttTask docs = new GanttTask("docs", "Docs", 2 * day).assign("dev");
+        GanttTask testing = new GanttTask("test", "Testing", 2 * day).assign("qa");
+        GanttTask release = new GanttTask("release", "Release", 0);
+        p.addTask(build);
+        p.addTask(build, api);
+        p.addTask(build, screens);
+        p.addTask(docs);
+        p.addTask(testing);
+        p.addTask(release);
+        p.link(api, screens);
+        p.link(screens, testing);
+        p.link(testing, release, TaskDependency.Type.FINISH_TO_START, 0);
+        p.update();
+        return p;
+    }
+}
