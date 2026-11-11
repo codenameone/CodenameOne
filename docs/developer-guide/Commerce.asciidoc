@@ -1,50 +1,866 @@
 == Commerce
 
-Commerce is an optional service that validates your in-app purchases and subscriptions server-side and gives your app a single, store-agnostic question to ask: _does this user have this entitlement right now?_ It wraps the existing Purchase API (see the _Monetization_ chapter) -- purchases still go through the platform store -- and adds cloud receipt validation, a normalized subscription state machine across Apple and Google, lifecycle webhooks to your backend, and a revenue console.
+Commerce is an optional service that validates in-app purchases and subscriptions server-side and gives your app a single, store-agnostic question to ask: _does this user have this entitlement right now?_ It answers that question for a customer on every platform at once, so a subscription bought on an iPhone unlocks the same account on Android, on the desktop and on the web. On top of entitlements it adds offerings you configure remotely, paywalls and a customer center you design in the console, targeting and experiments, lifecycle webhooks, integrations and a revenue console.
 
-Codename One doesn't process payments and never touches your money -- the stores (and, for physical goods, your own payment processor) do. Commerce is infrastructure that sits beside the money flow, exactly like the third-party services it replaces.
+Commerce wraps the `Purchase` API (see the <<Monetization,monetization chapter>>) and doesn't replace it. Purchases still go through the platform store, and code that talks to `Purchase` directly keeps working unchanged. When the service can't answer -- commerce is switched off in the build, the device is offline, or the account is over its plan -- the app falls back to the store's own receipts, so a paying user keeps access.
 
-=== Entitlements, not SKUs
+Codename One doesn't process payments and never touches your money. The stores, or your own Stripe or Paddle account for web purchases, do. Commerce is infrastructure that sits beside the money flow.
 
-The core idea is the *entitlement*: an abstract access right such as `pro` or `remove_ads`. You map one or more store products to an entitlement, and your code only ever checks the entitlement:
+=== Quick start
+
+Every cloud build is ready to use the service: there is nothing to add to the build. Three steps take you from nothing to a working paywall.
+
+. In the console, open *Commerce*, create an entitlement such as `pro`, and attach your store products to it. Then create an offering with a package for each product you want to sell.
+. Install a receipt store in your `init` method, as the next section shows.
+. Check the entitlement, and show the paywall when the customer doesn't have it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-quick-start,indent=0]
+----
+
+The paywall sells the packages of the offering and the service validates the purchase. From then on `isEntitled("pro")` returns `true`, on this device and on every other one the customer signs in to. Pass a `PaywallListener` instead of `null` to react the moment the purchase is confirmed, as the paywall section shows.
+
+=== Entitlements and products
+
+The core idea is the *entitlement*: an abstract access right such as `pro` or `remove_ads`. Your code checks the entitlement and never a store product:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava001Snippet.java[tag=commerce-java-001,indent=0]
 ----
 
-`isEntitled` reads the answer the cloud last cached, so it's only as fresh as your last `refresh()`: before one completes the cache is empty and a paying subscriber reads as unentitled. It falls back to asking the store for a subscription named after the entitlement, and since the entitlement-to-SKU mapping lives in the cloud rather than on the device, that only matches when a product happens to share the id. Where the cloud can't answer -- commerce not enabled in the build, an offline start, a degraded account -- check the granting SKU yourself, as the post-purchase example below does. Don't do it when the cloud answered no: a refunded or revoked receipt still looks active on the device, and treating that as a grant unlocks the app after the server denied it.
+==== Mapping products to entitlements
 
-An entitlement is active when *any* of its granting products is active. This matters: a promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single authoritative rule -- the latest expiry over the active grants, evaluated against a server timestamp -- so a tampered device clock can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access on its own.
+The *Products & Entitlements* page of the console holds the mapping. Each row names a store, a product id in that store and the entitlement the product grants. One entitlement usually has several products: a monthly and an annual subscription in each store, and perhaps a lifetime purchase. Changing the entitlement of a product moves the product's existing grants with it, so customers who already bought it follow the new mapping.
 
-=== Client usage
+An entitlement is active when *any* of its granting products is active. A promotional grant and a paid subscription, or a sandbox and a production purchase, can both map to `pro` without one hiding the other. Access is decided by a single rule -- the latest expiry over the active grants, evaluated against the service's clock -- so a device clock set back can't extend it. Everything else (will-renew, billing stage, period type, family sharing) is advisory and never removes access by itself.
 
-In your `Lifecycle.init` (or wherever you set up purchases). Installing a receipt store is part of the setup, not an optional extra: `Purchase` submits pending purchases and reloads its receipt list only when one is installed, so without it `refresh()` finds no receipts and no entitlement is ever granted. On iOS `isSubscriptionSupported()` returns false until one is installed, so subscriptions don't start at all. <<Monetization,The monetization chapter>> builds a store you can use here.
+==== Setting up the client
+
+Installing a receipt store is part of the setup. `Purchase` submits pending purchases and reloads its receipt list only when one is installed, so without it the service is never handed a receipt from this device. On iOS `isSubscriptionSupported()` returns false until one is installed, so subscriptions don't start at all. <<Monetization,The monetization chapter>> builds a store you can use here.
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava002Snippet.java[tag=commerce-java-002,indent=0]
 ----
 
-Drive purchases through the manager (these delegate to the `Purchase` API):
+You can still drive purchases by product id through the manager. These calls delegate to the `Purchase` API:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava003Snippet.java[tag=commerce-java-003,indent=0]
 ----
 
-After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` validates the receipts already stored rather than waiting for one in flight, so chain it off receipt synchronization after a purchase -- otherwise it runs before the new receipt has been submitted and nothing retries it. It's a blocking network call, so keep it off the EDT:
+==== Refreshing
+
+`refresh()` validates the device's receipts with the service and then asks the service what the customer is entitled to. The customer is asked even when the device holds no receipt at all, which is what unlocks a purchase made on another platform or an entitlement granted from the console. It's a blocking network call, so keep it off the EDT. Call it when the app starts and when it returns to the foreground:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-refresh,indent=0]
+----
+
+You don't need to call `refresh()` after a purchase. When `Purchase` finishes synchronizing receipts, the manager refreshes by itself in the background and the customer-info listeners hear the result. If you synchronize receipts yourself and want to act as soon as the answer is in, chain the refresh off the synchronization:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CommerceJava004Snippet.java[tag=commerce-java-004,indent=0]
 ----
 
-`isEntitled` returns the last cloud-validated answer when one is available, and otherwise falls back to the platform's own receipt (treating the entitlement id as a subscription SKU) so a paying user is never locked out while the network is down.
+==== Customer information
 
-=== How the app finds the service
+`getCustomerInfo()` returns everything the service last said about the customer. It never returns null and never touches the network:
 
-Commerce reuses the standard `build_key` that every Codename One cloud build already carries, the same token the analytics provider sends -- so there is *nothing to wire into the build*. `CommerceManager.isCloudEnabled()` is true on any cloud build and false in the simulator or a local build (where every call defers to `Purchase`). Two optional build hints tune it:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-customer-info,indent=0]
+----
+
+Each `EntitlementInfo` carries these fields:
+
+[cols="2,5"]
+|===
+|Method |What it tells you
+
+|`getId()`
+|The entitlement id, the name your code checks.
+
+|`isActive()`
+|Whether the service considers the entitlement held. This is the service's decision, made with its own clock.
+
+|`getExpiresDate()`
+|When the entitlement ends, in milliseconds since the epoch. `0` for a lifetime purchase.
+
+|`getProductId()`
+|The store product that granted it.
+
+|`getStore()`
+|The store the grant came from.
+
+|`getPeriodType()`
+|Whether the customer is in a trial, an introductory period or the normal one.
+
+|`getOwnershipType()`
+|Whether the customer bought the product or received it through family sharing.
+
+|`getBillingStage()`
+|Where the subscription is in its billing life, such as a grace period or billing retry.
+
+|`isWillRenew()`
+|Whether the subscription is set to renew.
+
+|`getProvenance()`
+|How the grant came to be: a purchase, a promotional grant or a transfer.
+|===
+
+`CustomerInfo` also lists the active subscriptions by product id, the customer's attributes, the virtual currency balances and a management address for the subscription.
+
+To follow changes, add a listener. It's called on the EDT whenever the customer information changes: after a refresh, a purchase, a restore, a sign-in or a sign-out.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-listener,indent=0]
+----
+
+==== The stored answer and degraded mode
+
+The last answer the service gave is stored on the device, per customer. After a cold start `isEntitled` and `getCustomerInfo` answer from it at once, before any network call and with no network at all. A stored entitlement is reported exactly as it was stored, even when its expiry date has passed by the device's clock. The device clock is the user's to set, so only the service decides when an entitlement ends, and it does so on the next `refresh()`.
+
+`isDegraded()` is true after a call that couldn't get an answer the app can trust: the service was unreachable, the response failed its signature check, or the account is over the validated volume of its plan. While it's true, the stored answer stays in place, and `isEntitled` also accepts the store's own receipt, treating the entitlement id as a subscription product id. A paying user is therefore not locked out while the network is down.
+
+When commerce isn't enabled in the build, or the manager is degraded, you can check the granting product yourself, as the receipt synchronization example does. Don't do it when the service answered no: a refunded or revoked receipt still looks active on the device, and treating that as a grant unlocks the app after the service denied it.
+
+=== Identity
+
+The service keys everything on an _app user id_. Until you set one, the manager generates an anonymous id and persists it, so entitlements survive restarts on the device.
+
+When the user signs in to your own account system, call `logIn` with your stable id for that user:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-log-in,indent=0]
+----
+
+Purchases made under the anonymous id always move to the account. The original anonymous id stays available through `CustomerInfo.getOriginalAppUserId()`. `logIn` returns `false` and leaves the previous id in place when the service didn't accept the change, and you can call it again.
+
+`setAppUserId` sets the id without telling the service anything. Use it when the id is known before the first purchase, for example when your app requires an account before it shows anything. Use `logIn` whenever an anonymous customer might already own something.
+
+==== Transfer policies
+
+When a signed-in user logs in to an account while the device's purchases already belong to _another_ known account, the transfer policy of the app decides who keeps them. Set it on the *Commerce* settings page of the console:
+
+[cols="2,5"]
+|===
+|Policy |Behavior
+
+|`TRANSFER`
+|The purchases move to the account that logged in last. This is the default, and it matches what the stores do when a device changes hands.
+
+|`KEEP_WITH_ORIGINAL`
+|The purchases stay with the account that made them. The new account gets nothing from this device's receipts.
+
+|`TRANSFER_IF_NO_ACTIVE`
+|The purchases move only when the account that holds them has no active entitlement of its own.
+|===
+
+Every move is reported to your backend as a `TRANSFER` webhook event.
+
+==== Signing out and restoring
+
+`logOut()` forgets the current customer. A new anonymous id is generated and the customer information becomes empty, so the next user of the device doesn't inherit the previous user's entitlements. Nothing is sent to the service. Refresh afterward to pick up what the store account on the device still owns:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-log-out,indent=0]
+----
+
+`restore()` asks the store to restore the purchases of the store account on the device, on platforms that support it. The restored receipts reach the service through the receipt synchronization that follows, and the manager refreshes by itself. The customer-info listeners hear the result. The built-in paywall and the customer center both have a restore button that calls it.
+
+=== Offerings and packages
+
+An *offering* is the set of things you're selling at one moment: "the standard plans," "the holiday sale." A *package* is one entry of an offering -- a store product together with the role it plays, such as the monthly plan. Because offerings live in the console, you change what the app sells, and at what price points, without shipping an update.
+
+==== Console setup
+
+On the *Offerings* page, create an offering and add packages to it. Each package has:
+
+- An id that's unique inside the offering.
+- A type: `LIFETIME`, `ANNUAL`, `SIX_MONTH`, `THREE_MONTH`, `TWO_MONTH`, `MONTHLY`, `WEEKLY` or `CUSTOM`.
+- A product id for each store the app ships to. The service hands each device the product of its own store.
+- The billing period, and the free trial and introductory price if the product has them. Enter these as you configured them in the store. Periods are ISO-8601 durations such as `P1M` or `P7D`.
+
+Mark one offering as the current one. That's the offering `getCurrent()` returns unless a targeting rule or an experiment selects another.
+
+==== Reading offerings
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-offerings,indent=0]
+----
+
+`getOfferings` is a blocking network call. The last answer is stored on the device and is what the call returns when the service can't be reached, so a paywall still opens offline. It never returns null. The result is empty, and `getCurrent()` is null, when commerce isn't enabled in the build or there has never been an answer.
+
+After a fresh answer the manager asks the store for the products of the packages, where the platform lists products, and attaches each to its package. `getProduct()` then carries the store's localized price and name. On a platform whose store doesn't list products it stays null.
+
+`Offering` has shortcuts for the standard types -- `getMonthly()`, `getAnnual()`, `getWeekly()` and `getLifetime()` -- and `getPackage(id)` for any other. `getMetadata()` returns the free-form values you attached to the offering in the console, which is a convenient place for a headline or a feature flag that should change with the offering.
+
+==== Placements
+
+A _placement_ is a named place in your app that sells something: `"onboarding"`, `"settings"`, `"export_limit"`. Pass it to `getOfferings(String)`. A targeting rule in the console can give a placement an offering of its own, so the upsell after onboarding and the one behind a locked feature can differ without a code change. A placement with no rule gets the current offering.
+
+==== Trial and introductory eligibility
+
+`isEligibleForIntro()` tells you whether this customer may still take the free trial or introductory price of a package. The service computes it from the customer's purchase history across platforms, so a customer who used a trial on one device isn't promised another one elsewhere. Use it to decide whether a paywall says "Start your free week" or "Subscribe." The built-in paywall variables described below follow the same rule.
+
+==== Buying a package
+
+`purchase(CommercePackage)` starts a subscription for every package that's one and a one-time purchase otherwise. The outcome arrives through the customer-info listeners once the service has validated the purchase:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-purchase-package,indent=0]
+----
+
+=== Targeting and experiments
+
+Targeting and experiments decide which offering `getCurrent()` returns for a given customer. Both are evaluated by the service on every `getOfferings` call, so they take effect without an app update.
+
+==== Targeting rules
+
+A targeting rule on the *Offerings* page names an offering and the conditions under which a customer gets it. A rule can match on:
+
+- *Country* -- one or more store countries.
+- *Platform* -- the platform the app is running on.
+- *App version* -- a minimum version, a maximum version, or both.
+- *Attribute* -- a subscriber attribute with a given value.
+- *Placement* -- the placement the app asked for.
+
+A condition you leave empty matches everyone. Rules are tried in priority order, lowest number first, and the first rule whose conditions all match wins. When no rule matches, the customer gets the current offering.
+
+==== Experiments
+
+An experiment splits customers between two or more offerings so that you can compare them. On the *Experiments* page, give the experiment an id, optionally limit it to a placement, and add variants. Each variant names an offering and a weight. Start the experiment when it's ready and stop it when you have an answer.
+
+Assignment is deterministic. The service hashes the experiment id together with the app user id and maps the result onto the variant weights, so a customer always sees the same variant, on every device and after every restart, and nothing about the assignment needs to be stored. A customer who logs in moves from the anonymous id to the account id and is assigned by the account id from then on.
+
+The app can read which variant it was given, for example to tag its own analytics:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-experiment,indent=0]
+----
+
+The results page reports, for each variant, the number of customers who saw a paywall of its offering, the number who went on to buy, and the conversion rate between the two. The counts come from the paywall events described in the next section, so an experiment needs the built-in paywall or your own `logEvent` calls to produce results.
+
+=== Paywalls
+
+A paywall is the screen that sells an offering. You design it in the console as a document attached to the offering, and the app draws it with native components. Changing the paywall doesn't require an app update.
+
+==== Showing a paywall
+
+`Paywall.show` opens the paywall of an offering in a form of its own, over the current form. Closing the paywall or going back returns to the form that was showing. Call it on the EDT:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-paywall,indent=0]
+----
+
+Every listener method is called on the EDT:
+
+[cols="2,5"]
+|===
+|Method |When it's called
+
+|`purchaseStarted(CommercePackage)`
+|The customer pressed the purchase button and the store was asked to sell the package.
+
+|`purchaseCompleted(CustomerInfo)`
+|The service confirmed the purchase. The customer now owns the product of the package.
+
+|`purchaseCancelled()`
+|The paywall was closed after a purchase was started and before the service confirmed it.
+
+|`restoreCompleted(CustomerInfo)`
+|The customer information changed after the customer asked to restore purchases.
+
+|`closed()`
+|The paywall was closed.
+|===
+
+==== The built-in paywall
+
+An offering with no paywall document is shown with the built-in one: a close button, a title, the packages of the offering as a list, a purchase button, a restore button and a footer. It names no colors, so your theme decides them all. `Paywall.createDefault(offering)` returns that document as a map you can change before you hand it to a `PaywallView`.
+
+`PaywallView` is the component behind `Paywall.show`. Use it directly to embed a paywall in a form of your own, and tell it what closing means there:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-paywall-view,indent=0]
+----
+
+The view reports `IMPRESSION` when it's first shown, then `PURCHASE_START`, `PURCHASE` and `CLOSE`, through `CommerceManager.logEvent`. The console charts these as a funnel for each offering and paywall, and experiments count them. If you build a purchase screen of your own instead, call `logEvent` with the same event names to get the same reports. Events are queued and sent from a background thread, and reporting never delays or fails a purchase.
+
+==== Theming
+
+Every element of a paywall has a UIID, so your theme can restyle it. The colors a document names are applied on top of the theme.
+
+[cols="3,4"]
+|===
+|UIID |Element
+
+|`PaywallForm`
+|The form `Paywall.show` creates.
+
+|`Paywall`
+|The view itself.
+
+|`PaywallStack`
+|A `stack` node.
+
+|`PaywallTitle`, `PaywallHeadline`, `PaywallBody`, `PaywallCaption`
+|The text of a `text` node, by its style.
+
+|`PaywallImage`, `PaywallIcon`
+|An `image` node and an `icon` node.
+
+|`PaywallFeatures`, `PaywallFeature`, `PaywallFeatureIcon`, `PaywallFeatureText`
+|A `features` node, one of its rows, and the two parts of a row.
+
+|`PaywallPackages`
+|A `packages` node.
+
+|`PaywallPackage`, `PaywallPackageTitle`, `PaywallPackagePrice`
+|A package and its two lines.
+
+|`PaywallPackageSelected`, `PaywallPackageTitleSelected`, `PaywallPackagePriceSelected`
+|The same three for the selected package.
+
+|`PaywallPurchaseButton`, `PaywallRestoreButton`, `PaywallCloseButton`
+|The three buttons.
+
+|`PaywallCloseBar`
+|The row that holds the close button.
+
+|`PaywallCarousel`
+|A `carousel` node.
+
+|`PaywallFooter`, `PaywallFooterLink`
+|A `footer` node and its links.
+
+|`PaywallSpacer`
+|A `spacer` node, and the gap between the children of a stack.
+|===
+
+==== The paywall document
+
+A paywall document is a JSON object. The *Paywalls* page of the console edits it with a live preview that uses the same `PaywallView` class the device does.
+
+[cols="2,5"]
+|===
+|Field |Meaning
+
+|`version`
+|The format version, `1`.
+
+|`id`
+|The id of the paywall, reported with every paywall event.
+
+|`defaultLocale`
+|The locale of `strings` to use when the device's locale has no entry.
+
+|`strings`
+|Translations: an object per locale, each mapping a key to its text.
+
+|`colors`
+|A `light` and a `dark` set, each with `background`, `text`, `muted`, `accent` and `accentText` as `#rrggbb`. The `dark` set is used when the device is in dark mode.
+
+|`root`
+|The node the paywall starts from, normally a `stack`.
+|===
+
+A node is an object with a `type`. A node of a type the app doesn't know is skipped, so a document that uses a newer node type still shows on an older build. Sizes are millimeters.
+
+[cols="2,3,4"]
+|===
+|Node type |Fields |What it draws
+
+|`stack`
+|`axis` (`y` or `x`), `gap`, `padding`, `align`, `children`
+|Its children, one after another along the axis.
+
+|`text`
+|`text`, `style` (`title`, `headline`, `body` or `caption`), `align`
+|A block of text.
+
+|`image`
+|`url`, `height`
+|An image loaded from an address.
+
+|`icon`
+|`name`
+|A material icon, by name.
+
+|`features`
+|`items`, each with `icon` and `text`
+|A list of selling points.
+
+|`packages`
+|`style` (`list` or `tiles`), `selected`
+|The packages of the offering. `selected` is the id of the package that starts selected.
+
+|`purchaseButton`
+|`text`
+|The button that buys the selected package.
+
+|`restoreButton`
+|`text`
+|The button that restores purchases.
+
+|`closeButton`
+|
+|The button that closes the paywall.
+
+|`carousel`
+|`children`
+|Its children as swipeable pages.
+
+|`footer`
+|`termsUrl`, `privacyUrl`
+|Links to your terms and privacy policy.
+
+|`spacer`
+|`size`
+|Empty space.
+|===
+
+A text is first looked up in `strings`, by the device's locale and then by the default locale. When it isn't a key there, it's used as written. Then the variables in it are replaced from the selected package, and replaced again whenever the customer selects another one:
+
+[cols="2,5"]
+|===
+|Variable |Replaced with
+
+|`{{price}}`
+|The price. This is the store's localized price when the store listed the product.
+
+|`{{period}}`
+|The billing period, in words.
+
+|`{{trialPeriod}}`
+|The length of the free trial.
+
+|`{{introPrice}}`
+|The introductory price.
+
+|`{{productName}}`
+|The store's name for the product.
+
+|`{{packageId}}`
+|The id of the package.
+|===
+
+A variable with no value becomes empty. A complete document:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/commerce.json[tag=commerce-json-001,indent=0]
+----
+
+=== Customer center
+
+The customer center is a ready-made form where a customer sees their active subscriptions and acts on them. One call shows it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-customer-center,indent=0]
+----
+
+The *Customer Center* page of the console decides which paths the form offers and in what order:
+
+[cols="1,5"]
+|===
+|Path |What it does
+
+|`MANAGE`
+|Opens the store's own subscription management. On a platform with none, it opens the customer's management page, which is the billing portal for a subscription bought on the web.
+
+|`RESTORE`
+|Restores the purchases of the store account.
+
+|`REFUND`
+|Asks the store for a refund. There is one row for each subscription the store can refund.
+
+|`CANCEL`
+|Asks the customer why, reports the answer, shows the retention offer for that reason if there is one, and otherwise continues to the store's subscription management. Offered while a subscription is active.
+
+|`SUPPORT`
+|Opens your support page, or an email to your support address. Offered when one of the two is configured.
+|===
+
+When the configuration can't be fetched, the form offers `MANAGE` and `RESTORE`. The form's texts can be translated per locale in the console. Its UIIDs are `CustomerCenterForm`, `CustomerCenterHeader`, `CustomerCenterSubscription`, `CustomerCenterEmpty`, `CustomerCenterRow` and `CustomerCenterReason`.
+
+==== Cancel reasons and retention offers
+
+For the `CANCEL` path you define a list of reasons, such as "Too expensive" or "Not using it enough." The reason a customer picks is reported to the service, and the console charts the answers.
+
+Each reason can carry a retention offer: a product, a line of text, and optionally the id of a promotional offer. A customer who picks that reason is shown the text and can accept or decline. Accepting buys the product, under the promotional offer when one is named and the store supports it. Declining continues to the store's subscription management, where the customer cancels.
+
+==== Promotional offers
+
+A promotional offer is an App Store discount for existing or lapsed subscribers that the store sells only when it comes with a signature made by the developer's key. The service makes that signature for you. `purchaseWithPromotionalOffer` asks for it and then asks the store to sell the product under the offer:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-promotional-offer,indent=0]
+----
+
+It may be called on the EDT. It returns `false`, and buys nothing, when no signature is available: the platform's store has no promotional offers, commerce isn't enabled in the build, or the service couldn't sign. Signing needs the `commerce.apple.keyId` and `commerce.apple.privateKey` secrets described under <<commerce-store-credentials,store credentials>>, and the key must be one App Store Connect accepts for subscription offers. Promotional offers are an App Store feature, on iOS and on the Mac. A retention offer on any other store sells its product at the regular price.
+
+=== Subscriber attributes and virtual currency
+
+==== Attributes
+
+Attributes are name and value pairs you attach to a customer. Targeting rules read them, the console shows them on the customer's page, and integrations use some of them to identify the customer in another system.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-attributes,indent=0]
+----
+
+`setAttributes` is a blocking network call that returns `true` when the service accepted the attributes. A null value deletes an attribute, and any other value is stored as its string form. The attributes come back with the customer information, in `CustomerInfo.getAttributes()`. Names that start with `$` are reserved for the uses this chapter lists, such as `$appsflyerId`.
+
+==== Virtual currency
+
+A virtual currency is a balance the service keeps for each customer: gems, credits, tokens. Define a currency on the *Currencies* page with a code and a name, and list the products that grant it with the amount each grants. When the service validates a purchase of such a product, it adds the amount to the customer's balance. A consumable product that should be bought again and again is the usual choice.
+
+The app reads balances from the customer information:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-currency,indent=0]
+----
+
+Spending is a server-side operation, so that a modified app can't grant itself currency. Your backend adjusts a balance through the REST API described below, and the app sees the new balance after its next `refresh()`.
+
+=== Stores
+
+==== Apple App Store, on iOS and on the Mac
+
+iOS purchases work with no setup beyond the receipt store. A native Mac build sells through the Mac App Store with the same code, and the service validates its receipts with the same Apple credentials. If the Mac app's bundle id differs from the package name of the project, enter it as the Mac bundle id in the app's commerce settings so that its receipts are accepted.
+
+Point App Store Server Notifications V2 at `https://cloud.codenameone.com/api/v2/commerce/notifications/apple` in App Store Connect, so that renewals, cancellations, refunds and billing problems reach the service when they happen.
+
+==== Google Play
+
+Android builds sell through Google Play by default. In the Play Console, set up Real-time developer notifications and route the Pub/Sub topic to `https://cloud.codenameone.com/api/v2/commerce/notifications/google`. Google purchases are validated with Google's own server API, so the service account described under <<commerce-store-credentials,store credentials>> is required for them. Without it the service accepts the purchase in degraded mode and the app relies on the device's receipt.
+
+==== Amazon Appstore
+
+An Android app is built for one store. To build for the Amazon Appstore, set the build hint:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/commerce.properties[tag=commerce-properties-001,indent=0]
+----
+
+The build then uses the Amazon Appstore SDK instead of the Play Billing Library, declares the receiver Amazon's client answers through, and leaves out the `com.android.vending.BILLING` permission, which the Amazon Appstore doesn't accept. The Google Play settings `android.licenseKey` and `android.billingclient.version` aren't used. Your code doesn't change: `Purchase` and `CommerceManager` behave the same, and receipts carry the store code `Receipt.STORE_CODE_AMAZON`.
+
+For validation, store your Amazon shared secret as `commerce.amazon.sharedSecret`. The Amazon page of the console shows the notification address to register with Amazon. It ends in a token that identifies your app, so copy it as shown.
+
+==== Web billing with Stripe and Paddle
+
+On platforms with no store -- the browser and the desktop -- the service sells through a hosted checkout page in your own Stripe or Paddle account. The same package can therefore be bought in the App Store on a phone and with a card on the web, and both grant the same entitlement.
+
+To set it up:
+
+. Store the credentials of your account in the console: `commerce.stripe.secretKey` and `commerce.stripe.webhookSecret` for Stripe, or `commerce.paddle.apiKey` and `commerce.paddle.notificationSecret` for Paddle.
+. Register the notification address the console shows for your app as a webhook in the Stripe or Paddle dashboard. It ends in a token that identifies your app.
+. On each package that should be sold on the web, enter its Stripe price id or its Paddle price id.
+
+In the app, `purchase(CommercePackage)` does the right thing on every platform. Where the platform has a store it sells the store product. Where it has none, and the package has a web price, it opens the hosted checkout in the browser. `isWebPurchase` tells you which of the two will happen, and `purchaseOnWeb` opens the checkout explicitly:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-web-purchase,indent=0]
+----
+
+The customer pays outside the app, so nothing reports the outcome to the call. Once the app is back in the foreground, run `refresh()` off the EDT, and the customer-info listeners hear what was bought. The paywall does that by itself.
+
+To send the customer back to pages of your own after the checkout, ask for the address and open it yourself. `getWebPurchaseUrl` is a blocking call that returns null when there is no web price for the package:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-web-purchase-url,indent=0]
+----
+
+Check the terms of each app store before you offer a web checkout inside an app that's distributed through that store.
+
+===== Hosted purchase links
+
+Every package with a web price also has a purchase link you can put on a website or in an email, with no app involved:
+
+----
+https://cloud.codenameone.com/api/v2/commerce/buy/<token>/<offeringId>/<packageId>?user=<appUserId>
+----
+
+The console shows the link, including your app's token, next to the package. Opening it redirects to the checkout for the customer named in `user`. Use the same id the app passes to `logIn`, and the purchase unlocks in the app on its next refresh.
+
+===== The management portal
+
+A customer who subscribed on the web manages the subscription in the billing portal of Stripe or Paddle. `fetchManagementUrl()` returns the right address for the customer's newest active entitlement: a fresh portal address when it was bought on the web, and the store's subscription page otherwise. A portal address is short lived, so ask for it when you're about to open it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-management-url,indent=0]
+----
+
+`getManagementUrl()` is the variant that never touches the network. It returns the portal address `fetchManagementUrl()` last answered with, or the store's page from the last customer information.
+
+[[commerce-store-credentials]]
+==== Store credentials
+
+By default the service validates the store-signed receipt the device presents. For Apple that's enough to gate features and it works with no setup. For _server-authoritative_ validation, where the service calls the stores' own server APIs to confirm the real subscription state, provide your credentials on the *Secrets* page of the console:
+
+[cols="2,3,4"]
+|===
+|Store |Secrets |Used for
+
+|Apple
+|`commerce.apple.keyId`, `commerce.apple.issuerId`, `commerce.apple.privateKey` (the contents of the `.p8` file)
+|Confirming subscription status for iOS and Mac purchases, recording renewals at their real amount, and signing promotional offers.
+
+|Google
+|`commerce.google.serviceAccountJson` (the full JSON key of a service account with Android Publisher access)
+|Validating every Google Play purchase.
+
+|Amazon
+|`commerce.amazon.sharedSecret`
+|Validating Amazon Appstore receipts.
+
+|Stripe
+|`commerce.stripe.secretKey`, `commerce.stripe.webhookSecret`
+|Creating checkouts and portals, and verifying Stripe's notifications.
+
+|Paddle
+|`commerce.paddle.apiKey`, `commerce.paddle.notificationSecret`
+|Creating checkouts and portals, and verifying Paddle's notifications.
+|===
+
+Secrets are stored AES-256-GCM encrypted. They're decrypted only server-side at call time and are never shown in the console again.
+
+Store notifications are idempotent. Each is deduplicated on the id the store gives it, so a redelivery never double-counts, and a store transaction is counted once however many devices present its receipt.
+
+=== Server side
+
+==== Lifecycle webhooks to your backend
+
+Commerce can forward every normalized state change to your own backend. Configure a URL and a signing secret on the *Webhook* page of the console. Each event is HMAC-SHA256 signed (header `CN1-Commerce-Signature`) and carries:
+
+- A *per-customer monotonic `sequence`*, so your consumer can reject stale events and never has to reorder defensively.
+- The grant's *`state_version`*. Reconcile against this.
+- An always-present *`effective_expiration_at`*.
+- The event `id` for idempotent deduplication.
+- The *`event_type`*.
+
+Delivery is at-least-once, in sequence order per customer, with retries that back off exponentially. The *Webhook* page lists recent deliveries and their outcome.
+
+[cols="2,5"]
+|===
+|Event type |Sent when
+
+|`INITIAL_PURCHASE`
+|A customer buys a subscription for the first time.
+
+|`RENEWAL`
+|A subscription renews.
+
+|`NON_RENEWING_PURCHASE`
+|A one-time product is bought: a lifetime unlock or a consumable.
+
+|`CANCELLATION`
+|The customer turns renewal off. Access continues until the period ends.
+
+|`UNCANCELLATION`
+|The customer turns renewal back on.
+
+|`EXPIRATION`
+|A subscription ends.
+
+|`BILLING_ISSUE`
+|A renewal payment failed.
+
+|`PRODUCT_CHANGE`
+|The customer moved to another product of the same subscription group.
+
+|`SUBSCRIPTION_PAUSED`
+|The subscription was paused.
+
+|`SUBSCRIPTION_EXTENDED`
+|The store extended the renewal date.
+
+|`REFUND`
+|A purchase was refunded.
+
+|`REFUND_REVERSED`
+|A refund was reversed.
+
+|`TRANSFER`
+|Purchases moved from one app user id to another.
+
+|`TEMPORARY_ENTITLEMENT_GRANT`
+|Access was granted for a short time while a purchase couldn't be validated.
+
+|`PROMOTIONAL_GRANT`
+|An entitlement was granted from the console or the REST API.
+
+|`PROMOTIONAL_REVOKE`
+|Such a grant was revoked.
+|===
+
+==== Integrations
+
+Integrations forward the same lifecycle events to other services, each in the format that service expects. Enable them on the *Integrations* page, where each takes its own credentials and a choice of event types to forward. A test button sends a sample event.
+
+[cols="2,3,4"]
+|===
+|Destination |Settings |Customer identity
+
+|Slack
+|`webhookUrl`
+|None. A message is posted for each event.
+
+|Amplitude
+|`apiKey`
+|The app user id.
+
+|Mixpanel
+|`token`
+|The app user id.
+
+|Segment
+|`writeKey`
+|The app user id.
+
+|Firebase (Google Analytics)
+|`measurementId`, `apiSecret`
+|The `$firebaseAppInstanceId` attribute. Required.
+
+|AppsFlyer
+|`appId`, `devKey`
+|The `$appsflyerId` attribute. Required.
+
+|Adjust
+|`appToken`, and an event token for each kind of event: `purchaseEventToken`, `renewalEventToken`, `trialEventToken`, `cancelEventToken`
+|The `$adjustId` attribute. Required.
+
+|Branch
+|`branchKey`
+|The `$branchId` attribute, or the app user id when it isn't set.
+|===
+
+The attribution services identify a device by their own id, which only their SDK on the device knows. Read it from the SDK when the app starts and store it with `setAttributes` under the reserved name in the table. An event for a customer who lacks a required attribute isn't sent to that destination. The other destinations still receive it.
+
+==== The REST API
+
+Your backend can read and change customers through a REST API. Create a secret key on the *API Keys* page. A key starts with `sk_`, belongs to one app, and is shown once when you create it, so store it then. Send it as a bearer token to `https://cloud.codenameone.com/api/v2/commerce/v1`:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/commerce.sh[tag=commerce-bash-001,indent=0]
+----
+
+[cols="1,4,5"]
+|===
+|Method |Path |What it does
+
+|`GET`
+|`/subscribers/{appUserId}`
+|Returns the customer: `serverTime`, `appUserId`, `originalAppUserId`, `managementUrl`, `activeSubscriptions`, `entitlements`, `attributes` and `currencies`.
+
+|`DELETE`
+|`/subscribers/{appUserId}`
+|Deletes the customer with their grants, attributes and currency history.
+
+|`POST`
+|`/subscribers/{appUserId}/attributes`
+|Sets attributes. The body is `{"attributes": {"name": "value"}}`, and a null value deletes an attribute.
+
+|`POST`
+|`/subscribers/{appUserId}/entitlements/{entitlementId}/grant`
+|Grants an entitlement. The optional body fields are `expiresDate`, in milliseconds since the epoch, and `reason`. Without an expiry the grant doesn't end.
+
+|`POST`
+|`/subscribers/{appUserId}/entitlements/{entitlementId}/revoke`
+|Revokes a grant made this way. Purchases aren't affected.
+
+|`POST`
+|`/receipts`
+|Validates a receipt your backend holds. The body names `appUserId`, `store` and `productId`, and carries the receipt as `signedTransaction` for Apple, `purchaseToken` for Google, or `signedTransaction` with `amazonUserId` for Amazon.
+
+|`POST`
+|`/receipts/import`
+|Imports receipts in bulk from a CSV body.
+
+|`GET`
+|`/offerings`
+|Lists the offerings of the app.
+
+|`GET`
+|`/subscribers/{appUserId}/currency`
+|Returns the customer's virtual currency balances.
+
+|`POST`
+|`/subscribers/{appUserId}/currency`
+|Changes a balance. The body is `code`, `delta`, and optionally `reason` and `reference`.
+|===
+
+A currency change with a negative `delta` spends. When the balance is too low the call answers `409` with the error `insufficient_balance` and changes nothing. `reference` makes the call safe to repeat: a second call with the same reference returns the first result, marked `replayed`, and doesn't change the balance again. Use your own order id as the reference.
+
+An unknown customer answers `404`, and a request the service can't read answers `400`.
+
+==== Granting entitlements from the console
+
+The customer page of the console has the same grant and revoke controls as the REST API. Pick an entitlement, optionally an expiry, and grant it. This is the way to give a customer access as a goodwill gesture, to unlock an account for a reviewer, or to give your team the paid features. A granted entitlement has the provenance `PROMOTIONAL`, is excluded from revenue, and reaches the app on its next `refresh()`.
+
+==== Export and import
+
+The *Export* page downloads two CSV files on demand, and can also deliver both every day to an Amazon S3 or Google Cloud Storage bucket you name.
+
+[cols="1,5"]
+|===
+|File |Columns
+
+|Transactions
+|`createdAt`, `appUserId`, `store`, `environment`, `productId`, `eventType`, `transactionId`, `originalTransactionId`, `price`, `currency`, `usd`, `validationState`
+
+|Subscribers
+|`appUserId`, `entitlementId`, `active`, `productId`, `store`, `expiresDate`, `willRenew`, `provenance`
+|===
+
+For a scheduled export, choose the destination, the bucket and a prefix, and for S3 the region. S3 takes an access key id and a secret access key, and Google Cloud Storage takes a service account key. The files are named `transactions-<day>.csv` and `subscribers-<day>.csv` under the prefix.
+
+Import brings existing customers into the service, for example when you add Commerce to an app that already has subscribers. Upload a CSV file on the *Import* page, or post it to `/receipts/import`. The first line must be this header:
+
+----
+app_user_id,store,product_id,receipt
+----
+
+Each row is validated exactly as a receipt from a device is, so an imported subscription is checked with the store and continues to renew, expire and report events like any other. The answer lists the rows that weren't imported, with the reason for each.
+
+==== The console
+
+The *Commerce* section in the console at https://cloud.codenameone.com/console/index.html is account-level by default, with an app filter to narrow to one app. Beside the configuration pages this chapter has described, it reports on the business:
+
+- *Overview* -- the subscription dashboard: headline KPIs (MRR, ARR, ARPU, active subscriptions, active trials, churn, trial conversion, customers) and trend charts for MRR, active subscriptions and revenue.
+- *Insights* -- MRR movement (new versus churned), MRR forecast, realized-LTV curve, active subscriptions by store and by product, cohort retention, trials started, conversion to paying, refund rate over time and subscription status.
+- *Customers* -- each app user with their active entitlements, attributes and balances.
+- *Transactions* -- the recent validated-event ledger.
+
+Commerce normalizes every active subscription to a monthly figure (MRR) and reconstructs the trends from the subscription history. Every chart pairs a graph with its underlying data table for export-friendly inspection. All money is shown in your reporting currency, and transactions in other currencies are normalized to USD through daily exchange rates.
+
+=== Build hints
+
+Commerce reuses the standard `build_key` that every Codename One cloud build already carries, so a cloud build needs no build hint to use the service. `CommerceManager.isCloudEnabled()` is true on any cloud build. These hints change the defaults:
 
 [cols="2,1,4"]
 |===
@@ -52,77 +868,63 @@ Commerce reuses the standard `build_key` that every Codename One cloud build alr
 
 |`commerce.cloud.enabled`
 |`true`
-|Set to `false` to switch the cloud path off in a cloud build; every call then defers to the platform `Purchase` API.
+|Set to `false` to keep every decision on the device, from the store's own receipts. Every `CommerceManager` call then defers to the `Purchase` API.
 
 |`commerce.cloud.endpoint`
 |_(Codename One cloud)_
-|Base URL of the commerce service. Override only if you self-host.
+|The base URL of the commerce service, for example `\https://commerce.example.com/api/v2/commerce`. It must be an `http` or `https` URL, and a build with any other value fails.
+
+|`commerce.cloud.publicKey`
+|_(Codename One cloud)_
+|The base64 encoded Ed25519 public key that responses of the service are verified against. Set it together with `commerce.cloud.endpoint` when the service signs with its own key.
+
+|`android.billing.store`
+|`play`
+|The store an Android app is built for: `play` or `amazon`.
 |===
 
-=== Server notifications
+==== Response signing and self-hosting
 
-For the entitlement state to stay correct after the initial purchase -- renewals, cancellations, refunds, billing retries, grace periods, holds -- point the stores' server notifications at the service:
+The answers that decide what a customer owns -- customer information, offerings, the customer center and promotional offer signatures -- are signed by the service with an Ed25519 key. Each request carries a fresh random nonce, and the signature covers that nonce together with the response. An answer recorded earlier can't be replayed to a later request, and an answer forged by something between the device and the service doesn't verify.
 
-. *Apple* -- in App Store Connect, set the App Store Server Notifications V2 URL to `https://cloud.codenameone.com/api/v2/commerce/notifications/apple`.
-. *Google* -- in the Play Console, set Real-time developer notifications and route the Pub/Sub topic to `https://cloud.codenameone.com/api/v2/commerce/notifications/google`.
+When the app knows the service's public key, an answer that's unsigned or wrongly signed is ignored. The manager becomes degraded and the app falls back to the stored answer and the store's receipts, exactly as it does when the network is down.
 
-Notifications are idempotent (deduplicated on Apple's `notificationUUID` / Google's Pub/Sub `messageId`), so a redelivery never double-counts.
+To run against a service of your own, set both hints:
 
-=== Server-side validation (connect your store credentials)
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/commerce.properties[tag=commerce-properties-002,indent=0]
+----
 
-By default the service validates the store-signed receipt the device presents -- enough to gate features, and it works with no setup. For *server-authoritative* validation -- where the service calls Apple's and Google's own server APIs to confirm the real subscription state -- provide your store credentials in the console *Secrets* page:
+Use the public half of the key pair your service signs with. A key that's set but can't be read verifies nothing, so every answer is ignored and the app runs degraded. That's deliberate: a broken key must not turn verification off.
 
-- *Apple* -- an App Store Connect API key, as three secrets: `commerce.apple.keyId`, `commerce.apple.issuerId`, and `commerce.apple.privateKey` (the contents of the `.p8` file).
-- *Google* -- a service account with Android Publisher access, as `commerce.google.serviceAccountJson` (the full JSON key).
+=== Testing in the simulator
 
-Secrets are stored AES-256-GCM encrypted in the BuildCloud vault; they're decrypted only server-side at call time and are never shown in the console again. Once set:
+The simulator reads the three `commerce.cloud` hints from the project's `codenameone_settings.properties`, so you can point it at a staging service or at one running on your own machine:
 
-- Entitlements are confirmed against Apple's `Get All Subscription Statuses` and Google's `subscriptionsv2.get`, so a grant is server-verified rather than device-trusted, and
-- Subscription *renewals* signalled by store notifications are recorded at their real amount (the renewal price lives only in the store's server response).
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/commerce.properties[tag=commerce-properties-003,indent=0]
+----
 
-Without credentials the service stays in device-trusted mode -- everything still works, you just don't get the server cross-check or accurate renewal revenue.
+The build key is stamped by the build server, and the simulator has none. Until one is set, `isCloudEnabled()` is false there and every call defers to the simulated `Purchase` API, which is enough to exercise your purchase flow and the built-in paywall. To talk to the service from the simulator, set the build key property before the first `CommerceManager` call:
 
-=== Lifecycle webhooks to your backend
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-simulator,indent=0]
+----
 
-Commerce can forward every normalized state change to your own backend. Configure a URL and a signing secret on the *Commerce* page of the console. Each event is HMAC-SHA256 signed (header `CN1-Commerce-Signature`) and carries:
-
-- A *per-customer monotonic `sequence`* -- so your consumer can reject stale events and never has to reorder defensively,
-- The grant's *`state_version`* -- reconcile against this,
-- An always-present *`effective_expiration_at`*, and
-- The event `id` for idempotent dedup.
-
-Delivery is at-least-once, in sequence order per customer, with retries that back off exponentially. Event types mirror the familiar set: `INITIAL_PURCHASE`, `RENEWAL`, `CANCELLATION`, `UNCANCELLATION`, `EXPIRATION`, `BILLING_ISSUE`, `PRODUCT_CHANGE`, `SUBSCRIPTION_PAUSED`, `REFUND_REVERSED`, `TRANSFER`.
-
-=== The console
-
-The *Commerce* section in the console at https://cloud.codenameone.com/console/index.html is account-level by default, with an app filter to narrow to one app:
-
-- *Overview* -- the subscription dashboard: headline KPIs (MRR, ARR, ARPU, active subscriptions, active trials, churn, trial conversion, customers) and trend charts for MRR, active subscriptions and revenue.
-- *Insights* -- MRR movement (new vs churned), MRR forecast, realized-LTV curve, active subscriptions by store and by product, cohort-retention, and period-over-period MRR.
-- *Customers* -- each app user and their active entitlements.
-- *Transactions* -- the recent validated-event ledger.
-- *Webhook* -- your delivery endpoint and signing secret.
-
-=== Analytics
-
-Commerce normalizes every active subscription to a monthly figure (MRR) and reconstructs the trends from the subscription history, so the dashboard matches what dedicated subscription-analytics tools provide:
-
-- *MRR / ARR / ARPU* -- normalized recurring revenue, annualized, and per active subscription.
-- *Churn* and *trial conversion* rates, *refund rate*.
-- *Cohort retention* -- monthly acquisition cohorts and the percentage still active each subsequent month.
-- *Realized LTV* -- average cumulative revenue per paying customer by months since acquisition.
-- *Forecast* -- projected MRR for the coming months from the current run-rate and recent growth.
-- *Breakdowns* by store and by product, and *period-over-period* comparison.
-
-Every chart pairs a graph with its underlying data table (one tab-flip away) for export-friendly inspection. All money is shown in your reporting currency; transactions in other currencies are normalized to USD via daily exchange rates.
+With that in place the simulator fetches offerings, paywalls and the customer center from the service, and the purchases you make in the simulated store are sent for validation as `Receipt.STORE_CODE_SIMULATOR` receipts. You can also grant the test customer an entitlement from the console and watch `refresh()` pick it up. `getAppUserId()` returns the id to look for.
 
 === Privacy
 
-Commerce stores entitlement state and transaction metadata (store, product id, event type, amount, validation state) keyed by your app-user id. It never stores card numbers or payment credentials -- those stay with Apple, Google, or your processor. Family shared purchases grant access but are excluded from revenue. The minimum lookup state needed to resolve the next notification is kept; grants are retained as the durable record, while the high-churn ledger and delivered webhook rows are purged on a rolling window.
+Commerce stores entitlement state and transaction metadata (store, product id, event type, amount, validation state) keyed by your app user id, together with the attributes you set. It never stores card numbers or payment credentials. Those stay with Apple, Google, Amazon, Stripe, Paddle or your processor. Family shared purchases grant access but are excluded from revenue. Deleting a customer through the REST API removes their grants, attributes and currency history.
 
 === Setup checklist
 
-. Map your store products to entitlements in the console.
-. In the app, call `CommerceManager.getInstance().subscribe(...)` / `.purchase(...)`, then `.refresh()` off the EDT, and gate features with `.isEntitled(...)`.
-. Point Apple App Store Server Notifications V2 and Google RTDN at the service notification URLs.
-. (Optional) Set a webhook URL + secret on the *Commerce* console page to receive lifecycle events on your backend.
+. Map your store products to entitlements in the console, and create an offering with a package for each product you sell.
+. In the app, install a receipt store, call `refresh()` off the EDT on start, and gate features with `isEntitled(...)`.
+. Show the offering with `Paywall.show(...)`, and add `CustomerCenter.show()` to your settings screen.
+. Call `logIn(...)` when the user signs in to your account system and `logOut()` when they sign out.
+. Point the stores' server notifications at the service, and store your store credentials on the *Secrets* page.
+. Optionally, set a webhook URL and secret to receive lifecycle events on your backend, and enable the integrations you use.
