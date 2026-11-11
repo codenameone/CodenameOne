@@ -90,9 +90,26 @@ public class LiveEndpoint implements WebSocket {
     @Override
     public void onClose(WebSocketSession session, int code, String reason) {
         Object username = session.getAttachment();
+        // Only an admitted connection; a refused one has no user and its end is
+        // expected. 1000 and 1001 are the app leaving. Anything else -- 1006
+        // above all, a connection lost with no Close -- is what to read first
+        // when pushes stop arriving, so it costs a line per dropped app.
+        if (username != null && code != 1000 && code != 1001) {
+            System.err.println("[live] websocket " + session.getId() + " of " + username
+                    + " closed " + code + (reason == null || reason.isEmpty() ? "" : " " + reason));
+        }
         if (username instanceof String) {
             hub.remove((String) username, session);
         }
+    }
+
+    @Override
+    public void onError(WebSocketSession session, Exception error) {
+        // A read failure, a protocol error or a callback that threw: the backend
+        // reports it here and then closes, and without this line the only trace
+        // of why a channel ended would be the 1006 that onClose prints.
+        System.err.println("[live] websocket " + session.getId() + " of "
+                + session.getAttachment() + " failed: " + error);
     }
 
     /// The `ticket` parameter of a query string, or null. A ticket is hex, so
