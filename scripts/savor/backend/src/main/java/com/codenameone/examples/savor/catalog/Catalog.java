@@ -299,7 +299,7 @@ public class Catalog {
     /// a new one, and the one it replaced is deleted only when no menu names
     /// it any more -- so an entry can only go stale for a photo nobody asks
     /// for, and lives `cn1.cache.photos.ttl` seconds.
-    @Cacheable(value = "photos", key = "#id")
+    @Cacheable(value = "photos", key = "#p0")
     @Transactional(readOnly = true)
     public PhotoDto photo(String id) {
         Photo photo = id == null || id.length() > 32 ? null : photos.findById(id);

@@ -30,12 +30,12 @@ import com.codenameone.developerguide.backend.orders.Order;
 // tag::backend-cache[]
 @Component
 public class OrderLookup {
-    @Cacheable(value = "orders", key = "#id")
+    @Cacheable(value = "orders", key = "#p0")
     public Order find(long id) {
         return load(id);
     }
 
-    @CacheEvict(value = "orders", key = "#order.id")
+    @CacheEvict(value = "orders", key = "#p0.id")
     public void update(Order order) {
         // write the change; the next find() reads it again
     }

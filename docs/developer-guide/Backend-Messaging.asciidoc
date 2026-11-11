@@ -62,9 +62,10 @@ the cache with `allEntries = true`.
 
 The build rewrites each method rather than wrapping it in a proxy, so a call
 from inside the same class is cached too. Spring's proxy would skip that call.
-The key expression is compiled at build time. It can name a parameter (`#id`,
-or `#p0` by position), a property of one (`#order.id`, read through its getter
-or a public field), a quoted literal, and `#root.methodName`, joined with `+`.
+The key expression is compiled at build time. It can name a parameter by
+position (`#p0`, `#p1`), or by name (`#id`) when the project compiles with
+javac's `-parameters`; a property of one (`#p0.id`, read through its getter or
+a public field); a quoted literal; and `#root.methodName`, joined with `+`.
 An expression the build can't compile fails the build, instead of failing on
 the first call in production. An empty key means every parameter, as Spring's
 default key generator does.
