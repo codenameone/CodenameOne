@@ -57,6 +57,85 @@ public class TextEditUtil {
     }
 
     /**
+     * The cursor position native code reports when editing ended on the Return
+     * key or the toolbar's Next button.
+     */
+    static final int ENDED_BY_RETURN_OR_NEXT = -2;
+
+    /**
+     * The cursor position native code reports when editing ended on the
+     * toolbar's Done button (METALView keyboardDoneClicked).
+     */
+    static final int ENDED_BY_DONE = -3;
+
+    /**
+     * Whether the component chose its keyboard action with the "nextButton" or
+     * "doneButton" client property.
+     */
+    static boolean choosesKeyboardAction(Component cmp) {
+        return cmp.getClientProperty("doneButton") != null || cmp.getClientProperty("nextButton") != null;
+    }
+
+    /**
+     * The component the keyboard moves to from cmp. "doneButton" answers null
+     * whatever follows: the native side derives the Return key, the toolbar
+     * button and whether Return advances from "is there a next component", so
+     * saying there is none is the one place Done has to be decided.
+     *
+     * @param cmp the component about to be edited
+     * @param following the component after it in the tab order, or null
+     */
+    static Component nextFor(Component cmp, Component following) {
+        return cmp.getClientProperty("doneButton") != null ? null : following;
+    }
+
+    /**
+     * Whether ending the edit of a component fires its Done listener. Every
+     * keyboard ending does, as it always has, with one exception: a field that
+     * asked for Next explicitly and has somewhere to go moves on without
+     * finishing, which is what Android does with its Next action. Its toolbar's
+     * Done button, where it has one, still fires.
+     *
+     * @param endCode the cursor position native code reported
+     * @param edited the component whose edit ended, possibly null
+     */
+    static boolean firesDoneEvent(int endCode, Component edited) {
+        if (edited == null) {
+            return false;
+        }
+        if (endCode == ENDED_BY_DONE) {
+            return true;
+        }
+        if (endCode != ENDED_BY_RETURN_OR_NEXT) {
+            return false;
+        }
+        return edited.getClientProperty("nextButton") == null || isLastEditComponent();
+    }
+
+    private static boolean explicitKeyboardAction;
+
+    /**
+     * Records whether the component about to be edited chose its keyboard action
+     * with the "nextButton" or "doneButton" client property.
+     *
+     * @param explicit true if it did
+     */
+    public static void setExplicitKeyboardAction(boolean explicit) {
+        explicitKeyboardAction = explicit;
+    }
+
+    /**
+     * Callback for native code. An explicit action is the developer saying the
+     * field must offer that action, so the toolbar carrying it is shown on an
+     * iPad too, where it is otherwise left out.
+     *
+     * @return true if the edited component chose its keyboard action explicitly
+     */
+    public static boolean isExplicitKeyboardAction() {
+        return explicitKeyboardAction;
+    }
+
+    /**
      * @return if the currently edited textarea is the last component on the
      * form
      */

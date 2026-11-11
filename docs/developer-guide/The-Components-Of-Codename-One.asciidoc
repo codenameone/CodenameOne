@@ -495,6 +495,37 @@ This will hide the toolbar for that given field.
 
 NOTE: You can customize the color of the #Done# button in the toolbar by setting the `ios.doneButtonColor` display property. For example: To change the color to red, you could do `Display.getInstance().setProperty("ios.doneButtonColor", String.valueOf(0xff0000))`.
 
+===== Choosing next or done
+
+The action the keyboard offers is separate from the input constraint, so a `NUMERIC` or `DECIMAL` field can offer #Next# or #Done# like any other. Without any setting, a single line field picks its action in this order:
+
+. The `searchField`, `sendButton` and `goButton` client properties described above (Android).
+. #Done#, if the field has a Done listener (Android). #Next# never calls a Done listener there, so a field with a listener offers #Done# even when another field follows it.
+. #Next#, if another field follows this one in the tab order.
+. #Done#.
+
+iOS skips the first two steps: it offers #Next# when another field follows and #Done# otherwise, and calls the Done listener for both.
+
+To make the choice yourself, set the `nextButton` or `doneButton` client property to any non-null value:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyboardActionSnippets.java[tag=keyboard-action-next-done,indent=0]
+----
+
+Both properties come after `searchField`, `sendButton` and `goButton` and before everything else in the list, on Android and iOS alike:
+
+- `nextButton` offers #Next# and moves to the following editable field. It doesn't call the Done listener: #Next# moves on, #Done# finishes. On a field nothing follows it's ignored, so the last field of a form still offers #Done#.
+- `doneButton` offers #Done# and ends editing, even when another field follows. It wins if both properties are set.
+
+On Android the properties apply to single line fields, and to multi-line ones that have a Done listener.
+
+On iOS the number, decimal and phone keyboards have no #Return# key, so their #Next# or #Done# is a button in a toolbar above the keyboard:
+
+- On an iPhone that toolbar is shown in portrait and landscape. For keyboards that do have a #Return# key the toolbar is left out in landscape, where there is little room for it.
+- On an iPad the docked number keyboard is a full keyboard with its own #Return# key and gets no toolbar. The floating keyboard has no such key, so a field with `nextButton` or `doneButton` gets the toolbar on an iPad too.
+- `iosHideToolbar` removes the toolbar wherever it would appear. On a number, decimal or phone keyboard that leaves no #Next# or #Done# at all.
+
 ==== Clearable text field
 
 iOS has a convention where an X can be placed after the text field to clear it. Some Android apps have it but there is no native support for that as of this writing.
