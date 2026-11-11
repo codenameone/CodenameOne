@@ -5569,6 +5569,12 @@ final class TypedEmit {
                         return r;
                     }
                 }
+                if ("isinstance".equals(n) && c.args.size() == 2 && c.keywords.isEmpty()
+                        && !(c.args.get(0) instanceof Starred) && !(c.args.get(1) instanceof Starred)) {
+                    // A Java boolean: no argument array, no bool to box and test.
+                    return new E("Py.isinstanceB(" + em.builtinRef(n) + ", " + box(expr(c.args.get(0))) + ", "
+                            + box(expr(c.args.get(1))) + ")", Ty.BOOL);
+                }
                 return genericCall(em.builtinRef(n), c);
             }
             // Any other callable a name holds: a class without a layout,

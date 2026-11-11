@@ -865,11 +865,20 @@ public final class Py {
     }
 
     public static Object in(Object x, Object container) {
-        return bool(Py.obj(container).contains(x));
+        return bool(contains(container, x));
     }
 
     public static Object notIn(Object x, Object container) {
-        return bool(!Py.obj(container).contains(x));
+        return bool(!contains(container, x));
+    }
+
+    /// `x in container`; a str in a str is answered without the PyStr view
+    /// Py.obj would allocate for the container.
+    private static boolean contains(Object container, Object x) {
+        if (container instanceof String && x instanceof String) {
+            return ((String) container).indexOf((String) x) >= 0;
+        }
+        return Py.obj(container).contains(x);
     }
 
     // ---- arithmetic ------------------------------------------------------
@@ -1452,6 +1461,16 @@ public final class Py {
                 }
             }
             return l.getItem(key);
+        }
+        if (o instanceof String && key instanceof Long) {
+            // s[i] without the PyStr view Py.obj makes (an allocation per
+            // character a tokenizer reads).
+            String str = (String) o;
+            long i = ((Long) key).longValue();
+            int len = str.length();
+            if (i >= 0 && i < len && PyStr.surrogates(str) == 0) {
+                return Typed.ch(str.charAt((int) i));
+            }
         }
         return Py.obj(o).getItem(key);
     }
@@ -2294,6 +2313,18 @@ public final class Py {
 
     private static final java.util.Set<String> FACTORY_MODULES = new java.util.HashSet<String>(java.util.Arrays.asList(
             "__main__", "collections", "typing", "enum", "dataclasses"));
+
+    /// `isinstance(o, t)` as a condition in typed code: the builtin's answer
+    /// as a Java boolean, with no bool to box and test.
+    public static boolean isinstanceB(Object f, Object o, Object t) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            if (o instanceof PyInstance && ((PyInstance) o).cls == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+            return isinstance(o, t);
+        }
+        return isTrue(call(f, o, t));
+    }
 
     public static boolean isinstance(Object o, Object t) {
         if (t instanceof PyTuple) {

@@ -389,7 +389,13 @@ public final class AttrSite {
         // from code that cannot name the Java class -- another module -- finds
         // it set, and one that finds it unset takes the generic read.
         int field = i.fieldIndex(name);
-        if (field >= 0 && !(clsAttr instanceof PyProperty) && !readsThroughGet(clsAttr) && !cls.hasCustomGetattribute()) {
+        if (clsAttr instanceof PyProperty && !cls.hasCustomGetattribute()) {
+            // A property is a data descriptor: it answers before the
+            // instance's own attributes, so while the class is unchanged
+            // (getVersion) every read is its getter. bindAttr calls it.
+            kind = CLASS_ATTR;
+            value = clsAttr;
+        } else if (field >= 0 && !(clsAttr instanceof PyProperty) && !readsThroughGet(clsAttr) && !cls.hasCustomGetattribute()) {
             kind = FIELD;
             slot = field;
         } else if (!(clsAttr instanceof PyProperty) && !readsThroughGet(clsAttr) && !cls.hasCustomGetattribute()

@@ -554,6 +554,28 @@ public final class PyFunction extends PyObject {
         if (kwNames.length == 0 && !varArgs && kwOnly == 0 && !varKw && args.length == positional) {
             return body.run(args);
         }
+        if (varArgs && kwNames.length == 0 && kwOnly == 0 && !varKw && args.length >= positional) {
+            // f(*args) called positionally: the slots are the leading
+            // arguments and one tuple of the rest, with none of bindArgs'
+            // keyword matching.
+            Object[] slots = spareSlots;
+            spareSlots = null;
+            if (slots == null) {
+                slots = new Object[positional + 1];
+            }
+            System.arraycopy(args, 0, slots, 0, positional);
+            int rest = args.length - positional;
+            if (rest == 0) {
+                slots[positional] = PyTuple.EMPTY;
+            } else {
+                Object[] items = new Object[rest];
+                System.arraycopy(args, positional, items, 0, rest);
+                slots[positional] = new PyTuple(items);
+            }
+            Object r = body.run(slots);
+            spareSlots = clear(slots);
+            return r;
+        }
         if (positional <= 6 && !varArgs && kwOnly == 0 && !varKw && args.length <= positional) {
             Object r = bindDirect(args, kwNames);
             if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
@@ -576,6 +598,33 @@ public final class PyFunction extends PyObject {
     }
 
     private Object[] spareSlots;
+
+    /// The slot of each name of the last two keyword-name arrays
+    /// [#bindDirect] matched. Every call site hoists its array into a static,
+    /// so the same array arrives again and again: one identity check instead
+    /// of a string comparison per keyword and parameter.
+    private String[] directKw0;
+    private int[] directSlots0;
+    private String[] directKw1;
+    private int[] directSlots1;
+
+    private int[] directSlots(String[] kwNames) {
+        if (kwNames == directKw0) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return directSlots0;
+        }
+        if (kwNames == directKw1) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return directSlots1;
+        }
+        int[] r = new int[kwNames.length];
+        for (int i = 0; i < r.length; i++) {
+            r[i] = slotOf(kwNames[i]);
+        }
+        directKw1 = directKw0;
+        directSlots1 = directSlots0;
+        directKw0 = kwNames;
+        directSlots0 = r;
+        return r;
+    }
 
     /// The keyword-name arrays of the last few call sites that bound through
     /// [#bindArgs], and the slot each of their names goes to (-1 for a name
@@ -602,6 +651,7 @@ public final class PyFunction extends PyObject {
     /// reports the call exactly as before.
     private Object bindDirect(Object[] args, String[] kwNames) {
         int nPos = args.length - kwNames.length;
+        int[] kwSlots = kwNames.length == 0 ? null : directSlots(kwNames);
         Object x0 = null;
         Object x1 = null;
         Object x2 = null;
@@ -611,7 +661,7 @@ public final class PyFunction extends PyObject {
         for (int i = 0; i < args.length; i++) {
             int slot = i;
             if (i >= nPos) {
-                slot = slotOf(kwNames[i - nPos]);
+                slot = kwSlots[i - nPos];
                 if (slot < 0) {
                     return UNBOUND;
                 }
