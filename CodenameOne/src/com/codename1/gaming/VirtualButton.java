@@ -37,6 +37,7 @@ public class VirtualButton {
     private float centerY;
     private final float radius;
     private String label;
+    private int labelColor = 0xff303030;
     private int color = 0xc0ffffff;
     private boolean pressed;
 
@@ -86,6 +87,18 @@ public class VirtualButton {
     public VirtualButton setColor(int argb) {
         this.color = argb;
         return this;
+    }
+
+    /// The ARGB colour of the label (default a dark grey). The label is drawn
+    /// over the button in this colour and is not tinted by `setColor`, so a
+    /// light label stays readable on a dark, translucent button.
+    public VirtualButton setLabelColor(int argb) {
+        this.labelColor = argb;
+        return this;
+    }
+
+    public int getLabelColor() {
+        return labelColor;
     }
 
     boolean contains(float px, float py) {

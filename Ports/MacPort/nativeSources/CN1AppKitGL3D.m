@@ -100,3 +100,18 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_gl3dUpdateFloatBuffer___long_float_1A
 JAVA_VOID com_codename1_impl_ios_IOSNative_gl3dUpdateShortBuffer___long_short_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_INT __cn1Arg3) {
 }
 
+/* Shadows and post processing: false makes the device draw directly. */
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return JAVA_FALSE;
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_gl3dEndShadowPass___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1) {
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_BOOLEAN __cn1Arg3) {
+    return JAVA_FALSE;
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_gl3dEndPostProcess___long_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+}
+

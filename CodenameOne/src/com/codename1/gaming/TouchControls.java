@@ -107,6 +107,17 @@ public class TouchControls {
         return b;
     }
 
+    /// Adds a button anchored to a corner of the view's safe area with its own
+    /// horizontal and vertical gaps, so a cluster of buttons can sit in an arc
+    /// around a bigger one rather than on the corner's diagonal.
+    public VirtualButton addButton(int keyCode, float radius, int hAlign, int vAlign, float marginX,
+            float marginY) {
+        VirtualButton b = new VirtualButton(keyCode, 0, 0, radius);
+        b.setAnchor(hAlign, vAlign, marginX, marginY);
+        buttons.add(b);
+        return b;
+    }
+
     /// Repositions every anchored control within the given safe-area rectangle (in
     /// view-local pixels). Called by `GameView` each frame; absolutely positioned
     /// controls are left untouched.

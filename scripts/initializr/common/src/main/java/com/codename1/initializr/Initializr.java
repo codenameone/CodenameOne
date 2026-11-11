@@ -467,7 +467,7 @@ public class Initializr extends Lifecycle {
         if (!GeneratorModel.isTemplateOffered(Template.WAYLINE)) {
             return empty;
         }
-        Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.DASH, Template.PARLEY,
+        Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.DASH, Template.SPLAT, Template.PARLEY,
             Template.BASTION, Template.REEL, Template.PULSE,
             Template.SLATE};
         int offered = 0;
@@ -512,6 +512,7 @@ public class Initializr extends Lifecycle {
     static String templateTitle(Template template) {
         return template == Template.SAVOR ? "Food delivery" : template == Template.SKIRMISH ? "Card battle game"
                 : template == Template.DASH ? "Endless runner"
+                : template == Template.SPLAT ? "Paintball shooter"
                 : template == Template.PARLEY ? "Messaging" : template == Template.WAYLINE ? "Ride hailing"
                 : template == Template.BASTION ? "Banking"
                 : template == Template.REEL ? "Video streaming"

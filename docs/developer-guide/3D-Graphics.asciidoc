@@ -79,6 +79,7 @@ lighting model:
 | `UNLIT` | Flat color/texture, no lighting. Ideal for UI, emissive surfaces.
 | `LAMBERT` | Diffuse (Lambert) lighting from one directional light.
 | `PHONG` | Diffuse + specular highlight (uses `setShininess`).
+| `PBR` | Physically based: metallic and roughness (`setMetallic`, `setRoughness`) with a GGX highlight, plus `setEmissive` for surfaces that glow. `GltfLoader` fills these from a model's own materials.
 | `SPRITE` | Unlit, for screen aligned sprites and billboards.
 | `SKYBOX` | Unlit background, rendered behind the scene.
 |===
@@ -150,6 +151,48 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/Matrix4.html[Matrix4]
 (column-major `float[16]`): `translation`, `scaling`, `rotation`, `multiply`,
 `lookAt`, `perspective`, `ortho`. Pass a model matrix as the third argument to
 `draw`, or `null` for the identity.
+
+=== Atmosphere, shadows and post processing
+
+Three settings turn a correctly lit scene into one that looks shot outdoors
+through a lens. All three start off, so a scene that never touches them
+renders exactly as before.
+
+An `Environment` (`GraphicsDevice.setEnvironment`, or `getEnvironment()` on a
+`GameView`) holds the atmosphere every draw is shaded in:
+
+* *Fog* -- exponential squared in distance, thinned with height, so distant
+  geometry melts into the haze.
+* *Hemisphere ambient* -- a sky color lights upward faces and a ground color
+  downward ones, which gives shape to everything in shadow.
+* *Tone mapping and exposure* -- a filmic (ACES) curve, so bright light rolls
+  off instead of clipping.
+* *An open sky* -- `setSky` paints `SKYBOX` surfaces as a gradient from the
+  horizon to the zenith, with soft clouds and the sun where the light comes
+  from. Draw it on a large sphere around the camera; it needs no texture.
+
+`Light.setShadows(true)` renders the scene from the light into a shadow map
+before each frame, and lit materials are darkened where it's blocked. Keep
+`setShadowMap`'s extent as small as the view allows and move
+`setShadowCenter` with the camera, since the map's resolution is spread over
+the area it covers. A material that shouldn't cast (grass, particles) says
+so with `setCastShadows(false)`.
+
+A `PostProcess` on the view renders the scene offscreen and adds bloom, a
+color grade, a vignette and film grain on the way to the screen. Touch
+controls are drawn after it and are never graded.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava007Snippet.java[tag=3d-graphics-java-007,indent=0]
+----
+
+Match the horizon color to the fog color and the far edge of the world
+disappears into the sky. A device that can't render shadows or offscreen
+says so through `GpuCapabilities.isShadowsSupported()` and
+`isPostProcessSupported()`, and the scene is then drawn directly. The JavaSE
+software rasterizer applies the fog, the ambient, tone mapping and the sky
+gradient, but not shadows, clouds or the post chain.
 
 === Platform notes
 

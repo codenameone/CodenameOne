@@ -230,6 +230,29 @@ class AnimatedModelTest extends UITestBase {
     }
 
     @Test
+    void layerMixesAClipIntoItsSubtreeOnly() {
+        AnimatedModel m = new AnimatedModel(new StubDevice(), GltfLoader.loadScene(armGltf()));
+        float[] prop = m.getParts()[1].getMesh().getVertices().getData();
+        float c = (float) Math.cos(Math.PI / 4);
+        assertTrue(m.setLayer("Bend", 1f, "root_bone"));
+        m.update(0.5f);
+        assertVertex(prop, 1, c, 1 + c, 0); // the layer's own clock, at half the bend
+        // a subtree that does not hold the animated bone: nothing moves
+        assertTrue(m.setLayer("Bend", 1f, "prop"));
+        m.update(0f);
+        assertVertex(prop, 1, 1, 1, 0);
+        assertTrue(m.setLayer("Bend", 0.5f, null));
+        m.update(0f);
+        float q = (float) Math.cos(Math.PI / 8);
+        float sn = (float) Math.sin(Math.PI / 8);
+        assertVertex(prop, 1, q, 1 + sn, 0); // half weight, half the angle
+        assertFalse(m.setLayer("Bend", 0f, null));
+        m.update(0f);
+        assertVertex(prop, 1, 1, 1, 0);
+        assertFalse(m.setLayer("Missing", 1f, null));
+    }
+
+    @Test
     void hidingANodeHidesItsSubtree() {
         AnimatedModel m = new AnimatedModel(new StubDevice(), GltfLoader.loadScene(armGltf()));
         assertTrue(m.hideNode("arm"));

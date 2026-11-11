@@ -21,6 +21,7 @@ on:
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
       - 'scripts/slate/**'
+      - 'scripts/splat/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'
       - 'scripts/parley/**'
@@ -150,6 +151,7 @@ jobs:
               - 'scripts/bastion/**'
               - 'scripts/pulse/**'
               - 'scripts/slate/**'
+              - 'scripts/splat/**'
               - 'scripts/hellocodenameone/common/src/main/kmp/**'
               - 'maven/cn1-app-kit/**'
             workflow:

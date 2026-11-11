@@ -453,6 +453,13 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     
     public void fireReady() {
         if (!CN.isEdt()) {
+            // With Codename One stopped, callSerially runs the call inline, on
+            // this same non-EDT thread, and the hop recursed until the stack
+            // overflowed: a browser that finishes loading after the app (or a
+            // test run) has shut down has nobody left to tell.
+            if (!com.codename1.ui.Display.isInitialized()) {
+                return;
+            }
             CN.callSerially(new Runnable() {
                public void run() {
                   fireReady(); 

@@ -130,6 +130,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateMavenRefusals();
         validateFullStackTemplate();
         validateReelGate();
+        validateSplatGate();
         validateCommandLineProject();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
@@ -410,8 +411,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
-        boolean game = template == Template.SKIRMISH || template == Template.DASH;
+        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT;
         boolean runner = template == Template.DASH;
+        boolean paintball = template == Template.SPLAT;
         boolean video = template == Template.REEL;
         boolean studio = template == Template.PULSE;
         boolean booking = template == Template.SLATE;
@@ -429,7 +431,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
             assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
@@ -639,6 +641,18 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 GeneratorModel.REEL_SINCE, "Reel is not generated before its gate");
         assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
                 GeneratorModel.REEL_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.REEL)), "The page offers Reel from its gate on");
+    }
+
+    /// The shooter template needs the 3D engine of a newer core: below its own
+    /// gate it is refused, and the page does not list it.
+    private void validateSplatGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.SPLAT_SINCE),
+                "Splat's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.SPLAT, "OldSplat",
+                "com.acme.oldsplat", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.SPLAT_SINCE, "Splat is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.SPLAT_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.SPLAT)), "The page offers Splat from its gate on");
     }
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {

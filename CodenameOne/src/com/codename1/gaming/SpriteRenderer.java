@@ -23,11 +23,13 @@
 package com.codename1.gaming;
 
 import com.codename1.gpu.Camera;
+import com.codename1.gpu.Environment;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Renderer;
@@ -77,6 +79,11 @@ public class SpriteRenderer implements Renderer {
     private final GameCamera gameCamera = new GameCamera();
     private final Camera camera = new Camera();
     private final Light light = new Light();
+    private final Environment environment = new Environment();
+    // what the touch controls are drawn in: no fog, no tone mapping
+    private final Environment plain = new Environment();
+    private PostProcess postProcess;
+    private long startTime;
     private final List models = new ArrayList();
     private TouchControls controls;
     private Mesh quad;
@@ -125,6 +132,23 @@ public class SpriteRenderer implements Renderer {
     /// `com.codename1.gpu.Light#setDirection(float, float, float)` etc.
     public Light getLight() {
         return light;
+    }
+
+    /// The fog, hemisphere ambient and tone mapping the 3D scene is shaded in.
+    /// The default changes nothing.
+    public Environment getEnvironment() {
+        return environment;
+    }
+
+    /// Sets the full screen effects applied to a perspective scene, or null for
+    /// none. The touch controls are drawn after them and are never affected.
+    public void setPostProcess(PostProcess postProcess) {
+        this.postProcess = postProcess;
+    }
+
+    /// Returns the full screen effects, or null if there are none.
+    public PostProcess getPostProcess() {
+        return postProcess;
     }
 
     /// Adds a 3D model to be drawn (in perspective mode) alongside the sprites.
@@ -287,16 +311,41 @@ public class SpriteRenderer implements Renderer {
             disposeReleased(device);
         }
 
-        device.clear(clearColor, true, true);
         // configure the GPU camera from the GameCamera each frame so a moving 3D
         // camera (or a switch between 2D and perspective) takes effect immediately.
         gameCamera.apply(camera, viewWidth, viewHeight);
         device.setCamera(camera);
         device.setLight(light);
+        device.setEnvironment(environment);
         boolean perspective = gameCamera.getMode() == GameCamera.MODE_PERSPECTIVE;
+        int modelCount = models.size();
+
+        // the shadow map is rendered from the light before the frame itself
+        if (perspective && light.isShadows() && device.beginShadowPass(light)) {
+            // A caster well outside the map cannot shade anything in it. The
+            // margin allows for the model's own size and its shadow's length.
+            float reach = light.getShadowExtent() * 1.5f + 12f;
+            float cx = light.getShadowCenterX();
+            float cz = light.getShadowCenterZ();
+            for (int i = 0; i < modelCount; i++) {
+                Model m = (Model) models.get(i);
+                if (m.isVisible() && m.getMesh() != null && m.getMaterial().isCastShadows()) {
+                    float[] mm = m.modelMatrix();
+                    float dx = mm[12] - cx;
+                    float dz = mm[14] - cz;
+                    if (dx * dx + dz * dz > reach * reach) {
+                        continue;
+                    }
+                    device.draw(m.getMesh(), m.getMaterial(), mm);
+                }
+            }
+            device.endShadowPass();
+        }
+        boolean post = perspective && postProcess != null
+                && device.beginPostProcess(postProcess, viewWidth, viewHeight);
+        device.clear(clearColor, true, true);
 
         // opaque 3D models first (they write depth), then alpha-blended sprites.
-        int modelCount = models.size();
         for (int i = 0; i < modelCount; i++) {
             Model m = (Model) models.get(i);
             if (m.isVisible() && m.getMesh() != null) {
@@ -317,6 +366,13 @@ public class SpriteRenderer implements Renderer {
             device.draw(quad, material, modelMatrix(s));
         }
 
+        if (post) {
+            if (startTime == 0) {
+                startTime = now;
+            }
+            device.endPostProcess((now - startTime) / 1000f);
+        }
+        device.setEnvironment(plain);
         drawControls(device);
     }
 
@@ -346,10 +402,14 @@ public class SpriteRenderer implements Renderer {
         int bn = controls.getButtonCount();
         for (int i = 0; i < bn; i++) {
             VirtualButton b = controls.getButton(i);
-            Image face = b.getLabel() == null ? discImage : labelDisc(b.getLabel());
             int col = b.isPressed() ? brighten(b.getColor()) : b.getColor();
-            screenQuad(device, face, b.getCenterX(), b.getCenterY(),
+            screenQuad(device, discImage, b.getCenterX(), b.getCenterY(),
                     b.getRadius() * 2, b.getRadius() * 2, col);
+            if (b.getLabel() != null) {
+                // the label is a texture of its own, tinted by its own colour
+                screenQuad(device, labelImage(b.getLabel()), b.getCenterX(), b.getCenterY(),
+                        b.getRadius() * 2, b.getRadius() * 2, b.getLabelColor());
+            }
         }
     }
 
@@ -365,38 +425,34 @@ public class SpriteRenderer implements Renderer {
         device.draw(quad, material, model);
     }
 
-    /// A white disc with a centered label, cached per label string. The font is
-    /// scaled down until the label fits inside the disc, so multi-letter labels
-    /// (e.g. "Jump") are not clipped.
-    private Image labelDisc(String label) {
+    /// A button label in white on a transparent square, cached per label
+    /// string. The text is drawn at its natural size and then scaled to fit
+    /// the disc, so a label of any length is shown whole: stepping down
+    /// through the system sizes alone still clipped a word like "Jump" on a
+    /// dense screen, where even the small font is wider than the texture.
+    private Image labelImage(String label) {
         Image img = (Image) labelImages.get(label);
         if (img == null) {
             int size = 128;
-            float maxTextWidth = size * 0.74f;
-            img = circleTexture(size, 0f, 1f);
+            com.codename1.ui.Font f = com.codename1.ui.Font.createSystemFont(
+                    com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
+                    com.codename1.ui.Font.SIZE_LARGE);
+            int tw = Math.max(1, f.stringWidth(label));
+            int th = Math.max(1, f.getHeight());
+            Image text = Image.createImage(tw + 4, th, 0);
+            com.codename1.ui.Graphics tg = text.getGraphics();
+            tg.setAntiAliased(true);
+            tg.setAntiAliasedText(true);
+            tg.setFont(f);
+            tg.setColor(0xffffff);
+            tg.drawString(label, 2, 0);
+            float fit = Math.min(size * 0.74f / (tw + 4), size * 0.5f / th);
+            int dw = Math.max(1, (int) ((tw + 4) * fit));
+            int dh = Math.max(1, (int) (th * fit));
+            img = Image.createImage(size, size, 0);
             com.codename1.ui.Graphics g = img.getGraphics();
             g.setAntiAliased(true);
-            g.setAntiAliasedText(true);
-            int[] fontSizes = {
-                com.codename1.ui.Font.SIZE_LARGE,
-                com.codename1.ui.Font.SIZE_MEDIUM,
-                com.codename1.ui.Font.SIZE_SMALL
-            };
-            com.codename1.ui.Font f = null;
-            int tw = 0;
-            for (int fontSize : fontSizes) {
-                f = com.codename1.ui.Font.createSystemFont(
-                        com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
-                        fontSize);
-                tw = f.stringWidth(label);
-                if (tw <= maxTextWidth) {
-                    break;
-                }
-            }
-            g.setFont(f);
-            g.setColor(0x303030);
-            int th = f.getHeight();
-            g.drawString(label, (size - tw) / 2, (size - th) / 2);
+            g.drawImage(text, (size - dw) / 2, (size - dh) / 2, dw, dh);
             labelImages.put(label, img);
         }
         return img;
