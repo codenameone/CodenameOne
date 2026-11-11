@@ -18825,7 +18825,36 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     cn1RecordAllocSite(cn1ArraySitePc((void**)__builtin_frame_address(0), __builtin_return_address(CN1_ALLOC_SITE_DEPTH)),
             type, CN1_ARRAY_ALLOC_BYTES(actualSize));
 #endif
-    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, (int)CN1_ARRAY_ALLOC_BYTES(actualSize), type);
+    JAVA_ARRAY array = 0;
+#if !defined(CN1_DISABLE_BIBOP) && defined(CN1_CONSERVATIVE_GC_ROOTS) && !defined(CN1_GC_INSTRUMENT)
+    /* A small array takes the bump slot a small object takes (cn1BibopFastAlloc), here
+     * rather than three calls down: codenameOneGcMalloc, cn1BibopAlloc and the slot
+     * initializer between them cost more than the allocation they lead to, and code
+     * that passes arguments and builds tuples allocates little else. Everything the
+     * long way decides before it reaches a bump slot is tested first, so anything but
+     * the plain case still goes that way: a class not registered yet, a real-time trap
+     * or memory limit, a suspended application, a heap not set up. The length test
+     * also keeps a size that overflowed int away from the size table. The bytes are
+     * charged when the page is retired, as an object's are. */
+    if(__builtin_expect((unsigned int)length <= (unsigned int)CN1_BIBOP_MAX_OBJECT
+            && (size_t)CN1_ARRAY_ALLOC_BYTES(actualSize) <= (size_t)CN1_BIBOP_MAX_OBJECT
+            && type != 0 && type->cn1ClazzRegistered
+            && !threadStateData->rtAllocTrap && cn1RtMemoryLimitBytes <= 0 && !isAppSuspended
+            && atomic_load_explicit(&bibopReady, memory_order_acquire), 1)) {
+        int bytes = (int)CN1_ARRAY_ALLOC_BYTES(actualSize);
+        array = (JAVA_ARRAY)cn1BibopFastAlloc(threadStateData, bytes, type, cn1BibopSizeToClass[bytes],
+                cn1ClazzIndexOf(type));
+        if(array == 0) {
+            /* A page the sweep gave a free list has no bump room, which is every page
+             * of a heap that has reached its working size. */
+            array = (JAVA_ARRAY)cn1BibopAllocRecycled(threadStateData, bytes, type, cn1BibopSizeToClass[bytes]);
+        }
+    }
+    if(array == 0)
+#endif
+    {
+        array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, (int)CN1_ARRAY_ALLOC_BYTES(actualSize), type);
+    }
     (*array).length = length;
     (*array).dimensions = dim;
     (*array).primitiveSize = primitiveSize;

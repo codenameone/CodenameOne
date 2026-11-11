@@ -535,6 +535,21 @@ public final class AttrSite {
         return Py.obj(Py.obj(o).getAttr(name)).call(rest, Py.NO_KW);
     }
 
+    /// `o.name(..., key=value)`: [#callN] with keyword names. A method of the
+    /// receiver's class is called with the receiver written into the empty
+    /// first slot, so the call makes neither a bound method nor a second
+    /// argument array.
+    public Object callKw(Object o, Object[] args, String[] kwNames) {
+        Object f = method(o);
+        if (f != null) {
+            args[0] = o;
+            return Py.obj(f).call(args, kwNames);
+        }
+        Object[] rest = new Object[args.length - 1];
+        System.arraycopy(args, 1, rest, 0, rest.length);
+        return Py.obj(get(o)).call(rest, kwNames);
+    }
+
     /// The function to call with the receiver prepended, when the call needs
     /// no bound method; otherwise null and the caller goes the generic way.
     private Object method(Object o) {

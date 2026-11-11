@@ -3301,6 +3301,13 @@ public final class Emitter {
                 kw.append(i == 0 ? "" : ", ").append(javaString(k.arg));
             }
             String w = hoist("String[]", kw.append("}").toString());
+            if (c.func instanceof Attribute && !(FRAME_HOOKS.contains(((Attribute) c.func).attr)
+                    && ((Attribute) c.func).value instanceof Name
+                    && "sys".equals(((Name) ((Attribute) c.func).value).id))) {
+                // A method call: the site puts the receiver in the first slot.
+                Attribute a = (Attribute) c.func;
+                return site(a.attr) + ".callKw(" + expr(a.value) + ", new Object[] {null" + args + "}, " + w + ")";
+            }
             String arr = args.length() == 0 ? "Py.NO_ARGS" : "new Object[] {" + args.substring(2) + "}";
             return "Py.callKw(" + expr(c.func) + ", " + arr + ", " + w + ")";
         }

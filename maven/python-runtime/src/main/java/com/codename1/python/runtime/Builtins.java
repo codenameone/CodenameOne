@@ -102,7 +102,8 @@ public final class Builtins {
     public static final Object ABS = PyBuiltin.unary("abs", x -> abs(x));
     public static final Object CALLABLE = PyBuiltin.unary("callable", x -> Py.bool(isCallable(x)));
     public static final Object ITER = PyBuiltin.positional("iter", a -> iter(a));
-    public static final Object NEXT = PyBuiltin.positional("next", a -> next(a));
+    public static final Object NEXT = PyBuiltin.positional("next", a -> next(a))
+            .with1(x -> next(x, null, false)).with2((x, d) -> next(x, d, true));
     public static final Object AITER = PyBuiltin.unary("aiter", x -> Py.callMethod(x, "__aiter__"));
     // anext with a default is an awaitable that answers the default on StopAsyncIteration; the
     // asyncio module supplies that wrapper, so the builtin covers the one-argument form.
@@ -1036,14 +1037,18 @@ public final class Builtins {
     }
 
     private static Object next(Object[] a) {
-        Object v = Py.next(a[0]);
+        return next(a[0], a.length > 1 ? a[1] : null, a.length > 1);
+    }
+
+    private static Object next(Object it, Object fallback, boolean hasFallback) {
+        Object v = Py.next(it);
         if (v == null) {
-            if (a.length > 1) {
-                return a[1];
+            if (hasFallback) {
+                return fallback;
             }
-            if (a[0] instanceof PyGenerator) {
+            if (it instanceof PyGenerator) {
                 // A finished generator's StopIteration carries its return value.
-                throw PyGenerator.stopIteration(((PyGenerator) a[0]).returned());
+                throw PyGenerator.stopIteration(((PyGenerator) it).returned());
             }
             throw new PyException(Py.STOP_ITERATION.call(Py.NO_ARGS, Py.NO_KW));
         }

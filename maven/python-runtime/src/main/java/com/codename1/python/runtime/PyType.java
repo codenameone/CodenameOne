@@ -357,14 +357,14 @@ public final class PyType extends PyObject {
             return true;
         }
         Object m = metaDunder("__instancecheck__");
-        return m != null && Py.isTrue(Py.obj(m).call(new Object[] {this, o}, Py.NO_KW));
+        return m != null && Py.isTrue(Py.obj(m).call2(this, o));
     }
 
     /// `issubclass(c, this)`, through the metaclass's `__subclasscheck__`.
     boolean subclassCheck(PyType c) {
         Object m = metaDunder("__subclasscheck__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this, c}, Py.NO_KW));
+            return Py.isTrue(Py.obj(m).call2(this, c));
         }
         return c.isSubtype(this);
     }
@@ -589,12 +589,12 @@ public final class PyType extends PyObject {
     public Object getItem(Object key) {
         Object m = metaDunder("__getitem__");
         if (m != null) {
-            return Py.obj(m).call(new Object[] {this, key}, Py.NO_KW);
+            return Py.obj(m).call2(this, key);
         }
         Object cg = lookup("__class_getitem__");
         if (cg != null) {
             Object f = cg instanceof PyClassMethod ? ((PyClassMethod) cg).func : cg;
-            return Py.obj(f).call(new Object[] {this, key}, Py.NO_KW);
+            return Py.obj(f).call2(this, key);
         }
         if (factory != null) {
             return new PyGenericAlias(this, key);
@@ -606,7 +606,7 @@ public final class PyType extends PyObject {
     public Object iter() {
         Object m = metaDunder("__iter__");
         if (m != null) {
-            return Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+            return Py.obj(m).call1(this);
         }
         return super.iter();
     }
@@ -615,7 +615,7 @@ public final class PyType extends PyObject {
     public int len() {
         Object m = metaDunder("__len__");
         if (m != null) {
-            return (int) Py.asLong(Py.obj(m).call(new Object[] {this}, Py.NO_KW));
+            return (int) Py.asLong(Py.obj(m).call1(this));
         }
         return super.len();
     }
@@ -624,7 +624,7 @@ public final class PyType extends PyObject {
     public boolean contains(Object x) {
         Object m = metaDunder("__contains__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this, x}, Py.NO_KW));
+            return Py.isTrue(Py.obj(m).call2(this, x));
         }
         return super.contains(x);
     }
@@ -633,7 +633,7 @@ public final class PyType extends PyObject {
     public boolean isTrue() {
         Object m = metaDunder("__bool__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this}, Py.NO_KW));
+            return Py.isTrue(Py.obj(m).call1(this));
         }
         m = metaDunder("__len__");
         return m == null || len() != 0;
@@ -643,7 +643,7 @@ public final class PyType extends PyObject {
     public String str() {
         Object m = metaDunder("__str__");
         if (m != null) {
-            return Py.strValue(Py.obj(m).call(new Object[] {this}, Py.NO_KW), "__str__");
+            return Py.strValue(Py.obj(m).call1(this), "__str__");
         }
         return repr();
     }
@@ -776,7 +776,7 @@ public final class PyType extends PyObject {
         Object m = meta.lookup(attr);
         if (m == null) {
             Object ga = metaDunder("__getattr__");
-            return ga == null ? null : Py.obj(ga).call(new Object[] {this, attr}, Py.NO_KW);
+            return ga == null ? null : Py.obj(ga).call2(this, attr);
         }
         if (m instanceof PyProperty) {
             return ((PyProperty) m).get(this);
@@ -794,7 +794,7 @@ public final class PyType extends PyObject {
     public void setAttr(String attr, Object value) {
         Object sa = metaDunder("__setattr__");
         if (sa != null) {
-            Py.obj(sa).call(new Object[] {this, attr, value}, Py.NO_KW);
+            Py.obj(sa).call3(this, attr, value);
             return;
         }
         setAttrDirect(attr, value);
@@ -820,7 +820,7 @@ public final class PyType extends PyObject {
     public void delAttr(String attr) {
         Object da = metaDunder("__delattr__");
         if (da != null) {
-            Py.obj(da).call(new Object[] {this, attr}, Py.NO_KW);
+            Py.obj(da).call2(this, attr);
             return;
         }
         delAttrDirect(attr);
@@ -984,7 +984,7 @@ public final class PyType extends PyObject {
     public String repr() {
         Object m = metaDunder("__repr__");
         if (m != null) {
-            return Py.strValue(Py.obj(m).call(new Object[] {this}, Py.NO_KW), "__repr__");
+            return Py.strValue(Py.obj(m).call1(this), "__repr__");
         }
         return "<class '" + fullName() + "'>";
     }

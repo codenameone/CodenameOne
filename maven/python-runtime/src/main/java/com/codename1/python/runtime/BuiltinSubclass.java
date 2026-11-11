@@ -94,7 +94,7 @@ final class BuiltinSubclass {
         unary(t, "__neg__", PyObject::neg);
         unary(t, "__pos__", PyObject::pos);
         unary(t, "__abs__", s -> Builtins.lookup("abs") instanceof PyObject
-                ? ((PyObject) Builtins.lookup("abs")).call(new Object[] {s}, Py.NO_KW) : null);
+                ? ((PyObject) Builtins.lookup("abs")).call1(s) : null);
         unary(t, "__float__", s -> Py.ofFloat(s.asDouble()));
         unary(t, "__bool__", s -> Py.bool(s.isTrue()));
     }

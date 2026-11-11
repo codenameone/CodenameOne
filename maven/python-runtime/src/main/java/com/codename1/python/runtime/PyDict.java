@@ -351,7 +351,7 @@ public class PyDict extends PyObject {
         if (v == null) {
             Object missing = type() == Py.DICT_TYPE ? null : type().lookup("__missing__"); //NOPMD CompareObjectsWithEquals - identity is meant
             if (missing != null) {
-                return Py.obj(missing).call(new Object[] {this, key}, Py.NO_KW);
+                return Py.obj(missing).call2(this, key);
             }
             throw Py.keyError(key);
         }

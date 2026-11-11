@@ -217,7 +217,7 @@ public class PyInstance extends PyObject {
             // type and never comes here. An AttributeError it raises falls back
             // to __getattr__, as CPython's slot does.
             try {
-                return Py.obj(cls.lookup("__getattribute__")).call(new Object[] {this, name}, Py.NO_KW);
+                return Py.obj(cls.lookup("__getattribute__")).call2(this, name);
             } catch (PyException e) {
                 if (!e.matches(Py.ATTRIBUTE_ERROR)) {
                     throw e;
@@ -226,7 +226,7 @@ public class PyInstance extends PyObject {
                 if (ga == null) {
                     return null;
                 }
-                return Py.obj(ga).call(new Object[] {this, name}, Py.NO_KW);
+                return Py.obj(ga).call2(this, name);
             }
         }
         Object v = genericAttrOrNull(name);
@@ -235,7 +235,7 @@ public class PyInstance extends PyObject {
         }
         Object ga = cls.lookup("__getattr__");
         if (ga != null) {
-            return Py.obj(ga).call(new Object[] {this, name}, Py.NO_KW);
+            return Py.obj(ga).call2(this, name);
         }
         return null;
     }
@@ -254,7 +254,7 @@ public class PyInstance extends PyObject {
             PyType dt = ((PyInstance) clsAttr).cls;
             get = dt.lookup("__get__");
             if (get != null && (dt.lookup("__set__") != null || dt.lookup("__delete__") != null)) {
-                return Py.obj(get).call(new Object[] {clsAttr, this, cls}, Py.NO_KW);
+                return Py.obj(get).call3(clsAttr, this, cls);
             }
         }
         Object v = own(name);
@@ -262,7 +262,7 @@ public class PyInstance extends PyObject {
             return v;
         }
         if (get != null) {
-            return Py.obj(get).call(new Object[] {clsAttr, this, cls}, Py.NO_KW);
+            return Py.obj(get).call3(clsAttr, this, cls);
         }
         if ("__dict__".equals(name)) {
             // A live view: its stores and deletes reach the instance, and it
@@ -295,7 +295,7 @@ public class PyInstance extends PyObject {
         // a property or another data descriptor owns, as in CPython.
         Object sa = cls.lookup("__setattr__");
         if (sa != null && !(sa instanceof PyBuiltin)) {
-            Py.obj(sa).call(new Object[] {this, name, value}, Py.NO_KW);
+            Py.obj(sa).call3(this, name, value);
             return;
         }
         setAttrObject(name, value);
@@ -329,7 +329,7 @@ public class PyInstance extends PyObject {
         if (clsAttr instanceof PyInstance) {
             Object set = ((PyInstance) clsAttr).cls.lookup("__set__");
             if (set != null) {
-                Py.obj(set).call(new Object[] {clsAttr, this, value}, Py.NO_KW);
+                Py.obj(set).call3(clsAttr, this, value);
                 return;
             }
         }
@@ -345,14 +345,14 @@ public class PyInstance extends PyObject {
     public void delAttr(String name) {
         Object da = cls.lookup("__delattr__");
         if (da != null && !(da instanceof PyBuiltin)) {
-            Py.obj(da).call(new Object[] {this, name}, Py.NO_KW);
+            Py.obj(da).call2(this, name);
             return;
         }
         Object clsAttr = cls.lookup(name);
         if (clsAttr instanceof PyInstance) {
             Object del = ((PyInstance) clsAttr).cls.lookup("__delete__");
             if (del != null) {
-                Py.obj(del).call(new Object[] {clsAttr, this}, Py.NO_KW);
+                Py.obj(del).call2(clsAttr, this);
                 return;
             }
         }
@@ -393,13 +393,13 @@ public class PyInstance extends PyObject {
         if (m == null) {
             return null;
         }
-        Object r = Py.obj(m).call(new Object[] {this, arg}, Py.NO_KW);
+        Object r = Py.obj(m).call2(this, arg);
         return r == Py.NOT_IMPLEMENTED ? null : r; //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     private Object dunder0(String name) {
         Object m = cls.lookup(name);
-        return m == null ? null : Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+        return m == null ? null : Py.obj(m).call1(this);
     }
 
     @Override
@@ -424,7 +424,7 @@ public class PyInstance extends PyObject {
     public boolean isTrue() {
         Object m = cls.lookup("__bool__");
         if (m != null) {
-            Object r = Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+            Object r = Py.obj(m).call1(this);
             if (!(r instanceof PyBool)) {
                 throw Py.typeError("__bool__ should return bool, returned " + Py.typeOf(r).name);
             }
@@ -607,7 +607,7 @@ public class PyInstance extends PyObject {
             }
             return System.identityHashCode(this);
         }
-        return Py.asLong(Py.obj(m).call(new Object[] {this}, Py.NO_KW));
+        return Py.asLong(Py.obj(m).call1(this));
     }
 
     @Override
@@ -621,7 +621,7 @@ public class PyInstance extends PyObject {
                 }
                 Object missing = cls.lookup("__missing__");
                 if (missing != null) {
-                    return Py.obj(missing).call(new Object[] {this, key}, Py.NO_KW);
+                    return Py.obj(missing).call2(this, key);
                 }
             }
         }
@@ -636,7 +636,7 @@ public class PyInstance extends PyObject {
             super.setItem(key, value);
             return;
         }
-        Py.obj(m).call(new Object[] {this, key, value}, Py.NO_KW);
+        Py.obj(m).call3(this, key, value);
     }
 
     @Override
@@ -646,7 +646,7 @@ public class PyInstance extends PyObject {
             super.delItem(key);
             return;
         }
-        Py.obj(m).call(new Object[] {this, key}, Py.NO_KW);
+        Py.obj(m).call2(this, key);
     }
 
     @Override
@@ -666,7 +666,7 @@ public class PyInstance extends PyObject {
     public boolean contains(Object x) {
         Object m = cls.lookup("__contains__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this, x}, Py.NO_KW));
+            return Py.isTrue(Py.obj(m).call2(this, x));
         }
         return super.contains(x);
     }
@@ -690,7 +690,7 @@ public class PyInstance extends PyObject {
             return super.next();
         }
         try {
-            return Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+            return Py.obj(m).call1(this);
         } catch (PyException e) {
             if (e.matches(Py.STOP_ITERATION)) {
                 return null;
