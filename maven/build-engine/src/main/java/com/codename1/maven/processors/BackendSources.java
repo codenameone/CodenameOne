@@ -86,6 +86,11 @@ final class BackendSources {
             if (aspect.transactional != null) {
                 layers.add("tx");
             }
+            if (aspect.cache != null) {
+                // Outside the transaction, so a hit opens none; inside the
+                // timing, so a timed method's histogram counts its hits.
+                layers.add("cache");
+            }
             if (aspect.timed != null || aspect.counted != null) {
                 layers.add("metrics");
             }
@@ -97,6 +102,8 @@ final class BackendSources {
                   .append(params).append(") throws Throwable {\n");
                 if ("tx".equals(layers.get(i))) {
                     transaction(sb, aspect, inner, isVoid, retType);
+                } else if ("cache".equals(layers.get(i))) {
+                    cache(sb, aspect, inner, isVoid, retType);
                 } else {
                     metrics(sb, cls, aspect, index, inner, isVoid, retType);
                 }
@@ -158,6 +165,87 @@ final class BackendSources {
         if (!isVoid) {
             sb.append("        return cn1Result;\n");
         }
+    }
+
+    private void cache(StringBuilder sb, BackendBeans.Aspect aspect, String inner,
+                       boolean isVoid, String retType) {
+        String rt = "com.codename1.impl.backend.CacheRuntime.";
+        String name = quote(aspect.cacheName);
+        String d = aspect.cache.getDescriptor();
+        if (aspect.cacheKey != null) {
+            sb.append("        String cn1Key = ").append(aspect.cacheKey).append(";\n");
+        }
+        if (BackendBeans.CACHE_EVICT.equals(d)) {
+            String evict = aspect.cacheKey == null ? rt + "evictAll(" + name + ");\n"
+                    : rt + "evict(" + name + ", cn1Key);\n";
+            boolean before = aspect.cache.getBoolOrDefault("beforeInvocation", false);
+            if (before) {
+                sb.append("        ").append(evict);
+            }
+            if (!isVoid) {
+                sb.append("        ").append(retType).append(" cn1Result = ").append(inner)
+                  .append(";\n");
+            } else {
+                sb.append("        ").append(inner).append(";\n");
+            }
+            if (!before) {
+                sb.append("        ").append(evict);
+            }
+            if (!isVoid) {
+                sb.append("        return cn1Result;\n");
+            }
+            return;
+        }
+        String type = BackendJsonCodecs.source(aspect.cacheType);
+        if (BackendBeans.CACHEABLE.equals(d)) {
+            sb.append("        byte[] cn1Hit = ").append(rt).append("get(").append(name)
+              .append(", cn1Key);\n");
+            sb.append("        if (cn1Hit != null) {\n");
+            sb.append("            Object j = ").append(rt).append("parse(cn1Hit);\n");
+            sb.append("            ").append(type).append(" target = ")
+              .append(defaultValue(retType)).append(";\n");
+            for (String line : aspect.cacheRead.split("\n")) {
+                sb.append("            ").append(line).append('\n');
+            }
+            sb.append("            return target;\n");
+            sb.append("        }\n");
+        }
+        sb.append("        final ").append(type).append(" result = ").append(inner).append(";\n");
+        boolean primitive = retType.indexOf('.') < 0 && !retType.endsWith("]")
+                && Character.isLowerCase(retType.charAt(0));
+        String writer = "new com.codename1.backend.Json.Writable() {\n"
+                + "            public void writeTo(com.codename1.backend.ByteSink out) {\n";
+        StringBuilder w = new StringBuilder(writer);
+        for (String line : aspect.cacheWrite.split("\n")) {
+            w.append("                ").append(line).append('\n');
+        }
+        w.append("            }\n        }");
+        if (primitive) {
+            sb.append("        ").append(rt).append("put(").append(name).append(", cn1Key, ")
+              .append(w).append(");\n");
+        } else if (BackendBeans.CACHEABLE.equals(d)) {
+            // A null result is a miss next time too; there is nothing to remove.
+            sb.append("        if (result != null) {\n            ").append(rt).append("put(")
+              .append(name).append(", cn1Key, ").append(w).append(");\n        }\n");
+        } else {
+            // @CachePut of null removes the entry, so a later read cannot be
+            // answered with a value the method no longer gives.
+            sb.append("        ").append(rt).append("put(").append(name).append(", cn1Key, ")
+              .append("result == null ? null : ").append(w).append(");\n");
+        }
+        sb.append("        return result;\n");
+    }
+
+    static String defaultValue(String type) {
+        if ("boolean".equals(type)) {
+            return "false";
+        }
+        if ("byte".equals(type) || "short".equals(type) || "int".equals(type)
+                || "long".equals(type) || "char".equals(type) || "float".equals(type)
+                || "double".equals(type)) {
+            return "(" + type + ") 0";
+        }
+        return "null";
     }
 
     /// Spring's rollback rule as one expression over `cn1Error`: the listed types,

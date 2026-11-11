@@ -44,6 +44,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.URL;
+import java.nio.file.Files;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1504,6 +1505,421 @@ public class BackendBeansTest {
         } finally {
             backend.stop();
         }
+    }
+
+    /// `@Cacheable`, `@CachePut` and `@CacheEvict` woven into a bean, run against
+    /// the in-process store -- or a Redis server when `CN1_TEST_REDIS` names one,
+    /// which is how the same test proves the wire client.
+    @Test
+    public void cachingAnnotationsAnswerFromTheStoreAndEvict() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Product", PKG + "public class Product {\n"
+                + "    public long id;\n"
+                + "    public String name;\n"
+                + "    public List<String> tags;\n"
+                + "    public long getId() { return id; }\n"
+                + "}\n");
+        s.put("com.example.Catalog", PKG + "@Component @EnableCaching public class Catalog {\n"
+                + "    public final AtomicInteger loads = new AtomicInteger();\n"
+                + "    @Cacheable(value = \"products\", key = \"#p0\")\n"
+                + "    public Product product(long id) {\n"
+                + "        loads.incrementAndGet();\n"
+                + "        Product p = new Product();\n"
+                + "        p.id = id; p.name = \"p\" + id;\n"
+                + "        p.tags = new ArrayList<String>(Arrays.asList(\"a\", \"b\"));\n"
+                + "        return p;\n"
+                + "    }\n"
+                + "    @Cacheable(\"counts\") public int count(String a, int b) {\n"
+                + "        loads.incrementAndGet();\n"
+                + "        return a.length() + b;\n"
+                + "    }\n"
+                + "    @CachePut(value = \"products\", key = \"#p0.id\")\n"
+                + "    public Product save(Product p) { return p; }\n"
+                + "    @CacheEvict(value = \"products\", key = \"#a0\") public void drop(long id) { }\n"
+                + "    @CacheEvict(value = \"products\", allEntries = true) public void clear() { }\n"
+                + "    @CacheEvict(cacheNames = \"counts\", allEntries = true) public void clearCounts() { }\n"
+                + "    @CacheEvict(value = \"maybe\", allEntries = true) public void clearMaybe() { }\n"
+                + "    @Cacheable(value = \"maybe\", key = \"'k'\", unless = \"#result == null\")\n"
+                + "    public String nothing() { loads.incrementAndGet(); return null; }\n"
+                + "    @Cacheable(value = \"maybe\", key = \"#root.methodName + ':' + #p0 + #p1\")\n"
+                + "    public Map<String, Integer> pair(String a, String b) {\n"
+                + "        loads.incrementAndGet();\n"
+                + "        Map<String, Integer> m = new LinkedHashMap<String, Integer>();\n"
+                + "        m.put(a, Integer.valueOf(a.length())); m.put(b, Integer.valueOf(b.length()));\n"
+                + "        return m;\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Catalog c;\n"
+                + "    private final com.codename1.backend.kv.KeyValueStore kv;\n"
+                + "    public Api(Catalog c, com.codename1.backend.kv.KeyValueStore kv) {\n"
+                + "        this.c = c; this.kv = kv;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/run\") public String run() throws Exception {\n"
+                + "        c.clear(); c.clearCounts(); c.clearMaybe(); c.drop(1);\n"
+                + "        StringBuilder sb = new StringBuilder();\n"
+                + "        Product a = c.product(1);\n"
+                + "        Product b = c.product(1);\n"
+                + "        sb.append(a.name).append(b.name).append(b.tags.size()).append(c.loads.get());\n"
+                + "        Product x = new Product(); x.id = 1; x.name = \"x\";\n"
+                + "        c.save(x);\n"
+                + "        sb.append(' ').append(c.product(1).name).append(c.loads.get());\n"
+                + "        c.drop(1);\n"
+                + "        sb.append(' ').append(c.product(1).name).append(c.loads.get());\n"
+                + "        sb.append(' ').append(c.count(\"ab\", 3)).append(c.count(\"ab\", 3))\n"
+                + "          .append(c.count(\"ab\", 4)).append(c.loads.get());\n"
+                + "        c.clear();\n"
+                + "        c.product(1);\n"
+                + "        sb.append(' ').append(c.loads.get());\n"
+                + "        c.nothing(); c.nothing();\n"
+                + "        sb.append(' ').append(c.loads.get());\n"
+                + "        sb.append(' ').append(c.pair(\"q\", \"rr\")).append(c.pair(\"q\", \"rr\"))\n"
+                + "          .append(c.loads.get());\n"
+                + "        sb.append(' ').append(kv.get(\"cn1:cache:products:1\") != null);\n"
+                + "        return sb.toString();\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        String redis = System.getenv("CN1_TEST_REDIS");
+        settings.setProperty("cn1.kv.url", redis == null || redis.length() == 0
+                ? "memory:" : redis);
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(),
+                (BackendApplication) loader.loadClass("com.example.BackendWiring")
+                        .newInstance()).start();
+        try {
+            assertEquals("p1p121 x1 p12 5564 5 7 {q=1, rr=2}{q=1, rr=2}8 true",
+                    http("GET", port, "/run"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    /// Listeners under all four annotation names, a retried message, a dead
+    /// letter and a send that rolls back, over `memory:` and `db:` -- the
+    /// database a SQLite file, or `CN1_TEST_DB_URL` (PostgreSQL, MySQL) when set.
+    @Test
+    public void messagingRegistersOnlyTheTransportsTheConfigurationNames() throws Exception {
+        String[][] cases = {
+            // Nothing named: the URL comes from the deployment, so all of them.
+            {"", "redis amqp"},
+            {"cn1.messaging.url=db:\n", ""},
+            {"cn1.messaging.transports=amqp\n", "amqp"},
+            {"cn1.messaging.url=redis://cache:6379\n", "redis"},
+            {"cn1.messaging.url=amqps://u:p@rabbit/%2F\n", "amqp"},
+            {"spring.rabbitmq.host=rabbit\n", "amqp"},
+            {"cn1.messaging.url=${BROKER}\n", "redis amqp"},
+        };
+        // A module of listeners alone is a server: it is the only thing that
+        // starts them.
+        for (String[] c : cases) {
+            Map<String, String> s = new LinkedHashMap<String, String>();
+            s.put("com.example.Inbox", PKG + "@Component public class Inbox {\n"
+                    + "    @MessageListener(\"q\") public void on(String text) { }\n"
+                    + "}\n");
+            File classes = compile(s);
+            writeProperties(classes, "application.properties", c[0]);
+            assertNoErrors(process(classes));
+            String wiring = new String(Files.readAllBytes(new File(classes,
+                    "com/example/BackendWiring.class").toPath()), "ISO-8859-1");
+            assertEquals(c[0], c[1].indexOf("redis") >= 0,
+                    wiring.indexOf("messaging/redis/RedisStreamTransport") >= 0);
+            assertEquals(c[0], c[1].indexOf("amqp") >= 0,
+                    wiring.indexOf("messaging/amqp/AmqpTransport") >= 0);
+        }
+    }
+
+    @Test
+    public void messageListenersReceiveRetryAndDeadLetter() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Order", PKG + "public class Order {\n"
+                + "    public long id;\n"
+                + "    public String name;\n"
+                + "}\n");
+        s.put("com.example.Inbox", PKG + "@Component public class Inbox {\n"
+                + "    public final Map<String, String> got = new ConcurrentHashMap<String, String>();\n"
+                + "    public final AtomicInteger flaky = new AtomicInteger();\n"
+                + "    @MessageListener(value = \"orders\", concurrency = 2)\n"
+                + "    public void order(Order o) { got.put(\"order\", o.id + o.name); }\n"
+                + "    @KafkaListener(topics = \"raw\", groupId = \"g\")\n"
+                + "    public void raw(String text) { got.put(\"raw\", text); }\n"
+                + "    @RabbitListener(queues = \"${q.name}\", concurrency = \"1-3\")\n"
+                + "    public void flaky(com.codename1.backend.messaging.Message m) {\n"
+                + "        if (flaky.incrementAndGet() < 3) throw new IllegalStateException(\"again\");\n"
+                + "        got.put(\"flaky\", String.valueOf(m.getAttempt()));\n"
+                + "    }\n"
+                + "    @JmsListener(destination = \"poison\")\n"
+                + "    public void poison(byte[] b) { throw new IllegalArgumentException(\"boom\"); }\n"
+                + "    @MessageListener(\"poison.dlq\")\n"
+                + "    public void dead(com.codename1.backend.messaging.Message m) {\n"
+                + "        got.put(\"dead\", m.getHeader(\"cn1-origin\") + \":\"\n"
+                + "                + m.getHeader(\"cn1-error\").substring(m.getHeader(\"cn1-error\").indexOf(':') + 2));\n"
+                + "    }\n"
+                + "    @MessageListener(\"tx\")\n"
+                + "    public void tx(String text) { String was = got.get(\"tx\"); got.put(\"tx\", was == null ? text : was + text); }\n"
+                + "}\n");
+        s.put("com.example.Sender", PKG + "@Component public class Sender {\n"
+                + "    private final com.codename1.backend.messaging.MessageTemplate t;\n"
+                + "    public Sender(com.codename1.backend.messaging.MessageTemplate t) { this.t = t; }\n"
+                + "    @Transactional public void ok() throws Exception { t.send(\"tx\", \"c1\"); }\n"
+                + "    @Transactional public void bad() throws Exception {\n"
+                + "        t.send(\"tx\", \"r1\");\n"
+                + "        throw new IllegalStateException(\"no\");\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Inbox in; private final Sender sender;\n"
+                + "    private final com.codename1.backend.messaging.MessageTemplate t;\n"
+                + "    public Api(Inbox in, Sender sender, com.codename1.backend.messaging.MessageTemplate t) {\n"
+                + "        this.in = in; this.sender = sender; this.t = t;\n"
+                + "    }\n"
+                + "    private Order order() { Order o = new Order(); o.id = 7; o.name = \"x\"; return o; }\n"
+                + "    @GetMapping(\"/run\") public String run() throws Exception {\n"
+                + "        t.send(\"orders\", order());\n"
+                + "        t.send(\"raw\", \"hello\");\n"
+                + "        t.send(\"flaky\", \"f\");\n"
+                + "        t.send(\"poison\", new byte[] {1});\n"
+                + "        sender.ok();\n"
+                + "        try { sender.bad(); } catch (IllegalStateException expected) { }\n"
+                + "        long end = System.currentTimeMillis() + 20000;\n"
+                + "        while (in.got.size() < 5 && System.currentTimeMillis() < end) Thread.sleep(20);\n"
+                + "        Thread.sleep(300);\n"
+                + "        return in.got.get(\"order\") + \" \" + in.got.get(\"raw\") + \" \"\n"
+                + "            + in.got.get(\"flaky\") + \" \" + in.got.get(\"dead\") + \" \" + in.got.get(\"tx\")\n"
+                + "            + \" \" + t.getClass().getSimpleName();\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        // A placeholder URL: the build cannot tell which broker, so it registers
+        // every transport, and each run below picks one.
+        writeProperties(classes, "application.properties",
+                "cn1.messaging.url=${CN1_MESSAGING_URL:memory:}\n");
+        assertNoErrors(process(classes));
+        List<String[]> runs = new ArrayList<String[]>();
+        File dir = Files.createTempDirectory("cn1-msg").toFile();
+        String redis = System.getenv("CN1_TEST_REDIS");
+        if (redis != null && redis.length() > 0) {
+            runs.add(new String[] {redis, new File(dir, "c.db").getAbsolutePath()});
+        }
+        String amqp = System.getenv("CN1_TEST_AMQP");
+        if (amqp != null && amqp.length() > 0) {
+            runs.add(new String[] {amqp, new File(dir, "d.db").getAbsolutePath()});
+        }
+        String kafka = System.getenv("CN1_TEST_KAFKA");
+        if (kafka != null && kafka.length() > 0) {
+            runs.add(new String[] {kafka, new File(dir, "e.db").getAbsolutePath()});
+        }
+        String sqs = System.getenv("CN1_TEST_SQS");
+        if (sqs != null && sqs.length() > 0) {
+            runs.add(new String[] {sqs, new File(dir, "f.db").getAbsolutePath()});
+        }
+        String pubsub = System.getenv("CN1_TEST_PUBSUB");
+        if (pubsub != null && pubsub.length() > 0) {
+            runs.add(new String[] {pubsub, new File(dir, "g.db").getAbsolutePath()});
+        }
+        runs.add(new String[] {"memory:", new File(dir, "a.db").getAbsolutePath()});
+        runs.add(new String[] {"db:", new File(dir, "b.db").getAbsolutePath()});
+        String external = System.getenv("CN1_TEST_DB_URL");
+        if (external != null && external.length() > 0) {
+            runs.add(new String[] {"db:", external});
+        }
+        // The ORM's entity registries are process wide, and a server creates every
+        // registered table: entities an earlier test in this JVM registered
+        // (SQLite collations among them) would be created here too.
+        clearRegistry(com.codename1.impl.orm.Models.class);
+        clearRegistry(com.codename1.backend.orm.EntityManager.class);
+        for (String[] run : runs) {
+            int port = freePort();
+            URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                    getClass().getClassLoader());
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+            settings.setProperty("cn1.messaging.url", run[0]);
+            settings.setProperty(Config.DATASOURCE_URL, run[1]);
+            settings.setProperty("q.name", "flaky");
+            // The generated entry point installs the codecs; this test starts the
+            // wiring directly, so it does what that line does.
+            com.codename1.impl.backend.JsonCodec.install((com.codename1.impl.backend.JsonCodec.Registry)
+                    loader.loadClass("cn1app.JsonCodecs").newInstance());
+            settings.setProperty("cn1.messaging.retry.backoff", "50");
+            settings.setProperty("cn1.messaging.db.poll", "50");
+            Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(),
+                    (BackendApplication) loader.loadClass("com.example.BackendWiring")
+                            .newInstance()).start();
+            try {
+                if (run[1].indexOf("://") > 0) {
+                    backend.getDataSource().execute("DELETE FROM cn1_messages", new Object[0]);
+                }
+                assertEquals(run[0] + " " + run[1], "7x hello 3 poison:boom c1 MessageTemplate",
+                        http("GET", port, "/run"));
+            } finally {
+                backend.stop();
+                com.codename1.impl.backend.JsonCodec.install(null);
+            }
+        }
+    }
+
+    /// Replicas over one Redis, with no database anywhere: a job whose lock
+    /// another replica holds does not run, and a session one server stored is read
+    /// by the next.
+    /// Needs `CN1_TEST_REDIS`; the in-process store is per server and shares
+    /// nothing, so without one only the build half runs.
+    @Test
+    public void replicasShareLocksAndSessionsThroughTheStore() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Jobs", PKG + "@Component public class Jobs {\n"
+                + "    public static final AtomicInteger inside = new AtomicInteger();\n"
+                + "    public static final AtomicInteger most = new AtomicInteger();\n"
+                + "    public static final AtomicInteger runs = new AtomicInteger();\n"
+                + "    @Scheduled(fixedRate = 10, lock = \"tick\", lockAtMostFor = 5000)\n"
+                + "    public void tick() throws Exception {\n"
+                + "        int now = inside.incrementAndGet();\n"
+                + "        int seen;\n"
+                + "        while ((seen = most.get()) < now && !most.compareAndSet(seen, now)) { }\n"
+                + "        Thread.sleep(30);\n"
+                + "        inside.decrementAndGet();\n"
+                + "        runs.incrementAndGet();\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/put\") public String put(HttpServer.Request r) {\n"
+                + "        r.getSession(true).setAttribute(\"who\", \"alice\");\n"
+                + "        return \"ok\";\n"
+                + "    }\n"
+                + "    @GetMapping(\"/get\") public String get(HttpServer.Request r) {\n"
+                + "        HttpSession session = r.getSession(false);\n"
+                + "        return session == null ? \"none\" : String.valueOf(session.getAttribute(\"who\"));\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        String redis = System.getenv("CN1_TEST_REDIS");
+        String url = redis == null || redis.length() == 0 ? "redis://127.0.0.1:1/0" : redis;
+        // The build accepts the lock without a database because the module names
+        // a shared store.
+        writeProperties(classes, "application.properties", "cn1.kv.url=" + url + "\n");
+        assertNoErrors(process(classes));
+        org.junit.Assume.assumeTrue("CN1_TEST_REDIS names no Redis server", redis != null
+                && redis.length() > 0);
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> jobs = loader.loadClass("com.example.Jobs");
+        java.util.concurrent.atomic.AtomicInteger runs =
+                (java.util.concurrent.atomic.AtomicInteger) jobs.getField("runs").get(null);
+        // Another replica holds the lock for the next 1.5 seconds.
+        com.codename1.backend.kv.KeyValueStore kv =
+                com.codename1.backend.kv.KeyValueStores.open(url, 5000, 1);
+        String cookie;
+        try {
+            kv.set("cn1:lock:tick", "another-replica".getBytes("UTF-8"), 1500);
+            Backend a = startShared(loader, url);
+            try {
+                Thread.sleep(700);
+                assertEquals("the job ran while another replica held its lock", 0, runs.get());
+                HttpURLConnection first = (HttpURLConnection) new URL("http://127.0.0.1:"
+                        + lastPort + "/put").openConnection();
+                assertEquals("ok", read(first));
+                cookie = first.getHeaderField("Set-Cookie");
+                assertNotNull("no session cookie", cookie);
+                Thread.sleep(1800);
+                assertTrue("the job never ran once the lock was free", runs.get() > 0);
+            } finally {
+                a.stop();
+            }
+            assertNull("the lock outlived the server that held it", kv.get("cn1:lock:tick"));
+        } finally {
+            kv.close();
+        }
+        // A different server -- the one process runs one at a time -- reads the
+        // session the first one stored.
+        Backend b = startShared(loader, url);
+        try {
+            HttpURLConnection second = (HttpURLConnection) new URL("http://127.0.0.1:"
+                    + lastPort + "/get").openConnection();
+            second.setRequestProperty("Cookie", cookie.substring(0, cookie.indexOf(';')));
+            assertEquals("alice", read(second));
+        } finally {
+            b.stop();
+        }
+        int most = ((java.util.concurrent.atomic.AtomicInteger) jobs.getField("most")
+                .get(null)).get();
+        assertEquals("the locked job overlapped itself", 1, most);
+    }
+
+    private int lastPort;
+
+    private Backend startShared(URLClassLoader loader, String url) throws Exception {
+        lastPort = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(lastPort));
+        settings.setProperty("cn1.kv.url", url);
+        settings.setProperty("cn1.session.store", "kv");
+        return withApplication(Backend.builder(Config.of(settings, "dev")).quiet(),
+                (BackendApplication) loader.loadClass("com.example.BackendWiring")
+                        .newInstance()).start();
+    }
+
+    /// A key expression the build cannot compile fails the build, naming why.
+    @Test
+    public void anUncompilableCacheKeyFailsTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Bad", PKG + "@Component public class Bad {\n"
+                + "    @Cacheable(value = \"c\", key = \"#id.toString()\")\n"
+                + "    public String one(String id) { return id; }\n"
+                + "    @Cacheable(value = \"c\", key = \"#nope\")\n"
+                + "    public String two(String id) { return id; }\n"
+                + "    @Cacheable(\"c\") public void three() { }\n"
+                + "    @Cacheable(value = \"c\", unless = \"#result.isEmpty()\")\n"
+                + "    public String four() { return \"\"; }\n"
+                + "}\n");
+        ProcessorContext ctx = process(compile(s));
+        String errors = String.valueOf(ctx.getErrors());
+        assertTrue(errors, errors.contains("one cannot be compiled"));
+        assertTrue(errors, errors.contains("\"#nope\" names no parameter"));
+        assertTrue(errors, errors.contains("three returns nothing"));
+        assertTrue(errors, errors.contains("only \"#result == null\" is supported"));
+    }
+
+    /// A key part whose text is its identity -- an array, an object with no
+    /// toString() of its own -- would key every call apart, and after a restart
+    /// could hit another object's entry, so the build refuses it. A value type,
+    /// a record, an enum or a property of the object is fine.
+    @Test
+    public void aCacheKeyThatIsAnIdentityFailsTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Query", PKG + "public class Query { public long id; }\n");
+        s.put("com.example.Named", PKG + "public class Named {\n"
+                + "    public String toString() { return \"n\"; }\n}\n");
+        s.put("com.example.Keys", PKG + "@Component public class Keys {\n"
+                + "    @Cacheable(\"c\") public String plain(Query q) { return \"\"; }\n"
+                + "    @Cacheable(\"c\") public String array(long[] ids) { return \"\"; }\n"
+                + "    @Cacheable(value = \"c\", key = \"#p0.id\")\n"
+                + "    public String byId(Query q) { return \"\"; }\n"
+                + "    @Cacheable(\"c\") public String named(Named n) { return \"\"; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("plain cannot be compiled"));
+        assertTrue(errors, errors.contains("array cannot be compiled"));
+        assertFalse(errors, errors.contains("byId"));
+        assertFalse(errors, errors.contains("named"));
+    }
+
+    /// `null` and the text "null" are two keys, alone and among others.
+    @Test
+    public void aNullKeyPartIsNotTheTextNull() throws Exception {
+        Class<?> rt = Class.forName("com.codename1.impl.backend.CacheRuntime");
+        java.lang.reflect.Method key = rt.getMethod("key", Object[].class);
+        assertFalse(key.invoke(null, new Object[] {new Object[] {null}})
+                .equals(key.invoke(null, new Object[] {new Object[] {"null"}})));
+        assertFalse(key.invoke(null, new Object[] {new Object[] {"a", null}})
+                .equals(key.invoke(null, new Object[] {new Object[] {"a", "null"}})));
     }
 
     /// A `@Repository` interface is injected like a bean: built once from the
@@ -3632,6 +4048,14 @@ public class BackendBeansTest {
     private static List<File> backendClasspath() throws Exception {
         URL url = HttpServer.class.getProtectionDomain().getCodeSource().getLocation();
         return Arrays.asList(new File(url.toURI()));
+    }
+
+    private static void clearRegistry(Class<?> owner) throws Exception {
+        java.lang.reflect.Field registry = owner.getDeclaredField("REGISTRY");
+        registry.setAccessible(true);
+        synchronized (owner) {
+            ((Map<?, ?>) registry.get(null)).clear();
+        }
     }
 
     private static int freePort() throws Exception {

@@ -903,6 +903,9 @@ picocli
 subcommand
 subcommands
 transpiles
+Redis
+Valkey
+zstd
 minimap
 killfeed
 paintballs

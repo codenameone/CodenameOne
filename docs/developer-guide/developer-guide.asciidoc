@@ -141,6 +141,8 @@ include::Backend-Security.asciidoc[]
 
 include::Backend-Scheduling.asciidoc[]
 
+include::Backend-Messaging.asciidoc[]
+
 include::Backend-Observability.asciidoc[]
 
 include::Backend-MCP.asciidoc[]

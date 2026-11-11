@@ -1767,8 +1767,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // a server the runtime builds a router for.
         boolean staticFiles = settings.values.containsKey("cn1.static.root")
                 || applicationPropertyKnown(ctx, "cn1.static.root");
+        // A worker that only consumes messages is a server too: nothing else
+        // would start its listeners.
         if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
-                && !beans.hasTools() && !beans.hasManaged() && !settings.management
+                && !beans.hasListeners() && !beans.hasTools() && !beans.hasManaged() && !settings.management
                 && !staticFiles) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning
@@ -3940,6 +3942,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// `application-<profile>.properties` beside it -- what a build can know about
     /// a setting that Config will read at run time.
     static boolean applicationPropertyKnown(ProcessorContext ctx, String key) {
+        return applicationProperty(ctx, key) != null;
+    }
+
+    /// The first value `key` has in the module's `application.properties` or an
+    /// `application-<profile>.properties` beside it, or null for none.
+    static String applicationProperty(ProcessorContext ctx, String key) {
         for (File f : applicationPropertyFiles(ctx)) {
             java.util.Properties props = new java.util.Properties();
             InputStream in = null;
@@ -3957,11 +3965,27 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     }
                 }
             }
-            if (props.getProperty(key) != null) {
-                return true;
+            String v = props.getProperty(key);
+            if (v != null) {
+                return v;
             }
         }
-        return false;
+        return null;
+    }
+
+    /// Every value `key` has across the module's `application.properties` and
+    /// its `application-<profile>.properties` files: one profile may name a
+    /// different broker than another, and the build must include each.
+    static List<String> applicationPropertyValues(ProcessorContext ctx, String key) {
+        List<String> out = new ArrayList<String>();
+        for (File f : applicationPropertyFiles(ctx)) {
+            java.util.Properties props = loadProperties(ctx, f);
+            String v = props == null ? null : props.getProperty(key);
+            if (v != null && !out.contains(v.trim())) {
+                out.add(v.trim());
+            }
+        }
+        return out;
     }
 
     /// The module's base `application.properties`, loaded, or null when it has
