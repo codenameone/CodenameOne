@@ -56,7 +56,10 @@ import java.util.TreeSet;
 /// ```
 ///
 /// A name is the module's dotted name followed by the function's, or by a
-/// class's and a method's. `remove` and `replace` are how code that cannot
+/// class's and a method's. `remove` also takes a class (none of its methods
+/// is compiled), a module, and a package, which is every module under it: a
+/// module left out still imports, and raises at the first use of anything
+/// it would have held. `remove` and `replace` are how code that cannot
 /// run in a translated program (`eval`, `exec`) stops failing the build when
 /// the program does reach the function it is in: the function's body is not
 /// compiled at all. A replaced function calls the Java registered for it
@@ -94,7 +97,8 @@ public final class Directives {
                     : "replace".equals(key) ? d.replace : null;
             if (eq < 0 || into == null) {
                 throw new PythonSyntaxError(FILE, n, 1, "expected keep=, remove= or replace= followed by the dotted"
-                        + " names of functions (module.function or module.Class.method), separated by commas");
+                        + " names of functions (module.function or module.Class.method), separated by commas; remove="
+                        + " also takes a class, a module or a package");
             }
             for (String name : line.substring(eq + 1).split(",")) {
                 if (!name.trim().isEmpty()) {
@@ -122,12 +126,24 @@ public final class Directives {
     /// in the build.
     public void apply(Map<String, Node.Module> modules) {
         for (String name : remove) {
-            for (FunctionDef f : resolve(name, modules)) {
-                Call c = at(new Call(at(new Name("__cn1_removed__"), f)), f);
-                c.args.add(at(new Constant(Constant.Kind.STR, name + " was left out of this build (remove= in "
-                        + FILE + ")"), f));
-                f.body.clear();
-                f.body.add(at(new ExprStmt(c), f));
+            if (modules.containsKey(name)) {
+                // A module, and when it is a package every module under it.
+                for (Map.Entry<String, Node.Module> e : modules.entrySet()) {
+                    if (e.getKey().equals(name) || e.getKey().startsWith(name + ".")) {
+                        leaveOut(e.getKey(), e.getValue(), name);
+                    }
+                }
+                continue;
+            }
+            for (Object o : resolve(name, modules, true)) {
+                if (o instanceof FunctionDef) {
+                    leaveOut((FunctionDef) o, name + " was left out of this build (remove= in " + FILE + ")");
+                } else {
+                    // A class stays a class -- it can be imported, named in an
+                    // annotation, tested against and derived from -- and none
+                    // of its methods is compiled.
+                    methods(((ClassDef) o).body, name, name);
+                }
             }
         }
         for (String name : replace) {
@@ -181,30 +197,95 @@ public final class Directives {
         return null;
     }
 
+    private static void leaveOut(FunctionDef f, String message) {
+        Call c = at(new Call(at(new Name("__cn1_removed__"), f)), f);
+        c.args.add(at(new Constant(Constant.Kind.STR, message), f));
+        f.body.clear();
+        f.body.add(at(new ExprStmt(c), f));
+    }
+
+    private static void methods(Object in, String qual, String directive) {
+        Infer.children(in, x -> {
+            if (x instanceof FunctionDef) {
+                leaveOut((FunctionDef) x, qual + "." + ((FunctionDef) x).name + " was left out of this build (remove="
+                        + directive + " in " + FILE + ")");
+            } else if (x instanceof ClassDef) {
+                methods(((ClassDef) x).body, qual + "." + ((ClassDef) x).name, directive);
+            } else if (!(x instanceof Expr)) {
+                methods(x, qual, directive);
+            }
+        });
+    }
+
+    /// What a module left out of the build is in its place. Importing it
+    /// works, as does importing a name from it, so a module that is kept
+    /// and imports this one at its top still loads; the first use of
+    /// anything it would have held -- a call, an attribute, a class
+    /// derived from it -- raises, naming the module and the directive.
+    private static final String LEFT_OUT = "class _Cn1LeftOut:\n"
+            + "    def __init__(self, name, bases=None, namespace=None):\n"
+            + "        if bases is not None:\n"
+            + "            __cn1_removed__(MESSAGE)\n"
+            + "        object.__setattr__(self, '_cn1_name', name)\n"
+            + "    def __getattr__(self, attribute):\n"
+            + "        if attribute.startswith('__') and attribute.endswith('__'):\n"
+            + "            raise AttributeError(attribute)\n"
+            + "        __cn1_removed__(MESSAGE)\n"
+            + "    def __mro_entries__(self, bases):\n"
+            + "        __cn1_removed__(MESSAGE)\n"
+            + "    def __call__(self, *args, **kwargs):\n"
+            + "        __cn1_removed__(MESSAGE)\n"
+            + "def __getattr__(name):\n"
+            + "    if name.startswith('__') and name.endswith('__'):\n"
+            + "        raise AttributeError(name)\n"
+            + "    return _Cn1LeftOut(name)\n";
+
+    private static void leaveOut(String module, Node.Module tree, String directive) {
+        String message = module + " was left out of this build (remove=" + directive + " in " + FILE + ")";
+        String text = LEFT_OUT.replace("MESSAGE", "'" + message.replace("\\", "\\\\").replace("'", "\\'") + "'");
+        tree.body.clear();
+        tree.body.addAll(com.codename1.python.transpiler.parser.Parser.parse(text, module).body);
+    }
+
     private static List<FunctionDef> resolve(String name, Map<String, Node.Module> modules) {
+        List<FunctionDef> r = new ArrayList<FunctionDef>();
+        for (Object o : resolve(name, modules, false)) {
+            r.add((FunctionDef) o);
+        }
+        return r;
+    }
+
+    /// The functions `name` is, and with `classes` the classes it is.
+    private static List<Object> resolve(String name, Map<String, Node.Module> modules, boolean classes) {
         String module = moduleOf(name, modules);
         List<Object> in = new ArrayList<Object>();
+        List<Object> r = new ArrayList<Object>();
         if (module != null) {
             in.add(modules.get(module).body);
             String[] path = name.substring(module.length() + 1).split("\\.");
             for (int i = 0; i < path.length; i++) {
                 List<Object> next = new ArrayList<Object>();
+                boolean last = i == path.length - 1;
                 for (Object o : in) {
-                    find(o, path[i], i == path.length - 1, next);
+                    find(o, path[i], last, next);
+                    if (last && classes) {
+                        classes(o, path[i], r);
+                    }
                 }
                 in = next;
             }
         }
-        List<FunctionDef> r = new ArrayList<FunctionDef>();
         for (Object o : in) {
             if (o instanceof FunctionDef) {
-                r.add((FunctionDef) o);
+                r.add(o);
             }
         }
         if (r.isEmpty()) {
-            throw new PythonSyntaxError(FILE, 1, 1, name + " is not a function of this program: a name is the"
-                    + " module's dotted name followed by the function's (pkg.module.function) or by a class's and"
-                    + " a method's (pkg.module.Class.method)");
+            throw new PythonSyntaxError(FILE, 1, 1, name + " is not " + (classes ? "a function, a class, a module or a"
+                    + " package" : "a function") + " of this program: a name is the module's dotted name"
+                    + (classes ? " (pkg.module, or pkg for all of a package)," : "") + " followed by the function's"
+                    + " (pkg.module.function)" + (classes ? ", by a class's (pkg.module.Class)" : "")
+                    + " or by a class's and a method's (pkg.module.Class.method)");
         }
         return r;
     }
@@ -223,6 +304,19 @@ public final class Directives {
                 }
             } else if (!(x instanceof Expr)) {
                 find(x, name, function, out);
+            }
+        });
+    }
+
+    /// Every class `name` that is defined as part of `in`.
+    private static void classes(Object in, String name, List<Object> out) {
+        Infer.children(in, x -> {
+            if (x instanceof ClassDef) {
+                if (((ClassDef) x).name.equals(name)) {
+                    out.add(x);
+                }
+            } else if (!(x instanceof Expr) && !(x instanceof FunctionDef)) {
+                classes(x, name, out);
             }
         });
     }

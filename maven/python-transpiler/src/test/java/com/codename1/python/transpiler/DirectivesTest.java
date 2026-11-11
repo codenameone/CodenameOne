@@ -126,6 +126,31 @@ class DirectivesTest {
     }
 
     @Test
+    void removeTakesAClass() {
+        String java = module(PythonTranspiler.transpile(program(CALLS_ALL,
+                "remove=pkg.tools.Box,pkg.tools.drop_everything,pkg.tools.run_code\n"), "main", classPath()), "pkg.tools");
+        assertTrue(java.contains("pkg.tools.Box.load_text was left out of this build (remove=pkg.tools.Box in"), java);
+    }
+
+    @Test
+    void removeTakesAModuleAndAPackage() {
+        String java = module(PythonTranspiler.transpile(program(CALLS_ALL, "remove=pkg.tools\n"), "main",
+                classPath()), "pkg.tools");
+        assertTrue(java.contains("pkg.tools was left out of this build (remove=pkg.tools in"), java);
+        assertFalse(java.contains("load_text"), "nothing of the module is compiled");
+        java = module(PythonTranspiler.transpile(program(CALLS_ALL, "remove=pkg\n"), "main", classPath()),
+                "pkg.tools");
+        assertTrue(java.contains("pkg.tools was left out of this build (remove=pkg in"), java);
+    }
+
+    @Test
+    void aNameThatIsNothingIsAnError() {
+        PythonSyntaxError e = assertThrows(PythonSyntaxError.class, () -> PythonTranspiler.transpile(
+                program(CALLS_ALL, "remove=pkg.tools.Missing\n"), "main", classPath()));
+        assertTrue(e.reason.contains("is not a function, a class, a module or a package"), e.reason);
+    }
+
+    @Test
     void replaceGeneratesTheJavaToFillIn() {
         Map<String, String> out = PythonTranspiler.transpile(program(CALLS_ALL,
                 "remove=pkg.tools.drop_everything\nreplace=pkg.tools.run_code,pkg.tools.Box.load_text\nreplace=pkg.tools.spread\n"), "main", classPath());
