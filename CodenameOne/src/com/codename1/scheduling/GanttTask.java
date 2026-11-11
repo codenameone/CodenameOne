@@ -288,9 +288,9 @@ public final class GanttTask {
 
     /// The units of a resource the task uses, 0 when it is not assigned.
     public float getUnits(String resourceId) {
-        for (int i = 0; i < assignments.size(); i++) {
-            if (assignments.get(i).getResourceId().equals(resourceId)) {
-                return assignments.get(i).getUnits();
+        for (ResourceAssignment assignment : assignments) {
+            if (assignment.getResourceId().equals(resourceId)) {
+                return assignment.getUnits();
             }
         }
         return 0f;

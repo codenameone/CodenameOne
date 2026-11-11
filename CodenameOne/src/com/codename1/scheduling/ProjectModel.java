@@ -198,8 +198,7 @@ public class ProjectModel {
     }
 
     private static void flatten(List<GanttTask> level, List<GanttTask> out) {
-        for (int i = 0; i < level.size(); i++) {
-            GanttTask t = level.get(i);
+        for (GanttTask t : level) {
             out.add(t);
             if (!t.children.isEmpty()) {
                 flatten(t.children, out);
@@ -209,9 +208,9 @@ public class ProjectModel {
 
     public GanttTask getTask(String id) {
         List<GanttTask> all = getTasks();
-        for (int i = 0; i < all.size(); i++) {
-            if (all.get(i).getId().equals(id)) {
-                return all.get(i);
+        for (GanttTask candidate : all) {
+            if (candidate.getId().equals(id)) {
+                return candidate;
             }
         }
         return null;
@@ -269,8 +268,7 @@ public class ProjectModel {
 
     /// The link from one task to another, or null.
     public TaskDependency getDependency(GanttTask predecessor, GanttTask successor) {
-        for (int i = 0; i < dependencies.size(); i++) {
-            TaskDependency d = dependencies.get(i);
+        for (TaskDependency d : dependencies) {
             if (d.getPredecessor() == predecessor && d.getSuccessor() == successor) { //NOPMD CompareObjectsWithEquals
                 return d;
             }
@@ -281,9 +279,9 @@ public class ProjectModel {
     /// The links that end at `task`.
     public List<TaskDependency> getPredecessors(GanttTask task) {
         List<TaskDependency> out = new ArrayList<TaskDependency>();
-        for (int i = 0; i < dependencies.size(); i++) {
-            if (dependencies.get(i).getSuccessor() == task) { //NOPMD CompareObjectsWithEquals
-                out.add(dependencies.get(i));
+        for (TaskDependency d : dependencies) {
+            if (d.getSuccessor() == task) { //NOPMD CompareObjectsWithEquals
+                out.add(d);
             }
         }
         return out;
@@ -292,9 +290,9 @@ public class ProjectModel {
     /// The links that start at `task`.
     public List<TaskDependency> getSuccessors(GanttTask task) {
         List<TaskDependency> out = new ArrayList<TaskDependency>();
-        for (int i = 0; i < dependencies.size(); i++) {
-            if (dependencies.get(i).getPredecessor() == task) { //NOPMD CompareObjectsWithEquals
-                out.add(dependencies.get(i));
+        for (TaskDependency d : dependencies) {
+            if (d.getPredecessor() == task) { //NOPMD CompareObjectsWithEquals
+                out.add(d);
             }
         }
         return out;
@@ -317,9 +315,9 @@ public class ProjectModel {
     }
 
     public ScheduleResource getResource(String id) {
-        for (int i = 0; i < resources.size(); i++) {
-            if (resources.get(i).getId().equals(id)) {
-                return resources.get(i);
+        for (ScheduleResource resource : resources) {
+            if (resource.getId().equals(id)) {
+                return resource;
             }
         }
         return null;
@@ -328,8 +326,7 @@ public class ProjectModel {
     /// Records every task's current dates as its baseline.
     public ProjectModel captureBaseline() {
         List<GanttTask> all = getTasks();
-        for (int i = 0; i < all.size(); i++) {
-            GanttTask t = all.get(i);
+        for (GanttTask t : all) {
             t.setBaseline(t.getStart(), t.getEnd());
         }
         return this;
@@ -338,8 +335,8 @@ public class ProjectModel {
     /// Removes every leveling delay. Call `update` after it.
     public ProjectModel clearLeveling() {
         List<GanttTask> all = getTasks();
-        for (int i = 0; i < all.size(); i++) {
-            all.get(i).setLevelingDelay(0);
+        for (GanttTask each : all) {
+            each.setLevelingDelay(0);
         }
         return this;
     }

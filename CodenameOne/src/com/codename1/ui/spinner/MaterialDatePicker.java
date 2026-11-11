@@ -464,14 +464,7 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             boolean current = b.getText().equals(String.valueOf(shownYear));
             b.setUIID(current ? "PickerMaterialYearSelected" : "PickerMaterialYear");
             if (current) {
-                final Button target = b;
-                final Container pane = years;
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        pane.scrollComponentToVisible(target);
-                    }
-                });
+                Display.getInstance().callSerially(new Reveal(years, b));
             }
         }
         return years;
@@ -490,9 +483,9 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             c.set(Calendar.MONTH, 10);
             c.set(Calendar.DAY_OF_MONTH, 22);
             String s = L10NManager.getInstance().formatDateShortStyle(c.getTime());
-            int y = s == null ? -1 : s.indexOf("99");
-            int m = s == null ? -1 : s.indexOf("11");
-            int d = s == null ? -1 : s.indexOf("22");
+            int y = s.indexOf("99");
+            int m = s.indexOf("11");
+            int d = s.indexOf("22");
             if (y >= 0 && m >= 0 && d >= 0) {
                 // Each field's place among the three: 0 year, 1 month, 2 day.
                 o[0] = (y > m ? 1 : 0) + (y > d ? 1 : 0);
@@ -708,5 +701,21 @@ public class MaterialDatePicker extends Container implements InternalPickerWidge
             days.getAbsoluteX() + st.getPaddingLeftNoRTL() + (w - cw * 7) / 2 + cell % 7 * cw + cw / 2,
             days.getAbsoluteY() + st.getPaddingTop() + (cell / 7 + 1) * chh + chh / 2
         };
+    }
+
+    // Scrolls the year shown into view once the grid of years has a layout.
+    private static final class Reveal implements Runnable {
+        private final Container pane;
+        private final Component target;
+
+        Reveal(Container pane, Component target) {
+            this.pane = pane;
+            this.target = target;
+        }
+
+        @Override
+        public void run() {
+            pane.scrollComponentToVisible(target);
+        }
     }
 }

@@ -485,7 +485,7 @@ final class GanttChart extends ScrollSurface {
             return null;
         }
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < as.size(); i++) {
+        for (int i = 0; i < as.size(); i++) { //NOPMD ForLoopCanBeForeach - painted for every row of every frame; a for-each allocates an iterator
             ScheduleResource r = model.getResource(as.get(i).getResourceId());
             if (r == null) {
                 continue;
@@ -584,8 +584,7 @@ final class GanttChart extends ScrollSurface {
         boolean showCritical = owner.isShowCriticalPath();
         int stub = Look.mm(1.8f);
         int head = Math.max(3, Look.mm(1));
-        for (int i = 0; i < all.size(); i++) {
-            TaskDependency d = all.get(i);
+        for (TaskDependency d : all) {
             Integer pr = rowOf.get(d.getPredecessor());
             Integer sr = rowOf.get(d.getSuccessor());
             if (pr == null || sr == null) {

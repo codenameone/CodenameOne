@@ -348,13 +348,26 @@ public final class SchedulePrinter {
             report(listener, PrintResult.failed(err.toString()));
             return;
         }
-        Printer.printPDF(path, new PrintResultListener() {
-            @Override
-            public void onResult(PrintResult result) {
-                fs.delete(path);
-                report(listener, result);
-            }
-        });
+        Printer.printPDF(path, new DeleteThenReport(fs, path, listener));
+    }
+
+    // The file is the printer's for as long as it prints, and nobody's after.
+    private static final class DeleteThenReport implements PrintResultListener {
+        private final FileSystemStorage fs;
+        private final String path;
+        private final PrintResultListener listener;
+
+        DeleteThenReport(FileSystemStorage fs, String path, PrintResultListener listener) {
+            this.fs = fs;
+            this.path = path;
+            this.listener = listener;
+        }
+
+        @Override
+        public void onResult(PrintResult result) {
+            fs.delete(path);
+            report(listener, result);
+        }
     }
 
     private static void report(PrintResultListener listener, PrintResult result) {

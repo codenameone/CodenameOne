@@ -209,14 +209,14 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
     }
 
     private void collect(Map<String, List<ScheduleItem>> map, long from, long to, List<ScheduleItem> out) {
-        for (int r = 0; r < resources.size(); r++) {
-            List<ScheduleItem> list = map.get(resources.get(r).getId());
+        for (ScheduleResource resource : resources) {
+            List<ScheduleItem> list = map.get(resource.getId());
             if (list == null) {
                 continue;
             }
-            for (int i = 0; i < list.size(); i++) {
-                if (list.get(i).intersects(from, to)) {
-                    out.add(list.get(i));
+            for (ScheduleItem item : list) {
+                if (item.intersects(from, to)) {
+                    out.add(item);
                 }
             }
         }
@@ -244,8 +244,8 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
         loadedFrom = from;
         loadedTo = to;
         final int asked = ++generation;
-        for (int r = 0; r < resources.size(); r++) {
-            String id = resources.get(r).getId();
+        for (ScheduleResource resource : resources) {
+            String id = resource.getId();
             if (freeBusyOnly.contains(id)) {
                 loadBusy(id, from, to, asked);
             } else {
@@ -269,8 +269,8 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                     return;
                 }
                 List<CalendarEvent> events = page.getItems();
-                for (int i = 0; i < events.size(); i++) {
-                    ScheduleItem item = toItem(events.get(i), calendarId);
+                for (CalendarEvent event : events) {
+                    ScheduleItem item = toItem(event, calendarId);
                     if (item != null) {
                         into.add(item);
                     }
@@ -298,8 +298,7 @@ public class CalendarScheduleModel extends AbstractScheduleModel {
                             return;
                         }
                         List<ScheduleItem> list = new ArrayList<ScheduleItem>();
-                        for (int i = 0; i < intervals.size(); i++) {
-                            FreeBusyInterval f = intervals.get(i);
+                        for (FreeBusyInterval f : intervals) {
                             if (f.getAvailability() == CalendarEvent.Availability.FREE) {
                                 continue;
                             }

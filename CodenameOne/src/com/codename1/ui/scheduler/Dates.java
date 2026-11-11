@@ -37,23 +37,15 @@ import java.util.Map;
 /// device's, so nothing here formats a `java.util.Date`: the day, month and
 /// minute are worked out first and only named here.
 final class Dates {
-    private static DateFormatSymbols symbols;
-    private static Map<String, String> symbolsBundle;
+    // The names are asked for with every header painted, so one set is kept
+    // for as long as the application's bundle stays the one it was made from.
+    private static final SymbolCache CACHE = new SymbolCache();
 
     private Dates() {
     }
 
     private static DateFormatSymbols symbols() {
-        Map<String, String> bundle = UIManager.getInstance().getBundle();
-        if (symbols == null || bundle != symbolsBundle) { //NOPMD CompareObjectsWithEquals - the bundle's identity is the point
-            DateFormatSymbols s = new DateFormatSymbols();
-            if (bundle instanceof Hashtable) {
-                s.setResourceBundle((Hashtable<String, String>) bundle);
-            }
-            symbols = s;
-            symbolsBundle = bundle;
-        }
-        return symbols;
+        return CACHE.get(UIManager.getInstance().getBundle());
     }
 
     /// `isoDay` is 1 for Monday to 7 for Sunday.
@@ -141,7 +133,23 @@ final class Dates {
         Calendar c = Calendar.getInstance();
         c.set(Calendar.HOUR_OF_DAY, 13);
         c.set(Calendar.MINUTE, 5);
-        String s = L10NManager.getInstance().formatTime(c.getTime());
-        return s != null && s.indexOf("13") >= 0;
+        return L10NManager.getInstance().formatTime(c.getTime()).indexOf("13") >= 0;
+    }
+
+    private static final class SymbolCache {
+        private DateFormatSymbols symbols;
+        private Map<String, String> bundle;
+
+        DateFormatSymbols get(Map<String, String> current) {
+            if (symbols == null || current != bundle) { //NOPMD CompareObjectsWithEquals - the bundle's identity is the point
+                DateFormatSymbols s = new DateFormatSymbols();
+                if (current instanceof Hashtable) {
+                    s.setResourceBundle((Hashtable<String, String>) current);
+                }
+                symbols = s;
+                bundle = current;
+            }
+            return symbols;
+        }
     }
 }

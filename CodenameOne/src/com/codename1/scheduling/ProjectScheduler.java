@@ -60,8 +60,7 @@ public final class ProjectScheduler {
             incoming.add(null);
             outgoing.add(null);
         }
-        for (int i = 0; i < deps.size(); i++) {
-            TaskDependency d = deps.get(i);
+        for (TaskDependency d : deps) {
             put(incoming, d.getSuccessor().index, d);
             put(outgoing, d.getPredecessor().index, d);
         }
@@ -139,15 +138,14 @@ public final class ProjectScheduler {
             }
         }
         List<GanttTask> leaves = new ArrayList<GanttTask>();
-        for (int i = 0; i < deps.size(); i++) {
-            TaskDependency d = deps.get(i);
+        for (TaskDependency d : deps) {
             GanttTask s = d.getSuccessor();
             if (s.isSummary()) {
                 leaves.clear();
                 leavesOf(s, leaves);
-                for (int l = 0; l < leaves.size(); l++) {
+                for (GanttTask leaf : leaves) {
                     from.add(d.getPredecessor().index);
-                    to.add(leaves.get(l).index);
+                    to.add(leaf.index);
                 }
             } else {
                 from.add(d.getPredecessor().index);
@@ -181,8 +179,10 @@ public final class ProjectScheduler {
         while (head < tail) {
             int t = out[head++];
             for (int e = firstEdge[t]; e < firstEdge[t + 1]; e++) {
-                if (--degree[target[e]] == 0) {
-                    out[tail++] = target[e];
+                int next = target[e];
+                degree[next]--;
+                if (degree[next] == 0) {
+                    out[tail++] = next;
                 }
             }
         }
@@ -203,8 +203,7 @@ public final class ProjectScheduler {
             if (in == null) {
                 continue;
             }
-            for (int i = 0; i < in.size(); i++) {
-                TaskDependency d = in.get(i);
+            for (TaskDependency d : in) {
                 GanttTask p = d.getPredecessor();
                 // Without a lag the bound is the predecessor's own instant:
                 // adding zero working time would carry the close of one day
@@ -279,8 +278,7 @@ public final class ProjectScheduler {
             if (out == null) {
                 continue;
             }
-            for (int i = 0; i < out.size(); i++) {
-                TaskDependency d = out.get(i);
+            for (TaskDependency d : out) {
                 // A summary's finish is the latest of its children, so a link
                 // from its finish holds each of them. Its start holds none.
                 if (a != t && !d.fromFinish()) { //NOPMD CompareObjectsWithEquals
@@ -290,8 +288,8 @@ public final class ProjectScheduler {
                 if (s.isSummary()) {
                     leaves.clear();
                     leavesOf(s, leaves);
-                    for (int l = 0; l < leaves.size(); l++) {
-                        lf = Math.min(lf, lateBound(d, leaves.get(l).lateStart, cal, dur));
+                    for (GanttTask leaf : leaves) {
+                        lf = Math.min(lf, lateBound(d, leaf.lateStart, cal, dur));
                     }
                 } else {
                     lf = Math.min(lf, lateBound(d, d.constrainsStart() ? s.lateStart : s.lateFinish, cal, dur));
@@ -330,8 +328,7 @@ public final class ProjectScheduler {
             if (out == null) {
                 continue;
             }
-            for (int i = 0; i < out.size(); i++) {
-                TaskDependency d = out.get(i);
+            for (TaskDependency d : out) {
                 if (a != t && !d.fromFinish()) { //NOPMD CompareObjectsWithEquals
                     continue;
                 }
@@ -340,8 +337,8 @@ public final class ProjectScheduler {
                 if (s.isSummary()) {
                     leaves.clear();
                     leavesOf(s, leaves);
-                    for (int l = 0; l < leaves.size(); l++) {
-                        long allowed = cal.subtractWorkingTime(leaves.get(l).earlyStart, d.getLag());
+                    for (GanttTask leaf : leaves) {
+                        long allowed = cal.subtractWorkingTime(leaf.earlyStart, d.getLag());
                         best = Math.min(best, cal.workingTimeBetween(mine, allowed));
                     }
                 } else {

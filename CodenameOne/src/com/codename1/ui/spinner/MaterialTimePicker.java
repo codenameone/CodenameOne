@@ -482,7 +482,7 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
             if (minutesShown) {
                 at = minute * 6;
             } else {
-                at = hour % 12 * 30;
+                at = hour * 30 % 360;
                 if (!meridiem && (hour == 0 || hour > 12)) {
                     ring = inner;
                 }
@@ -615,7 +615,7 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         if (ofMinutes) {
             a = Math.toRadians(value * 6);
         } else {
-            a = Math.toRadians(value % 12 * 30);
+            a = Math.toRadians(value * 30 % 360);
             if (!meridiem && (value == 0 || value > 12)) {
                 ring = inner;
             }

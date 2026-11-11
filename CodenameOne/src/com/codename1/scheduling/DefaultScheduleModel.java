@@ -79,9 +79,9 @@ public class DefaultScheduleModel extends AbstractScheduleModel {
     }
 
     public ScheduleItem getItem(String id) {
-        for (int i = 0; i < items.size(); i++) {
-            if (items.get(i).getId().equals(id)) {
-                return items.get(i);
+        for (ScheduleItem item : items) {
+            if (item.getId().equals(id)) {
+                return item;
             }
         }
         return null;
@@ -110,8 +110,7 @@ public class DefaultScheduleModel extends AbstractScheduleModel {
 
     @Override
     public void getItems(long from, long to, List<ScheduleItem> out) {
-        for (int i = 0; i < items.size(); i++) {
-            ScheduleItem it = items.get(i);
+        for (ScheduleItem it : items) {
             if (it.intersects(from, to)) {
                 out.add(it);
             }

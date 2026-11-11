@@ -51,8 +51,8 @@ public final class ResourceLeveler {
         List<ResourceOverallocation> out = new ArrayList<ResourceOverallocation>();
         List<ScheduleResource> resources = model.getResources();
         List<GanttTask> leaves = leaves(model);
-        for (int r = 0; r < resources.size(); r++) {
-            scan(resources.get(r), leaves, out, null);
+        for (ScheduleResource resource : resources) {
+            scan(resource, leaves, out, null);
         }
         return out;
     }
@@ -67,8 +67,7 @@ public final class ResourceLeveler {
         }
         List<GanttTask> leaves = leaves(model);
         double width = (to - from) / (double) buckets;
-        for (int i = 0; i < leaves.size(); i++) {
-            GanttTask t = leaves.get(i);
+        for (GanttTask t : leaves) {
             float units = t.getUnits(resourceId);
             if (units <= 0 || t.getEnd() <= from || t.getStart() >= to || t.getEnd() <= t.getStart()) {
                 continue;
@@ -105,8 +104,7 @@ public final class ResourceLeveler {
                 at = t.getStart();
             }
             float sum = 0;
-            for (int j = 0; j < leaves.size(); j++) {
-                GanttTask o = leaves.get(j);
+            for (GanttTask o : leaves) {
                 if (o.getStart() <= at && o.getEnd() > at) {
                     sum += o.getUnits(resourceId);
                 }
@@ -143,9 +141,9 @@ public final class ResourceLeveler {
         int limit = 200 + leaves.size() * leaves.size() * 4;
         for (int step = 0; step < limit; step++) {
             ResourceOverallocation first = null;
-            for (int r = 0; r < resources.size(); r++) {
+            for (ScheduleResource resource : resources) {
                 found.clear();
-                scan(resources.get(r), leaves, found, stuck);
+                scan(resource, leaves, found, stuck);
                 if (!found.isEmpty() && (first == null || found.get(0).getStart() < first.getStart())) {
                     first = found.get(0);
                 }
@@ -154,8 +152,7 @@ public final class ResourceLeveler {
                 break;
             }
             conflict.clear();
-            for (int i = 0; i < leaves.size(); i++) {
-                GanttTask t = leaves.get(i);
+            for (GanttTask t : leaves) {
                 if (t.getUnits(first.getResourceId()) > 0 && t.getStart() <= first.getStart() && t.getEnd() > first.getStart()) {
                     conflict.add(t);
                 }
@@ -166,8 +163,7 @@ public final class ResourceLeveler {
                 continue;
             }
             long until = Long.MAX_VALUE;
-            for (int i = 0; i < conflict.size(); i++) {
-                GanttTask o = conflict.get(i);
+            for (GanttTask o : conflict) {
                 if (o != victim) { //NOPMD CompareObjectsWithEquals
                     until = Math.min(until, o.getEnd());
                 }
@@ -193,8 +189,7 @@ public final class ResourceLeveler {
     // that starts last, then the one furthest down the outline.
     private static GanttTask pick(List<GanttTask> conflict, List<GanttTask> stuck) {
         GanttTask best = null;
-        for (int i = 0; i < conflict.size(); i++) {
-            GanttTask t = conflict.get(i);
+        for (GanttTask t : conflict) {
             if (t.isManuallyScheduled() || t.getPriority() >= 1000 || stuck.contains(t)
                     || t.getConstraint() == GanttTask.Constraint.MUST_START_ON
                     || t.getConstraint() == GanttTask.Constraint.MUST_FINISH_ON) {
@@ -223,9 +218,9 @@ public final class ResourceLeveler {
     }
 
     private static void addAllOnce(List<GanttTask> into, List<GanttTask> from) {
-        for (int i = 0; i < from.size(); i++) {
-            if (!into.contains(from.get(i))) {
-                into.add(from.get(i));
+        for (GanttTask task : from) {
+            if (!into.contains(task)) {
+                into.add(task);
             }
         }
     }
@@ -233,8 +228,7 @@ public final class ResourceLeveler {
     private static List<GanttTask> leaves(ProjectModel model) {
         List<GanttTask> all = model.getTasks();
         List<GanttTask> out = new ArrayList<GanttTask>();
-        for (int i = 0; i < all.size(); i++) {
-            GanttTask t = all.get(i);
+        for (GanttTask t : all) {
             if (!t.isSummary() && !t.getAssignments().isEmpty()) {
                 out.add(t);
             }
@@ -248,8 +242,7 @@ public final class ResourceLeveler {
                              List<GanttTask> ignore) {
         String id = res.getId();
         int count = 0;
-        for (int i = 0; i < leaves.size(); i++) {
-            GanttTask t = leaves.get(i);
+        for (GanttTask t : leaves) {
             if (t.getUnits(id) > 0 && t.getEnd() > t.getStart()) {
                 count++;
             }
@@ -259,8 +252,7 @@ public final class ResourceLeveler {
         }
         long[] bounds = new long[count * 2];
         int b = 0;
-        for (int i = 0; i < leaves.size(); i++) {
-            GanttTask t = leaves.get(i);
+        for (GanttTask t : leaves) {
             if (t.getUnits(id) > 0 && t.getEnd() > t.getStart()) {
                 bounds[b++] = t.getStart();
                 bounds[b++] = t.getEnd();
@@ -279,8 +271,7 @@ public final class ResourceLeveler {
             }
             float sum = 0;
             boolean movable = false;
-            for (int i = 0; i < leaves.size(); i++) {
-                GanttTask t = leaves.get(i);
+            for (GanttTask t : leaves) {
                 float u = t.getUnits(id);
                 if (u > 0 && t.getStart() <= from && t.getEnd() >= to && t.getEnd() > t.getStart()) {
                     sum += u;

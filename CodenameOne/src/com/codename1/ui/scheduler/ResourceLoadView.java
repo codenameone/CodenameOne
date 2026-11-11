@@ -203,8 +203,8 @@ final class ResourceLoadView extends ScrollSurface {
             float capacity = res.getCapacity();
             float[] units = profile[r];
             float peak = capacity;
-            for (int i = 0; i < units.length; i++) {
-                peak = Math.max(peak, units[i]);
+            for (float unit : units) {
+                peak = Math.max(peak, unit);
             }
             // The capacity is always at the same height unless the load
             // goes over it by more than half, and then the row is the peak.

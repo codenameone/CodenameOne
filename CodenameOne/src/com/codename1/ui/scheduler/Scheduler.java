@@ -318,18 +318,18 @@ public class Scheduler extends Container {
     /// Reads the model again. A model that fires its change listeners needs
     /// no call to this.
     public void refresh() {
-        if (current == dayGrid && dayGrid != null) {
+        if (current == dayGrid && dayGrid != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one
             if (view == View.RESOURCE_DAY) {
                 // The resources themselves may have changed.
                 apply();
             } else {
                 dayGrid.modelChanged();
             }
-        } else if (current == monthGrid && monthGrid != null) {
+        } else if (current == monthGrid && monthGrid != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one
             monthGrid.modelChanged();
-        } else if (current == agenda && agenda != null) {
+        } else if (current == agenda && agenda != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one
             agenda.modelChanged();
-        } else if (current == timeline && timeline != null) {
+        } else if (current == timeline && timeline != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one
             timeline.modelChanged();
         }
     }
@@ -340,9 +340,9 @@ public class Scheduler extends Container {
             return null;
         }
         List<ScheduleResource> all = model.getResources();
-        for (int i = 0; i < all.size(); i++) {
-            if (id.equals(all.get(i).getId())) {
-                return all.get(i);
+        for (ScheduleResource resource : all) {
+            if (id.equals(resource.getId())) {
+                return resource;
             }
         }
         return null;
@@ -412,16 +412,16 @@ public class Scheduler extends Container {
                 break;
             case WEEK:
             case WORK_WEEK:
-                anchorDay += 7 * direction;
+                anchorDay += 7L * direction;
                 break;
             case MONTH:
                 anchorDay = TimeMath.plusMonths(anchorDay, direction);
                 break;
             case AGENDA:
-                anchorDay += agendaDays * direction;
+                anchorDay += (long) agendaDays * direction;
                 break;
             default:
-                anchorDay += timelineDays * direction;
+                anchorDay += (long) timelineDays * direction;
                 break;
         }
         apply();
@@ -438,7 +438,7 @@ public class Scheduler extends Container {
     }
 
     private void show(Component c) {
-        if (current == c) {
+        if (current == c) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one
             return;
         }
         if (current != null) {
@@ -531,7 +531,7 @@ public class Scheduler extends Container {
                 // the next step is there before it is asked for.
                 model.setVisibleRange(from - (to - from), to + (to - from));
             }
-            for (int i = 0; i < listeners.size(); i++) {
+            for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
                 listeners.get(i).visibleRangeChanged(this, from, to);
             }
         }
@@ -681,6 +681,7 @@ public class Scheduler extends Container {
         apply();
     }
 
+    @Override
     public boolean isEditable() {
         return editable;
     }
@@ -760,20 +761,20 @@ public class Scheduler extends Container {
             return;
         }
         selected = item;
-        for (int i = 0; i < listeners.size(); i++) {
+        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
             listeners.get(i).itemSelected(this, item);
         }
         repaint();
     }
 
     void viewOpened(ScheduleItem item) {
-        for (int i = 0; i < listeners.size(); i++) {
+        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
             listeners.get(i).itemOpened(this, item);
         }
     }
 
     void viewRange(long start, long end, String resourceId) {
-        for (int i = 0; i < listeners.size(); i++) {
+        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
             listeners.get(i).rangeSelected(this, start, end, resourceId);
         }
         if (model != null) {
@@ -786,7 +787,7 @@ public class Scheduler extends Container {
     }
 
     boolean viewChanged(ScheduleItem item, long start, long end, String resourceId) {
-        for (int i = 0; i < listeners.size(); i++) {
+        for (int i = 0; i < listeners.size(); i++) { //NOPMD ForLoopCanBeForeach - a listener may remove itself while it is told
             if (!listeners.get(i).itemChanging(this, item, start, end, resourceId)) {
                 repaint();
                 return false;

@@ -2157,8 +2157,8 @@ public class UIManager {
         String tint = dark ? "0842a0" : "d3e3fd";
         String onTint = dark ? "d3e3fd" : "041e49";
         String error = dark ? "f28b82" : "d93025";
-        Font large = plain;
-        Font small = plain;
+        Font large;
+        Font small;
         if (Font.isNativeFontSchemeSupported()) {
             large = plain.derive(Display.getInstance().convertToPixels(5f), Font.STYLE_PLAIN);
             small = plain.derive(Display.getInstance().convertToPixels(2f), Font.STYLE_PLAIN);
