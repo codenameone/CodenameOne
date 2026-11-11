@@ -402,10 +402,6 @@ public final class Emitter {
             out.append(typedEmit.members());
         }
         out.append("\n    private ").append(className).append("() {\n    }\n\n");
-        out.append("    /// Makes `import ").append(javaComment(moduleName)).append("` find this module.\n");
-        out.append("    public static void register() {\n");
-        out.append("        PyModule.register(").append(javaString(moduleName)).append(", m -> exec(")
-                .append(javaString(moduleName)).append("));\n    }\n\n");
         out.append("    /// Runs the module body as module `runName` (`__main__` for the entry module).\n");
         out.append("    public static PyModule exec(String runName) {\n");
         StringBuilder slots = new StringBuilder();

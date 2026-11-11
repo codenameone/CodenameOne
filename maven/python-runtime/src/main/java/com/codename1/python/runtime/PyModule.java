@@ -131,6 +131,34 @@ public final class PyModule extends PyObject {
         LOADERS.put(name, loader);
     }
 
+    /// The modules of a generated registry: `exec(i)` runs the body of the
+    /// i-th name.
+    public interface Group {
+        void exec(int index);
+    }
+
+    /// Registers the modules `names` lists, one a line, as the ones `group`
+    /// runs by position. Nothing of a module is touched until it is imported:
+    /// a program is built with every module it could import and imports a
+    /// fraction of them.
+    public static void register(String names, final Group group) {
+        int at = 0;
+        int index = 0;
+        while (at <= names.length()) {
+            int end = names.indexOf('\n', at);
+            if (end < 0) {
+                end = names.length();
+            }
+            final int position = index++;
+            LOADERS.put(names.substring(at, end), new Loader() {
+                public void exec(PyModule m) {
+                    group.exec(position);
+                }
+            });
+            at = end + 1;
+        }
+    }
+
     /// Registers an already populated module (runtime-provided modules).
     public static void registerModule(PyModule m) {
         LOADED.put(m.name, m);

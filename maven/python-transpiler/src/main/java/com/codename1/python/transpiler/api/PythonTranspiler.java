@@ -1149,6 +1149,9 @@ public final class PythonTranspiler {
                 + java.substring(brace + 1);
     }
 
+    /// Modules to a registry method.
+    private static final int REGISTRY_GROUP = 400;
+
     private static String registry(Map<String, String> classes, String mainModule, boolean interop, boolean server, boolean db,
             boolean image, boolean serverImage, Map<String, String> nativeModules) {
         StringBuilder sb = new StringBuilder();
@@ -1186,10 +1189,37 @@ public final class PythonTranspiler {
         for (String cls : new java.util.TreeSet<String>(nativeModules.values())) {
             sb.append("        ").append(cls).append(".install();\n");
         }
-        for (String cls : classes.values()) {
-            sb.append("        ").append(cls).append(".register();\n");
+        // By name and number, never by a call into the module's class: that
+        // call would initialise the class, and a program imports a fraction
+        // of the modules it is built with. In groups, because a method and a
+        // string constant each have a size limit.
+        List<String> names = new ArrayList<String>(classes.keySet());
+        int groups = (names.size() + REGISTRY_GROUP - 1) / REGISTRY_GROUP;
+        for (int g = 0; g < groups; g++) {
+            StringBuilder joined = new StringBuilder();
+            int end = Math.min(names.size(), (g + 1) * REGISTRY_GROUP);
+            for (int i = g * REGISTRY_GROUP; i < end; i++) {
+                if (joined.length() > 0) {
+                    joined.append("\\n");
+                }
+                joined.append(names.get(i).replace("\\", "\\\\").replace("\"", "\\\""));
+            }
+            sb.append("        com.codename1.python.runtime.PyModule.register(\"").append(joined)
+                    .append("\", PythonModules::load").append(g).append(");\n");
         }
         sb.append("    }\n\n");
+        for (int g = 0; g < groups; g++) {
+            sb.append("    private static void load").append(g).append("(int index) {\n");
+            sb.append("        switch (index) {\n");
+            int end = Math.min(names.size(), (g + 1) * REGISTRY_GROUP);
+            for (int i = g * REGISTRY_GROUP; i < end; i++) {
+                String name = names.get(i);
+                sb.append("            case ").append(i - g * REGISTRY_GROUP).append(":\n                ")
+                        .append(classes.get(name)).append(".exec(\"")
+                        .append(name.replace("\\", "\\\\").replace("\"", "\\\"")).append("\");\n                return;\n");
+            }
+            sb.append("            default:\n                return;\n        }\n    }\n\n");
+        }
         sb.append("    /// Runs the entry module as `__main__` and returns the status the\n");
         sb.append("    /// interpreter would exit with. An exception the program does not\n");
         sb.append("    /// catch is reported on stderr, never thrown: on a device the\n");
