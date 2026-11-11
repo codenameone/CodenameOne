@@ -997,7 +997,7 @@ static BOOL cn1IsPadKeyboard(UIKeyboardType type) {
         || type == UIKeyboardTypeNumberPad;
 }
 
-static BOOL cn1ExplicitKeyboardAction() {
+static BOOL cn1ExplicitKeyboardAction(void) {
 #ifndef NEW_CODENAME_ONE_VM
     return com_codename1_impl_ios_TextEditUtil_isExplicitKeyboardAction__();
 #else
@@ -1009,7 +1009,7 @@ static BOOL cn1ExplicitKeyboardAction() {
 // number pad is a full keyboard with a Return key, so it is left alone; its
 // floating keyboard is not, and nothing here can tell the two apart, so a field
 // that chose its action with "nextButton"/"doneButton" gets the toolbar on an
-// iPad as well.
+// iPad whichever keyboard is up -- beside a Return key when it is the docked one.
 static BOOL cn1PadKeyboardNeedsToolbar(UIKeyboardType type) {
     return cn1IsPadKeyboard(type) && (!isIPad() || cn1ExplicitKeyboardAction());
 }

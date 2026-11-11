@@ -69,6 +69,15 @@ public class TextEditUtil {
     static final int ENDED_BY_DONE = -3;
 
     /**
+     * Whether native code reported that the edit ended on a keyboard action, as
+     * opposed to a touch elsewhere or a programmatic stop. Both codes move to the
+     * next component where there is one, as the single code they used to be did.
+     */
+    static boolean endedOnKeyboardAction(int endCode) {
+        return endCode == ENDED_BY_RETURN_OR_NEXT || endCode == ENDED_BY_DONE;
+    }
+
+    /**
      * Whether the component chose its keyboard action with the "nextButton" or
      * "doneButton" client property.
      */
@@ -93,8 +102,10 @@ public class TextEditUtil {
      * Whether ending the edit of a component fires its Done listener. Every
      * keyboard ending does, as it always has, with one exception: a field that
      * asked for Next explicitly and has somewhere to go moves on without
-     * finishing, which is what Android does with its Next action. Its toolbar's
-     * Done button, where it has one, still fires.
+     * finishing, which is what Android does with its Next action. The toolbar's
+     * Done button still fires, but such a field has one only beside Next on a
+     * number, decimal or phone pad in async edit mode: a listener that must run
+     * belongs on a field that offers Done.
      *
      * @param endCode the cursor position native code reported
      * @param edited the component whose edit ended, possibly null

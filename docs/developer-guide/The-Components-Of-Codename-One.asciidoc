@@ -513,17 +513,19 @@ To make the choice yourself, set the `nextButton` or `doneButton` client propert
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/KeyboardActionSnippets.java[tag=keyboard-action-next-done,indent=0]
 ----
 
-Both properties come after `searchField`, `sendButton` and `goButton` and before everything else in the list, on Android and iOS alike:
+Both properties work on Android and iOS, and take effect ahead of the Done listener and the following field. On Android `searchField`, `sendButton` and `goButton` still come first.
 
 - `nextButton` offers #Next# and moves to the following editable field. It doesn't call the Done listener: #Next# moves on, #Done# finishes. On a field nothing follows it's ignored, so the last field of a form still offers #Done#.
 - `doneButton` offers #Done# and ends editing, even when another field follows. It wins if both properties are set.
 
-On Android the properties apply to single line fields, and to multi-line ones that have a Done listener.
+WARNING: A field with `nextButton` usually has no #Done# on its keyboard, so a Done listener set on it isn't called when the user moves on. Set the listener on a field that offers #Done#, typically the last one.
+
+On Android the properties apply to single line fields, and to multi-line ones that have a Done listener. On iOS a multi-line field keeps its #Return# key for new lines, so there the properties only decide what the toolbar button says and does.
 
 On iOS the number, decimal and phone keyboards have no #Return# key, so their #Next# or #Done# is a button in a toolbar above the keyboard:
 
 - On an iPhone that toolbar is shown in portrait and landscape. For keyboards that do have a #Return# key the toolbar is left out in landscape, where there is little room for it.
-- On an iPad the docked number keyboard is a full keyboard with its own #Return# key and gets no toolbar. The floating keyboard has no such key, so a field with `nextButton` or `doneButton` gets the toolbar on an iPad too.
+- On an iPad the docked number keyboard is a full keyboard with its own #Return# key, so a field gets no toolbar there. The floating keyboard has no such key, and the two can't be told apart, so a field with `nextButton` or `doneButton` gets the toolbar on an iPad with either keyboard.
 - `iosHideToolbar` removes the toolbar wherever it would appear. On a number, decimal or phone keyboard that leaves no #Next# or #Done# at all.
 
 ==== Clearable text field

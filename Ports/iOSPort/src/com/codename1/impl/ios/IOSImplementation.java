@@ -1643,6 +1643,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 TextEditUtil.setNextEditComponent(TextEditUtil.nextFor(cmp, parentTop.getTabIterator(cmp).getNext()));
             } else if (current != null) {
                 TextEditUtil.setNextEditComponent(TextEditUtil.nextFor(cmp, current.getNextComponent(cmp)));
+            } else {
+                // Nothing to ask, so nothing follows. Leaving the previous edit's
+                // successor here sent Next to a component of another form, and would
+                // now also make a "nextButton" field skip its Done listener for it.
+                TextEditUtil.setNextEditComponent(null);
             }
             TextEditUtil.setExplicitKeyboardAction(TextEditUtil.choosesKeyboardAction(cmp));
             Display.getInstance().callSerially(new Runnable() {
@@ -1774,8 +1779,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         // were one code, and still behave as one, except for a field that
                         // asked for Next explicitly: there Next moves on without finishing,
                         // so only Done fires the listener -- which is what Android does.
-                        editNext = cursorPositon == TextEditUtil.ENDED_BY_RETURN_OR_NEXT
-                                || cursorPositon == TextEditUtil.ENDED_BY_DONE;
+                        editNext = TextEditUtil.endedOnKeyboardAction(cursorPositon);
                         boolean firesDone = TextEditUtil.firesDoneEvent(cursorPositon, instance.currentEditing);
                         synchronized(EDITING_LOCK) {
                             instance.currentEditing.setText(s);

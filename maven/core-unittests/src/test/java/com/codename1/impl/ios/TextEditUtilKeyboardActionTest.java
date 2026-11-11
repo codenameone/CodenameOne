@@ -27,6 +27,11 @@ import com.codename1.ui.TextField;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -46,10 +51,54 @@ class TextEditUtilKeyboardActionTest extends com.codename1.junit.UITestBase {
     }
 
     @Test
-    void endCodesAreTheOnesNativeCodeSends() {
-        // METALView.m sends these literals; changing a constant alone breaks it.
-        assertTrue(TextEditUtil.ENDED_BY_RETURN_OR_NEXT == RETURN_OR_NEXT);
-        assertTrue(TextEditUtil.ENDED_BY_DONE == DONE);
+    void endCodesAreTheOnesNativeCodeSends() throws Exception {
+        assertEquals(RETURN_OR_NEXT, TextEditUtil.ENDED_BY_RETURN_OR_NEXT);
+        assertEquals(DONE, TextEditUtil.ENDED_BY_DONE);
+
+        // The native side sends literals, so hold them to the constants here:
+        // the Done button alone sends ENDED_BY_DONE, Next and Return the other.
+        File source = new File("../../Ports/iOSPort/nativeSources/METALView.m");
+        assertTrue(source.isFile(), "METALView.m not found from " + new File(".").getAbsolutePath());
+        String text = new String(Files.readAllBytes(source.toPath()), StandardCharsets.UTF_8);
+        String done = method(text, "-(void) keyboardDoneClicked {");
+        String next = method(text, "-(void) keyboardNextClicked {");
+        String ret = method(text, "- (BOOL)textFieldShouldReturn:(UITextField *)theTextField {");
+        assertTrue(done.contains("stringEdit(YES, " + DONE + ","));
+        assertFalse(done.contains("stringEdit(YES, " + RETURN_OR_NEXT + ","));
+        assertTrue(next.contains("stringEdit(YES, " + RETURN_OR_NEXT + ","));
+        assertFalse(next.contains("stringEdit(YES, " + DONE + ","));
+        assertTrue(ret.contains("stringEdit(YES, " + RETURN_OR_NEXT + ","));
+        assertFalse(ret.contains("stringEdit(YES, " + DONE + ","));
+    }
+
+    /// The text of an Objective-C method: from its signature to the next line
+    /// that closes a top-level body.
+    private static String method(String text, String signature) {
+        int start = text.indexOf(signature);
+        assertTrue(start >= 0, "no method " + signature);
+        int end = text.indexOf("\n}", start);
+        assertTrue(end > start, "unterminated method " + signature);
+        return text.substring(start, end);
+    }
+
+    @Test
+    void bothEndCodesAreKeyboardActionsAndNothingElseIs() {
+        assertTrue(TextEditUtil.endedOnKeyboardAction(RETURN_OR_NEXT));
+        assertTrue(TextEditUtil.endedOnKeyboardAction(DONE));
+        assertFalse(TextEditUtil.endedOnKeyboardAction(-1));
+        assertFalse(TextEditUtil.endedOnKeyboardAction(0));
+        assertFalse(TextEditUtil.endedOnKeyboardAction(7));
+    }
+
+    @Test
+    void theExplicitFlagIsWhatNativeCodeReadsBack() {
+        assertFalse(TextEditUtil.isExplicitKeyboardAction());
+        TextField field = new TextField();
+        field.putClientProperty("nextButton", Boolean.TRUE);
+        TextEditUtil.setExplicitKeyboardAction(TextEditUtil.choosesKeyboardAction(field));
+        assertTrue(TextEditUtil.isExplicitKeyboardAction());
+        TextEditUtil.setExplicitKeyboardAction(TextEditUtil.choosesKeyboardAction(new TextField()));
+        assertFalse(TextEditUtil.isExplicitKeyboardAction());
     }
 
     @Test

@@ -1229,7 +1229,6 @@ public class InPlaceEditView extends FrameLayout{
         //if (cursorTimer != null) {
         //    cursorTimer.cancel();
         //}
-        System.out.println("-------In endEditing");
         if (!mIsEditing || mEditText == null) {
             return;
         }

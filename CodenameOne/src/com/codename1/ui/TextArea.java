@@ -2320,12 +2320,12 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// ```java
     /// quantity.setConstraint(TextArea.NUMERIC);
-    /// quantity.setDoneListener(e -> save());
     /// quantity.putClientProperty("nextButton", Boolean.TRUE);
     /// ```
     ///
     /// A field that asks for Next moves to the following field without calling
-    /// this listener; the listener is called when the user finishes with Done.
+    /// this listener, and its keyboard usually has no Done to call it with. Set
+    /// the listener on a field that offers Done, typically the last one.
     /// `"nextButton"` on a field nothing follows is ignored, and `"doneButton"`
     /// wins when both are set.
     ///
