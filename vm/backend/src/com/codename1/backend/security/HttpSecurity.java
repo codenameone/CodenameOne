@@ -114,6 +114,8 @@ public final class HttpSecurity {
     static final int ORDER_WEBAUTHN_LOGIN = 950;
     static final int ORDER_FORM_LOGIN = 1000;
     static final int ORDER_SECOND_FACTOR = 1050;
+    static final int ORDER_PASSWORD_RESET = 1060;
+    static final int ORDER_EMAIL_VERIFICATION = 1070;
     static final int ORDER_LOGIN_PAGE = 1100;
     static final int ORDER_API_KEY = 1200;
     static final int ORDER_BEARER_TOKEN = 1300;
@@ -179,6 +181,10 @@ public final class HttpSecurity {
                 Integer.valueOf(ORDER_FORM_LOGIN));
         filterOrder.put(PACKAGE + "SecondFactorAuthenticationFilter",
                 Integer.valueOf(ORDER_SECOND_FACTOR));
+        filterOrder.put(PACKAGE + "PasswordResetFilter",
+                Integer.valueOf(ORDER_PASSWORD_RESET));
+        filterOrder.put(PACKAGE + "EmailVerificationFilter",
+                Integer.valueOf(ORDER_EMAIL_VERIFICATION));
         filterOrder.put(PACKAGE + "DefaultLoginPageGeneratingFilter",
                 Integer.valueOf(ORDER_LOGIN_PAGE));
         filterOrder.put(PACKAGE + "ApiKeyAuthenticationFilter", Integer.valueOf(ORDER_API_KEY));
@@ -332,6 +338,31 @@ public final class HttpSecurity {
             configurer = new MfaConfigurer();
             apply(configurer);
             sessionMechanism();
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// A password reset by mail: the page that asks for one and the page the
+    /// mailed link opens; see [PasswordResetConfigurer].
+    public HttpSecurity passwordReset(Customizer<PasswordResetConfigurer> customizer) {
+        PasswordResetConfigurer configurer = getConfigurer(PasswordResetConfigurer.class);
+        if (configurer == null) {
+            configurer = new PasswordResetConfigurer();
+            apply(configurer);
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// The address a mailed verification link opens; see
+    /// [EmailVerificationConfigurer].
+    public HttpSecurity emailVerification(Customizer<EmailVerificationConfigurer> customizer) {
+        EmailVerificationConfigurer configurer =
+                getConfigurer(EmailVerificationConfigurer.class);
+        if (configurer == null) {
+            configurer = new EmailVerificationConfigurer();
+            apply(configurer);
         }
         customizer.customize(configurer);
         return this;
@@ -858,6 +889,22 @@ public final class HttpSecurity {
 
     List<String[]> loginLinks() {
         return loginLinks;
+    }
+
+    private final List<String> passwordResetPages = new ArrayList<String>();
+
+    /// Says that this chain mails password resets, and where one is asked
+    /// for: a generated login page then links there. Told from a configurer's
+    /// init().
+    void passwordResetPage(String path) {
+        passwordResetPages.add(path);
+    }
+
+    /// The page a reset is asked for at, in a list that is empty when the
+    /// chain mails none. The list itself is handed out, not a copy: the login
+    /// page may be built before the part that fills it has run.
+    List<String> passwordResetPages() {
+        return passwordResetPages;
     }
 
     /// Says that a part of this chain serves the login page; from a

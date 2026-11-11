@@ -1877,15 +1877,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sources.putAll(extra);
         boolean hasViews = false;
         for (Controller controller : controllers.values()) for (Route route : controller.routes) hasViews |= route.view;
-        if (hasViews || hasMvcControllers()) {
+        // A module whose only templates are its mails has no route that
+        // returns a view; they are compiled all the same, and nothing of the
+        // MVC support for requests (the assets) comes with them.
+        boolean mailViews = MvcTemplates.hasMailTemplates(ctx);
+        if (hasViews || hasMvcControllers() || mailViews) {
             try {
-                Map<String, String> mvcSources = hasViews ? new MvcTemplates(ctx).sources() : new LinkedHashMap<String, String>();
-                mvcSources.putAll(MvcAssets.sources(MvcTemplates.projectDirectory(ctx)));
+                Map<String, String> mvcSources = hasViews || mailViews ? new MvcTemplates(ctx).sources() : new LinkedHashMap<String, String>();
+                if (hasViews || hasMvcControllers()) mvcSources.putAll(MvcAssets.sources(MvcTemplates.projectDirectory(ctx)));
                 for (String generated : mvcSources.keySet()) if (isNotOurOwnOutput(ctx, generated)) {
                     ctx.error("Generated MVC class would overwrite " + generated); return;
                 }
                 sources.putAll(mvcSources);
-                ctx.setAttribute("cn1.backend.mvc", Boolean.TRUE);
+                if (hasViews || hasMvcControllers()) ctx.setAttribute("cn1.backend.mvc", Boolean.TRUE);
             }
             catch (IllegalArgumentException error) { ctx.error(error.getMessage()); return; }
         }

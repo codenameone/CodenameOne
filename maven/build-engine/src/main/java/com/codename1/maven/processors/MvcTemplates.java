@@ -108,6 +108,26 @@ final class MvcTemplates {
         return ctx.getProjectDir();
     }
 
+    /// Whether the module has templates for mail -- an `.html` anywhere under
+    /// `src/main/resources/templates/mail` -- so the views are compiled for a
+    /// module no controller of which returns one, and the wiring gives them
+    /// to the mail support.
+    static boolean hasMailTemplates(ProcessorContext ctx) {
+        File project = projectDirectory(ctx);
+        return project != null
+                && hasHtml(new File(project, "src/main/resources/templates/mail"), 0);
+    }
+
+    private static boolean hasHtml(File directory, int depth) {
+        File[] files = directory.listFiles();
+        if (files == null || depth > 16) return false;
+        for (File file : files) {
+            if (file.isDirectory() ? hasHtml(file, depth + 1) : file.getName().endsWith(".html"))
+                return true;
+        }
+        return false;
+    }
+
     Map<String, String> sources() {
         File project = projectDirectory(ctx);
         if (project == null)

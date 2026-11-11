@@ -1340,6 +1340,41 @@ Codes are six digits that change every 30 seconds, which is what authenticator
 apps expect. One step either side of the current one is accepted, to allow for
 a clock that's off. A code is good once.
 
+[[backend-security-email-code]]
+==== A code by mail
+
+A user without an authenticator app can be mailed a code. Declare an
+`EmailCodeService` beside the `TotpService`, or in its place:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/MailSecurityConfig.java[tag=backend-security-email-code,indent=0]
+----
+
+`emailCodes.enable(username)` turns it on for a user, and `disable` turns it
+off. A user with only this factor is mailed a code as soon as their password
+is accepted. A user who also has an authenticator app is asked for the app's
+code, and the page has a button that mails one. Either is accepted.
+
+A mailed code is six digits and good for ten minutes, once. Five wrong guesses
+spend it, whoever makes them. A new code can be asked for every 30 seconds and
+replaces the one before it, but it doesn't bring five more guesses: the count
+carries over until a code is entered correctly or the last one runs out. Once
+the five are spent, no code is mailed until then. The server stores a
+hash of the code, bound to the user it was made for. `validitySeconds`,
+`maxAttempts` and `resendSeconds` change the numbers, and `template` renders
+the mail from a template of your own, which is given `code`, `username` and
+`minutes`.
+
+The code goes to the address `EmailAddressResolver` gives for the user. The
+default takes a username that's an address as it is. An
+`EmailVerificationService` is such a resolver too, and passing it to
+`addressResolver` sends codes only to addresses users have proved are theirs.
+
+A mailed code is as strong as the user's mailbox. It stops a stolen password
+from being enough. It doesn't stop someone who reads the user's mail, which an
+authenticator app or a passkey does.
+
 ==== Recovery codes
 
 `RecoveryCodeService.generate` makes ten codes that stand in for a lost phone.
@@ -1486,6 +1521,91 @@ holds a secret: a public key verifies and can't sign. A user who signs in with
 a passkey is looked up in the application's `UserDetailsService` for their
 authorities.
 
+[[backend-security-password-reset]]
+=== Resetting a forgotten password
+
+`passwordReset` adds the two pages a forgotten password needs, and mails the
+link between them through the `MailSender` of <<backend-mail>>:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/MailSecurityConfig.java[tag=backend-security-reset,indent=0]
+----
+
+`GET /forgot-password` asks for the username. Posting it mails a link to
+`/reset-password`, where the user chooses a new password. The link works once
+and for 30 minutes. A newer link replaces an older one, and after a reset the
+user's remembered sign-ins are removed, so a browser that was remembered has
+to sign in again. A session that's already signed in stays until it ends.
+`requestUrl` and `resetUrl` move the pages, and `servePages(false)` leaves the
+`GET` of both to controllers of your own, which post to the same paths with
+the fields `username`, and `token`, `password` and `confirm`.
+
+The login page the layer generates gains a "Forgot your password?" link to the
+request page, and tells a user the reset sends back that the password was
+changed. A login page of your own links there itself; the reset returns to it
+with `?reset` in the address.
+
+What the layer does so that the pages can't be turned against your users:
+
+* *The answer never says whether an account exists.* A username nobody has
+  gets the same redirect, and no mail. An account that's disabled or has no
+  address is answered the same way.
+* *Asking is rate limited.* Five requests in fifteen minutes from one network,
+  and five for one username, then `429 Too Many Requests`. A `RateLimiter`
+  bean is used when there is one, so the limit holds across instances. See
+  <<backend-security-builtin-limits>>.
+* *Only a hash of the token is stored.* A copy of the database can't be used to
+  reset anyone's password.
+* *The link is never built from the request's `Host` header.* That header is
+  whatever the client sent, and a link built from it would mail your user a
+  link to someone else's site. Set `cn1.security.base-url=https://example.com`,
+  or call `baseUrl(...)`. Without it only a request to `localhost` is served,
+  which is enough for development, and any other fails naming the setting.
+* *The pages aren't cached and send no referrer,* so the token in the address
+  doesn't leave the browser.
+
+The new password has to be eight characters or more. `minimumLength` on the
+service changes that, `validityMinutes` the life of a link, and `template`
+names a mail template of your own, which is given `link`, `username` and
+`minutes`. The mail goes to the address `EmailAddressResolver` gives for the
+user, as in <<backend-security-email-code>>.
+
+[[backend-security-email-verification]]
+=== Verifying an email address
+
+An address a user typed at sign-up is a claim. `EmailVerificationService`
+turns it into a fact by mailing a link to it:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/MailSecurityConfig.java[tag=backend-security-verify,indent=0]
+----
+
+Send the mail when the account is created, or when the user changes their
+address:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/MailSecurityConfig.java[tag=backend-security-verify-send,indent=0]
+----
+
+`emailVerification` serves `/verify-email`, the page the link opens. It has
+one button. Pressing it marks the address as verified and redirects to
+`/?verified`, or to `successUrl`. Opening the link isn't enough by itself,
+because mail gateways open every link in a message to scan it, before the
+reader sees the message. The user doesn't have to be signed in when they
+follow the link. Most people open mail on a different device from the one
+they signed up on. A link works once and for a day, and a link that's spent
+or made up gets a `400` page. A link proves only the address it was mailed
+to.
+
+`verification.verified()` is an authorization rule: the request needs a
+signed-in user whose address is verified. `isVerified(username)` answers the
+same question in code. Sending again for a user replaces their pending address
+and their earlier link. An address stays verified until `send` is called with
+another or `forget` removes it.
+
 === Remembering a user
 
 `rememberMe` gives a user who ticks the box on the login form a cookie that
@@ -1622,6 +1742,10 @@ are the same on SQLite, PostgreSQL, and MySQL.
 | 12
 | `cn1_persistent_logins.user_agent`, `cn1_persistent_logins.ip_address`
 | The device each remembered sign-in came from.
+
+| 13
+| `cn1_one_time_token`, `cn1_mfa_email`, `cn1_verified_email`
+| `JdbcOneTimeTokenRepository`, `JdbcEmailCodeRepository`, `JdbcVerifiedEmailRepository`
 |===
 
 To use tables you already have, give their names in `application.properties`.
@@ -1976,6 +2100,11 @@ read by the build, because it decides what's linked into the server.
 | The one user of a server with no user store. The user exists when the
   password is set. The name is `user` unless set, and the roles are separated
   by commas. A password without a `{id}` prefix is taken as `{noop}`.
+
+| `cn1.security.base-url`
+| The address the server is reached at, such as `https://example.com`, with
+  nothing after the host. Mailed links start with it. See
+  <<backend-security-password-reset>>.
 
 | `cn1.security.password.maxConcurrent`
 | The most passwords checked at one time. No bound unless set.

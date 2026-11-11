@@ -33,12 +33,15 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
     private final String passwordParameter;
     private final String rememberMeParameter;
     private final java.util.List<String[]> links;
+    private final java.util.List<String> resetPages;
 
     DefaultLoginPageGeneratingFilter(String loginPage, String processingUrl,
                                      String usernameParameter, String passwordParameter,
                                      String rememberMeParameter,
-                                     java.util.List<String[]> links) {
+                                     java.util.List<String[]> links,
+                                     java.util.List<String> resetPages) {
         this.links = links;
+        this.resetPages = resetPages;
         this.rememberMeParameter = rememberMeParameter;
         this.loginPage = loginPage;
         this.processingUrl = processingUrl;
@@ -66,6 +69,11 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
         if (error) {
             page.append("<p role=\"alert\">Bad credentials</p>\n");
         }
+        // Only a chain that mails resets sends anyone here with this.
+        if (!resetPages.isEmpty() && request.queryParam("reset") != null) {
+            page.append("<p role=\"status\">Your password was changed. Sign in with the new "
+                    + "one.</p>\n");
+        }
         if (loggedOut) {
             page.append("<p role=\"status\">You have been signed out</p>\n");
         }
@@ -88,6 +96,12 @@ public final class DefaultLoginPageGeneratingFilter implements SecurityFilter {
                 .append(Responses.escape(token.getToken())).append("\">\n");
         }
         page.append("<button type=\"submit\">Sign in</button>\n</form>\n");
+        // Offered only by a chain that mails resets, which is one that has a
+        // way of sending mail.
+        if (!resetPages.isEmpty()) {
+            page.append("<p><a href=\"").append(Responses.escape(resetPages.get(0)))
+                .append("\">Forgot your password?</a></p>\n");
+        }
         // The other ways of signing in the chain declares: a link to each.
         for (String[] link : links) {
             page.append("<p><a href=\"").append(Responses.escape(link[0])).append("\">Sign in with ")
