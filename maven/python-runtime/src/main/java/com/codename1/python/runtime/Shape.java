@@ -70,6 +70,24 @@ final class Shape {
 
     /// This shape extended by `name`.
     Shape with(String name) {
+        String ln = lastName;
+        if (ln == name) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return lastNext;
+        }
+        Shape r = find(name);
+        lastNext = r;
+        lastName = name;
+        return r;
+    }
+
+    /// The last transition [#with] answered: most shapes are left by one name
+    /// only, the attribute every instance of one class sets next. Written
+    /// next before name, and read name first, so a stale pair is never
+    /// handed out on one thread; Python code here runs on one at a time.
+    private String lastName;
+    private Shape lastNext;
+
+    private Shape find(String name) {
         Shape[] t = next;
         if (byName != null) {
             Shape e = byName.get(name);

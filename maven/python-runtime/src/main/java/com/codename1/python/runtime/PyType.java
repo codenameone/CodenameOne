@@ -853,9 +853,7 @@ public final class PyType extends PyObject {
             // A builtin type builds and initialises its own instances.
             return factory.create(this, args, kwNames);
         }
-        Object newFn = lookup("__new__");
-        if (newFn == Builtins.BASE_EXCEPTION_NEW && kwNames.length == 0 && this != Py.OS_ERROR //NOPMD CompareObjectsWithEquals - identity is meant
-                && lookup("__init__") == Builtins.BASE_EXCEPTION_INIT) { //NOPMD CompareObjectsWithEquals - identity is meant
+        if (kwNames.length == 0 && this != Py.OS_ERROR && plainException()) { //NOPMD CompareObjectsWithEquals - identity is meant
             // An exception class that overrides neither: what __new__ and
             // __init__ would do between them, once, without the receiver
             // prepended to two argument arrays (raise ValueError(...) in a
@@ -866,6 +864,7 @@ public final class PyType extends PyObject {
             e.setAttrDirect("args", rest.length == 0 ? PyTuple.EMPTY : new PyTuple(rest));
             return e;
         }
+        Object newFn = lookup("__new__");
         Object obj;
         if (newFn != null && newFn != Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
             Object fn = newFn instanceof PyStaticMethod ? ((PyStaticMethod) newFn).func : newFn;
