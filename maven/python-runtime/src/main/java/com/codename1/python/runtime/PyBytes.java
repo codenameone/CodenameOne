@@ -585,7 +585,14 @@ public final class PyBytes extends PyObject {
     private static void installLatin1Delegates() {
         for (String e : LATIN1_DELEGATES) {
             final String name = e;
+            final int search = searchKind(name);
             Py.BYTES_TYPE.define(name, PyBuiltin.methodKw(Py.BYTES_TYPE, name, (args, kw) -> {
+                if (search != 0 && args.length == 2 && kw.length == 0) {
+                    Object r = searched(search, args[0], args[1]);
+                    if (r != null) {
+                        return r;
+                    }
+                }
                 Object[] mapped = new Object[args.length];
                 for (int k = 0; k < args.length; k++) {
                     Object v = args[k];
@@ -601,14 +608,109 @@ public final class PyBytes extends PyObject {
         }
     }
 
+    /// Which of the searches [#searched] answers `name` is, 0 for none of them.
+    private static int searchKind(String name) {
+        if ("startswith".equals(name)) {
+            return 1;
+        }
+        if ("endswith".equals(name)) {
+            return 2;
+        }
+        if ("find".equals(name)) {
+            return 3;
+        }
+        if ("rfind".equals(name)) {
+            return 4;
+        }
+        if ("count".equals(name)) {
+            return 5;
+        }
+        return 0;
+    }
+
+    /// A search of one bytes value for another, with no range, done on the bytes
+    /// themselves; null for any other call, which goes the long way. That way maps
+    /// the whole receiver to text first, so testing how a file starts
+    /// (`data.startswith(b"%PDF-")`, and a type sniffer asks that a dozen times)
+    /// copied the file twice per question.
+    private static Object searched(int kind, Object self, Object arg) {
+        byte[] h = like(self);
+        if (h == null) {
+            return null;
+        }
+        if (kind <= 2 && arg instanceof PyTuple) {
+            Object[] each = ((PyTuple) arg).items;
+            for (Object one : each) {
+                if (like(one) == null) {
+                    return null;
+                }
+            }
+            for (Object one : each) {
+                byte[] n = like(one);
+                if (matchesAt(h, n, kind == 1 ? 0 : h.length - n.length)) {
+                    return Py.TRUE;
+                }
+            }
+            return Py.FALSE;
+        }
+        byte[] n = like(arg);
+        if (n == null) {
+            return null;
+        }
+        if (kind == 1) {
+            return Py.bool(matchesAt(h, n, 0));
+        }
+        if (kind == 2) {
+            return Py.bool(matchesAt(h, n, h.length - n.length));
+        }
+        if (n.length == 0) {
+            return null;
+        }
+        if (kind == 3) {
+            for (int i = 0; i + n.length <= h.length; i++) {
+                if (h[i] == n[0] && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        if (kind == 4) {
+            for (int i = h.length - n.length; i >= 0; i--) {
+                if (h[i] == n[0] && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        int count = 0;
+        int i = 0;
+        while (i + n.length <= h.length) {
+            if (h[i] == n[0] && matchesAt(h, n, i)) {
+                count++;
+                i += n.length;
+            } else {
+                i++;
+            }
+        }
+        return PyInt.of(count);
+    }
+
+    private static boolean matchesAt(byte[] h, byte[] n, int at) {
+        if (at < 0 || at + n.length > h.length) {
+            return false;
+        }
+        for (int i = 0; i < n.length; i++) {
+            if (h[at + i] != n[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static Object toLatin1(Object o) {
         byte[] v = like(o);
         if (v != null) {
-            char[] c = new char[v.length];
-            for (int i = 0; i < v.length; i++) {
-                c[i] = (char) (v[i] & 0xff);
-            }
-            return new String(c);
+            return Codecs.latin1(v, 0, v.length);
         }
         if (o instanceof String) {
             throw Py.typeError("a bytes-like object is required, not 'str'");

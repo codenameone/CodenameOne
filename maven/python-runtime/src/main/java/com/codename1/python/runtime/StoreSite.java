@@ -27,13 +27,21 @@ package com.codename1.python.runtime;
 /// code: what [AttrSite] is for a read. A store has a site of its own, never
 /// one it shares with a read, so neither carries the other's entries.
 ///
-/// It remembers up to [AttrSite#WAYS] receiver layouts: the slot when the
+/// It remembers up to sixteen receiver layouts: the slot when the
 /// instance already has the attribute, or the shape transition when the
 /// store adds it. Everything it does not model -- a property, a descriptor
 /// with `__set__`, a `__setattr__` written in Python -- goes the generic
 /// way.
 public final class StoreSite {
-    private static final int WAYS = AttrSite.WAYS;
+    /// How many layouts a site remembers. More than a read site does, because a store
+    /// that adds an attribute takes two of them -- the transition, and the slot on the
+    /// shape it leads to -- and the stores that add attributes are those of an
+    /// `__init__`, which a base class shares with every subclass: at four, the
+    /// constructor of a class with three subclasses forgot one of them at every call
+    /// and stored by name instead. The first four are also held in fields, for the
+    /// test [#set] makes inline; the rest are found by the scan in [#setSlow].
+    private static final int WAYS = 16;
+    private static final int INLINE = 4;
 
     private final String name;
 
@@ -164,10 +172,25 @@ public final class StoreSite {
             setNext = (setNext + 1) % WAYS;
         }
         if (setTypes == null) {
-            setTypes = new PyType[WAYS];
-            setShapes = new Shape[WAYS];
-            setSlots = new int[WAYS];
-            setTos = new Shape[WAYS];
+            setTypes = new PyType[INLINE];
+            setShapes = new Shape[INLINE];
+            setSlots = new int[INLINE];
+            setTos = new Shape[INLINE];
+        } else if (k == setTypes.length) {
+            // Nearly every site sees one class or two; only one that has filled the
+            // small table pays for the large one.
+            PyType[] types = new PyType[WAYS];
+            Shape[] shapes = new Shape[WAYS];
+            int[] slots = new int[WAYS];
+            Shape[] tos = new Shape[WAYS];
+            System.arraycopy(setTypes, 0, types, 0, k);
+            System.arraycopy(setShapes, 0, shapes, 0, k);
+            System.arraycopy(setSlots, 0, slots, 0, k);
+            System.arraycopy(setTos, 0, tos, 0, k);
+            setTypes = types;
+            setShapes = shapes;
+            setSlots = slots;
+            setTos = tos;
         }
         setTypes[k] = t;
         setShapes[k] = shape;
@@ -179,7 +202,7 @@ public final class StoreSite {
             st1 = t; ss1 = shape; si1 = slot; sto1 = to;
         } else if (k == 2) {
             st2 = t; ss2 = shape; si2 = slot; sto2 = to;
-        } else {
+        } else if (k == 3) {
             st3 = t; ss3 = shape; si3 = slot; sto3 = to;
         }
     }
