@@ -22,6 +22,9 @@
  */
 package com.codename1.payment;
 
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.ConsentMode;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
@@ -111,7 +114,30 @@ public final class CommerceManager {
     private static final Random RANDOM =
             new Random(System.currentTimeMillis() ^ ((long) new Object().hashCode() << 32));
 
+    /// The category of every analytics event commerce emits; the one
+    /// [Purchase] uses for `purchase` and `purchase_initiated`.
+    private static final String ANALYTICS_CATEGORY = "commerce";
+    /// The experiment and variant last reported as an exposure.
+    private static final String PREF_EXPOSURE = "cn1$commerce$experimentExposure";
+    /// How long the context of a started purchase waits for its receipt. A
+    /// receipt of the same product after this is taken to be another
+    /// purchase and is not labelled.
+    private static final long PURCHASE_CONTEXT_LIFETIME = 10L * 60L * 1000L;
+    private static final Runnable INVITE_OBSERVER = new Runnable() {
+        @Override
+        public void run() {
+            getInstance().inviteArrived();
+        }
+    };
+
     private static CommerceManager instance;
+    // Offering id to {placement, experiment, variant} of the last offerings
+    // answer that carried it. Replaced as a whole, never changed in place.
+    private Map offeringContext = new HashMap();
+    private PurchaseContext pendingPurchase;
+    private boolean invitesHooked;
+    private boolean hookingInvites;
+    private boolean refreshing;
 
     private final Map entitlementCache = new HashMap();
     private final EventDispatcher customerInfoListeners = new EventDispatcher();
@@ -203,6 +229,11 @@ public final class CommerceManager {
     /// [degraded][#isDegraded()], the previous id stays, and the call can be
     /// repeated. When the cloud is not enabled in this build the id is
     /// switched locally and nothing else happens.
+    ///
+    /// This id is commerce's own. It is independent of the user id of
+    /// `Analytics.setUserId`, which stays whatever the application set:
+    /// logging in or out here never changes it, and an application that
+    /// wants its analytics under the same id sets it there as well.
     ///
     /// #### Parameters
     ///
@@ -367,6 +398,7 @@ public final class CommerceManager {
     /// Drops the shared instance so a test starts from a cold one.
     static synchronized void resetForTests() {
         instance = null;
+        Analytics.setAttributionObserver(null);
     }
 
     // ---- purchase delegation (thin pass-through to Purchase) ----------------
@@ -467,6 +499,7 @@ public final class CommerceManager {
         if (!isCloudEnabled()) {
             return new Offerings(null);
         }
+        hookInvites();
         String key = storageKey(STORAGE_OFFERINGS_PREFIX,
                 getAppUserId() + "/" + (placement == null ? "" : placement));
         Display d = Display.getInstance();
@@ -516,6 +549,8 @@ public final class CommerceManager {
             }
         }
         attachProducts(result);
+        rememberContext(result, placement);
+        reportExposure(result);
         return result;
     }
 
@@ -587,6 +622,10 @@ public final class CommerceManager {
         if (pkg.getProductId() == null) {
             return;
         }
+        // Read by Purchase when it reports purchase_initiated and purchase,
+        // so those events say which offering and package were bought.
+        pendingPurchase = new PurchaseContext(pkg.getProductId(),
+                contextParams(pkg.getOfferingId(), pkg.getId(), pkg.getProductId()));
         if (pkg.isSubscription()) {
             subscribe(pkg.getProductId());
         } else {
@@ -691,6 +730,20 @@ public final class CommerceManager {
             return false;
         }
         Display.getInstance().execute(url[0]);
+        if (pkg != null) {
+            // Purchase has no part in a web checkout, so its start is
+            // reported here, under the same name and category.
+            try {
+                Map<String, Object> params = contextParams(pkg.getOfferingId(), pkg.getId(), pkg.getProductId());
+                params.put("store", "web");
+                if (pkg.getProductId() != null) {
+                    params.put("sku", pkg.getProductId());
+                }
+                Analytics.autoEvent("purchase_initiated", ANALYTICS_CATEGORY, params);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
         return true;
     }
 
@@ -940,6 +993,254 @@ public final class CommerceManager {
         }
     }
 
+    /// Reports a commerce event to the analytics providers the application
+    /// registered with `Analytics`, in the category `commerce`.
+    /// [com.codename1.payment.paywall.PaywallView]
+    /// and the customer center call this for what they show; an application
+    /// that draws its own paywall can call it with the same names so its
+    /// reports read the same.
+    ///
+    /// The event carries the parameters `offering`, `package` and `product`
+    /// for the values that are not null, `placement` when the offering was
+    /// fetched for a placement, and `experiment` and `variant` when the
+    /// offering was chosen by an experiment. Nothing is sent without the
+    /// user's analytics consent, and the call does nothing at all when no
+    /// provider is registered. It never throws and never blocks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the event name, such as `paywall_view`
+    ///
+    /// - `offeringId`: the offering concerned, or null
+    ///
+    /// - `packageId`: the package concerned, or null
+    ///
+    /// - `productId`: the store product concerned, or null
+    ///
+    /// - `key`: the name of one more parameter, or null
+    ///
+    /// - `value`: the value of that parameter, or null to leave it out
+    public void analyticsEvent(String name, String offeringId, String packageId, String productId,
+            String key, String value) {
+        if (name == null) {
+            return;
+        }
+        try {
+            Map<String, Object> params = contextParams(offeringId, packageId, productId);
+            if (key != null && value != null) {
+                params.put(key, value);
+            }
+            Analytics.autoEvent(name, ANALYTICS_CATEGORY, params);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private Map<String, Object> contextParams(String offeringId, String packageId, String productId) {
+        Map<String, Object> params = new HashMap<String, Object>();
+        putParam(params, "offering", offeringId);
+        putParam(params, "package", packageId);
+        putParam(params, "product", productId);
+        Object context = offeringId == null ? null : offeringContext.get(offeringId);
+        if (context instanceof String[]) {
+            String[] c = (String[]) context;
+            putParam(params, "placement", c[0]);
+            putParam(params, "experiment", c[1]);
+            putParam(params, "variant", c[2]);
+        }
+        return params;
+    }
+
+    private static void putParam(Map<String, Object> params, String key, String value) {
+        if (value != null && value.length() > 0) {
+            params.put(key, value);
+        }
+    }
+
+    /// Remembers which placement and experiment each offering of an answer
+    /// belongs to. The experiment chose the current offering, so only that
+    /// one is labelled with it.
+    private void rememberContext(Offerings result, String placement) {
+        Map next = new HashMap(offeringContext);
+        Offering current = result.getCurrent();
+        for (Offering o : result.getAll()) {
+            if (o.getId() == null) {
+                continue;
+            }
+            boolean chosen = current != null && o.getId().equals(current.getId());
+            String[] context = new String[3];
+            context[0] = placement;
+            if (chosen) {
+                context[1] = result.getExperimentId();
+                context[2] = result.getExperimentVariant();
+            }
+            next.put(o.getId(), context);
+        }
+        offeringContext = next;
+    }
+
+    /// Reports `experiment_exposure` the first time this install is seen in
+    /// an experiment's variant. Remembered only once it could be sent, so an
+    /// exposure met before the user consented is reported after.
+    private static void reportExposure(Offerings result) {
+        try {
+            String id = result.getExperimentId();
+            if (id == null || !analyticsActive()) {
+                return;
+            }
+            String variant = result.getExperimentVariant();
+            String pair = id + "/" + (variant == null ? "" : variant);
+            if (pair.equals(Preferences.get(PREF_EXPOSURE, null))) {
+                return;
+            }
+            Preferences.set(PREF_EXPOSURE, pair);
+            Map<String, Object> params = new HashMap<String, Object>();
+            params.put("experiment", id);
+            putParam(params, "variant", variant);
+            Analytics.autoEvent("experiment_exposure", ANALYTICS_CATEGORY, params);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    /// Whether analytics would send an event now: a provider is registered
+    /// and the user's consent covers analytics.
+    private static boolean analyticsActive() {
+        AnalyticsConsent c = Analytics.getConsent();
+        boolean allowed;
+        if (Analytics.getConsentMode() == ConsentMode.OPT_OUT) {
+            allowed = c == null || c.isAnalytics();
+        } else {
+            allowed = c != null && c.isAnalytics();
+        }
+        return allowed && !Analytics.getProviders().isEmpty();
+    }
+
+    /// The analytics client id of this install, which the cloud uses to join
+    /// a customer to the install's analytics and invite records. Null -- and
+    /// then no request carries one -- when the application registered no
+    /// analytics provider or the user's consent does not cover analytics, so
+    /// an id is never created for an application that does not use analytics
+    /// and never sent for a user who opted out.
+    static String analyticsClientId() {
+        try {
+            if (!analyticsActive()) {
+                return null;
+            }
+            String id = Analytics.clientId();
+            return id == null || id.length() == 0 ? null : id;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static void appendClientId(StringBuilder sb) {
+        String id = analyticsClientId();
+        if (id != null) {
+            sb.append(',');
+            appendField(sb, "analyticsClientId", id);
+        }
+    }
+
+    /// Adds the context of a purchase started by
+    /// [#purchase(CommercePackage)] to the parameters of the analytics event
+    /// [Purchase] is about to send for the same product. A context is used
+    /// for one purchase: the completing event takes it, and it lapses by
+    /// itself so a later purchase of the product is not labelled with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the product of the event
+    ///
+    /// - `params`: the parameters to add to
+    ///
+    /// - `consume`: true for the event that completes the purchase
+    static void addPurchaseContext(String sku, Map<String, Object> params, boolean consume) {
+        // No try block here: the loop below casts, and a cast must never
+        // sit under a handler that could be taken for its failure.
+        CommerceManager cm = instance;
+        if (cm == null) {
+            return;
+        }
+        PurchaseContext pending = cm.pendingPurchase;
+        if (pending == null || sku == null || params == null || !sku.equals(pending.sku)) {
+            return;
+        }
+        boolean lapsed = System.currentTimeMillis() - pending.time > PURCHASE_CONTEXT_LIFETIME;
+        if (consume || lapsed) {
+            cm.pendingPurchase = null;
+        }
+        if (lapsed) {
+            return;
+        }
+        for (Map.Entry<String, Object> e : pending.params.entrySet()) {
+            if (!params.containsKey(e.getKey())) {
+                params.put(e.getKey(), e.getValue());
+            }
+        }
+    }
+
+    /// Moves the start of the pending purchase context back in time.
+    static void agePurchaseContextForTests(long millis) {
+        CommerceManager cm = instance;
+        if (cm != null && cm.pendingPurchase != null) {
+            cm.pendingPurchase = new PurchaseContext(cm.pendingPurchase.sku, cm.pendingPurchase.params,
+                    cm.pendingPurchase.time - millis);
+        }
+    }
+
+    /// What [#purchase(CommercePackage)] knew about a purchase it started.
+    private static final class PurchaseContext {
+        final String sku;
+        final Map<String, Object> params;
+        final long time;
+
+        PurchaseContext(String sku, Map<String, Object> params) {
+            this(sku, params, System.currentTimeMillis());
+        }
+
+        PurchaseContext(String sku, Map<String, Object> params, long time) {
+            this.sku = sku;
+            this.params = params;
+            this.time = time;
+        }
+    }
+
+    /// Registers, once, for the invite attribution of this install. A
+    /// referral reward is granted by the cloud, so when the attribution is
+    /// known the customer is fetched again and the reward appears without the
+    /// application asking. The registration goes through `Analytics`, not
+    /// the invite package: it leaves the application's own invite listener
+    /// alone, and commerce does not make an application depend on invites.
+    private void hookInvites() {
+        if (invitesHooked) {
+            return;
+        }
+        invitesHooked = true;
+        hookingInvites = true;
+        try {
+            Analytics.setAttributionObserver(INVITE_OBSERVER);
+        } catch (Throwable t) {
+            Log.e(t);
+        } finally {
+            hookingInvites = false;
+        }
+    }
+
+    private void inviteArrived() {
+        // Registering from inside a refresh answers at once when the
+        // attribution is already known, and that refresh is the fetch.
+        if (!isCloudEnabled() || (hookingInvites && refreshing)) {
+            return;
+        }
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                refresh();
+            }
+        });
+    }
+
     private void queueEvent(String event) {
         pendingEvents.add(event);
         if (eventFlushScheduled) {
@@ -1008,6 +1309,15 @@ public final class CommerceManager {
         if (!isCloudEnabled()) {
             return;
         }
+        refreshing = true;
+        try {
+            refreshNow();
+        } finally {
+            refreshing = false;
+        }
+    }
+
+    private void refreshNow() {
         ensureCustomerLoaded();
         List receipts = null;
         boolean receiptsFailed = false;
@@ -1084,6 +1394,9 @@ public final class CommerceManager {
     /// the device clock is still reported as stored: the service's clock
     /// decides, at the next refresh, and the device's is not trusted to.
     private void ensureCustomerLoaded() {
+        if (isCloudEnabled()) {
+            hookInvites();
+        }
         String id = getAppUserId();
         if (id.equals(customerLoadedFor)) {
             return;
@@ -1274,6 +1587,7 @@ public final class CommerceManager {
         appendField(sb, "appUserId", getAppUserId());
         sb.append(',');
         appendField(sb, "nonce", nonce);
+        appendClientId(sb);
         if (extraFields != null && extraFields.length() > 0) {
             sb.append(',').append(extraFields);
         }
@@ -1331,6 +1645,7 @@ public final class CommerceManager {
         appendField(sb, "signedTransaction", r.getOrderData());
         sb.append(',');
         appendField(sb, "productId", r.getSku());
+        appendClientId(sb);
         sb.append('}');
         return sb.toString();
     }

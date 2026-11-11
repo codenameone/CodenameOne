@@ -234,6 +234,7 @@ public class PaywallView extends Container {
         }
         selected = pkg;
         applySelection();
+        track("paywall_package_selected", pkg);
         if (getComponentForm() != null) {
             revalidate();
         }
@@ -270,6 +271,7 @@ public class PaywallView extends Container {
     /// information changes afterwards.
     public void restore() {
         restoring = true;
+        track("paywall_restore", selected);
         watchCustomer();
         CommerceManager.getInstance().restore();
     }
@@ -445,6 +447,20 @@ public class PaywallView extends Container {
     private void log(String type, String packageId) {
         CommerceManager.getInstance().logEvent(type,
                 offering == null ? null : offering.getId(), paywallId, packageId);
+        // The same moments, through the application's analytics providers.
+        // A purchase is not repeated here: Purchase reports it.
+        if ("IMPRESSION".equals(type)) {
+            track("paywall_view", null);
+        } else if ("CLOSE".equals(type)) {
+            track("paywall_close", null);
+        }
+    }
+
+    private void track(String name, CommercePackage pkg) {
+        CommerceManager.getInstance().analyticsEvent(name,
+                offering == null ? null : offering.getId(),
+                pkg == null ? null : pkg.getId(),
+                pkg == null ? null : pkg.getProductId(), null, null);
     }
 
     // ---- building ------------------------------------------------------------

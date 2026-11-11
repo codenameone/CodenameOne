@@ -22,6 +22,12 @@
  */
 package com.codename1.payment;
 
+import com.codename1.analytics.AbstractAnalyticsProvider;
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsCapability;
+import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.AnalyticsEvent;
+import com.codename1.analytics.ConsentMode;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
@@ -71,6 +77,70 @@ public abstract class CommerceTestBase extends UITestBase {
         implementation.clearNetworkMocks();
         implementation.setInAppPurchase(null);
         CommerceManager.resetForTests();
+        Analytics.clearProviders();
+        Analytics.setConsent(null);
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.attributionAvailable(false);
+    }
+
+    /// Registers a provider that records every event, with the user's
+    /// consent on record. Without this call a test has no analytics at all,
+    /// which is the state of an application that never registered a provider.
+    protected static AnalyticsRecorder analyticsOn() {
+        Analytics.clearProviders();
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.granted());
+        AnalyticsRecorder recorder = new AnalyticsRecorder();
+        Analytics.addProvider(recorder);
+        return recorder;
+    }
+
+    /// An analytics provider that keeps the events it is handed.
+    public static final class AnalyticsRecorder extends AbstractAnalyticsProvider {
+        private final List<AnalyticsEvent> events = new ArrayList<AnalyticsEvent>();
+
+        @Override
+        public String getName() {
+            return "commerce-recorder";
+        }
+
+        @Override
+        public void trackEvent(AnalyticsEvent event) {
+            events.add(event);
+        }
+
+        @Override
+        public boolean supports(AnalyticsCapability capability) {
+            return true;
+        }
+
+        public int count(String name) {
+            int n = 0;
+            for (AnalyticsEvent e : events) {
+                if (name.equals(e.getName())) {
+                    n++;
+                }
+            }
+            return n;
+        }
+
+        /// The last event of a name, or null.
+        public AnalyticsEvent last(String name) {
+            AnalyticsEvent found = null;
+            for (AnalyticsEvent e : events) {
+                if (name.equals(e.getName())) {
+                    found = e;
+                }
+            }
+            return found;
+        }
+
+        /// A parameter of the last event of a name; null when there is no
+        /// such event or it has no such parameter.
+        public Object param(String name, String key) {
+            AnalyticsEvent e = last(name);
+            return e == null ? null : e.getParameters().get(key);
+        }
     }
 
     /// The store of the test: it records what it is asked to sell.

@@ -516,6 +516,94 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 
 It may be called on the EDT. It returns `false`, and buys nothing, when no signature is available: the platform's store has no promotional offers, commerce isn't enabled in the build, or the service couldn't sign. Signing needs the `commerce.apple.keyId` and `commerce.apple.privateKey` secrets described under <<commerce-store-credentials,store credentials>>, and the key must be one App Store Connect accepts for subscription offers. Promotional offers are an App Store feature, on iOS and on the Mac. A retention offer on any other store sells its product at the regular price.
 
+[[commerce-analytics-invites]]
+=== Analytics and invites
+
+Commerce reports what happens around a purchase to the analytics providers the app registered (see the <<analytics,analytics chapter>>), and it joins a customer to the invite that brought them in (see <<analytics-invites,Invite a friend>>). Neither needs code. An app with no provider sends nothing, and nothing is sent for a user whose consent doesn't cover analytics.
+
+==== Events
+
+Every event is in the category `commerce`. The built-in paywall and the customer center send theirs as the customer uses them:
+
+[cols="2,3,3",options="header"]
+|===
+| Event | Sent when | Parameters
+
+| `paywall_view`
+| A paywall appears
+| `offering`
+
+| `paywall_package_selected`
+| The customer picks a package
+| `offering`, `package`, `product`
+
+| `paywall_restore`
+| The customer restores purchases from a paywall
+| `offering`, and `package` and `product` of the selected package
+
+| `paywall_close`
+| The paywall goes away
+| `offering`
+
+| `purchase_initiated`
+| The store, or a web checkout, is asked to sell
+| `sku`, `offering`, `package`, `product`, and `store` with the value `web` for a web checkout
+
+| `purchase`
+| The store reports the purchase
+| `sku`, `offering`, `package`, `product`
+
+| `customer_center_view`
+| The customer center opens
+| None
+
+| `customer_center_action`
+| The customer picks a row of the customer center
+| `action`, which is `MANAGE`, `RESTORE`, `REFUND`, `CANCEL` or `SUPPORT`, and `product`
+
+| `subscription_cancel_reason`
+| The customer picks a cancel reason
+| `reason`, the id of the reason, and `product`
+
+| `experiment_exposure`
+| The app is first given a variant of an experiment
+| `experiment`, `variant`
+|===
+
+An event about an offering also carries `placement` when the offering was read for a placement, and `experiment` and `variant` when an experiment chose it. A parameter with no value is left out.
+
+`purchase_initiated` and `purchase` are the events `Purchase` has always sent, each still sent once. They gain the offering, package and experiment when the purchase was started with `purchase(CommercePackage)`, which is what the built-in paywall does. A purchase started with a bare SKU carries the `sku` alone.
+
+A paywall you draw yourself can send the same events, so that it shows up in the same reports:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-analytics-event,indent=0]
+----
+
+==== Segmenting by experiment
+
+Because the paywall and purchase events carry `experiment` and `variant`, any analytics report can be split by variant: how many customers of each variant opened the paywall, picked the annual package, or bought. `experiment_exposure` is sent once for each experiment and variant an install is given, which gives every variant its denominator even for a customer who never opens a paywall.
+
+==== Purchases by invited users
+
+The service knows which install belongs to which customer, so a purchase by a customer who arrived through an invite is attributed to the inviter. The revenue it reports for that invite is verified: it's the amount of the purchase the service validated with the store, and not a value the app claimed. You don't call `Invites.conversion` for a purchase. Keep it for the conversions the service can't see, such as finishing a tutorial.
+
+When the user logs in with `logIn`, the attribution follows the customer to the account. The app user id of commerce and the user id of analytics stay separate, and logging in here doesn't change the one you set with `Analytics.setUserId`.
+
+==== Referral rewards
+
+A referral reward gives something to the inviter, the invited user, or both. You configure it in the console, where a reward grants either an entitlement or an amount of a virtual currency.
+
+The service grants the reward, so there's nothing to deliver from the app. An entitlement reward answers `isEntitled` like a purchased one, and a currency reward is part of the balance. When an invite is matched to the install, commerce asks the service for the customer again in the background, and the customer information listener hears about the reward. `getReferralRewards()` lists what was granted and why, for example to thank the user:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CommerceSnippets.java[tag=commerce-referral-rewards,indent=0]
+----
+
+A reward has an entitlement id or a currency code, an amount for a currency, an expiry date that is 0 when it doesn't expire, and the reason the service recorded. The list is empty for a customer with no rewards.
+
 === Subscriber attributes and virtual currency
 
 ==== Attributes

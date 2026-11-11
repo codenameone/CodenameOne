@@ -482,6 +482,69 @@ public final class Analytics {
         }
     }
 
+    // The install-attribution hook. One observer, held here rather than in
+    // the invite package so that another part of the framework can listen
+    // without naming a class of that package: the builders read a reference
+    // to it as "this application uses invites" and add what invites need.
+    private static Runnable attributionObserver;
+    private static boolean attributionKnown;
+    private static boolean attributionObserverTold;
+
+    /// Framework hook: registers the observer that is told when the invite
+    /// attribution of this install is known. It runs at most once per
+    /// registration -- at once when the attribution is already known, and
+    /// otherwise when it arrives. This is separate from the application's own
+    /// `InviteListener`, which it neither replaces nor delays.
+    ///
+    /// #### Parameters
+    ///
+    /// - `observer`: the observer, or null to remove it
+    ///
+    /// #### Deprecated
+    ///
+    /// Internal framework hook; an application listens with an
+    /// `InviteListener`.
+    public static void setAttributionObserver(Runnable observer) {
+        attributionObserver = observer;
+        attributionObserverTold = false;
+        if (attributionKnown) {
+            tellAttributionObserver();
+        }
+    }
+
+    /// Framework hook: called by the invite support when it knows whether
+    /// this install has an invite attribution. Tells the observer registered
+    /// with [#setAttributionObserver(Runnable)] the first time the answer is
+    /// yes. Never throws into the caller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `available`: true when the install has an attribution, false when
+    ///   it was forgotten
+    ///
+    /// #### Deprecated
+    ///
+    /// Internal framework hook; not intended for app use.
+    public static void attributionAvailable(boolean available) {
+        attributionKnown = available;
+        if (available) {
+            tellAttributionObserver();
+        }
+    }
+
+    private static void tellAttributionObserver() {
+        Runnable observer = attributionObserver;
+        if (observer == null || attributionObserverTold) {
+            return;
+        }
+        attributionObserverTold = true;
+        try {
+            observer.run();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     /// The pseudonymous client id, generating and persisting one on first use.
     /// Not derived from any hardware identifier.
     ///

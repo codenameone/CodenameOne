@@ -118,6 +118,9 @@ public abstract class Purchase {
         // provider is registered, and it never throws into the caller.
         java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
         params.put("sku", sku);
+        // The offering, package and experiment of a purchase that
+        // CommerceManager.purchase(CommercePackage) started; used up here.
+        CommerceManager.addPurchaseContext(sku, params, true);
         Analytics.autoEvent("purchase", "commerce", params);
 
     }
@@ -417,6 +420,7 @@ public abstract class Purchase {
     private static void fireAnalyticsPurchaseInitiated(String sku) {
         java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
         params.put("sku", sku);
+        CommerceManager.addPurchaseContext(sku, params, false);
         Analytics.autoEvent("purchase_initiated", "commerce", params);
     }
 

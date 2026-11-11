@@ -116,6 +116,30 @@ class CustomerCenterTest extends CommerceTestBase {
     }
 
     @FormTest
+    void theCenterReportsWhatTheCustomerDoesThere() throws Exception {
+        AnalyticsRecorder recorder = analyticsOn();
+        Map config = JSONParser.parseJSON("{\"paths\":[\"SUPPORT\"]}");
+        CustomerCenter.perform(new CustomerCenter.Row(CustomerCenter.PATH_SUPPORT, "Support", "pro_monthly"),
+                config, null, null);
+        assertEquals(1, recorder.count("customer_center_action"));
+        assertEquals("commerce", recorder.last("customer_center_action").getCategory());
+        assertEquals("SUPPORT", recorder.param("customer_center_action", "action"));
+        assertEquals("pro_monthly", recorder.param("customer_center_action", "product"));
+
+        mockFailure("/web-portal");
+        Map reason = JSONParser.parseJSON("{\"id\":\"price\"}");
+        CustomerCenter.reasonChosen(config, reason, null, "pro_monthly");
+        assertEquals(1, recorder.count("subscription_cancel_reason"));
+        assertEquals("price", recorder.param("subscription_cancel_reason", "reason"));
+        assertEquals("pro_monthly", recorder.param("subscription_cancel_reason", "product"));
+
+        mock("/customer-center", CONFIG);
+        CustomerCenter.show();
+        flushSerialCalls();
+        assertEquals(1, recorder.count("customer_center_view"));
+    }
+
+    @FormTest
     void theConfigurationComesFromTheCloudWhenItAccepts() {
         mock("/customer-center", CONFIG);
         assertNotNull(CommerceManager.getInstance().getCustomerCenterConfiguration());

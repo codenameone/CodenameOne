@@ -123,6 +123,7 @@ public final class CustomerCenter {
             }
         });
         Map config = fetched[0] == null ? defaultConfiguration() : fetched[0];
+        CommerceManager.getInstance().analyticsEvent("customer_center_view", null, null, null, null, null);
         createForm(config, CommerceManager.getInstance().getCustomerInfo(),
                 Purchase.getInAppPurchase(), d.getCurrent()).show();
     }
@@ -225,7 +226,9 @@ public final class CustomerCenter {
         return form;
     }
 
-    private static void perform(Row row, Map config, Purchase store, Form form) {
+    static void perform(Row row, Map config, Purchase store, Form form) {
+        CommerceManager.getInstance().analyticsEvent("customer_center_action", null, null, row.sku,
+                "action", row.path);
         if (PATH_MANAGE.equals(row.path)) {
             manage(store, row.sku);
         } else if (PATH_RESTORE.equals(row.path)) {
@@ -311,9 +314,10 @@ public final class CustomerCenter {
         picker.show();
     }
 
-    private static void reasonChosen(Map config, Map reason, Purchase store, String sku) {
+    static void reasonChosen(Map config, Map reason, Purchase store, String sku) {
         CommerceManager cm = CommerceManager.getInstance();
         cm.logEvent("CANCEL_REASON", null, null, null, text(reason.get("id")));
+        cm.analyticsEvent("subscription_cancel_reason", null, null, sku, "reason", text(reason.get("id")));
         Object offer = reason.get("offer");
         if (offer instanceof Map) {
             String productId = text(((Map) offer).get("productId"));

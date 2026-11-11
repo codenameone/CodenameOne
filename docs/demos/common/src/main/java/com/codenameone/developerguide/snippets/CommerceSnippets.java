@@ -28,11 +28,13 @@ import com.codename1.payment.CustomerInfo;
 import com.codename1.payment.EntitlementInfo;
 import com.codename1.payment.Offering;
 import com.codename1.payment.Offerings;
+import com.codename1.payment.ReferralReward;
 import com.codename1.payment.center.CustomerCenter;
 import com.codename1.payment.paywall.Paywall;
 import com.codename1.payment.paywall.PaywallListener;
 import com.codename1.payment.paywall.PaywallView;
 import com.codename1.ui.CN;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
@@ -350,6 +352,45 @@ public class CommerceSnippets {
             }
         }).start();
         // end::commerce-management-url[]
+    }
+
+    /** Report the events of a paywall the app draws itself. */
+    public void analyticsEvents() {
+        // tag::commerce-analytics-event[]
+        CommerceManager cm = CommerceManager.getInstance();
+        new Thread(() -> {
+            Offering offering = cm.getOfferings("onboarding").getCurrent();
+            if (offering == null || offering.getAnnual() == null) {
+                return;
+            }
+            CommercePackage annual = offering.getAnnual();
+            CN.callSerially(() -> {
+                // The names the built-in paywall uses, so the reports read the same.
+                cm.analyticsEvent("paywall_view", offering.getId(), null, null, null, null);
+                cm.analyticsEvent("paywall_package_selected", offering.getId(),
+                        annual.getId(), annual.getProductId(), null, null);
+                // purchase(CommercePackage) labels the purchase events by itself.
+                cm.purchase(annual);
+            });
+        }).start();
+        // end::commerce-analytics-event[]
+    }
+
+    /** List the rewards a customer earned by inviting. */
+    public void referralRewards() {
+        // tag::commerce-referral-rewards[]
+        CustomerInfo info = CommerceManager.getInstance().getCustomerInfo();
+        for (ReferralReward reward : info.getReferralRewards()) {
+            String earned = reward.isCurrency()
+                    ? reward.getAmount() + " " + reward.getCurrencyCode()
+                    : reward.getEntitlementId();
+            Dialog.show("Thank you", "Your invite earned you " + earned, "OK", null);
+        }
+        // The reward itself is already in effect: an entitlement answers
+        // isEntitled(), and a currency is part of the balance.
+        boolean pro = info.isEntitled("pro");
+        long coins = info.getCurrencyBalance("coins");
+        // end::commerce-referral-rewards[]
     }
 
     /** Point the simulator at a service. */

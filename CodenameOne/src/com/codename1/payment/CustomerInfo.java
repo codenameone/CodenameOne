@@ -42,6 +42,7 @@ public final class CustomerInfo {
     private final List<String> activeSubscriptions = new ArrayList<String>();
     private final Map<String, String> attributes = new HashMap<String, String>();
     private final Map<String, Long> currencies = new HashMap<String, Long>();
+    private final List<ReferralReward> referralRewards = new ArrayList<ReferralReward>();
 
     /// Builds a customer from the parsed JSON object of the service's
     /// customer payload.
@@ -90,6 +91,14 @@ public final class CustomerInfo {
                 Map.Entry e = (Map.Entry) o;
                 if (e.getKey() != null) {
                     currencies.put(String.valueOf(e.getKey()), Long.valueOf(asLong(e.getValue())));
+                }
+            }
+        }
+        Object rewards = m.get("rewards");
+        if (rewards instanceof List) {
+            for (Object o : (List) rewards) {
+                if (o instanceof Map) {
+                    referralRewards.add(new ReferralReward((Map) o));
                 }
             }
         }
@@ -205,6 +214,20 @@ public final class CustomerInfo {
         return new HashMap<String, Long>(currencies);
     }
 
+    /// The rewards the service granted this customer for referrals: an
+    /// entitlement or an amount of a virtual currency each, as configured in
+    /// the console. A reward that is an entitlement is also among
+    /// [#getEntitlements()], and a currency reward is already part of
+    /// [#getCurrencyBalance(String)]; this list says where they came from.
+    ///
+    /// #### Returns
+    ///
+    /// a new list, which the caller may change; empty when the service
+    /// reported no reward
+    public List<ReferralReward> getReferralRewards() {
+        return new ArrayList<ReferralReward>(referralRewards);
+    }
+
     /// This customer as the JSON object it was built from, for storage.
     /// Passing the result to the constructor gives an equal customer.
     ///
@@ -225,6 +248,13 @@ public final class CustomerInfo {
         out.put("activeSubscriptions", new ArrayList<String>(activeSubscriptions));
         out.put("attributes", new HashMap<String, Object>(attributes));
         out.put("currencies", new HashMap<String, Object>(currencies));
+        if (!referralRewards.isEmpty()) {
+            List<Object> rewards = new ArrayList<Object>();
+            for (ReferralReward r : referralRewards) {
+                rewards.add(r.toMap());
+            }
+            out.put("rewards", rewards);
+        }
         return out;
     }
 
