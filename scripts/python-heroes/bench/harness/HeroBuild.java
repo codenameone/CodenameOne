@@ -65,7 +65,17 @@ public final class HeroBuild {
         new PythonPackageResolver(log).resolve(requirements, common);
         File classes = new File(work, "classes");
         classes.mkdirs();
-        new PythonProjectBuilder(python, new File(work, "gen"), "main", log).packageData(classes).run();
+        // The class path this was started with has the Python runtime on it, as a
+        // project's compile class path does. Without it the transpiler cannot tell which
+        // names the runtime calls by itself, and leaves no unreached function out.
+        List<File> classPath = new ArrayList<File>();
+        for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
+            if (!entry.isEmpty() && new File(entry).exists()) {
+                classPath.add(new File(entry));
+            }
+        }
+        new PythonProjectBuilder(python, new File(work, "gen"), "main", log).classPath(classPath)
+                .packageData(classes).run();
     }
 
     private static void copyTree(java.nio.file.Path from, java.nio.file.Path to) throws java.io.IOException {
