@@ -39,6 +39,8 @@ final class XmlScan {
         PyModule m = new PyModule("_cn1xml", new String[0]);
         m.setAttr("scan_start", PyBuiltin.positional("scan_start",
                 a -> scanStart(Typed.asStr(a[0]), (int) Typed.toLong(a[1]))));
+        m.setAttr("run", PyBuiltin.positional("run",
+                a -> Long.valueOf(ExpatRun.run(a[0], Typed.asStr(a[1]), (int) Typed.toLong(a[2])))));
         m.setAttr("iter", PyBuiltin.positional("iter", a -> new ElementIter(a[0], a[1])));
         m.setAttr("find", PyBuiltin.positional("find", a -> children(a[0], a[1], false)));
         m.setAttr("findall", PyBuiltin.positional("findall", a -> children(a[0], a[1], true)));

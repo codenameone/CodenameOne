@@ -423,99 +423,112 @@ class XMLParserType:
     # -- the tokenizer -------------------------------------------------
 
     def _run(self, buf, pos, final):
+        # The common tokens run in Java (_cn1xml.run); it stops before any
+        # other, which _step handles exactly as the full tokenizer would.
         n = len(buf)
         while pos < n:
-            lt = buf.find("<", pos)
-            if lt != pos:
-                end = n if lt < 0 else lt
-                if lt < 0 and not final:
-                    amp = buf.rfind("&", pos, end)
-                    if amp >= 0 and buf.find(";", amp, end) < 0:
-                        end = amp
-                    if end == pos:
-                        return pos
-                self._ev = pos
-                self._text_run(buf, pos, end)
-                pos = end
-                continue
+            pos = _cn1xml.run(self, buf, pos)
+            if pos >= n:
+                break
+            q = self._step(buf, pos, final)
+            if q == pos:
+                return pos
+            pos = q
+        return pos
+
+    # One token at pos; returns pos unchanged to wait for more input.
+    def _step(self, buf, pos, final):
+        n = len(buf)
+        lt = buf.find("<", pos)
+        if lt != pos:
+            end = n if lt < 0 else lt
+            if lt < 0 and not final:
+                amp = buf.rfind("&", pos, end)
+                if amp >= 0 and buf.find(";", amp, end) < 0:
+                    end = amp
+                if end == pos:
+                    return pos
             self._ev = pos
-            c = buf[pos + 1] if pos + 1 < n else ""
-            if c == "/":
-                f = _cn1xml.scan_end(buf, pos)
-                if f is not None:
-                    self._end_tag(f[1], pos)
-                    pos = f[0]
-                    continue
-                m = _END.match(buf, pos)
-                if m is None:
-                    if not final and buf.find(">", pos) < 0:
-                        return pos
-                    self._raise(4, pos + 2)
-                self._end_tag(m.group(1), pos)
-                pos = m.end()
-                continue
-            if c == "?":
-                e = buf.find("?>", pos + 2)
+            self._text_run(buf, pos, end)
+            pos = end
+            return pos
+        self._ev = pos
+        c = buf[pos + 1] if pos + 1 < n else ""
+        if c == "/":
+            f = _cn1xml.scan_end(buf, pos)
+            if f is not None:
+                self._end_tag(f[1], pos)
+                pos = f[0]
+                return pos
+            m = _END.match(buf, pos)
+            if m is None:
+                if not final and buf.find(">", pos) < 0:
+                    return pos
+                self._raise(4, pos + 2)
+            self._end_tag(m.group(1), pos)
+            pos = m.end()
+            return pos
+        if c == "?":
+            e = buf.find("?>", pos + 2)
+            if e < 0:
+                if not final:
+                    return pos
+                self._raise(5, pos)
+            self._pi(buf, pos, e)
+            pos = e + 2
+            return pos
+        if c == "!":
+            if buf.startswith("<!--", pos):
+                e = buf.find("-->", pos + 4)
                 if e < 0:
                     if not final:
                         return pos
                     self._raise(5, pos)
-                self._pi(buf, pos, e)
-                pos = e + 2
-                continue
-            if c == "!":
-                if buf.startswith("<!--", pos):
-                    e = buf.find("-->", pos + 4)
-                    if e < 0:
-                        if not final:
-                            return pos
-                        self._raise(5, pos)
-                    body = buf[pos + 4:e]
-                    bad = body.find("--")
-                    if bad >= 0 or body.endswith("-"):
-                        self._raise(4, pos + 4 + (bad + 2 if bad >= 0 else len(body) + 1))
-                    self._flush()
-                    h = self.CommentHandler
-                    if h is not None:
-                        h(body)
-                    pos = e + 3
-                    continue
-                if buf.startswith("<![CDATA[", pos):
-                    e = buf.find("]]>", pos + 9)
-                    if e < 0:
-                        if not final:
-                            return pos
-                        self._raise(20, pos)
-                    if self._state != 1:
-                        self._raise(4, pos)
-                    self._cdata(buf[pos + 9:e])
-                    pos = e + 3
-                    continue
-                if buf.startswith("<!DOCTYPE", pos):
-                    r = self._doctype(buf, pos, final)
-                    if r < 0:
+                body = buf[pos + 4:e]
+                bad = body.find("--")
+                if bad >= 0 or body.endswith("-"):
+                    self._raise(4, pos + 4 + (bad + 2 if bad >= 0 else len(body) + 1))
+                self._flush()
+                h = self.CommentHandler
+                if h is not None:
+                    h(body)
+                pos = e + 3
+                return pos
+            if buf.startswith("<![CDATA[", pos):
+                e = buf.find("]]>", pos + 9)
+                if e < 0:
+                    if not final:
                         return pos
-                    pos = r
-                    continue
-                if not final and n - pos < 9:
+                    self._raise(20, pos)
+                if self._state != 1:
+                    self._raise(4, pos)
+                self._cdata(buf[pos + 9:e])
+                pos = e + 3
+                return pos
+            if buf.startswith("<!DOCTYPE", pos):
+                r = self._doctype(buf, pos, final)
+                if r < 0:
                     return pos
-                self._raise(4 if self._state == 1 else 2, pos)
-            f = _cn1xml.scan_start(buf, pos)
-            if f is not None:
-                fa = f[2]
-                self._start_tail(f[1], fa[0::2], fa[1::2], pos, f[3])
-                pos = f[0]
-                continue
-            m = _START.match(buf, pos)
-            if m is None:
-                if not final:
-                    return pos
-                if buf.find(">", pos) < 0:
-                    self._raise(5, pos)
-                self._raise(4, pos + 1)
-            self._start_tag(m, pos)
-            pos = m.end()
-        return pos
+                pos = r
+                return pos
+            if not final and n - pos < 9:
+                return pos
+            self._raise(4 if self._state == 1 else 2, pos)
+        f = _cn1xml.scan_start(buf, pos)
+        if f is not None:
+            fa = f[2]
+            self._start_tail(f[1], fa[0::2], fa[1::2], pos, f[3])
+            pos = f[0]
+            return pos
+        m = _START.match(buf, pos)
+        if m is None:
+            if not final:
+                return pos
+            if buf.find(">", pos) < 0:
+                self._raise(5, pos)
+            self._raise(4, pos + 1)
+        self._start_tag(m, pos)
+        return m.end()
 
     def _text_run(self, buf, s, e):
         if self._state != 1:
