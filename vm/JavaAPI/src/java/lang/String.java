@@ -45,7 +45,9 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
     };
     
-    private static ArrayList<String> str = new ArrayList<String>();
+    // Keyed by value: a list searched from the start made every intern() cost the
+    // size of the pool, and a program interning its names was quadratic in them.
+    private static java.util.HashMap<String, String> str = new java.util.HashMap<String, String>();
 
     // Compact-string storage: ONE backing reference holding EITHER a char[] (general UTF-16, the
     // original 2-byte representation -- a Unicode charAt is a direct 16-bit read, NO decode) OR a
@@ -953,11 +955,11 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         // during another thread's traversal). The JDK contract requires s.intern()==t.intern()
         // whenever s.equals(t).
         synchronized(str) {
-            int off = str.indexOf(this);
-            if(off > -1) {
-                return str.get(off);
+            String known = str.get(this);
+            if(known != null) {
+                return known;
             }
-            str.add(this);
+            str.put(this, this);
             return this;
         }
     }
