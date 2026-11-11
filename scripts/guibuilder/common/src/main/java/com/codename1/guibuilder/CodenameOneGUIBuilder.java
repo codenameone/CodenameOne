@@ -8533,6 +8533,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         final String[] before = new String[1];
         final boolean[] committedEdit = new boolean[1];
         final boolean[] rolledBack = new boolean[1];
+        final Element[] selectedBefore = new Element[1];
+        final boolean[] modifiedBefore = new boolean[1];
         final int rebuildsBefore = canvasRebuilds;
         String error = unattended(() -> {
             if (document == null) return "No active GUI document; open a form first";
@@ -8545,7 +8547,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 return "The developer is editing or dragging in the GUI Builder; try again when they finish";
             }
             before[0] = document.toXml();
-            final Element selectedBefore = document.selected();
+            selectedBefore[0] = document.selected();
+            modifiedBefore[0] = document.isModified();
             document.beginTransaction();
             boolean committed = false;
             try {
@@ -8564,7 +8567,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     // which would replace every element object while the canvas, the selection and
                     // the inspector still hold the old ones.
                     document.endTransaction();
-                    document.select(selectedBefore);
                 } else {
                     document.abortTransaction();
                     rolledBack[0] = true;
@@ -8574,6 +8576,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // An abandoned edit restores the document by re-parsing it, which can serialize attributes in
         // another order; only a committed edit can have changed anything.
         boolean changed = committedEdit[0] && document != null && !before[0].equals(document.toXml());
+        if (document != null && before[0] != null && !changed && !rolledBack[0]) {
+            // Nothing changed -- refused up front, or committed with the values already there. The
+            // tools select their target as they go, and every attribute write marks the document
+            // modified; put both back, or the inspector acts on a component the canvas does not show
+            // as selected and an untouched form asks to be saved.
+            document.select(selectedBefore[0]);
+            document.restoreModified(modifiedBefore[0]);
+        }
         // Rebuilt only when the form changed, or when a step that measured the canvas rebuilt it for
         // an edit that was then abandoned; otherwise the canvas, selection and status are left alone.
         // A rollback re-parses the document into new element objects, so the canvas has to be rebuilt
@@ -8626,6 +8636,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (value instanceof Number) {
             double number = ((Number) value).doubleValue();
             if (number != Math.floor(number)) throw new IllegalArgumentException(key + " must be a whole number");
+            // A cast saturates rather than failing, and a saturated span made the range checks overflow.
+            if (number > Integer.MAX_VALUE || number < Integer.MIN_VALUE) {
+                throw new IllegalArgumentException(key + " is out of range");
+            }
             return Integer.valueOf((int) number);
         }
         Integer parsed = parseInteger(String.valueOf(value).trim());
@@ -9122,8 +9136,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (r < 0 || r >= rows) return "row must be from 0 to " + (rows - 1) + "; grow the table with guibuilder_set_layout";
         if (c < 0 || c >= columns) return "column must be from 0 to " + (columns - 1)
                 + "; grow the table with guibuilder_set_layout";
-        if (rs < 1 || r + rs > rows) return "rowSpan must be from 1 to " + (rows - r);
-        if (cs < 1 || c + cs > columns) return "columnSpan must be from 1 to " + (columns - c);
+        // Written against the room left rather than as r + rs, which overflows for a huge span.
+        if (rs < 1 || rs > rows - r) return "rowSpan must be from 1 to " + (rows - r);
+        if (cs < 1 || cs > columns - c) return "columnSpan must be from 1 to " + (columns - c);
         if (!rectangleFree(parent, element, null, r, c, rs, cs)) {
             return "That cell range overlaps another component in " + mcpName(parent);
         }

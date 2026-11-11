@@ -280,6 +280,47 @@ class McpEditingToolsTest {
     }
 
     @Test
+    void anEditThatChangesNothingLeavesTheFormAsItWas() throws Exception {
+        // Freshly opened and never saved, so the document's modified flag is all isModified() has.
+        CodenameOneGUIBuilder builder = builder();
+        assertFalse(builder.documentForTest().isModified());
+        Map<String, Object> same = call("guibuilder_set_properties", "{\"component\":\"EditForm\",\"properties\":{\"title\":\"Edit\"}}");
+        assertEquals(Boolean.TRUE, same.get("success"), String.valueOf(same.get("error")));
+        assertFalse(builder.documentForTest().isModified(), "writing the value already there is not an edit");
+        Map<String, Object> badAxis = call("guibuilder_set_layout", "{\"container\":\"EditForm\",\"axis\":\"Z\"}");
+        assertEquals(Boolean.FALSE, badAxis.get("success"));
+        assertFalse(builder.documentForTest().isModified(), "a refusal after rewriting the same layout is not an edit");
+        assertEquals(Boolean.TRUE, call("guibuilder_create_form", "{\"className\":\"com.example.Untouched\"}").get("success"),
+                "an untouched form must not block opening another");
+
+        // The person has a component selected; an agent's no-op elsewhere must not move it.
+        call("guibuilder_add_component", "{\"type\":\"Label\",\"name\":\"mine\"}");
+        call("guibuilder_select", "{\"component\":\"mine\"}");
+        Map<String, Object> noop = call("guibuilder_set_properties", "{\"component\":\"Untouched\",\"properties\":{\"title\":\"Untouched\"}}");
+        assertEquals(Boolean.TRUE, noop.get("success"), String.valueOf(noop.get("error")));
+        assertEquals("mine", builder.documentForTest().selected().getAttribute("name"),
+                "the inspector acts on the document's selection, so a no-op must leave it where the person put it");
+    }
+
+    @Test
+    void hugeSpansAreRefusedRatherThanOverflowing() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"grid\","
+                + "\"layout\":{\"layout\":\"TableLayout\",\"rows\":2,\"columns\":2}}");
+        call("guibuilder_add_component", "{\"type\":\"Label\",\"name\":\"cell\",\"parent\":\"grid\"}");
+        // 1.0e10 rather than 1e10: the MCP server parses arguments with longs on, and JSONParser then
+        // drops an integer written with an exponent, so 1e10 never reaches the tool at all.
+        for (String span : new String[]{"2147483647", "1.0e10", "99999999999", "\"99999999999\""}) {
+            Map<String, Object> result = call("guibuilder_set_constraint", "{\"component\":\"cell\",\"row\":1,\"rowSpan\":" + span + "}");
+            assertEquals(Boolean.FALSE, result.get("success"), "rowSpan " + span + " must be refused");
+            Map<String, Object> columns = call("guibuilder_set_constraint", "{\"component\":\"cell\",\"column\":1,\"columnSpan\":" + span + "}");
+            assertEquals(Boolean.FALSE, columns.get("success"), "columnSpan " + span + " must be refused");
+        }
+        assertNull(element(builder, "cell").getAttribute("tableVerticalSpan"));
+        assertNull(element(builder, "cell").getAttribute("tableHorizontalSpan"));
+    }
+
+    @Test
     void tableCellsCannotOverlap() throws Exception {
         CodenameOneGUIBuilder builder = builder();
         call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"grid\","

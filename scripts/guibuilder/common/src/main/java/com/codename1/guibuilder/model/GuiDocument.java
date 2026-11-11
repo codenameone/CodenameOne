@@ -81,6 +81,19 @@ public final class GuiDocument {
         return !savedXml.equals(xmlOnly());
     }
 
+    /**
+     * Puts the modified state back after an edit that turned out to change nothing.
+     *
+     * <p>Writing an attribute marks the document modified even when the value is the one it already
+     * had, and before the first save that flag is all isModified() has to go on -- so a no-op left a
+     * form that nobody edited asking to be saved, and opening another form refused.
+     *
+     * @param wasModified what isModified() answered before the edit
+     */
+    public void restoreModified(boolean wasModified) {
+        modified = wasModified;
+    }
+
     public void markSaved() {
         modified = false;
         savedXml = xmlOnly();

@@ -33,9 +33,10 @@ import java.util.Map;
  *
  * <p>This is what the inspector's Properties tab offers, written down once so that a caller who
  * cannot see the inspector -- an MCP client -- is held to exactly the same set and the same
- * ranges. The inspector builds its fields by hand; {@code ComponentCatalogTest} opens it for
- * every type and fails when the two disagree, so a field added there without an entry here (or
- * the reverse) cannot ship.
+ * ranges. The inspector builds its fields by hand;
+ * {@code McpEditingToolsTest.theCatalogOffersExactlyWhatTheInspectorOffers} (in the javase
+ * module) opens it for every palette type and the Form root and fails when the two disagree, so a
+ * field added there without an entry here (or the reverse) cannot ship.
  *
  * <p>Layout, constraint, name, event and binding attributes are deliberately absent: each has a
  * dedicated operation with its own validation (border regions swap, table cells must stay free,
