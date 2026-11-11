@@ -2004,6 +2004,33 @@ public final class Py {
         return index(key);
     }
 
+    /// No names: the parameter table of a function that takes none.
+    public static final String[] NO_NAMES = new String[0];
+
+    /// The names in `joined`, one a line: how generated code writes a table
+    /// of names down as one constant.
+    public static String[] names(String joined) {
+        int n = 1;
+        for (int i = 0; i < joined.length(); i++) {
+            if (joined.charAt(i) == '\n') {
+                n++;
+            }
+        }
+        String[] out = new String[n];
+        int at = 0;
+        for (int i = 0; i < n; i++) {
+            int end = joined.indexOf('\n', at);
+            if (end < 0) {
+                end = joined.length();
+            }
+            // Interned, as the literals they stand for were: names are
+            // compared by identity before they are compared by value.
+            out[i] = joined.substring(at, end).intern();
+            at = end + 1;
+        }
+        return out;
+    }
+
     // ---- iteration -------------------------------------------------------
 
     public static PyObject iter(Object o) {

@@ -409,6 +409,23 @@ public final class PyFunction extends PyObject {
         return fn;
     }
 
+    /// The annotations as the program [Annotations#build] runs, and the
+    /// module whose names it reads: what most functions have in place of a
+    /// thunk.
+    private String annotationTable;
+    private PyModule annotationModule;
+
+    /// As [#meta(Object, Object, Body0)], the annotations a table.
+    public static Object meta(Object fn, Object doc, PyModule module, String annotations) {
+        if (fn instanceof PyFunction) {
+            PyFunction f = (PyFunction) fn;
+            f.doc = doc;
+            f.annotationTable = annotations;
+            f.annotationModule = module;
+        }
+        return fn;
+    }
+
     /// One annotation's value: `value`'s result, or `fallback` when
     /// evaluating it raises (an annotation the runtime cannot express, such
     /// as a generic alias it does not model, never fails the definition).
@@ -499,8 +516,9 @@ public final class PyFunction extends PyObject {
             }
             case "__annotations__":
                 PyDict d = new PyDict();
-                if (annotationThunk != null) {
-                    Object made = annotationThunk.run();
+                if (annotationThunk != null || annotationTable != null) {
+                    Object made = annotationTable != null
+                            ? Annotations.build(annotationModule, annotationTable) : annotationThunk.run();
                     Object[] kv = made instanceof Object[] ? (Object[]) made : Py.NO_ARGS;
                     for (int i = 0; i < kv.length; i += 2) {
                         d.setItem(kv[i], kv[i + 1]);

@@ -211,11 +211,13 @@ final class XmlScan {
     /// a processing instruction, any error), for the Python parser to
     /// handle -- and to report exactly as it does.
     private static final AttrSite CHILDREN = new AttrSite("_children");
-    private static final AttrSite ATTRIB = new AttrSite("attrib");
+    private static final StoreSite SET_CHILDREN = new StoreSite("_children");
+    private static final StoreSite SET_ATTRIB = new StoreSite("attrib");
     /// Slots in a builder's tag cache, a power of two.
     private static final int TAG_CACHE = 64;
 
     private static final AttrSite TAG = new AttrSite("tag");
+    private static final StoreSite SET_TAG = new StoreSite("tag");
 
     /// Whether ElementPath would read `path` as one child tag: `tag` or
     /// `{uri}tag`, with none of the characters a path expression uses.
@@ -822,9 +824,9 @@ final class XmlScan {
             Object el;
             if (direct) {
                 el = ((PyType) factory).newInstance();
-                TAG.set(el, tag);
-                ATTRIB.set(el, attrib);
-                CHILDREN.set(el, new PyList());
+                SET_TAG.set(el, tag);
+                SET_ATTRIB.set(el, attrib);
+                SET_CHILDREN.set(el, new PyList());
             } else {
                 el = Py.call(factory, tag, attrib);
             }

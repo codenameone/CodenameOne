@@ -122,6 +122,7 @@ public final class Emitter {
     private final List<String> slotNames = new ArrayList<String>();
     private final Map<String, Integer> slotIndex = new HashMap<String, Integer>();
     private final StringBuilder fields = new StringBuilder(); //NOPMD AvoidStringBufferField - the generator's output
+    private final Map<String, String> paramTables = new HashMap<String, String>();
     private int uid;
     private final Scope moduleScope;
 
@@ -395,6 +396,7 @@ public final class Emitter {
                     .append(javaString(e.getKey())).append(");\n");
         }
         out.append(fields);
+        siteTables(out);
         out.append(layoutCode());
         if (typedEmit != null) {
             out.append(typedEmit.members());
@@ -406,11 +408,21 @@ public final class Emitter {
                 .append(javaString(moduleName)).append("));\n    }\n\n");
         out.append("    /// Runs the module body as module `runName` (`__main__` for the entry module).\n");
         out.append("    public static PyModule exec(String runName) {\n");
-        out.append("        M = PyModule.begin(runName, new String[] {");
+        StringBuilder slots = new StringBuilder();
         for (int i = 0; i < slotNames.size(); i++) {
-            out.append(i == 0 ? "" : ", ").append(javaString(slotNames.get(i)));
+            slots.append(i == 0 ? "" : "\n").append(slotNames.get(i));
         }
-        out.append("});\n");
+        if (!slotNames.isEmpty() && slots.length() <= TABLE_CHARS) {
+            // One constant, not a store a name: see `tabled`.
+            out.append("        M = PyModule.begin(runName, Py.names(").append(javaString(slots.toString()))
+                    .append("));\n");
+        } else {
+            out.append("        M = PyModule.begin(runName, new String[] {");
+            for (int i = 0; i < slotNames.size(); i++) {
+                out.append(i == 0 ? "" : ", ").append(javaString(slotNames.get(i)));
+            }
+            out.append("});\n");
+        }
         out.append("        G = M.slots;\n");
         out.append("        G[0] = Py.str(runName);\n");
         // __file__ names the source under the read-only package data root,
@@ -790,7 +802,15 @@ public final class Emitter {
             augAssign((AugAssign) s, out, ind);
         } else if (s instanceof AnnAssign) {
             AnnAssign a = (AnnAssign) s;
-            if (sc.kind == Scope.Kind.CLASS && a.target instanceof Name) {
+            StringBuilder entry = new StringBuilder();
+            if (sc.kind == Scope.Kind.CLASS && a.target instanceof Name
+                    && annotationEntry(entry, ((Name) a.target).id, a.annotation)) {
+                // Evaluated here, in order, as the statement is -- by the
+                // table's evaluator: a model class is a hundred of these.
+                indent(out, ind);
+                out.append("Annotations.set(").append(sc.classVar).append(", M, ")
+                        .append(javaString(entry.toString())).append(");\n");
+            } else if (sc.kind == Scope.Kind.CLASS && a.target instanceof Name) {
                 String v = fresh("an");
                 indent(out, ind);
                 out.append("Object ").append(v).append(";\n");
@@ -961,6 +981,14 @@ public final class Emitter {
         // fall back to its source form; on ParparVM every lambda is a class, and those
         // thunks were a third of the classes of a large application.
         String thunk = "null";
+        String table = keys.isEmpty() ? null : annotationTable(all, f.returns);
+        if (table != null) {
+            // The usual annotation -- names, attributes, subscripts, unions --
+            // is written down, not compiled: what reads `__annotations__` is
+            // rare, and a thunk per function was a class and a method each
+            // for code that almost never runs.
+            return "PyFunction.meta(" + fn + ", " + doc + ", M, " + javaString(table) + ")";
+        }
         if (!keys.isEmpty()) {
             String r = fresh("ann");
             StringBuilder body = new StringBuilder("() -> { final Object[] ").append(r)
@@ -992,6 +1020,104 @@ public final class Emitter {
         String e = fresh("ae");
         return "try { " + target + " = " + expr(a) + "; } catch (PyException " + e + ") { "
                 + target + " = " + annotationValue(a) + "; }";
+    }
+
+    /// The annotations of a function as the program `Annotations.build`
+    /// runs on first read, or null when one of them is more than that
+    /// program expresses (a call, a lambda) and has to be compiled.
+    ///
+    /// One instruction a line. `=name` opens the annotation of a parameter
+    /// (`return` for the result) and `!text` gives what it is when
+    /// evaluating it raises; the rest is its expression in postfix order.
+    private String annotationTable(List<Arg> all, Expr returns) {
+        StringBuilder sb = new StringBuilder();
+        for (Arg a : all) {
+            if (a.annotation != null && !annotationEntry(sb, a.name, a.annotation)) {
+                return null;
+            }
+        }
+        if (returns != null && !annotationEntry(sb, "return", returns)) {
+            return null;
+        }
+        return sb.toString();
+    }
+
+    private boolean annotationEntry(StringBuilder sb, String key, Expr a) {
+        sb.append('=').append(key).append('\n');
+        if (!(a instanceof Constant) && !evaluable(a)) {
+            // Not evaluated at all: its name, or None.
+            sb.append(a instanceof Name ? "c" + ((Name) a).id : "N").append('\n');
+            return true;
+        }
+        if (a instanceof Name) {
+            sb.append('!').append(((Name) a).id).append('\n');
+        }
+        return annotationCode(sb, a);
+    }
+
+    private boolean annotationCode(StringBuilder sb, Expr a) {
+        if (a instanceof Constant) {
+            Constant c = (Constant) a;
+            switch (c.kind) {
+                case NONE:
+                    sb.append("N\n");
+                    return true;
+                case TRUE:
+                    sb.append("T\n");
+                    return true;
+                case FALSE:
+                    sb.append("F\n");
+                    return true;
+                case ELLIPSIS:
+                    sb.append("E\n");
+                    return true;
+                case STR:
+                    if (c.text.indexOf('\n') >= 0) {
+                        return false;
+                    }
+                    sb.append('c').append(c.text).append('\n');
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        if (a instanceof Name) {
+            String id = ((Name) a).id;
+            sb.append(sc.resolve(id) == Scope.Binding.BUILTIN ? 'b' : 'g').append(id).append('\n');
+            return true;
+        }
+        if (a instanceof Attribute) {
+            if (!annotationCode(sb, ((Attribute) a).value)) {
+                return false;
+            }
+            sb.append('a').append(((Attribute) a).attr).append('\n');
+            return true;
+        }
+        if (a instanceof Subscript) {
+            if (!annotationCode(sb, ((Subscript) a).value) || !annotationCode(sb, ((Subscript) a).index)) {
+                return false;
+            }
+            sb.append("s\n");
+            return true;
+        }
+        if (a instanceof BinOp && "|".equals(((BinOp) a).op)) {
+            if (!annotationCode(sb, ((BinOp) a).left) || !annotationCode(sb, ((BinOp) a).right)) {
+                return false;
+            }
+            sb.append("|\n");
+            return true;
+        }
+        if (a instanceof TupleExpr || a instanceof ListExpr) {
+            List<Expr> elts = a instanceof TupleExpr ? ((TupleExpr) a).elts : ((ListExpr) a).elts;
+            for (Expr e : elts) {
+                if (e instanceof Starred || !annotationCode(sb, e)) {
+                    return false;
+                }
+            }
+            sb.append(a instanceof TupleExpr ? 't' : 'l').append(elts.size()).append('\n');
+            return true;
+        }
+        return false;
     }
 
     private boolean evaluable(Expr a) {
@@ -1099,10 +1225,10 @@ public final class Emitter {
                     o = fresh("o");
                     out.append("final Object ").append(o).append(" = ").append(recv).append(";\n");
                 }
-                fieldSet(a.attr, o, value, site(a.attr), out, ind);
+                fieldSet(a.attr, o, value, storeSite(a.attr), out, ind);
                 return;
             }
-            out.append(site(a.attr)).append(".set(").append(expr(a.value)).append(", ").append(value)
+            out.append(storeSite(a.attr)).append(".set(").append(expr(a.value)).append(", ").append(value)
                     .append(");\n");
         } else if (t instanceof Subscript) {
             Subscript sub = (Subscript) t;
@@ -1344,9 +1470,9 @@ public final class Emitter {
                 String nv = fresh("s");
                 out.append("final Object ").append(nv).append(" = ")
                         .append(augValue(op, fieldGet(at.attr, o, site(at.attr)), a)).append(";\n");
-                fieldSet(at.attr, o, nv, site(at.attr), out, ind);
+                fieldSet(at.attr, o, nv, storeSite(at.attr), out, ind);
             } else {
-                out.append(site(at.attr)).append(".set(").append(o).append(", ")
+                out.append(storeSite(at.attr)).append(".set(").append(o).append(", ")
                         .append(augValue(op, site(at.attr) + ".get(" + o + ")", a)).append(");\n");
             }
         } else if (a.target instanceof Subscript) {
@@ -2060,12 +2186,20 @@ public final class Emitter {
         List<String> names = args.names();
         // The parameter names are a constant: a nested def or lambda is a new PyFunction
         // every time it is evaluated, and the table was a new array each time with it.
-        String pn = "PN" + paramNames++;
-        fields.append("    private static final String[] ").append(pn).append(" = {");
+        // One table for every function of the module with these names, and
+        // made by one call: an array literal is a store an element.
+        StringBuilder joined = new StringBuilder();
         for (int i = 0; i < names.size(); i++) {
-            fields.append(i == 0 ? "" : ", ").append(javaString(names.get(i)));
+            joined.append(i == 0 ? "" : "\n").append(names.get(i));
         }
-        fields.append("};\n");
+        String pn = paramTables.get(joined.toString());
+        if (pn == null) {
+            pn = "PN" + paramNames++;
+            paramTables.put(joined.toString(), pn);
+            fields.append("    private static final String[] ").append(pn).append(" = ")
+                    .append(names.isEmpty() ? "Py.NO_NAMES" : "Py.names(" + javaString(joined.toString()) + ")")
+                    .append(";\n");
+        }
         sig.append("new PyFunction(").append(javaString(name)).append(", ").append(pn).append(", ").append(args.positional.size()).append(", ").append(args.vararg != null).append(", ")
                 .append(args.kwonly.size()).append(", ").append(args.kwarg != null).append(", ");
         if (args.defaults.isEmpty()) {
@@ -4076,10 +4210,74 @@ public final class Emitter {
     }
 
     private String site(String attr) {
+        if (attr.indexOf('\n') < 0) {
+            return tabled(readSites, "SA", attr);
+        }
         String f = "S" + (++sites);
         fields.append("    private static final AttrSite ").append(f).append(" = new AttrSite(")
                 .append(javaString(attr)).append(");\n");
         return f;
+    }
+
+    /// A fresh inline cache for one attribute store.
+    private String storeSite(String attr) {
+        if (attr.indexOf('\n') < 0) {
+            return tabled(storeSites, "SS", attr);
+        }
+        String f = "S" + (++sites);
+        fields.append("    private static final StoreSite ").append(f).append(" = new StoreSite(")
+                .append(javaString(attr)).append(");\n");
+        return f;
+    }
+
+    /// The sites of the module, by table: the names of each table's sites
+    /// joined by newlines. A module has thousands of sites, and a static
+    /// field each was a store and an accessor each in the translated
+    /// program, most of it for code that never runs; a table is one call.
+    private final List<StringBuilder> readSites = new ArrayList<StringBuilder>();
+    private final List<StringBuilder> storeSites = new ArrayList<StringBuilder>();
+    private int tableFill;
+    private StringBuilder tableOpen;
+
+    /// At most this many names to a table and this many chars: a string
+    /// constant of a class file holds 65535 bytes.
+    private static final int TABLE_NAMES = 1024;
+    private static final int TABLE_CHARS = 16000;
+
+    private String tabled(List<StringBuilder> tables, String prefix, String attr) {
+        StringBuilder t = tables.isEmpty() ? null : tables.get(tables.size() - 1);
+        int n = t == null ? 0 : count(t);
+        if (t == null || n == TABLE_NAMES || t.length() + attr.length() > TABLE_CHARS) {
+            t = new StringBuilder();
+            tables.add(t);
+            n = 0;
+        }
+        if (n > 0) {
+            t.append('\n');
+        }
+        t.append(attr);
+        return prefix + (tables.size() - 1) + "[" + n + "]";
+    }
+
+    private static int count(StringBuilder t) {
+        int n = 1;
+        for (int i = 0; i < t.length(); i++) {
+            if (t.charAt(i) == '\n') {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private void siteTables(StringBuilder out) {
+        for (int i = 0; i < readSites.size(); i++) {
+            out.append("    private static final AttrSite[] SA").append(i).append(" = AttrSite.table(")
+                    .append(javaString(readSites.get(i).toString())).append(");\n");
+        }
+        for (int i = 0; i < storeSites.size(); i++) {
+            out.append("    private static final StoreSite[] SS").append(i).append(" = StoreSite.table(")
+                    .append(javaString(storeSites.get(i).toString())).append(");\n");
+        }
     }
 
     private String hoist(String type, String init) {
