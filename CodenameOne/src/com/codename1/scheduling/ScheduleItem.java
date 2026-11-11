@@ -48,7 +48,7 @@ public final class ScheduleItem {
     private boolean allDay;
     private String resourceId;
     private Kind kind = Kind.EVENT;
-    private String category;
+    private String uiid;
     private int color = -1;
     private boolean movable = true;
     private boolean resizable = true;
@@ -132,14 +132,15 @@ public final class ScheduleItem {
         return this;
     }
 
-    /// A name a theme can style: an item of category `Done` is drawn with the
-    /// UIID `SchedulerItemDone` when the theme has one.
-    public String getCategory() {
-        return category;
+    /// The UIID the item is drawn with in place of `SchedulerItem`, or null.
+    /// Its background, foreground and font are used, and its selected style
+    /// while the item is selected.
+    public String getUIID() {
+        return uiid;
     }
 
-    public ScheduleItem setCategory(String v) {
-        category = v;
+    public ScheduleItem setUIID(String v) {
+        uiid = v;
         return this;
     }
 

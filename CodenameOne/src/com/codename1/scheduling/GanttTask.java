@@ -70,7 +70,7 @@ public final class GanttTask {
     private long baselineStart;
     private long baselineEnd;
     private int color = -1;
-    private String category;
+    private String uiid;
     private Object userObject;
 
     // What the scheduler worked out.
@@ -306,13 +306,13 @@ public final class GanttTask {
         return this;
     }
 
-    /// A name a theme can style: `GanttBar` plus the category.
-    public String getCategory() {
-        return category;
+    /// The UIID the bar is drawn with in place of `GanttBar`, or null.
+    public String getUIID() {
+        return uiid;
     }
 
-    public GanttTask setCategory(String v) {
-        category = v;
+    public GanttTask setUIID(String v) {
+        uiid = v;
         return this;
     }
 
