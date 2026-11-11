@@ -199,7 +199,8 @@ class McpEditingToolsTest {
         // effectiveBorderConstraint() moves a duplicate region to the first free one, so a clash has
         // to be caught on the fragment's own constraint, before it lands.
         CodenameOneGUIBuilder builder = builder();
-        call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"frame\",\"layout\":{\"layout\":\"BorderLayout\"}}");
+        Map<String, Object> frame = call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"frame\",\"layout\":{\"layout\":\"BorderLayout\"}}");
+        assertEquals(Boolean.TRUE, frame.get("success"), String.valueOf(frame.get("error")));
         call("guibuilder_add_component", "{\"type\":\"Label\",\"name\":\"body\",\"parent\":\"frame\","
                 + "\"constraint\":{\"region\":\"Center\"}}");
         String before = builder.documentForTest().toXml();
@@ -318,6 +319,144 @@ class McpEditingToolsTest {
         }
         assertNull(element(builder, "cell").getAttribute("tableVerticalSpan"));
         assertNull(element(builder, "cell").getAttribute("tableHorizontalSpan"));
+    }
+
+    @Test
+    void createFormWaitsWhileTheDeveloperIsTyping() throws Exception {
+        // Half-typed inline text is not in the document yet, so the unsaved-changes check cannot see it.
+        CodenameOneGUIBuilder builder = builder();
+        Field inline = CodenameOneGUIBuilder.class.getDeclaredField("inlineEditor");
+        inline.setAccessible(true);
+        inline.set(builder, new com.codename1.ui.TextField("half typ"));
+        try {
+            Map<String, Object> refused = call("guibuilder_create_form", "{\"className\":\"com.example.Later\"}");
+            assertEquals(Boolean.FALSE, refused.get("success"));
+            assertFalse(Files.exists(project.resolve("src/main/guibuilder/com/example/Later.gui")), "nothing may be written");
+            assertTrue(builder.documentForTest().path().endsWith("EditForm.gui"), "the developer's form stays open");
+        } finally {
+            inline.set(builder, null);
+        }
+    }
+
+    @Test
+    void tablesInsideAFragmentAreCheckedLikeAnyOther() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        String before = builder.documentForTest().toXml();
+        String[] broken = {
+            "<component type=\"Container\" name=\"t\" layout=\"TableLayout\"><component type=\"Label\" name=\"a\" tableRow=\"0\" tableColumn=\"0\"/><component type=\"Label\" name=\"b\" tableRow=\"0\" tableColumn=\"0\"/></component>",
+            "<component type=\"Container\" name=\"t\" layout=\"TableLayout\"><component type=\"Label\" name=\"a\" tableRow=\"5\" tableColumn=\"0\"/></component>",
+            "<component type=\"Container\" name=\"t\" layout=\"TableLayout\"><component type=\"Label\" name=\"a\" tableRow=\"0\" tableColumn=\"1\" tableHorizontalSpan=\"2\"/></component>",
+            "<component type=\"Container\" name=\"t\" layout=\"TableLayout\"><component type=\"Label\" name=\"a\" tableHorizontalSpan=\"9\"/></component>",
+            "<component type=\"Container\" name=\"t\" layout=\"TableLayout\" tableLayoutColumns=\"0\"/>",
+            "<component type=\"Container\" name=\"t\" layout=\"BoxLayout\" boxLayoutAxis=\"Z\"/>",
+            "<component type=\"TextField\" name=\"f\" columns=\"0\"/>",
+            "<component type=\"Button\" name=\"go\" actionEvent=\"on-click\"/>"
+        };
+        for (String xml : broken) {
+            Map<String, Object> result = call("guibuilder_insert_xml", "{\"xml\":" + quote(xml) + "}");
+            assertEquals(Boolean.FALSE, result.get("success"), "must be refused: " + xml);
+            assertEquals(before, builder.documentForTest().toXml(), "nothing may land: " + xml);
+        }
+        Map<String, Object> ok = call("guibuilder_insert_xml", "{\"xml\":" + quote("<component type=\"Container\""
+                + " name=\"t\" layout=\"TableLayout\"><component type=\"Label\" name=\"a\" tableRow=\"0\" tableColumn=\"0\"/>"
+                + "<component type=\"Label\" name=\"b\"/><component type=\"Label\" name=\"c\"/></component>") + "}");
+        assertEquals(Boolean.TRUE, ok.get("success"), String.valueOf(ok.get("error")));
+        assertNotNull(element(builder, "b").getAttribute("tableRow"), "a child without a cell gets a free one");
+        assertNotNull(element(builder, "c").getAttribute("tableRow"));
+        assertCanvasLinked(builder, "after inserting a nested table");
+    }
+
+    @Test
+    void setBindingReportsOnlyWhatItDid() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        call("guibuilder_add_component", "{\"type\":\"Label\",\"name\":\"caption\"}");
+        call("guibuilder_select", "{\"component\":\"caption\"}");
+        Map<String, Object> on = call("guibuilder_set_binding", "{\"strategy\":\"properties\"}");
+        assertEquals(Boolean.TRUE, on.get("success"), String.valueOf(on.get("error")));
+        assertTrue(String.valueOf(on.get("note")).contains("model"), "the note says what happens to the model: " + on.get("note"));
+        Field status = CodenameOneGUIBuilder.class.getDeclaredField("status");
+        status.setAccessible(true);
+        assertEquals(on.get("note"), ((com.codename1.ui.Label) status.get(builder)).getText(),
+                "the developer sees the binding message, not a generic one");
+        Map<String, Object> off = call("guibuilder_set_binding", "{\"strategy\":\"none\"}");
+        assertEquals(Boolean.TRUE, off.get("success"), String.valueOf(off.get("error")));
+        assertNull(off.get("note"), "no model on disk, nothing to report; the old status line is no answer");
+    }
+
+    @Test
+    void valuesTheCanvasOrTheGeneratedSourceCannotReadAreRefused() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"free\",\"layout\":{\"layout\":\"LayeredLayout\"}}");
+        call("guibuilder_add_component", "{\"type\":\"Button\",\"name\":\"go\",\"parent\":\"free\"}");
+        for (String insets : new String[]{"auto auto baseline auto", "1.5px 0px 0px 0px", "Infinity% auto auto auto"}) {
+            Map<String, Object> result = call("guibuilder_set_constraint", "{\"component\":\"go\",\"insets\":\"" + insets + "\"}");
+            assertEquals(Boolean.FALSE, result.get("success"), "LayeredLayout throws on " + insets);
+        }
+        assertEquals(Boolean.FALSE, call("guibuilder_set_event_handler", "{\"component\":\"go\",\"handler\":\"record\"}").get("success"),
+                "the generator renames reserved words, so the reported method would not exist");
+        call("guibuilder_add_component", "{\"type\":\"Container\",\"name\":\"grid\",\"layout\":{\"layout\":\"TableLayout\"}}");
+        String before = builder.documentForTest().toXml();
+        String[][] fragments = {
+            {"grid", "<component type=\"Label\" name=\"z\" tableVerticalSpan=\"0\"/>"},
+            {"grid", "<component type=\"Label\" name=\"z\" tableVerticalSpan=\"2000000000\"/>"},
+            {null, "<component type=\"Container\" name=\"c\"><component type=\"Label\" name=\"z\" tableHorizontalSpan=\"x\"/></component>"},
+            {"free", "<component type=\"Label\" name=\"z\" layeredInsets=\"foo\"/>"},
+            {"free", "<component type=\"Label\" name=\"z\" guidedHorizontalAnchor=\"0f);System.exit(0);//\"/>"},
+            {"free", "<component type=\"Label\" name=\"z\" guidedReferencePositions=\"a b c d\"/>"},
+            {"free", "<component type=\"Label\" name=\"z\" guidedPreferredWidth=\"1);System.exit(0\"/>"}
+        };
+        for (String[] fragment : fragments) {
+            String parent = fragment[0] == null ? "" : "\"parent\":\"" + fragment[0] + "\",";
+            Map<String, Object> result = call("guibuilder_insert_xml", "{" + parent + "\"xml\":" + quote(fragment[1]) + "}");
+            assertEquals(Boolean.FALSE, result.get("success"), "must be refused: " + fragment[1]);
+            assertEquals(before, builder.documentForTest().toXml(), "nothing may land: " + fragment[1]);
+        }
+        assertCanvasLinked(builder, "after the refusals");
+    }
+
+    @Test
+    void fragmentValuesAreStoredTheWayTheCanvasAndGeneratorReadThem() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        Map<String, Object> result = call("guibuilder_insert_xml", "{\"xml\":" + quote("<component type=\"Container\""
+                + " name=\"box\" layout=\"BoxLayout\" boxLayoutAxis=\"x\"><component type=\"TextField\" name=\"pw\""
+                + " enabled=\"TRUE\" constraint=\"password\"/><component type=\"Label\" name=\"a|b c\"/></component>") + "}");
+        assertEquals(Boolean.TRUE, result.get("success"), String.valueOf(result.get("error")));
+        assertEquals("X", element(builder, "box").getAttribute("boxLayoutAxis"));
+        assertEquals("true", element(builder, "pw").getAttribute("enabled"), "the generator compares with \"true\" exactly");
+        assertEquals("PASSWORD", element(builder, "pw").getAttribute("constraint"), "lower case would show the password in plain text");
+        List<?> names = (List<?>) result.get("components");
+        for (Object name : names) {
+            assertFalse(String.valueOf(name).contains("|") || String.valueOf(name).contains(" "), "pasted names are sanitized: " + names);
+        }
+    }
+
+    @Test
+    void aRollbackLeavesASavedFormUnmodified() throws Exception {
+        CodenameOneGUIBuilder builder = builder();
+        call("guibuilder_toolbar_commands", "{\"action\":\"add\",\"label\":\"Share\"}");
+        assertEquals(Boolean.TRUE, call("guibuilder_command", "{\"command\":\"save\"}").get("success"));
+        assertFalse(builder.documentForTest().isModified());
+        Map<String, Object> refused = call("guibuilder_add_component", "{\"type\":\"Label\",\"properties\":{\"gap\":-5}}");
+        assertEquals(Boolean.FALSE, refused.get("success"));
+        assertFalse(builder.documentForTest().isModified(), "a rolled-back edit leaves the form as saved");
+        assertCanvasLinked(builder, "after the rollback");
+    }
+
+    @Test
+    void theCatalogReportsTheTextAResetActuallyShows() throws Exception {
+        builder();
+        Map<String, Object> catalog = call("guibuilder_component_types", "{}");
+        for (Object entry : (List<?>) catalog.get("types")) {
+            Map<?, ?> type = (Map<?, ?>) entry;
+            if (!"Button".equals(type.get("type"))) continue;
+            for (Object property : (List<?>) type.get("properties")) {
+                if ("text".equals(((Map<?, ?>) property).get("name"))) {
+                    assertEquals("Button", ((Map<?, ?>) property).get("default"));
+                    return;
+                }
+            }
+        }
+        fail("Button has no text property in the catalog");
     }
 
     @Test

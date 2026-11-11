@@ -188,9 +188,15 @@ public final class ComponentCatalog {
         if (isFormLike(type)) {
             out.add(text("title", "Title"));
         } else if (hasText(type)) {
-            out.add(text("text", "Text"));
+            // What the canvas and the generated source show when the attribute is absent -- which is
+            // where a reset (null) leaves it -- not an empty string.
+            String sample = GuiDocument.defaultTextFor(type);
+            out.add(new Property("text", "Text", KIND_TEXT, sample == null ? "" : sample, 0, 0, null));
         }
-        if ("TextField".equals(type) || "TextArea".equals(type)) out.add(text("hint", "Hint"));
+        if ("TextField".equals(type) || "TextArea".equals(type)) {
+            String hint = GuiDocument.defaultHintFor(type);
+            out.add(new Property("hint", "Hint", KIND_TEXT, hint == null ? "" : hint, 0, 0, null));
+        }
         out.add(new Property("uiid", "UIID (CSS selector)", KIND_TEXT, null, 0, 0, null));
         out.add(bool("enabled", "Enabled", true));
         out.add(bool("visible", "Visible", true));

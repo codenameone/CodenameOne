@@ -8172,6 +8172,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         out.put("canvasMode", canvasMode);
         out.put("darkMode", Boolean.valueOf(darkMode));
         out.put("status", status == null ? null : status.getText());
+        // Work the form's modified flag cannot see: text in an open Code, Model or CSS pane is in an
+        // editor buffer, and a half-typed inline edit or a drag is not in the document at all. A
+        // client deciding whether it may close or switch away has to know about both.
+        out.put("editorDirty", Boolean.valueOf(editorBufferIsDirty()));
+        out.put("developerBusy", Boolean.valueOf(mcpDeveloperBusy() != null));
         List<Object> forms = new ArrayList<Object>();
         for (String path : guiFiles) forms.add(relativeFormName(path));
         out.put("forms", forms);
@@ -8535,18 +8540,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         final boolean[] rolledBack = new boolean[1];
         final Element[] selectedBefore = new Element[1];
         final boolean[] modifiedBefore = new boolean[1];
+        final String[] statusBefore = new String[1];
         final int rebuildsBefore = canvasRebuilds;
         String error = unattended(() -> {
             if (document == null) return "No active GUI document; open a form first";
             if (canvasHost == null) return "The design canvas is not ready";
-            // The person at the keyboard comes first. Committing their half-typed text or cancelling
-            // their drag to make room for an agent's edit takes the canvas out from under them, so
-            // the edit waits instead.
-            if (inlineEditor != null || designerDragArmed || designerDragActive
-                    || guidedResizeArmed || guidedResizeActive) {
-                return "The developer is editing or dragging in the GUI Builder; try again when they finish";
-            }
+            String busy = mcpDeveloperBusy();
+            if (busy != null) return busy;
             before[0] = document.toXml();
+            statusBefore[0] = status == null ? null : status.getText();
             selectedBefore[0] = document.selected();
             modifiedBefore[0] = document.isModified();
             document.beginTransaction();
@@ -8589,8 +8591,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // A rollback re-parses the document into new element objects, so the canvas has to be rebuilt
         // after one even though the form is back as it was: otherwise the canvas, the selection and
         // the inspector keep editing elements that are no longer in the document.
+        if (rolledBack[0]) document.restoreModified(modifiedBefore[0]);
+        String rebuildFailure = null;
         if (changed || rolledBack[0] || canvasRebuilds != rebuildsBefore) {
-            unattended(() -> {
+            rebuildFailure = unattended(() -> {
                 if (document == null) return null;
                 if (changed && focus[0] != null && document.containsElement(focus[0])) {
                     selectedElements.clear();
@@ -8601,15 +8605,68 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 return null;
             });
         }
+        if (rebuildFailure != null && changed && error == null) {
+            // The edit reached the document but the canvas cannot show it, and the generated source
+            // would fail the same way. Take it back out rather than report it as done.
+            final String failure = rebuildFailure;
+            unattended(() -> {
+                if (document.undo()) refreshEditor();
+                return null;
+            });
+            error = "The canvas could not show that change, so it was undone: " + failure;
+        }
         if (error != null) {
             details.clear();
             details.put("error", error);
             recordAction("mcp_edit_refused", "operation", operation, "error", error);
         } else if (changed) {
             recordAction("mcp_edit", "operation", operation);
-            setStatus("Modified through MCP • " + relativeFormName(document.path()));
+            // An edit that reported something of its own on the status line (the binding model it will
+            // write, say) keeps it; the generic line would hide the one thing the developer needs.
+            String now = status == null ? null : status.getText();
+            if (now == null || now.equals(statusBefore[0])) {
+                setStatus("Modified through MCP • " + relativeFormName(document.path()));
+            }
         }
         return details;
+    }
+
+    /**
+     * Why an agent's change has to wait, or null when it need not.
+     *
+     * <p>The person at the keyboard comes first. Committing their half-typed text or cancelling their
+     * drag to make room for an agent's edit takes the canvas out from under them -- and half-typed
+     * inline text is not in the document yet, so no unsaved-changes check can see it.
+     */
+    private String mcpDeveloperBusy() {
+        if (inlineEditor != null || designerDragArmed || designerDragActive
+                || guidedResizeArmed || guidedResizeActive) {
+            return "The developer is editing or dragging in the GUI Builder; try again when they finish";
+        }
+        // A modal question (Save before switching? Regenerate the model?) runs a nested event loop,
+        // so an MCP call would land while the developer's save or switch is half done -- and save()
+        // marks whatever the document then holds as saved, though it wrote the earlier XML.
+        Form current = Display.getInstance().getCurrent();
+        if (current instanceof com.codename1.ui.Dialog) {
+            return "The GUI Builder is waiting for the developer to answer a dialog; try again when they have";
+        }
+        // Rebuilding the canvas rebuilds the inspector and any open Code, Model or CSS pane: a field
+        // the developer is typing in commits on the focus loss, and the pane loses its caret.
+        Component focused = current == null ? null : current.getFocused();
+        if (focused instanceof TextArea && inspectorHost != null && isInside(focused, inspectorHost)) {
+            return "The developer is typing in the inspector; try again when they finish";
+        }
+        if (activeCodeEditor != null) {
+            return "A Code, Model or CSS pane is open in the GUI Builder; ask the developer to close it first";
+        }
+        return null;
+    }
+
+    private static boolean isInside(Component component, Container ancestor) {
+        for (Container parent = component.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent == ancestor) return true; //NOPMD CompareObjectsWithEquals
+        }
+        return false;
     }
 
     private Element mcpElement(Object name) {
@@ -8754,7 +8811,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
         }
         document.select(parent);
-        Element inserted = document.pasteXml(xml);
+        // The fragment as validated and normalized, not the text as sent.
+        Element inserted = document.pasteXml(new com.codename1.xml.XMLWriter(true).toXML(parsed));
         if (inserted == null) return "The fragment could not be inserted into " + mcpName(parent);
         Integer index = mcpInteger(args, "index");
         if (index != null) {
@@ -8762,6 +8820,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (moved != null) return moved;
         }
         if ("TableLayout".equals(value(parent, "layout", "BoxLayout"))) normalizeTableCells(parent);
+        for (Element nested : allComponentsIn(inserted)) {
+            if ("TableLayout".equals(nested.getAttribute("layout"))) normalizeTableCells(nested);
+        }
         mcpPinBorderRegion(parent, inserted);
         document.select(inserted);
         List<Object> names = new ArrayList<Object>();
@@ -8809,9 +8870,38 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             return "Unsupported component type " + type + "; use one of "
                     + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.PALETTE_TYPES);
         }
+        String label = value(element, "name", type);
         String layout = element.getAttribute("layout");
         if (layout != null && !Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.LAYOUTS).contains(layout)) {
-            return "Unsupported layout " + layout + " on " + value(element, "name", type);
+            return "Unsupported layout " + layout + " on " + label;
+        }
+        // Every attribute the canvas or the generator reads is held to what the matching tool would
+        // accept, and stored in the form they expect: both compare booleans and choices exactly and
+        // emit several numbers into the generated source as they stand.
+        String attributeError = mcpNormalizeFragmentAttributes(element, type, label);
+        if (attributeError != null) return attributeError;
+        String handler = element.getAttribute("actionEvent");
+        if (handler != null && handler.trim().length() > 0 && !"true".equals(handler.trim())
+                && !mcpJavaIdentifier(handler.trim())) {
+            return label + ": actionEvent must be a Java method name";
+        }
+        String axis = element.getAttribute("boxLayoutAxis");
+        if (axis != null && !"X".equalsIgnoreCase(axis.trim()) && !"Y".equalsIgnoreCase(axis.trim())) {
+            return label + ": boxLayoutAxis must be X or Y";
+        }
+        if (axis != null) mcpPutAttribute(element, "boxLayoutAxis", axis.trim().toUpperCase());
+        String[] sizes = {"gridLayoutRows", "gridLayoutColumns", "tableLayoutRows", "tableLayoutColumns"};
+        for (String size : sizes) {
+            String raw = element.getAttribute(size);
+            if (raw == null) continue;
+            Integer parsed = parseInteger(raw.trim());
+            if (parsed == null || parsed.intValue() < 1 || parsed.intValue() > 100) {
+                return label + ": " + size + " must be from 1 to 100";
+            }
+        }
+        if ("TableLayout".equals(layout)) {
+            String cells = mcpValidateFragmentTable(element);
+            if (cells != null) return cells;
         }
         if (layout != null && !GuiDocument.acceptsChildren(element)) {
             return type + " cannot have a layout";
@@ -8831,6 +8921,147 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (refused != null) return refused;
         }
         return null;
+    }
+
+    /**
+     * Checks the cells a fragment's own TableLayout container gives its children. TableLayout throws
+     * on two children in one cell ("already occupied") or a span past the edge ("Illegal span"), on
+     * the canvas and in the generated app alike, so neither may reach the document.
+     */
+    private String mcpValidateFragmentTable(Element table) {
+        int rows = Math.max(1, integer(table.getAttribute("tableLayoutRows"), 2));
+        int columns = Math.max(1, integer(table.getAttribute("tableLayoutColumns"), 2));
+        String label = value(table, "name", "TableLayout container");
+        java.util.Set<String> taken = new LinkedHashSet<String>();
+        for (Element child : GuiDocument.componentsIn(table)) {
+            String childLabel = value(child, "name", value(child, "type", "component"));
+            String rawRow = child.getAttribute("tableRow");
+            String rawColumn = child.getAttribute("tableColumn");
+            Integer rowSpan = parseOptionalCount(child.getAttribute("tableVerticalSpan"));
+            Integer columnSpan = parseOptionalCount(child.getAttribute("tableHorizontalSpan"));
+            if (rowSpan == null || columnSpan == null) return childLabel + ": table spans must be whole numbers from 1";
+            if (rawRow == null && rawColumn == null) {
+                // No cell: one is assigned after the insert, but its span still has to fit the table.
+                if (rowSpan.intValue() > rows || columnSpan.intValue() > columns) {
+                    return childLabel + ": its span does not fit " + label + " (" + rows + " x " + columns + ")";
+                }
+                continue;
+            }
+            Integer row = rawRow == null ? null : parseInteger(rawRow.trim());
+            Integer column = rawColumn == null ? null : parseInteger(rawColumn.trim());
+            if (row == null || column == null) return childLabel + ": give both tableRow and tableColumn, as whole numbers";
+            int r = row.intValue();
+            int c = column.intValue();
+            if (r < 0 || r >= rows || c < 0 || c >= columns) {
+                return childLabel + ": cell " + r + "," + c + " is outside " + label + " (" + rows + " x " + columns + ")";
+            }
+            if (rowSpan.intValue() > rows - r || columnSpan.intValue() > columns - c) {
+                return childLabel + ": its span runs past the edge of " + label;
+            }
+            for (int i = r; i < r + rowSpan.intValue(); i++) {
+                for (int j = c; j < c + columnSpan.intValue(); j++) {
+                    if (!taken.add(i + ":" + j)) return childLabel + ": cell " + i + "," + j + " of " + label + " is already used";
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Replaces an attribute under its canonical (lower-case) key, dropping any camel-case copy. */
+    private static void mcpPutAttribute(Element element, String name, String value) {
+        element.removeAttribute(name);
+        element.removeAttribute(name.toLowerCase());
+        if (value != null) element.setAttribute(name.toLowerCase(), value);
+    }
+
+    private String mcpNormalizeFragmentAttributes(Element element, String type, String label) {
+        java.util.Hashtable attributes = element.getAttributes();
+        if (attributes != null) {
+            for (Object key : new ArrayList<Object>(attributes.keySet())) {
+                com.codename1.guibuilder.model.ComponentCatalog.Property property =
+                        com.codename1.guibuilder.model.ComponentCatalog.property(type, String.valueOf(key));
+                if (property == null) continue;
+                try {
+                    mcpPutAttribute(element, property.name(), mcpNormalizeProperty(element, property, attributes.get(key)));
+                } catch (IllegalArgumentException refused) {
+                    return label + ": " + refused.getMessage();
+                }
+            }
+        }
+        // Cells and spans: whole numbers in range, wherever they appear -- a later set_layout can turn
+        // any container into a table, and the generator emits spans into the source as written.
+        String[][] ranges = {{"tableRow", "0", "99"}, {"tableColumn", "0", "99"}, {"tableVerticalSpan", "1", "100"},
+            {"tableHorizontalSpan", "1", "100"}, {"tableWidth", "-1", "100"}, {"tableHeight", "-1", "100"},
+            {"guidedPreferredWidth", "0", "100000"}, {"guidedPreferredHeight", "0", "100000"},
+            {"selectedIndex", "0", "100000"}};
+        for (String[] range : ranges) {
+            String raw = element.getAttribute(range[0]);
+            if (raw == null) continue;
+            Integer parsed = parseInteger(raw.trim());
+            int minimum = Integer.parseInt(range[1]);
+            int maximum = Integer.parseInt(range[2]);
+            if (parsed == null || parsed.intValue() < minimum || parsed.intValue() > maximum) {
+                return label + ": " + range[0] + " must be a whole number from " + minimum + " to " + maximum;
+            }
+            mcpPutAttribute(element, range[0], String.valueOf(parsed));
+        }
+        // The guided-layout attributes LayeredLayout and the generated setters parse.
+        String insets = element.getAttribute("layeredInsets");
+        if (insets != null) {
+            String refused = mcpValidInsets(insets);
+            if (refused != null) return label + ": " + refused;
+        }
+        String[] anchors = {"guidedHorizontalAnchor", "guidedVerticalAnchor"};
+        for (String anchor : anchors) {
+            String raw = element.getAttribute(anchor);
+            if (raw == null) continue;
+            Float parsed = mcpFiniteFloat(raw);
+            if (parsed == null || parsed.floatValue() < 0 || parsed.floatValue() > 1) {
+                return label + ": " + anchor + " must be a number from 0 to 1";
+            }
+            mcpPutAttribute(element, anchor, String.valueOf(parsed.floatValue()));
+        }
+        String positions = element.getAttribute("guidedReferencePositions");
+        if (positions != null) {
+            String[] parts = positions.trim().split(" ");
+            int count = 0;
+            for (String part : parts) {
+                if (part.length() == 0) continue;
+                if (mcpFiniteFloat(part) == null) return label + ": guidedReferencePositions must be four numbers";
+                count++;
+            }
+            if (count != 4) return label + ": guidedReferencePositions must be four numbers";
+        }
+        String references = element.getAttribute("guidedReferences");
+        if (references != null && references.split("\\|", -1).length != 4) {
+            return label + ": guidedReferences must be four names or - separated by |";
+        }
+        String[] sizes = {"guidedHorizontalSize", "guidedVerticalSize"};
+        for (String size : sizes) {
+            String raw = element.getAttribute(size);
+            if (raw == null) continue;
+            if (!GuidedLayoutSupport.PREFERRED.equals(raw) && !GuidedLayoutSupport.FIXED.equals(raw)
+                    && !GuidedLayoutSupport.FILL.equals(raw) && !GuidedLayoutSupport.MATCH.equals(raw)) {
+                return label + ": " + size + " must be preferred, fixed, fill or match";
+            }
+        }
+        return null;
+    }
+
+    private static Float mcpFiniteFloat(String raw) {
+        try {
+            float value = Float.parseFloat(raw.trim());
+            return Float.isNaN(value) || Float.isInfinite(value) ? null : Float.valueOf(value);
+        } catch (NumberFormatException invalid) {
+            return null;
+        }
+    }
+
+    /** A span attribute: 1 when absent, null when it is not a whole number of at least 1. */
+    private static Integer parseOptionalCount(String raw) {
+        if (raw == null || raw.trim().length() == 0) return Integer.valueOf(1);
+        Integer parsed = parseInteger(raw.trim());
+        return parsed == null || parsed.intValue() < 1 ? null : parsed;
     }
 
     private String mcpMoveToIndex(Element element, Element parent, int index) {
@@ -8911,49 +9142,65 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             com.codename1.guibuilder.model.ComponentCatalog.Property property =
                     com.codename1.guibuilder.model.ComponentCatalog.property(type, key);
             if (property == null) return mcpUnknownProperty(type, key);
-            Object raw = entry.getValue();
             String normalized;
-            if (raw == null) {
-                normalized = null;
-            } else if (com.codename1.guibuilder.model.ComponentCatalog.KIND_BOOLEAN.equals(property.kind())) {
-                String text = String.valueOf(raw).trim();
-                if (!"true".equalsIgnoreCase(text) && !"false".equalsIgnoreCase(text)) {
-                    return property.name() + " must be true or false";
-                }
-                normalized = String.valueOf("true".equalsIgnoreCase(text));
-            } else if (com.codename1.guibuilder.model.ComponentCatalog.KIND_INTEGER.equals(property.kind())) {
-                Map<String, Object> holder = new LinkedHashMap<String, Object>();
-                holder.put(property.name(), raw);
-                int parsed = mcpInteger(holder, property.name()).intValue();
-                int maximum = property.maximum();
-                if ("selectedIndex".equals(property.name())) {
-                    maximum = Math.max(0, GuiDocument.componentsIn(element).size() - 1);
-                }
-                if (parsed < property.minimum() || parsed > maximum) {
-                    return property.name() + " must be from " + property.minimum() + " to " + maximum;
-                }
-                normalized = String.valueOf(parsed);
-            } else if (com.codename1.guibuilder.model.ComponentCatalog.KIND_CHOICE.equals(property.kind())) {
-                String text = String.valueOf(raw).trim();
-                normalized = null;
-                for (String choice : property.choices()) if (choice.equalsIgnoreCase(text)) normalized = choice;
-                if (normalized == null) return property.name() + " must be one of " + Arrays.asList(property.choices());
-            } else {
-                normalized = raw instanceof String ? (String) raw : mcpString(properties, key);
-                if ("uiid".equals(property.name())) {
-                    normalized = normalized.trim();
-                    for (int i = 0; i < normalized.length(); i++) {
-                        char c = normalized.charAt(i);
-                        if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-')) {
-                            return "uiid must be a CSS selector name (letters, digits, - and _)";
-                        }
-                    }
-                    if (normalized.length() == 0) normalized = null;
-                }
+            try {
+                normalized = mcpNormalizeProperty(element, property, entry.getValue());
+            } catch (IllegalArgumentException refused) {
+                return refused.getMessage();
             }
             document.setAttribute(element, property.name(), normalized);
         }
         return null;
+    }
+
+    /**
+     * The stored form of one property value, checked as the inspector checks it.
+     *
+     * @param element the component the value is for
+     * @param property the catalog entry
+     * @param raw the value as given, or null to reset it
+     * @return the value to store, or null to remove the attribute
+     * @throws IllegalArgumentException naming what is wrong with the value
+     */
+    private String mcpNormalizeProperty(Element element, com.codename1.guibuilder.model.ComponentCatalog.Property property,
+            Object raw) {
+        if (raw == null) return null;
+        String kind = property.kind();
+        if (com.codename1.guibuilder.model.ComponentCatalog.KIND_BOOLEAN.equals(kind)) {
+            String text = String.valueOf(raw).trim();
+            if (!"true".equalsIgnoreCase(text) && !"false".equalsIgnoreCase(text)) {
+                throw new IllegalArgumentException(property.name() + " must be true or false");
+            }
+            return String.valueOf("true".equalsIgnoreCase(text));
+        }
+        if (com.codename1.guibuilder.model.ComponentCatalog.KIND_INTEGER.equals(kind)) {
+            Map<String, Object> holder = new LinkedHashMap<String, Object>();
+            holder.put(property.name(), raw);
+            int parsed = mcpInteger(holder, property.name()).intValue();
+            int maximum = property.maximum();
+            if ("selectedIndex".equals(property.name())) {
+                maximum = Math.max(0, GuiDocument.componentsIn(element).size() - 1);
+            }
+            if (parsed < property.minimum() || parsed > maximum) {
+                throw new IllegalArgumentException(property.name() + " must be from " + property.minimum() + " to " + maximum);
+            }
+            return String.valueOf(parsed);
+        }
+        if (com.codename1.guibuilder.model.ComponentCatalog.KIND_CHOICE.equals(kind)) {
+            String text = String.valueOf(raw).trim();
+            for (String choice : property.choices()) if (choice.equalsIgnoreCase(text)) return choice;
+            throw new IllegalArgumentException(property.name() + " must be one of " + Arrays.asList(property.choices()));
+        }
+        String text = raw instanceof String ? (String) raw : mcpString(java.util.Collections.singletonMap("v", raw), "v");
+        if (!"uiid".equals(property.name())) return text;
+        text = text.trim();
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-')) {
+                throw new IllegalArgumentException("uiid must be a CSS selector name (letters, digits, - and _)");
+            }
+        }
+        return text.length() == 0 ? null : text;
     }
 
     private String mcpUnknownProperty(String type, String key) {
@@ -9221,6 +9468,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return null;
     }
 
+    /**
+     * Insets as LayeredLayout reads them, which is what the canvas and the generated setInsets() call
+     * do. Checked by handing them to a LayeredLayout, as the inspector's own field does: it is
+     * stricter than a pattern -- px must be whole, baseline only goes on top, infinity is refused.
+     */
+    private static String mcpLayoutInsetsError(String insets) {
+        try {
+            Container probe = new Container(new LayeredLayout());
+            Label child = new Label();
+            probe.add(child);
+            ((LayeredLayout) probe.getLayout()).setInsets(child, insets);
+            return null;
+        } catch (RuntimeException invalid) {
+            return "insets \"" + insets + "\" are not something LayeredLayout can read"
+                    + (invalid.getMessage() == null ? "" : ": " + invalid.getMessage());
+        }
+    }
+
     private static String mcpValidInsets(String insets) {
         String[] parts = insets.trim().split(" ");
         List<String> tokens = new ArrayList<String>();
@@ -9228,6 +9493,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (tokens.size() != 4) return "insets must be four values: top right bottom left (e.g. \"12px auto auto 0px\")";
         for (String token : tokens) {
             if ("auto".equals(token) || "baseline".equals(token)) continue;
+            if (token.indexOf("Infinity") >= 0 || token.indexOf("NaN") >= 0) return "inset " + token + " is not a number";
             String number = token;
             if (number.endsWith("px") || number.endsWith("mm")) number = number.substring(0, number.length() - 2);
             else if (number.endsWith("%")) number = number.substring(0, number.length() - 1);
@@ -9238,7 +9504,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 return "inset " + token + " is not a number";
             }
         }
-        return null;
+        return mcpLayoutInsetsError(insets.trim());
     }
 
     // --- events, toolbar, binding ------------------------------------------------------------
@@ -9288,7 +9554,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 + " else enum extends final finally float for goto if implements import instanceof int interface long"
                 + " native new package private protected public return short static strictfp super switch synchronized"
                 + " this throw throws transient try void volatile while true false null _ ";
-        if (keywords.indexOf(" " + name + " ") >= 0) return false;
+        if (keywords.indexOf(" " + name + " ") >= 0 || isJavaReserved(name)) return false;
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
             boolean letter = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' || c == '$';
@@ -9354,8 +9620,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         details.put("strategy", strategy);
         if (strategy.equals(previous)) return null;
         document.setAttribute(document.root(), "bindingStrategy", strategy);
+        String before = status == null ? null : status.getText();
         syncBindingModel(strategy);
-        details.put("note", status == null ? null : status.getText());
+        // Only what syncBindingModel() itself reported: it says nothing in some cases (no model on
+        // disk for "none", no source directory), and the status line then still holds whatever came
+        // before -- a selection, say -- which is no answer to this call.
+        String after = status == null ? null : status.getText();
+        if (after != null && !after.equals(before)) details.put("note", after);
         return null;
     }
 
@@ -9388,6 +9659,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (binding == null || binding.guiDir() == null || binding.sourceDir() == null) {
             return "No project is open";
         }
+        String busy = mcpDeveloperBusy();
+        if (busy != null) return busy;
         if (document != null && document.isModified()) return "The active form has unsaved changes; save it first";
         if (editorBufferIsDirty()) return "The open editor has unsaved changes; save or close that pane first";
         String className = mcpString(args, "className");

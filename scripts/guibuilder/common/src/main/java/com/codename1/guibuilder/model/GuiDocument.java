@@ -260,9 +260,12 @@ public final class GuiDocument {
     public Element addCommand() {
         beforeMutation();
         Element command = new Element("command");
-        command.setAttribute("name", "Command " + (commands().size() + 1));
-        command.setAttribute("placement", "right");
-        command.setAttribute("actionEvent", "onCommand" + (commands().size() + 1));
+        // Through the canonical (lower-case) keys, as every other write: a camel-case key comes back
+        // lower-case after an undo or rollback re-parses the XML, and the form then reads as modified
+        // against the copy it was saved with although nothing changed.
+        setNormalizedAttribute(command, "name", "Command " + (commands().size() + 1));
+        setNormalizedAttribute(command, "placement", "right");
+        setNormalizedAttribute(command, "actionEvent", "onCommand" + (commands().size() + 1));
         root.addChild(command);
         modified = true;
         return command;
@@ -630,8 +633,11 @@ public final class GuiDocument {
         for (Element element : elements) {
             String current = element.getAttribute("name");
             String type = element.getAttribute("type");
-            String base = current == null || current.length() == 0
-                    ? lowerFirst(type == null || type.length() == 0 ? "component" : type) : current;
+            // Sanitized as a rename is: a pipe splits guidedReferences and whitespace splits the
+            // positions, so a pasted name holding either broke every relationship anchored to it.
+            String clean = current == null ? "" : sanitizeName(current);
+            String base = clean.length() == 0
+                    ? lowerFirst(type == null || type.length() == 0 ? "component" : type) : clean;
             String unique = availableName(base, exclude, assigned);
             assigned.add(unique);
             if (unique.equals(current)) continue;
