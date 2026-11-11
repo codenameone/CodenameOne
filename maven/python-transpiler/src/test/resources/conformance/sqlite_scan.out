@@ -1,0 +1,14 @@
+(1, 'x', 'q', 'r')
+(2, 'y', 'z', '2')
+('p2', 'p1', 'p2', 'p3')
+("it's ? :not", 'v', None, None)
+('a"b', 5, None, None)
+('accent', 'été :x ?', None, None)
+ProgrammingError
+ProgrammingError
+ProgrammingError
+ProgrammingError
+[(1,), (';',), (2,), (';',)]
+[('a;b', 3)]
+[('k:x',)]
+True False

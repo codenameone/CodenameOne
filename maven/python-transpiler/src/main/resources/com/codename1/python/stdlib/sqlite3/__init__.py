@@ -251,7 +251,9 @@ def _kind(stmt):
 # reason (``cached_statements``); scanning character by character in Python
 # was most of what a short statement cost. Callers only read the answer.
 _SCANNED = {}
-_SCANNED_MAX = 256
+# The bound of _cn1sql's cache of plans, for its reason: texts seen once must not
+# keep emptying the cache of the ones that repeat.
+_SCANNED_MAX = 2048
 
 
 def _scan(sql):
@@ -272,12 +274,17 @@ def _scan(sql):
 
 
 def _scan_text(sql):
+    trigger = _first_word(sql) == "CREATE" and _is_trigger(sql)
+    # ASCII, nearly every statement, is scanned by _cn1sql, to the letter as below;
+    # it answers None for any other text.
+    r = _cn1sql.scan(sql, trigger)
+    if r is not None:
+        return r
     out = []
     params = []
     n = len(sql)
     i = 0
     start = 0
-    trigger = _first_word(sql) == "CREATE" and _is_trigger(sql)
     depth_begin = 0
     while i < n:
         c = sql[i]

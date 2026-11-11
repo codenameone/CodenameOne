@@ -801,7 +801,11 @@ public final class StdModules {
     }
 
     private static final java.util.Map<String, SqlitePlan> SQLITE_PLANS = new java.util.HashMap<String, SqlitePlan>();
-    private static final int SQLITE_PLANS_MAX = 256;
+    /// Well past what one pass of a program runs. A library that writes values or
+    /// generated names into its SQL (sqlite-utils does) makes hundreds of texts that
+    /// are each seen once, and a bound they reach empties the cache of the statements
+    /// that do repeat; at 256 that happened several times a second.
+    private static final int SQLITE_PLANS_MAX = 2048;
     /// Set by `_cn1sql.setup`: the `adapters` dict, the five keys whose
     /// presence means a storage value is adapted, `str`, and the legacy
     /// transaction-control value.
@@ -811,6 +815,116 @@ public final class StdModules {
     private static long sqliteLegacy;
     private static int sqliteAdaptersSize = -1;
     private static boolean sqlitePlainFree;
+
+    private static boolean sqlWordStart(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_';
+    }
+
+    private static boolean sqlWordPart(char c) {
+        return sqlWordStart(c) || c >= '0' && c <= '9';
+    }
+
+    /// Whether the word of `sql` in `[from, to)` is `word`, which is upper case,
+    /// whatever case it is written in.
+    private static boolean sqlWordIs(String sql, int from, int to, String word) {
+        return to - from == word.length() && sql.regionMatches(true, from, word, 0, word.length());
+    }
+
+    /// `sqlite3._scan_text` for a statement in ASCII, which is nearly every one:
+    /// the first statement of `sql` with each placeholder written `?`, the
+    /// placeholders in order (None for a bare `?`, an int for `?NNN`, the name
+    /// for `:name`, `@name` and `$name`), what follows the statement's `;`, and
+    /// `trigger` as it was passed. The module scanned a character at a time in
+    /// Python, for every text it had not seen, and a library that writes names
+    /// and values into its SQL shows it hundreds of new texts a second.
+    ///
+    /// Answers None for a text with a character outside ASCII: what Python
+    /// calls a letter or a digit there is the module's to decide, and it does.
+    private static Object sqliteScan(String sql, boolean trigger) {
+        int n = sql.length();
+        for (int k = 0; k < n; k++) {
+            if (sql.charAt(k) > 127) {
+                return Py.NONE;
+            }
+        }
+        StringBuilder out = null;
+        PyList params = new PyList();
+        int start = 0;
+        int depth = 0;
+        int i = 0;
+        while (i < n) {
+            char c = sql.charAt(i);
+            if (c == '\'' || c == '"' || c == '`' || c == '[') {
+                char close = c == '[' ? ']' : c;
+                int j = i + 1;
+                while (j < n) {
+                    if (sql.charAt(j) == close) {
+                        if (close != ']' && j + 1 < n && sql.charAt(j + 1) == close) {
+                            j += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    j++;
+                }
+                i = j + 1;
+            } else if (c == '-' && sql.startsWith("--", i)) {
+                int j = sql.indexOf('\n', i);
+                i = j < 0 ? n : j + 1;
+            } else if (c == '/' && sql.startsWith("/*", i)) {
+                int j = sql.indexOf("*/", i + 2);
+                i = j < 0 ? n : j + 2;
+            } else if (sqlWordStart(c)) {
+                int j = i;
+                while (j < n && sqlWordPart(sql.charAt(j))) {
+                    j++;
+                }
+                if (trigger) {
+                    if (sqlWordIs(sql, i, j, "BEGIN") || sqlWordIs(sql, i, j, "CASE")) {
+                        depth++;
+                    } else if (sqlWordIs(sql, i, j, "END")) {
+                        depth--;
+                    }
+                }
+                i = j;
+            } else if (c == '?') {
+                int j = i + 1;
+                while (j < n && sql.charAt(j) >= '0' && sql.charAt(j) <= '9') {
+                    j++;
+                }
+                if (j - i > 18) {
+                    // A number past a long: Python's int reads it.
+                    return Py.NONE;
+                }
+                if (out == null) {
+                    out = new StringBuilder(n);
+                }
+                out.append(sql.substring(start, i)).append('?');
+                params.append(j > i + 1 ? PyInt.of(Long.parseLong(sql.substring(i + 1, j))) : Py.NONE);
+                start = j;
+                i = j;
+            } else if ((c == ':' || c == '@' || c == '$') && i + 1 < n && sqlWordStart(sql.charAt(i + 1))) {
+                int j = i + 1;
+                while (j < n && sqlWordPart(sql.charAt(j))) {
+                    j++;
+                }
+                if (out == null) {
+                    out = new StringBuilder(n);
+                }
+                out.append(sql.substring(start, i)).append('?');
+                params.append(sql.substring(i + 1, j));
+                start = j;
+                i = j;
+            } else if (c == ';' && depth <= 0) {
+                String stmt = out == null ? sql.substring(start, i) : out.append(sql.substring(start, i)).toString();
+                return new PyTuple(new Object[] {stmt, params, sql.substring(i + 1), trigger ? Py.TRUE : Py.FALSE});
+            } else {
+                i++;
+            }
+        }
+        String stmt = out == null ? (start == 0 ? sql : sql.substring(start)) : out.append(sql.substring(start, n)).toString();
+        return new PyTuple(new Object[] {stmt, params, "", trigger ? Py.TRUE : Py.FALSE});
+    }
 
     /// `Cursor.execute` for the call nearly every application makes, in one
     /// builtin: a planned statement, a list or tuple of plain values, no
@@ -826,6 +940,7 @@ public final class StdModules {
             sqliteAdaptersSize = -1;
             return Py.NONE;
         }));
+        m.setAttr("scan", PyBuiltin.positional("scan", a -> sqliteScan(Py.toStr(a[0]), Py.isTrue(a[1]))));
         m.setAttr("plan", PyBuiltin.positional("plan", a -> {
             if (SQLITE_PLANS.size() >= SQLITE_PLANS_MAX) {
                 SQLITE_PLANS.clear();

@@ -386,6 +386,17 @@ public final class PyBytes extends PyObject {
             if (Py.isInt(x)) {
                 return new PyBytes(new byte[(int) Py.asLong(x)]);
             }
+            if (x instanceof PyBytes && t == Py.BYTES_TYPE) {
+                // bytes(b) is b: it cannot change. Hashing and I/O code calls
+                // this on every buffer it is handed.
+                return x;
+            }
+            if (x instanceof PyByteArray) {
+                return new PyBytes(((PyByteArray) x).bytes());
+            }
+            if (x instanceof PyMemoryView) {
+                return new PyBytes(((PyMemoryView) x).bytes().clone());
+            }
             Object[] items = Py.toArray(x);
             byte[] r = new byte[items.length];
             for (int i = 0; i < items.length; i++) {

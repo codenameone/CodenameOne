@@ -409,8 +409,8 @@ class terminal_size(tuple):
 
 
 def urandom(n):
-    import random as _random
-    return _random.SystemRandom().randbytes(n)
+    import _cn1hash
+    return _cn1hash.urandom(n)
 
 
 def strerror(code):

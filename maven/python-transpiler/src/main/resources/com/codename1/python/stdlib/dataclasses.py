@@ -182,56 +182,77 @@ def _make_init(cls, fields, std_fields, kw_only_fields, frozen, has_post_init):
     names = [f.name for f in std_fields + kw_only_fields]
     initvars = [f.name for f in fields if f._field_type is _FIELD_INITVAR]
 
+    # Everything about the fields that does not change from one call to the next is
+    # worked out here, once: a class's __init__ runs for every instance of it.
+    std_names = [f.name for f in std_fields]
+    std_pos = {}
+    for i in range(nstd):
+        std_pos[std_names[i]] = i
+    required_kw = [f.name for f in kw_only_fields if f.default is MISSING and f.default_factory is MISSING]
+    # One entry a field: its name, its place among the positional arguments (-1 for
+    # none), whether a caller may pass it, and what it is when the caller did not --
+    # 2 for a factory to call, 1 for a default, 0 for nothing at all.
+    plan = []
+    for f in fields:
+        if f._field_type is not _FIELD:
+            continue
+        if f.default_factory is not MISSING:
+            plan.append((f.name, std_pos.get(f.name, -1) if f.init else -1, f.init, 2, f.default_factory))
+        elif f.default is not MISSING and f.init:
+            plan.append((f.name, std_pos.get(f.name, -1), True, 1, f.default))
+        else:
+            plan.append((f.name, std_pos.get(f.name, -1) if f.init else -1, f.init, 0, None))
+    plan = tuple(plan)
+
     def __init__(self, *args, **kwargs):
-        if len(args) > nstd:
+        given = len(args)
+        if given > nstd:
             if nreq == nstd:
                 takes = "%d positional argument%s" % (nstd + 1, "" if nstd == 0 else "s")
             else:
                 takes = "from %d to %d positional arguments" % (nreq + 1, nstd + 1)
-            raise TypeError("%s() takes %s but %d were given" % (qualname, takes, len(args) + 1))
-        values = {}
-        for i in range(len(args)):
-            values[std_fields[i].name] = args[i]
-        for k, v in kwargs.items():
-            if k not in names:
-                raise TypeError(qualname + "() got an unexpected keyword argument " + repr(k))
-            if k in values:
-                raise TypeError(qualname + "() got multiple values for argument " + repr(k))
-            values[k] = v
-        missing = [f.name for f in std_fields if f.name not in values and f.default is MISSING and
-                   f.default_factory is MISSING]
-        if missing:
-            raise TypeError("%s() missing %d required positional argument%s: %s"
-                            % (qualname, len(missing), "" if len(missing) == 1 else "s",
-                               _and_join(["'" + m + "'" for m in missing])))
-        missing = [f.name for f in kw_only_fields if f.name not in values and f.default is MISSING and
-                   f.default_factory is MISSING]
-        if missing:
-            raise TypeError("%s() missing %d required keyword-only argument%s: %s"
-                            % (qualname, len(missing), "" if len(missing) == 1 else "s",
-                               _and_join(["'" + m + "'" for m in missing])))
-        for f in fields:
-            if f._field_type is not _FIELD:
-                continue
-            if f.init and f.name in values:
-                v = values[f.name]
-            elif f.default_factory is not MISSING:
-                v = f.default_factory()
-            elif f.default is not MISSING:
-                if not f.init:
-                    continue
-                v = f.default
+            raise TypeError("%s() takes %s but %d were given" % (qualname, takes, given + 1))
+        if kwargs:
+            for k in kwargs:
+                if k not in names:
+                    raise TypeError(qualname + "() got an unexpected keyword argument " + repr(k))
+                if std_pos.get(k, given) < given:
+                    raise TypeError(qualname + "() got multiple values for argument " + repr(k))
+        if given < nreq:
+            missing = [std_names[i] for i in range(given, nreq) if std_names[i] not in kwargs]
+            if missing:
+                raise TypeError("%s() missing %d required positional argument%s: %s"
+                                % (qualname, len(missing), "" if len(missing) == 1 else "s",
+                                   _and_join(["'" + m + "'" for m in missing])))
+        if required_kw:
+            missing = [name for name in required_kw if name not in kwargs]
+            if missing:
+                raise TypeError("%s() missing %d required keyword-only argument%s: %s"
+                                % (qualname, len(missing), "" if len(missing) == 1 else "s",
+                                   _and_join(["'" + m + "'" for m in missing])))
+        for name, pos, init, kind, fallback in plan:
+            if 0 <= pos < given:
+                v = args[pos]
+            elif init and name in kwargs:
+                v = kwargs[name]
+            elif kind == 2:
+                v = fallback()
+            elif kind == 1:
+                v = fallback
             else:
                 continue
             if frozen:
-                object.__setattr__(self, f.name, v)
+                object.__setattr__(self, name, v)
             else:
-                setattr(self, f.name, v)
+                setattr(self, name, v)
         if has_post_init:
             extra = []
             for name in initvars:
-                if name in values:
-                    extra.append(values[name])
+                pos = std_pos.get(name, -1)
+                if 0 <= pos < given:
+                    extra.append(args[pos])
+                elif name in kwargs:
+                    extra.append(kwargs[name])
                 else:
                     extra.append(next(f.default for f in fields if f.name == name))
             self.__post_init__(*extra)

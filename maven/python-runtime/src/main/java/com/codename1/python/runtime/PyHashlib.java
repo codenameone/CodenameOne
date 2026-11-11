@@ -32,6 +32,10 @@ import com.codename1.security.Pbkdf2;
 /// object can still be updated afterwards, as Python's can.
 final class PyHashlib {
 
+    /// `os.urandom`'s source, and so `secrets`' and `uuid`'s: the platform's secure
+    /// generator, which seeds itself and is safe to share between threads.
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
     private PyHashlib() {
     }
 
@@ -67,6 +71,15 @@ final class PyHashlib {
             }
             return new PyBytes(Pbkdf2.derive(algorithm, PyBytes.like(a[1]), PyBytes.like(a[2]),
                     (int) Py.asLong(a[3]), (int) Py.asLong(a[4])));
+        }));
+        m.setAttr("urandom", PyBuiltin.positional("urandom", a -> {
+            long n = Py.asLong(a[0]);
+            if (n < 0 || n > Integer.MAX_VALUE) {
+                throw Py.error(Py.VALUE_ERROR, "negative argument not allowed");
+            }
+            byte[] out = new byte[(int) n];
+            RANDOM.nextBytes(out);
+            return new PyBytes(out);
         }));
         return m;
     }
