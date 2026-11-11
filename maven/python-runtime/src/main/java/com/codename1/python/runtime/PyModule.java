@@ -53,6 +53,8 @@ public final class PyModule extends PyObject {
     public final String name;
     public final Object[] slots;
     private final String[] slotNames;
+    private static final int SCANNED = 6;
+    private java.util.HashMap<String, Integer> slotIndex;
     private Map<String, Object> extra;
 
     /// The loaded module whose translated class is `javaClass` or encloses
@@ -241,12 +243,27 @@ public final class PyModule extends PyObject {
     }
 
     private int slotOf(String n) {
-        for (int i = 0; i < slotNames.length; i++) {
-            if (slotNames[i].equals(n)) {
-                return i;
+        if (slotNames.length <= SCANNED) {
+            for (int i = 0; i < slotNames.length; i++) {
+                if (slotNames[i].equals(n)) {
+                    return i;
+                }
             }
+            return -1;
         }
-        return -1;
+        // Built by the first read by name: `json.dumps` and every other
+        // `module.attr` comes here, and a scan compared the name with each
+        // global of the module in turn.
+        java.util.HashMap<String, Integer> ix = slotIndex;
+        if (ix == null) {
+            ix = new java.util.HashMap<String, Integer>();
+            for (int i = slotNames.length - 1; i >= 0; i--) {
+                ix.put(slotNames[i], Integer.valueOf(i));
+            }
+            slotIndex = ix;
+        }
+        Integer at = ix.get(n);
+        return at == null ? -1 : at.intValue();
     }
 
     /// A global the generated code reads that was never assigned: the

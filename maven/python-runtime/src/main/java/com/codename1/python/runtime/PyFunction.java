@@ -577,6 +577,15 @@ public final class PyFunction extends PyObject {
 
     private Object[] spareSlots;
 
+    /// The keyword-name arrays of the last few call sites that bound through
+    /// [#bindArgs], and the slot each of their names goes to (-1 for a name
+    /// that is no parameter).
+    private static final int SEEN = 4;
+    private String[][] seenKw;
+    private int[][] seenSlots;
+    private int seenNext;
+    private String[] pendingKw;
+
     private static Object[] clear(Object[] a) {
         for (int i = 0; i < a.length; i++) {
             a[i] = null;
@@ -748,22 +757,51 @@ public final class PyFunction extends PyObject {
         PyDict kw = varKw ? new PyDict() : null;
         int kwBase = positional + (varArgs ? 1 : 0);
         List<String> byKeyword = null;
+        // Which slot each keyword names is the same every time one call site
+        // calls: its names are one constant array. Matching them against the
+        // parameters by text again was most of what binding a keyword call cost.
+        int[] known = null;
+        if (kwNames.length > 0 && seenKw != null) {
+            for (int c = 0; c < SEEN; c++) {
+                if (seenKw[c] == kwNames) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    known = seenSlots[c];
+                    break;
+                }
+            }
+        }
+        // Learnt at the second sight of an array: one built for a single call
+        // (`f(**kw)`) never comes back, and must not push out those that do.
+        int[] learnt = null;
+        if (known == null && kwNames.length > 0) {
+            if (pendingKw == kwNames) { //NOPMD CompareObjectsWithEquals - identity is meant
+                learnt = new int[kwNames.length];
+            } else {
+                pendingKw = kwNames;
+            }
+        }
         for (int i = 0; i < kwNames.length; i++) {
             String k = kwNames[i];
             Object v = args[nPos + i];
             int slot = -1;
-            for (int p = positionalOnly; p < positional; p++) {
-                if (params[p].equals(k)) {
-                    slot = p;
-                    break;
-                }
-            }
-            if (slot < 0) {
-                for (int p = 0; p < kwOnly; p++) {
-                    if (params[kwBase + p].equals(k)) {
-                        slot = kwBase + p;
+            if (known != null) {
+                slot = known[i];
+            } else {
+                for (int p = positionalOnly; p < positional; p++) {
+                    if (params[p].equals(k)) {
+                        slot = p;
                         break;
                     }
+                }
+                if (slot < 0) {
+                    for (int p = 0; p < kwOnly; p++) {
+                        if (params[kwBase + p].equals(k)) {
+                            slot = kwBase + p;
+                            break;
+                        }
+                    }
+                }
+                if (learnt != null) {
+                    learnt[i] = slot;
                 }
             }
             if (slot < 0) {
@@ -789,6 +827,15 @@ public final class PyFunction extends PyObject {
             }
             throw Py.typeError(qn() + "() got some positional-only arguments passed as keyword arguments: '"
                     + sb + "'");
+        }
+        if (learnt != null) {
+            if (seenKw == null) {
+                seenKw = new String[SEEN][];
+                seenSlots = new int[SEEN][];
+            }
+            seenKw[seenNext] = kwNames;
+            seenSlots[seenNext] = learnt;
+            seenNext = (seenNext + 1) % SEEN;
         }
         int firstDefault = positional - defaults.length;
         List<String> missing = null;

@@ -424,6 +424,25 @@ final class PyJson {
                     n++;
                 }
             }
+            if (n <= 32) {
+                // The usual object: a handful of keys, ordered in the array
+                // that is answered, with no boxed indices and no comparator.
+                int[] out = new int[n];
+                int w = 0;
+                for (int i = 0; i < used; i++) {
+                    if (keys[i] == null) {
+                        continue;
+                    }
+                    String key = (String) keys[i];
+                    int at = w++;
+                    while (at > 0 && codePointCompare((String) keys[out[at - 1]], key) > 0) {
+                        out[at] = out[at - 1];
+                        at--;
+                    }
+                    out[at] = i;
+                }
+                return out;
+            }
             Integer[] idx = new Integer[n];
             n = 0;
             for (int i = 0; i < used; i++) {
