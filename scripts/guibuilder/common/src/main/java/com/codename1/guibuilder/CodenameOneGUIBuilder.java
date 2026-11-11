@@ -610,6 +610,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void refreshEditor() {
         if (document == null) return;
+        canvasRebuilds++;
         TooltipManager.hideTooltip();
         normalizeSelection();
         cancelDesignerDrag();
@@ -8171,6 +8172,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         out.put("canvasMode", canvasMode);
         out.put("darkMode", Boolean.valueOf(darkMode));
         out.put("status", status == null ? null : status.getText());
+        // Work the form's modified flag cannot see: text in an open Code, Model or CSS pane is in an
+        // editor buffer, and a half-typed inline edit or a drag is not in the document at all. A
+        // client deciding whether it may close or switch away has to know about both.
+        out.put("editorDirty", Boolean.valueOf(editorBufferIsDirty()));
+        out.put("developerBusy", Boolean.valueOf(mcpDeveloperBusy() != null));
         List<Object> forms = new ArrayList<Object>();
         for (String path : guiFiles) forms.add(relativeFormName(path));
         out.put("forms", forms);
@@ -8456,6 +8462,1324 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 || "tabletPortrait".equals(command) || "desktop".equals(command)) setCanvasMode(command);
         else return "Unknown command " + command;
         recordAction("mcp_command", "command", command);
+        return null;
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MCP editing operations.
+    //
+    // Everything a client can change goes through mcpEdit(): one operation is one document
+    // transaction, so it is exactly one undo step for the person at the keyboard, and a failure
+    // part way through is abandoned outright rather than leaving half an edit behind. Validation is
+    // the inspector's own -- the same ranges, the same BorderLayout and table-cell rules, the same
+    // rename that repoints relationships -- because a client that can store what the inspector
+    // refuses produces forms the canvas and the generator disagree about.
+    // ------------------------------------------------------------------------------------------
+
+    /** The largest .gui fragment guibuilder_insert_xml accepts. */
+    private static final int MCP_MAX_XML = 256 * 1024;
+
+    /** One editing operation. Returns an error, or null after filling the details it reports. */
+    private interface McpEditOperation {
+        String apply(Map<String, Object> details);
+    }
+
+    /**
+     * Runs a named editing operation for an MCP client.
+     *
+     * @param operation the operation name (the tool name without its {@code guibuilder_} prefix)
+     * @param args the parsed tool arguments
+     * @return the operation's details, with {@code error} set when it was refused
+     */
+    Map<String, Object> mcpEdit(String operation, Map<String, Object> args) {
+        final Map<String, Object> a = args == null ? new LinkedHashMap<String, Object>() : args;
+        if ("component_types".equals(operation)) return com.codename1.guibuilder.model.ComponentCatalog.describe();
+        if ("get_form_xml".equals(operation)) return mcpFormXml(a);
+        if ("toolbar_commands".equals(operation) && (a.get("action") == null || "list".equals(a.get("action")))) {
+            // Read only, so it never goes near the transaction: listing must not touch the person's
+            // edit, the canvas or the status line.
+            Map<String, Object> details = new LinkedHashMap<String, Object>();
+            if (document == null) details.put("error", "No active GUI document; open a form first");
+            else if (!isFormLike(mcpType(document.root()))) details.put("error", "Only a Form or Dialog has toolbar commands");
+            else details.put("commands", mcpCommandList());
+            return details;
+        }
+        if ("create_form".equals(operation)) {
+            Map<String, Object> details = new LinkedHashMap<String, Object>();
+            String error = unattended(() -> mcpCreateFormImpl(a, details));
+            if (error != null) details.put("error", error);
+            return details;
+        }
+        McpEditOperation edit;
+        if ("add_component".equals(operation)) edit = details -> mcpAddComponent(a, details);
+        else if ("insert_xml".equals(operation)) edit = details -> mcpInsertXml(a, details);
+        else if ("set_properties".equals(operation)) edit = details -> mcpSetProperties(a, details);
+        else if ("rename_component".equals(operation)) edit = details -> mcpRename(a, details);
+        else if ("delete_components".equals(operation)) edit = details -> mcpDelete(a, details);
+        else if ("set_layout".equals(operation)) edit = details -> mcpSetLayout(a, details);
+        else if ("set_constraint".equals(operation)) edit = details -> mcpSetConstraint(a, details);
+        else if ("set_event_handler".equals(operation)) edit = details -> mcpSetEventHandler(a, details);
+        else if ("toolbar_commands".equals(operation)) edit = details -> mcpToolbarCommands(a, details);
+        else if ("set_binding".equals(operation)) edit = details -> mcpSetBinding(a, details);
+        else {
+            Map<String, Object> unknown = new LinkedHashMap<String, Object>();
+            unknown.put("error", "Unknown GUI Builder operation " + operation);
+            return unknown;
+        }
+        return mcpTransaction(operation, edit);
+    }
+
+    /** Counts canvas rebuilds, so an abandoned edit knows whether the canvas showed part of it. */
+    private int canvasRebuilds;
+
+    private Map<String, Object> mcpTransaction(String operation, McpEditOperation edit) {
+        final Map<String, Object> details = new LinkedHashMap<String, Object>();
+        final Element[] focus = new Element[1];
+        final String[] before = new String[1];
+        final boolean[] committedEdit = new boolean[1];
+        final boolean[] rolledBack = new boolean[1];
+        final Element[] selectedBefore = new Element[1];
+        final boolean[] modifiedBefore = new boolean[1];
+        final String[] statusBefore = new String[1];
+        final int rebuildsBefore = canvasRebuilds;
+        String error = unattended(() -> {
+            if (document == null) return "No active GUI document; open a form first";
+            if (canvasHost == null) return "The design canvas is not ready";
+            String busy = mcpDeveloperBusy();
+            if (busy != null) return busy;
+            before[0] = document.toXml();
+            statusBefore[0] = status == null ? null : status.getText();
+            selectedBefore[0] = document.selected();
+            modifiedBefore[0] = document.isModified();
+            document.beginTransaction();
+            boolean committed = false;
+            try {
+                String refused = edit.apply(details);
+                if (refused != null) return refused;
+                committed = true;
+                committedEdit[0] = true;
+                focus[0] = document.selected();
+                return null;
+            } finally {
+                if (committed) {
+                    document.endTransaction();
+                } else if (before[0].equals(document.toXml())) {
+                    // Refused before anything changed. Closing the transaction records nothing for an
+                    // unchanged document, and unlike abortTransaction() it does not re-parse the XML,
+                    // which would replace every element object while the canvas, the selection and
+                    // the inspector still hold the old ones.
+                    document.endTransaction();
+                } else {
+                    document.abortTransaction();
+                    rolledBack[0] = true;
+                }
+            }
+        });
+        // An abandoned edit restores the document by re-parsing it, which can serialize attributes in
+        // another order; only a committed edit can have changed anything.
+        boolean changed = committedEdit[0] && document != null && !before[0].equals(document.toXml());
+        if (document != null && before[0] != null && !changed && !rolledBack[0]) {
+            // Nothing changed -- refused up front, or committed with the values already there. The
+            // tools select their target as they go, and every attribute write marks the document
+            // modified; put both back, or the inspector acts on a component the canvas does not show
+            // as selected and an untouched form asks to be saved.
+            document.select(selectedBefore[0]);
+            document.restoreModified(modifiedBefore[0]);
+        }
+        // Rebuilt only when the form changed, or when a step that measured the canvas rebuilt it for
+        // an edit that was then abandoned; otherwise the canvas, selection and status are left alone.
+        // A rollback re-parses the document into new element objects, so the canvas has to be rebuilt
+        // after one even though the form is back as it was: otherwise the canvas, the selection and
+        // the inspector keep editing elements that are no longer in the document.
+        if (rolledBack[0]) document.restoreModified(modifiedBefore[0]);
+        String rebuildFailure = null;
+        if (changed || rolledBack[0] || canvasRebuilds != rebuildsBefore) {
+            rebuildFailure = unattended(() -> {
+                if (document == null) return null;
+                if (changed && focus[0] != null && document.containsElement(focus[0])) {
+                    selectedElements.clear();
+                    if (focus[0] != document.root()) selectedElements.add(focus[0]);
+                    document.select(focus[0]);
+                }
+                refreshEditor();
+                return null;
+            });
+        }
+        if (rebuildFailure != null && changed && error == null) {
+            // The edit reached the document but the canvas cannot show it, and the generated source
+            // would fail the same way. Take it back out rather than report it as done.
+            final String failure = rebuildFailure;
+            unattended(() -> {
+                // Not undo(): that would leave the change on the redo stack, and Redo would bring back
+                // a change the canvas has already shown it cannot draw.
+                if (document.revertLastChange()) refreshEditor();
+                return null;
+            });
+            error = "The canvas could not show that change, so it was undone: " + failure;
+        }
+        if (error != null) {
+            details.clear();
+            details.put("error", error);
+            recordAction("mcp_edit_refused", "operation", operation, "error", error);
+        } else if (changed) {
+            recordAction("mcp_edit", "operation", operation);
+            // An edit that reported something of its own on the status line (the binding model it will
+            // write, say) keeps it; the generic line would hide the one thing the developer needs.
+            String now = status == null ? null : status.getText();
+            if (now == null || now.equals(statusBefore[0])) {
+                setStatus("Modified through MCP • " + relativeFormName(document.path()));
+            }
+        }
+        return details;
+    }
+
+    /**
+     * Why an agent's change has to wait, or null when it need not.
+     *
+     * <p>The person at the keyboard comes first. Committing their half-typed text or cancelling their
+     * drag to make room for an agent's edit takes the canvas out from under them -- and half-typed
+     * inline text is not in the document yet, so no unsaved-changes check can see it.
+     */
+    private String mcpDeveloperBusy() {
+        if (inlineEditor != null || designerDragArmed || designerDragActive
+                || guidedResizeArmed || guidedResizeActive) {
+            return "The developer is editing or dragging in the GUI Builder; try again when they finish";
+        }
+        // A modal question (Save before switching? Regenerate the model?) runs a nested event loop,
+        // so an MCP call would land while the developer's save or switch is half done -- and save()
+        // marks whatever the document then holds as saved, though it wrote the earlier XML.
+        Form current = Display.getInstance().getCurrent();
+        if (current instanceof com.codename1.ui.Dialog) {
+            return "The GUI Builder is waiting for the developer to answer a dialog; try again when they have";
+        }
+        // Rebuilding the canvas rebuilds the inspector and any open Code, Model or CSS pane: a field
+        // the developer is typing in commits on the focus loss, and the pane loses its caret.
+        Component focused = current == null ? null : current.getFocused();
+        if (focused instanceof TextArea && inspectorHost != null && isInside(focused, inspectorHost)) {
+            return "The developer is typing in the inspector; try again when they finish";
+        }
+        if (activeCodeEditor != null) {
+            return "A Code, Model or CSS pane is open in the GUI Builder; ask the developer to close it first";
+        }
+        return null;
+    }
+
+    private static boolean isInside(Component component, Container ancestor) {
+        for (Container parent = component.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent == ancestor) return true; //NOPMD CompareObjectsWithEquals
+        }
+        return false;
+    }
+
+    private Element mcpElement(Object name) {
+        if (!(name instanceof String) || ((String) name).length() == 0) return null;
+        return findElementNamed(document, (String) name);
+    }
+
+    private static String mcpString(Map<String, Object> args, String key) {
+        Object value = args.get(key);
+        if (value == null) return null;
+        if (value instanceof String) return (String) value;
+        if (value instanceof Number) {
+            double number = ((Number) value).doubleValue();
+            if (number == Math.floor(number) && Math.abs(number) < 1e15) return String.valueOf((long) number);
+            return String.valueOf(number);
+        }
+        return String.valueOf(value);
+    }
+
+    /** An integer argument, or null when absent. Throws for a value that is not a whole number. */
+    private static Integer mcpInteger(Map<String, Object> args, String key) {
+        Object value = args.get(key);
+        if (value == null) return null;
+        if (value instanceof Number) {
+            double number = ((Number) value).doubleValue();
+            if (number != Math.floor(number)) throw new IllegalArgumentException(key + " must be a whole number");
+            // A cast saturates rather than failing, and a saturated span made the range checks overflow.
+            if (number > Integer.MAX_VALUE || number < Integer.MIN_VALUE) {
+                throw new IllegalArgumentException(key + " is out of range");
+            }
+            return Integer.valueOf((int) number);
+        }
+        Integer parsed = parseInteger(String.valueOf(value).trim());
+        if (parsed == null) throw new IllegalArgumentException(key + " must be a whole number");
+        return parsed;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> mcpObject(Map<String, Object> args, String key) {
+        Object value = args.get(key);
+        if (value instanceof Map) return (Map<String, Object>) value;
+        if (value == null) return null;
+        throw new IllegalArgumentException(key + " must be an object");
+    }
+
+    private String mcpName(Element element) {
+        return value(element, "name", value(element, "type", "component"));
+    }
+
+    private String mcpType(Element element) {
+        return value(element, "type", "Container");
+    }
+
+    // --- add, insert, delete, rename ---------------------------------------------------------
+
+    private String mcpAddComponent(Map<String, Object> args, Map<String, Object> details) {
+        String type = mcpString(args, "type");
+        if (!com.codename1.guibuilder.model.ComponentCatalog.isPaletteType(type)) {
+            return "type must be one of " + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.PALETTE_TYPES);
+        }
+        Element parent = args.get("parent") == null ? document.root() : mcpElement(args.get("parent"));
+        if (parent == null) return "No component named " + args.get("parent");
+        if (!GuiDocument.acceptsChildren(parent)) {
+            return mcpName(parent) + " is a " + mcpType(parent) + " and cannot hold components";
+        }
+        if (GuiDocument.borderLayoutIsFull(parent)) {
+            return mcpName(parent) + " is a BorderLayout and all five regions are taken";
+        }
+        document.select(parent);
+        Element added = document.addComponent(type);
+        if (added == null) return "Nothing was added to " + mcpName(parent);
+        mcpPinBorderRegion(parent, added);
+        Integer index = mcpInteger(args, "index");
+        if (index != null) {
+            String moved = mcpMoveToIndex(added, parent, index.intValue());
+            if (moved != null) return moved;
+        }
+        String requestedName = mcpString(args, "name");
+        if (requestedName != null) {
+            document.select(added);
+            String applied = document.renameSelected(requestedName);
+            if (applied == null || applied.length() == 0) return "Invalid component name " + requestedName;
+        }
+        Map<String, Object> layout = mcpObject(args, "layout");
+        if (layout != null) {
+            String refused = mcpApplyLayout(added, layout);
+            if (refused != null) return refused;
+        }
+        Map<String, Object> properties = mcpObject(args, "properties");
+        if (properties != null) {
+            String refused = mcpApplyProperties(added, properties);
+            if (refused != null) return refused;
+        }
+        Map<String, Object> constraint = mcpObject(args, "constraint");
+        if (constraint != null) {
+            String refused = mcpApplyConstraint(added, constraint);
+            if (refused != null) return refused;
+        }
+        document.select(added);
+        details.put("component", mcpName(added));
+        details.put("parent", mcpName(document.parentOf(added)));
+        return null;
+    }
+
+    private String mcpInsertXml(Map<String, Object> args, Map<String, Object> details) {
+        String xml = mcpString(args, "xml");
+        if (xml == null || xml.trim().length() == 0) return "xml is required";
+        if (xml.length() > MCP_MAX_XML) return "xml is larger than " + MCP_MAX_XML + " characters";
+        Element parsed;
+        try {
+            parsed = new com.codename1.xml.XMLParser().parse(new com.codename1.util.regex.StringReader(xml));
+        } catch (RuntimeException ex) {
+            return "xml could not be parsed: " + ex.getMessage();
+        }
+        if (parsed == null || !"component".equals(parsed.getTagName())) {
+            return "xml must be a single <component> element";
+        }
+        String invalid = mcpValidateFragment(parsed);
+        if (invalid != null) return invalid;
+        Element parent = args.get("parent") == null ? document.root() : mcpElement(args.get("parent"));
+        if (parent == null) return "No component named " + args.get("parent");
+        if (!GuiDocument.acceptsChildren(parent)) {
+            return mcpName(parent) + " is a " + mcpType(parent) + " and cannot hold components";
+        }
+        if (GuiDocument.borderLayoutIsFull(parent)) {
+            return mcpName(parent) + " is a BorderLayout and all five regions are taken";
+        }
+        if ("BorderLayout".equals(value(parent, "layout", "BoxLayout"))) {
+            // Checked against the fragment's own constraint, before it lands: once it is in the
+            // document, effectiveBorderConstraint() moves a duplicate to the first free region, so
+            // asking the siblings afterwards can never find the clash.
+            String requested = parsed.getAttribute("layoutConstraint");
+            String region = GuiDocument.normalizeBorderConstraint(requested);
+            if (requested != null && requested.trim().length() > 0 && region == null) {
+                return "layoutConstraint must be one of "
+                        + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.BORDER_REGIONS);
+            }
+            if (region != null && GuiDocument.childAtBorderConstraint(parent, region, null) != null) {
+                return "The " + region + " region of " + mcpName(parent) + " is already taken by "
+                        + mcpName(GuiDocument.childAtBorderConstraint(parent, region, null))
+                        + "; give the fragment a free layoutConstraint";
+            }
+        }
+        document.select(parent);
+        // The fragment as validated and normalized, not the text as sent.
+        Element inserted = document.pasteXml(new com.codename1.xml.XMLWriter(true).toXML(parsed));
+        if (inserted == null) return "The fragment could not be inserted into " + mcpName(parent);
+        Integer index = mcpInteger(args, "index");
+        if (index != null) {
+            String moved = mcpMoveToIndex(inserted, parent, index.intValue());
+            if (moved != null) return moved;
+        }
+        if ("TableLayout".equals(value(parent, "layout", "BoxLayout"))) normalizeTableCells(parent);
+        for (Element nested : allComponentsIn(inserted)) {
+            if ("TableLayout".equals(nested.getAttribute("layout"))) normalizeTableCells(nested);
+        }
+        mcpPinBorderRegion(parent, inserted);
+        document.select(inserted);
+        List<Object> names = new ArrayList<Object>();
+        for (Element element : allComponentsIn(inserted)) names.add(mcpName(element));
+        details.put("component", mcpName(inserted));
+        details.put("components", names);
+        return null;
+    }
+
+    /**
+     * Gives a new BorderLayout child the region it landed in as an explicit constraint, so a later
+     * reorder or insertion cannot reassign it.
+     */
+    private void mcpPinBorderRegion(Element parent, Element child) {
+        if (!"BorderLayout".equals(value(parent, "layout", "BoxLayout"))) return;
+        document.setAttribute(child, "layoutConstraint", GuiDocument.effectiveBorderConstraint(parent, child));
+    }
+
+    private List<Object> mcpCommandList() {
+        List<Object> out = new ArrayList<Object>();
+        List<Element> current = document.commands();
+        for (int i = 0; i < current.size(); i++) {
+            Element command = current.get(i);
+            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            item.put("index", Integer.valueOf(i));
+            item.put("label", value(command, "name", "Command"));
+            item.put("placement", value(command, "placement", "right"));
+            item.put("handler", value(command, "actionEvent", null));
+            out.add(item);
+        }
+        return out;
+    }
+
+    private List<Element> allComponentsIn(Element element) {
+        List<Element> out = new ArrayList<Element>();
+        out.add(element);
+        for (Element child : componentChildren(element)) out.addAll(allComponentsIn(child));
+        return out;
+    }
+
+    /** Rejects what the canvas or the generator cannot represent before it reaches the document. */
+    private String mcpValidateFragment(Element element) {
+        String type = element.getAttribute("type");
+        if (!com.codename1.guibuilder.model.ComponentCatalog.isKnownChildType(type)) {
+            return "Unsupported component type " + type + "; use one of "
+                    + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.PALETTE_TYPES);
+        }
+        String label = value(element, "name", type);
+        String layout = element.getAttribute("layout");
+        if (layout != null && !Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.LAYOUTS).contains(layout)) {
+            return "Unsupported layout " + layout + " on " + label;
+        }
+        // Every attribute the canvas or the generator reads is held to what the matching tool would
+        // accept, and stored in the form they expect: both compare booleans and choices exactly and
+        // emit several numbers into the generated source as they stand.
+        String attributeError = mcpNormalizeFragmentAttributes(element, type, label);
+        if (attributeError != null) return attributeError;
+        String handler = element.getAttribute("actionEvent");
+        if (handler != null && handler.trim().length() > 0 && !"true".equals(handler.trim())
+                && !mcpJavaIdentifier(handler.trim())) {
+            return label + ": actionEvent must be a Java method name";
+        }
+        String axis = element.getAttribute("boxLayoutAxis");
+        if (axis != null && !"X".equalsIgnoreCase(axis.trim()) && !"Y".equalsIgnoreCase(axis.trim())) {
+            return label + ": boxLayoutAxis must be X or Y";
+        }
+        if (axis != null) mcpPutAttribute(element, "boxLayoutAxis", axis.trim().toUpperCase());
+        String[] sizes = {"gridLayoutRows", "gridLayoutColumns", "tableLayoutRows", "tableLayoutColumns"};
+        for (String size : sizes) {
+            String raw = element.getAttribute(size);
+            if (raw == null) continue;
+            Integer parsed = parseInteger(raw.trim());
+            if (parsed == null || parsed.intValue() < 1 || parsed.intValue() > 100) {
+                return label + ": " + size + " must be from 1 to 100";
+            }
+        }
+        if ("TableLayout".equals(layout)) {
+            String cells = mcpValidateFragmentTable(element);
+            if (cells != null) return cells;
+        }
+        if (layout != null && !GuiDocument.acceptsChildren(element)) {
+            return type + " cannot have a layout";
+        }
+        if ("BorderLayout".equals(layout) && GuiDocument.componentsIn(element).size() > BORDER_LAYOUT_REGION_COUNT) {
+            return "A BorderLayout holds five components; " + value(element, "name", type) + " has more";
+        }
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (!(child instanceof Element)) continue;
+            Element nested = (Element) child;
+            if (!"component".equals(nested.getTagName())) {
+                return "Only <component> elements may appear in a fragment, found <" + nested.getTagName() + ">";
+            }
+            if (!GuiDocument.acceptsChildren(element)) return type + " cannot hold components";
+            String refused = mcpValidateFragment(nested);
+            if (refused != null) return refused;
+        }
+        return null;
+    }
+
+    /**
+     * Checks the cells a fragment's own TableLayout container gives its children. TableLayout throws
+     * on two children in one cell ("already occupied") or a span past the edge ("Illegal span"), on
+     * the canvas and in the generated app alike, so neither may reach the document.
+     */
+    private String mcpValidateFragmentTable(Element table) {
+        int rows = Math.max(1, integer(table.getAttribute("tableLayoutRows"), 2));
+        int columns = Math.max(1, integer(table.getAttribute("tableLayoutColumns"), 2));
+        String label = value(table, "name", "TableLayout container");
+        java.util.Set<String> taken = new LinkedHashSet<String>();
+        for (Element child : GuiDocument.componentsIn(table)) {
+            String childLabel = value(child, "name", value(child, "type", "component"));
+            String rawRow = child.getAttribute("tableRow");
+            String rawColumn = child.getAttribute("tableColumn");
+            Integer rowSpan = parseOptionalCount(child.getAttribute("tableVerticalSpan"));
+            Integer columnSpan = parseOptionalCount(child.getAttribute("tableHorizontalSpan"));
+            if (rowSpan == null || columnSpan == null) return childLabel + ": table spans must be whole numbers from 1";
+            if (rawRow == null && rawColumn == null) {
+                // No cell: one is assigned after the insert, but its span still has to fit the table.
+                if (rowSpan.intValue() > rows || columnSpan.intValue() > columns) {
+                    return childLabel + ": its span does not fit " + label + " (" + rows + " x " + columns + ")";
+                }
+                continue;
+            }
+            Integer row = rawRow == null ? null : parseInteger(rawRow.trim());
+            Integer column = rawColumn == null ? null : parseInteger(rawColumn.trim());
+            if (row == null || column == null) return childLabel + ": give both tableRow and tableColumn, as whole numbers";
+            int r = row.intValue();
+            int c = column.intValue();
+            if (r < 0 || r >= rows || c < 0 || c >= columns) {
+                return childLabel + ": cell " + r + "," + c + " is outside " + label + " (" + rows + " x " + columns + ")";
+            }
+            if (rowSpan.intValue() > rows - r || columnSpan.intValue() > columns - c) {
+                return childLabel + ": its span runs past the edge of " + label;
+            }
+            for (int i = r; i < r + rowSpan.intValue(); i++) {
+                for (int j = c; j < c + columnSpan.intValue(); j++) {
+                    if (!taken.add(i + ":" + j)) return childLabel + ": cell " + i + "," + j + " of " + label + " is already used";
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Replaces an attribute under its canonical (lower-case) key, dropping any camel-case copy. */
+    private static void mcpPutAttribute(Element element, String name, String value) {
+        element.removeAttribute(name);
+        element.removeAttribute(name.toLowerCase());
+        if (value != null) element.setAttribute(name.toLowerCase(), value);
+    }
+
+    private String mcpNormalizeFragmentAttributes(Element element, String type, String label) {
+        java.util.Hashtable attributes = element.getAttributes();
+        if (attributes != null) {
+            for (Object key : new ArrayList<Object>(attributes.keySet())) {
+                com.codename1.guibuilder.model.ComponentCatalog.Property property =
+                        com.codename1.guibuilder.model.ComponentCatalog.property(type, String.valueOf(key));
+                if (property == null) continue;
+                try {
+                    mcpPutAttribute(element, property.name(), mcpNormalizeProperty(element, property, attributes.get(key)));
+                } catch (IllegalArgumentException refused) {
+                    return label + ": " + refused.getMessage();
+                }
+            }
+        }
+        // Cells and spans: whole numbers in range, wherever they appear -- a later set_layout can turn
+        // any container into a table, and the generator emits spans into the source as written.
+        String[][] ranges = {{"tableRow", "0", "99"}, {"tableColumn", "0", "99"}, {"tableVerticalSpan", "1", "100"},
+            {"tableHorizontalSpan", "1", "100"}, {"tableWidth", "-1", "100"}, {"tableHeight", "-1", "100"},
+            {"guidedPreferredWidth", "0", "100000"}, {"guidedPreferredHeight", "0", "100000"},
+            {"selectedIndex", "0", "100000"}};
+        for (String[] range : ranges) {
+            String raw = element.getAttribute(range[0]);
+            if (raw == null) continue;
+            Integer parsed = parseInteger(raw.trim());
+            int minimum = Integer.parseInt(range[1]);
+            int maximum = Integer.parseInt(range[2]);
+            if (parsed == null || parsed.intValue() < minimum || parsed.intValue() > maximum) {
+                return label + ": " + range[0] + " must be a whole number from " + minimum + " to " + maximum;
+            }
+            mcpPutAttribute(element, range[0], String.valueOf(parsed));
+        }
+        // The guided-layout attributes LayeredLayout and the generated setters parse.
+        String insets = element.getAttribute("layeredInsets");
+        if (insets != null) {
+            String refused = mcpValidInsets(insets);
+            if (refused != null) return label + ": " + refused;
+        }
+        String[] anchors = {"guidedHorizontalAnchor", "guidedVerticalAnchor"};
+        for (String anchor : anchors) {
+            String raw = element.getAttribute(anchor);
+            if (raw == null) continue;
+            Float parsed = mcpFiniteFloat(raw);
+            if (parsed == null || parsed.floatValue() < 0 || parsed.floatValue() > 1) {
+                return label + ": " + anchor + " must be a number from 0 to 1";
+            }
+            mcpPutAttribute(element, anchor, String.valueOf(parsed.floatValue()));
+        }
+        String positions = element.getAttribute("guidedReferencePositions");
+        if (positions != null) {
+            String[] parts = positions.trim().split(" ");
+            int count = 0;
+            for (String part : parts) {
+                if (part.length() == 0) continue;
+                if (mcpFiniteFloat(part) == null) return label + ": guidedReferencePositions must be four numbers";
+                count++;
+            }
+            if (count != 4) return label + ": guidedReferencePositions must be four numbers";
+        }
+        String references = element.getAttribute("guidedReferences");
+        if (references != null && references.split("\\|", -1).length != 4) {
+            return label + ": guidedReferences must be four names or - separated by |";
+        }
+        String[] sizes = {"guidedHorizontalSize", "guidedVerticalSize"};
+        for (String size : sizes) {
+            String raw = element.getAttribute(size);
+            if (raw == null) continue;
+            if (!GuidedLayoutSupport.PREFERRED.equals(raw) && !GuidedLayoutSupport.FIXED.equals(raw)
+                    && !GuidedLayoutSupport.FILL.equals(raw) && !GuidedLayoutSupport.MATCH.equals(raw)) {
+                return label + ": " + size + " must be preferred, fixed, fill or match";
+            }
+        }
+        return null;
+    }
+
+    private static Float mcpFiniteFloat(String raw) {
+        try {
+            float value = Float.parseFloat(raw.trim());
+            return Float.isNaN(value) || Float.isInfinite(value) ? null : Float.valueOf(value);
+        } catch (NumberFormatException invalid) {
+            return null;
+        }
+    }
+
+    /** A span attribute: 1 when absent, null when it is not a whole number of at least 1. */
+    private static Integer parseOptionalCount(String raw) {
+        if (raw == null || raw.trim().length() == 0) return Integer.valueOf(1);
+        Integer parsed = parseInteger(raw.trim());
+        return parsed == null || parsed.intValue() < 1 ? null : parsed;
+    }
+
+    private String mcpMoveToIndex(Element element, Element parent, int index) {
+        if (index < 0) return "index must be zero or more";
+        if ("TableLayout".equals(value(parent, "layout", "BoxLayout"))) {
+            return "Order in a TableLayout is its cells; set row and column with guibuilder_set_constraint instead of index";
+        }
+        if ("BorderLayout".equals(value(parent, "layout", "BoxLayout"))) {
+            // Reordering a BorderLayout's children reassigns the regions of any without one of
+            // their own, silently moving a component the caller never named.
+            return "Order in a BorderLayout is its regions; set region with guibuilder_set_constraint instead of index";
+        }
+        int count = componentChildren(parent).size();
+        document.select(element);
+        if (!document.moveSelectedToParent(parent, Math.min(index, count - 1))) {
+            return "Could not move " + mcpName(element) + " to index " + index;
+        }
+        return null;
+    }
+
+    private String mcpDelete(Map<String, Object> args, Map<String, Object> details) {
+        Object raw = args.get("components");
+        if (!(raw instanceof List) || ((List<?>) raw).isEmpty()) return "components must be a non-empty list of names";
+        List<Element> targets = new ArrayList<Element>();
+        for (Object name : (List<?>) raw) {
+            Element element = mcpElement(name);
+            if (element == null) return "No component named " + name;
+            if (element == document.root()) return "The form itself cannot be deleted";
+            targets.add(element);
+        }
+        List<Object> deleted = new ArrayList<Object>();
+        for (Element element : targets) {
+            // A component inside one deleted earlier in the list went with it.
+            if (!document.containsElement(element)) continue;
+            deleted.add(mcpName(element));
+            document.select(element);
+            if (!document.deleteSelected()) return "Could not delete " + mcpName(element);
+        }
+        details.put("deleted", deleted);
+        return null;
+    }
+
+    private String mcpRename(Map<String, Object> args, Map<String, Object> details) {
+        Element element = mcpElement(args.get("component"));
+        if (element == null) return "No component named " + args.get("component");
+        String requested = mcpString(args, "name");
+        if (requested == null || requested.trim().length() == 0) return "name is required";
+        String previous = mcpName(element);
+        document.select(element);
+        String applied = document.renameSelected(requested);
+        if (applied == null || applied.length() == 0) return "Invalid component name " + requested;
+        details.put("previous", previous);
+        details.put("component", applied);
+        if (!applied.equals(requested.trim())) {
+            details.put("note", "Renamed to " + applied + " because " + requested + " is already used or not allowed");
+        }
+        return null;
+    }
+
+    // --- properties ----------------------------------------------------------------------------
+
+    private String mcpSetProperties(Map<String, Object> args, Map<String, Object> details) {
+        Element element = mcpElement(args.get("component"));
+        if (element == null) return "No component named " + args.get("component");
+        Map<String, Object> properties = mcpObject(args, "properties");
+        if (properties == null || properties.isEmpty()) return "properties must be a non-empty object";
+        String refused = mcpApplyProperties(element, properties);
+        if (refused != null) return refused;
+        document.select(element);
+        details.put("component", mcpName(element));
+        return null;
+    }
+
+    private String mcpApplyProperties(Element element, Map<String, Object> properties) {
+        String type = mcpType(element);
+        for (Map.Entry<String, Object> entry : properties.entrySet()) {
+            String key = entry.getKey();
+            com.codename1.guibuilder.model.ComponentCatalog.Property property =
+                    com.codename1.guibuilder.model.ComponentCatalog.property(type, key);
+            if (property == null) return mcpUnknownProperty(type, key);
+            String normalized;
+            try {
+                normalized = mcpNormalizeProperty(element, property, entry.getValue());
+            } catch (IllegalArgumentException refused) {
+                return refused.getMessage();
+            }
+            document.setAttribute(element, property.name(), normalized);
+        }
+        return null;
+    }
+
+    /**
+     * The stored form of one property value, checked as the inspector checks it.
+     *
+     * @param element the component the value is for
+     * @param property the catalog entry
+     * @param raw the value as given, or null to reset it
+     * @return the value to store, or null to remove the attribute
+     * @throws IllegalArgumentException naming what is wrong with the value
+     */
+    private String mcpNormalizeProperty(Element element, com.codename1.guibuilder.model.ComponentCatalog.Property property,
+            Object raw) {
+        if (raw == null) return null;
+        String kind = property.kind();
+        if (com.codename1.guibuilder.model.ComponentCatalog.KIND_BOOLEAN.equals(kind)) {
+            String text = String.valueOf(raw).trim();
+            if (!"true".equalsIgnoreCase(text) && !"false".equalsIgnoreCase(text)) {
+                throw new IllegalArgumentException(property.name() + " must be true or false");
+            }
+            return String.valueOf("true".equalsIgnoreCase(text));
+        }
+        if (com.codename1.guibuilder.model.ComponentCatalog.KIND_INTEGER.equals(kind)) {
+            Map<String, Object> holder = new LinkedHashMap<String, Object>();
+            holder.put(property.name(), raw);
+            int parsed = mcpInteger(holder, property.name()).intValue();
+            int maximum = property.maximum();
+            if ("selectedIndex".equals(property.name())) {
+                maximum = Math.max(0, GuiDocument.componentsIn(element).size() - 1);
+            }
+            if (parsed < property.minimum() || parsed > maximum) {
+                throw new IllegalArgumentException(property.name() + " must be from " + property.minimum() + " to " + maximum);
+            }
+            return String.valueOf(parsed);
+        }
+        if (com.codename1.guibuilder.model.ComponentCatalog.KIND_CHOICE.equals(kind)) {
+            String text = String.valueOf(raw).trim();
+            for (String choice : property.choices()) if (choice.equalsIgnoreCase(text)) return choice;
+            throw new IllegalArgumentException(property.name() + " must be one of " + Arrays.asList(property.choices()));
+        }
+        String text = raw instanceof String ? (String) raw : mcpString(java.util.Collections.singletonMap("v", raw), "v");
+        if (!"uiid".equals(property.name())) return text;
+        text = text.trim();
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-')) {
+                throw new IllegalArgumentException("uiid must be a CSS selector name (letters, digits, - and _)");
+            }
+        }
+        return text.length() == 0 ? null : text;
+    }
+
+    private String mcpUnknownProperty(String type, String key) {
+        String lower = key == null ? "" : key.toLowerCase();
+        if ("name".equals(lower)) return "Rename with guibuilder_rename_component";
+        if ("layout".equals(lower) || lower.startsWith("boxlayout") || lower.startsWith("gridlayout")
+                || lower.startsWith("tablelayout")) {
+            return key + " is set with guibuilder_set_layout";
+        }
+        if ("layoutconstraint".equals(lower) || lower.startsWith("table") || lower.startsWith("layered")
+                || lower.startsWith("guided")) {
+            return key + " is set with guibuilder_set_constraint";
+        }
+        if ("actionevent".equals(lower)) return "Event handlers are set with guibuilder_set_event_handler";
+        if ("bindingstrategy".equals(lower)) return "The binding strategy is set with guibuilder_set_binding";
+        List<String> names = new ArrayList<String>();
+        for (com.codename1.guibuilder.model.ComponentCatalog.Property property
+                : com.codename1.guibuilder.model.ComponentCatalog.propertiesFor(type)) names.add(property.name());
+        return "A " + type + " has no property " + key + "; it accepts " + names;
+    }
+
+    // --- layout and constraints ----------------------------------------------------------------
+
+    private String mcpSetLayout(Map<String, Object> args, Map<String, Object> details) {
+        Element element = mcpElement(args.get("container"));
+        if (element == null) return "No component named " + args.get("container");
+        String refused = mcpApplyLayout(element, args);
+        if (refused != null) return refused;
+        document.select(element);
+        details.put("component", mcpName(element));
+        details.put("layout", value(element, "layout", "BoxLayout"));
+        return null;
+    }
+
+    private String mcpApplyLayout(Element element, Map<String, Object> args) {
+        String type = mcpType(element);
+        if (!com.codename1.guibuilder.model.ComponentCatalog.hasSelectableLayout(type)) {
+            return "A " + type + " lays out its own children; its layout cannot be changed";
+        }
+        String layout = mcpString(args, "layout");
+        if (layout == null) layout = value(element, "layout", "BoxLayout");
+        if (!Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.LAYOUTS).contains(layout)) {
+            return "layout must be one of " + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.LAYOUTS);
+        }
+        int children = GuiDocument.componentsIn(element).size();
+        if ("BorderLayout".equals(layout) && children > BORDER_LAYOUT_REGION_COUNT) {
+            return "A BorderLayout holds five components; " + mcpName(element) + " has " + children;
+        }
+        String axis = mcpString(args, "axis");
+        Integer rows = mcpInteger(args, "rows");
+        Integer columns = mcpInteger(args, "columns");
+        if (axis != null && !"BoxLayout".equals(layout)) return "axis applies to BoxLayout only";
+        if ((rows != null || columns != null) && !"GridLayout".equals(layout) && !"TableLayout".equals(layout)) {
+            return "rows and columns apply to GridLayout and TableLayout only";
+        }
+        document.setAttribute(element, "layout", layout);
+        if (axis != null) {
+            if (!"X".equalsIgnoreCase(axis) && !"Y".equalsIgnoreCase(axis)) return "axis must be X or Y";
+            document.setAttribute(element, "boxLayoutAxis", axis.toUpperCase());
+        }
+        if ("GridLayout".equals(layout)) {
+            if (rows != null && (rows.intValue() < 1 || rows.intValue() > 100)) return "rows must be from 1 to 100";
+            if (columns != null && (columns.intValue() < 1 || columns.intValue() > 100)) return "columns must be from 1 to 100";
+            if (rows != null) document.setAttribute(element, "gridLayoutRows", String.valueOf(rows));
+            if (columns != null) document.setAttribute(element, "gridLayoutColumns", String.valueOf(columns));
+        }
+        if ("TableLayout".equals(layout)) {
+            if (columns != null) {
+                int floor = Math.max(1, occupiedTableExtent(element, "tableColumn", "tableHorizontalSpan"));
+                if (columns.intValue() < floor || columns.intValue() > 100) {
+                    return "columns must be from " + floor + " to 100 (the children already occupy " + floor + ")";
+                }
+                document.setAttribute(element, "tableLayoutColumns", String.valueOf(columns));
+            }
+            normalizeTableCells(element);
+            if (rows != null) {
+                int floor = Math.max(1, occupiedTableExtent(element, "tableRow", "tableVerticalSpan"));
+                if (rows.intValue() < floor || rows.intValue() > 100) {
+                    return "rows must be from " + floor + " to 100 (the children already occupy " + floor + ")";
+                }
+                document.setAttribute(element, "tableLayoutRows", String.valueOf(rows));
+            }
+        }
+        return null;
+    }
+
+    private String mcpSetConstraint(Map<String, Object> args, Map<String, Object> details) {
+        Element element = mcpElement(args.get("component"));
+        if (element == null) return "No component named " + args.get("component");
+        String refused = mcpApplyConstraint(element, args);
+        if (refused != null) return refused;
+        document.select(element);
+        details.put("component", mcpName(element));
+        return null;
+    }
+
+    private String mcpApplyConstraint(Element element, Map<String, Object> args) {
+        if (element == document.root()) return "The form itself has no parent constraint";
+        Element parent = document.parentOf(element);
+        String layout = value(parent, "layout", "BoxLayout");
+        Integer index = mcpInteger(args, "index");
+        if (index != null) {
+            String moved = mcpMoveToIndex(element, parent, index.intValue());
+            if (moved != null) return moved;
+        }
+        boolean border = args.containsKey("region");
+        boolean table = args.containsKey("row") || args.containsKey("column") || args.containsKey("rowSpan")
+                || args.containsKey("columnSpan") || args.containsKey("columnWidth") || args.containsKey("rowHeight");
+        boolean guided = args.containsKey("reference") || args.containsKey("insets")
+                || args.containsKey("horizontalSize") || args.containsKey("verticalSize") || args.containsKey("align");
+        if (border && !"BorderLayout".equals(layout)) return "region applies to children of a BorderLayout; "
+                + mcpName(parent) + " is a " + layout;
+        if (table && !"TableLayout".equals(layout)) return "row, column and spans apply to children of a TableLayout; "
+                + mcpName(parent) + " is a " + layout;
+        if (guided && !"LayeredLayout".equals(layout)) return "reference, insets, sizes and align apply to children of a"
+                + " LayeredLayout; " + mcpName(parent) + " is a " + layout;
+        if (border) {
+            String refused = mcpApplyBorderRegion(element, parent, mcpString(args, "region"));
+            if (refused != null) return refused;
+        }
+        if (table) {
+            String refused = mcpApplyTableCell(element, parent, args);
+            if (refused != null) return refused;
+        }
+        if (guided) {
+            String refused = mcpApplyGuided(element, parent, args);
+            if (refused != null) return refused;
+        }
+        return null;
+    }
+
+    private String mcpApplyBorderRegion(Element element, Element parent, String requested) {
+        String region = null;
+        for (String candidate : com.codename1.guibuilder.model.ComponentCatalog.BORDER_REGIONS) {
+            if (candidate.equalsIgnoreCase(requested)) region = candidate;
+        }
+        if (region == null) return "region must be one of "
+                + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.BORDER_REGIONS);
+        // Siblings without a constraint of their own take a region from their order, so changing this
+        // child's region would silently move them. Write down where each one is now first.
+        // A duplicate explicit region is moved the same way, so it is pinned too. Every region is read
+        // before any is written, because each write can change what the later siblings resolve to.
+        List<Element> siblings = componentChildren(parent);
+        List<String> regions = new ArrayList<String>();
+        for (Element sibling : siblings) regions.add(GuiDocument.effectiveBorderConstraint(parent, sibling));
+        for (int i = 0; i < siblings.size(); i++) {
+            Element sibling = siblings.get(i);
+            if (!regions.get(i).equals(GuiDocument.normalizeBorderConstraint(sibling.getAttribute("layoutConstraint")))) {
+                document.setAttribute(sibling, "layoutConstraint", regions.get(i));
+            }
+        }
+        // The occupant trades places, as the inspector's picker and a drop do.
+        Element occupant = null;
+        for (Element sibling : componentChildren(parent)) {
+            if (sibling == element) continue; //NOPMD CompareObjectsWithEquals
+            if (region.equals(GuiDocument.effectiveBorderConstraint(parent, sibling))) {
+                occupant = sibling;
+                break;
+            }
+        }
+        String vacated = GuiDocument.effectiveBorderConstraint(parent, element);
+        document.setAttribute(element, "layoutConstraint", region);
+        if (occupant != null) document.setAttribute(occupant, "layoutConstraint", vacated);
+        return null;
+    }
+
+    private String mcpApplyTableCell(Element element, Element parent, Map<String, Object> args) {
+        Integer row = mcpInteger(args, "row");
+        Integer column = mcpInteger(args, "column");
+        Integer rowSpan = mcpInteger(args, "rowSpan");
+        Integer columnSpan = mcpInteger(args, "columnSpan");
+        Integer columnWidth = mcpInteger(args, "columnWidth");
+        Integer rowHeight = mcpInteger(args, "rowHeight");
+        int r = row != null ? row.intValue() : integer(element.getAttribute("tableRow"), 0);
+        int c = column != null ? column.intValue() : integer(element.getAttribute("tableColumn"), 0);
+        int rs = rowSpan != null ? rowSpan.intValue() : Math.max(1, integer(element.getAttribute("tableVerticalSpan"), 1));
+        int cs = columnSpan != null ? columnSpan.intValue() : Math.max(1, integer(element.getAttribute("tableHorizontalSpan"), 1));
+        int rows = Math.max(1, integer(value(parent, "tableLayoutRows", "2"), 2));
+        int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
+        if (r < 0 || r >= rows) return "row must be from 0 to " + (rows - 1) + "; grow the table with guibuilder_set_layout";
+        if (c < 0 || c >= columns) return "column must be from 0 to " + (columns - 1)
+                + "; grow the table with guibuilder_set_layout";
+        // Written against the room left rather than as r + rs, which overflows for a huge span.
+        if (rs < 1 || rs > rows - r) return "rowSpan must be from 1 to " + (rows - r);
+        if (cs < 1 || cs > columns - c) return "columnSpan must be from 1 to " + (columns - c);
+        if (!rectangleFree(parent, element, null, r, c, rs, cs)) {
+            return "That cell range overlaps another component in " + mcpName(parent);
+        }
+        if (columnWidth != null && (columnWidth.intValue() < -1 || columnWidth.intValue() > 100)) {
+            return "columnWidth must be a percentage from 0 to 100, or -1 for automatic";
+        }
+        if (rowHeight != null && (rowHeight.intValue() < -1 || rowHeight.intValue() > 100)) {
+            return "rowHeight must be a percentage from 0 to 100, or -1 for automatic";
+        }
+        document.setAttribute(element, "tableRow", String.valueOf(r));
+        document.setAttribute(element, "tableColumn", String.valueOf(c));
+        document.setAttribute(element, "tableVerticalSpan", rs == 1 ? null : String.valueOf(rs));
+        document.setAttribute(element, "tableHorizontalSpan", cs == 1 ? null : String.valueOf(cs));
+        if (columnWidth != null) document.setAttribute(element, "tableWidth", String.valueOf(columnWidth));
+        if (rowHeight != null) document.setAttribute(element, "tableHeight", String.valueOf(rowHeight));
+        return null;
+    }
+
+    private String mcpApplyGuided(Element element, Element parent, Map<String, Object> args) {
+        if (args.containsKey("reference")) {
+            Object reference = args.get("reference");
+            if (reference == null || "".equals(reference)) {
+                document.setAttribute(element, "guidedReferenceTarget", null);
+            } else {
+                Element target = namedSibling(parent, String.valueOf(reference));
+                if (target == null || target == element) { //NOPMD CompareObjectsWithEquals
+                    return "reference must name another child of " + mcpName(parent);
+                }
+                document.setAttribute(element, "guidedReferenceTarget", mcpName(target));
+            }
+        }
+        String insets = mcpString(args, "insets");
+        if (insets != null) {
+            String refused = mcpValidInsets(insets);
+            if (refused != null) return refused;
+            document.setAttribute(element, "layeredInsets", insets.trim());
+        }
+        String horizontal = mcpString(args, "horizontalSize");
+        String vertical = mcpString(args, "verticalSize");
+        Object align = args.get("align");
+        List<String> actions = new ArrayList<String>();
+        if (align instanceof String) actions.add((String) align);
+        else if (align instanceof List) for (Object action : (List<?>) align) actions.add(String.valueOf(action));
+        else if (align != null) return "align must be an action name or a list of them";
+        List<String> known = Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.GUIDED_ALIGN_ACTIONS);
+        for (String action : actions) if (!known.contains(action)) return "align actions are " + known;
+        String[] policies = {GuidedLayoutSupport.PREFERRED, GuidedLayoutSupport.FIXED, GuidedLayoutSupport.FILL,
+            GuidedLayoutSupport.MATCH};
+        if (horizontal != null && !Arrays.asList(policies).contains(horizontal)) {
+            return "horizontalSize must be one of " + Arrays.asList(policies);
+        }
+        if (vertical != null && !Arrays.asList(policies).contains(vertical)) {
+            return "verticalSize must be one of " + Arrays.asList(policies);
+        }
+        if (horizontal == null && vertical == null && actions.isEmpty()) return null;
+        // Size policies and alignment are measured from what the canvas shows, so it has to show the
+        // document as it now is before they run.
+        boolean needsReference = GuidedLayoutSupport.MATCH.equals(horizontal) || GuidedLayoutSupport.MATCH.equals(vertical);
+        for (String action : actions) if (action.startsWith("align") || action.startsWith("match")) needsReference = true;
+        if (needsReference && componentChildren(parent).size() < 2) {
+            return "Aligning or matching needs another component in " + mcpName(parent) + " as the reference";
+        }
+        document.select(element);
+        refreshEditor();
+        Component self = componentForElement(canvasHost, element);
+        Component parentPreview = componentForElement(canvasHost, parent);
+        if (self == null || !(parentPreview instanceof Container)) {
+            return mcpName(element) + " is not visible on the canvas, so it cannot be measured";
+        }
+        // The helpers below return quietly when they find no reference on the canvas -- an invisible
+        // sibling, say -- so it is checked here, or the call would report success having done nothing.
+        if (needsReference && guidedReferenceComponent(element, (Container) parentPreview, self) == null) {
+            return "No reference component is visible next to " + mcpName(element)
+                    + "; set reference to a visible sibling, or make one visible";
+        }
+        if (horizontal != null) {
+            document.select(element);
+            applyGuidedSizePolicy(true, horizontal);
+        }
+        if (vertical != null) {
+            document.select(element);
+            applyGuidedSizePolicy(false, vertical);
+        }
+        for (String action : actions) {
+            document.select(element);
+            applyLayeredAction(action);
+        }
+        return null;
+    }
+
+    /**
+     * Insets as LayeredLayout reads them, which is what the canvas and the generated setInsets() call
+     * do. Checked by handing them to a LayeredLayout, as the inspector's own field does: it is
+     * stricter than a pattern -- px must be whole, baseline only goes on top, infinity is refused.
+     */
+    private static String mcpLayoutInsetsError(String insets) {
+        try {
+            Container probe = new Container(new LayeredLayout());
+            Label child = new Label();
+            probe.add(child);
+            ((LayeredLayout) probe.getLayout()).setInsets(child, insets);
+            return null;
+        } catch (RuntimeException invalid) {
+            return "insets \"" + insets + "\" are not something LayeredLayout can read"
+                    + (invalid.getMessage() == null ? "" : ": " + invalid.getMessage());
+        }
+    }
+
+    private static String mcpValidInsets(String insets) {
+        String[] parts = insets.trim().split(" ");
+        List<String> tokens = new ArrayList<String>();
+        for (String part : parts) if (part.length() > 0) tokens.add(part);
+        if (tokens.size() != 4) return "insets must be four values: top right bottom left (e.g. \"12px auto auto 0px\")";
+        for (String token : tokens) {
+            if ("auto".equals(token) || "baseline".equals(token)) continue;
+            if (token.indexOf("Infinity") >= 0 || token.indexOf("NaN") >= 0) return "inset " + token + " is not a number";
+            String number = token;
+            if (number.endsWith("px") || number.endsWith("mm")) number = number.substring(0, number.length() - 2);
+            else if (number.endsWith("%")) number = number.substring(0, number.length() - 1);
+            else return "inset " + token + " must be auto, baseline, or a number with px, mm or %";
+            try {
+                Double.parseDouble(number);
+            } catch (NumberFormatException ex) {
+                return "inset " + token + " is not a number";
+            }
+        }
+        return mcpLayoutInsetsError(insets.trim());
+    }
+
+    // --- events, toolbar, binding ------------------------------------------------------------
+
+    private String mcpSetEventHandler(Map<String, Object> args, Map<String, Object> details) {
+        Element element = mcpElement(args.get("component"));
+        if (element == null) return "No component named " + args.get("component");
+        String type = mcpType(element);
+        if (!com.codename1.guibuilder.model.ComponentCatalog.firesActionEvents(type)) {
+            return "A " + type + " does not fire action events; attach a handler to a Button, CheckBox,"
+                    + " RadioButton, TextField, TextArea or Slider";
+        }
+        String handler = mcpString(args, "handler");
+        if (handler == null || handler.trim().length() == 0) {
+            document.setAttribute(element, "actionEvent", null);
+            details.put("component", mcpName(element));
+            details.put("handler", null);
+            return null;
+        }
+        handler = handler.trim();
+        if (!mcpJavaIdentifier(handler)) return "handler must be a Java method name, e.g. onSignIn";
+        document.setAttribute(element, "actionEvent", handler);
+        document.select(element);
+        details.put("component", mcpName(element));
+        details.put("handler", handler);
+        details.put("signature", "protected void " + handler + "(ActionEvent event)");
+        if (binding != null && binding.sourceDir() != null) {
+            String source = companionSourcePath();
+            details.put("source", source);
+            boolean exists = false;
+            try {
+                exists = ProjectIO.exists(source) && ProjectIO.read(source).indexOf(" " + handler + "(ActionEvent") >= 0;
+            } catch (IOException ignored) {
+                exists = false;
+            }
+            details.put("methodExists", Boolean.valueOf(exists));
+            details.put("note", exists ? "The method already exists in the companion source"
+                    : "Saving the form adds an empty " + handler + " method to the user code region of the"
+                    + " companion source; write its body there");
+        }
+        return null;
+    }
+
+    private static boolean mcpJavaIdentifier(String name) {
+        if (name.length() == 0) return false;
+        String keywords = " abstract assert boolean break byte case catch char class const continue default do double"
+                + " else enum extends final finally float for goto if implements import instanceof int interface long"
+                + " native new package private protected public return short static strictfp super switch synchronized"
+                + " this throw throws transient try void volatile while true false null _ ";
+        if (keywords.indexOf(" " + name + " ") >= 0 || isJavaReserved(name)) return false;
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            boolean letter = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' || c == '$';
+            if (!letter && (i == 0 || c < '0' || c > '9')) return false;
+        }
+        return true;
+    }
+
+    private String mcpToolbarCommands(Map<String, Object> args, Map<String, Object> details) {
+        if (!isFormLike(mcpType(document.root()))) return "Only a Form or Dialog has toolbar commands";
+        String action = mcpString(args, "action");
+        if (action == null) action = "list";
+        List<Element> commands = document.commands();
+        Integer index = mcpInteger(args, "index");
+        if ("add".equals(action)) {
+            Element command = document.addCommand();
+            String refused = mcpApplyCommand(command, args);
+            if (refused != null) return refused;
+            details.put("index", Integer.valueOf(document.commands().size() - 1));
+        } else if ("update".equals(action) || "remove".equals(action)) {
+            if (index == null || index.intValue() < 0 || index.intValue() >= commands.size()) {
+                return "index must be from 0 to " + (commands.size() - 1);
+            }
+            Element command = commands.get(index.intValue());
+            if ("remove".equals(action)) {
+                if (!document.removeCommand(command)) return "Could not remove command " + index;
+            } else {
+                String refused = mcpApplyCommand(command, args);
+                if (refused != null) return refused;
+            }
+        } else {
+            return "action must be list, add, update or remove";
+        }
+        details.put("commands", mcpCommandList());
+        return null;
+    }
+
+    private String mcpApplyCommand(Element command, Map<String, Object> args) {
+        String label = mcpString(args, "label");
+        if (label != null) document.setCommandAttribute(command, "name", label);
+        String placement = mcpString(args, "placement");
+        if (placement != null) {
+            if (!Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.COMMAND_PLACEMENTS).contains(placement)) {
+                return "placement must be one of " + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.COMMAND_PLACEMENTS);
+            }
+            document.setCommandAttribute(command, "placement", placement);
+        }
+        String handler = mcpString(args, "handler");
+        if (handler != null) {
+            if (!mcpJavaIdentifier(handler.trim())) return "handler must be a Java method name, e.g. onShare";
+            document.setCommandAttribute(command, "actionEvent", handler.trim());
+        }
+        return null;
+    }
+
+    private String mcpSetBinding(Map<String, Object> args, Map<String, Object> details) {
+        if (!isFormLike(mcpType(document.root()))) return "Only a Form or Dialog has a binding strategy";
+        String strategy = mcpString(args, "strategy");
+        if (!"none".equals(strategy) && !"properties".equals(strategy) && !"bindable".equals(strategy)) {
+            return "strategy must be none, properties or bindable";
+        }
+        String previous = value(document.root(), "bindingStrategy", "properties");
+        details.put("strategy", strategy);
+        if (strategy.equals(previous)) return null;
+        document.setAttribute(document.root(), "bindingStrategy", strategy);
+        String before = status == null ? null : status.getText();
+        syncBindingModel(strategy);
+        // Only what syncBindingModel() itself reported: it says nothing in some cases (no model on
+        // disk for "none", no source directory), and the status line then still holds whatever came
+        // before -- a selection, say -- which is no answer to this call.
+        String after = status == null ? null : status.getText();
+        if (after != null && !after.equals(before)) details.put("note", after);
+        return null;
+    }
+
+    // --- read-only and form creation -------------------------------------------------------------
+
+    private Map<String, Object> mcpFormXml(Map<String, Object> args) {
+        final Map<String, Object> out = new LinkedHashMap<String, Object>();
+        final Object name = args.get("component");
+        if (document == null) {
+            out.put("error", "No active GUI document; open a form first");
+            return out;
+        }
+        if (name == null) {
+            out.put("form", relativeFormName(document.path()));
+            out.put("modified", Boolean.valueOf(document.isModified()));
+            out.put("xml", document.toXml());
+            return out;
+        }
+        Element element = mcpElement(name);
+        if (element == null) {
+            out.put("error", "No component named " + name);
+            return out;
+        }
+        out.put("component", mcpName(element));
+        out.put("xml", new com.codename1.xml.XMLWriter(true).toXML(element));
+        return out;
+    }
+
+    private String mcpCreateFormImpl(Map<String, Object> args, Map<String, Object> details) {
+        if (binding == null || binding.guiDir() == null || binding.sourceDir() == null) {
+            return "No project is open";
+        }
+        String busy = mcpDeveloperBusy();
+        if (busy != null) return busy;
+        if (document != null && document.isModified()) return "The active form has unsaved changes; save it first";
+        if (editorBufferIsDirty()) return "The open editor has unsaved changes; save or close that pane first";
+        String className = mcpString(args, "className");
+        String classError = mcpFormClassError(className);
+        if (classError != null) return classError;
+        String type = mcpString(args, "type");
+        if (type == null) type = "Form";
+        if (!Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.ROOT_TYPES).contains(type)) {
+            return "type must be one of " + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.ROOT_TYPES);
+        }
+        String layout = mcpString(args, "layout");
+        if (layout == null) layout = "BoxLayout";
+        if (!Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.LAYOUTS).contains(layout)) {
+            return "layout must be one of " + Arrays.asList(com.codename1.guibuilder.model.ComponentCatalog.LAYOUTS);
+        }
+        String relative = className.replace('.', '/');
+        String guiPath = ProjectIO.fsUrl(binding.guiDir()) + "/" + relative + ".gui";
+        String sourcePath = binding.sourceDir() + "/" + relative + ".java";
+        if (ProjectIO.exists(guiPath)) return "A form already exists at " + guiPath;
+        if (ProjectIO.exists(sourcePath)) return "A Java source already exists at " + sourcePath
+                + "; choose another class name so it is not overwritten";
+        String simple = className.substring(className.lastIndexOf('.') + 1);
+        StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<component type=\"")
+                .append(type).append("\" name=\"").append(simple).append('"');
+        if (isFormLike(type)) xml.append(" title=\"").append(simple).append('"');
+        xml.append(" layout=\"").append(layout).append('"');
+        if ("BoxLayout".equals(layout)) xml.append(" boxLayoutAxis=\"Y\"");
+        // No binding model unless asked for: a new form should compile on its own. Every root type,
+        // a Container included: the generator reads the strategy from any root, and set_binding only
+        // offers a way back for a Form or Dialog.
+        xml.append(" bindingStrategy=\"none\"");
+        xml.append(">\n</component>\n");
+        try {
+            ProjectIO.write(guiPath, xml.toString());
+        } catch (IOException ex) {
+            return "Could not write " + guiPath + ": " + ex.getMessage();
+        }
+        guiFiles = ProjectIO.findGuiFiles(binding.guiDir());
+        String opened = null;
+        for (String path : guiFiles) if (relativeFormName(path).equals(className)) opened = path;
+        if (opened == null || !openForm(opened)) return "Created " + guiPath + " but could not open it";
+        refreshForms();
+        // Writes the companion class, so the new form compiles and can be shown at once.
+        if (!save()) return "Created " + guiPath + " but could not write its companion source";
+        recordAction("form_created", "form", className, "source", "mcp");
+        details.put("form", className);
+        details.put("gui", guiPath);
+        details.put("source", companionSourcePath());
+        details.put("usage", "new " + simple + "()" + (isFormLike(type) ? ".show()" : ""));
+        return null;
+    }
+
+    /**
+     * Every simple name the generated companion and model sources import: com.codename1.ui.*,
+     * com.codename1.ui.layouts.*, com.codename1.properties.* and the single-type imports. A form
+     * class with one of these names shadows the import for everything in its package -- a form
+     * named Form extends itself, and one named Label turns every generated Label field into it.
+     * McpEditingToolsTest checks this list against the core jar.
+     */
+    static final String GENERATED_IMPORT_NAMES =
+            "|AbstractDialog|AbstractEditorComponent|AccessibilityColorVisionDeficiency|Accordion|ActionEvent|"
+            + "AnimationManager|AutoCompleteTextComponent|AutoCompleteTextField|Bind|BindAttr|Bindable|"
+            + "Binders|Binding|BlockingDisallowedException|BooleanProperty|BorderLayout|BoxLayout|"
+            + "BrowserComponent|BrowserWindow|Button|ButtonGroup|ByteProperty|CN|CN1Constants|CSSColor|"
+            + "Calendar|CharProperty|CheckBox|ClipboardContent|ClipboardDataProvider|CodeCompletion|"
+            + "CodeCompletionProvider|CodeDiagnostic|CodeEditor|CollectionProperty|ComboBox|Command|"
+            + "CommonProgressAnimations|Component|ComponentGroup|ComponentImage|ComponentSelector|"
+            + "ConicGradient|Container|ContextMenu|CoordinateLayout|Desktop|DevicePosture|Dialog|Dimension|"
+            + "Display|DoubleProperty|DynamicImage|EditField|Editable|EncodedImage|FloatProperty|FlowLayout|"
+            + "Font|FontImage|Form|GeneratedSVGImage|Gradient|Graphics|GridBagConstraints|GridBagLayout|"
+            + "GridLayout|GroupLayout|IconHolder|Image|ImageFactory|InfiniteContainer|InputComponent|Insets|"
+            + "InstantUI|IntProperty|InterFormContainer|Label|LayeredLayout|Layout|LayoutStyle|LinearGradient|"
+            + "LinearGradientPaint|List|ListProperty|LongProperty|MapAdapter|MapProperty|MenuBar|Monitor|"
+            + "MultipleGradientPaint|NativeDragAndDrop|NativeDragOperation|NativeDropEvent|NavigationCommand|"
+            + "NumericProperty|Paint|Painter|PeerComponent|PickerComponent|PreferencesObject|Property|"
+            + "PropertyBase|PropertyBusinessObject|PropertyChangeListener|PropertyIndex|RGBImage|"
+            + "RadialGradient|RadioButton|ReleasableComponent|RichTextArea|RichTextClipboardData|"
+            + "RichTextComponent|RichTextFormat|SQLMap|SelectableIconHolder|SetProperty|Sheet|SideMenuBar|"
+            + "Slider|SpanLabel|Stroke|SwipeableContainer|TableLayout|Tabs|TextArea|TextComponent|"
+            + "TextComponentPassword|TextField|TextHolder|TextInputClient|TextInputConfig|TextInputGeometry|"
+            + "TextInputState|TextModeLayout|TextSelection|Toolbar|TooltipManager|TopLevelContainer|Transform|"
+            + "UIFragment|URLImage|UiBinding|VirtualInputDevice|Window|";
+
+    private static String mcpFormClassError(String className) {
+        if (className == null || className.length() == 0) return "className is required, e.g. com.example.myapp.LoginForm";
+        String[] parts = className.split("\\.");
+        if (parts.length < 2 || className.endsWith(".")) return "className needs a package, e.g. com.example.myapp.LoginForm";
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+            if (part.length() == 0) return "className has an empty package segment";
+            boolean last = i == parts.length - 1;
+            char first = part.charAt(0);
+            if (last ? first < 'A' || first > 'Z' : first < 'a' || first > 'z') {
+                return last ? "The class name must start with an upper-case letter"
+                        : "Package segment " + part + " must start with a lower-case letter";
+            }
+            for (int j = 1; j < part.length(); j++) {
+                char c = part.charAt(j);
+                if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9')) {
+                    return "className may use only letters and digits in each segment";
+                }
+            }
+            if (!mcpJavaIdentifier(part)) return part + " is a Java keyword";
+        }
+        String simple = parts[parts.length - 1];
+        if (GENERATED_IMPORT_NAMES.indexOf("|" + simple + "|") >= 0) {
+            return simple + " is the name of a Codename One class the generated source imports; choose another,"
+                    + " e.g. " + simple + "Form";
+        }
         return null;
     }
 

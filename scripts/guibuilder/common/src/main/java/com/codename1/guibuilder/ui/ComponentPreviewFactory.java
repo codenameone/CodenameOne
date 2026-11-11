@@ -246,7 +246,16 @@ public final class ComponentPreviewFactory {
             }
         }
         if (out.getLayout() instanceof LayeredLayout) GuidedLayoutSupport.apply(element, out);
-        if (out.getComponentCount() == 0) out.add(emptyContainerHint());
+        // A BorderLayout refuses a child without a region, so the hint for an empty one goes in the
+        // centre: added bare, it threw and left the whole canvas blank as soon as an empty container
+        // was switched to BorderLayout, from the inspector's picker as much as from anywhere else.
+        if (out.getComponentCount() == 0) {
+            if (out.getLayout() instanceof com.codename1.ui.layouts.BorderLayout) {
+                out.add(com.codename1.ui.layouts.BorderLayout.CENTER, emptyContainerHint());
+            } else {
+                out.add(emptyContainerHint());
+            }
+        }
         return out;
     }
 

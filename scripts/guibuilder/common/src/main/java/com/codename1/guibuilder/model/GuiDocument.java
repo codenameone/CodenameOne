@@ -81,6 +81,19 @@ public final class GuiDocument {
         return !savedXml.equals(xmlOnly());
     }
 
+    /**
+     * Puts the modified state back after an edit that turned out to change nothing.
+     *
+     * <p>Writing an attribute marks the document modified even when the value is the one it already
+     * had, and before the first save that flag is all isModified() has to go on -- so a no-op left a
+     * form that nobody edited asking to be saved, and opening another form refused.
+     *
+     * @param wasModified what isModified() answered before the edit
+     */
+    public void restoreModified(boolean wasModified) {
+        modified = wasModified;
+    }
+
     public void markSaved() {
         modified = false;
         savedXml = xmlOnly();
@@ -247,9 +260,12 @@ public final class GuiDocument {
     public Element addCommand() {
         beforeMutation();
         Element command = new Element("command");
-        command.setAttribute("name", "Command " + (commands().size() + 1));
-        command.setAttribute("placement", "right");
-        command.setAttribute("actionEvent", "onCommand" + (commands().size() + 1));
+        // Through the canonical (lower-case) keys, as every other write: a camel-case key comes back
+        // lower-case after an undo or rollback re-parses the XML, and the form then reads as modified
+        // against the copy it was saved with although nothing changed.
+        setNormalizedAttribute(command, "name", "Command " + (commands().size() + 1));
+        setNormalizedAttribute(command, "placement", "right");
+        setNormalizedAttribute(command, "actionEvent", "onCommand" + (commands().size() + 1));
         root.addChild(command);
         modified = true;
         return command;
@@ -617,8 +633,11 @@ public final class GuiDocument {
         for (Element element : elements) {
             String current = element.getAttribute("name");
             String type = element.getAttribute("type");
-            String base = current == null || current.length() == 0
-                    ? lowerFirst(type == null || type.length() == 0 ? "component" : type) : current;
+            // Sanitized as a rename is: a pipe splits guidedReferences and whitespace splits the
+            // positions, so a pasted name holding either broke every relationship anchored to it.
+            String clean = current == null ? "" : sanitizeName(current);
+            String base = clean.length() == 0
+                    ? lowerFirst(type == null || type.length() == 0 ? "component" : type) : clean;
             String unique = availableName(base, exclude, assigned);
             assigned.add(unique);
             if (unique.equals(current)) continue;
@@ -875,6 +894,18 @@ public final class GuiDocument {
     public boolean undo() {
         if (!canUndo()) return false;
         redo.add(capture());
+        restore(undo.remove(undo.size() - 1));
+        return true;
+    }
+
+    /**
+     * Takes the last change back without offering it to Redo. For a change that must not come back --
+     * one the canvas could not show, which Redo would only reinstate to fail again.
+     *
+     * @return true when there was a change to take back
+     */
+    public boolean revertLastChange() {
+        if (!canUndo()) return false;
         restore(undo.remove(undo.size() - 1));
         return true;
     }
