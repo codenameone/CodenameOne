@@ -68,6 +68,18 @@ public class PyDict extends PyObject {
             hashes = NO_HASHES;
             return;
         }
+        allocate(n);
+    }
+
+    /// An empty dict about to be filled with `n` entries gets its arrays at
+    /// that size at once, rather than through every growth on the way.
+    void reserve(int n) {
+        if (used == 0 && keys.length < n) {
+            allocate(n);
+        }
+    }
+
+    private void allocate(int n) {
         keys = new Object[n];
         values = new Object[n];
         hashes = new long[n];

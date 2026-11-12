@@ -766,6 +766,13 @@ public class PyInstance extends PyObject {
         private long seenFields;
         private boolean seen;
 
+        /// Where each entry's value lives, by entry index, while the keys are
+        /// as the last refill laid them out: a field index, or `~j` for slot
+        /// `j`. An iteration step reads its value from there with no name
+        /// lookup; null when the layout is not known.
+        private int[] src;
+        private int srcLen;
+
         // No "dictionary keys changed during iteration" check: CPython 3.14
         // does not raise it for an instance's __dict__ either (deleting one
         // attribute and adding another while iterating runs on, as
@@ -804,6 +811,7 @@ public class PyInstance extends PyObject {
                     // The same keys in the same order: the values are
                     // brought up to date in place, so an iteration in
                     // progress over this dict is not disturbed.
+                    src = null;
                     int n = 0;
                     for (int i = 0; i < used && n < names.length; i++) {
                         if (keys[i] != null) {
@@ -813,9 +821,7 @@ public class PyInstance extends PyObject {
                     return;
                 }
                 super.clear();
-                for (String e : names) {
-                    super.setItem(e, self.own(e));
-                }
+                refill(fields, other == null ? 0 : other.size);
                 if (other != null) {
                     for (int i = 0; i < other.used; i++) {
                         if (other.keys[i] != null) {
@@ -835,6 +841,36 @@ public class PyInstance extends PyObject {
         /// the shape, the set fields and the size, which fix the keys; the
         /// name check is a cheap safety net against a path that changes the
         /// keys without moving any of those, never the expected case.
+        /// Fills the emptied dict with the set fields and then the shape's
+        /// slots, the order attributeNames lists them in, by index: what
+        /// `own(name)` answers for each name, without looking a name up.
+        private void refill(String[] fields, int others) {
+            String[] shapeNames = self.shape().names;
+            Object[] sl = self.slots;
+            int n = shapeNames.length;
+            reserve(fields.length + n + others);
+            int[] map = new int[fields.length + n];
+            int w = 0;
+            for (int i = 0; i < fields.length; i++) {
+                Object v = self.getField(i);
+                if (v != null) {
+                    super.setItem(fields[i], v);
+                    map[w++] = i;
+                }
+            }
+            for (int j = 0; j < n; j++) {
+                // A name both set as a field and held in the shape is the
+                // field's, as own() answers: its entry is already there.
+                if (fields.length != 0 && super.getOrNull(shapeNames[j]) != null) {
+                    continue;
+                }
+                super.setItem(shapeNames[j], sl == null || j >= sl.length ? null : sl[j]);
+                map[w++] = ~j;
+            }
+            src = used == w ? map : null;
+            srcLen = w;
+        }
+
         /// Which of the instance's first `n` (at most 64) fields are set.
         private long fieldMask(int n) {
             long mask = 0;
@@ -859,6 +895,21 @@ public class PyInstance extends PyObject {
 
         @Override
         Object valueAt(int e) {
+            int[] m = src;
+            if (m != null && e < srcLen) {
+                int s = m[e];
+                Object v;
+                if (s >= 0) {
+                    v = self.getField(s);
+                } else {
+                    Object[] sl = self.slots;
+                    v = sl != null && ~s < sl.length ? sl[~s] : null;
+                }
+                if (v != null) {
+                    values[e] = v;
+                }
+                return values[e];
+            }
             Object k = keys[e];
             if (k instanceof String) {
                 Object v = self.own((String) k);
@@ -951,6 +1002,7 @@ public class PyInstance extends PyObject {
             // The write may restore a shape the stamp already holds (del
             // d['b'] then c.b = 9), so the next sync must not trust it.
             seen = false;
+            src = null;
         }
 
         @Override
@@ -972,6 +1024,7 @@ public class PyInstance extends PyObject {
         /// Removes `key` from what the dict stands for.
         private void forget(Object key) {
             seen = false;
+            src = null;
             if (isStr(key)) {
                 self.delAttrDirect(Py.toStr(key));
             } else if (self.nonStrKeys != null) {

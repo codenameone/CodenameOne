@@ -1942,6 +1942,89 @@ public final class Py {
     /// lists each argument; `kinds` says 0 = plain, 1 = star, 2 = double star,
     /// 3 = keyword (name in `names` at the same index).
     public static Object callSpread(Object f, Object[] parts, int[] kinds, String[] names) {
+        // `f(*args, **kwargs)` forwarding a tuple and an empty dict, the
+        // usual shape of a wrapper (pdfplumber's render_char over super()):
+        // the arguments go straight into a fixed-arity call, with nothing
+        // gathered into lists or arrays on the way.
+        int npos = spreadCount(parts, kinds);
+        if (npos >= 0 && npos <= 6) {
+            PyObject fo = Py.obj(f);
+            switch (npos) {
+                case 0:
+                    return fo.call0();
+                case 1:
+                    return fo.call1(spreadAt(parts, kinds, 0));
+                case 2:
+                    return fo.call2(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1));
+                case 3:
+                    return fo.call3(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2));
+                case 4:
+                    return fo.call4(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2),
+                            spreadAt(parts, kinds, 3));
+                case 5:
+                    return fo.call5(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2),
+                            spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4));
+                default:
+                    return fo.call6(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2),
+                            spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5));
+            }
+        }
+        return callSpreadGeneral(f, parts, kinds, names);
+    }
+
+    /// The positional count of a call whose parts are plain values, tuples
+    /// and lists spread with `*`, and empty plain dicts spread with `**`;
+    /// -1 for any other call.
+    private static int spreadCount(Object[] parts, int[] kinds) {
+        int n = 0;
+        for (int i = 0; i < parts.length; i++) {
+            Object p = parts[i];
+            switch (kinds[i]) {
+                case 0:
+                    n++;
+                    break;
+                case 1:
+                    if (p instanceof PyTuple) {
+                        n += ((PyTuple) p).items.length;
+                    } else if (p != null && p.getClass() == PyList.class) {
+                        n += ((PyList) p).size;
+                    } else {
+                        return -1;
+                    }
+                    break;
+                case 2:
+                    if (p == null || p.getClass() != PyDict.class || ((PyDict) p).size != 0) {
+                        return -1;
+                    }
+                    break;
+                default:
+                    return -1;
+            }
+        }
+        return n;
+    }
+
+    /// Positional argument `j` of a call [#spreadCount] accepted.
+    private static Object spreadAt(Object[] parts, int[] kinds, int j) {
+        for (int i = 0; i < parts.length; i++) {
+            Object p = parts[i];
+            if (kinds[i] == 0) {
+                if (j == 0) {
+                    return p;
+                }
+                j--;
+            } else if (kinds[i] == 1) {
+                int n = p instanceof PyTuple ? ((PyTuple) p).items.length : ((PyList) p).size;
+                if (j < n) {
+                    return p instanceof PyTuple ? ((PyTuple) p).items[j] : ((PyList) p).get(j);
+                }
+                j -= n;
+            }
+        }
+        throw new IllegalStateException();
+    }
+
+    private static Object callSpreadGeneral(Object f, Object[] parts, int[] kinds, String[] names) {
         List<Object> pos = new ArrayList<Object>();
         List<String> kwn = new ArrayList<String>();
         List<Object> kwv = new ArrayList<Object>();

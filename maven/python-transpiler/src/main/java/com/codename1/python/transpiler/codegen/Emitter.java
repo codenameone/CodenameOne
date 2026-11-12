@@ -3422,7 +3422,7 @@ public final class Emitter {
             String it = fresh("i");
             String x = fresh("x");
             indent(b, depth);
-            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? a + "[0]" : expr(g.iter))
+            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? a : expr(g.iter))
                     .append(");\n");
             indent(b, depth);
             b.append("for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
@@ -3486,13 +3486,15 @@ public final class Emitter {
         frame = savedFrame;
         sc = savedScope;
         StringBuilder out = new StringBuilder();
-        out.append("((PyFunction.Body) (Object[] ").append(a).append(") -> {\n").append(pro).append(b);
+        // One parameter, the first iterable: a Body1, so the call builds no
+        // argument array.
+        out.append("((PyFunction.Body1) (Object ").append(a).append(") -> {\n").append(pro).append(b);
         indent(out, ind);
         // A generator expression gets here only for a consumer that drains it (eagerArgument),
         // which is handed the list itself.
         out.append("return ").append(r).append(";\n");
         indent(out, ind - 1);
-        out.append("}).run(new Object[] {").append(first).append("})");
+        out.append("}).run(").append(first).append(")");
         return out.toString();
     }
 
@@ -3757,7 +3759,7 @@ public final class Emitter {
         String step = resolveRegions(gen.step(body));
         String a = "a" + frame.id;
         StringBuilder r = new StringBuilder();
-        r.append("((PyFunction.Body) (Object[] ").append(a).append(") -> {\n");
+        r.append("((PyFunction.Body1) (Object ").append(a).append(") -> {\n");
         indent(r, 3);
         if (!genexp) {
             r.append("return new PyGenerator(\"<").append(c.kind.name().toLowerCase(java.util.Locale.ROOT))
@@ -3772,7 +3774,7 @@ public final class Emitter {
             if (!cs.isLocal(n)) {
                 continue;
             }
-            String init = ".0".equals(n) ? a + "[0]" : ".r".equals(n) ? empty : null;
+            String init = ".0".equals(n) ? a : ".r".equals(n) ? empty : null;
             if (cs.cells.contains(n)) {
                 r.append("                final Object[] ").append(cellVar(cs, n)).append(" = new Object[] {")
                         .append(init == null ? "null" : init).append("};\n");
@@ -3794,7 +3796,7 @@ public final class Emitter {
         r.append("};\n");
         indent(r, 2);
         String firstIter = c.generators.get(0).isAsync ? first : "Py.iter(" + first + ")";
-        r.append("}).run(new Object[] {").append(firstIter).append("})");
+        r.append("}).run(").append(firstIter).append(")");
         gen = savedGen;
         frame = savedFrame;
         sc = savedScope;
