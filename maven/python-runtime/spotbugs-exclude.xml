@@ -170,4 +170,12 @@
         <Class name="com.codename1.python.runtime.StdModules"/>
         <Bug pattern="DM_GC"/>
     </Match>
+    <!-- A regex loop runs once per match over one text, and its text is
+         prepared once: only that very string may skip the preparation, and
+         equals() would read the whole text, the work it exists to skip. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.Regex$Text"/>
+        <Method name="reset"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
 </FindBugsFilter>

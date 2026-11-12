@@ -403,6 +403,12 @@ final class Regex {
         }
 
         void reset(String s) {
+            if (s == this.s) { //NOPMD CompareObjectsWithEquals - the same text, whose count is known
+                // A substitution or findall runs once per match over one
+                // text, and a text of up to 256 chars is never cached, so
+                // each run counted its pairs again.
+                return;
+            }
             this.s = s;
             // PyStr keeps the count for the last long string, so a pattern
             // run again and again over one text (a scanner's match(text,
@@ -1092,18 +1098,26 @@ final class Regex {
     /// `_engine.run`: mode 0 matches, 1 fully matches, 2 searches. The
     /// group registers then `lastindex`, or `NO_MATCH`.
     static int[] run(Prog p, String text, int pos, int endpos, int mode, int forbid) {
-        Scratch sc = p.scratch;
-        p.scratch = null;
-        if (sc == null) {
-            sc = new Scratch();
-        }
+        Scratch sc = acquire(p);
         try {
             return run(p, sc, text, pos, endpos, mode, forbid);
         } finally {
-            sc.text.s = null;
-            sc.text.cps = null;
-            p.scratch = sc;
+            release(p, sc);
         }
+    }
+
+    /// The pattern's scratch, held by one loop over one text: a loop that
+    /// runs once per match keeps it, so the text is prepared once.
+    private static Scratch acquire(Prog p) {
+        Scratch sc = p.scratch;
+        p.scratch = null;
+        return sc == null ? new Scratch() : sc;
+    }
+
+    private static void release(Prog p, Scratch sc) {
+        sc.text.s = null;
+        sc.text.cps = null;
+        p.scratch = sc;
     }
 
     /// `pattern.subn(template, text, count)` with the loop in Java: `template`
@@ -1111,93 +1125,103 @@ final class Regex {
     /// `_compile_template` makes it. No Match object is made per match --
     /// the Python loop made one, and a generator step, for each.
     static Object subn(Prog p, String text, PyList template, int count) {
-        int n = PyStr.codePoints(text);
-        int[] regs = count >= 0 ? run(p, text, 0, n, 2, -1) : new int[0];
-        if (regs.length == 0) {
-            return Py.tuple(text, Long.valueOf(0));
-        }
-        // Made once, after the first match, and never reassigned: ParparVM
-        // keeps a builder on the stack only when its local holds nothing
-        // else and only StringBuilder methods receive it (no helper), and one
-        // on the heap pays a lock on every append. Without
-        // surrogates a code point index is the char index, so the pieces are
-        // appended straight from the text instead of as substrings.
-        StringBuilder out = new StringBuilder(text.length() + 16);
-        boolean plain = n == text.length();
-        int parts = template.size();
-        int last = 0;
-        int done = 0;
-        while (true) {
-            int s = regs[0];
-            int e = regs[1];
-            if (plain) {
-                out.append(text, last, s);
-            } else {
-                out.append(PyStr.substr(text, last, s));
+        Scratch sc = acquire(p);
+        try {
+            int n = PyStr.codePoints(text);
+            int[] regs = count >= 0 ? run(p, sc, text, 0, n, 2, -1) : new int[0];
+            if (regs.length == 0) {
+                return Py.tuple(text, Long.valueOf(0));
             }
-            for (int k = 0; k < parts; k++) {
-                Object part = template.get(k);
-                if (part instanceof String) {
-                    out.append((String) part);
+            // Made once, after the first match, and never reassigned: ParparVM
+            // keeps a builder on the stack only when its local holds nothing
+            // else and only StringBuilder methods receive it (no helper), and one
+            // on the heap pays a lock on every append. Without
+            // surrogates a code point index is the char index, so the pieces are
+            // appended straight from the text instead of as substrings.
+            StringBuilder out = new StringBuilder(text.length() + 16);
+            boolean plain = n == text.length();
+            int parts = template.size();
+            int last = 0;
+            int done = 0;
+            while (true) {
+                int s = regs[0];
+                int e = regs[1];
+                if (plain) {
+                    out.append(text, last, s);
                 } else {
-                    int g = (int) Py.index(part);
-                    int gs = regs[2 * g];
-                    int ge = regs[2 * g + 1];
-                    if (gs >= 0 && ge >= 0) {
-                        if (plain) {
-                            out.append(text, gs, ge);
-                        } else {
-                            out.append(PyStr.substr(text, gs, ge));
+                    out.append(PyStr.substr(text, last, s));
+                }
+                for (int k = 0; k < parts; k++) {
+                    Object part = template.get(k);
+                    if (part instanceof String) {
+                        out.append((String) part);
+                    } else {
+                        int g = (int) Py.index(part);
+                        int gs = regs[2 * g];
+                        int ge = regs[2 * g + 1];
+                        if (gs >= 0 && ge >= 0) {
+                            if (plain) {
+                                out.append(text, gs, ge);
+                            } else {
+                                out.append(PyStr.substr(text, gs, ge));
+                            }
                         }
                     }
                 }
+                last = e;
+                done++;
+                if (e > n || count != 0 && done >= count) {
+                    break;
+                }
+                regs = run(p, sc, text, e, n, 2, s == e ? e : -1);
+                if (regs.length == 0) {
+                    break;
+                }
             }
-            last = e;
-            done++;
-            if (e > n || count != 0 && done >= count) {
-                break;
+            if (plain) {
+                out.append(text, last, n);
+            } else {
+                out.append(PyStr.substr(text, last, n));
             }
-            regs = run(p, text, e, n, 2, s == e ? e : -1);
-            if (regs.length == 0) {
-                break;
-            }
+            return Py.tuple(out.toString(), Long.valueOf(done));
+        } finally {
+            release(p, sc);
         }
-        if (plain) {
-            out.append(text, last, n);
-        } else {
-            out.append(PyStr.substr(text, last, n));
-        }
-        return Py.tuple(out.toString(), Long.valueOf(done));
     }
 
     /// `pattern.findall(text, pos, endpos)` with the loop in Java: the whole
     /// match, the one group, or a tuple of groups, an unmatched group as "".
     static Object findall(Prog p, String text, int pos, int endpos) {
-        PyList out = Py.list();
-        int at = pos;
-        int forbid = -1;
-        while (at <= endpos) {
-            int[] regs = run(p, text, at, endpos, 2, forbid);
-            if (regs.length == 0) {
-                break;
-            }
-            if (p.groups == 0) {
-                out.append(PyStr.substr(text, regs[0], regs[1]));
-            } else if (p.groups == 1) {
-                out.append(group(text, regs, 1));
-            } else {
-                Object[] g = new Object[p.groups];
-                for (int k = 0; k < g.length; k++) {
-                    g[k] = group(text, regs, k + 1);
+        Scratch sc = acquire(p);
+        try {
+            PyList out = Py.list();
+            int at = pos;
+            int forbid = -1;
+            while (at <= endpos) {
+                int[] regs = run(p, sc, text, at, endpos, 2, forbid);
+                if (regs.length == 0) {
+                    break;
                 }
-                out.append(Py.tuple(g));
+                if (p.groups == 0) {
+                    out.append(PyStr.substr(text, regs[0], regs[1]));
+                } else if (p.groups == 1) {
+                    out.append(group(text, regs, 1));
+                } else {
+                    Object[] g = new Object[p.groups];
+                    for (int k = 0; k < g.length; k++) {
+                        g[k] = group(text, regs, k + 1);
+                    }
+                    out.append(Py.tuple(g));
+                }
+                int s = regs[0];
+                int e = regs[1];
+                forbid = s == e ? e : -1;
+                at = e;
             }
-            int s = regs[0];
-            int e = regs[1];
-            forbid = s == e ? e : -1;
-            at = e;
+            return out;
+        } finally {
+            release(p, sc);
         }
-        return out;
     }
 
     private static String group(String text, int[] regs, int g) {
