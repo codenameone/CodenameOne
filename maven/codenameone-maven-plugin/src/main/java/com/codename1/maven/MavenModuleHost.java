@@ -151,6 +151,13 @@ final class MavenModuleHost implements ProjectHost {
         return artifact.getFile();
     }
 
+    /// The backend goals build no application target, so they read no port. The
+    /// translator they do need is resolved by `BackendPackageMojo` itself.
+    @Override
+    public File getPortJar(String artifactId, String classifier) {
+        return getJar("com.codenameone", artifactId, classifier);
+    }
+
     @Override
     public File getJar(String groupId, String artifactId, String classifier) {
         for (BuildArtifact a : artifacts()) {

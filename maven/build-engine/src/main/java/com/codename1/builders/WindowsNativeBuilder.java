@@ -287,9 +287,9 @@ public class WindowsNativeBuilder extends Executor {
                 log("Native theme not used by this build, not shipped: windowsNativeTheme.res");
             }
         } catch (Exception ex) {
-            throw new BuildException("Failed to stage the WindowsPort native layer. The codenameone "
-                    + "maven plugin must provide the codenameone-windows 'bundle' artifact "
-                    + "(WindowsPort.jar + nativewindows.jar) on its classpath.", ex);
+            throw new BuildException("Failed to stage the WindowsPort native layer. The codenameone-windows "
+                    + "'bundle' artifact this build resolved must carry WindowsPort.jar and "
+                    + "nativewindows.jar; a truncated download or a bundle of another version does not.", ex);
         }
 
         // The bundled SQLite engine is emitted only for applications that use com.codename1.db,

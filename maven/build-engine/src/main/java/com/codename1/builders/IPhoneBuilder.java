@@ -10712,15 +10712,15 @@ public class IPhoneBuilder extends Executor {
         } else {
             return null;
         }
-        return "The iOS port bundle on this build's classpath is older than the Codename One "
-                + "Maven plugin running it: " + reason + ". The scene delegate is what creates "
+        return "The iOS port bundle this build reads is older than the Codename One "
+                + "build plugin running it: " + reason + ". The scene delegate is what creates "
                 + "the application window, and the Info.plist this build writes names it, so the "
                 + "result would be an app that builds cleanly and fails to launch. These two "
                 + "artifacts are released together and are not meant to be mixed -- remove the "
                 + "<dependencies> override pinning com.codenameone:codenameone-ios under the "
                 + "codenameone-maven-plugin declaration in your pom, or move the plugin back to "
                 + "the version that matches it. Note cn1.version is not what selects this: the "
-                + "port is a dependency of the plugin, not of your project.";
+                + "port is resolved at the plugin's own version, not your project's.";
     }
 
     /// The launch-screen keys Apple accepts, in the order its release notes name them.

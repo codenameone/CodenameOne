@@ -51,7 +51,7 @@ function ios_release() {
 
 function jar() {
     global MVNW;
-    call(MVNW, "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-DskipTests");
+    call(MVNW, "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-Dcn1.ffmpeg.allPlatforms=true", "-DskipTests");
 }
 
 function help() {

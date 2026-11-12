@@ -86,6 +86,12 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
         request.setProperties(properties);
 
         if (buildExecutableJar()) {
+            // The jar runs on machines other than this one, so it takes the media
+            // natives of every desktop platform, not the host's alone. The child
+            // build is a separate Maven run: it sees the property only if it is sent.
+            if (!properties.containsKey("cn1.ffmpeg.allPlatforms")) {
+                properties.setProperty("cn1.ffmpeg.allPlatforms", "true");
+            }
             request.setProfiles(Collections.singletonList("executable-jar"));
         }
 

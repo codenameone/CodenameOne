@@ -143,6 +143,8 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
                              ('ios_source', '-Dcodename1.buildTarget=ios-source')]:
         run('build', target, argument)
     run('build', '', '-Pexecutable-jar')
+    # The jar runs on other machines, so it takes every desktop platform's media natives.
+    run('build', '', '-Dcn1.ffmpeg.allPlatforms')
     run('run', '', '-Psimulator')
     run('build', 'javascript_cloud', '-Dcodename1.buildTarget=javascript', 37)
     run('run', 'simulator', '-Psimulator', 37)

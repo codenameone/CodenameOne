@@ -126,6 +126,11 @@ public class DelegatingProjectHost implements ProjectHost {
     }
 
     @Override
+    public File getPortJar(String artifactId, String classifier) {
+        return delegate.getPortJar(artifactId, classifier);
+    }
+
+    @Override
     public File getJar(String groupId, String artifactId, String classifier) {
         return delegate.getJar(groupId, artifactId, classifier);
     }

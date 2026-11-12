@@ -131,6 +131,26 @@ final class AppSupport {
         addFramework(project, simulator.getName(), version, "codenameone-core", "codenameone-javase");
         project.getDependencies().addProvider(simulator.getName(),
                 version.map(v -> PluginInfo.GROUP + ":cn1-binaries-javase:" + v));
+        // cn1-binaries-javase brings ffmpeg's Java half; its natives are chosen by
+        // Maven profiles keyed on the host OS, which Gradle does not evaluate. So
+        // the host's natives are named here, at the versions that pom was built
+        // with -- one platform, where the aggregator used to bring all seven.
+        String ffmpegVersion = PluginInfo.builtWith("ffmpeg.version");
+        String javacppVersion = PluginInfo.builtWith("javacpp.version");
+        if (ffmpegVersion == null || javacppVersion == null) {
+            // Skipping the natives here would be a simulator without media and
+            // without a word about why. The versions are written into the plugin
+            // when it is built, so this is a plugin that was built wrong.
+            throw new org.gradle.api.GradleException("The Codename One plugin does not know the ffmpeg"
+                    + " and javacpp versions it was built with (plugin.properties). Rebuild the plugin.");
+        }
+        for (String platform : PluginInfo.hostFfmpegPlatforms(
+                System.getProperty("os.name"), System.getProperty("os.arch"))) {
+            project.getDependencies().add(simulator.getName(),
+                    "org.bytedeco:ffmpeg:" + ffmpegVersion + ":" + platform);
+            project.getDependencies().add(simulator.getName(),
+                    "org.bytedeco:javacpp:" + javacppVersion + ":" + platform);
+        }
         Configuration cssCompiler = resolvable(project, "cn1CssCompiler", "The Codename One CSS compiler");
         addFramework(project, cssCompiler.getName(), version, "codenameone-css-cli");
 
@@ -741,6 +761,31 @@ final class AppSupport {
                     t.getOverwrite().set(false);
                 });
 
+        // The ports this task's target reads, and no others: the build tool does not
+        // depend on them, so that a project which only ever runs the simulator or
+        // builds in the cloud never downloads one. Nothing resolves this until the
+        // task runs. Not transitive -- a port is read as a file, and its pom names the
+        // framework jars the project already has.
+        final Configuration ports = resolvable(project, "cn1Ports"
+                + name.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + name.substring(1),
+                "The port jars a local build of " + name + " reads");
+        ports.setTransitive(false);
+        // At the plugin's version, never the project's: codenameone.version is the
+        // framework the application compiles against and may be held behind the
+        // plugin, and a builder paired with an older port writes a project that
+        // builds and does not start. The Maven plugin resolves them the same way.
+        final Provider<String> portVersion = project.provider(PluginInfo::version);
+        ports.getDependencies().addAllLater(targetProvider.flatMap(target -> portVersion.map(v -> {
+            List<org.gradle.api.artifacts.Dependency> out = new ArrayList<org.gradle.api.artifacts.Dependency>();
+            for (String port : com.codename1.maven.AppBuilder.portArtifacts(target)) {
+                int colon = port.indexOf(':');
+                out.add(project.getDependencies().create(PluginInfo.GROUP + ":"
+                        + (colon < 0 ? port : port.substring(0, colon)) + ":" + v
+                        + (colon < 0 ? "" : ":" + port.substring(colon + 1))));
+            }
+            return out;
+        })).orElse(Collections.<org.gradle.api.artifacts.Dependency>emptyList()));
+
         project.getTasks().register(name, Cn1BuildTask.class, t -> {
             common(t, project, layout, ext, userProperties);
             t.setGroup(BUILD_GROUP);
@@ -759,6 +804,7 @@ final class AppSupport {
                     .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
             t.getOpen().set(ext.getOpenGeneratedProjects());
             t.getFrameworkJars().from(framework);
+            t.getPortJars().from(ports);
             // Resolve after build-script configuration, including Kotlin and added/generated roots.
             t.getSourceRoots().set(project.provider(() -> sourceRoots(main, layout)));
             t.getFinalName().set(project.getName());

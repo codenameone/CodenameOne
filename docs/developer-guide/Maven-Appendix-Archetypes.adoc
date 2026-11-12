@@ -23,6 +23,8 @@ Native interface implementations live in the same directories either way. `mvn c
 
 A project without a `javase` module keeps the desktop app's native theme in `common/src/desktop/resources`. `mvn package -Pexecutable-jar -Dcodename1.platform=javase` writes the desktop jar to `common/target`.
 
+The desktop jar is one archive for Windows, macOS and Linux, so it carries the media libraries of all three. This layout adds them without being asked. A project with a `javase` module packages the libraries of the machine that builds it unless the command passes `-Dcn1.ffmpeg.allPlatforms=true`, which the generated `build.sh`, `build.bat` and IDE launchers do. Add the property to a launcher written before it existed; the build prints a warning when it's missing.
+
 [#maven-backend-only]
 ==== Backend-only projects
 

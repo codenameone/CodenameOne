@@ -344,9 +344,9 @@ public class LinuxNativeBuilder extends Executor {
                 log("Native theme not used by this build, not shipped: linuxNativeTheme.res");
             }
         } catch (Exception ex) {
-            throw new BuildException("Failed to stage the LinuxPort native layer. The codenameone "
-                    + "maven plugin must provide the codenameone-linux 'bundle' artifact "
-                    + "(LinuxPort.jar + nativelinux.jar) on its classpath.", ex);
+            throw new BuildException("Failed to stage the LinuxPort native layer. The codenameone-linux "
+                    + "'bundle' artifact this build resolved must carry LinuxPort.jar and "
+                    + "nativelinux.jar; a truncated download or a bundle of another version does not.", ex);
         }
 
         // The bundled SQLite engine is emitted only for applications that use com.codename1.db,

@@ -37,6 +37,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -57,6 +58,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import javax.imageio.ImageIO;
@@ -110,6 +112,7 @@ public abstract class Executor {
     private boolean canceled;
     private Class<?>[] nativeInterfaces;
     private boolean unitTestMode;
+    private final List<File> portJars = new ArrayList<File>();
     static boolean IS_MAC;
     /**
      * The internal class name inside a JVM field descriptor.
@@ -4455,9 +4458,88 @@ public abstract class Executor {
      * Gets a potentially versioned resource
      */
     public InputStream getResourceAsStream(String res) {
+        InputStream is = Executor.class.getResourceAsStream(res);
+        if (is != null) {
+            return is;
+        }
+        return openPortResource(res);
+    }
 
+    /// Attaches a port jar this build reads its platform out of -- `iOSPort.jar` and
+    /// `nativeios.jar` from the `codenameone-ios` bundle, the translator from the
+    /// `codenameone-parparvm` one, `android_port_sources.jar` from `codenameone-android`.
+    ///
+    /// These used to be dependencies of the build tool itself, which made every one of
+    /// them part of the first download of every project: Maven resolves a plugin's whole
+    /// class path before it runs a single goal, so a Hello World started in the simulator
+    /// fetched the iOS, Android, macOS, Windows and Linux ports and the translator --
+    /// about 55 MB it never opened. The host now resolves only what the target being
+    /// built reads (see `AppBuilder.portArtifacts`) and hands the files over here.
+    ///
+    /// The class path is still asked first, so a tool that does carry a port (the cloud
+    /// builder, a test) behaves exactly as before and nothing here is consulted.
+    public void addPortJar(File jar) {
+        if (jar != null && !portJars.contains(jar)) {
+            portJars.add(jar);
+        }
+    }
 
-        return Executor.class.getResourceAsStream(res);
+    /// The port jars attached to this build, in the order they are searched.
+    public List<File> getPortJars() {
+        return new ArrayList<File>(portJars);
+    }
+
+    private InputStream openPortResource(String res) {
+        // Class.getResourceAsStream resolves a name with no leading slash against the
+        // class's own package, and a port resource has to answer to the same name.
+        String entry = res.startsWith("/") ? res.substring(1) : "com/codename1/builders/" + res;
+        for (File jar : portJars) {
+            ZipFile zip = null;
+            try {
+                zip = new ZipFile(jar);
+                ZipEntry e = zip.getEntry(entry);
+                if (e != null && !e.isDirectory()) {
+                    InputStream in = new PortResourceStream(zip, zip.getInputStream(e));
+                    zip = null;
+                    return in;
+                }
+            } catch (IOException ex) {
+                // An unreadable jar is not "the resource is absent": every caller turns
+                // null into "X is missing from the class path", which would send the
+                // reader looking for a packaging bug when the download is what broke.
+                throw new IllegalStateException("Could not read the port jar " + jar + ": " + ex, ex);
+            } finally {
+                if (zip != null) {
+                    try {
+                        zip.close();
+                    } catch (IOException ignored) {
+                        // nothing was read from it
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /// A port resource's stream, which owns the jar it was opened from: closing the
+    /// stream closes the jar, so a caller needs no more care than it took with a class
+    /// path resource.
+    private static final class PortResourceStream extends FilterInputStream {
+        private final ZipFile zip;
+
+        PortResourceStream(ZipFile zip, InputStream in) {
+            super(in);
+            this.zip = zip;
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                super.close();
+            } finally {
+                zip.close();
+            }
+        }
     }
 
     protected boolean isUnitTestMode() {

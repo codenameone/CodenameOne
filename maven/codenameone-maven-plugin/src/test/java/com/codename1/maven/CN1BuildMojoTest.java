@@ -124,6 +124,17 @@ public class CN1BuildMojoTest {
                 "org.bytedeco:ffmpeg-platform:jar:7.1-1.5.11",
                 "org.bytedeco:ffmpeg:jar:windows-x86_64:7.1-1.5.11");
         assertTrue(CN1BuildMojo.isDesktopRuntimeBinary("org.bytedeco", "ffmpeg", viaAggregator));
+        // The aggregator names ffmpeg and each platform's natives itself now.
+        List<String> direct = Arrays.asList(
+                "com.example:myapp-javase:jar:1.0-SNAPSHOT",
+                "com.codenameone:cn1-binaries-javase:pom:8.0-SNAPSHOT",
+                "org.bytedeco:ffmpeg:jar:macosx-arm64:7.1-1.5.11");
+        assertTrue(CN1BuildMojo.isDesktopRuntimeBinary("org.bytedeco", "ffmpeg", direct));
+        List<String> javacpp = Arrays.asList(
+                "com.example:myapp-javase:jar:1.0-SNAPSHOT",
+                "com.codenameone:cn1-binaries-javase:pom:8.0-SNAPSHOT",
+                "org.bytedeco:javacpp:jar:linux-x86_64:1.5.11");
+        assertTrue(CN1BuildMojo.isDesktopRuntimeBinary("org.bytedeco", "javacpp", javacpp));
     }
 
     @Test

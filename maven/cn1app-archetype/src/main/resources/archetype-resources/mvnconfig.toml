@@ -86,7 +86,7 @@ label="Gradle Android Project"
 group="Local"
 
 [jar]
-command=["$MVNW", "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-DskipTests", "-U", "-e"]
+command=["$MVNW", "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-Dcn1.ffmpeg.allPlatforms=true", "-DskipTests", "-U", "-e"]
 label="Cross-platform (JavaSE) Desktop App"
 group="Local"
 build=true

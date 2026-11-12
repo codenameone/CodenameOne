@@ -69,10 +69,45 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         applyAnnotationBuildHints();
+        warnAboutHostOnlyMedia();
         generateIcons();
         generateThemeConfiguration();
         generateStub();
         registerCustomStubSourceRoot();
+    }
+
+    /// Says, once per desktop jar build, that the jar will play media on this machine's
+    /// platform alone.
+    ///
+    /// The project's class path carries ffmpeg for the machine that resolves it. A
+    /// project with a `javase` module packages its desktop jar with the dependency and
+    /// jar plugins straight from that class path, and its launch commands predate the
+    /// property that widens it -- so nothing else would tell its author. A project
+    /// without that module is packaged by `javase-executable-jar`, which resolves the
+    /// other platforms itself.
+    private void warnAboutHostOnlyMedia() {
+        if (isHosting() || project == null) {
+            return;
+        }
+        // An IDE's embedded Maven passes a launcher's properties to the session and
+        // sets no system property, so both are asked.
+        Properties user = getSession() == null ? null : getSession().getUserProperties();
+        if ("true".equals(System.getProperty("cn1.ffmpeg.allPlatforms"))
+                || (user != null && "true".equals(user.getProperty("cn1.ffmpeg.allPlatforms")))) {
+            return;
+        }
+        boolean packaging = false;
+        for (Object profile : project.getActiveProfiles()) {
+            if (profile instanceof org.apache.maven.model.Profile
+                    && "executable-jar".equals(((org.apache.maven.model.Profile) profile).getId())) {
+                packaging = true;
+            }
+        }
+        if (packaging) {
+            getLog().warn("This desktop jar bundles ffmpeg for the platform it is being built on only. To play"
+                    + " media on the other desktop platforms too, add -Dcn1.ffmpeg.allPlatforms=true to this"
+                    + " command.");
+        }
     }
 
     /// Overlays the hints declared as annotations (`@DesktopBuild(themeMode = ...)`,

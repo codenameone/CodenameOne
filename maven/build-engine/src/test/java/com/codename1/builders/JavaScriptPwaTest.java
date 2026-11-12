@@ -139,11 +139,13 @@ class JavaScriptPwaTest {
         BuildRequest request = request();
         request.putArgument("javascript.manifest.start_url", "./dashboard?installed=1");
         request.putArgument("javascript.inject_proxy", "false");
-        assertNull(JavaScriptProxyPackager.packageProxy(app, temp.toFile(), "App", request, message -> {}));
+        assertNull(JavaScriptProxyPackager.packageProxy(app, temp.toFile(), "App", request, message -> {},
+                new JavaScriptBuilder()));
         assertEquals("standalone", parse(new File(app, "manifest.json")).get("display"));
         request.putArgument("javascript.inject_proxy", "true");
         request.putArgument("javascript.proxy.target", "node");
-        File zip = JavaScriptProxyPackager.packageProxy(app, temp.toFile(), "App", request, message -> {});
+        File zip = JavaScriptProxyPackager.packageProxy(app, temp.toFile(), "App", request, message -> {},
+                new JavaScriptBuilder());
         try (java.util.zip.ZipFile archive = new java.util.zip.ZipFile(zip)) {
             assertNotNull(archive.getEntry("public/manifest.json"));
             assertNotNull(archive.getEntry("public/sw.js"));

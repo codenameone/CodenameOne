@@ -85,6 +85,6 @@
   },
   {
     "alias": "Local > Cross-platform (JavaSE) Desktop App",
-    "command": "\"-Pexecutable-jar\" \"package\" \"-Dcodename1.platform=javase\" \"-DskipTests\" \"-U\" \"-e\""
+    "command": "\"-Pexecutable-jar\" \"package\" \"-Dcodename1.platform=javase\" \"-Dcn1.ffmpeg.allPlatforms=true\" \"-DskipTests\" \"-U\" \"-e\""
   }
 ]}

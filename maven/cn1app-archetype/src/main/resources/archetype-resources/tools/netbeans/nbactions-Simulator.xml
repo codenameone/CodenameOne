@@ -38,6 +38,7 @@
         </goals>
         <properties>
             <skipTests>true</skipTests>
+            <cn1.ffmpeg.allPlatforms>true</cn1.ffmpeg.allPlatforms>
         </properties>
         <activatedProfiles>
             <activatedProfile>executable-jar</activatedProfile>
@@ -55,6 +56,7 @@
         </goals>
         <properties>
             <skipTests>true</skipTests>
+            <cn1.ffmpeg.allPlatforms>true</cn1.ffmpeg.allPlatforms>
         </properties>
         <activatedProfiles>
             <activatedProfile>executable-jar</activatedProfile>
@@ -72,6 +74,7 @@
         </goals>
         <properties>
             <skipTests>true</skipTests>
+            <cn1.ffmpeg.allPlatforms>true</cn1.ffmpeg.allPlatforms>
         </properties>
         <activatedProfiles>
             <activatedProfile>executable-jar</activatedProfile>

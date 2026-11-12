@@ -147,6 +147,7 @@
                         <option name="jreName" value="#USE_PROJECT_JDK" />
                         <option name="mavenProperties">
                             <map>
+                                <entry key="cn1.ffmpeg.allPlatforms" value="true" />
                                 <entry key="codename1.platform" value="javase" />
                             </map>
                         </option>

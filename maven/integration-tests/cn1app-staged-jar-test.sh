@@ -231,8 +231,8 @@ fi
 # is on MODULE's compile classpath, so only the plugin keeps it out of the upload.
 require_compile_ffmpeg() {
   if ! mvn -B -ntp dependency:tree -pl common,$3 -Dcodename1.platform=$2 < /dev/null 2>/dev/null \
-      | sed -n "/Building .*-$3 /,\$p" | grep -q "org.bytedeco:ffmpeg-platform:jar:.*:compile"; then
-    echo "FAIL: [$1] ffmpeg-platform is not at compile scope in $3, so this pass would check nothing."
+      | sed -n "/Building .*-$3 /,\$p" | grep -q "org.bytedeco:ffmpeg:jar:[a-z0-9_-]*:[0-9][^:]*:compile"; then
+    echo "FAIL: [$1] no org.bytedeco:ffmpeg native is at compile scope in $3, so this pass would check nothing."
     exit 1
   fi
 }
