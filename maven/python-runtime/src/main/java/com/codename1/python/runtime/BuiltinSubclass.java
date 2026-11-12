@@ -69,11 +69,17 @@ final class BuiltinSubclass {
                     ? ((PyInstance) a[1]).base : a[1];
             Object r = op.apply(Py.obj(a[0]), other);
             return r == null ? Py.NOT_IMPLEMENTED : r;
+        }).with2((self, x) -> {
+            // The fixed-arity call (`x in s`, `s == y` on an instance of a
+            // subclass): the receiver arrives unwrapped, no argument arrays.
+            Object other = x instanceof PyInstance && ((PyInstance) x).base != null ? ((PyInstance) x).base : x;
+            Object r = op.apply(Py.obj(self), other);
+            return r == null ? Py.NOT_IMPLEMENTED : r;
         }));
     }
 
     private static void unary(PyType t, String name, Unary op) {
-        t.define(name, PyBuiltin.method(t, name, a -> op.apply(Py.obj(a[0]))));
+        t.define(name, PyBuiltin.method(t, name, a -> op.apply(Py.obj(a[0]))).with1(self -> op.apply(Py.obj(self))));
     }
 
     private static void arithmetic(PyType t) {

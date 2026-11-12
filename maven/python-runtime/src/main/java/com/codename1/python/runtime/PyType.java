@@ -951,6 +951,67 @@ public final class PyType extends PyObject {
         return lookup("__init__");
     }
 
+    // Keyword constructor calls of a plain class (`Tag(parser, builder,
+    // name, attrs=a)`): `__init__` gets the new instance and the arguments as
+    // parameters, with no argument array and none with the instance
+    // prepended. Anything else -- a builtin, a `__new__`, a metaclass -- goes
+    // the generic way.
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a));
+            return o;
+        }
+        return super.callKwF(kwNames, a);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e);
+    }
+
     /// A positional constructor call of a plain class without an argument
     /// array: `__init__` is a function, or the one a dataclass generated. Null
     /// when the class is neither, and the caller builds the array after all.
