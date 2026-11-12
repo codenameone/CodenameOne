@@ -57,6 +57,12 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
 
     public void optionsMaxHeight(double v) { this.optionsMaxHeight = v; }
 
+    /**
+     * Flutter's {@code optionsViewOpenDirection}: accepted, not applied. The options
+     * list always opens below the field here.
+     */
+    public void optionsViewOpenDirection(com.codename1.flutter.widgets.OptionsViewOpenDirection v) { }
+
     @Override
     public double optionsMaxHeight() {
         return optionsMaxHeight;

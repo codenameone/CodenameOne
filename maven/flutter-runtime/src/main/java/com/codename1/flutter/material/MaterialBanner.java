@@ -54,6 +54,11 @@ public class MaterialBanner extends StatelessWidget {
         this.content = v;
     }
 
+    /// The banner's content widget.
+    public Widget getContent() {
+        return content;
+    }
+
     public void contentTextStyle(TextStyle v) {
         this.contentTextStyle = v;
     }

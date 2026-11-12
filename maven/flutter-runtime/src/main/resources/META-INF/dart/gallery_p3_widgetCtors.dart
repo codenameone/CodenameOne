@@ -33,6 +33,9 @@ class OrdinalSortKey {
 class DefaultTextStyle extends Widget {
   external DefaultTextStyle({Key? key, TextStyle? style, TextAlign? textAlign, bool? softWrap, Object? overflow, int? maxLines, Widget? child});
   external static DefaultTextStyle of(BuildContext context);
+  external TextStyle get style;
+  external static Widget merge({Key? key, TextStyle? style, TextAlign? textAlign, bool? softWrap,
+      Object? overflow, int? maxLines, required Widget child});
 }
 
 @JavaName('com.codename1.flutter.widgets.FocusTraversalGroup')
@@ -144,6 +147,9 @@ class TextPainter {
   external Size get size;
   external double get width;
   external double get height;
+  external InlineSpan? get text;
+  external set text(InlineSpan? value);
+  external bool get didExceedMaxLines;
 }
 
 // ======================================================================

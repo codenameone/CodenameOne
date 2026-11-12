@@ -125,6 +125,9 @@ public class Text extends Widget {
 
     @Override
     public Element createElement() {
+        if (textSpan != null && WidgetSpan.contains(textSpan)) {
+            return WidgetSpan.flow(textSpan, style, textAlign).createElement();
+        }
         if (textSpan != null) {
             RichText rt = new RichText();
             TextSpan root = textSpan;

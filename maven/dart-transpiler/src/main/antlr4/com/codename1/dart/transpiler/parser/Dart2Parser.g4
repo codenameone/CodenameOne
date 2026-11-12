@@ -44,11 +44,13 @@ additiveOperator
     ;
 
 argumentList
-    : namedArgument (C namedArgument)*
-    | expressionList ( C namedArgument)*
-    // Dart 2.17: named arguments anywhere, so a named one may precede a positional one.
-    // Only reached when neither form above matches; positional order is kept as written.
-    | mixedArgument (C mixedArgument)*
+    // One alternative, decided per argument by two tokens (`identifier :`). The
+    // former three alternatives (all named / positional then named / mixed) all
+    // overlap, so choosing among them needed full-context prediction across the
+    // WHOLE argument list on every call -- nested widget constructors made that
+    // quadratic and it was >90% of parse time on Flutter screens. Positional and
+    // named order is kept as written either way.
+    : mixedArgument (C mixedArgument)*
     ;
 
 mixedArgument

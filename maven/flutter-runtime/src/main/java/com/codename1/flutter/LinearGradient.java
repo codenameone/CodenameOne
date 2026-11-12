@@ -25,4 +25,11 @@ package com.codename1.flutter;
 
 /** A 2D linear gradient — Flutter's {@code LinearGradient}. */
 public class LinearGradient extends Gradient {
+
+    /// Flutter's {@code colors}.
+    @SuppressWarnings("unchecked")
+    public dart.core.DartList<Color> colors() {
+        Object c = getColors();
+        return c instanceof dart.core.DartList ? (dart.core.DartList<Color>) c : null;
+    }
 }

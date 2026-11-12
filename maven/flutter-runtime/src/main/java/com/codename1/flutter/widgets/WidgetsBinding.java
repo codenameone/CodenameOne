@@ -45,6 +45,9 @@ public final class WidgetsBinding {
      */
     public static final class PlatformDispatcher {
 
+        /** dart:ui's {@code PlatformDispatcher.instance}: the binding's one dispatcher. */
+        public static final PlatformDispatcher instance = WidgetsBinding.instance.platformDispatcher();
+
         /** The system-wide brightness. Defaults to light in this runtime. */
         public Brightness platformBrightness = Brightness.light;
 

@@ -33,7 +33,10 @@ public final class NumberFormat {
 
     private final String prefix;
     private final String suffix;
-    private final int digits;
+    private int digits;
+    /// intl's minimumFractionDigits once set; -1 keeps the pattern's own (0 for a
+    /// decimal pattern, which drops trailing zeros, otherwise every digit).
+    private int minDigits = -1;
     private final boolean percent;
     /** 0: fixed; 1: compact ("1.2K"); 2: compact long ("1.2 thousand"); 3: grouped decimal. */
     private int mode;
@@ -172,12 +175,36 @@ public final class NumberFormat {
             return compactFormat(v);
         }
         if (mode == 3) {
-            return grouped(trim(fixed(v, digits)));
+            return grouped(trimTo(fixed(v, digits), minimumFractionDigitsInt()));
         }
         if (percent) {
             v = v * 100;
         }
-        return prefix + fixed(v, digits) + suffix;
+        String body = fixed(v, digits);
+        return prefix + (minDigits >= 0 ? trimTo(body, minDigits) : body) + suffix;
+    }
+
+    /** Drops trailing fraction zeros down to {@code min} digits, and a bare point. */
+    private static String trimTo(String s, int min) {
+        int dot = s.indexOf('.');
+        if (dot < 0) {
+            return s;
+        }
+        int end = s.length();
+        while (end - dot - 1 > min && s.charAt(end - 1) == '0') {
+            end--;
+        }
+        if (end == dot + 1) {
+            end = dot;
+        }
+        return s.substring(0, end);
+    }
+
+    private int minimumFractionDigitsInt() {
+        if (minDigits >= 0) {
+            return minDigits;
+        }
+        return mode == 3 ? 0 : digits;
     }
 
     private static String fixed(double value, int digits) {
@@ -205,4 +232,31 @@ public final class NumberFormat {
         }
         return sb.toString();
     }
+
+    /** intl's {@code minimumFractionDigits}. */
+    public long minimumFractionDigits() {
+        return minimumFractionDigitsInt();
+    }
+
+    /** intl's {@code minimumFractionDigits = v}; raises the maximum to match if needed. */
+    public void minimumFractionDigits(long v) {
+        minDigits = (int) Math.max(0, v);
+        if (digits < minDigits) {
+            digits = minDigits;
+        }
+    }
+
+    /** intl's {@code maximumFractionDigits}. */
+    public long maximumFractionDigits() {
+        return digits;
+    }
+
+    /** intl's {@code maximumFractionDigits = v}; lowers the minimum to match if needed. */
+    public void maximumFractionDigits(long v) {
+        digits = (int) Math.max(0, v);
+        if (minDigits > digits) {
+            minDigits = digits;
+        }
+    }
+
 }

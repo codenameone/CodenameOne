@@ -63,4 +63,17 @@ public class Switch extends Widget {
     public Element createElement() {
         return new SwitchRenderElement(this);
     }
+
+    /// {@code Switch.adaptive}: this runtime draws one switch on every platform, so
+    /// it is a plain Switch; the colour parameters are accepted and not applied.
+    public static Switch adaptive(com.codename1.flutter.Key key, boolean value, Funcs.VoidFunc1<Boolean> onChanged,
+            com.codename1.flutter.Color activeColor, com.codename1.flutter.Color activeTrackColor,
+            com.codename1.flutter.Color inactiveThumbColor, com.codename1.flutter.Color inactiveTrackColor,
+            Object thumbColor, Object trackColor) {
+        Switch s = new Switch();
+        s.key(key);
+        s.value(value);
+        s.onChanged(onChanged);
+        return s;
+    }
 }

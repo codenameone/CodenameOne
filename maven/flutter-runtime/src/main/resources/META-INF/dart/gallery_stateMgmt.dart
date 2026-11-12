@@ -100,6 +100,7 @@ class Locale {
   external Locale(String languageCode, [String? countryCode]);
   external String get languageCode;
   external String? get countryCode;
+  external String? get scriptCode;
 }
 
 // --- theming value classes --------------------------------------------
@@ -134,6 +135,12 @@ class AppBarTheme {
   external Color? get backgroundColor;
   external double? get elevation;
   external IconThemeData? get iconTheme;
+  external IconThemeData? get actionsIconTheme;
+  external Color? get foregroundColor;
+  external TextStyle? get titleTextStyle;
+  external TextStyle? get toolbarTextStyle;
+  external dynamic get shape;
+  external bool? get centerTitle;
 }
 
 @JavaName('com.codename1.flutter.material.ChipThemeData')

@@ -226,4 +226,42 @@ public class InputDecoration {
         }
         return d;
     }
+
+    /// Flutter's {@code copyWith}: a copy with every non-null argument replacing
+    /// this decoration's value.
+    public InputDecoration copyWith(String labelText,
+            String hintText,
+            String helperText,
+            String errorText,
+            String prefixText,
+            String suffixText,
+            com.codename1.flutter.Widget icon,
+            com.codename1.flutter.Widget prefixIcon,
+            com.codename1.flutter.Widget suffixIcon,
+            Boolean filled,
+            com.codename1.flutter.Color fillColor,
+            com.codename1.flutter.InputBorder border,
+            com.codename1.flutter.TextStyle labelStyle,
+            com.codename1.flutter.TextStyle hintStyle,
+            com.codename1.flutter.EdgeInsetsGeometry contentPadding,
+            FloatingLabelBehavior floatingLabelBehavior) {
+        InputDecoration c = new InputDecoration();
+        c.labelText = labelText != null ? labelText : this.labelText;
+        c.hintText = hintText != null ? hintText : this.hintText;
+        c.helperText = helperText != null ? helperText : this.helperText;
+        c.errorText = errorText != null ? errorText : this.errorText;
+        c.prefixText = prefixText != null ? prefixText : this.prefixText;
+        c.suffixText = suffixText != null ? suffixText : this.suffixText;
+        c.icon = icon != null ? icon : this.icon;
+        c.prefixIcon = prefixIcon != null ? prefixIcon : this.prefixIcon;
+        c.suffixIcon = suffixIcon != null ? suffixIcon : this.suffixIcon;
+        c.filled = filled != null ? filled : this.filled;
+        c.fillColor = fillColor != null ? fillColor : this.fillColor;
+        c.border = border != null ? border : this.border;
+        c.labelStyle = labelStyle != null ? labelStyle : this.labelStyle;
+        c.hintStyle = hintStyle != null ? hintStyle : this.hintStyle;
+        c.contentPadding = contentPadding != null ? contentPadding : this.contentPadding;
+        c.floatingLabelBehavior = floatingLabelBehavior != null ? floatingLabelBehavior : this.floatingLabelBehavior;
+        return c;
+    }
 }

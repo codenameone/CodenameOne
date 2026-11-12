@@ -213,4 +213,20 @@ class NavigatorStackTest {
         assertEquals(0, Dialogs.openDialogCount());
         assertEquals(false, nav.canPop());
     }
+
+    /// pushAndRemoveUntil(withName('/')) from home keeps home, as Flutter does: the new
+    /// route goes on top, and Back still reaches home.
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void pushAndRemoveUntilKeepsTheBaseWhenThePredicateAcceptsIt() {
+        dart.runtime.Funcs.Func1 home = (r) -> "/".equals(((com.codename1.flutter.navigation.Route) r).settings().name());
+        Navigator.pushAndRemoveUntil(null, route(), home);
+        assertEquals(1, Navigator.stackSize());
+        Navigator.push(null, route());
+        Navigator.push(null, route());
+        Navigator.pushAndRemoveUntil(null, route(), home);
+        assertEquals(1, Navigator.stackSize(), "every pushed route goes, home stays under the new one");
+        Navigator.pushAndRemoveUntil(null, route(), (r) -> false);
+        assertEquals(1, Navigator.stackSize(), "(r) => false replaces the remaining route; nothing is pushed over it");
+    }
 }

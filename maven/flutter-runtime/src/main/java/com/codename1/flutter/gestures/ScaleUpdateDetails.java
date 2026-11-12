@@ -38,6 +38,16 @@ public final class ScaleUpdateDetails {
     private double verticalScale = 1.0;
     private double rotation;
     private Offset focalPointDelta = Offset.zero;
+    private long pointerCount = 2;
+
+    /** The number of pointers on the screen, Flutter's {@code pointerCount}. */
+    public long pointerCount() {
+        return pointerCount;
+    }
+
+    public void pointerCount(long v) {
+        pointerCount = v;
+    }
 
     public ScaleUpdateDetails() {
     }

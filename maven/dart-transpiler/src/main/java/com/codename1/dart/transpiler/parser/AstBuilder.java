@@ -26,6 +26,7 @@ package com.codename1.dart.transpiler.parser;
 import com.codename1.dart.transpiler.api.Diagnostics;
 import com.codename1.dart.transpiler.ast.Ast;
 import com.codename1.dart.transpiler.ast.Ast.*;
+import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -33,6 +34,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.atn.PredictionMode;
+import org.antlr.v4.runtime.misc.ParseCancellationException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,8 +69,6 @@ public final class AstBuilder {
     public Library parse(String fileName, String source) {
         this.file = fileName;
         Dart2Lexer lexer = new Dart2Lexer(CharStreams.fromString(source));
-        Dart2Parser parser = new Dart2Parser(new CommonTokenStream(lexer));
-        parser.removeErrorListeners();
         lexer.removeErrorListeners();
         BaseErrorListener listener = new BaseErrorListener() {
             @Override
@@ -76,9 +77,27 @@ public final class AstBuilder {
                 diags.error(fileName, line, charPositionInLine, "E0001", "Syntax error: " + msg);
             }
         };
-        parser.addErrorListener(listener);
         lexer.addErrorListener(listener);
-        Dart2Parser.CompilationUnitContext unit = parser.compilationUnit();
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        // Two-stage parse: SLL prediction with a bail-out strategy first, which is
+        // exact for every input it accepts and avoids the full-context (LL)
+        // simulation; only a file SLL cannot handle is re-parsed in LL mode, with
+        // the error listener attached so a real syntax error is still reported.
+        Dart2Parser parser = new Dart2Parser(tokens);
+        parser.removeErrorListeners();
+        parser.getInterpreter().setPredictionMode(PredictionMode.SLL);
+        parser.setErrorHandler(new BailErrorStrategy());
+        Dart2Parser.CompilationUnitContext unit;
+        try {
+            unit = parser.compilationUnit();
+        } catch (ParseCancellationException ex) {
+            tokens.seek(0);
+            parser = new Dart2Parser(tokens);
+            parser.removeErrorListeners();
+            parser.addErrorListener(listener);
+            parser.getInterpreter().setPredictionMode(PredictionMode.LL);
+            unit = parser.compilationUnit();
+        }
         Library lib = new Library();
         lib.fileName = fileName;
         currentLib = lib;
@@ -2842,17 +2861,6 @@ public final class AstBuilder {
             } else {
                 out.positional.add(buildExpr(m.expr()));
             }
-        }
-        if (list.expressionList() != null) {
-            for (Dart2Parser.ExprContext e : list.expressionList().expr()) {
-                out.positional.add(buildExpr(e));
-            }
-        }
-        for (Dart2Parser.NamedArgumentContext n : list.namedArgument()) {
-            NamedArg na = new NamedArg();
-            na.name = n.label().identifier().getText();
-            na.value = buildExpr(n.expr());
-            out.named.add(na);
         }
     }
 

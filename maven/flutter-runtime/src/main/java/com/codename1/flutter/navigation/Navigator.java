@@ -550,6 +550,16 @@ public class Navigator extends StatelessWidget {
             com.codename1.flutter.FlutterErrorReport.noRoute(name, null);
             return nothingPushed();
         }
+        com.codename1.flutter.FlutterErrorReport.route(name);
+        return replaceRoute(context, route, result);
+    }
+
+    /// {@code Navigator.pushReplacement}: pushes {@code route} in place of the current
+    /// one, whose future completes with {@code result}. Shared by pushReplacementNamed.
+    static dart.async.Future<Object> replaceRoute(BuildContext context, Route route, Object result) {
+        if (route == null) {
+            return nothingPushed();
+        }
         // Replacing the IMPLICIT base route: the stack is empty, so the pop() below is a
         // no-op -- nothing is removed and nothing is torn down. Without this check, push()
         // still went ahead and recorded the base form (still on screen, since pop() did
@@ -568,7 +578,6 @@ public class Navigator extends StatelessWidget {
         // to push FIRST, and the replacement then landed above it -- the reverse of
         // Flutter's order, with the callback's route stranded under it.
         RouteEntry removed = Dialogs.popTopDialog(result) ? null : popPage();
-        com.codename1.flutter.FlutterErrorReport.route(name);
         dart.async.Future<Object> pushed = push(context, route);
         if (replacingImplicitBase) {
             RouteEntry e = stack.remove(stack.size() - 1);
@@ -664,6 +673,17 @@ public class Navigator extends StatelessWidget {
         }
 
         @Override
+        public dart.async.Future<Object> pushReplacement(Object route, Object result) {
+            return Navigator.pushReplacement(null, route, result);
+        }
+
+        @Override
+        public dart.async.Future<Object> pushAndRemoveUntil(Object route,
+                Funcs.Func1<Route<Object>, Boolean> predicate) {
+            return Navigator.pushAndRemoveUntil(null, route, predicate);
+        }
+
+        @Override
         public String restorablePush(
                 Funcs.Func2<BuildContext, Object, Object> routeBuilder, Object arguments) {
             return Navigator.restorablePush(null, routeBuilder, arguments);
@@ -715,6 +735,88 @@ public class Navigator extends StatelessWidget {
             }
         }
     };
+
+    /// {@code Navigator.popUntil(context, predicate)}.
+    public static void popUntil(BuildContext context, Funcs.Func1<Route<Object>, Boolean> predicate) {
+        STATE.popUntil(predicate);
+    }
+
+    /// {@code Navigator.canPop(context)}: whether a route (or dialog) is above the base.
+    public static boolean canPop(BuildContext context) {
+        return poppable();
+    }
+
+    /// {@code Navigator.pushReplacement(context, route, result: r)}.
+    public static dart.async.Future<Object> pushReplacement(BuildContext context, Object route, Object result) {
+        if (!(route instanceof Route)) {
+            return pushAny(context, route);
+        }
+        return replaceRoute(context, (Route) route, result);
+    }
+
+    /// {@code Navigator.pushAndRemoveUntil(context, route, predicate)}: removes routes
+    /// from the top until {@code predicate} accepts one, then pushes {@code route} above
+    /// it. The base route is never handed to the predicate (this runtime keeps no Route
+    /// object for it): when every pushed route is rejected, {@code route} replaces the
+    /// base and becomes the only route, as {@code (r) => false} has it in Flutter.
+    public static dart.async.Future<Object> pushAndRemoveUntil(BuildContext context, Object route,
+            Funcs.Func1<Route<Object>, Boolean> predicate) {
+        if (!(route instanceof Route)) {
+            return pushAny(context, route);
+        }
+        while (Dialogs.openDialogCount() > 0 || !stack.isEmpty()) {
+            Route<Object> top = Dialogs.openDialogCount() > 0
+                    ? new DialogRoute<Object>()
+                    : (Route<Object>) stack.get(stack.size() - 1).route;
+            Boolean keep;
+            try {
+                keep = predicate == null ? null : predicate.call(top);
+            } catch (Throwable thrownByPredicate) {
+                com.codename1.flutter.FlutterErrorReport.record(thrownByPredicate);
+                keep = null;
+            }
+            if (keep != null && keep.booleanValue()) {
+                return push(context, (Route) route);
+            }
+            if (Dialogs.openDialogCount() == 0 && stack.size() == 1) {
+                if (keepsBase(predicate)) {
+                    // The base survives, as in Flutter: drop the last pushed route and
+                    // push over the base.
+                    pop(context, null);
+                    return push(context, (Route) route);
+                }
+                // Replacing the last pushed route (rather than popping it and then
+                // pushing) lets replaceRoute settle what becomes the base.
+                break;
+            }
+            pop(context, null);
+        }
+        if (stack.isEmpty() && Dialogs.openDialogCount() == 0 && keepsBase(predicate)) {
+            // From the home route with nothing pushed: `withName('/')` keeps home, so the
+            // new route goes on top and Back still reaches it.
+            return push(context, (Route) route);
+        }
+        return replaceRoute(context, (Route) route, null);
+    }
+
+    /// Asks the predicate about the implicit base route, which has no Route object of
+    /// its own here: a stand-in named '/', the name Flutter gives the initial route.
+    private static boolean keepsBase(Funcs.Func1<Route<Object>, Boolean> predicate) {
+        if (predicate == null) {
+            return false;
+        }
+        MaterialPageRoute<Object> base = new MaterialPageRoute<Object>();
+        RouteSettings settings = new RouteSettings();
+        settings.name("/");
+        base.settings(settings);
+        try {
+            Boolean keep = predicate.call(base);
+            return keep != null && keep.booleanValue();
+        } catch (Throwable thrownByPredicate) {
+            com.codename1.flutter.FlutterErrorReport.record(thrownByPredicate);
+            return false;
+        }
+    }
 
     /**
      * The nearest navigator's mutable state ({@code Navigator.of(context)}).
@@ -865,6 +967,17 @@ public class Navigator extends StatelessWidget {
         @Override
         public dart.async.Future<Object> push(Object route) {
             return pushAny(context, route);
+        }
+
+        @Override
+        public dart.async.Future<Object> pushReplacement(Object route, Object result) {
+            return Navigator.pushReplacement(context, route, result);
+        }
+
+        @Override
+        public dart.async.Future<Object> pushAndRemoveUntil(Object route,
+                Funcs.Func1<Route<Object>, Boolean> predicate) {
+            return Navigator.pushAndRemoveUntil(context, route, predicate);
         }
 
         @Override

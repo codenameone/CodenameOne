@@ -120,4 +120,37 @@ public class Positioned extends Widget {
     public Element createElement() {
         return new PositionedRenderElement(this);
     }
+
+    /// {@code Positioned.directional}: {@code start}/{@code end} are the left/right
+    /// insets for left-to-right text and the right/left ones for right-to-left.
+    public static Positioned directional(Key key, com.codename1.flutter.TextDirection textDirection,
+            Double start, Double top, Double end, Double bottom, Double width, Double height, Widget child) {
+        boolean rtl = textDirection == com.codename1.flutter.TextDirection.rtl;
+        Double left = rtl ? end : start;
+        Double right = rtl ? start : end;
+        Positioned p = new Positioned();
+        p.key(key);
+        if (left != null) {
+            p.left(left);
+        }
+        if (top != null) {
+            p.top(top);
+        }
+        if (right != null) {
+            p.right(right);
+        }
+        if (bottom != null) {
+            p.bottom(bottom);
+        }
+        if (width != null) {
+            p.width(width);
+        }
+        if (height != null) {
+            p.height(height);
+        }
+        if (child != null) {
+            p.child(child);
+        }
+        return p;
+    }
 }

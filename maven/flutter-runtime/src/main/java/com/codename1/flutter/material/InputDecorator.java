@@ -71,7 +71,7 @@ public class InputDecorator extends StatelessWidget {
             body = Kit.text(hint, hs);
         }
         boolean outlined = d != null && d.getBorder() instanceof com.codename1.flutter.OutlineInputBorder;
-        InputDecorationThemeData theme = Theme.of(context).inputDecorationTheme();
+        InputDecorationThemeData theme = Theme.of(context).givenInputDecorationTheme();
         boolean filled = (d != null && d.isFilled()) || (theme != null && Boolean.TRUE.equals(Boolean.valueOf(theme.isFilled())));
         Color fill = d != null && d.getFillColor() != null ? d.getFillColor()
                 : (theme != null && theme.getFillColor() != null ? theme.getFillColor() : cs.surfaceContainerHighest());

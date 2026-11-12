@@ -165,7 +165,7 @@ class ClipPath extends Widget {
 @JavaName('com.codename1.flutter.material.DatePickerDialog.show')
 external Future<DateTime?> showDatePicker({required BuildContext context, DateTime? initialDate,
     required DateTime firstDate, required DateTime lastDate, DateTime? currentDate, String? helpText,
-    String? cancelText, String? confirmText});
+    String? cancelText, String? confirmText, bool Function(DateTime)? selectableDayPredicate});
 
 @JavaName('com.codename1.flutter.material.TimePickerDialog.show')
 external Future<TimeOfDay?> showTimePicker({required BuildContext context, required TimeOfDay initialTime,

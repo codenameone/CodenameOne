@@ -87,4 +87,13 @@ public class FilledButton extends ElevatedButton {
         }
         return icon(key, onPressed, style, icon, label);
     }
+
+    /// {@code FilledButton.tonalIcon}: the tonal variant with a leading (or, with
+    /// {@code iconAlignment: end}, trailing) icon.
+    public static FilledButton tonalIcon(Key key, Funcs.VoidFunc0 onPressed, ButtonStyle style,
+            Widget icon, Widget label, IconAlignment iconAlignment) {
+        FilledButton b = icon(key, onPressed, style, icon, label, iconAlignment);
+        b.tonal = true;
+        return b;
+    }
 }

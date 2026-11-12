@@ -2481,13 +2481,13 @@ class Icon extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.Column')
 class Column extends Widget {
-  external Column({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, List<Widget> children});
+  external Column({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, VerticalDirection? verticalDirection, List<Widget> children});
   external TextBaseline? get textBaseline;
 }
 
 @JavaName('com.codename1.flutter.widgets.Row')
 class Row extends Widget {
-  external Row({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, List<Widget> children});
+  external Row({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, VerticalDirection? verticalDirection, List<Widget> children});
   external TextBaseline? get textBaseline;
 }
 
@@ -2562,7 +2562,7 @@ class ThemeData {
       IconThemeData? iconTheme, IconThemeData? primaryIconTheme, AppBarTheme? appBarTheme,
       ChipThemeData? chipTheme, CheckboxThemeData? checkboxTheme, CardTheme? cardTheme,
       BottomAppBarThemeData? bottomAppBarTheme, DividerThemeData? dividerTheme,
-      dynamic snackBarTheme, dynamic inputDecorationTheme, dynamic radioTheme, dynamic switchTheme,
+      dynamic snackBarTheme, dynamic inputDecorationTheme, dynamic tabBarTheme, dynamic radioTheme, dynamic switchTheme,
       dynamic tooltipTheme, BottomSheetThemeData? bottomSheetTheme, dynamic floatingActionButtonTheme,
       dynamic elevatedButtonTheme, dynamic textButtonTheme, dynamic outlinedButtonTheme,
       PageTransitionsTheme? pageTransitionsTheme, dynamic visualDensity, dynamic typography, dynamic platform,
@@ -2577,6 +2577,8 @@ class ThemeData {
   external Brightness get brightness;
   external IconThemeData? get iconTheme;
   external AppBarTheme? get appBarTheme;
+  external InputDecorationThemeData get inputDecorationTheme;
+  external TabBarThemeData get tabBarTheme;
   external ChipThemeData? get chipTheme;
   external CardTheme? get cardTheme;
   external DividerThemeData? get dividerTheme;
@@ -2753,6 +2755,8 @@ class Stack extends Widget {
 class Positioned extends Widget {
   external Positioned({Key? key, double? left, double? top, double? right, double? bottom, double? width, double? height, Widget child});
   external static Positioned fill({Key? key, double? left, double? top, double? right, double? bottom, Widget? child});
+  external static Positioned directional({Key? key, required TextDirection textDirection, double? start,
+      double? top, double? end, double? bottom, double? width, double? height, required Widget child});
 }
 
 @JavaName('com.codename1.flutter.widgets.Align')
@@ -2796,7 +2800,7 @@ class ElevatedButton extends Widget {
       Color? shadowColor, double? elevation, TextStyle? textStyle, EdgeInsets? padding,
       dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity,
       Size? minimumSize, Size? maximumSize, Color? disabledForegroundColor, Color? disabledBackgroundColor});
-  external static ElevatedButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label});
+  external static ElevatedButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label, IconAlignment? iconAlignment});
 }
 
 @JavaName('com.codename1.flutter.material.TextButton')
@@ -2806,7 +2810,7 @@ class TextButton extends Widget {
       Color? shadowColor, double? elevation, TextStyle? textStyle, EdgeInsets? padding,
       dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity,
       Size? minimumSize, Size? maximumSize, Color? disabledForegroundColor, Color? disabledBackgroundColor});
-  external static TextButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label});
+  external static TextButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label, IconAlignment? iconAlignment});
 }
 
 @JavaName('com.codename1.flutter.material.FilledButton')
@@ -2814,6 +2818,7 @@ class FilledButton extends ElevatedButton {
   external FilledButton({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? child});
   external static FilledButton tonal({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? child});
   external static FilledButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label, IconAlignment? iconAlignment});
+  external static FilledButton tonalIcon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label, IconAlignment? iconAlignment});
 }
 
 @JavaName('com.codename1.flutter.material.OutlinedButton')
@@ -2823,7 +2828,7 @@ class OutlinedButton extends Widget {
       Color? shadowColor, double? elevation, TextStyle? textStyle, EdgeInsets? padding,
       dynamic side, dynamic shape, dynamic alignment, dynamic tapTargetSize, dynamic visualDensity,
       Size? minimumSize, Size? maximumSize, Color? disabledForegroundColor, Color? disabledBackgroundColor});
-  external static OutlinedButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label});
+  external static OutlinedButton icon({Key? key, VoidCallback? onPressed, ButtonStyle? style, Widget? icon, Widget? label, IconAlignment? iconAlignment});
 }
 
 @JavaName('com.codename1.flutter.material.IconButton')
@@ -2859,6 +2864,8 @@ class TextEditingController {
   // which is why declaring this setter is enough to fix the assignment.
   external set text(String value);
   external void setText(String value);
+  external TextEditingValue get value;
+  external set value(TextEditingValue newValue);
   external void addListener(VoidCallback listener);
   external void removeListener(VoidCallback listener);
   external void clear();
@@ -2870,6 +2877,7 @@ class TextEditingController {
 class InputDecoration {
   external InputDecoration({String? labelText, String? hintText});
   external static InputDecoration collapsed({String? hintText, dynamic hintStyle, dynamic border, bool? filled, Color? fillColor});
+  external InputDecoration copyWith({String? labelText, String? hintText, String? helperText, String? errorText, String? prefixText, String? suffixText, Widget? icon, Widget? prefixIcon, Widget? suffixIcon, bool? filled, Color? fillColor, InputBorder? border, TextStyle? labelStyle, TextStyle? hintStyle, EdgeInsetsGeometry? contentPadding, FloatingLabelBehavior? floatingLabelBehavior});
 }
 
 @JavaName('com.codename1.flutter.material.TextField')
@@ -2890,6 +2898,9 @@ class Radio<T> extends Widget {
 @JavaName('com.codename1.flutter.material.Switch')
 class Switch extends Widget {
   external Switch({Key? key, bool value, BoolCallback? onChanged});
+  external static Switch adaptive({Key? key, required bool value, BoolCallback? onChanged, Color? activeColor,
+      Color? activeTrackColor, Color? inactiveThumbColor, Color? inactiveTrackColor, Object? thumbColor,
+      Object? trackColor});
 }
 
 @JavaName('com.codename1.flutter.material.Slider')
@@ -2922,6 +2933,11 @@ class Navigator extends Widget {
   // this used to answer a synchronous bool, so `await Navigator.maybePop(context)`
   // did not compile against the stub.
   external static Future<bool> maybePop(BuildContext context, [Object? result]);
+  external static bool canPop(BuildContext context);
+  external static void popUntil(BuildContext context, bool Function(Route<dynamic>) predicate);
+  external static Future<T?> pushReplacement<T>(BuildContext context, Route<T> newRoute, {Object? result});
+  external static Future<T?> pushAndRemoveUntil<T>(BuildContext context, Route<T> newRoute,
+      bool Function(Route<dynamic>) predicate);
 }
 
 @JavaName('com.codename1.flutter.material.Dialogs.showDialog')
@@ -2961,9 +2977,23 @@ abstract class ScaffoldMessenger extends Widget {
   external static ScaffoldMessengerState? maybeOf(BuildContext context);
 }
 
+@JavaName('com.codename1.flutter.material.SnackBarClosedReason')
+enum SnackBarClosedReason { action, dismiss, swipe, hide, remove, timeout }
+
+@JavaName('com.codename1.flutter.material.ScaffoldFeatureController')
+abstract class ScaffoldFeatureController {
+  external Future<SnackBarClosedReason> get closed;
+  external void close();
+}
+
 @JavaName('com.codename1.flutter.material.ScaffoldMessengerState')
 abstract class ScaffoldMessengerState {
-  external void showSnackBar(SnackBar snackBar);
+  // Returns the controller whose `closed` completes with a SnackBarClosedReason.
+  external ScaffoldFeatureController showSnackBar(SnackBar snackBar);
+  external ScaffoldFeatureController showMaterialBanner(MaterialBanner materialBanner);
+  external void hideCurrentMaterialBanner({dynamic reason});
+  external void removeCurrentMaterialBanner({dynamic reason});
+  external void clearMaterialBanners();
   // Dismisses the visible SnackBar immediately — Flutter's `hideCurrentSnackBar`.
   external void hideCurrentSnackBar({dynamic reason});
   external void removeCurrentSnackBar({dynamic reason});

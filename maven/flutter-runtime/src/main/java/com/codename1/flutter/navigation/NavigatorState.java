@@ -89,4 +89,15 @@ public abstract class NavigatorState {
     public dart.async.Future<Object> push(Object route) {
         return dart.async.Future.value(null);
     }
+
+    /// {@code NavigatorState.pushReplacement}.
+    public dart.async.Future<Object> pushReplacement(Object route, Object result) {
+        return dart.async.Future.value(null);
+    }
+
+    /// {@code NavigatorState.pushAndRemoveUntil}.
+    public dart.async.Future<Object> pushAndRemoveUntil(Object route,
+            dart.runtime.Funcs.Func1<Route<Object>, Boolean> predicate) {
+        return dart.async.Future.value(null);
+    }
 }

@@ -82,6 +82,13 @@ public class CustomScrollView extends StatefulWidget {
     public void primary(Object v) {
     }
 
+    /**
+     * Flutter's {@code keyboardDismissBehavior}: accepted, not applied. Codename One's
+     * own text input already closes the keyboard when focus leaves the field.
+     */
+    public void keyboardDismissBehavior(com.codename1.flutter.widgets.ScrollViewKeyboardDismissBehavior v) {
+    }
+
     public void clipBehavior(Clip v) {
     }
 

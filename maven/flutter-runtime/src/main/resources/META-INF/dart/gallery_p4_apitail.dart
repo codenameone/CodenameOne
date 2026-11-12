@@ -281,6 +281,9 @@ class Matrix4 {
   external Float64List get storage;
   external Matrix4 clone();
   external void translate(double x, [double y, double z]);
+  external void rotateX(double angle);
+  external void rotateY(double angle);
+  external void rotateZ(double angle);
   external void scale(double x, [double? y, double? z]);
   external void scaleByDouble(double sx, double sy, double sz, double sw);
   external void setEntry(int row, int col, double value);
