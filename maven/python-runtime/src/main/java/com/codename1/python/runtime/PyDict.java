@@ -612,6 +612,17 @@ public class PyDict extends PyObject {
         return r;
     }
 
+    /// Before each step of an iteration. A view can do less than a full
+    /// `sync` there, as long as what the step returns is current.
+    void syncStep() {
+        sync();
+    }
+
+    /// The value of live entry `e`, for an iteration step.
+    Object valueAt(int e) {
+        return values[e];
+    }
+
     /// Iterates over entries; `kind` 0 = keys, 1 = values, 2 = items.
     Object iterate(final int kind) {
         sync();
@@ -625,7 +636,7 @@ public class PyDict extends PyObject {
                 // object behind it, so a store made through the object while
                 // iterating is caught as one made through the dict is. A plain
                 // dict's sync does nothing.
-                sync();
+                syncStep();
                 if (size != startSize) {
                     throw Py.runtimeError("dictionary changed size during iteration");
                 }
@@ -640,9 +651,9 @@ public class PyDict extends PyObject {
                     return keys[e];
                 }
                 if (kind == 1) {
-                    return values[e];
+                    return valueAt(e);
                 }
-                return new PyTuple(new Object[] {keys[e], values[e]});
+                return new PyTuple(new Object[] {keys[e], valueAt(e)});
             }
         });
     }

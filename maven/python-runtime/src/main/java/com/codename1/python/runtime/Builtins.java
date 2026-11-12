@@ -241,6 +241,15 @@ public final class Builtins {
         for (int i = 0; i < its.length; i++) {
             its[i] = Py.iter(a[i + 1]);
         }
+        if (its.length == 1) {
+            // One iterable, the usual case: a one-argument call, no row array.
+            final Object it = its[0];
+            final PyObject fn = Py.obj(f);
+            return new PyJavaIter(() -> {
+                Object v = Py.next(it);
+                return v == null ? null : fn.call1(v);
+            });
+        }
         return new PyJavaIter(() -> {
             Object[] row = new Object[its.length];
             for (int i = 0; i < its.length; i++) {
@@ -255,9 +264,10 @@ public final class Builtins {
     public static final Object FILTER = PyBuiltin.positional("filter", a -> {
         final Object f = a[0];
         final Object it = Py.iter(a[1]);
+        final PyObject fn = f == Py.NONE ? null : Py.obj(f); //NOPMD CompareObjectsWithEquals - identity is meant
         return new PyJavaIter(() -> {
             for (Object v = Py.next(it); v != null; v = Py.next(it)) {
-                if (f == Py.NONE ? Py.isTrue(v) : Py.isTrue(Py.obj(f).call(new Object[] {v}, Py.NO_KW))) { //NOPMD CompareObjectsWithEquals - identity is meant
+                if (fn == null ? Py.isTrue(v) : Py.isTrue(fn.call1(v))) { //NOPMD CompareObjectsWithEquals - identity is meant
                     return v;
                 }
             }

@@ -446,6 +446,42 @@ public class PyInstance extends PyObject {
         return Py.obj(m).call(Py.prepend(this, args), kwNames);
     }
 
+    // Fixed-arity calls hand `self` and the arguments on without building an
+    // argument array and then a second one with `self` prepended.
+
+    private Object callable() {
+        Object m = cls.lookup("__call__");
+        if (m == null) {
+            throw Py.typeError("'" + type().name + "' object is not callable");
+        }
+        return m;
+    }
+
+    @Override
+    public Object call0() {
+        return Py.obj(callable()).call1(this);
+    }
+
+    @Override
+    public Object call1(Object a) {
+        return Py.obj(callable()).call2(this, a);
+    }
+
+    @Override
+    public Object call2(Object a, Object b) {
+        return Py.obj(callable()).call3(this, a, b);
+    }
+
+    @Override
+    public Object call3(Object a, Object b, Object c) {
+        return Py.obj(callable()).call4(this, a, b, c);
+    }
+
+    @Override
+    public Object call4(Object a, Object b, Object c, Object d) {
+        return Py.obj(callable()).call5(this, a, b, c, d);
+    }
+
     @Override
     public Object add(Object o) {
         return dunder("__add__", o);
@@ -748,13 +784,8 @@ public class PyInstance extends PyObject {
             syncing = true;
             try {
                 String[] fields = self.fieldNames();
-                long mask = 0;
                 boolean small = fields.length <= 64;
-                for (int i = 0; small && i < fields.length; i++) {
-                    if (self.getField(i) != null) {
-                        mask |= 1L << i;
-                    }
-                }
+                long mask = small ? fieldMask(fields.length) : 0;
                 // A net, not the mechanism: every write through this dict
                 // clears `seen`, but a path that changes the instance without
                 // moving its shape or set fields would otherwise go unseen.
@@ -804,6 +835,40 @@ public class PyInstance extends PyObject {
         /// the shape, the set fields and the size, which fix the keys; the
         /// name check is a cheap safety net against a path that changes the
         /// keys without moving any of those, never the expected case.
+        /// Which of the instance's first `n` (at most 64) fields are set.
+        private long fieldMask(int n) {
+            long mask = 0;
+            for (int i = 0; i < n; i++) {
+                if (self.getField(i) != null) {
+                    mask |= 1L << i;
+                }
+            }
+            return mask;
+        }
+
+        // Iterating an instance's __dict__ used to sync the whole dict on
+        // every step, quadratic in the attributes. While the keys are as last
+        // read (same shape, same set fields), a step re-reads only the value
+        // it returns.
+        @Override
+        void syncStep() {
+            if (!seen || seenShape != self.shape || fieldMask(self.fieldNames().length) != seenFields) { //NOPMD CompareObjectsWithEquals - identity is meant
+                sync();
+            }
+        }
+
+        @Override
+        Object valueAt(int e) {
+            Object k = keys[e];
+            if (k instanceof String) {
+                Object v = self.own((String) k);
+                if (v != null) {
+                    values[e] = v;
+                }
+            }
+            return values[e];
+        }
+
         private boolean refreshValues(String[] fieldNames, long mask) {
             int fieldCount = fieldNames.length;
             String[] shapeNames = self.shape().names;
