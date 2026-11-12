@@ -5777,7 +5777,7 @@ final class TypedEmit {
         for (E x : args) {
             a.append(", ").append(box(x));
         }
-        if (args.size() <= 6) {
+        if (args.size() <= 13) {
             return new E(site + ".call" + args.size() + "(" + a + ")", Ty.DYN);
         }
         StringBuilder arr = new StringBuilder();

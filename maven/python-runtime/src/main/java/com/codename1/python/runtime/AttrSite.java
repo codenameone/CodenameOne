@@ -516,15 +516,44 @@ public final class AttrSite {
                 : Py.obj(Py.obj(o).getAttr(name)).call5(a, b, c, d, e);
     }
 
-    /// `o.name(...)` with six arguments: a module's function (`_cn1re.run`)
-    /// takes them directly; a method, which needs a seventh for the
-    /// receiver, gets the array.
     public Object call6(Object o, Object a, Object b, Object c, Object d, Object e, Object f) {
-        Object m = method(o);
-        if (m != null) {
-            return Py.obj(m).call(new Object[] {o, a, b, c, d, e, f}, Py.NO_KW);
-        }
-        return Py.obj(Py.obj(o).getAttr(name)).call6(a, b, c, d, e, f);
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call7(o, a, b, c, d, e, f) : Py.obj(Py.obj(o).getAttr(name)).call6(a, b, c, d, e, f);
+    }
+
+    public Object call7(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call8(o, a, b, c, d, e, f, g) : Py.obj(Py.obj(o).getAttr(name)).call7(a, b, c, d, e, f, g);
+    }
+
+    public Object call8(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call9(o, a, b, c, d, e, f, g, h) : Py.obj(Py.obj(o).getAttr(name)).call8(a, b, c, d, e, f, g, h);
+    }
+
+    public Object call9(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call10(o, a, b, c, d, e, f, g, h, i) : Py.obj(Py.obj(o).getAttr(name)).call9(a, b, c, d, e, f, g, h, i);
+    }
+
+    public Object call10(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call11(o, a, b, c, d, e, f, g, h, i, j) : Py.obj(Py.obj(o).getAttr(name)).call10(a, b, c, d, e, f, g, h, i, j);
+    }
+
+    public Object call11(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call12(o, a, b, c, d, e, f, g, h, i, j, k) : Py.obj(Py.obj(o).getAttr(name)).call11(a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    public Object call12(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call13(o, a, b, c, d, e, f, g, h, i, j, k, l) : Py.obj(Py.obj(o).getAttr(name)).call12(a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    public Object call13(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call14(o, a, b, c, d, e, f, g, h, i, j, k, l, m) : Py.obj(Py.obj(o).getAttr(name)).call13(a, b, c, d, e, f, g, h, i, j, k, l, m);
     }
 
     /// `o.name(...)` with seven or more arguments. `args[0]` is a slot the

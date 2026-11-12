@@ -74,6 +74,46 @@ public final class PyMethod extends PyObject {
     }
 
     @Override
+    public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
+        return Py.obj(func).call7(self, a, b, c, d, e, f);
+    }
+
+    @Override
+    public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return Py.obj(func).call8(self, a, b, c, d, e, f, g);
+    }
+
+    @Override
+    public Object call8(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return Py.obj(func).call9(self, a, b, c, d, e, f, g, h);
+    }
+
+    @Override
+    public Object call9(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        return Py.obj(func).call10(self, a, b, c, d, e, f, g, h, i);
+    }
+
+    @Override
+    public Object call10(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        return Py.obj(func).call11(self, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    @Override
+    public Object call11(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        return Py.obj(func).call12(self, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    @Override
+    public Object call12(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        return Py.obj(func).call13(self, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    @Override
+    public Object call13(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        return Py.obj(func).call14(self, a, b, c, d, e, f, g, h, i, j, k, l, m);
+    }
+
+    @Override
     public Object getAttrOrNull(String name) {
         if ("__self__".equals(name)) {
             return self;

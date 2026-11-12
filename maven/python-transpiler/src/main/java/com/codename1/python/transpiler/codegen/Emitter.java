@@ -2239,7 +2239,7 @@ public final class Emitter {
         Set<String> savedRecycled = recycled;
         recycled = body != null ? ListRecycling.find(body, names, fs) : java.util.Collections.<String>emptySet();
         List<String> pnames = args.names();
-        boolean directParams = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && pnames.size() <= 6;
+        boolean directParams = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && pnames.size() <= 14;
         if (asStatic != null && asClass != null && directParams && !pnames.isEmpty()
                 && !fs.assigned.contains(pnames.get(0)) && !fs.cells.contains(pnames.get(0))) {
             selfLocal = localVar(fs, pnames.get(0));
@@ -2301,9 +2301,9 @@ public final class Emitter {
         }
         String a = "a" + frame.id;
         // Only positional parameters, at most six: the body takes them as
-        // Java parameters (PyFunction.Body0..Body6), so a call allocates no
+        // Java parameters (PyFunction.Body0..Body14), so a call allocates no
         // argument array.
-        boolean direct = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && names.size() <= 6;
+        boolean direct = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && names.size() <= 14;
         StringBuilder pro = new StringBuilder();
         Set<String> declared = new LinkedHashSet<String>();
         for (int i = 0; i < names.size(); i++) {
@@ -3181,7 +3181,7 @@ public final class Emitter {
                 starred |= x instanceof Starred;
             }
             if (!starred && !l.scope.hasYield && la.vararg == null && la.kwarg == null && la.kwonly.isEmpty()
-                    && la.defaults.isEmpty() && la.positional.size() == c.args.size() && c.args.size() <= 6) {
+                    && la.defaults.isEmpty() && la.positional.size() == c.args.size() && c.args.size() <= 14) {
                 String inl = inlineLambda(l, c);
                 if (inl != null) {
                     return inl;
@@ -3331,7 +3331,7 @@ public final class Emitter {
                 String direct = directCall(a.attr, n, recv, args.toString(), helper, site(a.attr));
                 return direct != null ? direct : helper + recv + args + ", " + site(a.attr) + ")";
             }
-            if (n <= 6) {
+            if (n <= 13) {
                 return site(a.attr) + ".call" + n + "(" + recv + args + ")";
             }
             return site(a.attr) + ".callN(" + recv + ", new Object[] {null, " + args.substring(2) + "})";

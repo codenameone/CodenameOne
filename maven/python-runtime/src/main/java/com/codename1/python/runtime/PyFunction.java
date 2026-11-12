@@ -72,6 +72,38 @@ public final class PyFunction extends PyObject {
         Object run(Object a, Object b, Object c, Object d, Object e, Object f);
     }
 
+    public interface Body7 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g);
+    }
+
+    public interface Body8 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h);
+    }
+
+    public interface Body9 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i);
+    }
+
+    public interface Body10 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j);
+    }
+
+    public interface Body11 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k);
+    }
+
+    public interface Body12 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l);
+    }
+
+    public interface Body13 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m);
+    }
+
+    public interface Body14 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n);
+    }
+
     /// A function whose body is one float expression of its parameters
     /// also has its value as a raw double: the arithmetic alone, for the
     /// parameter types the expression implies. It answers NaN for "not
@@ -126,6 +158,14 @@ public final class PyFunction extends PyObject {
     private Body4 body4;
     private Body5 body5;
     private Body6 body6;
+    private Body7 body7;
+    private Body8 body8;
+    private Body9 body9;
+    private Body10 body10;
+    private Body11 body11;
+    private Body12 body12;
+    private Body13 body13;
+    private Body14 body14;
     private PureD1 pure1;
     private PureD2 pure2;
     private PureD3 pure3;
@@ -201,6 +241,62 @@ public final class PyFunction extends PyObject {
         body6 = b;
     }
 
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body7 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6]));
+        body7 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body8 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]));
+        body8 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body9 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]));
+        body9 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body10 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]));
+        body10 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body11 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]));
+        body11 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body12 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11]));
+        body12 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body13 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]));
+        body13 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body14 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13]));
+        body14 = b;
+    }
+
     @Override
     public Object call0() {
         if (body0 != null) {
@@ -257,6 +353,46 @@ public final class PyFunction extends PyObject {
     @Override
     public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
         return body6 != null ? body6.run(a, b, c, d, e, f) : call(new Object[] {a, b, c, d, e, f}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return body7 != null ? body7.run(a, b, c, d, e, f, g) : call(new Object[] {a, b, c, d, e, f, g}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call8(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return body8 != null ? body8.run(a, b, c, d, e, f, g, h) : call(new Object[] {a, b, c, d, e, f, g, h}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call9(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        return body9 != null ? body9.run(a, b, c, d, e, f, g, h, i) : call(new Object[] {a, b, c, d, e, f, g, h, i}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call10(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        return body10 != null ? body10.run(a, b, c, d, e, f, g, h, i, j) : call(new Object[] {a, b, c, d, e, f, g, h, i, j}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call11(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        return body11 != null ? body11.run(a, b, c, d, e, f, g, h, i, j, k) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call12(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        return body12 != null ? body12.run(a, b, c, d, e, f, g, h, i, j, k, l) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call13(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        return body13 != null ? body13.run(a, b, c, d, e, f, g, h, i, j, k, l, m) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call14(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
+        return body14 != null ? body14.run(a, b, c, d, e, f, g, h, i, j, k, l, m, n) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, Py.NO_KW);
     }
 
     /// Whether a positional call with `n` arguments binds as `f(*args)` does:

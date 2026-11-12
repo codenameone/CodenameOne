@@ -1908,6 +1908,38 @@ public final class Py {
         return Py.obj(f).call6(a, b, c, d, e, g);
     }
 
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6) {
+        return Py.obj(fn).call7(x0, x1, x2, x3, x4, x5, x6);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7) {
+        return Py.obj(fn).call8(x0, x1, x2, x3, x4, x5, x6, x7);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8) {
+        return Py.obj(fn).call9(x0, x1, x2, x3, x4, x5, x6, x7, x8);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9) {
+        return Py.obj(fn).call10(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10) {
+        return Py.obj(fn).call11(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10, Object x11) {
+        return Py.obj(fn).call12(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10, Object x11, Object x12) {
+        return Py.obj(fn).call13(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10, Object x11, Object x12, Object x13) {
+        return Py.obj(fn).call14(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13);
+    }
+
     public static Object call(Object f, Object... args) {
         return Py.obj(f).call(args, NO_KW);
     }
@@ -1947,7 +1979,7 @@ public final class Py {
         // the arguments go straight into a fixed-arity call, with nothing
         // gathered into lists or arrays on the way.
         int npos = spreadCount(parts, kinds);
-        if (npos >= 0 && npos <= 6) {
+        if (npos >= 0 && npos <= 14) {
             PyObject fo = Py.obj(f);
             switch (npos) {
                 case 0:
@@ -1959,14 +1991,29 @@ public final class Py {
                 case 3:
                     return fo.call3(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2));
                 case 4:
-                    return fo.call4(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2),
-                            spreadAt(parts, kinds, 3));
+                    return fo.call4(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3));
                 case 5:
-                    return fo.call5(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2),
-                            spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4));
+                    return fo.call5(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4));
+                case 6:
+                    return fo.call6(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5));
+                case 7:
+                    return fo.call7(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6));
+                case 8:
+                    return fo.call8(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7));
+                case 9:
+                    return fo.call9(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8));
+                case 10:
+                    return fo.call10(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9));
+                case 11:
+                    return fo.call11(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10));
+                case 12:
+                    return fo.call12(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10), spreadAt(parts, kinds, 11));
+                case 13:
+                    return fo.call13(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10), spreadAt(parts, kinds, 11), spreadAt(parts, kinds, 12));
+                case 14:
+                    return fo.call14(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10), spreadAt(parts, kinds, 11), spreadAt(parts, kinds, 12), spreadAt(parts, kinds, 13));
                 default:
-                    return fo.call6(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2),
-                            spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5));
+                    break;
             }
         }
         return callSpreadGeneral(f, parts, kinds, names);
