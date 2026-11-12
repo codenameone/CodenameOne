@@ -2027,6 +2027,31 @@ public final class Py {
         return Py.obj(f).call(args, NO_KW);
     }
 
+    /// [#callKw] of a fixed arity: no argument array at the call site.
+    public static Object callKwF(Object fn, String[] kwNames, Object a) {
+        return Py.obj(fn).callKwF(kwNames, a);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b) {
+        return Py.obj(fn).callKwF(kwNames, a, b);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f);
+    }
+
     public static Object callKw(Object f, Object[] args, String[] kwNames) {
         return Py.obj(f).call(args, kwNames);
     }

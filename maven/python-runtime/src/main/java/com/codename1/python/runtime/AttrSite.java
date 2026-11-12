@@ -610,6 +610,48 @@ public final class AttrSite {
         return Py.obj(get(o)).call(rest, kwNames);
     }
 
+    /// [#callKw] of a fixed arity: the receiver plus at most five arguments,
+    /// with no argument array at the call site.
+    public Object callKwF(Object o, String[] kwNames, Object a) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e);
+    }
+
     /// The function to call with the receiver prepended, when the call needs
     /// no bound method; otherwise null and the caller goes the generic way.
     private Object method(Object o) {

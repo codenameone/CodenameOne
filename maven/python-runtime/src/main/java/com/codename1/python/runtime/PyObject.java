@@ -111,6 +111,35 @@ public abstract class PyObject {
         return call(Py.NO_ARGS, Py.NO_KW);
     }
 
+    // Keyword calls of a fixed arity: `kwNames` names the trailing arguments,
+    // as in [#call]. The transpiler emits these for calls of at most six
+    // arguments, so the call site builds no argument array; a function
+    // binds them in locals, anything else gets the array here.
+
+    public Object callKwF(String[] kwNames, Object a) {
+        return call(new Object[] {a}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b) {
+        return call(new Object[] {a, b}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c) {
+        return call(new Object[] {a, b, c}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d) {
+        return call(new Object[] {a, b, c, d}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        return call(new Object[] {a, b, c, d, e}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        return call(new Object[] {a, b, c, d, e, f}, kwNames);
+    }
+
     public Object call1(Object a) {
         return call(new Object[] {a}, Py.NO_KW);
     }

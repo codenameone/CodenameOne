@@ -6648,6 +6648,9 @@ final class TypedEmit {
         }
         // Hoisted: the callee caches its keyword binding by the array's identity.
         String w = em.hoist("String[]", "new String[] {" + names + "}");
+        if (c.args.size() + c.keywords.size() <= 6) {
+            return new E("Py.callKwF(" + f + ", " + w + ", " + a + ")", Ty.DYN);
+        }
         return new E("Py.callKw(" + f + ", new Object[] {" + a + "}, " + w + ")", Ty.DYN);
     }
 

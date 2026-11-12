@@ -3388,7 +3388,16 @@ public final class Emitter {
                     && "sys".equals(((Name) ((Attribute) c.func).value).id))) {
                 // A method call: the site puts the receiver in the first slot.
                 Attribute a = (Attribute) c.func;
+                int n = c.args.size() + c.keywords.size();
+                if (n <= 5) {
+                    // Fixed arity: the receiver and arguments travel as
+                    // parameters, so the call builds no argument array.
+                    return site(a.attr) + ".callKwF(" + expr(a.value) + ", " + w + args + ")";
+                }
                 return site(a.attr) + ".callKw(" + expr(a.value) + ", new Object[] {null" + args + "}, " + w + ")";
+            }
+            if (c.args.size() + c.keywords.size() <= 6) {
+                return "Py.callKwF(" + expr(c.func) + ", " + w + args + ")";
             }
             String arr = args.length() == 0 ? "Py.NO_ARGS" : "new Object[] {" + args.substring(2) + "}";
             return "Py.callKw(" + expr(c.func) + ", " + arr + ", " + w + ")";

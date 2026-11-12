@@ -39,6 +39,31 @@ public final class PyMethod extends PyObject {
     }
 
     @Override
+    public Object callKwF(String[] kwNames, Object a) {
+        return Py.obj(func).callKwF(kwNames, self, a);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b) {
+        return Py.obj(func).callKwF(kwNames, self, a, b);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e);
+    }
+
+    @Override
     public Object call(Object[] args, String[] kwNames) {
         return Py.obj(func).call(Py.prepend(self, args), kwNames);
     }
