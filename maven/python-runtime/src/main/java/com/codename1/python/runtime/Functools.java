@@ -209,7 +209,7 @@ final class Functools {
             if (maxsize == 0 || typed) {
                 return call(new Object[] {a, b}, Py.NO_KW);
             }
-            Object k = PyTuple.of(a, b);
+            Object k = Py.tuple(a, b);
             Object hit = lookup(k);
             if (hit != null) {
                 return hit;

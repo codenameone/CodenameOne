@@ -974,7 +974,7 @@ public final class PyList extends PyObject {
             if (!(keys[i] instanceof PyTuple)) {
                 return false;
             }
-            Object[] t = ((PyTuple) keys[i]).items;
+            Object[] t = ((PyTuple) keys[i]).arr();
             if (t.length == 0 || !(t[0] instanceof Long)) {
                 return false;
             }

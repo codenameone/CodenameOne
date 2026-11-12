@@ -648,7 +648,7 @@ final class PyJson {
             if (pairsHook != null) {
                 Object[] pairs = new Object[n];
                 for (int i = 0; i < n; i++) {
-                    pairs[i] = PyTuple.of(stack[start + 2 * i], stack[start + 2 * i + 1]);
+                    pairs[i] = Py.tuple(stack[start + 2 * i], stack[start + 2 * i + 1]);
                 }
                 result = new PyList(pairs);
             } else {

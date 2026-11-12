@@ -143,7 +143,7 @@ public final class PySlice extends PyObject {
                     throw Py.valueError("length should not be negative");
                 }
                 int[] r = indices((int) n);
-                return new PyTuple(new Object[] {Py.of((long) r[0]), Py.of((long) r[1]), Py.of((long) r[2])});
+                return Py.tuple(Py.of((long) r[0]), Py.of((long) r[1]), Py.of((long) r[2]));
             });
         }
         return super.getAttrOrNull(name);

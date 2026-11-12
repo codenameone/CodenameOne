@@ -107,7 +107,7 @@ final class NumPy {
     private static int[] ints(Object o) {
         Object[] items;
         if (o instanceof PyTuple) {
-            items = ((PyTuple) o).items;
+            items = ((PyTuple) o).arr();
         } else if (o instanceof PyList) {
             items = ((PyList) o).toArray();
         } else {
@@ -145,7 +145,7 @@ final class NumPy {
     }
 
     private static NdBuf fromFlat(char kind, Object list) {
-        Object[] items = list instanceof PyList ? ((PyList) list).toArray() : ((PyTuple) list).items;
+        Object[] items = list instanceof PyList ? ((PyList) list).toArray() : ((PyTuple) list).arr();
         NdBuf b = new NdBuf(kind, items.length);
         for (int i = 0; i < items.length; i++) {
             setScalar(b, i, items[i]);
@@ -1014,7 +1014,7 @@ final class NumPy {
     }
 
     private static NdBuf concat(char kind, Object parts) {
-        Object[] items = parts instanceof PyList ? ((PyList) parts).toArray() : ((PyTuple) parts).items;
+        Object[] items = parts instanceof PyList ? ((PyList) parts).toArray() : ((PyTuple) parts).arr();
         int n = 0;
         for (Object o : items) {
             n += buf(o).size();

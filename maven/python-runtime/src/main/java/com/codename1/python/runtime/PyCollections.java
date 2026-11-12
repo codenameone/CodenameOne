@@ -38,7 +38,7 @@ final class PyCollections {
         PyModule m = new PyModule("_cn1collections", new String[0]);
         m.setAttr("tuplegetter", PyBuiltin.fixed2("tuplegetter", (i, doc) -> tupleGetter((int) Py.index(i))));
         m.setAttr("nt_new", PyBuiltin.fixed3("nt_new", (tn, names, defs) ->
-                ntNew(Py.toStr(tn), ((PyTuple) names).items, (PyDict) defs)));
+                ntNew(Py.toStr(tn), ((PyTuple) names).arr(), (PyDict) defs)));
         m.setAttr("dd_init", new PyBuiltin("__init__", PyCollections::ddInit)
                 .with1(self -> ddInit(self, Py.NONE)).with2(PyCollections::ddInit));
         m.setAttr("dd_missing", PyBuiltin.fixed2("__missing__", PyCollections::missing));
@@ -54,7 +54,7 @@ final class PyCollections {
         if (self instanceof PyInstance) {
             Object b = ((PyInstance) self).base;
             if (b instanceof PyTuple) {
-                Object[] items = ((PyTuple) b).items;
+                Object[] items = ((PyTuple) b).arr();
                 if (i < items.length) {
                     return items[i];
                 }

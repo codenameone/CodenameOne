@@ -95,7 +95,7 @@ public final class PyImage {
         }));
         m.setAttr("size", PyBuiltin.fixed1("size", a0 -> {
             PyImageData s = img(a0);
-            return new PyTuple(new Object[] {PyInt.of(s.w), PyInt.of(s.h)});
+            return Py.tuple(PyInt.of(s.w), PyInt.of(s.h));
         }));
         m.setAttr("tobytes", PyBuiltin.fixed1("tobytes", a0 -> {
             PyImageData s = img(a0);
@@ -232,17 +232,17 @@ public final class PyImage {
                 new PyJavaObject(requireEngine().deriveFont(ft(a[0]), Py.asDouble(a[1])))));
         m.setAttr("ft_name", PyBuiltin.fixed1("ft_name", a0 -> {
             String[] n = requireEngine().fontName(ft(a0));
-            return new PyTuple(new Object[] {new PyStr(n[0]), new PyStr(n[1])});
+            return Py.tuple(new PyStr(n[0]), new PyStr(n[1]));
         }));
         m.setAttr("ft_metrics", PyBuiltin.fixed1("ft_metrics", a0 -> {
             int[] mt = requireEngine().fontMetrics(ft(a0));
-            return new PyTuple(new Object[] {PyInt.of(mt[0]), PyInt.of(mt[1])});
+            return Py.tuple(PyInt.of(mt[0]), PyInt.of(mt[1]));
         }));
         m.setAttr("ft_length", PyBuiltin.positional("ft_length", a ->
                 PyInt.of(requireEngine().textLength(ft(a[0]), Py.toStr(a[1])))));
         m.setAttr("ft_bbox", PyBuiltin.fixed3("ft_bbox", (a0, a1, a2) -> {
             int[] b = requireEngine().textBox(ft(a0), Py.toStr(a1), anchor(a2));
-            return new PyTuple(new Object[] {PyInt.of(b[0]), PyInt.of(b[1]), PyInt.of(b[2]), PyInt.of(b[3])});
+            return Py.tuple(PyInt.of(b[0]), PyInt.of(b[1]), PyInt.of(b[2]), PyInt.of(b[3]));
         }));
         m.setAttr("ft_mask", PyBuiltin.positional("ft_mask", a -> {
             PyImageEngine e = requireEngine();
@@ -250,8 +250,8 @@ public final class PyImage {
             String text = Py.toStr(a[1]);
             String anchor = anchor(a[2]);
             int[] b = e.textBox(f, text, anchor);
-            return new PyTuple(new Object[] {wrap(e.textMask(f, text, anchor, Py.isTrue(a[3]))), PyInt.of(b[2]),
-                PyInt.of(b[3])});
+            return Py.tuple(wrap(e.textMask(f, text, anchor, Py.isTrue(a[3]))), PyInt.of(b[2]),
+                PyInt.of(b[3]));
         }));
         m.setAttr("exact", PyBuiltin.positional("exact", a -> {
             PyImageEngine e = engine;
@@ -496,7 +496,7 @@ public final class PyImage {
         if (x1 < 0) {
             return Py.NONE;
         }
-        return new PyTuple(new Object[] {PyInt.of(x0), PyInt.of(y0), PyInt.of(x1 + 1), PyInt.of(y1 + 1)});
+        return Py.tuple(PyInt.of(x0), PyInt.of(y0), PyInt.of(x1 + 1), PyInt.of(y1 + 1));
     }
 
     /// One horizontal pass of Pillow's box blur for an integer radius.

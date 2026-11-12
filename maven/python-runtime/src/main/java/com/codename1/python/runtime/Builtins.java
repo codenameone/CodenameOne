@@ -120,7 +120,7 @@ public final class Builtins {
     public static final Object OCT = PyBuiltin.unary("oct", x -> Py.str(Formatting.format(x, "#o")));
     public static final Object BIN = PyBuiltin.unary("bin", x -> Py.str(Formatting.format(x, "#b")));
     public static final Object FORMAT = PyBuiltin.positional("format", a -> Py.format(a[0], a.length > 1 ? Py.toStr(a[1]) : ""));
-    public static final Object DIVMOD = PyBuiltin.fixed2("divmod", (a0, a1) -> PyTuple.of(Py.floordiv(a0, a1), Py.mod(a0, a1)));
+    public static final Object DIVMOD = PyBuiltin.fixed2("divmod", (a0, a1) -> Py.tuple(Py.floordiv(a0, a1), Py.mod(a0, a1)));
     public static final Object POW = PyBuiltin.positional("pow", a -> pow(a));
     public static final Object ROUND = new PyBuiltin("round", (args, kw) -> round(new Args("round", args, kw).check(2, "number", "ndigits")));
     /// What the body of a function the build removed is: it raises, with
@@ -248,7 +248,7 @@ public final class Builtins {
             if (v == null) {
                 return null;
             }
-            Object r = PyTuple.of(n[0], v);
+            Object r = Py.tuple(n[0], v);
             n[0] = Py.add(n[0], PyInt.of(1));
             return r;
         });
@@ -303,7 +303,7 @@ public final class Builtins {
             if (!(args[i] instanceof PyTuple)) {
                 return null;
             }
-            cols[i] = ((PyTuple) args[i]).items;
+            cols[i] = ((PyTuple) args[i]).arr();
             len = Math.min(len, cols[i].length);
         }
         final int end = len;
@@ -314,6 +314,9 @@ public final class Builtins {
                 return null;
             }
             pos[0] = p + 1;
+            if (cols.length == 2) {
+                return Py.tuple(cols[0][p], cols[1][p]);
+            }
             Object[] row = new Object[cols.length];
             for (int i = 0; i < row.length; i++) {
                 row[i] = cols[i][p];
@@ -371,7 +374,7 @@ public final class Builtins {
                 it = null;
             } else if (iterable instanceof PyTuple) {
                 list = null;
-                arr = ((PyTuple) iterable).items;
+                arr = ((PyTuple) iterable).arr();
                 it = null;
             } else {
                 list = null;
@@ -774,7 +777,7 @@ public final class Builtins {
 
     static Object[] exceptionArgs(Object e) {
         Object args = ((PyInstance) e).own("args");
-        return args instanceof PyTuple ? ((PyTuple) args).items : Py.NO_ARGS;
+        return args instanceof PyTuple ? ((PyTuple) args).arr() : Py.NO_ARGS;
     }
 
     private static void installFactories() {
@@ -1430,7 +1433,7 @@ public final class Builtins {
             throw Py.typeError("issubclass() arg 1 must be a class");
         }
         if (t instanceof PyTuple) {
-            Object[] items = ((PyTuple) t).items;
+            Object[] items = ((PyTuple) t).arr();
             for (Object item : items) {
                 if (issubclass(c, item)) {
                     return true;
@@ -1592,7 +1595,7 @@ public final class Builtins {
         Object[] items = null;
         int n = 0;
         if (iterable instanceof PyTuple) {
-            items = ((PyTuple) iterable).items;
+            items = ((PyTuple) iterable).arr();
             n = items.length;
         } else if (iterable instanceof PyList) {
             PyList l = (PyList) iterable;

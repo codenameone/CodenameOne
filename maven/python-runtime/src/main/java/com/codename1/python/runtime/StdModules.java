@@ -400,9 +400,9 @@ public final class StdModules {
         }));
         m.setAttr("isenabled", PyBuiltin.positional("isenabled", a -> Py.bool(gcEnabled)));
         m.setAttr("get_count", PyBuiltin.positional("get_count",
-                a -> new PyTuple(new Object[] {PyInt.of(0), PyInt.of(0), PyInt.of(0)})));
+                a -> Py.tuple(PyInt.of(0), PyInt.of(0), PyInt.of(0))));
         m.setAttr("get_threshold", PyBuiltin.positional("get_threshold",
-                a -> new PyTuple(new Object[] {PyInt.of(700), PyInt.of(10), PyInt.of(10)})));
+                a -> Py.tuple(PyInt.of(700), PyInt.of(10), PyInt.of(10))));
         m.setAttr("set_threshold", new PyBuiltin("set_threshold", (args, kwNames) -> Py.NONE));
         m.setAttr("freeze", PyBuiltin.positional("freeze", a -> Py.NONE));
         m.setAttr("unfreeze", PyBuiltin.positional("unfreeze", a -> Py.NONE));
@@ -773,8 +773,8 @@ public final class StdModules {
             Object[] rows = sqlRows(r);
             if (!server) {
                 // sqlite3 (_cn1sql): SQLite reports no column types.
-                return new PyTuple(new Object[] {new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
-                    PyInt.of(r.lastRowId)});
+                return Py.tuple(new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
+                    PyInt.of(r.lastRowId));
             }
             // _cn1db adds each column's kind (PySql.Result.types) for _cn1dbapi.
             Object[] kinds = new Object[cols.length];
@@ -782,8 +782,8 @@ public final class StdModules {
                 kinds[i] = r.types != null && i < r.types.length && r.types[i] != null
                         ? Py.str(r.types[i]) : Py.NONE;
             }
-            return new PyTuple(new Object[] {new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
-                PyInt.of(r.lastRowId), new PyTuple(kinds)});
+            return Py.tuple(new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
+                PyInt.of(r.lastRowId), new PyTuple(kinds));
         }));
         m.setAttr("create_function", PyBuiltin.positional("create_function", a -> {
             PySql.Connection c = sqlConnection(a[0]);
@@ -985,7 +985,7 @@ public final class StdModules {
                 i = j;
             } else if (c == ';' && depth <= 0) {
                 String stmt = out == null ? sql.substring(start, i) : out.append(sql.substring(start, i)).toString();
-                return new PyTuple(new Object[] {stmt, params, sql.substring(i + 1), trigger ? Py.TRUE : Py.FALSE});
+                return Py.tuple(stmt, params, sql.substring(i + 1), trigger ? Py.TRUE : Py.FALSE);
             } else {
                 i++;
             }
@@ -1167,7 +1167,7 @@ public final class StdModules {
         Object[] values;
         int count;
         if (parameters instanceof PyTuple) {
-            values = ((PyTuple) parameters).items;
+            values = ((PyTuple) parameters).arr();
             count = values.length;
         } else {
             PyList list = (PyList) parameters;
@@ -1403,7 +1403,7 @@ public final class StdModules {
         PyModule m = new PyModule("_thread", new String[0]);
         m.setAttr("start_new_thread", PyBuiltin.positional("start_new_thread", a -> {
             final Object fn = a[0];
-            final Object[] args = a.length > 1 && a[1] instanceof PyTuple ? ((PyTuple) a[1]).items : new Object[0];
+            final Object[] args = a.length > 1 && a[1] instanceof PyTuple ? ((PyTuple) a[1]).arr() : new Object[0];
             Thread t = new Thread(() -> {
                 Gil.enter();
                 try {
@@ -1478,10 +1478,10 @@ public final class StdModules {
             }
             Object[] pairs = new Object[r.headers.length / 2];
             for (int i = 0; i < pairs.length; i++) {
-                pairs[i] = new PyTuple(new Object[] {Py.str(r.headers[2 * i]), Py.str(r.headers[2 * i + 1])});
+                pairs[i] = Py.tuple(Py.str(r.headers[2 * i]), Py.str(r.headers[2 * i + 1]));
             }
-            return new PyTuple(new Object[] {PyInt.of(r.status), Py.str(r.reason), Py.str(r.url), new PyList(pairs),
-                new PyBytes(r.body)});
+            return Py.tuple(PyInt.of(r.status), Py.str(r.reason), Py.str(r.url), new PyList(pairs),
+                new PyBytes(r.body));
         }));
         return m;
     }
@@ -1780,7 +1780,7 @@ public final class StdModules {
         m.setAttr("cast", CAST);
         Operator.install(m);
         m.setAttr("getitems", PyBuiltin.fixed2("getitems", (obj, keys) -> {
-            Object[] k = ((PyTuple) keys).items;
+            Object[] k = ((PyTuple) keys).arr();
             Object[] out = new Object[k.length];
             for (int i = 0; i < k.length; i++) {
                 out[i] = Py.getitem(obj, k[i]);
@@ -1788,7 +1788,7 @@ public final class StdModules {
             return new PyTuple(out);
         }));
         m.setAttr("getattrs", PyBuiltin.fixed2("getattrs", (obj, names) -> {
-            Object[] k = ((PyTuple) names).items;
+            Object[] k = ((PyTuple) names).arr();
             Object[] out = new Object[k.length];
             for (int i = 0; i < k.length; i++) {
                 Object v = obj;

@@ -959,8 +959,13 @@ public class PyDict extends PyObject {
 
     private void pairItem(Object pair, int n) {
         Object[] kv;
+        if (pair instanceof PyTuple && ((PyTuple) pair).size() == 2) {
+            PyTuple t = (PyTuple) pair;
+            setItem(t.get(0), t.get(1));
+            return;
+        }
         if (pair instanceof PyTuple) {
-            kv = ((PyTuple) pair).items;
+            kv = ((PyTuple) pair).arr();
         } else if (pair instanceof PyList) {
             kv = ((PyList) pair).toArray();
         } else {
@@ -1071,7 +1076,7 @@ public class PyDict extends PyObject {
                 if (kind == 1) {
                     return valueAt(e);
                 }
-                return new PyTuple(new Object[] {keys[e], valueAt(e)});
+                return Py.tuple(keys[e], valueAt(e));
             }
         });
     }

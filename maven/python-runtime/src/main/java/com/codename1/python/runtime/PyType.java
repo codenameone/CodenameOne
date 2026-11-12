@@ -383,7 +383,7 @@ public final class PyType extends PyObject {
             if (!(entries instanceof PyTuple)) {
                 throw Py.typeError("__mro_entries__ must return a tuple");
             }
-            Object[] items = ((PyTuple) entries).items;
+            Object[] items = ((PyTuple) entries).arr();
             for (Object item : items) {
                 if (!out.contains(item)) {
                     out.add(item);

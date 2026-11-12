@@ -957,8 +957,8 @@ public final class Py {
             // PyTuple.lt. No Java subclass overrides the comparison (a struct
             // sequence compares as a tuple, as in CPython), and a Python
             // subclass is a PyInstance, which takes the long way below.
-            Object[] x = ((PyTuple) a).items;
-            Object[] y = ((PyTuple) b).items;
+            Object[] x = ((PyTuple) a).arr();
+            Object[] y = ((PyTuple) b).arr();
             return seqCompare(x, x.length, y, y.length) < 0;
         }
         return isTrue(lt(a, b));
@@ -1653,9 +1653,9 @@ public final class Py {
                 return l.get((int) i);
             }
         } else if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
-            if (i >= 0 && i < items.length) {
-                return items[(int) i];
+            PyTuple t = (PyTuple) o;
+            if (i >= 0 && i < t.size()) {
+                return t.get((int) i);
             }
         }
         return Py.obj(o).getItem(Long.valueOf(i));
@@ -1805,7 +1805,7 @@ public final class Py {
             return k >= 0 && l.isFloatAt(k);
         }
         if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
+            Object[] items = ((PyTuple) o).arr();
             int k = floatIndex(i, items.length);
             return k >= 0 && items[k] instanceof Double;
         }
@@ -1818,7 +1818,7 @@ public final class Py {
             PyList l = (PyList) o;
             return l.floatAt(floatIndex(i, l.size));
         }
-        Object[] items = ((PyTuple) o).items;
+        Object[] items = ((PyTuple) o).arr();
         return ((Double) items[floatIndex(i, items.length)]).doubleValue();
     }
 
@@ -1886,14 +1886,14 @@ public final class Py {
             return v instanceof Double ? ((Double) v).doubleValue() : Double.NaN;
         }
         if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
+            PyTuple t = (PyTuple) o;
             if (k < 0) {
-                k += items.length;
+                k += t.size();
             }
-            if (k < 0 || k >= items.length) {
+            if (k < 0 || k >= t.size()) {
                 return Double.NaN;
             }
-            Object v = items[(int) k];
+            Object v = t.get((int) k);
             return v instanceof Double ? ((Double) v).doubleValue() : Double.NaN;
         }
         return Double.NaN;
@@ -2224,7 +2224,7 @@ public final class Py {
                     break;
                 case 1:
                     if (p instanceof PyTuple) {
-                        n += ((PyTuple) p).items.length;
+                        n += ((PyTuple) p).size();
                     } else if (p != null && p.getClass() == PyList.class) {
                         n += ((PyList) p).size;
                     } else {
@@ -2253,9 +2253,9 @@ public final class Py {
                 }
                 j--;
             } else if (kinds[i] == 1) {
-                int n = p instanceof PyTuple ? ((PyTuple) p).items.length : ((PyList) p).size;
+                int n = p instanceof PyTuple ? ((PyTuple) p).size() : ((PyList) p).size;
                 if (j < n) {
-                    return p instanceof PyTuple ? ((PyTuple) p).items[j] : ((PyList) p).get(j);
+                    return p instanceof PyTuple ? ((PyTuple) p).get(j) : ((PyList) p).get(j);
                 }
                 j -= n;
             }
@@ -2412,7 +2412,7 @@ public final class Py {
     /// Materialises any iterable.
     public static Object[] toArray(Object o) {
         if (o instanceof PyTuple) {
-            return ((PyTuple) o).items;
+            return ((PyTuple) o).arr();
         }
         if (o instanceof PyList) {
             return ((PyList) o).toArray();
@@ -2423,9 +2423,27 @@ public final class Py {
     }
 
     /// `a, b = value`: exactly `n` items or `ValueError`.
+    /// [#unpack] for generated code, answering an empty array when `o` is
+    /// a fixed-size tuple of exactly `n` items (n is at least one): the
+    /// caller then reads them from the tuple, and no array is made for it.
+    public static Object[] unpackT(Object o, int n) {
+        if (o instanceof PyTuple && ((PyTuple) o).elems == null && ((PyTuple) o).size() == n) {
+            return NO_ARGS;
+        }
+        return unpack(o, n);
+    }
+
+    /// [#unpackNames] answering an empty array as [#unpackT] does.
+    public static Object[] unpackNamesT(Object o, int n) {
+        if (o instanceof PyTuple && ((PyTuple) o).elems == null && ((PyTuple) o).size() == n) {
+            return NO_ARGS;
+        }
+        return unpackNames(o, n);
+    }
+
     public static Object[] unpack(Object o, int n) {
         if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
+            Object[] items = ((PyTuple) o).arr();
             if (items.length == n) {
                 return items;
             }
@@ -2460,7 +2478,7 @@ public final class Py {
         if (o instanceof PyTuple) {
             // A tuple never changes, and the generated code only reads the
             // array it gets back, at once: its own items need no copy.
-            Object[] items = ((PyTuple) o).items;
+            Object[] items = ((PyTuple) o).arr();
             if (items.length == n) {
                 return items;
             }
@@ -2508,6 +2526,30 @@ public final class Py {
 
     public static PyTuple tuple(Object... items) {
         return PyTuple.of(items);
+    }
+
+    // `(a, b)` to `(a, ..., f)`: one object each, its items in fields. A
+    // tuple of one keeps the varargs form, whose single Object[] argument
+    // would otherwise bind here.
+
+    public static PyTuple tuple(Object a, Object b) {
+        return new PyTuple.T2(a, b);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c) {
+        return new PyTuple.T3(a, b, c);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c, Object d) {
+        return new PyTuple.T4(a, b, c, d);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c, Object d, Object e) {
+        return new PyTuple.T5(a, b, c, d, e);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c, Object d, Object e, Object f) {
+        return new PyTuple.T6(a, b, c, d, e, f);
     }
 
     /// `{}`, without the empty varargs array or a sized table.
@@ -2680,7 +2722,7 @@ public final class Py {
             return ((PyType) t).instanceCheck(o);
         }
         if (t instanceof PyTuple) {
-            Object[] items = ((PyTuple) t).items;
+            Object[] items = ((PyTuple) t).arr();
             for (Object item : items) {
                 if (isinstance(o, item)) {
                     return true;

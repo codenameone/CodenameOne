@@ -570,7 +570,7 @@ final class Formatting {
         Object[] items = null;
         int count;
         if (args instanceof PyTuple) {
-            items = ((PyTuple) args).items;
+            items = ((PyTuple) args).arr();
             count = items.length;
         } else if (args instanceof Long || args instanceof String) {
             count = 1;
@@ -629,7 +629,7 @@ final class Formatting {
         Object[] items;
         PyDict mapping = null;
         if (args instanceof PyTuple) {
-            items = ((PyTuple) args).items;
+            items = ((PyTuple) args).arr();
         } else {
             items = new Object[] {args};
             if (args instanceof PyDict) {

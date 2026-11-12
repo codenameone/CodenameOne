@@ -53,7 +53,7 @@ final class ExceptionGroups {
         }));
         b.define("split", PyBuiltin.fixed2("split", (a0, a1) -> {
             Object[] r = split(a0, a1);
-            return new PyTuple(new Object[] {r[0] == null ? Py.NONE : r[0], r[1] == null ? Py.NONE : r[1]});
+            return Py.tuple(r[0] == null ? Py.NONE : r[0], r[1] == null ? Py.NONE : r[1]);
         }));
         b.define("subgroup", PyBuiltin.fixed2("subgroup", (a0, a1) -> {
             Object m = split(a0, a1)[0];
@@ -105,7 +105,7 @@ final class ExceptionGroups {
             throw Py.typeError("Cannot nest BaseExceptions in an ExceptionGroup");
         }
         PyInstance e = cls.newInstance();
-        e.setAttrDirect("args", new PyTuple(new Object[] {message, excs}));
+        e.setAttrDirect("args", Py.tuple(message, excs));
         e.setAttrDirect("message", message);
         e.setAttrDirect("exceptions", new PyTuple(items));
         return e;
@@ -223,7 +223,7 @@ final class ExceptionGroups {
         }
 
         Object take(Object type) {
-            Object[] ts = type instanceof PyTuple ? ((PyTuple) type).items : new Object[] {type};
+            Object[] ts = type instanceof PyTuple ? ((PyTuple) type).arr() : new Object[] {type};
             for (Object x : ts) {
                 if (x instanceof PyType && ((PyType) x).isSubtype(Py.BASE_EXCEPTION_GROUP)) {
                     throw Py.typeError("catching ExceptionGroup with except* is not allowed. Use except instead.");

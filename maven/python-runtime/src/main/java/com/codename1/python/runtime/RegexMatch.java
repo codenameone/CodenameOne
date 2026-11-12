@@ -223,7 +223,7 @@ final class RegexMatch extends PyObject {
     }
 
     private Object span(int i) {
-        return new PyTuple(new Object[] {Py.of(regs[2 * i]), Py.of(regs[2 * i + 1])});
+        return Py.tuple(Py.of(regs[2 * i]), Py.of(regs[2 * i + 1]));
     }
 
     private Object lastgroup() {
@@ -316,12 +316,12 @@ final class RegexMatch extends PyObject {
                 }
             }
             Object r = Regex.subn(p, (String) string, template, (int) Py.index(countObj));
-            return withCount ? r : ((PyTuple) r).items[0];
+            return withCount ? r : ((PyTuple) r).arr()[0];
         }
         if (string instanceof String && !(repl instanceof String) && Builtins.isCallable(repl)
                 && !checkKind(p, pattern, string)) {
             Object r = Regex.subCall(p, pattern, (String) string, repl, (int) Py.index(countObj));
-            return withCount ? r : ((PyTuple) r).items[0];
+            return withCount ? r : ((PyTuple) r).arr()[0];
         }
         if (string instanceof PyBytes && checkKind(p, pattern, string)) {
             // A bytes subject runs here too, over its Latin-1 text, as a
@@ -349,7 +349,7 @@ final class RegexMatch extends PyObject {
                 r = Regex.subCall(p, pattern, (PyBytes) string, text, repl, (int) Py.index(countObj));
             }
             if (r != null) {
-                Object[] items = ((PyTuple) r).items;
+                Object[] items = ((PyTuple) r).arr();
                 PyBytes out = new PyBytes(latin1Encode((String) items[0]));
                 return withCount ? Py.tuple(out, items[1]) : out;
             }

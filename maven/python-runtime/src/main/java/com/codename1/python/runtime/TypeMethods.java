@@ -705,7 +705,7 @@ final class TypeMethods {
         if (!(c instanceof PyTuple)) {
             return affixAt(self, lo, hi, strArg(c, start ? "startswith" : "endswith"), start);
         }
-        for (Object cand : ((PyTuple) c).items) {
+        for (Object cand : ((PyTuple) c).arr()) {
             if (affixAt(self, lo, hi, strArg(cand, start ? "startswith" : "endswith"), start)) {
                 return true;
             }
@@ -1214,7 +1214,7 @@ final class TypeMethods {
     private static void installTuple() {
         PyType t = Py.TUPLE_TYPE;
         def2(t, "count", (a0, a1) -> {
-            Object[] items = ((PyTuple) a0).items;
+            Object[] items = ((PyTuple) a0).arr();
             int n = 0;
             for (Object item : items) {
                 if (Py.eqBool(item, a1)) {
@@ -1224,7 +1224,7 @@ final class TypeMethods {
             return PyInt.of(n);
         });
         def2(t, "index", (a0, a1) -> {
-            Object[] items = ((PyTuple) a0).items;
+            Object[] items = ((PyTuple) a0).arr();
             for (int i = 0; i < items.length; i++) {
                 if (Py.eqBool(items[i], a1)) {
                     return PyInt.of(i);
@@ -1499,7 +1499,7 @@ final class TypeMethods {
             Object cls = args[0];
             return cls == Py.INT_TYPE ? PyInt.of(v) : Py.call(cls, PyInt.of(v)); //NOPMD CompareObjectsWithEquals - identity is meant
         })));
-        def(Py.INT_TYPE, "as_integer_ratio", a -> new PyTuple(new Object[] {a[0], PyInt.of(1)}));
+        def(Py.INT_TYPE, "as_integer_ratio", a -> Py.tuple(a[0], PyInt.of(1)));
         def(Py.INT_TYPE, "is_integer", a -> Py.TRUE);
         def(Py.INT_TYPE, "bit_count", a -> PyInt.of(Py.intView(a[0]).toBig().abs().bitCount()));
         def(Py.INT_TYPE, "conjugate", a -> a[0]);
@@ -1544,7 +1544,7 @@ final class TypeMethods {
         }
         exp -= 1075;
         if (mant == 0) {
-            return new PyTuple(new Object[] {PyInt.of(0), PyInt.of(1)});
+            return Py.tuple(PyInt.of(0), PyInt.of(1));
         }
         while ((mant & 1) == 0 && exp < 0) {
             mant >>= 1;
@@ -1554,8 +1554,8 @@ final class TypeMethods {
             mant = -mant;
         }
         if (exp >= 0) {
-            return new PyTuple(new Object[] {PyInt.of(BigInteger.valueOf(mant).shiftLeft(exp)), PyInt.of(1)});
+            return Py.tuple(PyInt.of(BigInteger.valueOf(mant).shiftLeft(exp)), PyInt.of(1));
         }
-        return new PyTuple(new Object[] {PyInt.of(mant), PyInt.of(BigInteger.valueOf(1).shiftLeft(-exp))});
+        return Py.tuple(PyInt.of(mant), PyInt.of(BigInteger.valueOf(1).shiftLeft(-exp)));
     }
 }

@@ -171,7 +171,7 @@ public abstract class PyServer {
         String query = q < 0 ? "" : target.substring(q + 1);
         PyList hs = new PyList(headers.length / 2);
         for (int i = 0; i + 1 < headers.length; i += 2) {
-            hs.append(new PyTuple(new Object[] {headers[i], headers[i + 1]}));
+            hs.append(Py.tuple(headers[i], headers[i + 1]));
         }
         return new Object[] {method, path, query, hs, new PyBytes(body == null ? new byte[0] : body)};
     }
@@ -195,7 +195,7 @@ public abstract class PyServer {
         Object after = t.size() == 4 && t.get(3) != Py.NONE ? t.get(3) : null; //NOPMD CompareObjectsWithEquals - identity is meant
         Object hl = t.get(1);
         Object[] pairs = hl instanceof PyList ? ((PyList) hl).toArray()
-                : hl instanceof PyTuple ? ((PyTuple) hl).items : null;
+                : hl instanceof PyTuple ? ((PyTuple) hl).arr() : null;
         if (pairs == null) {
             throw Py.typeError("dispatch headers must be a list of (name, value) pairs");
         }

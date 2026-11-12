@@ -49,7 +49,7 @@ final class PyUnion extends PyObject {
 
     private static void add(List<Object> out, Object t) {
         if (t instanceof PyUnion) {
-            for (Object o : ((PyUnion) t).args.items) {
+            for (Object o : ((PyUnion) t).args.arr()) {
                 add(out, o);
             }
             return;
@@ -85,7 +85,7 @@ final class PyUnion extends PyObject {
     }
 
     boolean instanceCheck(Object o) {
-        for (Object t : args.items) {
+        for (Object t : args.arr()) {
             if (Py.isinstance(o, t)) {
                 return true;
             }
@@ -127,8 +127,8 @@ final class PyUnion extends PyObject {
         if (!(o instanceof PyUnion)) {
             return null;
         }
-        Object[] mine = args.items;
-        Object[] theirs = ((PyUnion) o).args.items;
+        Object[] mine = args.arr();
+        Object[] theirs = ((PyUnion) o).args.arr();
         if (mine.length != theirs.length) {
             return Py.FALSE;
         }
@@ -150,7 +150,7 @@ final class PyUnion extends PyObject {
     @Override
     public long hash() {
         long h = 0;
-        for (Object t : args.items) {
+        for (Object t : args.arr()) {
             h ^= Py.hashOf(t);
         }
         return h;
@@ -159,11 +159,11 @@ final class PyUnion extends PyObject {
     @Override
     public String repr() {
         StringBuilder b = new StringBuilder();
-        for (int i = 0; i < args.items.length; i++) {
+        for (int i = 0; i < args.arr().length; i++) {
             if (i > 0) {
                 b.append(" | ");
             }
-            b.append(typeRepr(args.items[i]));
+            b.append(typeRepr(args.arr()[i]));
         }
         return b.toString();
     }

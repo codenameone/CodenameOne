@@ -202,7 +202,7 @@ final class PyZlib {
                 }
             }
             int consumed = in.length - z.availIn;
-            return new PyTuple(new Object[] {new PyBytes(out.toByteArray()), PyInt.of(consumed), Py.bool(eof)});
+            return Py.tuple(new PyBytes(out.toByteArray()), PyInt.of(consumed), Py.bool(eof));
         }
     }
 }

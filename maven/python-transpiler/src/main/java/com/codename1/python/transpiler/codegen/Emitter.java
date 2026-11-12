@@ -1250,12 +1250,25 @@ public final class Emitter {
                 }
             }
             String arr = fresh("u");
+            if (star < 0) {
+                // A fixed-size tuple is read in place: the runtime answers
+                // an empty array for one and no array is made.
+                String held = fresh("uv");
+                indent(out, ind);
+                out.append("final Object ").append(held).append(" = ").append(value).append(";\n");
+                indent(out, ind);
+                out.append("final Object[] ").append(arr).append(" = ")
+                        .append(onlyNames(t) ? "Py.unpackNamesT(" : "Py.unpackT(").append(held).append(", ")
+                        .append(elts.size()).append(");\n");
+                for (int i = 0; i < elts.size(); i++) {
+                    store(elts.get(i), "(" + arr + ".length != 0 ? " + arr + "[" + i + "] : ((PyTuple) " + held
+                            + ").get(" + i + "))", out, ind);
+                }
+                return;
+            }
             indent(out, ind);
             out.append("final Object[] ").append(arr).append(" = ");
-            if (star < 0) {
-                out.append(onlyNames(t) ? "Py.unpackNames(" : "Py.unpack(").append(value).append(", ")
-                        .append(elts.size()).append(");\n");
-            } else {
+            {
                 out.append("Py.unpackStar(").append(value).append(", ").append(star).append(", ")
                         .append(elts.size() - star - 1).append(");\n");
             }

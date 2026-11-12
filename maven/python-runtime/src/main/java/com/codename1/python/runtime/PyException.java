@@ -56,7 +56,7 @@ public final class PyException extends RuntimeException {
     /// `isinstance(value, type)`, where `type` may be a tuple of types.
     public boolean matches(Object type) {
         if (type instanceof PyTuple) {
-            Object[] items = ((PyTuple) type).items;
+            Object[] items = ((PyTuple) type).arr();
             for (Object item : items) {
                 if (matches(item)) {
                     return true;

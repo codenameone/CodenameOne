@@ -103,11 +103,11 @@ final class PyGenericAlias extends PyObject {
     @Override
     public String repr() {
         StringBuilder b = new StringBuilder(PyUnion.typeRepr(origin)).append('[');
-        for (int i = 0; i < args.items.length; i++) {
+        for (int i = 0; i < args.arr().length; i++) {
             if (i > 0) {
                 b.append(", ");
             }
-            b.append(PyUnion.typeRepr(args.items[i]));
+            b.append(PyUnion.typeRepr(args.arr()[i]));
         }
         return b.append(']').toString();
     }

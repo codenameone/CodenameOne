@@ -610,7 +610,7 @@ final class Itertools {
             tgtKey = currKey;
             Grouper g = new Grouper(grouperType, this, tgtKey);
             currGrouper = g;
-            return new PyTuple(new Object[] {currKey, g});
+            return Py.tuple(currKey, g);
         }
     }
 
@@ -753,7 +753,7 @@ final class Itertools {
                 old = null;
                 return null;
             }
-            PyTuple r = new PyTuple(new Object[] {old, n});
+            PyTuple r = Py.tuple(old, n);
             old = n;
             return r;
         }

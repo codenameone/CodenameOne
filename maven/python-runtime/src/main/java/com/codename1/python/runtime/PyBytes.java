@@ -694,7 +694,7 @@ public final class PyBytes extends PyObject {
             return searchedIn(kind, h, lo, hi, arg);
         }
         if (kind <= 2 && arg instanceof PyTuple) {
-            Object[] each = ((PyTuple) arg).items;
+            Object[] each = ((PyTuple) arg).arr();
             for (Object one : each) {
                 if (like(one) == null) {
                     return null;

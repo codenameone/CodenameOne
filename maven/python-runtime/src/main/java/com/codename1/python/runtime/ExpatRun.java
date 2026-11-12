@@ -668,7 +668,7 @@ final class ExpatRun {
             }
             Py.call(h, name, attrs);
         }
-        c.stack.append(new PyTuple(new Object[] {qname, name, declared, parentNs}));
+        c.stack.append(Py.tuple(qname, name, declared, parentNs));
         if (c.selfClosing) {
             c.ev(pos);
             closeTop(c);

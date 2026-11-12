@@ -2639,12 +2639,25 @@ final class TypedEmit {
                 }
             }
             String arr = fresh();
+            if (star < 0) {
+                // A fixed-size tuple is read in place: the runtime answers
+                // an empty array for one and no array is made.
+                String held = fresh();
+                indent(b, ind);
+                b.append("final Object ").append(held).append(" = ").append(box(v)).append(";\n");
+                indent(b, ind);
+                b.append("final Object[] ").append(arr).append(" = ")
+                        .append(Emitter.onlyNames(t) ? "Py.unpackNamesT(" : "Py.unpackT(").append(held).append(", ")
+                        .append(elts.size()).append(");\n");
+                for (int i = 0; i < elts.size(); i++) {
+                    store(elts.get(i), new E("(" + arr + ".length != 0 ? " + arr + "[" + i + "] : ((PyTuple) " + held
+                            + ").get(" + i + "))", Ty.DYN), b, ind);
+                }
+                return;
+            }
             indent(b, ind);
             b.append("final Object[] ").append(arr).append(" = ");
-            if (star < 0) {
-                b.append(Emitter.onlyNames(t) ? "Py.unpackNames(" : "Py.unpack(").append(box(v)).append(", ")
-                        .append(elts.size()).append(");\n");
-            } else {
+            {
                 b.append("Py.unpackStar(").append(box(v)).append(", ").append(star).append(", ")
                         .append(elts.size() - star - 1).append(");\n");
             }

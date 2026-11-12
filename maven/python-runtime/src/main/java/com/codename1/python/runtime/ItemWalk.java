@@ -86,7 +86,7 @@ public final class ItemWalk extends PyObject {
             if (v == null) {
                 return null;
             }
-            current = v instanceof PyTuple && ((PyTuple) v).items.length == 2 ? ((PyTuple) v).items
+            current = v instanceof PyTuple && ((PyTuple) v).arr().length == 2 ? ((PyTuple) v).arr()
                     : Py.unpack(v, 2);
             return this;
         }

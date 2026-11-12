@@ -466,7 +466,7 @@ final class MathFunctions {
         m.setAttr("frexp", PyBuiltin.fixed1("frexp", a0 -> {
             double x = Py.asDouble(a0);
             if (x == 0 || Double.isNaN(x) || Double.isInfinite(x)) {
-                return new PyTuple(new Object[] {Py.ofFloat(x), PyInt.of(0)});
+                return Py.tuple(Py.ofFloat(x), PyInt.of(0));
             }
             int e = 0;
             double ax = Math.abs(x);
@@ -484,7 +484,7 @@ final class MathFunctions {
             }
             e += be - 1022;
             double mant = Double.longBitsToDouble((bits & 0x800fffffffffffffL) | (1022L << 52));
-            return new PyTuple(new Object[] {Py.ofFloat(x < 0 ? -mant : mant), PyInt.of(e)});
+            return Py.tuple(Py.ofFloat(x < 0 ? -mant : mant), PyInt.of(e));
         }));
         m.setAttr("ldexp", PyBuiltin.fixed2("ldexp", (a0, a1) -> {
             if (!Py.isInt(a1)) {
@@ -508,14 +508,14 @@ final class MathFunctions {
         m.setAttr("modf", PyBuiltin.fixed1("modf", a0 -> {
             double x = Py.asDouble(a0);
             if (Double.isInfinite(x)) {
-                return new PyTuple(new Object[] {Py.ofFloat(x > 0 ? 0.0 : -0.0), Py.ofFloat(x)});
+                return Py.tuple(Py.ofFloat(x > 0 ? 0.0 : -0.0), Py.ofFloat(x));
             }
             double ip = x < 0 ? Math.ceil(x) : Math.floor(x);
             double fp = x - ip;
             if (fp == 0 && x < 0 || (x == 0 && 1 / x < 0)) {
                 fp = -0.0;
             }
-            return new PyTuple(new Object[] {Py.ofFloat(fp), Py.ofFloat(ip)});
+            return Py.tuple(Py.ofFloat(fp), Py.ofFloat(ip));
         }));
         m.setAttr("fma", PyBuiltin.fixed3("fma", (a0, a1, a2) -> {
             // Not fused: device class libraries have no exact fma.
