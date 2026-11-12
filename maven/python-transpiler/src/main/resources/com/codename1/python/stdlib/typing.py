@@ -528,8 +528,9 @@ def runtime_checkable(cls):
     return cls
 
 
-def cast(typ, val):
-    return val
+# A builtin, so that a call the compiler can see is this one skips building
+# its type argument (see StdModules.CAST).
+from _cn1op import cast
 
 
 def assert_type(val, typ, /):

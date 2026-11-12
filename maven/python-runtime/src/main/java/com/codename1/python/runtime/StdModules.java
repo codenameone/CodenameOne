@@ -1753,8 +1753,17 @@ public final class StdModules {
     /// `_cn1op`: the loops of `operator.itemgetter` and `attrgetter` with
     /// several keys, which CPython runs in C; the Python ones made a
     /// generator for every call, and `pdfplumber` sorts by one per char.
+    /// `typing.cast`, which answers its second argument. A Java builtin so
+    /// that generated code can tell it by identity: a `cast(T, v)` whose `T` is
+    /// a plain type expression then skips evaluating `T` -- a subscription
+    /// such as `List[Rule]`, a cache lookup in typing, built to be thrown away
+    /// (bs4 does that for every tag it parses). Anything else bound to the
+    /// name is called as written.
+    public static final PyBuiltin CAST = PyBuiltin.fixed2("cast", (typ, val) -> val);
+
     private static PyModule operatorModule() {
         PyModule m = new PyModule("_cn1op", new String[0]);
+        m.setAttr("cast", CAST);
         m.setAttr("getitems", PyBuiltin.fixed2("getitems", (obj, keys) -> {
             Object[] k = ((PyTuple) keys).items;
             Object[] out = new Object[k.length];

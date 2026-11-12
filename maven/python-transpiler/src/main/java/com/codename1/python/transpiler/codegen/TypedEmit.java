@@ -5403,6 +5403,21 @@ final class TypedEmit {
     private final Set<Comp> eagerGens = java.util.Collections.newSetFromMap(new IdentityHashMap<Comp, Boolean>());
 
     private E call(Call c) {
+        if (Emitter.castCall(c)) {
+            // `cast(T, v)` (see Emitter.castCall). Both branches are
+            // conditional, so nothing of either is hoisted ahead of the test.
+            condDepth++;
+            try {
+                String f = box(expr(c.func));
+                String v = box(expr(c.args.get(1)));
+                String r = "(" + f + " == StdModules.CAST ? " + v + " : Py.call(" + box(expr(c.func)) + ", "
+                        + box(expr(c.args.get(0))) + ", " + box(expr(c.args.get(1))) + "))";
+                forgetPaths();
+                return new E(r, Ty.DYN);
+            } finally {
+                condDepth--;
+            }
+        }
         if (c.args.size() == 1 && c.keywords.isEmpty() && c.args.get(0) instanceof Comp
                 && ((Comp) c.args.get(0)).kind == Comp.Kind.GENERATOR
                 && (c.func instanceof Name && EAGER.contains(((Name) c.func).id)

@@ -1293,6 +1293,52 @@ public final class Emitter {
 
     /// `x.split()` with no arguments, which a loop walks word by word
     /// (Py.splitWords) instead of splitting into a list first.
+    private boolean inCast;
+
+    /// `cast(T, v)` or `typing.cast(T, v)` with `T` a plain type expression
+    /// and `v` an expression that may be emitted twice (no nested scope).
+    static boolean castCall(Call c) {
+        if (c.args.size() != 2 || !c.keywords.isEmpty() || Infer.hasStarred(c.args)) {
+            return false;
+        }
+        boolean named = c.func instanceof Name && "cast".equals(((Name) c.func).id)
+                || c.func instanceof Attribute && "cast".equals(((Attribute) c.func).attr)
+                && ((Attribute) c.func).value instanceof Name;
+        return named && typeExpr(c.args.get(0))
+                && com.codename1.python.transpiler.analyze.GenInline.plainExpr(c.args.get(1));
+    }
+
+    /// Names, dotted names, string constants, None and subscriptions, tuples,
+    /// lists and unions of them: what a type annotation is made of.
+    private static boolean typeExpr(Expr e) {
+        if (e instanceof Name) {
+            return true;
+        }
+        if (e instanceof Constant) {
+            Constant k = (Constant) e;
+            return k.kind == Constant.Kind.STR || k.kind == Constant.Kind.NONE;
+        }
+        if (e instanceof Attribute) {
+            return typeExpr(((Attribute) e).value);
+        }
+        if (e instanceof Subscript) {
+            return typeExpr(((Subscript) e).value) && typeExpr(((Subscript) e).index);
+        }
+        if (e instanceof TupleExpr || e instanceof ListExpr) {
+            for (Expr x : e instanceof TupleExpr ? ((TupleExpr) e).elts : ((ListExpr) e).elts) {
+                if (!typeExpr(x)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (e instanceof BinOp) {
+            BinOp b = (BinOp) e;
+            return "|".equals(b.op) && typeExpr(b.left) && typeExpr(b.right);
+        }
+        return false;
+    }
+
     /// The receiver of `x.items()` iterated into exactly two names, or null.
     /// Such a loop walks the pairs with the runtime's `ItemWalk` instead of building a
     /// tuple per entry; with any other target an item may be kept, so it is
@@ -3256,6 +3302,19 @@ public final class Emitter {
         String miss = missIntrinsic(c);
         if (miss != null) {
             return miss;
+        }
+        if (!inCast && castCall(c)) {
+            // `cast(T, v)`: when the callee is typing's, v alone; T is a plain
+            // type expression, so skipping it is not observable. Anything
+            // else bound to the name is called as written.
+            String f = temp();
+            inCast = true;
+            try {
+                return "((" + f + " = " + expr(c.func) + ") == StdModules.CAST ? " + expr(c.args.get(1))
+                        + " : Py.call(" + f + ", " + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + "))";
+            } finally {
+                inCast = false;
+            }
         }
         if (getattrDefault(c) && sc.resolve("getattr") == Scope.Binding.BUILTIN) {
             return "Py.orDefault(" + site(((Constant) c.args.get(1)).text) + ".getOrMiss(" + expr(c.args.get(0)) + "), "

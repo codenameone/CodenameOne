@@ -229,7 +229,7 @@ public final class GenInline {
     }
 
     /// Expressions the copy knows: no nested scope, no yield, no walrus.
-    private static boolean plainExpr(Expr e) {
+    public static boolean plainExpr(Expr e) {
         if (e == null || e instanceof Name || e instanceof Constant) {
             return true;
         }
