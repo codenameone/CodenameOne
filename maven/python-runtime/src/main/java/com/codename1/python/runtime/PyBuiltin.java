@@ -341,6 +341,30 @@ public final class PyBuiltin extends PyObject {
         return b;
     }
 
+    /// [#methodKw] for an implementation that unwraps its receiver itself
+    /// with [#base]: no copy of the arguments per call.
+    static PyBuiltin methodKwSelf(final PyType owner, final String name, final Impl p) {
+        return new PyBuiltin(name, new Impl() {
+            @Override
+            public Object call(Object[] args, String[] kwNames) {
+                checkReceiver(owner, name, args);
+                return p.call(args, kwNames);
+            }
+        }, owner);
+    }
+
+    /// The builtin value an instance of a subclass of builtin `owner`
+    /// extends, or `self` itself.
+    static Object base(PyType owner, Object self) {
+        if (owner != Py.OBJECT_TYPE && self instanceof PyInstance) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object b = ((PyInstance) self).base;
+            if (b != null) {
+                return b;
+            }
+        }
+        return self;
+    }
+
     /// The arguments with an instance of a subclass of builtin `owner`
     /// replaced by the builtin value it extends, which is what the
     /// implementation works on. A method returning that value (a chained

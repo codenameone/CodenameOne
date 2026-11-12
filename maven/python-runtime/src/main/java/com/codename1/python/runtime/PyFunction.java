@@ -1024,7 +1024,7 @@ public final class PyFunction extends PyObject {
     /// True when a keyword call of `n` arguments can go through
     /// [#bindPlanned]: no `*args` or `**kwargs` to collect into.
     private boolean planned(int n) {
-        return !varArgs && !varKw && n <= positional + kwOnly;
+        return !varArgs && (varKw || n <= positional + kwOnly);
     }
 
     /// The slot of each name of the last keyword-name array [#bindPlanned]
@@ -1068,10 +1068,26 @@ public final class PyFunction extends PyObject {
         Object[] slots = spareSlots;
         spareSlots = null;
         if (slots == null) {
-            slots = new Object[total];
+            slots = new Object[varKw ? total + 1 : total];
         }
+        // `**kwargs` (markitdown's `convert_a(self, el, text, **kwargs)`,
+        // called per link): a keyword no parameter takes goes into the dict
+        // in the slot after the keyword-only ones, where bindArgs puts it.
+        PyDict extra = null;
         for (int i = 0; i < n; i++) {
             int slot = i < nPos ? i : kwSlots[i - nPos];
+            if (slot < 0 && varKw && i >= nPos) {
+                if (extra == null) {
+                    extra = new PyDict();
+                }
+                String k = kwNames[i - nPos];
+                if (extra.getOrNull(k) != null) {
+                    spareSlots = clear(slots);
+                    return UNBOUND;
+                }
+                extra.setItem(k, arg(i, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13));
+                continue;
+            }
             if (slot < 0 || slots[slot] != null) {
                 spareSlots = clear(slots);
                 return UNBOUND;
@@ -1134,9 +1150,46 @@ public final class PyFunction extends PyObject {
                 slots[p] = v;
             }
         }
+        if (varKw) {
+            slots[total] = extra != null ? extra : kwShared ? NO_KWARGS : new PyDict();
+        }
         Object r = body.run(slots);
         spareSlots = clear(slots);
         return r;
+    }
+
+    /// Argument `i` of `p0`..`p13`.
+    private static Object arg(int i, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7, Object p8, Object p9, Object p10, Object p11, Object p12, Object p13) {
+        switch (i) {
+            case 0:
+                return p0;
+            case 1:
+                return p1;
+            case 2:
+                return p2;
+            case 3:
+                return p3;
+            case 4:
+                return p4;
+            case 5:
+                return p5;
+            case 6:
+                return p6;
+            case 7:
+                return p7;
+            case 8:
+                return p8;
+            case 9:
+                return p9;
+            case 10:
+                return p10;
+            case 11:
+                return p11;
+            case 12:
+                return p12;
+            default:
+                return p13;
+        }
     }
 
     private Object[] spareSlots;

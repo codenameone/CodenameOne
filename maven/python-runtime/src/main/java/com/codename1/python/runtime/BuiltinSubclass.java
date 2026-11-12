@@ -178,8 +178,8 @@ final class BuiltinSubclass {
 
     /// `T.__init__(self, *args)` of a mutable builtin `T`: refills the value.
     private static void initMethod(final PyType t) {
-        t.define("__init__", PyBuiltin.methodKw(t, "__init__", (args, kw) -> {
-            Object self0 = args[0];
+        t.define("__init__", PyBuiltin.methodKwSelf(t, "__init__", (args, kw) -> {
+            Object self0 = PyBuiltin.base(t, args[0]);
             if (kw.length == 0 && args.length <= 2 && !(self0 instanceof PyProperty)) {
                 // `list.__init__(self, it)` from a subclass constructor, as
                 // bs4's ResultSet does per search: refill from the iterable
@@ -201,7 +201,7 @@ final class BuiltinSubclass {
             Object[] rest = new Object[args.length - 1];
             System.arraycopy(args, 1, rest, 0, rest.length);
             Object fresh = t.factory.create(t, rest, kw);
-            Object self = args[0];
+            Object self = self0;
             if (self instanceof PyProperty && fresh instanceof PyProperty) {
                 ((PyProperty) self).fill((PyProperty) fresh);
             } else if (self instanceof PyList) {

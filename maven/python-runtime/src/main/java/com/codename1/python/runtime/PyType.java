@@ -1142,7 +1142,56 @@ public final class PyType extends PyObject {
             fields.fill(o, n, a, b, c, d, e);
             return o;
         }
-        return null;
+        return constructFixed(n, a, b, c, d, e);
+    }
+
+    /// [#construct] for a call of `n` positional arguments: `__new__` and
+    /// `__init__` called at their arity, where construct prepends the
+    /// receiver to an argument array for each. A namedtuple (`urlparse`), a
+    /// str subclass (bs4's NavigableString) and a list subclass are built
+    /// this way per element. Null for a call this does not cover, which
+    /// then goes through construct exactly as before.
+    private Object constructFixed(int n, Object a, Object b, Object c, Object d, Object e) {
+        if (factory != null || this == Py.TYPE_TYPE || this == Py.OS_ERROR || plainException() //NOPMD CompareObjectsWithEquals - identity is meant
+                || metaDunder("__call__") != null) {
+            return null;
+        }
+        Object newFn = lookup("__new__");
+        Object obj;
+        if (newFn != null && newFn != Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object fn = newFn instanceof PyStaticMethod ? ((PyStaticMethod) newFn).func : newFn;
+            obj = callWith(Py.obj(fn), this, n, a, b, c, d, e);
+            if (!Py.typeOf(obj).isSubtype(this)) {
+                return obj;
+            }
+        } else {
+            obj = newInstance();
+        }
+        Object init = lookup("__init__");
+        if (init != null && init != Builtins.OBJECT_INIT) { //NOPMD CompareObjectsWithEquals - identity is meant
+            initReturned(callWith(Py.obj(init), obj, n, a, b, c, d, e));
+        } else if (n > 0 && newFn == Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
+            throw Py.typeError(name + "() takes no arguments");
+        }
+        return obj;
+    }
+
+    /// `f(first, a, ...)` with the `n` arguments after `first`.
+    private static Object callWith(PyObject f, Object first, int n, Object a, Object b, Object c, Object d, Object e) {
+        switch (n) {
+            case 0:
+                return f.call1(first);
+            case 1:
+                return f.call2(first, a);
+            case 2:
+                return f.call3(first, a, b);
+            case 3:
+                return f.call4(first, a, b, c);
+            case 4:
+                return f.call5(first, a, b, c, d);
+            default:
+                return f.call6(first, a, b, c, d, e);
+        }
     }
 
     private static void initReturned(Object r) {
