@@ -192,8 +192,12 @@ final class Regex {
         }));
         m.setAttr("run", new RunFn());
         m.setAttr("match", new MatchFn());
+        // The module's own callers (re/__init__.py) pass every argument, so each
+        // entry also has its array-free form for exactly that many.
         m.setAttr("iter", PyBuiltin.positional("iter", a -> RegexMatch.search(prog(a[0]), a[1], a[2], a[3],
-                a[4], (int) Py.index(a[5]), 2, (int) Py.index(a[6]))));
+                a[4], (int) Py.index(a[5]), 2, (int) Py.index(a[6])))
+                .with7((a0, a1, a2, a3, a4, a5, a6) -> RegexMatch.search(prog(a0), a1, a2, a3, a4,
+                        (int) Py.index(a5), 2, (int) Py.index(a6))));
         m.setAttr("set_hooks", PyBuiltin.fixed3("set_hooks", (a0, a1, a2) -> {
             RegexMatch.expandHook = a0;
             RegexMatch.templateHook = a1;
@@ -201,12 +205,15 @@ final class Regex {
             return Py.NONE;
         }));
         m.setAttr("sub", PyBuiltin.positional("sub", a -> RegexMatch.sub(prog(a[0]), a[1], a[2], a[3],
-                a[4], Py.isTrue(a[5]))));
+                a[4], Py.isTrue(a[5])))
+                .with6((a0, a1, a2, a3, a4, a5) -> RegexMatch.sub(prog(a0), a1, a2, a3, a4, Py.isTrue(a5))));
         m.setAttr("Match", RegexMatch.TYPE);
         m.setAttr("subn", PyBuiltin.positional("subn", a -> subn(prog(a[0]), Py.toStr(a[1]),
-                (PyList) a[2], (int) Py.index(a[3]))));
+                (PyList) a[2], (int) Py.index(a[3])))
+                .with4((a0, a1, a2, a3) -> subn(prog(a0), Py.toStr(a1), (PyList) a2, (int) Py.index(a3))));
         m.setAttr("findall", PyBuiltin.positional("findall", a -> findall(prog(a[0]), Py.toStr(a[1]),
-                (int) Py.index(a[2]), (int) Py.index(a[3]))));
+                (int) Py.index(a[2]), (int) Py.index(a[3])))
+                .with4((a0, a1, a2, a3) -> findall(prog(a0), Py.toStr(a1), (int) Py.index(a2), (int) Py.index(a3))));
         return m;
     }
 
@@ -1161,62 +1168,71 @@ final class Regex {
             if (regs.length == 0) {
                 return Py.tuple(text, Long.valueOf(0));
             }
-            // Made once, after the first match, and never reassigned: ParparVM
-            // keeps a builder on the stack only when its local holds nothing
-            // else and only StringBuilder methods receive it (no helper), and one
-            // on the heap pays a lock on every append. A builder also keeps a
-            // Latin-1 text Latin-1, which a char array would widen. Without
-            // surrogates a code point index is the char index, so the pieces are
-            // appended straight from the text instead of as substrings.
-            StringBuilder out = new StringBuilder(text.length() + 16);
-            boolean plain = n == text.length();
-            int parts = template.size();
-            int last = 0;
-            int done = 0;
-            while (true) {
-                int s = regs[0];
-                int e = regs[1];
-                if (plain) {
-                    out.append(text, last, s);
-                } else {
-                    out.append(PyStr.substr(text, last, s));
-                }
-                for (int k = 0; k < parts; k++) {
-                    Object part = template.get(k);
-                    if (part instanceof String) {
-                        out.append((String) part);
-                    } else {
-                        int g = (int) Py.index(part);
-                        int gs = regs[2 * g];
-                        int ge = regs[2 * g + 1];
-                        if (gs >= 0 && ge >= 0) {
-                            if (plain) {
-                                out.append(text, gs, ge);
-                            } else {
-                                out.append(PyStr.substr(text, gs, ge));
-                            }
-                        }
-                    }
-                }
-                last = e;
-                done++;
-                if (e > n || count != 0 && done >= count) {
-                    break;
-                }
-                regs = run(p, sc, text, e, n, 2, s == e ? e : -1);
-                if (regs.length == 0) {
-                    break;
-                }
-            }
-            if (plain) {
-                out.append(text, last, n);
-            } else {
-                out.append(PyStr.substr(text, last, n));
-            }
-            return Py.tuple(out.toString(), Long.valueOf(done));
+            return subnLoop(p, sc, text, n, regs, template, count);
         } finally {
             release(p, sc);
         }
+    }
+
+    /// The replacing loop, outside the caller's try/finally: javac parks a
+    /// value returned from inside a try in a spare local, and when that slot
+    /// is the builder's the translator rightly keeps the builder on the
+    /// heap, where every append takes its lock.
+    private static Object subnLoop(Prog p, Scratch sc, String text, int n, int[] first, PyList template, int count) {
+        int[] regs = first;
+        // Made once, after the first match, and never reassigned: ParparVM
+        // keeps a builder on the stack only when its local holds nothing
+        // else and only StringBuilder methods receive it (no helper), and one
+        // on the heap pays a lock on every append. A builder also keeps a
+        // Latin-1 text Latin-1, which a char array would widen. Without
+        // surrogates a code point index is the char index, so the pieces are
+        // appended straight from the text instead of as substrings.
+        StringBuilder out = new StringBuilder(text.length() + 16);
+        boolean plain = n == text.length();
+        int parts = template.size();
+        int last = 0;
+        int done = 0;
+        while (true) {
+            int s = regs[0];
+            int e = regs[1];
+            if (plain) {
+                out.append(text, last, s);
+            } else {
+                out.append(PyStr.substr(text, last, s));
+            }
+            for (int k = 0; k < parts; k++) {
+                Object part = template.get(k);
+                if (part instanceof String) {
+                    out.append((String) part);
+                } else {
+                    int g = (int) Py.index(part);
+                    int gs = regs[2 * g];
+                    int ge = regs[2 * g + 1];
+                    if (gs >= 0 && ge >= 0) {
+                        if (plain) {
+                            out.append(text, gs, ge);
+                        } else {
+                            out.append(PyStr.substr(text, gs, ge));
+                        }
+                    }
+                }
+            }
+            last = e;
+            done++;
+            if (e > n || count != 0 && done >= count) {
+                break;
+            }
+            regs = run(p, sc, text, e, n, 2, s == e ? e : -1);
+            if (regs.length == 0) {
+                break;
+            }
+        }
+        if (plain) {
+            out.append(text, last, n);
+        } else {
+            out.append(PyStr.substr(text, last, n));
+        }
+        return Py.tuple(out.toString(), Long.valueOf(done));
     }
 
     /// `pattern.subn(fn, text, count)` for a callable `fn`, with the loop in
@@ -1235,46 +1251,55 @@ final class Regex {
             if (regs.length == 0) {
                 return Py.tuple(text, Long.valueOf(0));
             }
-            StringBuilder out = new StringBuilder(text.length() + 16);
-            boolean plain = n == text.length();
-            PyObject f = Py.obj(fn);
-            int last = 0;
-            int done = 0;
-            while (true) {
-                int s = regs[0];
-                int e = regs[1];
-                if (plain) {
-                    out.append(text, last, s);
-                } else {
-                    out.append(PyStr.substr(text, last, s));
-                }
-                // The callable may run this same pattern; it then builds its
-                // own scratch, since this one is taken.
-                Object r = f.call1(new RegexMatch(pattern, text, text, false, 0, n, p.groups, regs));
-                if (r instanceof String) {
-                    out.append((String) r);
-                } else if (r != Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
-                    throw Py.typeError("expected str instance, " + Py.typeOf(r).name + " found");
-                }
-                last = e;
-                done++;
-                if (e > n || count != 0 && done >= count) {
-                    break;
-                }
-                regs = run(p, sc, text, e, n, 2, s == e ? e : -1);
-                if (regs.length == 0) {
-                    break;
-                }
-            }
-            if (plain) {
-                out.append(text, last, n);
-            } else {
-                out.append(PyStr.substr(text, last, n));
-            }
-            return Py.tuple(out.toString(), Long.valueOf(done));
+            return subCallLoop(p, sc, pattern, text, n, regs, fn, count);
         } finally {
             release(p, sc);
         }
+    }
+
+    /// The replacing loop, outside the caller's try/finally: javac parks a
+    /// value returned from inside a try in a spare local, and when that slot
+    /// is the builder's the translator rightly keeps the builder on the
+    /// heap, where every append takes its lock.
+    private static Object subCallLoop(Prog p, Scratch sc, Object pattern, String text, int n, int[] first, Object fn, int count) {
+        int[] regs = first;
+        StringBuilder out = new StringBuilder(text.length() + 16);
+        boolean plain = n == text.length();
+        PyObject f = Py.obj(fn);
+        int last = 0;
+        int done = 0;
+        while (true) {
+            int s = regs[0];
+            int e = regs[1];
+            if (plain) {
+                out.append(text, last, s);
+            } else {
+                out.append(PyStr.substr(text, last, s));
+            }
+            // The callable may run this same pattern; it then builds its
+            // own scratch, since this one is taken.
+            Object r = f.call1(new RegexMatch(pattern, text, text, false, 0, n, p.groups, regs));
+            if (r instanceof String) {
+                out.append((String) r);
+            } else if (r != Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
+                throw Py.typeError("expected str instance, " + Py.typeOf(r).name + " found");
+            }
+            last = e;
+            done++;
+            if (e > n || count != 0 && done >= count) {
+                break;
+            }
+            regs = run(p, sc, text, e, n, 2, s == e ? e : -1);
+            if (regs.length == 0) {
+                break;
+            }
+        }
+        if (plain) {
+            out.append(text, last, n);
+        } else {
+            out.append(PyStr.substr(text, last, n));
+        }
+        return Py.tuple(out.toString(), Long.valueOf(done));
     }
 
     /// `pattern.findall(text, pos, endpos)` with the loop in Java: the whole

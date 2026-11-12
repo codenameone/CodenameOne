@@ -60,6 +60,8 @@ public final class PyBuiltin extends PyObject {
     private Two two;
     private Three three;
     private Four four;
+    private Six six;
+    private Seven seven;
     /// The builtin type a [#method] belongs to; null for a function.
     private final PyType owner;
     /// `__qualname__` where it is not the name: a method made for a class in Python.
@@ -165,6 +167,28 @@ public final class PyBuiltin extends PyObject {
         return this;
     }
 
+    /// [One] for six arguments.
+    public interface Six {
+        Object call(Object a, Object b, Object c, Object d, Object e, Object f);
+    }
+
+    /// [One] for seven arguments.
+    public interface Seven {
+        Object call(Object a, Object b, Object c, Object d, Object e, Object f, Object g);
+    }
+
+    /// [#with1] for six arguments; not for methods of a builtin type.
+    public PyBuiltin with6(Six f) {
+        six = f;
+        return this;
+    }
+
+    /// [#with1] for seven arguments; not for methods of a builtin type.
+    public PyBuiltin with7(Seven f) {
+        seven = f;
+        return this;
+    }
+
     /// [#with1] for three arguments.
     public PyBuiltin with3(Three f) {
         three = f;
@@ -213,6 +237,22 @@ public final class PyBuiltin extends PyObject {
             return super.call4(a, b, c, d);
         }
         return four.call(a, b, c, d);
+    }
+
+    @Override
+    public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
+        if (six == null || owner != null) {
+            return super.call6(a, b, c, d, e, f);
+        }
+        return six.call(a, b, c, d, e, f);
+    }
+
+    @Override
+    public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        if (seven == null || owner != null) {
+            return super.call7(a, b, c, d, e, f, g);
+        }
+        return seven.call(a, b, c, d, e, f, g);
     }
 
     /// [#checkReceiver] and [#unwrap] for the receiver of a fixed-arity
