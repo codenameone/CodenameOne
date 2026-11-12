@@ -927,6 +927,19 @@ public final class PyType extends PyObject {
     private Object plainInitCache;
     private int plainInitVersion = -1;
 
+    /// `__bool__` of this type, else its `__len__` (one of them null), for
+    /// truth tests of instances; good while [#truthVersion] is [#version].
+    Object truthBool;
+    Object truthLen;
+    int truthVersion = -1;
+
+    /// Refreshes [#truthBool] and [#truthLen] after any type changed.
+    void truthMethods() {
+        truthBool = lookup("__bool__");
+        truthLen = truthBool == null ? lookup("__len__") : null;
+        truthVersion = version;
+    }
+
     private Object resolvePlainInit() {
         if (factory != null || this == Py.TYPE_TYPE || customMeta()) { //NOPMD CompareObjectsWithEquals - identity is meant
             return null;

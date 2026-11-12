@@ -422,7 +422,11 @@ public class PyInstance extends PyObject {
 
     @Override
     public boolean isTrue() {
-        Object m = cls.lookup("__bool__");
+        PyType t = cls;
+        if (t.truthVersion != PyType.version) {
+            t.truthMethods();
+        }
+        Object m = t.truthBool;
         if (m != null) {
             Object r = Py.obj(m).call1(this);
             if (!(r instanceof PyBool)) {
@@ -430,8 +434,7 @@ public class PyInstance extends PyObject {
             }
             return r == Py.TRUE; //NOPMD CompareObjectsWithEquals - identity is meant
         }
-        m = cls.lookup("__len__");
-        if (m != null) {
+        if (t.truthLen != null) {
             return len() != 0;
         }
         return true;
