@@ -214,6 +214,8 @@ final class Regex {
         m.setAttr("subn", PyBuiltin.positional("subn", a -> subn(prog(a[0]), Py.toStr(a[1]),
                 (PyList) a[2], (int) Py.index(a[3])))
                 .with4((a0, a1, a2, a3) -> subn(prog(a0), Py.toStr(a1), (PyList) a2, (int) Py.index(a3))));
+        m.setAttr("split", PyBuiltin.fixed3("split", (a0, a1, a2) -> split(prog(a0), Py.toStr(a1),
+                (int) Py.index(a2))));
         m.setAttr("findall", PyBuiltin.positional("findall", a -> findall(prog(a[0]), Py.toStr(a[1]),
                 (int) Py.index(a[2]), (int) Py.index(a[3])))
                 .with4((a0, a1, a2, a3) -> findall(prog(a0), Py.toStr(a1), (int) Py.index(a2), (int) Py.index(a3))));
@@ -1259,7 +1261,7 @@ final class Regex {
             if (plain) {
                 out.append(text, last, s);
             } else {
-                out.append(PyStr.substr(text, last, s));
+                out.append(cut(sc.text, last, s));
             }
             for (int k = 0; k < parts; k++) {
                 Object part = template.get(k);
@@ -1273,7 +1275,7 @@ final class Regex {
                         if (plain) {
                             out.append(text, gs, ge);
                         } else {
-                            out.append(PyStr.substr(text, gs, ge));
+                            out.append(cut(sc.text, gs, ge));
                         }
                     }
                 }
@@ -1291,7 +1293,7 @@ final class Regex {
         if (plain) {
             out.append(text, last, n);
         } else {
-            out.append(PyStr.substr(text, last, n));
+            out.append(cut(sc.text, last, n));
         }
         return Py.tuple(out.toString(), Long.valueOf(done));
     }
@@ -1335,7 +1337,7 @@ final class Regex {
             if (plain) {
                 out.append(text, last, s);
             } else {
-                out.append(PyStr.substr(text, last, s));
+                out.append(cut(sc.text, last, s));
             }
             // The callable may run this same pattern; it then builds its
             // own scratch, since this one is taken.
@@ -1358,7 +1360,7 @@ final class Regex {
         if (plain) {
             out.append(text, last, n);
         } else {
-            out.append(PyStr.substr(text, last, n));
+            out.append(cut(sc.text, last, n));
         }
         return Py.tuple(out.toString(), Long.valueOf(done));
     }
@@ -1377,13 +1379,13 @@ final class Regex {
                     break;
                 }
                 if (p.groups == 0) {
-                    out.append(PyStr.substr(text, regs[0], regs[1]));
+                    out.append(cut(sc.text, regs[0], regs[1]));
                 } else if (p.groups == 1) {
-                    out.append(group(text, regs, 1));
+                    out.append(group(sc.text, regs, 1));
                 } else {
                     Object[] g = new Object[p.groups];
                     for (int k = 0; k < g.length; k++) {
-                        g[k] = group(text, regs, k + 1);
+                        g[k] = group(sc.text, regs, k + 1);
                     }
                     out.append(Py.tuple(g));
                 }
@@ -1398,10 +1400,61 @@ final class Regex {
         }
     }
 
-    private static String group(String text, int[] regs, int g) {
+    /// `pattern.split(text, maxsplit)` for a str, with the loop in Java as
+    /// sre's is C: no generator step and no Match per piece. An unmatched
+    /// group is None here, where findall makes it "".
+    static Object split(Prog p, String text, int maxsplit) {
+        PyList out = Py.list();
+        if (maxsplit < 0) {
+            out.append(text);
+            return out;
+        }
+        Scratch sc = acquire(p);
+        try {
+            Text t = sc.text;
+            t.reset(text);
+            int endpos = t.cps == null ? text.length() : t.cps.length;
+            int at = 0;
+            int last = 0;
+            int forbid = -1;
+            int n = 0;
+            while (at <= endpos && (maxsplit == 0 || n < maxsplit)) {
+                int[] regs = run(p, sc, text, at, endpos, 2, forbid);
+                if (regs.length == 0) {
+                    break;
+                }
+                int st = regs[0];
+                int e = regs[1];
+                out.append(cut(t, last, st));
+                for (int k = 1; k <= p.groups; k++) {
+                    int gs = regs[2 * k];
+                    int ge = regs[2 * k + 1];
+                    out.append(gs < 0 || ge < 0 ? Py.NONE : cut(t, gs, ge));
+                }
+                last = e;
+                forbid = st == e ? e : -1;
+                at = e;
+                n++;
+            }
+            out.append(cut(t, last, endpos));
+            return out;
+        } finally {
+            release(p, sc);
+        }
+    }
+
+    private static String group(Text t, int[] regs, int g) {
         int s = regs[2 * g];
         int e = regs[2 * g + 1];
-        return s < 0 || e < 0 ? "" : PyStr.substr(text, s, e);
+        return s < 0 || e < 0 ? "" : cut(t, s, e);
+    }
+
+    /// Code points `from` to `to` of the run's text. The text was measured
+    /// when it was set (`cps` is null when it has no surrogate pair), so a
+    /// piece is a plain substring; PyStr.substr counted the pairs again for
+    /// every piece.
+    private static String cut(Text t, int from, int to) {
+        return t.cps == null ? t.s.substring(from, to) : PyStr.substr(t.s, from, to);
     }
 
     private static int[] run(Prog p, Scratch sc, String text, int pos, int endpos, int mode, int forbid) {

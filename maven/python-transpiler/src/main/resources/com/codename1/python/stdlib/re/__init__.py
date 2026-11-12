@@ -140,6 +140,10 @@ class Pattern:
         return out
 
     def split(self, string, maxsplit=0):
+        if isinstance(string, str) and isinstance(self.pattern, str):
+            # The loop in Java, without a Match per piece.
+            return _cn1re.split(self._prog, string, maxsplit)
+        self._check(string)
         out = []
         last = 0
         n = 0
