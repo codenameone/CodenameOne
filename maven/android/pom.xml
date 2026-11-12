@@ -162,6 +162,15 @@
                                      rather than letting javac fail in the
                                      generated project. -->
                                 <exclude>com/codename1/impl/android/BillingSupport.java</exclude>
+                                <!-- AmazonBillingSupport is the same case
+                                     for the Amazon Appstore SDK, which this
+                                     module has no jar of. It ships as source
+                                     and AndroidGradleBuilder keeps it only in
+                                     a build with android.billing.store=amazon,
+                                     where it also adds the SDK dependency;
+                                     every other build deletes the file, so a
+                                     Play app never compiles it. -->
+                                <exclude>com/codename1/impl/android/AmazonBillingSupport.java</exclude>
                             </excludes>
                         </configuration>
                     </plugin>

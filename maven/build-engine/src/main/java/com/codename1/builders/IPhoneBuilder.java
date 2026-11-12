@@ -4202,6 +4202,9 @@ public class IPhoneBuilder extends Executor {
                     + newStorage
                     + disableScreenshots
                     + inviteDomainProperty
+                    // Commerce reads its switch, endpoint and signing key through
+                    // Display.getProperty; this is the only thing that puts them there.
+                    + CommerceBuildHints.stubProperties(request)
                     + dbLegacy
                     + desktopTitleBar
                     + adPadding

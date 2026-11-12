@@ -5681,13 +5681,23 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to generate icon files", ex);
         }
 
+        // Which store the application's purchases go through. Read before anything
+        // billing related is resolved, because the two stores share nothing: each
+        // has its own library, its own manifest entries and its own port source.
+        String billingStore = request.getArg("android.billing.store", AmazonBillingFragments.STORE_PLAY);
+        String billingStoreRefusal = AmazonBillingFragments.refusalFor(billingStore);
+        if (billingStoreRefusal != null) {
+            throw new BuildException(billingStoreRefusal);
+        }
+        final boolean amazonBilling = AmazonBillingFragments.isAmazon(billingStore);
+
         // The Play Billing version, resolved here rather than beside the gradle
         // dependency it feeds, because it also moves minSdk and the manifest that
         // carries minSdkVersion is written further down this method. Resolving it
         // late put the raised floor in build.gradle and left the manifest saying 19,
         // which is the merge failure it was meant to prevent.
         String billingClientVersion = null;
-        if (purchasePermissions) {
+        if (purchasePermissions && !amazonBilling) {
             billingClientVersion = request.getArg("android.billingclient.version",
                     PlayBillingVersions.DEFAULT_VERSION);
             // The port's BillingSupport is written against the ProductDetails API, which
@@ -5712,8 +5722,10 @@ public class AndroidGradleBuilder extends Executor {
             minSDK = billingRaisedMinSdk;
         }
 
-        if (!purchasePermissions) {
-            File billingSupport = new File(srcDir, path("com", "codename1", "impl", "android", "BillingSupport.java"));
+        // Each billing source compiles only against its own store's library, so the
+        // one this build has no library for is removed -- both, without purchases.
+        for (String unused : AmazonBillingFragments.sourcesToRemove(purchasePermissions, amazonBilling)) {
+            File billingSupport = new File(srcDir, path("com", "codename1", "impl", "android", unused));
             if (billingSupport.exists()) {
                 billingSupport.delete();
             }
@@ -6420,7 +6432,8 @@ public class AndroidGradleBuilder extends Executor {
         if (purchasePermissions) {
             String k = request.getArg("android.licenseKey", null);
             //if the android.licenseKey is not defined abort the build
-            if (k == null) {
+            // The key is Google Play's; an Amazon Appstore build has none to give.
+            if (k == null && !amazonBilling) {
                 throw new BuildException("android.licenseKey must be defined in the build hints, grab the key from the \"Monetization setup\" section in the android dev portal" +
                         ", then paste the Base64-encoded RSA public key into the android.licenseKey build hint.\n\n");
             }
@@ -6446,13 +6459,15 @@ public class AndroidGradleBuilder extends Executor {
                     consumable = "\"" + cons + "\"";
                 }
             }
-            permissions += "    <uses-permission android:name=\"com.android.vending.BILLING\" android:required=\"false\" />\n";
+            permissions += AmazonBillingFragments.permissions(amazonBilling);
+            billingServiceData = AmazonBillingFragments.receiver(amazonBilling,
+                    request.getArg("android.xapplication", ""));
             activityBillingSource
                     = "    protected boolean isBillingEnabled() {\n"
                     + "        return true;\n"
                     + "    }\n\n"
                     + "    protected com.codename1.impl.android.IBillingSupport createBillingSupport() {\n"
-                    + "        return new com.codename1.impl.android.BillingSupport(this);\n"
+                    + "        return new " + AmazonBillingFragments.billingSupportClass(amazonBilling) + "(this);\n"
                     + "    }\n\n";
 
         }
@@ -7447,6 +7462,9 @@ public class AndroidGradleBuilder extends Executor {
                             + "            firstTime = false;\n"
                             + firebaseRegisterInstall
                             + inviteDomainProperty
+                            // Commerce reads its switch, endpoint and signing key through
+                            // Display.getProperty; this is the only thing that puts them there.
+                            + CommerceBuildHints.stubProperties(request)
                             + inviteRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"
@@ -8234,7 +8252,7 @@ public class AndroidGradleBuilder extends Executor {
 
             // Resolved earlier, with the minSdk raise, because the manifest that carries
             // minSdkVersion is written before this point.
-            additionalDependencies += " implementation 'com.android.billingclient:billing:"+billingClientVersion+"'\n";
+            additionalDependencies += AmazonBillingFragments.dependency(amazonBilling, billingClientVersion);
         }
 
         // Play In-App Review library, added only when the app references the

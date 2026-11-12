@@ -673,9 +673,6 @@ UIImagePickerControllerDelegate,
 MFMailComposeViewControllerDelegate,
 #endif
 UIScrollViewDelegate,
-#ifdef CN1_USE_STOREKIT
-SKProductsRequestDelegate, SKPaymentTransactionObserver,
-#endif
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 MFMessageComposeViewControllerDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate,
 #endif
@@ -793,3 +790,12 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 -(void)updateCanvas:(BOOL)animated;
 @end
 #endif // TARGET_OS_WATCH (GL view controller interface variant)
+
+// Declared on a category rather than in the protocol list of either interface
+// above, because the delegate methods are implemented in one
+// (CodenameOne_GLViewController.m) that both the UIKit controller and the
+// native macOS render driver pick up. See the category's implementation.
+#if defined(CN1_USE_STOREKIT) && !TARGET_OS_WATCH
+@interface CodenameOne_GLViewController (CN1StoreKit) <SKProductsRequestDelegate, SKPaymentTransactionObserver>
+@end
+#endif

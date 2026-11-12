@@ -6208,134 +6208,6 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
 #endif
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MessageUI delegates)
 
-extern JAVA_OBJECT productsArrayPending;
-
-#ifdef CN1_USE_STOREKIT
-- (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
-	POOL_BEGIN();
-    if(productsArrayPending != nil) {
-#ifndef NEW_CODENAME_ONE_VM
-        org_xmlvm_runtime_XMLVMArray* pArray = productsArrayPending;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-#else
-        JAVA_ARRAY pArray = (JAVA_ARRAY)productsArrayPending;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(pArray);
-#endif
-        NSArray* arr = response.products;
-        int count = arr.count;
-        for(int iter = 0 ; iter < count ; iter++) {
-            SKProduct* prod = [arr objectAtIndex:iter];
-            NSString* sku = [prod productIdentifier];
-            com_codename1_payment_Product_setSku___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sku));
-            
-            NSNumberFormatter *numberFormatter = [[NSNumberFormatter alloc] init];
-            [numberFormatter setFormatterBehavior:NSNumberFormatterBehavior10_4];
-            [numberFormatter setNumberStyle:NSNumberFormatterCurrencyStyle];
-            [numberFormatter setLocale:prod.priceLocale];
-            NSString *formattedString = [numberFormatter stringFromNumber:prod.price];
-            com_codename1_payment_Product_setLocalizedPrice___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG formattedString));
-            
-            
-            com_codename1_payment_Product_setDescription___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [prod localizedDescription]));
-            com_codename1_payment_Product_setDisplayName___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [prod localizedTitle]));
-        }
-    }
-    productsArrayPending = nil;
-    com_codename1_impl_ios_ZoozPurchase_fetchProductsComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    POOL_END();
-#endif
-}
-
-
--(void)request:(SKRequest *)request didFailWithError:(NSError *)error
-{
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
-    POOL_BEGIN();
-    com_codename1_impl_ios_ZoozPurchase_fetchProductsCanceledOrFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
-    
-    POOL_END();
-#endif
-}
-
-extern SKPayment *paymentInstance;
-- (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray *)transactions
-{
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
-    for (SKPaymentTransaction *transaction in transactions)
-    {
-        switch (transaction.transactionState)
-        {
-            case SKPaymentTransactionStatePurchased:
-                
-                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                NSData *receipt = nil;
-                if (isIOS7()) {
-                    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
-                    receipt = [NSData dataWithContentsOfURL : receiptURL];
-                } else {
-                    receipt = transaction.transactionReceipt;
-                }
-                
-                // Post the receipt
-                com_codename1_payment_Purchase_postReceipt___java_lang_String_java_lang_String_java_lang_String_long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG
-                    get_static_com_codename1_payment_Receipt_STORE_CODE_ITUNES(),
-                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier),
-                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.transactionIdentifier),
-                    (JAVA_LONG)[transaction.transactionDate timeIntervalSince1970] * 1000,
-                    receipt ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [receipt base64EncodedStringWithOptions:0]) : JAVA_NULL
-                );
-                    
-                com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
-                continue;
-            case SKPaymentTransactionStateFailed:
-                if (transaction.error.code != SKErrorPaymentCancelled) {
-                    CN1Log(@"Transaction error %@", transaction.error);
-                    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.error.localizedDescription));
-                }
-                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                continue;
-                
-            case SKPaymentTransactionStateRestored:
-                CN1Log(@"Transaction restored SKPaymentTransactionStateRestored %@", transaction.originalTransaction.payment.productIdentifier);
-                
-                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                com_codename1_impl_ios_IOSImplementation_itemRestored___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.originalTransaction.payment.productIdentifier));
-                continue;
-            case SKPaymentTransactionStatePurchasing:
-                CN1Log(@"SKPaymentTransactionStatePurchasing");
-                continue;
-            default:
-                CN1Log(@"Transaction error %i", transaction.transactionState);
-                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                continue;
-        }
-    }
-#endif
-}
-
--(void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue
-{
-    CN1Log(@"Restore transactions finished");
-    com_codename1_impl_ios_IOSImplementation_restoreRequestComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-}
--(void)paymentQueue:(SKPaymentQueue *)queue restoreCompletedTransactionsFailedWithError:(NSError *)error
-{
-    CN1Log(@"Restore error");
-    com_codename1_impl_ios_IOSImplementation_restoreRequestError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG error.localizedDescription));
-}
-
-#endif
-
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
     CN1Log(@"audioRecorderDidFinishRecording: %i", (int)flag);
 }
@@ -6763,4 +6635,135 @@ UIPopoverController* popoverControllerInstance;
 #endif // !TARGET_OS_TV (UIPickerView / UIDocumentInteractionController)
 @end
 #endif
+#endif
+
+// The StoreKit delegate lives in a category, outside the UIKit controller's
+// @implementation above, because that implementation is compiled out on the
+// native macOS port (CN1MacViewController.m supplies the class there). A
+// category attaches to whichever of the two is in the build, so iOS, tvOS and
+// macOS run the same product listing, transaction and receipt code. Nothing in
+// it is UIKit: StoreKit 1 and the app receipt are the same API on all three.
+// watchOS is left out, as it always was -- the watch driver never observed the
+// payment queue.
+#if defined(CN1_USE_STOREKIT) && !TARGET_OS_WATCH
+extern JAVA_OBJECT productsArrayPending;
+
+@implementation CodenameOne_GLViewController (CN1StoreKit)
+- (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
+	POOL_BEGIN();
+    if(productsArrayPending != nil) {
+#ifndef NEW_CODENAME_ONE_VM
+        org_xmlvm_runtime_XMLVMArray* pArray = productsArrayPending;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+        JAVA_ARRAY pArray = (JAVA_ARRAY)productsArrayPending;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(pArray);
+#endif
+        NSArray* arr = response.products;
+        int count = arr.count;
+        for(int iter = 0 ; iter < count ; iter++) {
+            SKProduct* prod = [arr objectAtIndex:iter];
+            NSString* sku = [prod productIdentifier];
+            com_codename1_payment_Product_setSku___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sku));
+            
+            NSNumberFormatter *numberFormatter = [[NSNumberFormatter alloc] init];
+            [numberFormatter setFormatterBehavior:NSNumberFormatterBehavior10_4];
+            [numberFormatter setNumberStyle:NSNumberFormatterCurrencyStyle];
+            [numberFormatter setLocale:prod.priceLocale];
+            NSString *formattedString = [numberFormatter stringFromNumber:prod.price];
+            com_codename1_payment_Product_setLocalizedPrice___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG formattedString));
+            
+            
+            com_codename1_payment_Product_setDescription___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [prod localizedDescription]));
+            com_codename1_payment_Product_setDisplayName___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG data[iter], fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [prod localizedTitle]));
+        }
+    }
+    productsArrayPending = nil;
+    com_codename1_impl_ios_ZoozPurchase_fetchProductsComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    POOL_END();
+}
+
+
+-(void)request:(SKRequest *)request didFailWithError:(NSError *)error
+{
+    POOL_BEGIN();
+    com_codename1_impl_ios_ZoozPurchase_fetchProductsCanceledOrFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
+    
+    POOL_END();
+}
+
+extern SKPayment *paymentInstance;
+- (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray *)transactions
+{
+    for (SKPaymentTransaction *transaction in transactions)
+    {
+        switch (transaction.transactionState)
+        {
+            case SKPaymentTransactionStatePurchased:
+                
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                NSData *receipt = nil;
+#if TARGET_OS_OSX
+                // macOS never had the per-transaction receipt: the app receipt
+                // (Contents/_MASReceipt/receipt) is the only one, and it is the
+                // same payload the iOS arm posts.
+                NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+                receipt = receiptURL ? [NSData dataWithContentsOfURL : receiptURL] : nil;
+#else
+                if (isIOS7()) {
+                    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+                    receipt = [NSData dataWithContentsOfURL : receiptURL];
+                } else {
+                    receipt = transaction.transactionReceipt;
+                }
+#endif
+                
+                // Post the receipt
+                com_codename1_payment_Purchase_postReceipt___java_lang_String_java_lang_String_java_lang_String_long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG
+                    get_static_com_codename1_payment_Receipt_STORE_CODE_ITUNES(),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.transactionIdentifier),
+                    (JAVA_LONG)[transaction.transactionDate timeIntervalSince1970] * 1000,
+                    receipt ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [receipt base64EncodedStringWithOptions:0]) : JAVA_NULL
+                );
+                    
+                com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
+                continue;
+            case SKPaymentTransactionStateFailed:
+                if (transaction.error.code != SKErrorPaymentCancelled) {
+                    CN1Log(@"Transaction error %@", transaction.error);
+                    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.error.localizedDescription));
+                }
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                continue;
+                
+            case SKPaymentTransactionStateRestored:
+                CN1Log(@"Transaction restored SKPaymentTransactionStateRestored %@", transaction.originalTransaction.payment.productIdentifier);
+                
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                com_codename1_impl_ios_IOSImplementation_itemRestored___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.originalTransaction.payment.productIdentifier));
+                continue;
+            case SKPaymentTransactionStatePurchasing:
+                CN1Log(@"SKPaymentTransactionStatePurchasing");
+                continue;
+            default:
+                CN1Log(@"Transaction error %i", (int)transaction.transactionState);
+                [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                continue;
+        }
+    }
+}
+
+-(void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue
+{
+    CN1Log(@"Restore transactions finished");
+    com_codename1_impl_ios_IOSImplementation_restoreRequestComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+-(void)paymentQueue:(SKPaymentQueue *)queue restoreCompletedTransactionsFailedWithError:(NSError *)error
+{
+    CN1Log(@"Restore error");
+    com_codename1_impl_ios_IOSImplementation_restoreRequestError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG error.localizedDescription));
+}
+
+@end
 #endif

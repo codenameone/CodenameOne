@@ -868,6 +868,9 @@ public class LinuxNativeBuilder extends Executor {
         // Stamp the hardening metadata so Hardening.isHardened() and crash reports carry the
         // mapping id / level on this port too (parity with iOS and Android).
         src.append(hardeningRuntimeProperties(request));
+        // The commerce switch, endpoint and signing key, which CommerceManager reads through
+        // Display.getProperty and nothing else puts there.
+        src.append(CommerceBuildHints.stubProperties(request));
         // And the database compatibility switch, before the lifecycle below starts, so it is in
         // force by the time anything opens a database.
         src.append(databaseLegacyStubProperty(request, usesDatabase));

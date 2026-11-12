@@ -534,6 +534,9 @@ class WatchNativeBuilder {
                 + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                 + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"
                 + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
+                // The commerce switch, endpoint and signing key, which CommerceManager reads
+                // through Display.getProperty and nothing else puts there.
+                + CommerceBuildHints.stubProperties(request)
                 + "        if(!initialized) {\n"
                 + "            initialized = true;\n"
                 // The SAME registry installs the phone stub emits.

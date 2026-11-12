@@ -13846,8 +13846,9 @@ SKPayment *paymentInstance = nil;
 NSObject *paymentDiscountInstance = nil;
 #endif
 
-#if defined(CN1_USE_STOREKIT) && TARGET_OS_TV
+#if defined(CN1_USE_STOREKIT) && (TARGET_OS_TV || TARGET_OS_OSX)
 /*
+ * Shared by the native macOS port, where the SDK marks the same selector unavailable.
  * tvOS has no +[SKPayment paymentWithProductIdentifier:]: a payment can only be built from an
  * SKProduct, so the product is looked up first. A product the store does not return is reported
  * through the same itemPurchaseError callback a failed transaction uses. The request keeps this
@@ -13902,7 +13903,7 @@ NSObject *paymentDiscountInstance = nil;
     }
     SKMutablePayment *payment = [SKMutablePayment paymentWithProduct:product];
     if (discount != nil) {
-        if (@available(tvOS 12.2, *)) {
+        if (@available(tvOS 12.2, macOS 10.14.4, *)) {
             payment.paymentDiscount = (SKPaymentDiscount *)discount;
         }
     }
@@ -13942,7 +13943,7 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
         }
         nsSku = [dict valueForKey:@"sku"];
         NSDictionary *promoDict = [dict valueForKey: @"promotionalOffer"];
-        if (@available(iOS 12.2, *)) {
+        if (@available(iOS 12.2, macOS 10.14.4, *)) {
             for (NSString* stringKey in @[@"offerIdentifier", @"keyIdentifier", @"signature", @"nonce"]) {
                 if (!promoDict[stringKey] || ! [promoDict[stringKey] isKindOfClass:[NSString class]] ) {
                     JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
@@ -13971,7 +13972,7 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
         }
         
     }
-#if TARGET_OS_TV
+#if TARGET_OS_TV || TARGET_OS_OSX
     NSString *tvSku = nsSku;
     NSObject *tvDiscount = paymentDiscountInstance;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -13983,7 +13984,7 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
     dispatch_async(dispatch_get_main_queue(), ^{
         if (paymentDiscountInstance != nil) {
             paymentInstance = [SKMutablePayment paymentWithProductIdentifier:nsSku];
-            if (@available(iOS 12.2, *)) {
+            if (@available(iOS 12.2, macOS 10.14.4, *)) {
                 ((SKMutablePayment*)paymentInstance).paymentDiscount = (SKPaymentDiscount*) paymentDiscountInstance;
             } else {
                 // Fallback on earlier versions

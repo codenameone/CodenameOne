@@ -635,6 +635,9 @@ public class JavaScriptBuilder extends Executor {
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
             pw.println("            public void run() {");
             pw.print(hardeningRuntimeProperties(request));
+            // The commerce switch, endpoint and signing key, which CommerceManager reads
+            // through Display.getProperty and nothing else puts there.
+            pw.print(CommerceBuildHints.stubProperties(request));
             // The theme, title-bar and text-selection hints, read by the port through
             // Display.getProperty. The native theme is installed from the lifecycle's init,
             // which runs after this.

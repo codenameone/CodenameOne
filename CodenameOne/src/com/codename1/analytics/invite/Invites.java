@@ -1214,6 +1214,7 @@ public final class Invites {
     /// that left the referral dimensions behind would re-link the fresh
     /// identity to the same inviter.
     public static void reset() {
+        Analytics.attributionAvailable(false);
         if (!resetVerified()) {
             // The records did not go, and this method promised they would.
             //
@@ -3890,7 +3891,23 @@ public final class Invites {
     // restart; deliveredThisRun covers the window between resolving and the
     // flag reaching the disk, so a failed write costs at most a duplicate
     // after a crash rather than one on every launch.
+    // Tells the framework's own observer (Analytics.setAttributionObserver)
+    // that this install has an attribution. It is not the application's
+    // listener and takes nothing from it: no delivered flag is read or
+    // written here, and Analytics tells its observer once however often this
+    // runs.
+    private static void announceAttribution() {
+        try {
+            if (getAttribution() != null) {
+                Analytics.attributionAvailable(true);
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     private static void deliverPending() {
+        announceAttribution();
         if (listener == null || deliveredThisRun) {
             return;
         }

@@ -37,6 +37,13 @@ public class Receipt implements Externalizable {
 
     public static final String STORE_CODE_ITUNES = "itunes";
     public static final String STORE_CODE_PLAY = "play";
+
+    /// The Amazon Appstore, for an Android application built with the
+    /// `android.billing.store=amazon` build hint. The transaction id of such a
+    /// receipt is Amazon's receipt id, and `#getOrderData()` is a JSON object
+    /// with the `receiptId`, `userId` and `sku` that Amazon's receipt
+    /// verification service asks for.
+    public static final String STORE_CODE_AMAZON = "amazon";
     public static final String STORE_CODE_WINDOWS = "windows";
     public static final String STORE_CODE_SIMULATOR = "simulator";
     private static boolean externalizableRegistered;
@@ -76,7 +83,7 @@ public class Receipt implements Externalizable {
     private String orderData;
 
     /// The store code from which this receipt originated.  Will usually be one of
-    /// `#STORE_CODE_ITUNES`, `#STORE_CODE_PLAY`, `#STORE_CODE_WINDOWS`,
+    /// `#STORE_CODE_ITUNES`, `#STORE_CODE_PLAY`, `#STORE_CODE_AMAZON`, `#STORE_CODE_WINDOWS`,
     /// or `#STORE_CODE_SIMULATOR`, but developers could also use custom codes
     /// if they use a different store, or no store at all.  This code can be used
     /// for validating the receipt.
@@ -336,7 +343,7 @@ public class Receipt implements Externalizable {
     }
 
     /// The store code from which this receipt originated.  Will usually be one of
-    /// `#STORE_CODE_ITUNES`, `#STORE_CODE_PLAY`, `#STORE_CODE_WINDOWS`,
+    /// `#STORE_CODE_ITUNES`, `#STORE_CODE_PLAY`, `#STORE_CODE_AMAZON`, `#STORE_CODE_WINDOWS`,
     /// or `#STORE_CODE_SIMULATOR`, but developers could also use custom codes
     /// if they use a different store, or no store at all.  This code can be used
     /// for validating the receipt.
