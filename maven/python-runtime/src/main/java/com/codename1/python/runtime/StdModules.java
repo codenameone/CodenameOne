@@ -126,6 +126,10 @@ public final class StdModules {
             PyModule.registerModule(PyStruct.module());
             return true;
         }
+        if ("_cn1op".equals(name)) {
+            PyModule.registerModule(operatorModule());
+            return true;
+        }
         if ("_cn1zlib".equals(name)) {
             PyModule.registerModule(PyZlib.module());
             return true;
@@ -1738,6 +1742,42 @@ public final class StdModules {
                 Gil.restore(saved);
             }
             return Py.NONE;
+        }));
+        return m;
+    }
+
+    /// `_cn1op`: the loops of `operator.itemgetter` and `attrgetter` with
+    /// several keys, which CPython runs in C; the Python ones made a
+    /// generator for every call, and `pdfplumber` sorts by one per char.
+    private static PyModule operatorModule() {
+        PyModule m = new PyModule("_cn1op", new String[0]);
+        m.setAttr("getitems", PyBuiltin.fixed2("getitems", (obj, keys) -> {
+            Object[] k = ((PyTuple) keys).items;
+            Object[] out = new Object[k.length];
+            for (int i = 0; i < k.length; i++) {
+                out[i] = Py.getitem(obj, k[i]);
+            }
+            return new PyTuple(out);
+        }));
+        m.setAttr("getattrs", PyBuiltin.fixed2("getattrs", (obj, names) -> {
+            Object[] k = ((PyTuple) names).items;
+            Object[] out = new Object[k.length];
+            for (int i = 0; i < k.length; i++) {
+                Object v = obj;
+                String path = Typed.asStr(k[i]);
+                int start = 0;
+                while (true) {
+                    int dot = path.indexOf('.', start);
+                    if (dot < 0) {
+                        v = Py.getattr(v, path.substring(start));
+                        break;
+                    }
+                    v = Py.getattr(v, path.substring(start, dot));
+                    start = dot + 1;
+                }
+                out[i] = v;
+            }
+            return new PyTuple(out);
         }));
         return m;
     }

@@ -3,6 +3,8 @@
 # exception, as the rest of the Codename One Python runtime.
 """Standard operators as functions."""
 
+import _cn1op
+
 
 def lt(a, b): return a < b
 def le(a, b): return a <= b
@@ -89,7 +91,7 @@ class attrgetter:
     def __call__(self, obj):
         if len(self._attrs) == 1:
             return self._one(obj, self._attrs[0])
-        return tuple(self._one(obj, n) for n in self._attrs)
+        return _cn1op.getattrs(obj, self._attrs)
 
     def __repr__(self):
         return "operator.attrgetter(" + ", ".join(repr(a) for a in self._attrs) + ")"
@@ -102,7 +104,7 @@ class itemgetter:
     def __call__(self, obj):
         if len(self._items) == 1:
             return obj[self._items[0]]
-        return tuple(obj[i] for i in self._items)
+        return _cn1op.getitems(obj, self._items)
 
     def __repr__(self):
         return "operator.itemgetter(" + ", ".join(repr(a) for a in self._items) + ")"
