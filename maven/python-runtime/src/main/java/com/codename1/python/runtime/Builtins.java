@@ -992,6 +992,11 @@ public final class Builtins {
         }
         // What the transpiler rewrites a `match` case into (see PyMatch).
         NAMES.put("__cn1_match__", PyBuiltin.fixed2("__cn1_match__", (a0, a1) -> PyMatch.match(a0, a1)));
+        // What the transpiler rewrites `try: x = next(it) except
+        // StopIteration:` into: no exception is raised when `next` is the
+        // builtin, and one a shadowing `next` raises is caught here.
+        NAMES.put("__cn1_stop__", NEXT_STOP);
+        NAMES.put("__cn1_next_or_stop__", PyBuiltin.fixed2("__cn1_next_or_stop__", Builtins::nextOrStop));
         ExceptionGroups.names(NAMES);
         // open() is io.open, written in Python; the transpiler bundles `io`
         // into any program that mentions open.
@@ -1244,6 +1249,29 @@ public final class Builtins {
             throw exhausted(it);
         }
         return v;
+    }
+
+    /// The marker `__cn1_next_or_stop__` answers for an exhausted iterator.
+    static final Object NEXT_STOP = new PyObject() {
+        @Override
+        public PyType type() {
+            return Py.OBJECT_TYPE;
+        }
+    };
+
+    private static Object nextOrStop(Object f, Object it) {
+        if (f == NEXT) {
+            Object v = Py.next(it);
+            return v == null ? NEXT_STOP : v;
+        }
+        try {
+            return Py.call(f, it);
+        } catch (PyException e) {
+            if (e.matches(Py.STOP_ITERATION)) {
+                return NEXT_STOP;
+            }
+            throw e;
+        }
     }
 
     /// The StopIteration `next(it)` raises once `it` is exhausted.
