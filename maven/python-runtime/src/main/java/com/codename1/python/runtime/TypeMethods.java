@@ -422,6 +422,41 @@ final class TypeMethods {
     /// absent) on a string without surrogate pairs -- nearly every call -- are
     /// clamped here as slice indices clamp; anything else goes through
     /// [PySlice], which also raises for a bound that is not an index.
+    /// `str.count(sub, start, end)`, counted in place: `_markupbase`
+    /// counts the newlines of a window of the whole document on every
+    /// tag, and a substring per call copied that window each time.
+    private static Object count(Object a0, Object a1, Object a2, Object a3) {
+        String self = s(a0);
+        String sub = strArg(a1, "count");
+        long r = range(self, a2, a3);
+        int lo = lo(r);
+        int hi = hi(r);
+        if (hi < lo) {
+            return PyInt.of(0);
+        }
+        int m = sub.length();
+        if (m == 0) {
+            return PyInt.of(self.codePointCount(lo, hi) + 1);
+        }
+        int n = 0;
+        if (m == 1) {
+            // Bounded by hand: indexOf would run on past `end` to the next
+            // match, the whole rest of a document with no newline in it.
+            char c = sub.charAt(0);
+            for (int i = lo; i < hi; i++) {
+                if (self.charAt(i) == c) {
+                    n++;
+                }
+            }
+            return PyInt.of(n);
+        }
+        String v = hi == self.length() ? self : self.substring(0, hi);
+        for (int i = v.indexOf(sub, lo); i >= 0; i = v.indexOf(sub, i + m)) {
+            n++;
+        }
+        return PyInt.of(n);
+    }
+
     private static long range(String self, Object[] a, int from) {
         return range(self, a.length > from ? a[from] : Py.NONE, a.length > from + 1 ? a[from + 1] : Py.NONE);
     }
@@ -835,23 +870,13 @@ final class TypeMethods {
             }
             return PyInt.of(i);
         });
-        def(t, "count", a -> {
-            String self = s(a[0]);
-            String sub = strArg(a[1], "count");
-            long r = range(self, a, 2);
-            if (hi(r) < lo(r)) {
-                return PyInt.of(0);
+        t.define("count", PyBuiltin.method(t, "count", a -> {
+            if (a.length < 2 || a.length > 4) {
+                throw Py.typeError("count() takes from 1 to 3 arguments (" + (a.length - 1) + " given)");
             }
-            String v = self.substring(lo(r), hi(r));
-            if (sub.length() == 0) {
-                return PyInt.of(PyStr.codePoints(v) + 1);
-            }
-            int n = 0;
-            for (int i = v.indexOf(sub); i >= 0; i = v.indexOf(sub, i + sub.length())) {
-                n++;
-            }
-            return PyInt.of(n);
-        });
+            return count(a[0], a[1], a.length > 2 ? a[2] : Py.NONE, a.length > 3 ? a[3] : Py.NONE);
+        }).with2((a0, a1) -> count(a0, a1, Py.NONE, Py.NONE)).with3((a0, a1, a2) -> count(a0, a1, a2, Py.NONE))
+                .with4(TypeMethods::count));
         def1(t, "upper", a0 -> Py.str(mapCase(s(a0), 1)));
         def1(t, "lower", a0 -> Py.str(mapCase(s(a0), 0)));
         def1(t, "casefold", a0 -> Py.str(mapCase(s(a0), 4)));

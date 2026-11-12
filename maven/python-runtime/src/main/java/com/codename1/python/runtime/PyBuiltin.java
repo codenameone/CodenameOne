@@ -161,7 +161,7 @@ public final class PyBuiltin extends PyObject {
         Object call(Object a, Object b, Object c, Object d);
     }
 
-    /// [#with1] for four arguments; not for methods of a builtin type.
+    /// [#with1] for four arguments.
     public PyBuiltin with4(Four f) {
         four = f;
         return this;
@@ -233,10 +233,14 @@ public final class PyBuiltin extends PyObject {
 
     @Override
     public Object call4(Object a, Object b, Object c, Object d) {
-        if (four == null || owner != null) {
+        if (four == null) {
             return super.call4(a, b, c, d);
         }
-        return four.call(a, b, c, d);
+        if (owner == null) {
+            return four.call(a, b, c, d);
+        }
+        Object s = receiver(a);
+        return result(a, s, four.call(s, b, c, d));
     }
 
     @Override
@@ -346,8 +350,7 @@ public final class PyBuiltin extends PyObject {
         if (owner != Py.OBJECT_TYPE && self instanceof PyInstance) { //NOPMD CompareObjectsWithEquals - identity is meant
             Object b = ((PyInstance) self).base;
             if (b != null) {
-                Object[] a = new Object[args.length];
-                System.arraycopy(args, 0, a, 0, args.length);
+                Object[] a = args.clone();
                 a[0] = b;
                 return a;
             }

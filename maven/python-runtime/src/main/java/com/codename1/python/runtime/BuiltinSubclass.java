@@ -179,6 +179,25 @@ final class BuiltinSubclass {
     /// `T.__init__(self, *args)` of a mutable builtin `T`: refills the value.
     private static void initMethod(final PyType t) {
         t.define("__init__", PyBuiltin.methodKw(t, "__init__", (args, kw) -> {
+            Object self0 = args[0];
+            if (kw.length == 0 && args.length <= 2 && !(self0 instanceof PyProperty)) {
+                // `list.__init__(self, it)` from a subclass constructor, as
+                // bs4's ResultSet does per search: refill from the iterable
+                // directly rather than building a fresh value to copy.
+                // CPython clears a list or a set first and never a dict.
+                if (self0 instanceof PyList) {
+                    PyList l = (PyList) self0;
+                    l.clear();
+                    if (args.length == 2) {
+                        l.extend(args[1]);
+                    }
+                    return Py.NONE;
+                }
+                if (self0 instanceof PyDict && args.length == 2 && args[1] instanceof PyDict) {
+                    ((PyDict) self0).update(args[1]);
+                    return Py.NONE;
+                }
+            }
             Object[] rest = new Object[args.length - 1];
             System.arraycopy(args, 1, rest, 0, rest.length);
             Object fresh = t.factory.create(t, rest, kw);
@@ -190,9 +209,8 @@ final class BuiltinSubclass {
                 l.clear();
                 l.extend(fresh);
             } else if (self instanceof PyDict) {
-                PyDict d = (PyDict) self;
-                d.clear();
-                d.update(fresh);
+                // dict.__init__ adds to what is there; it never clears.
+                ((PyDict) self).update(fresh);
             } else if (self instanceof PySet) {
                 PySet s = (PySet) self;
                 s.clear();
