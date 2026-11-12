@@ -59,6 +59,11 @@ public final class AttrSite {
     /// class, and no `__getattribute__` or `__getattr__` that could answer
     /// it. Only [#getOrMiss] answers from it; a plain read still raises.
     private static final int MISSING = 5;
+    /// Hit-path kinds only (gkN): a class attribute read through an instance
+    /// that is a plain value, returned as it is, or a property, whose getter
+    /// runs. Both are what getSlow's CLASS_ATTR answer would be.
+    private static final int CONST = 6;
+    private static final int PROP = 7;
     /// The layout [#getOrMiss] last found missing, checked before the ways:
     /// a probe that misses usually misses on one class.
     private PyType missType;
@@ -123,6 +128,10 @@ public final class AttrSite {
     private Object gf1;
     private Object gf2;
     private Object gf3;
+    private Object gv0;
+    private Object gv1;
+    private Object gv2;
+    private Object gv3;
 
     /// A site for each name of `names`, one a line: the sites of a module,
     /// which generated code holds as one table.
@@ -183,6 +192,7 @@ public final class AttrSite {
             getVersion = PyType.version;
             getUsed = 0;
             gt0 = gt1 = gt2 = gt3 = null;
+            gv0 = gv1 = gv2 = gv3 = null;
             if (getTypes != null && getTypes.length > WAYS) {
                 // The overflow entries name layouts of the old version.
                 getTypes = null;
@@ -242,15 +252,22 @@ public final class AttrSite {
         getSlots[k] = slot;
         getValues[k] = value;
         int fast = kind == SLOT || kind == FIELD ? kind : NONE;
+        if (kind == CLASS_ATTR) {
+            if (value instanceof PyProperty) {
+                fast = PROP;
+            } else if (!(value instanceof PyObject) && value != null) {
+                fast = CONST;
+            }
+        }
         Object f = kind == CLASS_ATTR && value instanceof PyFunction ? value : null;
         if (k == 0) {
-            gt0 = t; gs0 = shape; gk0 = fast; gi0 = slot; gf0 = f;
+            gt0 = t; gs0 = shape; gk0 = fast; gi0 = slot; gf0 = f; gv0 = value;
         } else if (k == 1) {
-            gt1 = t; gs1 = shape; gk1 = fast; gi1 = slot; gf1 = f;
+            gt1 = t; gs1 = shape; gk1 = fast; gi1 = slot; gf1 = f; gv1 = value;
         } else if (k == 2) {
-            gt2 = t; gs2 = shape; gk2 = fast; gi2 = slot; gf2 = f;
+            gt2 = t; gs2 = shape; gk2 = fast; gi2 = slot; gf2 = f; gv2 = value;
         } else if (k == 3) {
-            gt3 = t; gs3 = shape; gk3 = fast; gi3 = slot; gf3 = f;
+            gt3 = t; gs3 = shape; gk3 = fast; gi3 = slot; gf3 = f; gv3 = value;
         }
         return k;
     }
@@ -273,6 +290,12 @@ public final class AttrSite {
                             return v;
                         }
                     }
+                    if (gk0 == CONST) {
+                        return gv0;
+                    }
+                    if (gk0 == PROP) {
+                        return ((PyProperty) gv0).get(i);
+                    }
                 }
                 if (gs1 == s && gt1 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
                     if (gk1 == SLOT) {
@@ -283,6 +306,12 @@ public final class AttrSite {
                         if (v != null) {
                             return v;
                         }
+                    }
+                    if (gk1 == CONST) {
+                        return gv1;
+                    }
+                    if (gk1 == PROP) {
+                        return ((PyProperty) gv1).get(i);
                     }
                 }
                 if (gs2 == s && gt2 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
@@ -295,6 +324,12 @@ public final class AttrSite {
                             return v;
                         }
                     }
+                    if (gk2 == CONST) {
+                        return gv2;
+                    }
+                    if (gk2 == PROP) {
+                        return ((PyProperty) gv2).get(i);
+                    }
                 }
                 if (gs3 == s && gt3 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
                     if (gk3 == SLOT) {
@@ -305,6 +340,12 @@ public final class AttrSite {
                         if (v != null) {
                             return v;
                         }
+                    }
+                    if (gk3 == CONST) {
+                        return gv3;
+                    }
+                    if (gk3 == PROP) {
+                        return ((PyProperty) gv3).get(i);
                     }
                 }
             }

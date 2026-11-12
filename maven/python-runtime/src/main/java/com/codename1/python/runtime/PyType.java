@@ -930,6 +930,12 @@ public final class PyType extends PyObject {
     /// `__bool__` of this type, else its `__len__` (one of them null), for
     /// truth tests of instances; good while [#truthVersion] is [#version].
     Object truthBool;
+
+    /// How many extra attribute slots this class's instances have grown to,
+    /// the most seen: a new instance's first slot array is that long, so an
+    /// `__init__` that sets a dozen names allocates once rather than at 4, 8
+    /// and 16. Only a size hint -- any value is correct.
+    int slotHint = 4;
     Object truthLen;
     int truthVersion = -1;
 

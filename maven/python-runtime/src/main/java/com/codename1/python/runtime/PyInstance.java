@@ -178,11 +178,15 @@ public class PyInstance extends PyObject {
     void append(Shape next, Object value) {
         int n = shape().size();
         if (slots == null) {
-            slots = new Object[4];
+            slots = new Object[cls.slotHint];
         } else if (n == slots.length) {
-            Object[] grown = new Object[n < 4 ? 4 : n * 2];
+            int size = n < 4 ? 4 : n * 2;
+            Object[] grown = new Object[size];
             System.arraycopy(slots, 0, grown, 0, n);
             slots = grown;
+            if (size > cls.slotHint) {
+                cls.slotHint = size;
+            }
         }
         slots[n] = value;
         shape = next;
