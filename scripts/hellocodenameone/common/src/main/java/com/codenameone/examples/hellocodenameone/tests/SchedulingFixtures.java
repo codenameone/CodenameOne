@@ -30,6 +30,11 @@ import com.codename1.scheduling.ScheduleResource;
 import com.codename1.scheduling.TaskDependency;
 import com.codename1.scheduling.TimeMath;
 import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.scheduler.Scheduler;
 
 import java.time.ZoneId;
@@ -118,5 +123,36 @@ final class SchedulingFixtures {
         p.link(testing, release, TaskDependency.Type.FINISH_TO_START, 0);
         p.update();
         return p;
+    }
+
+    /// A Material picker the way a `Picker` shows it: a card of its own
+    /// width in the middle of the screen, over a dimmed form, with the two
+    /// buttons under it. A picker laid across a whole form is stretched to
+    /// a width it is never given in an application.
+    ///
+    /// `mode` is the keyboard button of a time picker, which a dialog moves
+    /// to the row of its buttons, or null.
+    static Container pickerDialog(Component picker, Button mode) {
+        Container card = new Container(new BorderLayout());
+        card.setUIID("PickerMaterialDialog");
+        card.add(BorderLayout.CENTER, picker);
+        Container buttons = new Container(new BorderLayout());
+        buttons.setUIID("PickerMaterialButtons");
+        if (mode != null) {
+            Container was = mode.getParent();
+            mode.remove();
+            if (was != null) {
+                was.setHidden(true);
+            }
+            buttons.add(BorderLayout.WEST, mode);
+        }
+        buttons.add(BorderLayout.EAST, BoxLayout.encloseX(new Button("Cancel", "PickerMaterialButton"),
+                new Button("OK", "PickerMaterialButton")));
+        card.add(BorderLayout.SOUTH, buttons);
+        Container scrim = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+        scrim.getAllStyles().setBgColor(0);
+        scrim.getAllStyles().setBgTransparency(82);
+        scrim.add(BorderLayout.CENTER, card);
+        return scrim;
     }
 }

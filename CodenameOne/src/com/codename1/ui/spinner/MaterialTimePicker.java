@@ -41,8 +41,9 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.MathUtil;
@@ -101,8 +102,13 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
     private final TextField minuteInput = new TextField();
     private final RadioButton am = new RadioButton("");
     private final RadioButton pm = new RadioButton("");
-    private final Container periods = new Container(BoxLayout.y());
-    private final Container time = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
+    // Two rows of one height each, so AM and PM together are as tall as
+    // the hour beside them whatever a theme pads them with.
+    private final Container periods = new Container(new GridLayout(2, 1));
+    private final Container time = new Container();
+    private final Colon separator = new Colon();
+    private final Label hourCaption = new Label("", "PickerMaterialOverline");
+    private final Label minuteCaption = new Label("", "PickerMaterialOverline");
     private final Dial dial = new Dial();
     private final Button modeButton = new Button("", "PickerMaterialButton");
     private final Container modeRow = new Container(new FlowLayout(Component.LEFT));
@@ -113,6 +119,9 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         super(new BorderLayout());
         setUIID("PickerMaterial");
         overline.setText(getUIManager().localize("picker.selectTime", "Select time"));
+        hourCaption.setText(getUIManager().localize("picker.hour", "Hour"));
+        minuteCaption.setText(getUIManager().localize("picker.minute", "Minute"));
+        time.setLayout(new TimeRow());
         String[] names = new DateFormatSymbols().getAmPmStrings();
         am.setText(names != null && names.length > 1 ? names[0] : "AM");
         pm.setText(names != null && names.length > 1 ? names[1] : "PM");
@@ -189,6 +198,9 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         f.setUIID("PickerMaterialField");
         f.setConstraint(TextArea.NUMERIC);
         f.setColumns(2);
+        // Two digits in a box made for them: there is nothing to scroll to,
+        // and the bar of a text area was drawn down the side of the box.
+        f.setScrollVisible(false);
         f.setMaxSize(2);
         f.addDataChangedListener(new DataChangedListener() {
             @Override
@@ -205,7 +217,7 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         } else {
             time.add(hourField);
         }
-        time.add(new Label(":", "PickerMaterialTimeSeparator"));
+        time.add(separator);
         if (inputMode) {
             time.add(minuteInput);
         } else {
@@ -213,6 +225,148 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         }
         if (meridiem) {
             time.add(periods);
+        }
+        if (inputMode) {
+            time.add(hourCaption);
+            time.add(minuteCaption);
+        }
+    }
+
+    // The row of the time: the hour and the minute in two boxes of one
+    // size, the colon between them and AM and PM beside them, all of one
+    // height and centred as a group.
+    //
+    // A flow of the four gave each its own preferred size. The hour was
+    // narrower than the minute whenever it had one digit, the two periods
+    // were as tall as their paddings added up to, and the colon sat
+    // wherever the font put it. Here the box of the hour sets the size and
+    // everything else is measured against it.
+    private final class TimeRow extends Layout {
+        private int boxWidth() {
+            return Math.max(hourField.getPreferredW(), minuteField.getPreferredW());
+        }
+
+        private int boxHeight() {
+            return Math.max(hourField.getPreferredH(), minuteField.getPreferredH());
+        }
+
+        private int captionGap() {
+            return Display.getInstance().convertToPixels(0.7f);
+        }
+
+        private int periodsWidth() {
+            return meridiem ? periods.getPreferredW() + Display.getInstance().convertToPixels(2f) : 0;
+        }
+
+        @Override
+        public void layoutContainer(Container parent) {
+            Style s = parent.getStyle();
+            int fw = boxWidth();
+            int fh = boxHeight();
+            int sw = separator.getPreferredW();
+            int pw = periodsWidth();
+            int room = parent.getWidth() - s.getHorizontalPadding();
+            int x = s.getPaddingLeftNoRTL() + Math.max(0, (room - 2 * fw - sw - pw) / 2);
+            int y = s.getPaddingTop();
+            if (inputMode) {
+                padTyped(fw, fh);
+            }
+            place(inputMode ? (Component) hourInput : hourField, x, y, fw, fh);
+            place(separator, x + fw, y, sw, fh);
+            place(inputMode ? (Component) minuteInput : minuteField, x + fw + sw, y, fw, fh);
+            if (meridiem) {
+                int gap = pw - periods.getPreferredW();
+                // The outer edges of the two are the edges of the row: what
+                // a theme puts around each as a margin stays between them.
+                int over = am.getStyle().getMarginTop();
+                int under = pm.getStyle().getMarginBottom();
+                place(periods, x + 2 * fw + sw + gap, y - over, pw - gap, fh + over + under);
+            }
+            if (inputMode) {
+                int cy = y + fh + captionGap();
+                place(hourCaption, x, cy, fw, hourCaption.getPreferredH());
+                place(minuteCaption, x + fw + sw, cy, fw, minuteCaption.getPreferredH());
+            }
+        }
+
+        private void place(Component c, int x, int y, int w, int h) {
+            c.setX(x);
+            c.setY(y);
+            c.setWidth(w);
+            c.setHeight(h);
+        }
+
+        @Override
+        public Dimension getPreferredSize(Container parent) {
+            Style s = parent.getStyle();
+            int h = boxHeight();
+            if (inputMode) {
+                h += captionGap() + Math.max(hourCaption.getPreferredH(), minuteCaption.getPreferredH());
+            }
+            return new Dimension(2 * boxWidth() + separator.getPreferredW() + periodsWidth()
+                    + s.getHorizontalPadding(), h + s.getVerticalPadding());
+        }
+    }
+
+    // A typed field is the box of the hour with a caret in it: the same
+    // type, and two digits in the middle of it. A text field draws its text
+    // from its padding and has no centred alignment, so the padding is what
+    // puts the digits there.
+    private void padTyped(int fw, int fh) {
+        Font f = getUIManager().getComponentStyle("PickerMaterialTimeField").getFont();
+        int px = Math.max(0, (fw - f.stringWidth("00")) / 2);
+        int py = Math.max(0, (fh - f.getHeight()) / 2);
+        padTyped(hourInput, f, px, py);
+        padTyped(minuteInput, f, px, py);
+    }
+
+    // Asked of the style every time and written only when it differs: a
+    // theme that is refreshed gives the field a new style, and a number
+    // remembered here would say the padding was still on it.
+    private static void padTyped(TextField t, Font f, int px, int py) {
+        Style now = t.getUnselectedStyle();
+        if (now.getFont() == f && now.getPaddingLeftNoRTL() == px && now.getPaddingTop() == py) { //NOPMD CompareObjectsWithEquals - the very font
+            return;
+        }
+        Style all = t.getAllStyles();
+        all.setFont(f);
+        all.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        all.setPadding(py, py, px, px);
+        all.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+        all.setMargin(0, 0, 0, 0);
+    }
+
+    // The colon between the hour and the minute: two dots about the middle
+    // of the row. The glyph of a font sits between the baseline and the
+    // height of a lower case letter, which is under the middle of the
+    // digits beside it.
+    private static final class Colon extends Component {
+        Colon() {
+            setUIID("PickerMaterialTimeSeparator");
+            setFocusable(false);
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+            Style s = getStyle();
+            int h = s.getFont().getHeight();
+            return new Dimension(Math.max(h / 3, Display.getInstance().convertToPixels(3f)) + s.getHorizontalPadding(),
+                    h);
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            Style s = getStyle();
+            int d = Math.max(3, s.getFont().getHeight() / 7);
+            int cx = getX() + getWidth() / 2;
+            int cy = getY() + getHeight() / 2;
+            int off = d * 2;
+            boolean aa = g.isAntiAliased();
+            g.setAntiAliased(true);
+            g.setColor(s.getFgColor());
+            g.fillArc(cx - d / 2, cy - off - d / 2, d, d, 0, 360);
+            g.fillArc(cx - d / 2, cy + off - d / 2, d, d, 0, 360);
+            g.setAntiAliased(aa);
         }
     }
 
@@ -384,6 +538,10 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         return dial.overIndex;
     }
 
+    Container timeRow() {
+        return time;
+    }
+
     TextField hourInputField() {
         return hourInput;
     }
@@ -414,7 +572,10 @@ public class MaterialTimePicker extends Container implements InternalPickerWidge
         FontImage.setMaterialIcon(modeButton, inputMode ? FontImage.MATERIAL_SCHEDULE : FontImage.MATERIAL_KEYBOARD);
         if (inputMode && !updating) {
             updating = true;
-            hourInput.setText(hourText());
+            // Two digits, as the minute has: the hour is typed over, and a
+            // box with one digit off its middle reads as a broken one.
+            int h = meridiem ? (hour % 12 == 0 ? 12 : hour % 12) : hour;
+            hourInput.setText(two(h));
             minuteInput.setText(two(minute));
             updating = false;
         }

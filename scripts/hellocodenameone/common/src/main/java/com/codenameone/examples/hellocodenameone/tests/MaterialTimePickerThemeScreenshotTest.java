@@ -44,6 +44,6 @@ public class MaterialTimePickerThemeScreenshotTest extends DualAppearanceBaseTes
         // Said outright, so the capture does not follow the device's setting.
         picker.setShowMeridiem(true);
         picker.setTime(9, 25);
-        form.add(BorderLayout.NORTH, picker);
+        form.add(BorderLayout.CENTER, SchedulingFixtures.pickerDialog(picker, picker.getInputModeButton()));
     }
 }

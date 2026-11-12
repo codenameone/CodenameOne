@@ -528,4 +528,73 @@ class MaterialPickerTest extends UITestBase {
         picker.stopEditing(null);
         flushSerialCalls();
     }
+
+    @FormTest
+    void theHourTheMinuteAndThePeriodsAreOneRow() {
+        MaterialTimePicker p = new MaterialTimePicker();
+        p.setShowMeridiem(true);
+        // One digit beside two: the boxes are one size all the same.
+        p.setTime(9, 25);
+        place(p);
+        Container row = p.timeRow();
+        assertEquals(4, row.getComponentCount());
+        Component hour = row.getComponentAt(0);
+        Component colon = row.getComponentAt(1);
+        Component minute = row.getComponentAt(2);
+        Component periods = row.getComponentAt(3);
+        assertTrue(hour.getWidth() > 0 && hour.getHeight() > 0);
+        assertEquals(hour.getWidth(), minute.getWidth(), "the hour is as wide as the minute");
+        for (int i = 1; i < 3; i++) {
+            assertEquals(hour.getY(), row.getComponentAt(i).getY(), "one top, part " + i);
+            assertEquals(hour.getHeight(), row.getComponentAt(i).getHeight(), "one height, part " + i);
+        }
+        assertEquals(hour.getX() + hour.getWidth(), colon.getX());
+        assertEquals(colon.getX() + colon.getWidth(), minute.getX());
+        assertTrue(periods.getX() > minute.getX() + minute.getWidth());
+        Container half = (Container) periods;
+        assertEquals(half.getComponentAt(0).getHeight(), half.getComponentAt(1).getHeight(),
+                "AM is as tall as PM");
+        // The margins of the two are outside the row, so what is painted of
+        // them starts and ends where the hour does.
+        Component first = half.getComponentAt(0);
+        Component last = half.getComponentAt(1);
+        assertEquals(hour.getAbsoluteY(), first.getAbsoluteY(), "AM starts where the hour does");
+        assertEquals(hour.getAbsoluteY() + hour.getHeight(), last.getAbsoluteY() + last.getHeight(),
+                "PM ends where the hour does");
+        int left = hour.getX();
+        int right = row.getWidth() - (periods.getX() + periods.getWidth());
+        assertTrue(Math.abs(left - right) <= 1, "the group is in the middle: " + left + " and " + right);
+
+        int x = hour.getX();
+        int w = hour.getWidth();
+        int h = hour.getHeight();
+        p.setInputMode(true);
+        Display.getInstance().getCurrent().revalidate();
+        assertEquals(x, p.hourInputField().getX(), "a typed hour is where the hour was");
+        assertEquals(w, p.hourInputField().getWidth());
+        assertEquals(h, p.hourInputField().getHeight());
+        assertEquals(w, p.minuteInputField().getWidth());
+        assertEquals(p.hourInputField().getY(), p.minuteInputField().getY());
+        assertEquals("09", p.hourInputField().getText(), "two digits, to sit in the middle of the box");
+    }
+
+    @FormTest
+    void theDefaultsTurnDarkWithAThemeThatFollowsTheDevice() {
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("$DarkForm.bgColor", "101010");
+        Boolean was = Display.getInstance().isDarkMode();
+        try {
+            Display.getInstance().setDarkMode(Boolean.FALSE);
+            UIManager.getInstance().setThemeProps(theme);
+            int light = UIManager.getInstance().getComponentStyle("PickerMaterial").getBgColor();
+            Display.getInstance().setDarkMode(Boolean.TRUE);
+            UIManager.getInstance().setThemeProps(theme);
+            int dark = UIManager.getInstance().getComponentStyle("PickerMaterial").getBgColor();
+            assertEquals(0xf3edf7, light);
+            assertEquals(0x2b2930, dark, "a theme with dark entries has dark defaults in dark mode");
+        } finally {
+            Display.getInstance().setDarkMode(was);
+            UIManager.getInstance().setThemeProps(new Hashtable<String, Object>());
+        }
+    }
 }

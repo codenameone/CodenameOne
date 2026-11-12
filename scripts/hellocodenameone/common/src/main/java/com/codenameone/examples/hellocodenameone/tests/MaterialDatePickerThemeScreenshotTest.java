@@ -51,6 +51,6 @@ public class MaterialDatePickerThemeScreenshotTest extends DualAppearanceBaseTes
         // every zone; a month in the past has no "today" to mark.
         picker.setDate(new Date(TimeMath.at(SchedulingFixtures.MONDAY + 9, 12 * 60,
                 ZoneId.systemDefault())));
-        form.add(BorderLayout.NORTH, picker);
+        form.add(BorderLayout.CENTER, SchedulingFixtures.pickerDialog(picker, null));
     }
 }

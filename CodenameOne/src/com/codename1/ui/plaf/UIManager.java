@@ -2122,8 +2122,18 @@ public class UIManager {
                                            Font plain, Font bold) {
         java.util.HashSet<String> themed = new java.util.HashSet<String>();
         boolean dark = darkMode;
+        // A theme that carries its dark styles as `$Dark` entries turns dark
+        // with the device and has no `darkModeBool` to say so. The defaults
+        // here are looked up under the light name when a `$Dark` one is
+        // missing, so they have to be the dark palette while that is on, or
+        // a week view is a white sheet in a dark form.
+        Boolean deviceDark = CN.isDarkMode();
+        boolean followsDevice = deviceDark != null && deviceDark.booleanValue();
         if (installedTheme != null) {
             for (String key : installedTheme.keySet()) {
+                if (followsDevice && key.startsWith("$Dark")) {
+                    dark = true;
+                }
                 if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")) {
                     int dot = key.indexOf('.');
                     if (dot > 0) {
