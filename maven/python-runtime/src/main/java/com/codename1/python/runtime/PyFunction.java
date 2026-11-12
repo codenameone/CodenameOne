@@ -1212,8 +1212,85 @@ public final class PyFunction extends PyObject {
         return bindDirect(n, kwNames, n > 0 ? args[0] : null, n > 1 ? args[1] : null, n > 2 ? args[2] : null, n > 3 ? args[3] : null, n > 4 ? args[4] : null, n > 5 ? args[5] : null, n > 6 ? args[6] : null, n > 7 ? args[7] : null, n > 8 ? args[8] : null, n > 9 ? args[9] : null, n > 10 ? args[10] : null, n > 11 ? args[11] : null, n > 12 ? args[12] : null, n > 13 ? args[13] : null);
     }
 
+    /// [#bindDirect] for a function of at most four parameters called with
+    /// at most four arguments -- `self.match(i, _known_rules=True)` in bs4's
+    /// filter loop: four locals and one placement per argument instead of
+    /// the fourteen-way form. Answers exactly what the general form does.
+    private Object bindSmall(int n, String[] kwNames, Object p0, Object p1, Object p2, Object p3) {
+        int nPos = n - kwNames.length;
+        int[] kwSlots = kwNames.length == 0 ? null : directSlots(kwNames);
+        Object x0 = null;
+        Object x1 = null;
+        Object x2 = null;
+        Object x3 = null;
+        for (int i = 0; i < n; i++) {
+            int slot = i;
+            if (i >= nPos) {
+                slot = kwSlots[i - nPos];
+            }
+            if (slot < 0 || slot >= positional) {
+                // Too many arguments or no such parameter: bindArgs reports it.
+                return UNBOUND;
+            }
+            Object v = i == 0 ? p0 : i == 1 ? p1 : i == 2 ? p2 : p3;
+            if (slot == 0) {
+                if (x0 != null) {
+                    return UNBOUND;
+                }
+                x0 = v;
+            } else if (slot == 1) {
+                if (x1 != null) {
+                    return UNBOUND;
+                }
+                x1 = v;
+            } else if (slot == 2) {
+                if (x2 != null) {
+                    return UNBOUND;
+                }
+                x2 = v;
+            } else {
+                if (x3 != null) {
+                    return UNBOUND;
+                }
+                x3 = v;
+            }
+        }
+        int first = positional - defaults.length;
+        if (positional >= 1 && x0 == null) {
+            x0 = dflt(0, first);
+        }
+        if (positional >= 2 && x1 == null) {
+            x1 = dflt(1, first);
+        }
+        if (positional >= 3 && x2 == null) {
+            x2 = dflt(2, first);
+        }
+        if (positional >= 4 && x3 == null) {
+            x3 = dflt(3, first);
+        }
+        if (positional > 0 && x0 == null || positional > 1 && x1 == null || positional > 2 && x2 == null
+                || positional > 3 && x3 == null) {
+            return UNBOUND;
+        }
+        switch (positional) {
+            case 0:
+                return body0 != null ? body0.run() : UNBOUND;
+            case 1:
+                return body1 != null ? body1.run(x0) : UNBOUND;
+            case 2:
+                return body2 != null ? body2.run(x0, x1) : UNBOUND;
+            case 3:
+                return body3 != null ? body3.run(x0, x1, x2) : UNBOUND;
+            default:
+                return body4 != null ? body4.run(x0, x1, x2, x3) : UNBOUND;
+        }
+    }
+
     /// [#bindDirect] over the `n` arguments `p0`..`p13` themselves.
     private Object bindDirect(int n, String[] kwNames, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7, Object p8, Object p9, Object p10, Object p11, Object p12, Object p13) {
+        if (positional <= 4 && n <= 4) {
+            return bindSmall(n, kwNames, p0, p1, p2, p3);
+        }
         int nPos = n - kwNames.length;
         int[] kwSlots = kwNames.length == 0 ? null : directSlots(kwNames);
         Object x0 = null;
