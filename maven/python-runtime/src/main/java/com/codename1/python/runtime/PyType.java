@@ -110,6 +110,16 @@ public final class PyType extends PyObject {
     /// The direct subclasses, for `type.__subclasses__()`; null until one exists.
     private List<PyType> subclasses;
 
+    /// A number of its own, for the hashed caches of the store sites
+    /// ([StoreSite]). Python code runs on one thread at a time.
+    final int id = nextTypeId();
+
+    private static int typeIds;
+
+    private static int nextTypeId() {
+        return ++typeIds;
+    }
+
     PyType(String name, PyType[] bases, Factory factory) {
         this.name = name;
         this.bases = bases;

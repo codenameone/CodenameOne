@@ -49,11 +49,25 @@ public final class StoreSite {
     // shape transition when the store adds it.
     private int setVersion = -1;
     private int setUsed;
-    private int setNext;
     private PyType[] setTypes;
     private Shape[] setShapes;
     private int[] setSlots;
     private Shape[] setTos;
+
+    /// Once the sixteen are taken: every further layout, by a hash of its
+    /// class and shape, one entry a slot. A store in an `__init__` that a base
+    /// class shares with hundreds of subclasses (python-pptx's element class per
+    /// XML tag) evicted round robin and missed on every call, paying two class
+    /// lookups by name and a generic store each time.
+    private static final int HASHED = 256;
+    private PyType[] hTypes;
+    private Shape[] hShapes;
+    private int[] hSlots;
+    private Shape[] hTos;
+
+    private static int hash(PyType t, Shape s) {
+        return (t.id * 0x9E3779B1 + (s == null ? 0 : s.id) * 0x85EBCA6B) >>> 24;
+    }
 
     private PyType st0;
     private PyType st1;
@@ -163,6 +177,18 @@ public final class StoreSite {
         if (setVersion == PyType.version) {
             PyType t = i.cls;
             Shape s = i.shape;
+            if (hTypes != null) {
+                int h = hash(t, s);
+                if (hTypes[h] == t && hShapes[h] == s) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    Shape to = hTos[h];
+                    if (to == null) {
+                        i.slots[hSlots[h]] = v;
+                    } else {
+                        i.append(to, v);
+                    }
+                    return;
+                }
+            }
             for (int k = 0; k < setUsed; k++) {
                 if (setTypes[k] == t && setShapes[k] == s) { //NOPMD CompareObjectsWithEquals - identity is meant
                     Shape to = setTos[k];
@@ -177,8 +203,8 @@ public final class StoreSite {
         } else {
             setVersion = PyType.version;
             setUsed = 0;
-            setNext = 0;
             st0 = st1 = st2 = st3 = null;
+            hTypes = null;
         }
         fillSet(i, v);
     }
@@ -188,8 +214,18 @@ public final class StoreSite {
         if (setUsed < WAYS) {
             k = setUsed++;
         } else {
-            k = setNext;
-            setNext = (setNext + 1) % WAYS;
+            if (hTypes == null) {
+                hTypes = new PyType[HASHED];
+                hShapes = new Shape[HASHED];
+                hSlots = new int[HASHED];
+                hTos = new Shape[HASHED];
+            }
+            int h = hash(t, shape);
+            hTypes[h] = t;
+            hShapes[h] = shape;
+            hSlots[h] = slot;
+            hTos[h] = to;
+            return;
         }
         if (setTypes == null) {
             setTypes = new PyType[INLINE];

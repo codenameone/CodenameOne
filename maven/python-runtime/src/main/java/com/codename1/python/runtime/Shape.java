@@ -44,6 +44,16 @@ final class Shape {
     /// list was paid by the first assignment of every instance made.
     private java.util.HashMap<String, Shape> byName;
 
+    /// A number of its own, for the hashed caches of the store sites
+    /// ([StoreSite]). Python code runs on one thread at a time.
+    final int id = nextId();
+
+    private static int ids;
+
+    private static int nextId() {
+        return ++ids;
+    }
+
     private Shape(String[] names) {
         this.names = names;
     }
