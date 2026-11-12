@@ -31,6 +31,28 @@ public final class PyBytes extends PyObject {
         this.value = value;
     }
 
+    /// The empty and the one-byte values, shared as CPython shares them: a
+    /// tokenizer's `s[j:j + 1]` (pdfminer's psparser, once per character)
+    /// otherwise allocates a byte array and a bytes object every time.
+    private static final PyBytes[] SMALL = new PyBytes[257];
+
+    /// `v[lo:hi]` as a new bytes, or the shared value for zero or one byte.
+    static PyBytes range(byte[] v, int lo, int hi) {
+        int n = hi <= lo ? 0 : hi - lo;
+        if (n <= 1) {
+            int k = n == 0 ? 256 : v[lo] & 0xff;
+            PyBytes b = SMALL[k];
+            if (b == null) {
+                b = new PyBytes(n == 0 ? new byte[0] : new byte[] {v[lo]});
+                SMALL[k] = b;
+            }
+            return b;
+        }
+        byte[] out = new byte[n];
+        System.arraycopy(v, lo, out, 0, n);
+        return new PyBytes(out);
+    }
+
     @Override
     public PyType type() {
         return Py.BYTES_TYPE;
@@ -262,12 +284,11 @@ public final class PyBytes extends PyObject {
         if (key instanceof PySlice) {
             int[] r = ((PySlice) key).indices(value.length);
             int n = PySlice.length(r);
-            byte[] out = new byte[n];
             if (r[2] == 1) {
                 // A plain slice is one block copy, not a checked store per element.
-                System.arraycopy(value, r[0], out, 0, n);
-                return new PyBytes(out);
+                return range(value, r[0], r[0] + n);
             }
+            byte[] out = new byte[n];
             for (int i = 0, j = r[0]; i < n; i++, j += r[2]) {
                 out[i] = value[j];
             }

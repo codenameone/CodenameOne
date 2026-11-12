@@ -1673,9 +1673,7 @@ public final class Py {
             if (lo == 0 && hi == n) {
                 return o; // bytes are immutable: CPython hands back the same object
             }
-            byte[] out = new byte[hi <= lo ? 0 : hi - lo];
-            System.arraycopy(v, lo, out, 0, out.length);
-            return new PyBytes(out);
+            return PyBytes.range(v, lo, hi);
         }
         return Py.obj(o).getItem(new PySlice(a, b, c));
     }
