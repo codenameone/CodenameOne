@@ -450,11 +450,58 @@ final class TypeMethods {
             }
             return PyInt.of(n);
         }
-        String v = hi == self.length() ? self : self.substring(0, hi);
-        for (int i = v.indexOf(sub, lo); i >= 0; i = v.indexOf(sub, i + m)) {
+        for (int i = indexIn(self, sub, lo, hi); i >= 0; i = indexIn(self, sub, i + m, hi)) {
             n++;
         }
         return PyInt.of(n);
+    }
+
+    /// `str.replace(old, new, count)`; `a3` null when no count was passed.
+    private static Object replace(Object a0, Object a1, Object a2, Object a3) {
+        String v = s(a0);
+        String old = strArg(a1, "replace");
+        String nw = strArg(a2, "replace");
+        long count = a3 != null ? Py.asLong(a3) : -1;
+        if (count < 0) {
+            if (old.length() == 0) {
+                StringBuilder sb = new StringBuilder(nw);
+                for (int i = 0; i < v.length(); i++) {
+                    sb.append(v.charAt(i)).append(nw);
+                }
+                return Py.str(sb.toString());
+            }
+            return Py.str(v.replace(old, nw));
+        }
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        for (long k = 0; k < count; k++) {
+            int j = v.indexOf(old, i);
+            if (j < 0) {
+                break;
+            }
+            sb.append(v, i, j).append(nw);
+            i = j + old.length();
+            if (old.length() == 0) {
+                if (i < v.length()) {
+                    sb.append(v.charAt(i));
+                }
+                i++;
+            }
+        }
+        if (i <= v.length()) {
+            sb.append(v.substring(Math.min(i, v.length())));
+        }
+        return Py.str(sb.toString());
+    }
+
+    private static Object setdefault(Object a0, Object a1, Object a2) {
+        PyDict self = d(a0);
+        Object v = self.getOrNull(a1);
+        if (v == null) {
+            v = a2;
+            self.setItem(a1, v);
+        }
+        return v;
     }
 
     private static long range(String self, Object[] a, int from) {
@@ -512,6 +559,14 @@ final class TypeMethods {
     static int findWhole(String v, String sub, boolean last) {
         int i = last ? v.lastIndexOf(sub) : v.indexOf(sub);
         return i < 0 ? -1 : PyStr.cpIndex(v, i);
+    }
+
+    /// The answer of `find` (-1 for a miss) or `index` (which raises).
+    private static Object found(int i, boolean raise) {
+        if (i < 0 && raise) {
+            throw Py.valueError("substring not found");
+        }
+        return PyInt.of(i);
     }
 
     private static int find(String self, Object[] a, boolean last) {
@@ -608,19 +663,24 @@ final class TypeMethods {
     }
 
     private static boolean affix(String self, Object[] a, boolean start) {
-        // Compared in place: no substring, and no offsets resolved unless
-        // a start or end was given.
+        return affix(self, a[1], a.length > 2 ? a[2] : null, a.length > 3 ? a[3] : Py.NONE, start);
+    }
+
+    /// `self.startswith(c, b0, b1)` or `endswith`; `b0` null when neither
+    /// bound was passed. Compared in place: no substring, and no offsets
+    /// resolved unless a bound was given.
+    private static boolean affix(String self, Object c, Object b0, Object b1, boolean start) {
         int lo = 0;
         int hi = self.length();
-        if (a.length > 2) {
-            long r = range(self, a, 2);
+        if (b0 != null) {
+            long r = range(self, b0, b1);
             lo = lo(r);
             hi = hi(r);
         }
-        if (!(a[1] instanceof PyTuple)) {
-            return affixAt(self, lo, hi, strArg(a[1], start ? "startswith" : "endswith"), start);
+        if (!(c instanceof PyTuple)) {
+            return affixAt(self, lo, hi, strArg(c, start ? "startswith" : "endswith"), start);
         }
-        for (Object cand : ((PyTuple) a[1]).items) {
+        for (Object cand : ((PyTuple) c).items) {
             if (affixAt(self, lo, hi, strArg(cand, start ? "startswith" : "endswith"), start)) {
                 return true;
             }
@@ -634,12 +694,16 @@ final class TypeMethods {
     }
 
     private static Object pad(Object[] a, int mode) {
-        String v = s(a[0]);
-        int width = (int) Py.asLong(a[1]);
-        String fill = a.length > 2 ? strArg(a[2], "fill") : " ";
-        int n = PyStr.codePoints((String) a[0]);
+        return pad(a[0], a[1], a.length > 2 ? a[2] : null, mode);
+    }
+
+    private static Object pad(Object a0, Object a1, Object a2, int mode) {
+        String v = s(a0);
+        int width = (int) Py.asLong(a1);
+        String fill = a2 != null ? strArg(a2, "fill") : " ";
+        int n = PyStr.codePoints(v);
         if (width <= n) {
-            return a[0];
+            return a0;
         }
         int total = width - n;
         int left = mode == 0 ? 0 : mode == 1 ? total : total / 2 + (total & width & 1);
@@ -816,60 +880,31 @@ final class TypeMethods {
                 a0 -> Py.str(strip(s(a0), null, true, false)), (a0, a1) -> Py.str(strip(s(a0), a1, true, false)), null);
         defOpt(t, "rstrip", a -> Py.str(strip(s(a[0]), a.length > 1 ? a[1] : null, false, true)),
                 a0 -> Py.str(strip(s(a0), null, false, true)), (a0, a1) -> Py.str(strip(s(a0), a1, false, true)), null);
-        def(t, "replace", a -> {
-            String v = s(a[0]);
-            String old = strArg(a[1], "replace");
-            String nw = strArg(a[2], "replace");
-            long count = a.length > 3 ? Py.asLong(a[3]) : -1;
-            if (count < 0) {
-                if (old.length() == 0) {
-                    StringBuilder sb = new StringBuilder(nw);
-                    for (int i = 0; i < v.length(); i++) {
-                        sb.append(v.charAt(i)).append(nw);
-                    }
-                    return Py.str(sb.toString());
-                }
-                return Py.str(v.replace(old, nw));
+        t.define("replace", PyBuiltin.method(t, "replace", a -> {
+            if (a.length < 3) {
+                throw Py.typeError("replace() takes at least 2 arguments (" + (a.length - 1) + " given)");
             }
-            StringBuilder sb = new StringBuilder();
-            int i = 0;
-            for (long k = 0; k < count; k++) {
-                int j = v.indexOf(old, i);
-                if (j < 0) {
-                    break;
-                }
-                sb.append(v, i, j).append(nw);
-                i = j + old.length();
-                if (old.length() == 0) {
-                    if (i < v.length()) {
-                        sb.append(v.charAt(i));
-                    }
-                    i++;
-                }
-            }
-            if (i <= v.length()) {
-                sb.append(v.substring(Math.min(i, v.length())));
-            }
-            return Py.str(sb.toString());
-        });
-        def(t, "startswith", a -> Py.bool(affix(s(a[0]), a, true)));
-        def(t, "endswith", a -> Py.bool(affix(s(a[0]), a, false)));
-        def(t, "find", a -> PyInt.of(find(s(a[0]), a, false)));
-        def(t, "rfind", a -> PyInt.of(find(s(a[0]), a, true)));
-        def(t, "index", a -> {
-            int i = find(s(a[0]), a, false);
-            if (i < 0) {
-                throw Py.valueError("substring not found");
-            }
-            return PyInt.of(i);
-        });
-        def(t, "rindex", a -> {
-            int i = find(s(a[0]), a, true);
-            if (i < 0) {
-                throw Py.valueError("substring not found");
-            }
-            return PyInt.of(i);
-        });
+            return replace(a[0], a[1], a[2], a.length > 3 ? a[3] : null);
+        }).with3((a0, a1, a2) -> replace(a0, a1, a2, null)).with4(TypeMethods::replace));
+        // The search family runs without an argument array for every
+        // arity it takes: these are called per token by every parser.
+        for (int k = 0; k < 2; k++) {
+            final boolean st = k == 0;
+            t.define(st ? "startswith" : "endswith", PyBuiltin.method(t, st ? "startswith" : "endswith",
+                    a -> Py.bool(affix(s(a[0]), a, st)))
+                    .with2((a0, a1) -> Py.bool(affix(s(a0), a1, null, Py.NONE, st)))
+                    .with3((a0, a1, a2) -> Py.bool(affix(s(a0), a1, a2, Py.NONE, st)))
+                    .with4((a0, a1, a2, a3) -> Py.bool(affix(s(a0), a1, a2, a3, st))));
+        }
+        for (int k = 0; k < 4; k++) {
+            final boolean last = (k & 1) != 0;
+            final boolean raise = k >= 2;
+            String nm = (last ? "r" : "") + (raise ? "index" : "find");
+            t.define(nm, PyBuiltin.method(t, nm, a -> found(find(s(a[0]), a, last), raise))
+                    .with2((a0, a1) -> found(findIn(s(a0), strArg(a1, "find"), Py.NONE, Py.NONE, last), raise))
+                    .with3((a0, a1, a2) -> found(findIn(s(a0), strArg(a1, "find"), a2, Py.NONE, last), raise))
+                    .with4((a0, a1, a2, a3) -> found(findIn(s(a0), strArg(a1, "find"), a2, a3, last), raise)));
+        }
         t.define("count", PyBuiltin.method(t, "count", a -> {
             if (a.length < 2 || a.length > 4) {
                 throw Py.typeError("count() takes from 1 to 3 arguments (" + (a.length - 1) + " given)");
@@ -933,9 +968,9 @@ final class TypeMethods {
             }
             return Py.TRUE;
         });
-        def(t, "ljust", a -> pad(a, 0));
-        def(t, "rjust", a -> pad(a, 1));
-        def(t, "center", a -> pad(a, 2));
+        defOpt(t, "ljust", a -> pad(a, 0), null, (a0, a1) -> pad(a0, a1, null, 0), (a0, a1, a2) -> pad(a0, a1, a2, 0));
+        defOpt(t, "rjust", a -> pad(a, 1), null, (a0, a1) -> pad(a0, a1, null, 1), (a0, a1, a2) -> pad(a0, a1, a2, 1));
+        defOpt(t, "center", a -> pad(a, 2), null, (a0, a1) -> pad(a0, a1, null, 2), (a0, a1, a2) -> pad(a0, a1, a2, 2));
         def2(t, "zfill", (a0, a1) -> {
             String v = s(a0);
             int width = (int) Py.asLong(a1);
@@ -1229,15 +1264,8 @@ final class TypeMethods {
             }
             throw Py.error(Py.KEY_ERROR, "popitem(): dictionary is empty");
         });
-        def(t, "setdefault", a -> {
-            PyDict self = d(a[0]);
-            Object v = self.getOrNull(a[1]);
-            if (v == null) {
-                v = a.length > 2 ? a[2] : Py.NONE;
-                self.setItem(a[1], v);
-            }
-            return v;
-        });
+        defOpt(t, "setdefault", a -> setdefault(a[0], a[1], a.length > 2 ? a[2] : Py.NONE), null,
+                (a0, a1) -> setdefault(a0, a1, Py.NONE), TypeMethods::setdefault);
         defKw(t, "update", (args, kw) -> {
             PyDict self = d(args[0]);
             int npos = args.length - kw.length;
