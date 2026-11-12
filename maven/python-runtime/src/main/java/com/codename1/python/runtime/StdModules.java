@@ -118,6 +118,14 @@ public final class StdModules {
             PyModule.registerModule(PyHashlib.module());
             return true;
         }
+        if ("_cn1binascii".equals(name)) {
+            PyModule.registerModule(PyBinascii.module());
+            return true;
+        }
+        if ("_cn1struct".equals(name)) {
+            PyModule.registerModule(PyStruct.module());
+            return true;
+        }
         if ("_cn1zlib".equals(name)) {
             PyModule.registerModule(PyZlib.module());
             return true;
