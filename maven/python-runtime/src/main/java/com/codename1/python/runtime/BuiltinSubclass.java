@@ -102,7 +102,14 @@ final class BuiltinSubclass {
         unary(t, "__abs__", s -> Builtins.lookup("abs") instanceof PyObject
                 ? ((PyObject) Builtins.lookup("abs")).call1(s) : null);
         unary(t, "__float__", s -> Py.ofFloat(s.asDouble()));
-        unary(t, "__bool__", s -> Py.bool(s.isTrue()));
+        // The truth of the builtin value an instance wraps. Marked, so that
+        // PyType.truthMethods recognizes it and `if s:` on a str subclass
+        // (bs4's NavigableString) asks the String itself: it called this
+        // builtin and made a PyStr view of the String for every test.
+        PyBuiltin b = PyBuiltin.method(t, "__bool__", a -> Py.bool(Py.isTrue(a[0])))
+                .with1(s -> Py.bool(Py.isTrue(s)));
+        b.baseTruth = true;
+        t.define("__bool__", b);
     }
 
     private static void bits(PyType t) {

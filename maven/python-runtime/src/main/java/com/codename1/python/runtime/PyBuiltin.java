@@ -56,6 +56,9 @@ public final class PyBuiltin extends PyObject {
 
     public final String name;
     final Impl impl;
+    /// Set on a builtin subclass's own `__bool__` (see BuiltinSubclass):
+    /// the instance's truth is its base value's.
+    boolean baseTruth;
     private One one;
     private Two two;
     private Three three;

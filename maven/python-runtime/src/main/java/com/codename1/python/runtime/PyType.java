@@ -952,6 +952,15 @@ public final class PyType extends PyObject {
     /// `__bool__` of this type, else its `__len__` (one of them null), for
     /// truth tests of instances; good while [#truthVersion] is [#version].
     Object truthBool;
+    /// [#truthBool] is a builtin subclass's own `__bool__`: an instance's
+    /// truth is its base value's.
+    boolean truthBase;
+    /// `__len__` / `__hash__` are the builtin's own (a subclass of str,
+    /// tuple, int... that does not override them): an instance's answer is
+    /// its base value's, asked without the builtin call and the view of the
+    /// value it made. Kept with the truth methods, against the version.
+    boolean lenBase;
+    boolean hashBase;
 
     /// How many extra attribute slots this class's instances have grown to,
     /// the most seen: a new instance's first slot array is that long, so an
@@ -965,6 +974,13 @@ public final class PyType extends PyObject {
     void truthMethods() {
         truthBool = lookup("__bool__");
         truthLen = truthBool == null ? lookup("__len__") : null;
+        // A builtin's own __bool__, or (str, list, dict: no __bool__) its
+        // own __len__, both answer the truth of the value an instance wraps.
+        // A Python override is a function, never a builtin.
+        truthBase = truthBool instanceof PyBuiltin ? ((PyBuiltin) truthBool).baseTruth
+                : truthBool == null && truthLen instanceof PyBuiltin;
+        lenBase = lookup("__len__") instanceof PyBuiltin;
+        hashBase = lookup("__hash__") instanceof PyBuiltin;
         truthVersion = version;
     }
 

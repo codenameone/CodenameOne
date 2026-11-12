@@ -430,6 +430,9 @@ public class PyInstance extends PyObject {
         if (t.truthVersion != PyType.version) {
             t.truthMethods();
         }
+        if (t.truthBase && base != null) {
+            return Py.isTrue(base);
+        }
         Object m = t.truthBool;
         if (m != null) {
             Object r = Py.obj(m).call1(this);
@@ -640,6 +643,13 @@ public class PyInstance extends PyObject {
 
     @Override
     public long hash() {
+        PyType t = cls;
+        if (t.truthVersion != PyType.version) {
+            t.truthMethods();
+        }
+        if (t.hashBase && base != null) {
+            return Py.hashOf(base);
+        }
         Object m = cls.lookup("__hash__");
         if (m == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
             throw Py.typeError("unhashable type: '" + cls.name + "'");
@@ -693,6 +703,13 @@ public class PyInstance extends PyObject {
 
     @Override
     public int len() {
+        PyType t = cls;
+        if (t.truthVersion != PyType.version) {
+            t.truthMethods();
+        }
+        if (t.lenBase && base != null) {
+            return Py.len(base);
+        }
         Object r = dunder0("__len__");
         if (r == null) {
             return super.len();
