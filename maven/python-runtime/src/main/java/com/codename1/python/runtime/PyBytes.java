@@ -343,8 +343,8 @@ public final class PyBytes extends PyObject {
             return Py.str(sb.toString());
         }));
         installLatin1Delegates();
-        Py.BYTES_TYPE.define("fromhex", new PyClassMethod(PyBuiltin.positional("fromhex", a -> {
-            String h = Py.toStr(a[1]);
+        Py.BYTES_TYPE.define("fromhex", new PyClassMethod(PyBuiltin.fixed2("fromhex", (a0, a1) -> {
+            String h = Py.toStr(a1);
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             int i = 0;
             while (i < h.length()) {
@@ -364,29 +364,27 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(out.toByteArray());
         })));
-        Py.BYTES_TYPE.define("upper", PyBuiltin.method(Py.BYTES_TYPE, "upper", a -> asciiCase((PyBytes) a[0], true)));
-        Py.BYTES_TYPE.define("lower", PyBuiltin.method(Py.BYTES_TYPE, "lower", a -> asciiCase((PyBytes) a[0], false)));
-        Py.BYTES_TYPE.define("isdigit", PyBuiltin.method(Py.BYTES_TYPE, "isdigit",
-                a -> Py.bool(allAscii((PyBytes) a[0], "0123456789"))));
-        Py.BYTES_TYPE.define("isalpha", PyBuiltin.method(Py.BYTES_TYPE, "isalpha",
-                a -> Py.bool(allAscii((PyBytes) a[0], LETTERS))));
-        Py.BYTES_TYPE.define("isalnum", PyBuiltin.method(Py.BYTES_TYPE, "isalnum",
-                a -> Py.bool(allAscii((PyBytes) a[0], LETTERS + "0123456789"))));
-        Py.BYTES_TYPE.define("isspace", PyBuiltin.method(Py.BYTES_TYPE, "isspace",
-                a -> Py.bool(allAscii((PyBytes) a[0], " \t\n\r\u000b\f"))));
+        Py.BYTES_TYPE.define("upper", PyBuiltin.method1(Py.BYTES_TYPE, "upper", a0 -> asciiCase((PyBytes) a0, true)));
+        Py.BYTES_TYPE.define("lower", PyBuiltin.method1(Py.BYTES_TYPE, "lower", a0 -> asciiCase((PyBytes) a0, false)));
+        Py.BYTES_TYPE.define("isdigit", PyBuiltin.method1(Py.BYTES_TYPE, "isdigit", a0 -> Py.bool(allAscii((PyBytes) a0, "0123456789"))));
+        Py.BYTES_TYPE.define("isalpha", PyBuiltin.method1(Py.BYTES_TYPE, "isalpha", a0 -> Py.bool(allAscii((PyBytes) a0, LETTERS))));
+        Py.BYTES_TYPE.define("isalnum", PyBuiltin.method1(Py.BYTES_TYPE, "isalnum", a0 -> Py.bool(allAscii((PyBytes) a0, LETTERS + "0123456789"))));
+        Py.BYTES_TYPE.define("isspace", PyBuiltin.method1(Py.BYTES_TYPE, "isspace", a0 -> Py.bool(allAscii((PyBytes) a0, " \t\n\r\u000b\f"))));
         installAsciiText();
-        Py.BYTES_TYPE.factory = (t, args, kw) -> {
-            if (args.length == 0) {
-                return new PyBytes(new byte[0]);
-            }
-            Object x = args[0];
+        Py.BYTES_TYPE.factory = (t, args, kw) -> args.length == 0 ? new PyBytes(new byte[0]) : fromOne(t, args[0]);
+        Py.BYTES_TYPE.unary = x -> fromOne(Py.BYTES_TYPE, x);
+    }
+
+    /// `t(x)` for bytes or a subclass `t`.
+    static Object fromOne(PyType t, Object x) {
+        {
             if (x instanceof String) {
                 return new PyBytes(Utf8.encode(((String) x)));
             }
             if (Py.isInt(x)) {
                 return new PyBytes(new byte[(int) Py.asLong(x)]);
             }
-            if (x instanceof PyBytes && t == Py.BYTES_TYPE) {
+            if (x instanceof PyBytes && t == Py.BYTES_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
                 // bytes(b) is b: it cannot change. Hashing and I/O code calls
                 // this on every buffer it is handed.
                 return x;
@@ -407,7 +405,7 @@ public final class PyBytes extends PyObject {
                 r[i] = (byte) v;
             }
             return new PyBytes(r);
-        };
+        }
     }
 
     private static boolean isUpper(int c) {
@@ -487,8 +485,8 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(out);
         }));
-        t.define("isascii", PyBuiltin.method(t, "isascii", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("isascii", PyBuiltin.method1(t, "isascii", a0 -> {
+            byte[] v = self(a0).value;
             for (byte e : v) {
                 if (e < 0) {
                     return Py.FALSE;
@@ -496,10 +494,10 @@ public final class PyBytes extends PyObject {
             }
             return Py.TRUE;
         }));
-        t.define("islower", PyBuiltin.method(t, "islower", a -> Py.bool(cased(self(a[0]).value, false))));
-        t.define("isupper", PyBuiltin.method(t, "isupper", a -> Py.bool(cased(self(a[0]).value, true))));
-        t.define("istitle", PyBuiltin.method(t, "istitle", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("islower", PyBuiltin.method1(t, "islower", a0 -> Py.bool(cased(self(a0).value, false))));
+        t.define("isupper", PyBuiltin.method1(t, "isupper", a0 -> Py.bool(cased(self(a0).value, true))));
+        t.define("istitle", PyBuiltin.method1(t, "istitle", a0 -> {
+            byte[] v = self(a0).value;
             boolean cased = false;
             boolean prevCased = false;
             for (byte e : v) {
@@ -522,8 +520,8 @@ public final class PyBytes extends PyObject {
             }
             return Py.bool(cased);
         }));
-        t.define("swapcase", PyBuiltin.method(t, "swapcase", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("swapcase", PyBuiltin.method1(t, "swapcase", a0 -> {
+            byte[] v = self(a0).value;
             byte[] r = new byte[v.length];
             for (int i = 0; i < v.length; i++) {
                 int c = v[i] & 0xff;
@@ -531,8 +529,8 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(r);
         }));
-        t.define("capitalize", PyBuiltin.method(t, "capitalize", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("capitalize", PyBuiltin.method1(t, "capitalize", a0 -> {
+            byte[] v = self(a0).value;
             byte[] r = new byte[v.length];
             for (int i = 0; i < v.length; i++) {
                 int c = v[i] & 0xff;
@@ -544,8 +542,8 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(r);
         }));
-        t.define("title", PyBuiltin.method(t, "title", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("title", PyBuiltin.method1(t, "title", a0 -> {
+            byte[] v = self(a0).value;
             byte[] r = new byte[v.length];
             boolean prevCased = false;
             for (int i = 0; i < v.length; i++) {

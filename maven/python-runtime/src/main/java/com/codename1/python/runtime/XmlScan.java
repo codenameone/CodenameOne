@@ -37,17 +37,14 @@ final class XmlScan {
 
     static PyModule module() {
         PyModule m = new PyModule("_cn1xml", new String[0]);
-        m.setAttr("scan_start", PyBuiltin.positional("scan_start",
-                a -> scanStart(Typed.asStr(a[0]), (int) Typed.toLong(a[1]))));
-        m.setAttr("run", PyBuiltin.positional("run",
-                a -> Long.valueOf(ExpatRun.run(a[0], Typed.asStr(a[1]), (int) Typed.toLong(a[2])))));
-        m.setAttr("iter", PyBuiltin.positional("iter", a -> new ElementIter(a[0], a[1])));
-        m.setAttr("find", PyBuiltin.positional("find", a -> children(a[0], a[1], false)));
-        m.setAttr("findall", PyBuiltin.positional("findall", a -> children(a[0], a[1], true)));
+        m.setAttr("scan_start", PyBuiltin.fixed2("scan_start", (a0, a1) -> scanStart(Typed.asStr(a0), (int) Typed.toLong(a1))));
+        m.setAttr("run", PyBuiltin.fixed3("run", (a0, a1, a2) -> Long.valueOf(ExpatRun.run(a0, Typed.asStr(a1), (int) Typed.toLong(a2)))));
+        m.setAttr("iter", PyBuiltin.fixed2("iter", (a0, a1) -> new ElementIter(a0, a1)));
+        m.setAttr("find", PyBuiltin.fixed2("find", (a0, a1) -> children(a0, a1, false)));
+        m.setAttr("findall", PyBuiltin.fixed2("findall", (a0, a1) -> children(a0, a1, true)));
         m.setAttr("build", PyBuiltin.positional("build",
                 a -> new Builder(Typed.asStr(a[0]), a[1], Py.isTrue(a[2]), a.length > 3 ? a[3] : null).build()));
-        m.setAttr("scan_end", PyBuiltin.positional("scan_end",
-                a -> scanEnd(Typed.asStr(a[0]), (int) Typed.toLong(a[1]))));
+        m.setAttr("scan_end", PyBuiltin.fixed2("scan_end", (a0, a1) -> scanEnd(Typed.asStr(a0), (int) Typed.toLong(a1))));
         return m;
     }
 

@@ -65,19 +65,19 @@ final class PyZlib {
             }
             return new PyJavaObject(z);
         }));
-        m.setAttr("deflate", PyBuiltin.positional("deflate", a -> {
-            ZStream z = stream(a[0]);
-            byte[] in = PyBytes.like(a[1]);
-            int flush = (int) Py.asLong(a[2]);
+        m.setAttr("deflate", PyBuiltin.fixed3("deflate", (a0, a1, a2) -> {
+            ZStream z = stream(a0);
+            byte[] in = PyBytes.like(a1);
+            int flush = (int) Py.asLong(a2);
             return new PyBytes(deflate(z, in, flush));
         }));
-        m.setAttr("inflate_new", PyBuiltin.positional("inflate_new", a -> {
+        m.setAttr("inflate_new", PyBuiltin.fixed2("inflate_new", (a0, a1) -> {
             ZStream z = new ZStream();
-            int err = z.inflateInit((int) Py.asLong(a[0]));
+            int err = z.inflateInit((int) Py.asLong(a0));
             if (err != JZlib.Z_OK) {
                 throw Py.error(Py.VALUE_ERROR, "Invalid initialization option");
             }
-            return new PyJavaObject(new InflateState(z, a[1] == Py.NONE ? null : PyBytes.like(a[1]))); //NOPMD CompareObjectsWithEquals - identity is meant
+            return new PyJavaObject(new InflateState(z, a1 == Py.NONE ? null : PyBytes.like(a1))); //NOPMD CompareObjectsWithEquals - identity is meant
         }));
         m.setAttr("inflate", PyBuiltin.positional("inflate", a -> {
             InflateState s = inflateState(a[0]);
@@ -85,8 +85,8 @@ final class PyZlib {
             long max = Py.asLong(a[2]);
             return s.inflate(in, max <= 0 ? Long.MAX_VALUE : max, Py.isTrue(a[3]));
         }));
-        m.setAttr("end", PyBuiltin.positional("end", a -> {
-            Object v = a[0] instanceof PyJavaObject ? ((PyJavaObject) a[0]).value : null;
+        m.setAttr("end", PyBuiltin.fixed1("end", a0 -> {
+            Object v = a0 instanceof PyJavaObject ? ((PyJavaObject) a0).value : null;
             if (v instanceof ZStream) {
                 ((ZStream) v).deflateEnd();
             } else if (v instanceof InflateState) {
@@ -94,17 +94,17 @@ final class PyZlib {
             }
             return Py.NONE;
         }));
-        m.setAttr("crc32", PyBuiltin.positional("crc32", a -> {
-            byte[] b = PyBytes.like(a[0]);
+        m.setAttr("crc32", PyBuiltin.fixed2("crc32", (a0, a1) -> {
+            byte[] b = PyBytes.like(a0);
             CRC32 c = new CRC32();
-            c.reset(Py.asLong(a[1]) & 0xffffffffL);
+            c.reset(Py.asLong(a1) & 0xffffffffL);
             c.update(b, 0, b.length);
             return PyInt.of(c.getValue() & 0xffffffffL);
         }));
-        m.setAttr("adler32", PyBuiltin.positional("adler32", a -> {
-            byte[] b = PyBytes.like(a[0]);
+        m.setAttr("adler32", PyBuiltin.fixed2("adler32", (a0, a1) -> {
+            byte[] b = PyBytes.like(a0);
             Adler32 c = new Adler32();
-            c.reset(Py.asLong(a[1]) & 0xffffffffL);
+            c.reset(Py.asLong(a1) & 0xffffffffL);
             c.update(b, 0, b.length);
             return PyInt.of(c.getValue() & 0xffffffffL);
         }));

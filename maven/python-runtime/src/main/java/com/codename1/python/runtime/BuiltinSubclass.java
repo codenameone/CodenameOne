@@ -136,12 +136,12 @@ final class BuiltinSubclass {
         binary(t, "__contains__", (s, x) -> Py.bool(s.contains(x)));
         binary(t, "__getitem__", PyObject::getItem);
         if (t == Py.LIST_TYPE || t == Py.DICT_TYPE || t == Py.BYTEARRAY_TYPE || t == Py.MEMORYVIEW_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
-            t.define("__setitem__", PyBuiltin.method(t, "__setitem__", a -> {
-                Py.obj(a[0]).setItem(a[1], a[2]);
+            t.define("__setitem__", PyBuiltin.method3(t, "__setitem__", (a0, a1, a2) -> {
+                Py.obj(a0).setItem(a1, a2);
                 return Py.NONE;
             }));
-            t.define("__delitem__", PyBuiltin.method(t, "__delitem__", a -> {
-                Py.obj(a[0]).delItem(a[1]);
+            t.define("__delitem__", PyBuiltin.method2(t, "__delitem__", (a0, a1) -> {
+                Py.obj(a0).delItem(a1);
                 return Py.NONE;
             }));
         }

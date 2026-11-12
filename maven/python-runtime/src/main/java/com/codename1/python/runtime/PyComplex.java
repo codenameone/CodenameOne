@@ -245,12 +245,12 @@ public final class PyComplex extends PyObject {
 
     static void install() {
         PyType t = Py.COMPLEX_TYPE;
-        t.define("conjugate", PyBuiltin.method(t, "conjugate", a -> {
-            PyComplex c = self(a[0]);
+        t.define("conjugate", PyBuiltin.method1(t, "conjugate", a0 -> {
+            PyComplex c = self(a0);
             return new PyComplex(c.real, -c.imag);
         }));
-        t.define("__abs__", PyBuiltin.method(t, "__abs__", a -> Py.ofFloat(abs(self(a[0])))));
-        t.define("__complex__", PyBuiltin.method(t, "__complex__", a -> self(a[0])));
+        t.define("__abs__", PyBuiltin.method1(t, "__abs__", a0 -> Py.ofFloat(abs(self(a0)))));
+        t.define("__complex__", PyBuiltin.method1(t, "__complex__", a0 -> self(a0)));
         t.factory = (type, args, kw) -> {
             Args p = new Args("complex", args, kw).check(2, "real", "imag");
             Object re = p.get(0, "real", null);

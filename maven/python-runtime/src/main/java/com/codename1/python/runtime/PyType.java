@@ -50,6 +50,11 @@ public final class PyType extends PyObject {
         Object create(Object x);
     }
 
+    /// [Unary] for two positional arguments: `int(s, 16)`, `str(b, "utf-8")`.
+    interface Binary {
+        Object create(Object x, Object y);
+    }
+
     public String name;
     public final PyType[] bases;
     final PyType[] mro;
@@ -95,6 +100,7 @@ public final class PyType extends PyObject {
     /// Set only on the builtin type itself, never inherited: a subclass of
     /// `str` constructs through `__new__`/`__init__` as usual.
     Unary unary;
+    Binary binary;
     /// The builtin type whose storage instances of this class extend, or `null`.
     final PyType solidBase;
     /// The class's metaclass: `type`, or a subclass of it (null while `type`
@@ -984,6 +990,9 @@ public final class PyType extends PyObject {
 
     @Override
     public Object call2(Object a, Object b) {
+        if (binary != null) {
+            return binary.create(a, b);
+        }
         Object o = positionalNew(2, a, b, null, null, null);
         return o != null ? o : super.call2(a, b);
     }

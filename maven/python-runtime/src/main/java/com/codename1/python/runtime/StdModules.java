@@ -387,9 +387,8 @@ public final class StdModules {
     /// lookup, not a search of a path.
     private static PyModule imp() {
         PyModule m = new PyModule("_cn1imp", new String[0]);
-        m.setAttr("load", PyBuiltin.positional("load", a -> PyModule.load(Py.toStr(a[0]))));
-        m.setAttr("available", PyBuiltin.positional("available",
-                a -> PyModule.available(Py.toStr(a[0])) ? Py.TRUE : Py.FALSE));
+        m.setAttr("load", PyBuiltin.fixed1("load", a0 -> PyModule.load(Py.toStr(a0))));
+        m.setAttr("available", PyBuiltin.fixed1("available", a0 -> PyModule.available(Py.toStr(a0)) ? Py.TRUE : Py.FALSE));
         return m;
     }
 
@@ -408,9 +407,9 @@ public final class StdModules {
             EXIT_KW.add(kwNames);
             return args[0];
         }));
-        m.setAttr("unregister", PyBuiltin.positional("unregister", a -> {
+        m.setAttr("unregister", PyBuiltin.fixed1("unregister", a0 -> {
             for (int i = EXIT_CALLS.size() - 1; i >= 0; i--) {
-                if (Py.isTrue(Py.eq(EXIT_CALLS.get(i)[0], a[0]))) {
+                if (Py.isTrue(Py.eq(EXIT_CALLS.get(i)[0], a0))) {
                     EXIT_CALLS.remove(i);
                     EXIT_KW.remove(i);
                 }
@@ -444,8 +443,7 @@ public final class StdModules {
         }
         m.setAttr("ref", t);
         m.setAttr("ReferenceType", t);
-        m.setAttr("referenceable", PyBuiltin.positional("referenceable",
-                a -> Py.bool(PyWeakRef.referenceable(a[0]))));
+        m.setAttr("referenceable", PyBuiltin.fixed1("referenceable", a0 -> Py.bool(PyWeakRef.referenceable(a0))));
         return m;
     }
 
@@ -660,8 +658,8 @@ public final class StdModules {
             }
             return d;
         }));
-        m.setAttr("getenv", PyBuiltin.positional("getenv", a -> {
-            String v = System.getenv(Py.toStr(a[0]));
+        m.setAttr("getenv", PyBuiltin.fixed1("getenv", a0 -> {
+            String v = System.getenv(Py.toStr(a0));
             return v == null ? Py.NONE : Py.str(v);
         }));
         return m;
@@ -684,8 +682,8 @@ public final class StdModules {
         PyModule m = new PyModule(moduleName, new String[0]);
         if (server) {
             m.setAttr("available", PyBuiltin.positional("available", a -> Py.bool(PyDb.get() != null)));
-            m.setAttr("dialect", PyBuiltin.positional("dialect", a -> {
-                PySql.Connection c = sqlConnection(a[0]);
+            m.setAttr("dialect", PyBuiltin.fixed1("dialect", a0 -> {
+                PySql.Connection c = sqlConnection(a0);
                 return Py.str(c instanceof PyDb.Connection ? ((PyDb.Connection) c).dialect() : "sqlite");
             }));
         }
@@ -980,7 +978,7 @@ public final class StdModules {
             sqliteAdaptersSize = -1;
             return Py.NONE;
         }));
-        m.setAttr("scan", PyBuiltin.positional("scan", a -> sqliteScan(Py.toStr(a[0]), Py.isTrue(a[1]))));
+        m.setAttr("scan", PyBuiltin.fixed2("scan", (a0, a1) -> sqliteScan(Py.toStr(a0), Py.isTrue(a1))));
         m.setAttr("plan", PyBuiltin.positional("plan", a -> {
             if (SQLITE_PLANS.size() >= SQLITE_PLANS_MAX) {
                 SQLITE_PLANS.clear();
@@ -1394,15 +1392,15 @@ public final class StdModules {
             return Py.NONE;
         }));
         m.setAttr("allocate_lock", PyBuiltin.positional("allocate_lock", a -> new PyJavaObject(new PyLock())));
-        m.setAttr("lock_acquire", PyBuiltin.positional("lock_acquire", a -> {
-            double timeout = a[2] == Py.NONE ? -1 : Py.asDouble(a[2]); //NOPMD CompareObjectsWithEquals - identity is meant
-            return Py.bool(lock(a[0]).acquire(Py.isTrue(a[1]), timeout < 0 ? -1 : (long) (timeout * 1000)));
+        m.setAttr("lock_acquire", PyBuiltin.fixed3("lock_acquire", (a0, a1, a2) -> {
+            double timeout = a2 == Py.NONE ? -1 : Py.asDouble(a2); //NOPMD CompareObjectsWithEquals - identity is meant
+            return Py.bool(lock(a0).acquire(Py.isTrue(a1), timeout < 0 ? -1 : (long) (timeout * 1000)));
         }));
-        m.setAttr("lock_release", PyBuiltin.positional("lock_release", a -> {
-            lock(a[0]).release();
+        m.setAttr("lock_release", PyBuiltin.fixed1("lock_release", a0 -> {
+            lock(a0).release();
             return Py.NONE;
         }));
-        m.setAttr("lock_locked", PyBuiltin.positional("lock_locked", a -> Py.bool(lock(a[0]).locked())));
+        m.setAttr("lock_locked", PyBuiltin.fixed1("lock_locked", a0 -> Py.bool(lock(a0).locked())));
         m.setAttr("get_ident", PyBuiltin.positional("get_ident", a -> PyInt.of(threadIdent())));
         return m;
     }
@@ -1485,10 +1483,8 @@ public final class StdModules {
         fn1(m, "fabs", Math::abs);
         fn1(m, "degrees", Math::toDegrees);
         fn1(m, "radians", Math::toRadians);
-        m.setAttr("atan2", PyBuiltin.positional("atan2",
-                a -> Py.ofFloat(com.codename1.util.MathUtil.atan2(Py.asDouble(a[0]), Py.asDouble(a[1])))));
-        m.setAttr("pow", PyBuiltin.positional("pow",
-                a -> Py.ofFloat(com.codename1.util.MathUtil.pow(Py.asDouble(a[0]), Py.asDouble(a[1])))));
+        m.setAttr("atan2", PyBuiltin.fixed2("atan2", (a0, a1) -> Py.ofFloat(com.codename1.util.MathUtil.atan2(Py.asDouble(a0), Py.asDouble(a1)))));
+        m.setAttr("pow", PyBuiltin.fixed2("pow", (a0, a1) -> Py.ofFloat(com.codename1.util.MathUtil.pow(Py.asDouble(a0), Py.asDouble(a1)))));
         m.setAttr("hypot", PyBuiltin.positional("hypot", a -> {
             double s = 0;
             for (int i = 0; i < a.length; i++) {
@@ -1509,25 +1505,24 @@ public final class StdModules {
             return Py.ofFloat(r);
         }));
         fn1(m, "log10", PyMath::log10);
-        m.setAttr("log2", PyBuiltin.positional("log2",
-                a -> Py.ofFloat(com.codename1.util.MathUtil.log(Py.asDouble(a[0])) / com.codename1.util.MathUtil.log(2))));
-        m.setAttr("floor", PyBuiltin.positional("floor", a -> a[0] instanceof PyInt ? a[0]
-                : Builtins.toInt(Py.ofFloat(Math.floor(Py.asDouble(a[0]))))));
-        m.setAttr("ceil", PyBuiltin.positional("ceil", a -> a[0] instanceof PyInt ? a[0]
-                : Builtins.toInt(Py.ofFloat(Math.ceil(Py.asDouble(a[0]))))));
-        m.setAttr("trunc", PyBuiltin.positional("trunc", a -> Builtins.toInt(a[0])));
-        m.setAttr("isnan", PyBuiltin.positional("isnan", a -> Py.bool(Double.isNaN(Py.asDouble(a[0])))));
-        m.setAttr("isinf", PyBuiltin.positional("isinf", a -> Py.bool(Double.isInfinite(Py.asDouble(a[0])))));
-        m.setAttr("isfinite", PyBuiltin.positional("isfinite", a -> {
-            double d = Py.asDouble(a[0]);
+        m.setAttr("log2", PyBuiltin.fixed1("log2", a0 -> Py.ofFloat(com.codename1.util.MathUtil.log(Py.asDouble(a0)) / com.codename1.util.MathUtil.log(2))));
+        m.setAttr("floor", PyBuiltin.fixed1("floor", a0 -> a0 instanceof PyInt ? a0
+                : Builtins.toInt(Py.ofFloat(Math.floor(Py.asDouble(a0))))));
+        m.setAttr("ceil", PyBuiltin.fixed1("ceil", a0 -> a0 instanceof PyInt ? a0
+                : Builtins.toInt(Py.ofFloat(Math.ceil(Py.asDouble(a0))))));
+        m.setAttr("trunc", PyBuiltin.fixed1("trunc", a0 -> Builtins.toInt(a0)));
+        m.setAttr("isnan", PyBuiltin.fixed1("isnan", a0 -> Py.bool(Double.isNaN(Py.asDouble(a0)))));
+        m.setAttr("isinf", PyBuiltin.fixed1("isinf", a0 -> Py.bool(Double.isInfinite(Py.asDouble(a0)))));
+        m.setAttr("isfinite", PyBuiltin.fixed1("isfinite", a0 -> {
+            double d = Py.asDouble(a0);
             return Py.bool(!Double.isNaN(d) && !Double.isInfinite(d));
         }));
-        m.setAttr("copysign", PyBuiltin.positional("copysign", a -> {
-            double x = Math.abs(Py.asDouble(a[0]));
-            double s = Py.asDouble(a[1]);
+        m.setAttr("copysign", PyBuiltin.fixed2("copysign", (a0, a1) -> {
+            double x = Math.abs(Py.asDouble(a0));
+            double s = Py.asDouble(a1);
             return Py.ofFloat(s < 0 || s == 0 && 1 / s < 0 ? -x : x);
         }));
-        m.setAttr("fmod", PyBuiltin.positional("fmod", a -> Py.ofFloat(PyMath.fmod(Py.asDouble(a[0]), Py.asDouble(a[1])))));
+        m.setAttr("fmod", PyBuiltin.fixed2("fmod", (a0, a1) -> Py.ofFloat(PyMath.fmod(Py.asDouble(a0), Py.asDouble(a1)))));
         m.setAttr("gcd", PyBuiltin.positional("gcd", a -> {
             com.codename1.util.BigInteger g = com.codename1.util.BigInteger.ZERO;
             for (int i = 0; i < a.length; i++) {
@@ -1535,8 +1530,8 @@ public final class StdModules {
             }
             return PyInt.of(g);
         }));
-        m.setAttr("factorial", PyBuiltin.positional("factorial", a -> {
-            long n = Py.asLong(a[0]);
+        m.setAttr("factorial", PyBuiltin.fixed1("factorial", a0 -> {
+            long n = Py.asLong(a0);
             if (n < 0) {
                 throw Py.valueError("factorial() not defined for negative values");
             }
@@ -1546,8 +1541,8 @@ public final class StdModules {
             }
             return r;
         }));
-        m.setAttr("isqrt", PyBuiltin.positional("isqrt", a -> {
-            com.codename1.util.BigInteger n = Py.intView(Builtins.toInt(a[0])).toBig();
+        m.setAttr("isqrt", PyBuiltin.fixed1("isqrt", a0 -> {
+            com.codename1.util.BigInteger n = Py.intView(Builtins.toInt(a0)).toBig();
             if (n.signum() < 0) {
                 throw Py.valueError("isqrt() argument must be nonnegative");
             }
@@ -1563,18 +1558,18 @@ public final class StdModules {
                 x = y;
             }
         }));
-        m.setAttr("fsum", PyBuiltin.positional("fsum", a -> Py.obj(Builtins.SUM).call(new Object[] {a[0], Py.ofFloat(0)}, Py.NO_KW)));
-        m.setAttr("prod", PyBuiltin.positional("prod", a -> {
+        m.setAttr("fsum", PyBuiltin.fixed1("fsum", a0 -> Py.obj(Builtins.SUM).call(new Object[] {a0, Py.ofFloat(0)}, Py.NO_KW)));
+        m.setAttr("prod", PyBuiltin.fixed1("prod", a0 -> {
             Object r = PyInt.of(1);
-            Object it = Py.iter(a[0]);
+            Object it = Py.iter(a0);
             for (Object v = Py.next(it); v != null; v = Py.next(it)) {
                 r = Py.mul(r, v);
             }
             return r;
         }));
-        m.setAttr("comb", PyBuiltin.positional("comb", a -> {
-            long n = Py.asLong(a[0]);
-            long k = Py.asLong(a[1]);
+        m.setAttr("comb", PyBuiltin.fixed2("comb", (a0, a1) -> {
+            long n = Py.asLong(a0);
+            long k = Py.asLong(a1);
             if (k < 0 || k > n) {
                 return PyInt.of(0);
             }
@@ -1642,8 +1637,8 @@ public final class StdModules {
         // the deep input processed in full instead.
         final Object[] limit = {PyInt.of(1000)};
         m.setAttr("getrecursionlimit", PyBuiltin.positional("getrecursionlimit", a -> limit[0]));
-        m.setAttr("setrecursionlimit", PyBuiltin.positional("setrecursionlimit", a -> {
-            limit[0] = a[0];
+        m.setAttr("setrecursionlimit", PyBuiltin.fixed1("setrecursionlimit", a0 -> {
+            limit[0] = a0;
             return Py.NONE;
         }));
         m.setAttr("exception", PyBuiltin.positional("exception", a -> Py.handling()));
@@ -1654,7 +1649,7 @@ public final class StdModules {
             }
             return PyTuple.of(Py.typeOf(e), e, Py.NONE);
         }));
-        m.setAttr("intern", PyBuiltin.positional("intern", a -> a[0]));
+        m.setAttr("intern", PyBuiltin.fixed1("intern", a0 -> a0));
         m.setAttr("exit", PyBuiltin.positional("exit", a -> {
             throw new PyException(Py.SYSTEM_EXIT.call(a, Py.NO_KW));
         }));
@@ -1662,9 +1657,9 @@ public final class StdModules {
             @Override
             public Object getAttrOrNull(String name) {
                 if ("write".equals(name)) {
-                    return PyBuiltin.positional("write", a -> {
-                        Builtins.writeOut(Py.toStr(a[0]));
-                        return PyInt.of(Py.len(a[0]));
+                    return PyBuiltin.fixed1("write", a0 -> {
+                        Builtins.writeOut(Py.toStr(a0));
+                        return PyInt.of(Py.len(a0));
                     });
                 }
                 if ("flush".equals(name)) {
@@ -1677,9 +1672,9 @@ public final class StdModules {
             @Override
             public Object getAttrOrNull(String name) {
                 if ("write".equals(name)) {
-                    return PyBuiltin.positional("write", a -> {
-                        System.err.print(Py.toStr(a[0]));
-                        return PyInt.of(Py.len(a[0]));
+                    return PyBuiltin.fixed1("write", a0 -> {
+                        System.err.print(Py.toStr(a0));
+                        return PyInt.of(Py.len(a0));
                     });
                 }
                 if ("flush".equals(name)) {
@@ -1713,7 +1708,7 @@ public final class StdModules {
 
     private static PyModule time() {
         PyModule m = new PyModule("_time", new String[0]);
-        m.setAttr("utcoffset", PyBuiltin.positional("utcoffset", a -> PyInt.of(utcOffset(Py.asDouble(a[0])))));
+        m.setAttr("utcoffset", PyBuiltin.fixed1("utcoffset", a0 -> PyInt.of(utcOffset(Py.asDouble(a0)))));
         m.setAttr("tzname", PyBuiltin.positional("tzname", a -> Py.str(java.util.TimeZone.getDefault().getID())));
         m.setAttr("time", PyBuiltin.positional("time", a -> Py.ofFloat(System.currentTimeMillis() / 1000.0)));
         m.setAttr("time_ns", PyBuiltin.positional("time_ns", a -> PyInt.of(System.currentTimeMillis() * 1000000L)));

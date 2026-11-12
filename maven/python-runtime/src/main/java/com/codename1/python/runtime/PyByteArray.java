@@ -317,24 +317,24 @@ public final class PyByteArray extends PyObject {
                 return toArray(Py.obj(Py.BYTES_TYPE.lookup(name)).call(mapped, kw));
             }));
         }
-        t.define("append", PyBuiltin.method(t, "append", a -> {
-            PyByteArray b = self(a[0]);
-            b.insertAt(b.size, new byte[] {byteOf(a[1])});
+        t.define("append", PyBuiltin.method2(t, "append", (a0, a1) -> {
+            PyByteArray b = self(a0);
+            b.insertAt(b.size, new byte[] {byteOf(a1)});
             return Py.NONE;
         }));
-        t.define("extend", PyBuiltin.method(t, "extend", a -> {
-            PyByteArray b = self(a[0]);
-            byte[] src = PyBytes.like(a[1]);
-            b.insertAt(b.size, src != null ? src : PyBytes.fromInts(a[1]));
+        t.define("extend", PyBuiltin.method2(t, "extend", (a0, a1) -> {
+            PyByteArray b = self(a0);
+            byte[] src = PyBytes.like(a1);
+            b.insertAt(b.size, src != null ? src : PyBytes.fromInts(a1));
             return Py.NONE;
         }));
-        t.define("insert", PyBuiltin.method(t, "insert", a -> {
-            PyByteArray b = self(a[0]);
-            long i = Py.index(a[1]);
+        t.define("insert", PyBuiltin.method3(t, "insert", (a0, a1, a2) -> {
+            PyByteArray b = self(a0);
+            long i = Py.index(a1);
             if (i < 0) {
                 i = Math.max(0, i + b.size);
             }
-            b.insertAt((int) Math.min(i, b.size), new byte[] {byteOf(a[2])});
+            b.insertAt((int) Math.min(i, b.size), new byte[] {byteOf(a2)});
             return Py.NONE;
         }));
         t.define("pop", PyBuiltin.method(t, "pop", a -> {
@@ -347,9 +347,9 @@ public final class PyByteArray extends PyObject {
             b.removeRange(i, i + 1);
             return PyInt.of(v);
         }));
-        t.define("remove", PyBuiltin.method(t, "remove", a -> {
-            PyByteArray b = self(a[0]);
-            byte v = byteOf(a[1]);
+        t.define("remove", PyBuiltin.method2(t, "remove", (a0, a1) -> {
+            PyByteArray b = self(a0);
+            byte v = byteOf(a1);
             for (int i = 0; i < b.size; i++) {
                 if (b.buf[i] == v) {
                     b.removeRange(i, i + 1);
@@ -358,12 +358,12 @@ public final class PyByteArray extends PyObject {
             }
             throw Py.valueError("value not found in bytearray");
         }));
-        t.define("clear", PyBuiltin.method(t, "clear", a -> {
-            self(a[0]).size = 0;
+        t.define("clear", PyBuiltin.method1(t, "clear", a0 -> {
+            self(a0).size = 0;
             return Py.NONE;
         }));
-        t.define("reverse", PyBuiltin.method(t, "reverse", a -> {
-            PyByteArray b = self(a[0]);
+        t.define("reverse", PyBuiltin.method1(t, "reverse", a0 -> {
+            PyByteArray b = self(a0);
             for (int i = 0, j = b.size - 1; i < j; i++, j--) {
                 byte x = b.buf[i];
                 b.buf[i] = b.buf[j];
@@ -371,12 +371,22 @@ public final class PyByteArray extends PyObject {
             }
             return Py.NONE;
         }));
-        t.define("copy", PyBuiltin.method(t, "copy", a -> new PyByteArray(self(a[0]).bytes())));
+        t.define("copy", PyBuiltin.method1(t, "copy", a0 -> new PyByteArray(self(a0).bytes())));
         t.define("maketrans", Py.BYTES_TYPE.lookup("maketrans"));
-        t.define("fromhex", new PyClassMethod(PyBuiltin.positional("fromhex", a -> {
+        t.define("fromhex", new PyClassMethod(PyBuiltin.fixed2("fromhex", (a0, a1) -> {
             Object b = Py.obj(Py.BYTES_TYPE.lookup("fromhex")).bind(Py.BYTES_TYPE);
-            return new PyByteArray(((PyBytes) Py.call(b, a[1])).value);
+            return new PyByteArray(((PyBytes) Py.call(b, a1)).value);
         })));
+        t.unary = x -> {
+            if (x instanceof String || x instanceof PyStr) {
+                throw Py.typeError("string argument without an encoding");
+            }
+            Object b = PyBytes.fromOne(Py.BYTES_TYPE, x);
+            if (!(b instanceof PyBytes)) {
+                throw Py.typeError("cannot convert '" + Py.typeOf(x).name + "' object to bytearray");
+            }
+            return new PyByteArray(((PyBytes) b).bytes());
+        };
         t.factory = (type, args, kw) -> {
             if (args.length == 0) {
                 return new PyByteArray(new byte[0]);

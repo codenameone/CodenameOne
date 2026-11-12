@@ -463,8 +463,8 @@ final class MathFunctions {
         fn(m, "erfc", Erf::erfc);
         fn(m, "gamma", MathFunctions::gamma, "expected a noninteger or positive integer, got %s");
         fn(m, "lgamma", MathFunctions::lgamma, "expected a noninteger or positive integer, got %s");
-        m.setAttr("frexp", PyBuiltin.positional("frexp", a -> {
-            double x = Py.asDouble(a[0]);
+        m.setAttr("frexp", PyBuiltin.fixed1("frexp", a0 -> {
+            double x = Py.asDouble(a0);
             if (x == 0 || Double.isNaN(x) || Double.isInfinite(x)) {
                 return new PyTuple(new Object[] {Py.ofFloat(x), PyInt.of(0)});
             }
@@ -486,12 +486,12 @@ final class MathFunctions {
             double mant = Double.longBitsToDouble((bits & 0x800fffffffffffffL) | (1022L << 52));
             return new PyTuple(new Object[] {Py.ofFloat(x < 0 ? -mant : mant), PyInt.of(e)});
         }));
-        m.setAttr("ldexp", PyBuiltin.positional("ldexp", a -> {
-            if (!Py.isInt(a[1])) {
+        m.setAttr("ldexp", PyBuiltin.fixed2("ldexp", (a0, a1) -> {
+            if (!Py.isInt(a1)) {
                 throw Py.typeError("Expected an int as second argument to ldexp.");
             }
-            double x = Py.asDouble(a[0]);
-            Object e = a[1];
+            double x = Py.asDouble(a0);
+            Object e = a1;
             long n;
             com.codename1.util.BigInteger big = Py.intView(e).toBig();
             if (big.bitLength() > 62) {
@@ -505,8 +505,8 @@ final class MathFunctions {
             }
             return Py.ofFloat(r);
         }));
-        m.setAttr("modf", PyBuiltin.positional("modf", a -> {
-            double x = Py.asDouble(a[0]);
+        m.setAttr("modf", PyBuiltin.fixed1("modf", a0 -> {
+            double x = Py.asDouble(a0);
             if (Double.isInfinite(x)) {
                 return new PyTuple(new Object[] {Py.ofFloat(x > 0 ? 0.0 : -0.0), Py.ofFloat(x)});
             }
@@ -517,14 +517,14 @@ final class MathFunctions {
             }
             return new PyTuple(new Object[] {Py.ofFloat(fp), Py.ofFloat(ip)});
         }));
-        m.setAttr("fma", PyBuiltin.positional("fma", a -> {
+        m.setAttr("fma", PyBuiltin.fixed3("fma", (a0, a1, a2) -> {
             // Not fused: device class libraries have no exact fma.
-            double r = Py.asDouble(a[0]) * Py.asDouble(a[1]) + Py.asDouble(a[2]);
+            double r = Py.asDouble(a0) * Py.asDouble(a1) + Py.asDouble(a2);
             return Py.ofFloat(r);
         }));
-        m.setAttr("remainder", PyBuiltin.positional("remainder", a -> {
-            double x = Py.asDouble(a[0]);
-            double y = Py.asDouble(a[1]);
+        m.setAttr("remainder", PyBuiltin.fixed2("remainder", (a0, a1) -> {
+            double x = Py.asDouble(a0);
+            double y = Py.asDouble(a1);
             double r = remainder(x, y);
             if (Double.isNaN(r) && !Double.isNaN(x) && !Double.isNaN(y)) {
                 throw Py.valueError("math domain error");
@@ -555,9 +555,9 @@ final class MathFunctions {
             return Py.ofFloat(y > x ? nextUp(x) : nextDown(x));
         }));
         fn(m, "ulp", MathFunctions::ulp);
-        m.setAttr("dist", PyBuiltin.positional("dist", a -> {
-            Object[] p = Py.toArray(a[0]);
-            Object[] q = Py.toArray(a[1]);
+        m.setAttr("dist", PyBuiltin.fixed2("dist", (a0, a1) -> {
+            Object[] p = Py.toArray(a0);
+            Object[] q = Py.toArray(a1);
             if (p.length != q.length) {
                 throw Py.valueError("both points must have the same number of dimensions");
             }
@@ -611,9 +611,9 @@ final class MathFunctions {
             }
             return PyInt.of(r);
         }));
-        m.setAttr("sumprod", PyBuiltin.positional("sumprod", a -> {
-            Object[] p = Py.toArray(a[0]);
-            Object[] q = Py.toArray(a[1]);
+        m.setAttr("sumprod", PyBuiltin.fixed2("sumprod", (a0, a1) -> {
+            Object[] p = Py.toArray(a0);
+            Object[] q = Py.toArray(a1);
             if (p.length != q.length) {
                 throw Py.valueError("Inputs are not the same length");
             }

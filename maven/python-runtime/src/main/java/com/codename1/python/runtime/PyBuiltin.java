@@ -59,6 +59,7 @@ public final class PyBuiltin extends PyObject {
     private One one;
     private Two two;
     private Three three;
+    private Four four;
     /// The builtin type a [#method] belongs to; null for a function.
     private final PyType owner;
     /// `__qualname__` where it is not the name: a method made for a class in Python.
@@ -93,6 +94,41 @@ public final class PyBuiltin extends PyObject {
         });
     }
 
+    /// A builtin of exactly `n` arguments, whose fixed-arity call runs
+    /// without an argument array.
+    private static PyBuiltin fixed(final String name, final int n, final Positional p) {
+        return positional(name, a -> {
+            // Too few is an error; extra arguments are ignored, as the array
+            // implementations these replaced ignored them (__exit__).
+            if (a.length < n) {
+                throw Py.typeError(name + " expected " + n + (n == 1 ? " argument" : " arguments") + ", got "
+                        + a.length);
+            }
+            return p.call(a);
+        });
+    }
+
+    /// [#fixed] for one argument.
+    public static PyBuiltin fixed1(final String name, final One f) {
+        PyBuiltin b = fixed(name, 1, a -> f.call(a[0]));
+        b.one = f;
+        return b;
+    }
+
+    /// [#fixed] for two arguments.
+    public static PyBuiltin fixed2(final String name, final Two f) {
+        PyBuiltin b = fixed(name, 2, a -> f.call(a[0], a[1]));
+        b.two = f;
+        return b;
+    }
+
+    /// [#fixed] for three arguments.
+    public static PyBuiltin fixed3(final String name, final Three f) {
+        PyBuiltin b = fixed(name, 3, a -> f.call(a[0], a[1], a[2]));
+        b.three = f;
+        return b;
+    }
+
     /// A builtin of exactly one argument: `len`, `ord`, `repr`.
     public static PyBuiltin unary(final String name, final One f) {
         PyBuiltin b = positional(name, a -> {
@@ -115,6 +151,17 @@ public final class PyBuiltin extends PyObject {
     /// [#with1] for two arguments.
     public PyBuiltin with2(Two f) {
         two = f;
+        return this;
+    }
+
+    /// [One] for four arguments.
+    public interface Four {
+        Object call(Object a, Object b, Object c, Object d);
+    }
+
+    /// [#with1] for four arguments; not for methods of a builtin type.
+    public PyBuiltin with4(Four f) {
+        four = f;
         return this;
     }
 
@@ -160,6 +207,14 @@ public final class PyBuiltin extends PyObject {
         return result(a, s, three.call(s, b, c));
     }
 
+    @Override
+    public Object call4(Object a, Object b, Object c, Object d) {
+        if (four == null || owner != null) {
+            return super.call4(a, b, c, d);
+        }
+        return four.call(a, b, c, d);
+    }
+
     /// [#checkReceiver] and [#unwrap] for the receiver of a fixed-arity
     /// method call: the value the implementation works on.
     private Object receiver(Object self) {
@@ -199,6 +254,33 @@ public final class PyBuiltin extends PyObject {
             }
         }, owner);
         return b;
+    }
+
+    /// A method of builtin type `owner` taking the receiver and `n - 1`
+    /// arguments, whose fixed-arity call runs without an argument array.
+    private static PyBuiltin methodN(final PyType owner, final String name, final int n, final Positional p) {
+        return method(owner, name, a -> {
+            if (a.length < n) {
+                throw Py.typeError(name + "() takes " + (n == 1 ? "no arguments" : "exactly " + (n - 1)
+                        + (n == 2 ? " argument" : " arguments")) + " (" + (a.length - 1) + " given)");
+            }
+            return p.call(a);
+        });
+    }
+
+    /// [#methodN] for the receiver alone.
+    public static PyBuiltin method1(final PyType owner, final String name, final One f) {
+        return methodN(owner, name, 1, a -> f.call(a[0])).with1(f);
+    }
+
+    /// [#methodN] for the receiver and one argument.
+    public static PyBuiltin method2(final PyType owner, final String name, final Two f) {
+        return methodN(owner, name, 2, a -> f.call(a[0], a[1])).with2(f);
+    }
+
+    /// [#methodN] for the receiver and two arguments.
+    public static PyBuiltin method3(final PyType owner, final String name, final Three f) {
+        return methodN(owner, name, 3, a -> f.call(a[0], a[1], a[2])).with3(f);
     }
 
     /// [#method] for an implementation that takes keyword arguments.

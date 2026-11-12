@@ -61,7 +61,7 @@ public final class Builtins {
     });
     /// Marks an optional argument that was not passed.
     private static final Object ABSENT = new PyStr("<absent>");
-    public static final PyBuiltin OBJECT_INIT = PyBuiltin.positional("__init__", a -> Py.NONE);
+    public static final PyBuiltin OBJECT_INIT = PyBuiltin.positional("__init__", a -> Py.NONE).with1(a -> Py.NONE);
 
     public static final Object PRINT = new PyBuiltin("print", (args, kw) -> {
         Args a = new Args("print", args, kw).check(Integer.MAX_VALUE, "sep", "end", "file", "flush");
@@ -93,7 +93,7 @@ public final class Builtins {
 
     public static final Object LEN = PyBuiltin.unary("len", x -> PyInt.of(Py.len(x)));
     /// `object.__hash__`, which the object type reads without defining it.
-    static final Object OBJECT_HASH = PyBuiltin.positional("__hash__", a -> Py.of((long) System.identityHashCode(a[0])));
+    static final Object OBJECT_HASH = PyBuiltin.fixed1("__hash__", a0 -> Py.of((long) System.identityHashCode(a0)));
 
     public static final Object REPR = PyBuiltin.unary("repr", x -> Py.str(Py.toRepr(x)));
     public static final Object ASCII = PyBuiltin.unary("ascii", x -> Py.str(asciiOnly(Py.toRepr(x))));
@@ -120,31 +120,31 @@ public final class Builtins {
     public static final Object OCT = PyBuiltin.unary("oct", x -> Py.str(Formatting.format(x, "#o")));
     public static final Object BIN = PyBuiltin.unary("bin", x -> Py.str(Formatting.format(x, "#b")));
     public static final Object FORMAT = PyBuiltin.positional("format", a -> Py.format(a[0], a.length > 1 ? Py.toStr(a[1]) : ""));
-    public static final Object DIVMOD = PyBuiltin.positional("divmod", a -> PyTuple.of(Py.floordiv(a[0], a[1]), Py.mod(a[0], a[1])));
+    public static final Object DIVMOD = PyBuiltin.fixed2("divmod", (a0, a1) -> PyTuple.of(Py.floordiv(a0, a1), Py.mod(a0, a1)));
     public static final Object POW = PyBuiltin.positional("pow", a -> pow(a));
     public static final Object ROUND = new PyBuiltin("round", (args, kw) -> round(new Args("round", args, kw).check(2, "number", "ndigits")));
     /// What the body of a function the build removed is: it raises, with
     /// the message the build wrote for it.
-    public static final Object CN1_REMOVED = PyBuiltin.positional("__cn1_removed__", a -> {
-        throw Py.runtimeError(String.valueOf(a[0]));
+    public static final Object CN1_REMOVED = PyBuiltin.fixed1("__cn1_removed__", a0 -> {
+        throw Py.runtimeError(String.valueOf(a0));
     });
     /// What the body of a function the build replaced calls: the Java
     /// registered for its name, with the function's own arguments.
     public static final Object CN1_REPLACED = PyBuiltin.positional("__cn1_replaced__", a -> NativeModule.replaced(a));
-    public static final Object ISINSTANCE = PyBuiltin.positional("isinstance", a -> Py.bool(Py.isinstance(a[0], a[1])))
+    public static final Object ISINSTANCE = PyBuiltin.fixed2("isinstance", (a0, a1) -> Py.bool(Py.isinstance(a0, a1)))
             .with2((x, t) -> Py.bool(Py.isinstance(x, t)));
-    public static final Object ISSUBCLASS = PyBuiltin.positional("issubclass", a -> Py.bool(issubclass(a[0], a[1])))
+    public static final Object ISSUBCLASS = PyBuiltin.fixed2("issubclass", (a0, a1) -> Py.bool(issubclass(a0, a1)))
             .with2((x, t) -> Py.bool(issubclass(x, t)));
     public static final Object GETATTR = PyBuiltin.positional("getattr", a -> getattr(a))
             .with2((o, n) -> Py.obj(o).getAttr(Py.toStr(n)))
             .with3(Builtins::getattr3);
-    public static final Object SETATTR = PyBuiltin.positional("setattr", a -> {
-        Py.obj(a[0]).setAttr(Py.toStr(a[1]), a[2]);
+    public static final Object SETATTR = PyBuiltin.fixed3("setattr", (a0, a1, a2) -> {
+        Py.obj(a0).setAttr(Py.toStr(a1), a2);
         return Py.NONE;
     });
-    public static final Object HASATTR = PyBuiltin.positional("hasattr", a -> {
+    public static final Object HASATTR = PyBuiltin.fixed2("hasattr", (a0, a1) -> {
         try {
-            return Py.bool(Py.obj(a[0]).getAttrOrNull(Py.toStr(a[1])) != null);
+            return Py.bool(Py.obj(a0).getAttrOrNull(Py.toStr(a1)) != null);
         } catch (PyException e) {
             if (e.matches(Py.ATTRIBUTE_ERROR)) {
                 return Py.FALSE;
@@ -152,15 +152,35 @@ public final class Builtins {
             throw e;
         }
     });
-    public static final Object DELATTR = PyBuiltin.positional("delattr", a -> {
-        Py.obj(a[0]).delAttr(Py.toStr(a[1]));
+    public static final Object DELATTR = PyBuiltin.fixed2("delattr", (a0, a1) -> {
+        Py.obj(a0).delAttr(Py.toStr(a1));
         return Py.NONE;
     });
     public static final Object VARS = PyBuiltin.unary("vars", x -> Py.obj(x).getAttr("__dict__"));
     public static final Object DIR = PyBuiltin.unary("dir", x -> dir(x));
     public static final Object SUM = new PyBuiltin("sum", (args, kw) -> sum(new Args("sum", args, kw).check(2, "start")));
-    public static final Object MIN = new PyBuiltin("min", (args, kw) -> minMax("min", args, kw, true));
-    public static final Object MAX = new PyBuiltin("max", (args, kw) -> minMax("max", args, kw, false));
+    public static final Object MIN = new PyBuiltin("min", (args, kw) -> minMax("min", args, kw, true))
+            .with1(x -> minMax1("min", x, true)).with2((x, y) -> Py.ltBool(y, x) ? y : x)
+            .with3((x, y, z) -> {
+                Object m = Py.ltBool(y, x) ? y : x;
+                return Py.ltBool(z, m) ? z : m;
+            })
+            .with4((x, y, z, w) -> {
+                Object m = Py.ltBool(y, x) ? y : x;
+                m = Py.ltBool(z, m) ? z : m;
+                return Py.ltBool(w, m) ? w : m;
+            });
+    public static final Object MAX = new PyBuiltin("max", (args, kw) -> minMax("max", args, kw, false))
+            .with1(x -> minMax1("max", x, false)).with2((x, y) -> Py.ltBool(x, y) ? y : x)
+            .with3((x, y, z) -> {
+                Object m = Py.ltBool(x, y) ? y : x;
+                return Py.ltBool(m, z) ? z : m;
+            })
+            .with4((x, y, z, w) -> {
+                Object m = Py.ltBool(x, y) ? y : x;
+                m = Py.ltBool(m, z) ? z : m;
+                return Py.ltBool(m, w) ? w : m;
+            });
     public static final Object ANY = PyBuiltin.positional("any", a -> {
         Object it = Py.iter(one("any", a));
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
@@ -236,19 +256,13 @@ public final class Builtins {
         });
     });
     public static final Object MAP = PyBuiltin.positional("map", a -> {
+        if (a.length == 2) {
+            return map1(a[0], a[1]);
+        }
         final Object f = a[0];
         final Object[] its = new Object[a.length - 1];
         for (int i = 0; i < its.length; i++) {
             its[i] = Py.iter(a[i + 1]);
-        }
-        if (its.length == 1) {
-            // One iterable, the usual case: a one-argument call, no row array.
-            final Object it = its[0];
-            final PyObject fn = Py.obj(f);
-            return new PyJavaIter(() -> {
-                Object v = Py.next(it);
-                return v == null ? null : fn.call1(v);
-            });
         }
         return new PyJavaIter(() -> {
             Object[] row = new Object[its.length];
@@ -260,14 +274,24 @@ public final class Builtins {
             }
             return Py.obj(f).call(row, Py.NO_KW);
         });
-    });
-    public static final Object FILTER = PyBuiltin.positional("filter", a -> {
-        final Object f = a[0];
-        final Object it = Py.iter(a[1]);
+    }).with2(Builtins::map1);
+
+    /// `map(f, iterable)`, the usual case: a one-argument call per item.
+    private static Object map1(Object f, Object iterable) {
+        final Object it = Py.iter(iterable);
+        final PyObject fn = Py.obj(f);
+        return new PyJavaIter(() -> {
+            Object v = Py.next(it);
+            return v == null ? null : fn.call1(v);
+        });
+    }
+    public static final Object FILTER = PyBuiltin.fixed2("filter", (a0, a1) -> {
+        final Object f = a0;
+        final Object it = Py.iter(a1);
         final PyObject fn = f == Py.NONE ? null : Py.obj(f); //NOPMD CompareObjectsWithEquals - identity is meant
         return new PyJavaIter(() -> {
             for (Object v = Py.next(it); v != null; v = Py.next(it)) {
-                if (fn == null ? Py.isTrue(v) : Py.isTrue(fn.call1(v))) { //NOPMD CompareObjectsWithEquals - identity is meant
+                if (fn == null ? Py.isTrue(v) : Py.isTrue(fn.call1(v))) {
                     return v;
                 }
             }
@@ -329,25 +353,22 @@ public final class Builtins {
         }));
         // The reduction protocol's defaults are written in Python, in copyreg,
         // which pickle and copy import; object only forwards to them.
-        o.define("__reduce_ex__", PyBuiltin.positional("__reduce_ex__",
-                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce_ex"), a[0], a[1])));
-        o.define("__reduce__", PyBuiltin.positional("__reduce__",
-                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce"), a[0])));
-        o.define("__getstate__", PyBuiltin.positional("__getstate__",
-                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_getstate"), a[0])));
-        o.define("__delattr__", PyBuiltin.positional("__delattr__", a -> {
-            if (a[0] instanceof PyInstance) {
-                ((PyInstance) a[0]).delAttrDirect(Py.toStr(a[1]));
-            } else if (a[0] instanceof PyType) {
-                ((PyType) a[0]).delAttrDirect(Py.toStr(a[1]));
+        o.define("__reduce_ex__", PyBuiltin.fixed2("__reduce_ex__", (a0, a1) -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce_ex"), a0, a1)));
+        o.define("__reduce__", PyBuiltin.fixed1("__reduce__", a0 -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce"), a0)));
+        o.define("__getstate__", PyBuiltin.fixed1("__getstate__", a0 -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_getstate"), a0)));
+        o.define("__delattr__", PyBuiltin.fixed2("__delattr__", (a0, a1) -> {
+            if (a0 instanceof PyInstance) {
+                ((PyInstance) a0).delAttrDirect(Py.toStr(a1));
+            } else if (a0 instanceof PyType) {
+                ((PyType) a0).delAttrDirect(Py.toStr(a1));
             } else {
-                Py.obj(a[0]).delAttr(Py.toStr(a[1]));
+                Py.obj(a0).delAttr(Py.toStr(a1));
             }
             return Py.NONE;
         }));
-        o.define("__repr__", PyBuiltin.positional("__repr__", a -> Py.str("<" + Py.typeOf(a[0]).fullName()
-                + " object at 0x" + Integer.toHexString(System.identityHashCode(a[0])) + ">")));
-        o.define("__str__", PyBuiltin.positional("__str__", a -> Py.str(Py.toRepr(a[0]))));
+        o.define("__repr__", PyBuiltin.fixed1("__repr__", a0 -> Py.str("<" + Py.typeOf(a0).fullName()
+                + " object at 0x" + Integer.toHexString(System.identityHashCode(a0)) + ">")));
+        o.define("__str__", PyBuiltin.fixed1("__str__", a0 -> Py.str(Py.toRepr(a0))));
         installExceptions();
         installFactories();
         TypeMethods.install();
@@ -400,37 +421,37 @@ public final class Builtins {
             return e;
         }));
         b.define("__new__", BASE_EXCEPTION_NEW);
-        b.define("__str__", PyBuiltin.positional("__str__", a -> {
-            Object[] args = exceptionArgs(a[0]);
+        b.define("__str__", PyBuiltin.fixed1("__str__", a0 -> {
+            Object[] args = exceptionArgs(a0);
             if (args.length == 0) {
                 return Py.EMPTY_STR;
             }
             if (args.length == 1) {
-                if (Py.typeOf(a[0]).isSubtype(Py.KEY_ERROR)) {
+                if (Py.typeOf(a0).isSubtype(Py.KEY_ERROR)) {
                     return Py.str(Py.toRepr(args[0]));
                 }
                 return Py.str(Py.toStr(args[0]));
             }
             return Py.str(new PyTuple(args).repr());
         }));
-        b.define("__repr__", PyBuiltin.positional("__repr__", a -> {
-            Object[] args = exceptionArgs(a[0]);
+        b.define("__repr__", PyBuiltin.fixed1("__repr__", a0 -> {
+            Object[] args = exceptionArgs(a0);
             String inner = args.length == 1 ? Py.toRepr(args[0]) : Py.joinRepr("", args, args.length, "");
-            return Py.str(Py.typeOf(a[0]).name + "(" + inner + ")");
+            return Py.str(Py.typeOf(a0).name + "(" + inner + ")");
         }));
         installOsError();
         installUnicodeError(Py.UNICODE_DECODE_ERROR, "decode");
         installUnicodeError(Py.UNICODE_ENCODE_ERROR, "encode");
-        b.define("with_traceback", PyBuiltin.positional("with_traceback", a -> a[0]));
+        b.define("with_traceback", PyBuiltin.fixed1("with_traceback", a0 -> a0));
         b.define("__cause__", Py.NONE);
         b.define("__context__", Py.NONE);
         b.define("__suppress_context__", Py.FALSE);
         b.define("__traceback__", Py.NONE);
-        Py.STOP_ITERATION.define("value", new PyProperty(PyBuiltin.positional("value", a -> {
-            Object[] args = exceptionArgs(a[0]);
+        Py.STOP_ITERATION.define("value", new PyProperty(PyBuiltin.fixed1("value", a0 -> {
+            Object[] args = exceptionArgs(a0);
             return args.length == 0 ? Py.NONE : args[0];
         }), null, null));
-        Py.SYSTEM_EXIT.define("code", new PyProperty(PyBuiltin.positional("code", a -> systemExitCode(a[0])),
+        Py.SYSTEM_EXIT.define("code", new PyProperty(PyBuiltin.fixed1("code", a0 -> systemExitCode(a0)),
                 null, null));
     }
 
@@ -493,9 +514,9 @@ public final class Builtins {
             e.setAttrDirect("args", new PyTuple(args));
             return Py.NONE;
         }));
-        t.define("__str__", PyBuiltin.positional("__str__", a -> {
-            if (a[0] instanceof PyInstance) {
-                PyInstance e = (PyInstance) a[0];
+        t.define("__str__", PyBuiltin.fixed1("__str__", a0 -> {
+            if (a0 instanceof PyInstance) {
+                PyInstance e = (PyInstance) a0;
                 Object errno = orNone(e.own("errno"));
                 Object strerror = orNone(e.own("strerror"));
                 Object filename = orNone(e.own("filename"));
@@ -512,7 +533,7 @@ public final class Builtins {
                     return Py.str(head);
                 }
             }
-            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a[0]);
+            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a0);
         }));
     }
 
@@ -539,9 +560,9 @@ public final class Builtins {
             e.setAttrDirect("args", new PyTuple(args));
             return Py.NONE;
         }));
-        t.define("__str__", PyBuiltin.positional("__str__", a -> {
-            if (a[0] instanceof PyInstance && ((PyInstance) a[0]).own("reason") != null) {
-                PyInstance e = (PyInstance) a[0];
+        t.define("__str__", PyBuiltin.fixed1("__str__", a0 -> {
+            if (a0 instanceof PyInstance && ((PyInstance) a0).own("reason") != null) {
+                PyInstance e = (PyInstance) a0;
                 long start = Py.asLong(e.own("start"));
                 long end = Py.asLong(e.own("end"));
                 String head = "'" + Py.toStr(e.own("encoding")) + "' codec can't " + verb + " ";
@@ -562,7 +583,7 @@ public final class Builtins {
                 }
                 return Py.str(head + ": " + Py.toStr(e.own("reason")));
             }
-            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a[0]);
+            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a0);
         }));
     }
 
@@ -600,6 +621,30 @@ public final class Builtins {
         Py.STR_TYPE.unary = x -> Py.str(Py.toStr(x));
         Py.FLOAT_TYPE.unary = Builtins::toFloat;
         Py.BOOL_TYPE.unary = x -> Py.bool(Py.isTrue(x));
+        // One-argument construction of the exact builtin types runs without
+        // an argument array; the factories below take every other call.
+        Py.TUPLE_TYPE.unary = x -> x instanceof PyTuple ? x : new PyTuple(Py.toArray(x));
+        Py.LIST_TYPE.unary = x -> {
+            PyList l = new PyList();
+            l.extend(x);
+            return l;
+        };
+        Py.DICT_TYPE.unary = x -> {
+            PyDict d = new PyDict();
+            d.update(x);
+            return d;
+        };
+        Py.SET_TYPE.unary = x -> PySet.of(x, false);
+        Py.FROZENSET_TYPE.unary = x -> PySet.of(x, true);
+        Py.TYPE_TYPE.unary = Py::typeOf;
+        Py.INT_TYPE.binary = (x, base) -> PyInt.parse(intText(x, true), (int) Py.asLong(base));
+        Py.STR_TYPE.binary = (x, enc) -> {
+            if (!(x instanceof PyBytes)) {
+                throw Py.typeError("decoding to str: need a bytes-like object, " + Py.typeOf(x).name + " found");
+            }
+            return Py.str(Codecs.decodeKeep(((PyBytes) x).value, Py.toStr(enc), "strict"));
+        };
+        Py.RANGE_TYPE.unary = x -> new PyRange(0, Py.index(x), 1);
         Py.BOOL_TYPE.factory = (t, args, kw) -> Py.bool(args.length > 0 && Py.isTrue(args[0]));
         Py.FLOAT_TYPE.factory = (t, args, kw) -> args.length == 0 ? Py.ofFloat(0) : toFloat(args[0]);
         Py.STR_TYPE.factory = (t, args, kw) -> {
@@ -708,27 +753,27 @@ public final class Builtins {
             PyProperty p = property(a[0]);
             return a.length < 2 || a[1] == Py.NONE ? a[0] : p.get(a[1]);
         }));
-        Py.PROPERTY_TYPE.define("__set__", PyBuiltin.positional("__set__", a -> {
-            property(a[0]).set(a[1], a[2]);
+        Py.PROPERTY_TYPE.define("__set__", PyBuiltin.fixed3("__set__", (a0, a1, a2) -> {
+            property(a0).set(a1, a2);
             return Py.NONE;
         }));
-        Py.PROPERTY_TYPE.define("__delete__", PyBuiltin.positional("__delete__", a -> {
-            property(a[0]).delete(a[1]);
+        Py.PROPERTY_TYPE.define("__delete__", PyBuiltin.fixed2("__delete__", (a0, a1) -> {
+            property(a0).delete(a1);
             return Py.NONE;
         }));
         // On the type rather than only on PyProperty, so an instance of a
         // property subclass has them too; a copy keeps the receiver's class.
-        Py.PROPERTY_TYPE.define("getter", PyBuiltin.positional("getter", a -> {
-            PyProperty p = property(a[0]);
-            return propertyCopy(a[0], a[1], p.fset, p.fdel);
+        Py.PROPERTY_TYPE.define("getter", PyBuiltin.fixed2("getter", (a0, a1) -> {
+            PyProperty p = property(a0);
+            return propertyCopy(a0, a1, p.fset, p.fdel);
         }));
-        Py.PROPERTY_TYPE.define("setter", PyBuiltin.positional("setter", a -> {
-            PyProperty p = property(a[0]);
-            return propertyCopy(a[0], p.fget, a[1], p.fdel);
+        Py.PROPERTY_TYPE.define("setter", PyBuiltin.fixed2("setter", (a0, a1) -> {
+            PyProperty p = property(a0);
+            return propertyCopy(a0, p.fget, a1, p.fdel);
         }));
-        Py.PROPERTY_TYPE.define("deleter", PyBuiltin.positional("deleter", a -> {
-            PyProperty p = property(a[0]);
-            return propertyCopy(a[0], p.fget, p.fset, a[1]);
+        Py.PROPERTY_TYPE.define("deleter", PyBuiltin.fixed2("deleter", (a0, a1) -> {
+            PyProperty p = property(a0);
+            return propertyCopy(a0, p.fget, p.fset, a1);
         }));
         String[] parts = {"fget", "fset", "fdel"};
         for (int i = 0; i < parts.length; i++) {
@@ -798,7 +843,7 @@ public final class Builtins {
             NAMES.put(t.name, t);
         }
         // What the transpiler rewrites a `match` case into (see PyMatch).
-        NAMES.put("__cn1_match__", PyBuiltin.positional("__cn1_match__", a -> PyMatch.match(a[0], a[1])));
+        NAMES.put("__cn1_match__", PyBuiltin.fixed2("__cn1_match__", (a0, a1) -> PyMatch.match(a0, a1)));
         ExceptionGroups.names(NAMES);
         // open() is io.open, written in Python; the transpiler bundles `io`
         // into any program that mentions open.
@@ -1323,6 +1368,21 @@ public final class Builtins {
             return Py.ofFloat(fs + fc);
         }
         return acc;
+    }
+
+    /// `min(iterable)` / `max(iterable)` with no key or default.
+    private static Object minMax1(String fn, Object iterable, boolean min) {
+        Object it = Py.iter(iterable);
+        Object best = Py.next(it);
+        if (best == null) {
+            throw Py.valueError(fn + "() iterable argument is empty");
+        }
+        for (Object v = Py.next(it); v != null; v = Py.next(it)) {
+            if (min ? Py.ltBool(v, best) : Py.ltBool(best, v)) {
+                best = v;
+            }
+        }
+        return best;
     }
 
     private static Object minMax(String fn, Object[] args, String[] kw, boolean min) {

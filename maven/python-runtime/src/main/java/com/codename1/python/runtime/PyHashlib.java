@@ -57,13 +57,13 @@ final class PyHashlib {
             }
             return new PyJavaObject(h);
         }));
-        m.setAttr("update", PyBuiltin.positional("update", a -> {
-            byte[] b = PyBytes.like(a[1]);
-            hash(a[0]).update(b, 0, b.length);
+        m.setAttr("update", PyBuiltin.fixed2("update", (a0, a1) -> {
+            byte[] b = PyBytes.like(a1);
+            hash(a0).update(b, 0, b.length);
             return Py.NONE;
         }));
-        m.setAttr("copy", PyBuiltin.positional("copy", a -> new PyJavaObject(hash(a[0]).copy())));
-        m.setAttr("digest", PyBuiltin.positional("digest", a -> new PyBytes(hash(a[0]).copy().digest())));
+        m.setAttr("copy", PyBuiltin.fixed1("copy", a0 -> new PyJavaObject(hash(a0).copy())));
+        m.setAttr("digest", PyBuiltin.fixed1("digest", a0 -> new PyBytes(hash(a0).copy().digest())));
         m.setAttr("pbkdf2", PyBuiltin.positional("pbkdf2", a -> {
             String algorithm = algorithm(Py.toStr(a[0]));
             if (algorithm == null || Hash.SHA3_256.equals(algorithm)) {
@@ -72,8 +72,8 @@ final class PyHashlib {
             return new PyBytes(Pbkdf2.derive(algorithm, PyBytes.like(a[1]), PyBytes.like(a[2]),
                     (int) Py.asLong(a[3]), (int) Py.asLong(a[4])));
         }));
-        m.setAttr("urandom", PyBuiltin.positional("urandom", a -> {
-            long n = Py.asLong(a[0]);
+        m.setAttr("urandom", PyBuiltin.fixed1("urandom", a0 -> {
+            long n = Py.asLong(a0);
             if (n < 0 || n > Integer.MAX_VALUE) {
                 throw Py.error(Py.VALUE_ERROR, "negative argument not allowed");
             }

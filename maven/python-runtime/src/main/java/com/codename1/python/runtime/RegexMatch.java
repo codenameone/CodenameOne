@@ -328,7 +328,7 @@ final class RegexMatch extends PyObject {
         t.define("group", PyBuiltin.method(t, "group", a -> self(a[0]).group(a))
                 .with1(m -> self(m).get(0, Py.NONE))
                 .with2((m, g) -> self(m).get(self(m).index(g), Py.NONE)));
-        t.define("__getitem__", PyBuiltin.method(t, "__getitem__", a -> self(a[0]).getItem(a[1]))
+        t.define("__getitem__", PyBuiltin.method2(t, "__getitem__", (a0, a1) -> self(a0).getItem(a1))
                 .with2((m, g) -> self(m).getItem(g)));
         t.define("groups", PyBuiltin.method(t, "groups",
                 a -> self(a[0]).groupsTuple(a.length > 1 ? a[1] : Py.NONE))
@@ -355,16 +355,15 @@ final class RegexMatch extends PyObject {
                 a -> self(a[0]).span(a.length > 1 ? self(a[0]).index(a[1]) : 0))
                 .with1(m -> self(m).span(0))
                 .with2((m, g) -> self(m).span(self(m).index(g))));
-        t.define("expand", PyBuiltin.method(t, "expand", a -> {
+        t.define("expand", PyBuiltin.method2(t, "expand", (a0, a1) -> {
             if (expandHook == null) {
                 throw Py.runtimeError("re is not initialised");
             }
-            return Py.obj(expandHook).call2(a[0], a[1]);
+            return Py.obj(expandHook).call2(a0, a1);
         }));
-        t.define("__copy__", PyBuiltin.method(t, "__copy__", a -> a[0]));
-        t.define("__deepcopy__", PyBuiltin.method(t, "__deepcopy__", a -> a[0]));
-        t.define("__class_getitem__", new PyClassMethod(PyBuiltin.positional("__class_getitem__",
-                a -> new PyGenericAlias((PyType) a[0], a[1]))));
+        t.define("__copy__", PyBuiltin.method1(t, "__copy__", a0 -> a0));
+        t.define("__deepcopy__", PyBuiltin.method1(t, "__deepcopy__", a0 -> a0));
+        t.define("__class_getitem__", new PyClassMethod(PyBuiltin.fixed2("__class_getitem__", (a0, a1) -> new PyGenericAlias((PyType) a0, a1))));
         t.define("__module__", "re");
     }
 }

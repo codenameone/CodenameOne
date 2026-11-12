@@ -592,32 +592,31 @@ public abstract class PyGenerator extends PyObject {
 
     static void install() {
         PyType ag = Py.ASYNC_GENERATOR_TYPE;
-        ag.define("__aiter__", PyBuiltin.method(ag, "__aiter__", a -> a[0]));
-        ag.define("__anext__", PyBuiltin.method(ag, "__anext__", a -> new ASend(gen(a[0]), ASEND, Py.NONE)));
-        ag.define("asend", PyBuiltin.method(ag, "asend", a -> new ASend(gen(a[0]), ASEND, a[1])));
+        ag.define("__aiter__", PyBuiltin.method1(ag, "__aiter__", a0 -> a0));
+        ag.define("__anext__", PyBuiltin.method1(ag, "__anext__", a0 -> new ASend(gen(a0), ASEND, Py.NONE)));
+        ag.define("asend", PyBuiltin.method2(ag, "asend", (a0, a1) -> new ASend(gen(a0), ASEND, a1)));
         ag.define("athrow", PyBuiltin.method(ag, "athrow", a -> new ASend(gen(a[0]), ATHROW,
                 a.length > 2 && a[2] != Py.NONE ? a[2] : a[1])));
-        ag.define("aclose", PyBuiltin.method(ag, "aclose", a -> new ASend(gen(a[0]), ACLOSE, Py.NONE)));
+        ag.define("aclose", PyBuiltin.method1(ag, "aclose", a0 -> new ASend(gen(a0), ACLOSE, Py.NONE)));
         for (int i = 0; i < 2; i++) {
             PyType t = i == 0 ? Py.GENERATOR_TYPE : Py.COROUTINE_TYPE;
             t.define("send", PyBuiltin.method(t, "send", a -> gen(a[0]).send(a.length > 1 ? a[1] : Py.NONE)));
             t.define("throw", PyBuiltin.method(t, "throw", a -> gen(a[0]).throwIn(a.length > 2 && a[2] != Py.NONE
                     ? a[2] : a[1])));
-            t.define("close", PyBuiltin.method(t, "close", a -> {
-                gen(a[0]).close();
+            t.define("close", PyBuiltin.method1(t, "close", a0 -> {
+                gen(a0).close();
                 return Py.NONE;
             }));
         }
-        Py.GENERATOR_TYPE.define("__iter__", PyBuiltin.method(Py.GENERATOR_TYPE, "__iter__", a -> a[0]));
-        Py.GENERATOR_TYPE.define("__next__", PyBuiltin.method(Py.GENERATOR_TYPE, "__next__", a -> {
-            Object r = gen(a[0]).resume(Py.NONE, null);
+        Py.GENERATOR_TYPE.define("__iter__", PyBuiltin.method1(Py.GENERATOR_TYPE, "__iter__", a0 -> a0));
+        Py.GENERATOR_TYPE.define("__next__", PyBuiltin.method1(Py.GENERATOR_TYPE, "__next__", a0 -> {
+            Object r = gen(a0).resume(Py.NONE, null);
             if (r == null) {
-                throw stopIteration(gen(a[0]).returned);
+                throw stopIteration(gen(a0).returned);
             }
             return r;
         }));
-        Py.COROUTINE_TYPE.define("__await__", PyBuiltin.method(Py.COROUTINE_TYPE, "__await__",
-                a -> new Awaiter(gen(a[0]))));
+        Py.COROUTINE_TYPE.define("__await__", PyBuiltin.method1(Py.COROUTINE_TYPE, "__await__", a0 -> new Awaiter(gen(a0))));
     }
 
     private static PyGenerator gen(Object o) {

@@ -47,31 +47,30 @@ final class ExceptionGroups {
             return create((PyType) a[0], a[1], a[2]);
         })));
         b.define("__init__", PyBuiltin.positional("__init__", a -> Py.NONE));
-        b.define("__str__", PyBuiltin.positional("__str__", a -> {
-            int n = exceptions(a[0]).length;
-            return Py.str(Py.toStr(message(a[0])) + " (" + n + " sub-exception" + (n == 1 ? "" : "s") + ")");
+        b.define("__str__", PyBuiltin.fixed1("__str__", a0 -> {
+            int n = exceptions(a0).length;
+            return Py.str(Py.toStr(message(a0)) + " (" + n + " sub-exception" + (n == 1 ? "" : "s") + ")");
         }));
-        b.define("split", PyBuiltin.positional("split", a -> {
-            Object[] r = split(a[0], a[1]);
+        b.define("split", PyBuiltin.fixed2("split", (a0, a1) -> {
+            Object[] r = split(a0, a1);
             return new PyTuple(new Object[] {r[0] == null ? Py.NONE : r[0], r[1] == null ? Py.NONE : r[1]});
         }));
-        b.define("subgroup", PyBuiltin.positional("subgroup", a -> {
-            Object m = split(a[0], a[1])[0];
+        b.define("subgroup", PyBuiltin.fixed2("subgroup", (a0, a1) -> {
+            Object m = split(a0, a1)[0];
             return m == null ? Py.NONE : m;
         }));
-        b.define("derive", PyBuiltin.positional("derive", a -> create(Py.BASE_EXCEPTION_GROUP, message(a[0]), a[1])));
+        b.define("derive", PyBuiltin.fixed2("derive", (a0, a1) -> create(Py.BASE_EXCEPTION_GROUP, message(a0), a1)));
     }
 
     static void names(Map<String, Object> names) {
-        names.put("__cn1_except_star__", PyBuiltin.positional("__cn1_except_star__", a -> new ExceptStar(a[0])));
-        names.put("__cn1_except_star_take__", PyBuiltin.positional("__cn1_except_star_take__",
-                a -> star(a[0]).take(a[1])));
-        names.put("__cn1_except_star_raised__", PyBuiltin.positional("__cn1_except_star_raised__", a -> {
-            star(a[0]).raised.add(a[1]);
+        names.put("__cn1_except_star__", PyBuiltin.fixed1("__cn1_except_star__", a0 -> new ExceptStar(a0)));
+        names.put("__cn1_except_star_take__", PyBuiltin.fixed2("__cn1_except_star_take__", (a0, a1) -> star(a0).take(a1)));
+        names.put("__cn1_except_star_raised__", PyBuiltin.fixed2("__cn1_except_star_raised__", (a0, a1) -> {
+            star(a0).raised.add(a1);
             return Py.NONE;
         }));
-        names.put("__cn1_except_star_finish__", PyBuiltin.positional("__cn1_except_star_finish__", a -> {
-            star(a[0]).finish();
+        names.put("__cn1_except_star_finish__", PyBuiltin.fixed1("__cn1_except_star_finish__", a0 -> {
+            star(a0).finish();
             return Py.NONE;
         }));
     }

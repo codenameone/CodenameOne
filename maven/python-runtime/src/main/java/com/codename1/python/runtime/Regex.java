@@ -177,10 +177,10 @@ final class Regex {
         m.setAttr("match", new MatchFn());
         m.setAttr("iter", PyBuiltin.positional("iter", a -> RegexMatch.search(prog(a[0]), a[1], a[2], a[3],
                 a[4], (int) Py.index(a[5]), 2, (int) Py.index(a[6]))));
-        m.setAttr("set_hooks", PyBuiltin.positional("set_hooks", a -> {
-            RegexMatch.expandHook = a[0];
-            RegexMatch.templateHook = a[1];
-            RegexMatch.subHook = a[2];
+        m.setAttr("set_hooks", PyBuiltin.fixed3("set_hooks", (a0, a1, a2) -> {
+            RegexMatch.expandHook = a0;
+            RegexMatch.templateHook = a1;
+            RegexMatch.subHook = a2;
             return Py.NONE;
         }));
         m.setAttr("sub", PyBuiltin.positional("sub", a -> RegexMatch.sub(prog(a[0]), a[1], a[2], a[3],
