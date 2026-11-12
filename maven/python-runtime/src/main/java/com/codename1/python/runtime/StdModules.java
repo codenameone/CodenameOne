@@ -126,6 +126,10 @@ public final class StdModules {
             PyModule.registerModule(PyStruct.module());
             return true;
         }
+        if ("_cn1url".equals(name)) {
+            PyModule.registerModule(urlModule());
+            return true;
+        }
         if ("_cn1op".equals(name)) {
             PyModule.registerModule(operatorModule());
             return true;
@@ -1780,5 +1784,126 @@ public final class StdModules {
             return new PyTuple(out);
         }));
         return m;
+    }
+
+    private static final String HEX = "0123456789ABCDEF";
+
+    /// `_cn1url.quote(data, safe)`: percent-encodes a str (as UTF-8) or a
+    /// bytes-like object, keeping the always-safe ASCII set plus `safe`.
+    /// Answers None for anything it does not handle -- a lone surrogate,
+    /// which strict UTF-8 refuses, or an unexpected type -- so the Python
+    /// code raises exactly as before.
+    private static PyModule urlModule() {
+        PyModule m = new PyModule("_cn1url", new String[0]);
+        m.setAttr("quote", PyBuiltin.fixed2("quote", (data, safe) -> {
+            boolean[] keep = new boolean[128];
+            for (int c = 'A'; c <= 'Z'; c++) {
+                keep[c] = true;
+                keep[c + 32] = true;
+            }
+            for (int c = '0'; c <= '9'; c++) {
+                keep[c] = true;
+            }
+            keep['_'] = true;
+            keep['.'] = true;
+            keep['-'] = true;
+            keep['~'] = true;
+            if (safe instanceof String) {
+                String sf = (String) safe;
+                for (int i = 0; i < sf.length(); i++) {
+                    char c = sf.charAt(i);
+                    if (c < 128) {
+                        keep[c] = true;
+                    }
+                }
+            } else if (safe instanceof PyBytes) {
+                for (byte b : ((PyBytes) safe).value) {
+                    if (b >= 0) {
+                        keep[b] = true;
+                    }
+                }
+            } else {
+                return Py.NONE;
+            }
+            byte[] bytes;
+            int n;
+            if (data instanceof String) {
+                String str = (String) data;
+                boolean plain = true;
+                for (int i = 0; i < str.length(); i++) {
+                    char c = str.charAt(i);
+                    if (c >= 128 || !keep[c]) {
+                        plain = false;
+                        break;
+                    }
+                }
+                if (plain) {
+                    return str;
+                }
+                bytes = utf8(str);
+                if (bytes == NOT_UTF8) {
+                    return Py.NONE;
+                }
+                n = bytes.length;
+            } else if (data instanceof PyBytes) {
+                bytes = ((PyBytes) data).value;
+                n = bytes.length;
+            } else if (data instanceof PyByteArray) {
+                bytes = ((PyByteArray) data).buf;
+                n = ((PyByteArray) data).size;
+            } else {
+                return Py.NONE;
+            }
+            StringBuilder sb = new StringBuilder(n + 16);
+            for (int i = 0; i < n; i++) {
+                int b = bytes[i] & 0xff;
+                if (b < 128 && keep[b]) {
+                    sb.append((char) b);
+                } else {
+                    sb.append('%').append(HEX.charAt(b >> 4)).append(HEX.charAt(b & 15));
+                }
+            }
+            return sb.toString();
+        }));
+        return m;
+    }
+
+    /// What `utf8` answers for a lone surrogate. An empty string never gets
+    /// there (it is all safe characters), so a zero-length array is free.
+    private static final byte[] NOT_UTF8 = new byte[0];
+
+    /// Strict UTF-8, or `NOT_UTF8` for a lone surrogate.
+    private static byte[] utf8(String s) {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            int c = s.charAt(i);
+            if (c >= 0xD800 && c <= 0xDFFF) {
+                if (c > 0xDBFF || i + 1 >= s.length()) {
+                    return NOT_UTF8;
+                }
+                int d = s.charAt(i + 1);
+                if (d < 0xDC00 || d > 0xDFFF) {
+                    return NOT_UTF8;
+                }
+                c = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00);
+                i++;
+            }
+            if (c < 0x80) {
+                out.write(c);
+            } else if (c < 0x800) {
+                out.write(0xC0 | (c >> 6));
+                out.write(0x80 | (c & 63));
+            } else if (c < 0x10000) {
+                out.write(0xE0 | (c >> 12));
+                out.write(0x80 | ((c >> 6) & 63));
+                out.write(0x80 | (c & 63));
+            } else {
+                out.write(0xF0 | (c >> 18));
+                out.write(0x80 | ((c >> 12) & 63));
+                out.write(0x80 | ((c >> 6) & 63));
+                out.write(0x80 | (c & 63));
+            }
+        }
+        return out.toByteArray();
     }
 }
