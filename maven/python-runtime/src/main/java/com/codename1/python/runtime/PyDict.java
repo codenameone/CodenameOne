@@ -50,12 +50,222 @@ public class PyDict extends PyObject {
     private static final Object[] NO_OBJECTS = new Object[0];
     private static final long[] NO_HASHES = new long[0];
 
+    /// The shared key layout this dict's `keys`, `hashes` and `index` belong
+    /// to, or null when they are its own. While it is set the dict has no
+    /// deleted entry, `used == size == layout.n`, and those three arrays
+    /// must never be written: every write path calls [#unshare] first.
+    Layout layout;
+
     /// An empty dict allocates no arrays until its first entry: keyword
     /// dicts, per-call dicts and the like are often never filled.
     public PyDict() {
         keys = NO_OBJECTS;
         values = NO_OBJECTS;
         hashes = NO_HASHES;
+        if (getClass() == PyDict.class) {
+            layout = Layout.ROOT;
+        }
+    }
+
+    /// A hidden class, as JavaScript engines have them: the keys, hashes and
+    /// index table of every dict that received the same str keys in the same
+    /// order. pdfplumber turns each char of a page into a dict of the same
+    /// twenty keys; sharing the layout means each of those dicts holds only
+    /// its values, is built without hashing or probing a key, and a
+    /// `char["top"]` site ([KeySite]) finds the slot by one identity
+    /// compare. A layout is immutable once made.
+    static final class Layout {
+        /// The most keys a layout holds, the most layouts that follow one
+        /// (but the root, which every dict starts from: kwargs and module
+        /// dicts reach it before any record does), and the most layouts in
+        /// the program. Past any of them dicts keep their own arrays, as
+        /// before; the last bounds what a program of map-like dicts costs.
+        private static final int MAX_KEYS = 48;
+        private static final int MAX_NEXT = 64;
+        private static final int MAX_LAYOUTS = 8192;
+        private static int layouts;
+
+        final Object[] keys;
+        final long[] hashes;
+        final int[] index;
+        final int n;
+        private String[] nextKey = NO_KEYS;
+        private Layout[] next = NO_LAYOUTS;
+        private static final String[] NO_KEYS = new String[0];
+        private static final Layout[] NO_LAYOUTS = new Layout[0];
+        /// Declared after the empty arrays its fields start from.
+        static final Layout ROOT = new Layout(NO_OBJECTS, NO_HASHES, null, 0);
+        private int nNext;
+        /// Keys one dict has added here that no layout follows yet. A step
+        /// is made a layout the second time a dict takes it, so a dict used
+        /// as a map (a word count) never builds a chain of layouts.
+        private String[] seen = NO_KEYS;
+        private int nSeen;
+
+        private Layout(Object[] keys, long[] hashes, int[] index, int n) {
+            this.keys = keys;
+            this.hashes = hashes;
+            this.index = index;
+            this.n = n;
+        }
+
+        /// The layout after adding `key` (absent here), or null when the dict
+        /// must take its own arrays.
+        Layout step(String key, long h) {
+            String[] nk = nextKey;
+            if (nk.length > 0) {
+                int mask = nk.length - 1;
+                int i = (int) h & mask;
+                String k;
+                while ((k = nk[i]) != null) {
+                    if (k.equals(key)) {
+                        return next[i];
+                    }
+                    i = (i + 1) & mask;
+                }
+            }
+            if (n >= MAX_KEYS || nNext >= MAX_NEXT && n > 0 || layouts >= MAX_LAYOUTS) {
+                return null;
+            }
+            String[] sn = seen;
+            for (int i = 0; i < nSeen; i++) {
+                if (sn[i].equals(key)) {
+                    sn[i] = sn[--nSeen];
+                    sn[nSeen] = null;
+                    return extend(key, h);
+                }
+            }
+            if (sn.length == 0) {
+                seen = sn = new String[4];
+            }
+            if (nSeen < sn.length) {
+                sn[nSeen++] = key;
+            } else {
+                sn[(int) (h & (sn.length - 1))] = key;
+            }
+            return null;
+        }
+
+        private Layout extend(String key, long h) {
+            int m = n + 1;
+            Object[] k = new Object[m];
+            long[] hs = new long[m];
+            System.arraycopy(keys, 0, k, 0, n);
+            System.arraycopy(hashes, 0, hs, 0, n);
+            k[n] = key;
+            hs[n] = h;
+            int[] ix = null;
+            if (m > LINEAR) {
+                int t = 16;
+                while (m * 3 >= t * 2) {
+                    t *= 2;
+                }
+                ix = newIndex(t);
+                int mask = t - 1;
+                for (int e = 0; e < m; e++) {
+                    long sp = spread(hs[e]);
+                    int i = (int) (sp & mask);
+                    long perturb = sp & Long.MAX_VALUE;
+                    while (ix[i] != EMPTY) {
+                        perturb >>>= 5;
+                        i = (int) ((i * 5L + perturb + 1) & mask);
+                    }
+                    ix[i] = e;
+                }
+            }
+            Layout l = new Layout(k, hs, ix, m);
+            layouts++;
+            if ((nNext + 1) * 2 > nextKey.length) {
+                String[] ok = nextKey;
+                Layout[] ol = next;
+                nextKey = new String[Math.max(4, ok.length * 2)];
+                next = new Layout[nextKey.length];
+                for (int i = 0; i < ok.length; i++) {
+                    if (ok[i] != null) {
+                        place(ok[i], ol[i]);
+                    }
+                }
+            }
+            place(key, l);
+            nNext++;
+            return l;
+        }
+
+        private void place(String key, Layout l) {
+            int mask = nextKey.length - 1;
+            int i = key.hashCode() & mask;
+            while (nextKey[i] != null) {
+                i = (i + 1) & mask;
+            }
+            nextKey[i] = key;
+            next[i] = l;
+        }
+
+        /// The entry of str `key` in this layout, or -1.
+        int slotOf(String key) {
+            Object[] k = keys;
+            for (int e = 0; e < n; e++) {
+                Object x = k[e];
+                if (key.equals(x)) {
+                    return e;
+                }
+            }
+            return -1;
+        }
+    }
+
+    /// Takes the next layout for a new str key: only the value is stored.
+    private void appendShared(Layout nl, Object value) {
+        int u = used;
+        Object[] v = values;
+        if (v.length <= u) {
+            Object[] nv = new Object[Math.max(4, u + (u >> 1) + 1)];
+            System.arraycopy(v, 0, nv, 0, u);
+            values = v = nv;
+        }
+        v[u] = value;
+        keys = nl.keys;
+        hashes = nl.hashes;
+        index = nl.index;
+        layout = nl;
+        used = u + 1;
+        size = u + 1;
+    }
+
+    /// Gives this dict its own copies of the shared arrays, before a write
+    /// no layout describes (a delete, a key that is not a str, a layout
+    /// past its limits).
+    void unshare() {
+        Layout l = layout;
+        if (l == null) {
+            return;
+        }
+        layout = null;
+        int cap = Math.max(4, values.length);
+        Object[] k = new Object[cap];
+        long[] h = new long[cap];
+        System.arraycopy(l.keys, 0, k, 0, l.n);
+        System.arraycopy(l.hashes, 0, h, 0, l.n);
+        keys = k;
+        hashes = h;
+        if (values.length < cap) {
+            Object[] nv = new Object[cap];
+            System.arraycopy(values, 0, nv, 0, used);
+            values = nv;
+        }
+        index = l.index == null ? null : l.index.clone();
+        if (index == null && cap > LINEAR) {
+            rebuildFor(cap);
+        }
+    }
+
+    /// The index table for a dict of capacity `cap`, as grow() sizes it.
+    private void rebuildFor(int cap) {
+        int t = 16;
+        while (cap * 3 >= t * 2) {
+            t *= 2;
+        }
+        rebuild(t);
     }
 
     /// A dict sized for `n` entries, as a literal of that many pairs builds:
@@ -66,6 +276,16 @@ public class PyDict extends PyObject {
             keys = NO_OBJECTS;
             values = NO_OBJECTS;
             hashes = NO_HASHES;
+            if (getClass() == PyDict.class) {
+                layout = Layout.ROOT;
+            }
+            return;
+        }
+        if (getClass() == PyDict.class) {
+            keys = NO_OBJECTS;
+            hashes = NO_HASHES;
+            values = new Object[n];
+            layout = Layout.ROOT;
             return;
         }
         allocate(n);
@@ -74,6 +294,12 @@ public class PyDict extends PyObject {
     /// An empty dict about to be filled with `n` entries gets its arrays at
     /// that size at once, rather than through every growth on the way.
     void reserve(int n) {
+        if (layout != null) {
+            if (used == 0 && values.length < n) {
+                values = new Object[n];
+            }
+            return;
+        }
         if (used == 0 && keys.length < n) {
             allocate(n);
         }
@@ -83,6 +309,7 @@ public class PyDict extends PyObject {
     /// of ones an equal dict already built (an instance's `__dict__`, see
     /// `PyInstance.InstanceDict`): no key is hashed or probed again.
     void adopt(Object[] k, long[] h, int[] ix, Object[] v, int n) {
+        layout = null;
         keys = k;
         hashes = h;
         index = ix;
@@ -97,6 +324,7 @@ public class PyDict extends PyObject {
     }
 
     private void allocate(int n) {
+        layout = null;
         keys = new Object[n];
         values = new Object[n];
         hashes = new long[n];
@@ -346,6 +574,10 @@ public class PyDict extends PyObject {
             values[entry(s)] = value;
             return;
         }
+        if (layout != null) {
+            unshare();
+            s = findLong(k, h);
+        }
         if (used == keys.length) {
             grow();
             s = findLong(k, h);
@@ -417,6 +649,17 @@ public class PyDict extends PyObject {
         if (s >= 0) {
             values[entry(s)] = value;
             return;
+        }
+        if (layout != null) {
+            if (key instanceof String) {
+                Layout nl = layout.step((String) key, h);
+                if (nl != null) {
+                    appendShared(nl, value);
+                    return;
+                }
+            }
+            unshare();
+            s = find(key, h);
         }
         if (used == keys.length) {
             grow();
@@ -490,9 +733,14 @@ public class PyDict extends PyObject {
 
     /// Removes `key`, returning its value or `null` when absent.
     public Object remove(Object key) {
-        int s = find(key, Py.keyHash(key, "a dict key"));
+        long h = Py.keyHash(key, "a dict key");
+        int s = find(key, h);
         if (s < 0) {
             return null;
+        }
+        if (layout != null) {
+            unshare();
+            s = find(key, h);
         }
         int e = entry(s);
         Object v = values[e];
@@ -536,6 +784,17 @@ public class PyDict extends PyObject {
     }
 
     public void clear() {
+        if (layout != null) {
+            // The shared arrays are not this dict's to null; its values are.
+            nullOut(values, used);
+            keys = NO_OBJECTS;
+            hashes = NO_HASHES;
+            index = null;
+            layout = Layout.ROOT;
+            used = 0;
+            size = 0;
+            return;
+        }
         if (keys.length <= KEEP_ON_CLEAR) {
             // A dict cleared and refilled, a cache or a window, keeps its
             // capacity as Java's HashMap does: refilling it would otherwise
@@ -582,6 +841,20 @@ public class PyDict extends PyObject {
             if (size == 0 && used == 0 && d.size == 0) {
                 return;
             }
+            if (size == 0 && used == 0 && d.layout != null && layout != null && d.size > 0) {
+                // `dict(d)` and `d.copy()` of a dict on a shared layout: the
+                // copy takes the same layout and a copy of the values.
+                Object[] nv = new Object[d.used];
+                System.arraycopy(d.values, 0, nv, 0, d.used);
+                keys = d.keys;
+                hashes = d.hashes;
+                index = d.index;
+                values = nv;
+                layout = d.layout;
+                used = d.used;
+                size = d.size;
+                return;
+            }
             if (size == 0 && used == 0 && d.size <= LINEAR && getClass() == PyDict.class) {
                 // `dict(small)`, as every `self.attrib = dict(attrib)` is: the
                 // entries and their hashes copied once into arrays of the right
@@ -605,6 +878,7 @@ public class PyDict extends PyObject {
                 used = w;
                 size = w;
                 index = null;
+                layout = null;
                 return;
             }
             for (int i = 0; i < d.used; i++) {

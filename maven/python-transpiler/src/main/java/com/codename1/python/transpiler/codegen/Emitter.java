@@ -3086,7 +3086,7 @@ public final class Emitter {
             }
             String key = expr(s.index);
             if (isStrLiteral(key)) {
-                return "Py.getitemS(" + expr(s.value) + ", " + key + ")";
+                return keyRead(expr(s.value), key);
             }
             return "Py.getitem(" + expr(s.value) + ", " + key + ")";
         }
@@ -3329,6 +3329,19 @@ public final class Emitter {
         return "Py.isMiss(" + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + ", "
                 + ("AttributeError".equals(((Name) c.args.get(1)).id) ? "Py.ATTRIBUTE_ERROR" : "Py.KEY_ERROR") + ")";
     }
+
+    /// `o["k"]` for a str literal: through an inline cache of the dict
+    /// layout (the runtime's `KeySite`) when the key can name a table entry, else
+    /// `Py.getitemS`.
+    String keyRead(String o, String literal) {
+        String raw = literal.substring(1, literal.length() - 1);
+        if (raw.indexOf('\\') >= 0 || raw.isEmpty()) {
+            return "Py.getitemS(" + o + ", " + literal + ")";
+        }
+        return tabled(keySites, "SK", raw) + ".get(" + o + ")";
+    }
+
+    private final List<StringBuilder> keySites = new ArrayList<StringBuilder>();
 
     /// Whether generated code is exactly one Java string literal: a subscript
     /// by one (`ch["top"]`) reads a dict through [Py#getitemS].
@@ -4535,6 +4548,10 @@ public final class Emitter {
         for (int i = 0; i < readSites.size(); i++) {
             out.append("    private static final AttrSite[] SA").append(i).append(" = AttrSite.table(")
                     .append(javaString(readSites.get(i).toString())).append(");\n");
+        }
+        for (int i = 0; i < keySites.size(); i++) {
+            out.append("    private static final KeySite[] SK").append(i).append(" = KeySite.table(")
+                    .append(javaString(keySites.get(i).toString())).append(");\n");
         }
         for (int i = 0; i < storeSites.size(); i++) {
             out.append("    private static final StoreSite[] SS").append(i).append(" = StoreSite.table(")

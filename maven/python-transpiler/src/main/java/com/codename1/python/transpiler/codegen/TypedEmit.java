@@ -3914,7 +3914,7 @@ final class TypedEmit {
             }
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
                 if (Emitter.isStrLiteral(i.c)) {
-                    return new E("Py.getitemS(" + box(l) + ", " + i.c + ")", Ty.DYN);
+                    return new E(em.keyRead(box(l), i.c), Ty.DYN);
                 }
                 return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.DYN);
             }
