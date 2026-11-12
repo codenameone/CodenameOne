@@ -38,7 +38,19 @@ import java.util.Map;
 ///
 /// ```java
 /// Offering offering = CommerceManager.getInstance().getOfferings().getCurrent();
-/// Paywall.show(offering, listener);
+/// Paywall.show(offering, new PaywallListener() {
+///     public void purchaseStarted(CommercePackage pkg) {
+///     }
+///     public void purchaseCompleted(CustomerInfo info) {
+///         Dialog.show("Thanks", "Your purchase is active", "OK", null);
+///     }
+///     public void purchaseCancelled() {
+///     }
+///     public void restoreCompleted(CustomerInfo info) {
+///     }
+///     public void closed() {
+///     }
+/// });
 /// ```
 public final class Paywall {
     private Paywall() {
