@@ -582,6 +582,46 @@ public class PyDict extends PyObject {
             return;
         }
         Object keysFn;
+        if (!(other instanceof PyInstance)) {
+            // A builtin's attributes are its type's: no __getattr__ can run,
+            // so no handler (a setjmp per dict() call on ParparVM).
+            keysFn = Py.obj(other).getAttrOrNull("keys");
+        } else {
+            keysFn = instanceKeys(other);
+        }
+        if (keysFn != null) {
+            Object it = Py.iter(Py.obj(keysFn).call(Py.NO_ARGS, Py.NO_KW));
+            for (Object k = Py.next(it); k != null; k = Py.next(it)) {
+                setItem(k, Py.obj(other).getItem(k));
+            }
+            return;
+        }
+        if (other instanceof PyList) {
+            // Pairs read straight off the list, its length read each step.
+            PyList l = (PyList) other;
+            for (int n = 0; n < l.size; n++) {
+                pairItem(l.get(n), n);
+            }
+            return;
+        }
+        Object it = Py.iter(other);
+        int n = 0;
+        for (Object pair = Py.next(it); pair != null; pair = Py.next(it), n++) {
+            pairItem(pair, n);
+        }
+    }
+
+    private void pairItem(Object pair, int n) {
+        Object[] kv = Py.toArray(pair);
+        if (kv.length != 2) {
+            throw Py.valueError("dictionary update sequence element #" + n + " has length " + kv.length
+                    + "; 2 is required");
+        }
+        setItem(kv[0], kv[1]);
+    }
+
+    private static Object instanceKeys(Object other) {
+        Object keysFn;
         try {
             keysFn = Py.obj(other).getAttrOrNull("keys");
         } catch (PyException e) {
@@ -592,23 +632,7 @@ public class PyDict extends PyObject {
             }
             keysFn = null;
         }
-        if (keysFn != null) {
-            Object it = Py.iter(Py.obj(keysFn).call(Py.NO_ARGS, Py.NO_KW));
-            for (Object k = Py.next(it); k != null; k = Py.next(it)) {
-                setItem(k, Py.obj(other).getItem(k));
-            }
-            return;
-        }
-        Object it = Py.iter(other);
-        int n = 0;
-        for (Object pair = Py.next(it); pair != null; pair = Py.next(it), n++) {
-            Object[] kv = Py.toArray(pair);
-            if (kv.length != 2) {
-                throw Py.valueError("dictionary update sequence element #" + n + " has length " + kv.length
-                        + "; 2 is required");
-            }
-            setItem(kv[0], kv[1]);
-        }
+        return keysFn;
     }
 
     /// The live keys in order.
@@ -624,10 +648,18 @@ public class PyDict extends PyObject {
         return r;
     }
 
-    /// Before each step of an iteration. A view can do less than a full
-    /// `sync` there, as long as what the step returns is current.
-    void syncStep() {
+    /// Before each step of an iteration; `last` when the walk has no entry
+    /// left, where a change of size must still be found. A view can do less
+    /// than a full `sync` there, as long as what the step returns is current.
+    void syncStep(boolean last) {
         sync();
+    }
+
+    /// Whether a `for k, v in d.items()` may walk this dict through
+    /// [#sync], [#syncStep] and [#valueAt] instead of calling its items():
+    /// true for a view whose items() is exactly that walk.
+    boolean walkAsView() {
+        return false;
     }
 
     /// The value of live entry `e`, for an iteration step.
@@ -648,7 +680,11 @@ public class PyDict extends PyObject {
                 // object behind it, so a store made through the object while
                 // iterating is caught as one made through the dict is. A plain
                 // dict's sync does nothing.
-                syncStep();
+                int j = i;
+                while (j < used && keys[j] == null) {
+                    j++;
+                }
+                syncStep(j >= used);
                 if (size != startSize) {
                     throw Py.runtimeError("dictionary changed size during iteration");
                 }

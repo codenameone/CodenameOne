@@ -4128,6 +4128,20 @@ public final class Emitter {
                             .append(t ? typedEmit.fieldGetCase(k, f) : "f_" + mangle(f)).append(";\n");
                 }
                 o.append("                default:\n                    return super.getField(i);\n            }\n        }\n");
+                // Every field in one call, for a pass that reads them all (an
+                // instance __dict__'s refresh): getField is a virtual call and
+                // a switch per field.
+                o.append("        @Override\n        protected void copyFields(Object[] d) {\n");
+                if (base > 0) {
+                    o.append("            super.copyFields(d);\n");
+                }
+                for (int i = 0; i < k.fields.size(); i++) {
+                    String f = k.fields.get(i);
+                    boolean t = typedEmit != null && typedEmit.typedField(k, f) != null;
+                    o.append("            d[").append(base + i).append("] = ")
+                            .append(t ? typedEmit.fieldGetCase(k, f) : "f_" + mangle(f)).append(";\n");
+                }
+                o.append("        }\n");
                 o.append("        @Override\n        protected void setField(int i, Object v) {\n            switch (i) {\n");
                 for (int i = 0; i < k.fields.size(); i++) {
                     String f = k.fields.get(i);

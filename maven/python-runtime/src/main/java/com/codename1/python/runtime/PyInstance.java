@@ -94,6 +94,15 @@ public class PyInstance extends PyObject {
         return null;
     }
 
+    /// Every field into `d[0..fieldNames().length)`, as getField answers
+    /// each; generated classes write them in one pass.
+    protected void copyFields(Object[] d) {
+        int n = fieldNames().length;
+        for (int i = 0; i < n; i++) {
+            d[i] = getField(i);
+        }
+    }
+
     /// Stores field `i`; null unsets it.
     protected void setField(int i, Object value) {
     }
@@ -895,10 +904,20 @@ public class PyInstance extends PyObject {
         }
 
         /// Which of the instance's first `n` (at most 64) fields are set.
+        /// The fields as [#fieldMask] last read them, in one copyFields call.
+        private Object[] snap = new Object[0];
+
+        /// Which of the `n` fields are set, from a fresh [#snap].
         private long fieldMask(int n) {
+            Object[] d = snap;
+            if (d.length < n) {
+                d = new Object[n];
+                snap = d;
+            }
+            self.copyFields(d);
             long mask = 0;
             for (int i = 0; i < n; i++) {
-                if (self.getField(i) != null) {
+                if (d[i] != null) {
                     mask |= 1L << i;
                 }
             }
@@ -910,10 +929,22 @@ public class PyInstance extends PyObject {
         // read (same shape, same set fields), a step re-reads only the value
         // it returns.
         @Override
-        void syncStep() {
-            if (!seen || seenShape != self.shape || fieldMask(self.fieldNames().length) != seenFields) { //NOPMD CompareObjectsWithEquals - identity is meant
+        void syncStep(boolean last) {
+            // The set fields are compared (every field read) only at the end
+            // of the walk: per step that made iterating quadratic in the
+            // attributes -- pdfplumber's dict(map(..., obj.__dict__.items()))
+            // spent 6x CPython's time here. A step reads its value from the
+            // instance anyway (valueAt); an attribute added or removed in the
+            // middle changes the size, which the last step still reports.
+            if (!seen || seenShape != self.shape //NOPMD CompareObjectsWithEquals - identity is meant
+                    || last && fieldMask(self.fieldNames().length) != seenFields) {
                 sync();
             }
+        }
+
+        @Override
+        boolean walkAsView() {
+            return true;
         }
 
         @Override
@@ -960,7 +991,8 @@ public class PyInstance extends PyObject {
                     if (!fieldNames[f].equals(keys[i])) {
                         return false;
                     }
-                    values[i] = self.getField(f++);
+                    // Read by the fieldMask the caller has just taken.
+                    values[i] = snap[f++];
                 } else if (sl != null && slot < sl.length && slot < shapeNames.length) {
                     if (!shapeNames[slot].equals(keys[i])) {
                         return false;

@@ -40,20 +40,32 @@ public final class ItemWalk extends PyObject {
     private final PyDict dict;
     private final int startSize;
     private final PyObject it;
+    /// A dict that is a view of something else (an instance's `__dict__`),
+    /// walked through its iteration hooks as its own items() would be.
+    private final boolean view;
     private int at;
 
-    private ItemWalk(PyDict dict, PyObject it) {
+    private ItemWalk(PyDict dict, PyObject it, boolean view) {
         this.dict = dict;
         this.it = it;
+        this.view = view;
         this.startSize = dict != null ? dict.size : 0;
     }
 
     /// The walk over `o.items()`.
     public static ItemWalk of(Object o) {
         if (o instanceof PyDict && o.getClass() == PyDict.class) {
-            return new ItemWalk((PyDict) o, null);
+            return new ItemWalk((PyDict) o, null, false);
         }
-        return new ItemWalk(null, Py.iter(Py.call(Py.getattr(o, "items"))));
+        if (o instanceof PyDict && ((PyDict) o).walkAsView()) {
+            // As PyDict.iterate does: brought up to date first, then each
+            // step through syncStep and valueAt -- no items() lookup and
+            // no tuple per entry.
+            PyDict d = (PyDict) o;
+            d.sync();
+            return new ItemWalk(d, null, true);
+        }
+        return new ItemWalk(null, Py.iter(Py.call(Py.getattr(o, "items"))), false);
     }
 
     @Override
@@ -78,6 +90,15 @@ public final class ItemWalk extends PyObject {
                     : Py.unpack(v, 2);
             return this;
         }
+        if (view) {
+            Object[] ks = d.keys;
+            int u = d.used;
+            int j = at;
+            while (j < u && ks[j] == null) {
+                j++;
+            }
+            d.syncStep(j >= u);
+        }
         if (d.size != startSize) {
             throw Py.runtimeError("dictionary changed size during iteration");
         }
@@ -93,7 +114,7 @@ public final class ItemWalk extends PyObject {
         at = i + 1;
         Object[] p = pair;
         p[0] = keys[i];
-        p[1] = d.values[i];
+        p[1] = view ? d.valueAt(i) : d.values[i];
         current = p;
         return this;
     }

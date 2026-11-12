@@ -289,6 +289,9 @@ public final class Builtins {
         if (a.length == 2) {
             return map1(a[0], a[1]);
         }
+        if (a.length == 3) {
+            return new MapIter(Py.obj(a[0]), new Feed(a[1]), new Feed(a[2]));
+        }
         final Object f = a[0];
         final Object[] its = new Object[a.length - 1];
         for (int i = 0; i < its.length; i++) {
@@ -304,30 +307,145 @@ public final class Builtins {
             }
             return Py.obj(f).call(row, Py.NO_KW);
         });
-    }).with2(Builtins::map1);
+    }).with2(Builtins::map1).with3((a0, a1, a2) -> new MapIter(Py.obj(a0), new Feed(a1), new Feed(a2)));
 
     /// `map(f, iterable)`, the usual case: a one-argument call per item.
     private static Object map1(Object f, Object iterable) {
-        final Object it = Py.iter(iterable);
-        final PyObject fn = Py.obj(f);
-        return new PyJavaIter(() -> {
-            Object v = Py.next(it);
-            return v == null ? null : fn.call1(v);
-        });
+        return new MapIter(Py.obj(f), new Feed(iterable), null);
     }
-    public static final Object FILTER = PyBuiltin.fixed2("filter", (a0, a1) -> {
-        final Object f = a0;
-        final Object it = Py.iter(a1);
-        final PyObject fn = f == Py.NONE ? null : Py.obj(f); //NOPMD CompareObjectsWithEquals - identity is meant
-        return new PyJavaIter(() -> {
-            for (Object v = Py.next(it); v != null; v = Py.next(it)) {
-                if (fn == null ? Py.isTrue(v) : Py.isTrue(fn.call1(v))) {
+
+    public static final Object FILTER = PyBuiltin.fixed2("filter", (a0, a1) ->
+            new FilterIter(a0 == Py.NONE ? null : Py.obj(a0), new Feed(a1))); //NOPMD CompareObjectsWithEquals - identity is meant
+
+    /// The source of a map or filter: a list or tuple read by index (a
+    /// list's length read again each step, as its own iterator does), any
+    /// other iterable through its iterator. No iterator object and no
+    /// next() call per value for the usual list argument.
+    static final class Feed {
+        private final PyList list;
+        private final Object[] arr;
+        private final Object it;
+        private int i;
+
+        Feed(Object iterable) {
+            if (iterable instanceof PyList) {
+                list = (PyList) iterable;
+                arr = null;
+                it = null;
+            } else if (iterable instanceof PyTuple) {
+                list = null;
+                arr = ((PyTuple) iterable).items;
+                it = null;
+            } else {
+                list = null;
+                arr = null;
+                it = Py.iter(iterable);
+            }
+        }
+
+        Object next() {
+            int k = i;
+            if (list != null) {
+                if (k >= list.size) {
+                    return null;
+                }
+                i = k + 1;
+                return list.get(k);
+            }
+            if (arr != null) {
+                if (k >= arr.length) {
+                    return null;
+                }
+                i = k + 1;
+                return arr[k];
+            }
+            return Py.next(it);
+        }
+    }
+
+    /// `map(f, a)` and `map(f, a, b)`: a call1 or call2 per item, no row array.
+    static final class MapIter extends PyObject {
+        private final PyObject fn;
+        private final Feed a;
+        private final Feed b;
+        private boolean done;
+
+        MapIter(PyObject fn, Feed a, Feed b) {
+            this.fn = fn;
+            this.a = a;
+            this.b = b;
+        }
+
+        @Override
+        public PyType type() {
+            return Py.ITERATOR_TYPE;
+        }
+
+        @Override
+        public Object iter() {
+            return this;
+        }
+
+        @Override
+        public Object next() {
+            if (done) {
+                return null;
+            }
+            Object x = a.next();
+            if (x == null) {
+                done = true;
+                return null;
+            }
+            if (b == null) {
+                return fn.call1(x);
+            }
+            Object y = b.next();
+            if (y == null) {
+                done = true;
+                return null;
+            }
+            return fn.call2(x, y);
+        }
+    }
+
+    /// `filter(f, iterable)`; `f` null for `filter(None, ...)`.
+    static final class FilterIter extends PyObject {
+        private final PyObject fn;
+        private final Feed src;
+        private boolean done;
+
+        FilterIter(PyObject fn, Feed src) {
+            this.fn = fn;
+            this.src = src;
+        }
+
+        @Override
+        public PyType type() {
+            return Py.ITERATOR_TYPE;
+        }
+
+        @Override
+        public Object iter() {
+            return this;
+        }
+
+        @Override
+        public Object next() {
+            if (done) {
+                return null;
+            }
+            final Feed s = src;
+            final PyObject f = fn;
+            for (Object v = s.next(); v != null; v = s.next()) {
+                if (f == null ? Py.isTrue(v) : Py.isTrue(f.call1(v))) {
                     return v;
                 }
             }
+            done = true;
             return null;
-        });
-    });
+        }
+    }
+
     public static final Object SUPER = PyBuiltin.positional("super", a -> {
         if (a.length != 2 || !(a[0] instanceof PyType)) {
             throw Py.runtimeError("super(): no arguments");
