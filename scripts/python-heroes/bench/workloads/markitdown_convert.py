@@ -29,7 +29,11 @@ PH = {}
 def work(fixtures, dump=None):
     md = MarkItDown(enable_plugins=False)
     digest = hashlib.sha256()
+    # MARKITDOWN_ONLY=test.pdf converts one document, to profile it alone.
+    only = os.environ.get("MARKITDOWN_ONLY")
     for name in FILES:
+        if only and name != only:
+            continue
         t = time.perf_counter()
         # The ZIP converter names the archive's path, which is not the same
         # string on the two sides.

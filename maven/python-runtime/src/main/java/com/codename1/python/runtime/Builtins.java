@@ -1316,6 +1316,19 @@ public final class Builtins {
     }
 
     private static Object minMax(String fn, Object[] args, String[] kw, boolean min) {
+        if (kw.length == 0 && args.length >= 2) {
+            // min(a, b, ...) with no key: a straight scan over the arguments,
+            // with no argument parsing, tuple or iterator. pdfminer's
+            // apply_matrix_rect calls it four times per rectangle.
+            Object best = args[0];
+            for (int i = 1; i < args.length; i++) {
+                Object v = args[i];
+                if (min ? Py.ltBool(v, best) : Py.ltBool(best, v)) {
+                    best = v;
+                }
+            }
+            return best;
+        }
         Args a = new Args(fn, args, kw).check(Integer.MAX_VALUE, "key", "default");
         Object key = a.kw("key");
         if (key == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
