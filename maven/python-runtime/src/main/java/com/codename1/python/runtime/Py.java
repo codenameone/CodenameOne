@@ -2052,6 +2052,38 @@ public final class Py {
         return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f);
     }
 
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m, n);
+    }
+
     public static Object callKw(Object f, Object[] args, String[] kwNames) {
         return Py.obj(f).call(args, kwNames);
     }

@@ -112,9 +112,9 @@ public abstract class PyObject {
     }
 
     // Keyword calls of a fixed arity: `kwNames` names the trailing arguments,
-    // as in [#call]. The transpiler emits these for calls of at most six
-    // arguments, so the call site builds no argument array; a function
-    // binds them in locals, anything else gets the array here.
+    // as in [#call]. The transpiler emits these for every keyword call of at
+    // most 14 arguments, so the call site builds no argument array; a
+    // function binds them in locals, anything else gets the array here.
 
     public Object callKwF(String[] kwNames, Object a) {
         return call(new Object[] {a}, kwNames);
@@ -138,6 +138,38 @@ public abstract class PyObject {
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
         return call(new Object[] {a, b, c, d, e, f}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return call(new Object[] {a, b, c, d, e, f, g}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return call(new Object[] {a, b, c, d, e, f, g, h}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        return call(new Object[] {a, b, c, d, e, f, g, h, i}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, kwNames);
+    }
+
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, kwNames);
     }
 
     public Object call1(Object a) {

@@ -64,6 +64,46 @@ public final class PyMethod extends PyObject {
     }
 
     @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f, g);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f, g, h);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f, g, h, i);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        return Py.obj(func).callKwF(kwNames, self, a, b, c, d, e, f, g, h, i, j, k, l, m);
+    }
+
+    @Override
     public Object call(Object[] args, String[] kwNames) {
         return Py.obj(func).call(Py.prepend(self, args), kwNames);
     }

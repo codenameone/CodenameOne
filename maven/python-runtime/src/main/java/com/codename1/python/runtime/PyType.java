@@ -1012,6 +1012,94 @@ public final class PyType extends PyObject {
         return super.callKwF(kwNames, a, b, c, d, e);
     }
 
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l, m));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m);
+    }
+
     /// A positional constructor call of a plain class without an argument
     /// array: `__init__` is a function, or the one a dataclass generated. Null
     /// when the class is neither, and the caller builds the array after all.

@@ -610,7 +610,7 @@ public final class AttrSite {
         return Py.obj(get(o)).call(rest, kwNames);
     }
 
-    /// [#callKw] of a fixed arity: the receiver plus at most five arguments,
+    /// [#callKw] of a fixed arity: the receiver plus at most thirteen arguments,
     /// with no argument array at the call site.
     public Object callKwF(Object o, String[] kwNames, Object a) {
         Object fn = method(o);
@@ -650,6 +650,70 @@ public final class AttrSite {
             return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e);
         }
         return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l, m);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m);
     }
 
     /// The function to call with the receiver prepended, when the call needs
