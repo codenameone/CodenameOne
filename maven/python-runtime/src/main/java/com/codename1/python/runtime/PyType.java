@@ -701,6 +701,28 @@ public final class PyType extends PyObject {
         return customGetattribute;
     }
 
+    /// Whether `__getitem__` is the builtin one (a dict subclass that does
+    /// not override it), and the class's `__missing__` (null for none), kept
+    /// against [#version] as [#hasCustomGetattribute()] is: a subscript of a
+    /// `defaultdict` asked both of the whole MRO on every read.
+    private boolean builtinGetitem;
+    private Object missing;
+    private int getitemVersion = -1;
+
+    boolean hasBuiltinGetitem() {
+        if (getitemVersion != version) {
+            builtinGetitem = lookup("__getitem__") instanceof PyBuiltin;
+            missing = lookup("__missing__");
+            getitemVersion = version;
+        }
+        return builtinGetitem;
+    }
+
+    /// `__missing__`, valid after [#hasBuiltinGetitem()] answered.
+    Object missingMethod() {
+        return missing;
+    }
+
     /// `issubclass(self, other)`.
     public boolean isSubtype(PyType other) {
         for (PyType e : mro) {

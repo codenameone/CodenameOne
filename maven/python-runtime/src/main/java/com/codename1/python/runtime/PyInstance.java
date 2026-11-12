@@ -656,13 +656,12 @@ public class PyInstance extends PyObject {
     @Override
     public Object getItem(Object key) {
         if (base instanceof PyDict) {
-            Object m = cls.lookup("__getitem__");
-            if (m instanceof PyBuiltin) {
+            if (cls.hasBuiltinGetitem()) {
                 Object v = ((PyDict) base).getOrNull(key);
                 if (v != null) {
                     return v;
                 }
-                Object missing = cls.lookup("__missing__");
+                Object missing = cls.missingMethod();
                 if (missing != null) {
                     return Py.obj(missing).call2(this, key);
                 }
