@@ -771,6 +771,22 @@ public final class PyFunction extends PyObject {
 
     private Object[] spareSlots;
 
+    /// Set when the body only ever passes its `**kwargs` on with `**` (a
+    /// logger's `debug(msg, *args, **kwargs)`): a call without keywords then
+    /// gets [#NO_KWARGS] rather than a new dict nobody can see, write or keep.
+    /// The transpiler proves this; see `Emitter.kwForwardOnly`.
+    private boolean kwShared;
+
+    /// The empty `**kwargs` of a [#kwShared] function. Spreading it adds
+    /// nothing, and a callee that collects keywords builds its own dict.
+    static final PyDict NO_KWARGS = new PyDict();
+
+    /// Marks the function [#kwShared].
+    public PyFunction kwShared() {
+        kwShared = true;
+        return this;
+    }
+
     /// The slot of each name of the last two keyword-name arrays
     /// [#bindDirect] matched. Every call site hoists its array into a static,
     /// so the same array arrives again and again: one identity check instead
@@ -976,7 +992,7 @@ public final class PyFunction extends PyObject {
         } else if (varArgs) {
             out[positional] = PyTuple.EMPTY;
         }
-        PyDict kw = varKw ? new PyDict() : null;
+        PyDict kw = varKw ? (kwShared && kwNames.length == 0 ? NO_KWARGS : new PyDict()) : null;
         int kwBase = positional + (varArgs ? 1 : 0);
         List<String> byKeyword = null;
         // Which slot each keyword names is the same every time one call site

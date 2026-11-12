@@ -2459,6 +2459,9 @@ public final class Emitter {
         if (!q.equals(name)) {
             r.append(".qual(").append(javaString(q)).append(")");
         }
+        if (args.kwarg != null && kwForwardOnly(args.kwarg.name, body != null ? body : exprBody)) {
+            r.append(".kwShared()");
+        }
         r.append(".inModule(G[0])");
         if (args.positionalOnly > 0) {
             r.append(".positionalOnly(").append(args.positionalOnly).append(")");
@@ -2472,6 +2475,36 @@ public final class Emitter {
             r.insert(0, "(" + defField + " = ").append(")");
         }
         return r.toString();
+    }
+
+    /// Whether the only uses of `**name` in a body pass it on as `**name` in a
+    /// call: never read, stored, deleted or captured otherwise, and nothing
+    /// in the body can reach a frame's locals. A call without keywords can
+    /// then hand such a function one shared empty dict (PyFunction.kwShared).
+    private static boolean kwForwardOnly(String name, Object body) {
+        boolean[] ok = {true};
+        kwScan(name, body, ok);
+        return ok[0];
+    }
+
+    private static void kwScan(String name, Object o, boolean[] ok) {
+        if (!ok[0]) {
+            return;
+        }
+        if (o instanceof Keyword) {
+            Keyword k = (Keyword) o;
+            if (k.arg == null && k.value instanceof Name && name.equals(((Name) k.value).id)) {
+                return;
+            }
+        } else if (o instanceof Name) {
+            String id = ((Name) o).id;
+            if (name.equals(id) || "locals".equals(id) || "vars".equals(id) || "exec".equals(id)
+                    || "eval".equals(id)) {
+                ok[0] = false;
+                return;
+            }
+        }
+        Infer.children(o, x -> kwScan(name, x, ok));
     }
 
     /// Parameter `i` of a function body: its own Java parameter, or an
@@ -3252,6 +3285,20 @@ public final class Emitter {
         if (c.func instanceof Name && c.keywords.isEmpty() && !Infer.hasStarred(c.args)) {
             String fn = ((Name) c.func).id;
             boolean builtin = sc.resolve(fn) == Scope.Binding.BUILTIN;
+            if (builtin && "isinstance".equals(fn) && c.args.size() == 2 && c.args.get(1) instanceof TupleExpr) {
+                // `isinstance(x, (A, B))`: the types are checked one by one,
+                // as the builtin walks the tuple, and no tuple is built for a
+                // call that is often on a hot path (pdfplumber's resolve_all).
+                List<Expr> ts = ((TupleExpr) c.args.get(1)).elts;
+                if (ts.size() >= 2 && ts.size() <= 4 && !Infer.hasStarred(ts)) {
+                    StringBuilder r = new StringBuilder("Py.isinstanceAny(").append(expr(c.func)).append(", ")
+                            .append(expr(c.args.get(0)));
+                    for (Expr t : ts) {
+                        r.append(", ").append(expr(t));
+                    }
+                    return r.append(")").toString();
+                }
+            }
             if (builtin && "isinstance".equals(fn) && c.args.size() == 2) {
                 return "Py.isinstance(" + expr(c.func) + ", " + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + ")";
             }

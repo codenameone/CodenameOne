@@ -342,6 +342,30 @@ public final class Py {
         return call(f, o, t);
     }
 
+    /// `isinstance(o, (a, b))` with the tuple written out: the builtin checks
+    /// each type in turn without the tuple being built; anything else that
+    /// is bound to the name gets the tuple.
+    public static Object isinstanceAny(Object f, Object o, Object a, Object b) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b));
+        }
+        return call(f, o, tuple(a, b));
+    }
+
+    public static Object isinstanceAny(Object f, Object o, Object a, Object b, Object c) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c));
+        }
+        return call(f, o, tuple(a, b, c));
+    }
+
+    public static Object isinstanceAny(Object f, Object o, Object a, Object b, Object c, Object d) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d));
+        }
+        return call(f, o, tuple(a, b, c, d));
+    }
+
     /// `dict(o)`, as [#isinstance(Object, Object, Object)]: a copy of a dict
     /// made straight from it.
     public static Object dict1(Object f, Object o) {
