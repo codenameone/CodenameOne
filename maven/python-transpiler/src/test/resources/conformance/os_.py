@@ -33,7 +33,9 @@ print(open("f.txt").read())
 os.rename("f.txt", "g.txt")
 print(sorted(os.listdir(".")))
 os.replace("g.txt", "x/h.txt")
-print(os.listdir("x"))
+# Sorted like the listings above: a directory is read in whatever order
+# the file system keeps it, and that differs from one runner to the next.
+print(sorted(os.listdir("x")))
 os.chdir("..")
 os.remove("d1/x/h.txt")
 os.rmdir("d1/x/y")
