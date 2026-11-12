@@ -108,6 +108,30 @@ class BarLayoutTest extends UITestBase {
         assertFalse(layout.isStacked());
     }
 
+    /// The narrowest phones: the title no longer fits beside the buttons
+    /// that lead, where it used to be cut off in the middle of the year.
+    @FormTest
+    void aMiddleThatDoesNotFitBesideWhatLeadsSharesTheSecondRow() {
+        BarLayout layout = new BarLayout();
+        Label lead = part(150, 30);
+        Label middle = part(80, 20);
+        Label trail = part(100, 40);
+        Container c = bar(layout, lead, middle, trail);
+
+        assertTrue(layout.fit(c, 200));
+        lay(c, 200);
+
+        assertEquals(70, c.getHeight(), "still two rows");
+        assertEquals(0, lead.getY());
+        assertEquals(150, lead.getWidth());
+        assertEquals(30, middle.getY(), "under what leads");
+        assertEquals(0, middle.getX());
+        assertEquals(80, middle.getWidth(), "all of it");
+        assertEquals(30, trail.getY());
+        assertEquals(100, trail.getX(), "what trails keeps the far edge");
+        assertTrue(middle.getX() + middle.getWidth() <= trail.getX());
+    }
+
     @FormTest
     void aTrailingPartWiderThanTheBarStartsAtItsStart() {
         BarLayout layout = new BarLayout();

@@ -236,10 +236,16 @@ class SchedulerFeedbackTest extends UITestBase {
         assertTrue(seen[0] >= 0, "the item was painted");
         assertEquals(0, seen[0] & ScheduleItemRenderer.HOVERED);
 
+        // By a clock that is held: the light comes up from nothing, so a
+        // frame painted in the millisecond of the hover has none yet, and a
+        // machine fast enough to paint it then is not what is tested.
         int[] r = rect(grid, "a");
+        s.setAnimationTime(1000);
         hover(grid, r[0] + r[2] / 2, r[1] + r[3] / 2);
+        s.setAnimationTime(1060);
         s.paintComponent(out.getGraphics(), true);
         assertTrue((seen[0] & ScheduleItemRenderer.HOVERED) != 0);
+        s.setAnimationTime(-1);
     }
 
     @FormTest

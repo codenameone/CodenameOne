@@ -457,10 +457,7 @@ draws an event as a card with a stripe, and deepens it under the pointer:
 include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/CardItemRenderer.java[tag=scheduler-renderer,indent=0]
 ----
 
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling/SchedulingSnippets.java[tag=scheduler-renderer-use,indent=0]
-----
+It's handed to a scheduler with `setItemRenderer(new CardItemRenderer())`.
 
 .The day view drawn by that renderer
 image::img/generated/scheduler-renderer.png["The day view with items drawn as pale cards with a solid stripe down their left edge",scaledwidth=30%]

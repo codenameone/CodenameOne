@@ -510,6 +510,7 @@ public class Gantt extends Container {
     /// makes them. A negative value returns to the clock.
     ///
     /// ```java
+    /// Gantt gantt = new Gantt();
     /// gantt.setAnimationTime(1000);  // nothing has started
     /// // ... press, drag, release ...
     /// gantt.setAnimationTime(1100);  // 100 milliseconds into what followed

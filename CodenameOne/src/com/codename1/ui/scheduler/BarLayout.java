@@ -116,6 +116,18 @@ final class BarLayout extends Layout {
         }
         int lw = Math.min(rowW, outerWidth(lead));
         place(lead, rtl ? x + rowW - lw : x, y, lw, rowH);
+        if (stacked && trail != null && middle != null && !middle.isHidden() && outerWidth(middle) > rowW - lw
+                && outerWidth(middle) + outerWidth(trail) <= w) {
+            // On the narrowest phones the middle does not fit beside what
+            // leads either, and a title cut off halfway through the year
+            // reads as a fault. It fits in the second row, opposite what
+            // trails, so it goes there.
+            int mw = outerWidth(middle);
+            int tw = outerWidth(trail);
+            place(middle, rtl ? x + w - mw : x, y + rowH, mw, h - rowH);
+            place(trail, rtl ? x : x + w - tw, y + rowH, tw, h - rowH);
+            return;
+        }
         if (middle != null) {
             place(middle, rtl ? x : x + lw, y, rowW - lw, rowH);
         }

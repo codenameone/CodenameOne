@@ -289,21 +289,20 @@ public class SchedulingSnippets {
         // end::schedule-print[]
     }
 
-    public void customRenderer(Scheduler scheduler) {
-        // tag::scheduler-renderer-use[]
-        scheduler.setItemRenderer(new CardItemRenderer());
-        // end::scheduler-renderer-use[]
-    }
-
-    public Image animationFrame(Scheduler scheduler, Runnable drag) {
+    public Image animationFrame() {
         // tag::scheduler-animation-time[]
+        Scheduler scheduler = new Scheduler();
+        Form form = new Form("Week", new BorderLayout());
+        form.add(BorderLayout.CENTER, scheduler);
+        form.show();
+
         // Stop the clock, do what starts the animation, then move the clock
-        // to the moment wanted: 80 milliseconds into picking an item up.
+        // to the moment wanted: 80 milliseconds into what was started.
         scheduler.setAnimationTime(1000);
-        drag.run();
+        // ... press an item and drag it ...
         scheduler.setAnimationTime(1080);
 
-        Image frame = Image.createImage(scheduler.getWidth(), scheduler.getHeight());
+        Image frame = Image.createImage(Math.max(1, scheduler.getWidth()), Math.max(1, scheduler.getHeight()));
         scheduler.paintComponent(frame.getGraphics(), true);
 
         // Back to the real clock.

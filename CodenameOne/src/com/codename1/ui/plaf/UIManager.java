@@ -45,6 +45,7 @@ import com.codename1.util.StringUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -189,6 +190,10 @@ public class UIManager {
     private boolean useNativeColors;
     private boolean useNativeFonts;
     private boolean refreshingTheme;
+    /// What `installSchedulingDefaults` put into the theme, by key. A refresh
+    /// hands the whole theme back in, these included, and without this they
+    /// would read as the application's own styles and never be replaced.
+    private final HashMap<String, Object> schedulingDefaults = new HashMap<String, Object>();
     private final java.util.Set<String> nativeFontKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeColorKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeBorderKeys = new java.util.HashSet<String>();
@@ -2130,15 +2135,37 @@ public class UIManager {
         Boolean deviceDark = CN.isDarkMode();
         boolean followsDevice = deviceDark != null && deviceDark.booleanValue();
         if (installedTheme != null) {
-            for (String key : installedTheme.keySet()) {
+            ArrayList<String> stale = null;
+            for (Map.Entry<String, Object> entry : installedTheme.entrySet()) {
+                String key = entry.getKey();
                 if (followsDevice && key.startsWith("$Dark")) {
                     dark = true;
                 }
                 if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")) {
+                    // A default from the last pass is not the theme's: it
+                    // was the light palette if that pass was light, and a
+                    // refresh into dark mode has to be able to replace it.
+                    // One the application changed since is the theme's.
+                    Object ours = refreshingTheme ? schedulingDefaults.get(key) : null;
+                    Object now = entry.getValue();
+                    if (ours != null && (ours == now || ours.equals(now))) { //NOPMD CompareObjectsWithEquals - the same object is the usual case
+                        if (stale == null) {
+                            stale = new ArrayList<String>();
+                        }
+                        stale.add(key);
+                        continue;
+                    }
                     int dot = key.indexOf('.');
                     if (dot > 0) {
                         themed.add(key.substring(0, dot));
                     }
+                }
+            }
+            if (stale != null) {
+                // The theme is applied over the defaults once this returns,
+                // so the old ones have to leave it or they win again.
+                for (String key : stale) {
+                    installedTheme.remove(key);
                 }
             }
             // A theme that is dark without the dark mode switch still needs
@@ -2278,6 +2305,13 @@ public class UIManager {
             themeProps.put("PickerMaterialTab.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialTab", "sel#", variant, raised, "0");
             schedulingState("PickerMaterialTab", "press#", onTint, tint, "255");
+        }
+        schedulingDefaults.clear();
+        for (Map.Entry<String, Object> e : themeProps.entrySet()) {
+            String key = e.getKey();
+            if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")) {
+                schedulingDefaults.put(key, e.getValue());
+            }
         }
     }
 

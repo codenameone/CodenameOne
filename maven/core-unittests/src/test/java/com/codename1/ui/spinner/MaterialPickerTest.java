@@ -597,4 +597,35 @@ class MaterialPickerTest extends UITestBase {
             UIManager.getInstance().setThemeProps(new Hashtable<String, Object>());
         }
     }
+
+    /// The path an application takes when the device turns dark: the theme is
+    /// refreshed, not set again. The refresh hands the defaults of the light
+    /// pass back in as if they were the theme's, which once kept every one
+    /// of them light.
+    @FormTest
+    void aRefreshIntoDarkModeReplacesTheLightDefaults() {
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("$DarkForm.bgColor", "101010");
+        Boolean was = Display.getInstance().isDarkMode();
+        try {
+            Display.getInstance().setDarkMode(Boolean.FALSE);
+            UIManager.getInstance().setThemeProps(theme);
+            assertEquals(0xf3edf7, UIManager.getInstance().getComponentStyle("PickerMaterial").getBgColor());
+            Hashtable<String, Object> own = new Hashtable<String, Object>();
+            own.put("GanttRow.bgColor", "123456");
+            UIManager.getInstance().addThemeProps(own);
+            Display.getInstance().setDarkMode(Boolean.TRUE);
+            UIManager.getInstance().refreshTheme();
+            assertEquals(0x2b2930, UIManager.getInstance().getComponentStyle("PickerMaterial").getBgColor());
+            assertEquals(0x1c1b1f, UIManager.getInstance().getComponentStyle("SchedulerHeader").getBgColor());
+            assertEquals(0x123456, UIManager.getInstance().getComponentStyle("GanttRow").getBgColor(),
+                    "a style the application set is not a default to replace");
+            Display.getInstance().setDarkMode(Boolean.FALSE);
+            UIManager.getInstance().refreshTheme();
+            assertEquals(0xf3edf7, UIManager.getInstance().getComponentStyle("PickerMaterial").getBgColor());
+        } finally {
+            Display.getInstance().setDarkMode(was);
+            UIManager.getInstance().setThemeProps(new Hashtable<String, Object>());
+        }
+    }
 }
