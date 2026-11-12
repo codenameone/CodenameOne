@@ -2319,6 +2319,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// ones included:
     ///
     /// ```java
+    /// TextField quantity = new TextField();
     /// quantity.setConstraint(TextArea.NUMERIC);
     /// quantity.putClientProperty("nextButton", Boolean.TRUE);
     /// ```

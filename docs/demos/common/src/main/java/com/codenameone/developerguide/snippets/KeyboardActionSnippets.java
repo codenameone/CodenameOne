@@ -22,6 +22,7 @@
  */
 package com.codenameone.developerguide.snippets;
 
+import com.codename1.ui.Dialog;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 
@@ -38,10 +39,7 @@ public class KeyboardActionSnippets {
 
         // Offers Done even if another field follows it, and calls the listener
         price.putClientProperty("doneButton", Boolean.TRUE);
-        price.setDoneListener(e -> save());
+        price.setDoneListener(e -> Dialog.show("Saved", price.getText(), "OK", null));
         // end::keyboard-action-next-done[]
-    }
-
-    void save() {
     }
 }
