@@ -143,6 +143,13 @@ final class RegexMatch extends PyObject {
         }
         byte[] v = b.value;
         String t = Codecs.latin1(v, 0, v.length);
+        if (v.length <= 64) {
+            // A short subject costs less to convert than to remember, and
+            // remembering it would evict the long one: psparser alternates
+            // `NONSPC.search(self.buf, i)` with subs over each hex token, and
+            // every token converted the whole buffer again.
+            return t;
+        }
         lastBytes = b;
         lastText = t;
         return t;
