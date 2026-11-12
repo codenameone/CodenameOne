@@ -97,6 +97,10 @@ final class Regex {
         /// AT: the assertion. LOOK: behind, negative, width.
         int at;
         boolean behind;
+        /// A LOOK whose program is single-char tests and then MATCH (`(?<!\\)`,
+        /// `(?=px)`, `(?<![a-z])`): it is answered in line, by those tests,
+        /// with no nested run, register copy or stacks.
+        boolean simple;
         int width;
         /// LOOK, ATOMIC, BACKREF: the sub-program, or the case flag.
         Op[] sub;
@@ -263,7 +267,11 @@ final class Regex {
                     pc++;
                     continue;
                 }
-                if (op.k == SAVE) {
+                if (op.k == SAVE || op.k == LOOK) {
+                    // A lookaround is zero width too: whatever follows it must
+                    // still match from the same offset, so its first set is
+                    // a necessary condition. `(?<![a-z])\d+` ran the whole
+                    // program at every offset without this.
                     pc++;
                 } else if (op.k == JMP) {
                     pc = op.a;
@@ -358,6 +366,7 @@ final class Regex {
                 o.behind = Py.isTrue(t[2]);
                 o.neg = Py.isTrue(t[3]);
                 o.width = num(t[4]);
+                o.simple = simpleLook(o.sub);
                 break;
             case ATOMIC:
                 o.sub = program(t[1]);
@@ -512,6 +521,42 @@ final class Regex {
             }
         }
         return false;
+    }
+
+    private static boolean simpleLook(Op[] sub) {
+        if (sub == null) {
+            return false;
+        }
+        int n = sub.length;
+        if (n < 2 || sub[n - 1].k != MATCH) {
+            return false;
+        }
+        for (int i = 0; i < n - 1; i++) {
+            int k = sub[i].k;
+            if (k != CHAR && k != CHARI && k != ANY && k != ANYALL && k != SET) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A simple LOOK's own tests (see `Op.simple`), before the negation.
+    private static boolean lookHit(Op op, Text t, int pos, int endpos) {
+        Op[] sub = op.sub;
+        if (sub == null) {
+            return false;
+        }
+        int n = sub.length - 1;
+        int from = op.behind ? pos - n : pos;
+        if (from < 0 || from + n > (op.behind ? pos : endpos)) {
+            return false;
+        }
+        for (int q = 0; q < n; q++) {
+            if (!one(sub[q], t.at(from + q))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean one(Op op, int c) {
@@ -795,6 +840,43 @@ final class Regex {
     private static final class Ints {
         int[] a = NO_INTS;
         int n;
+        /// What a lookaround or atomic group run from this stack's exec works
+        /// in: its copy of the registers and its own two stacks, kept here
+        /// rather than allocated per attempt. A lookbehind in a searched
+        /// pattern is tried at every position. The inner run is over before
+        /// the outer one goes on, so one set per nesting level serves all of
+        /// them; a nested one hangs off the inner stack the same way.
+        private int[] subRegs = NO_INTS;
+        private Ints subStack;
+        private Ints subTrail;
+
+        int[] inner(int[] regs) {
+            int[] r = subRegs;
+            if (r.length != regs.length) {
+                r = new int[regs.length];
+                subRegs = r;
+            }
+            System.arraycopy(regs, 0, r, 0, regs.length);
+            return r;
+        }
+
+        Ints subStack() {
+            Ints x = subStack;
+            if (x == null) {
+                x = new Ints();
+                subStack = x;
+            }
+            return x;
+        }
+
+        Ints subTrail() {
+            Ints x = subTrail;
+            if (x == null) {
+                x = new Ints();
+                subTrail = x;
+            }
+            return x;
+        }
 
         /// The array with room for `need` entries in all; grown when short.
         int[] room(int need) {
@@ -961,13 +1043,21 @@ final class Regex {
                     pc = regs[2 * op.a] >= 0 && regs[2 * op.a + 1] >= 0 ? pc + 1 : op.b;
                     continue;
                 case LOOK: {
-                    int[] inner = copy(regs);
+                    if (op.simple) {
+                        if (lookHit(op, t, pos, endpos) != op.neg) {
+                            pc++;
+                            continue;
+                        }
+                        ok = false;
+                        break;
+                    }
+                    int[] inner = stack.inner(regs);
                     int end;
                     if (op.behind) {
                         int s = pos - op.width;
-                        end = s < 0 ? -1 : exec(op.sub, t, s, pos, inner, true, -1, li, new Ints(), new Ints());
+                        end = s < 0 ? -1 : exec(op.sub, t, s, pos, inner, true, -1, li, stack.subStack(), stack.subTrail());
                     } else {
-                        end = exec(op.sub, t, pos, endpos, inner, false, -1, li, new Ints(), new Ints());
+                        end = exec(op.sub, t, pos, endpos, inner, false, -1, li, stack.subStack(), stack.subTrail());
                     }
                     if (op.neg) {
                         if (end < 0) {
@@ -986,8 +1076,8 @@ final class Regex {
                     continue;
                 }
                 case ATOMIC: {
-                    int[] inner = copy(regs);
-                    int end = exec(op.sub, t, pos, endpos, inner, false, -1, li, new Ints(), new Ints());
+                    int[] inner = stack.inner(regs);
+                    int end = exec(op.sub, t, pos, endpos, inner, false, -1, li, stack.subStack(), stack.subTrail());
                     if (end < 0) {
                         ok = false;
                         break;
@@ -1082,12 +1172,6 @@ final class Regex {
             sb.append(str(t.at(a + i)));
         }
         return sb.toString();
-    }
-
-    private static int[] copy(int[] regs) {
-        int[] r = new int[regs.length];
-        System.arraycopy(regs, 0, r, 0, regs.length);
-        return r;
     }
 
     private static void adopt(int[] regs, int[] inner, Ints trail) {

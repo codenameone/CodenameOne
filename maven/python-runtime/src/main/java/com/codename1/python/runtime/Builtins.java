@@ -947,11 +947,7 @@ public final class Builtins {
             throw Py.typeError("int() argument must be a string, a bytes-like object or a real number, not '"
                     + Py.typeOf(x).name + "'");
         }
-        char[] c = new char[b.length];
-        for (int i = 0; i < b.length; i++) {
-            c[i] = (char) (b[i] & 0xff);
-        }
-        return new String(c);
+        return Codecs.latin1(b, 0, b.length);
     }
 
     static Object toFloat(Object x) {
@@ -992,12 +988,8 @@ public final class Builtins {
         byte[] b = x instanceof PyStr ? null : PyBytes.like(x);
         if (b != null) {
             // float(b"1.5") parses the bytes as ASCII text.
-            char[] cs = new char[b.length];
-            for (int i = 0; i < b.length; i++) {
-                cs[i] = (char) (b[i] & 0xff);
-            }
             try {
-                return toFloat(new String(cs));
+                return toFloat(Codecs.latin1(b, 0, b.length));
             } catch (PyException e) {
                 throw Py.valueError("could not convert string to float: " + Py.toRepr(x)); //NOPMD PreserveStackTrace - CPython's error has no cause
             }

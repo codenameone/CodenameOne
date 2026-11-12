@@ -714,6 +714,15 @@ public final class Py {
         return bool(!isTrue(o));
     }
 
+    /// `a == lit` for a str literal: a str compares its text, anything else
+    /// (a str subclass, an object with its own `__eq__`) the generic way.
+    public static boolean eqStr(Object a, String lit) {
+        if (a instanceof String) {
+            return lit.equals(a);
+        }
+        return !(a instanceof Long) && a != Py.NONE && eqBool(a, lit); //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
     public static boolean eqBool(Object a, Object b) {
         if (a instanceof Long && b instanceof Long) {
             return ((Long) a).longValue() == ((Long) b).longValue();

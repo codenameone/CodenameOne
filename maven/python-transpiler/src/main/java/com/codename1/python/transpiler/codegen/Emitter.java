@@ -2739,6 +2739,10 @@ public final class Emitter {
     /// `v instanceof Long` rather than `(t = v) instanceof Long`, which the
     /// ParparVM translator compiles to C expressions instead of operand-stack
     /// DUP/ASTORE traffic -- that was a third of a generator's step().
+    /// A Java string literal as the emitter writes a str constant.
+    private static final java.util.regex.Pattern STR_LITERAL =
+            java.util.regex.Pattern.compile("\"(?:[^\"\\\\]|\\\\.)*\"");
+
     private String[] operandTemps(String l, String r) {
         if (PLAIN_NAME.matcher(l).matches() && PLAIN_NAME.matcher(r).matches()) {
             return new String[] {l, r};
@@ -2790,6 +2794,17 @@ public final class Emitter {
             default:
                 return null;
         }
+        if ("==".equals(op) || "!=".equals(op)) {
+            // Against a str literal the int test can never pass: compare as
+            // strings, the literal having no effects to keep in order.
+            String neg = "==".equals(op) ? "" : "!";
+            if (STR_LITERAL.matcher(r).matches()) {
+                return "(" + neg + "Py.eqStr(" + l + ", " + r + "))";
+            }
+            if (STR_LITERAL.matcher(l).matches()) {
+                return "(" + neg + "Py.eqStr(" + r + ", " + l + "))";
+            }
+        }
         String[] tu = operandTemps(l, r);
         String t = tu[0];
         String u = tu[1];
@@ -2803,6 +2818,10 @@ public final class Emitter {
     private String inlineArith(String op, String l, String r, boolean inPlace) {
         if (!"+".equals(op) && !"-".equals(op)) {
             return null;
+        }
+        if (STR_LITERAL.matcher(l).matches() || STR_LITERAL.matcher(r).matches()) {
+            // A str literal is never an int: no int test, no temporaries.
+            return "Py." + (inPlace ? "i" : "") + BIN.get(op) + "(" + l + ", " + r + ")";
         }
         String[] tu = operandTemps(l, r);
         String t = tu[0];

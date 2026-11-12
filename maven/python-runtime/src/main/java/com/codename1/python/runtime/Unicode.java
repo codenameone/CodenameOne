@@ -112,6 +112,9 @@ final class Unicode {
     static final class Mapping {
         private final char[] keys;
         private final String[] values;
+        /// What each Latin-1 char maps to when that is one Latin-1 char,
+        /// else -1 (sharp s upper-cases to two, y-diaeresis to U+0178).
+        final short[] latin1 = new short[256];
 
         Mapping(String[] table) {
             String t = join(table);
@@ -126,6 +129,10 @@ final class Unicode {
                 keys[k] = t.charAt(i);
                 values[k] = t.substring(i + 2, i + 2 + t.charAt(i + 1));
                 k++;
+            }
+            for (int c = 0; c < 256; c++) {
+                String v = get((char) c);
+                latin1[c] = v == null ? (short) c : v.length() == 1 && v.charAt(0) < 256 ? (short) v.charAt(0) : -1;
             }
         }
 
