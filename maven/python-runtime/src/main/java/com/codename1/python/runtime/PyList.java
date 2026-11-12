@@ -184,7 +184,10 @@ public final class PyList extends PyObject {
 
     private void appendObject(Object v) {
         if (size == items.length) {
-            Object[] n = new Object[size * 2 + 4];
+            // 8 first, as CPython's list starts an unsized fill: a list
+            // built from a filter or a generator of a dozen items then
+            // allocates twice rather than three times.
+            Object[] n = new Object[size + (size >> 1) + 8];
             System.arraycopy(items, 0, n, 0, size);
             items = n;
         }
@@ -234,6 +237,22 @@ public final class PyList extends PyObject {
                 }
             } catch (Throwable e) {
                 throw PyGenerator.loopEscape(g, e);
+            }
+            return;
+        }
+        if (it instanceof Builtins.FilterIter) {
+            // Both classes are final: next() is a direct call, not a
+            // virtual one through Py.next per item.
+            Builtins.FilterIter f = (Builtins.FilterIter) it;
+            for (Object v = f.next(); v != null; v = f.next()) {
+                append(v);
+            }
+            return;
+        }
+        if (it instanceof Builtins.MapIter) {
+            Builtins.MapIter m = (Builtins.MapIter) it;
+            for (Object v = m.next(); v != null; v = m.next()) {
+                append(v);
             }
             return;
         }

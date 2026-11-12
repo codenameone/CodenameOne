@@ -581,6 +581,25 @@ public class PyDict extends PyObject {
             }
             return;
         }
+        if (other instanceof PyList) {
+            // Pairs read straight off the list, its length read each step;
+            // a list has no keys() to look up first, and the table is sized
+            // once for every pair rather than grown on the way.
+            PyList l = (PyList) other;
+            if (size == 0 && getClass() == PyDict.class) {
+                reserve(l.size);
+            }
+            for (int n = 0; n < l.size; n++) {
+                pairItem(l.get(n), n);
+            }
+            return;
+        }
+        if (other instanceof PyTuple || other instanceof PyGenerator || other instanceof Builtins.FilterIter
+                || other instanceof Builtins.MapIter) {
+            // None of these has keys(): no attribute lookup per dict() call.
+            updatePairs(other);
+            return;
+        }
         Object keysFn;
         if (!(other instanceof PyInstance)) {
             // A builtin's attributes are its type's: no __getattr__ can run,
@@ -596,23 +615,57 @@ public class PyDict extends PyObject {
             }
             return;
         }
-        if (other instanceof PyList) {
-            // Pairs read straight off the list, its length read each step.
-            PyList l = (PyList) other;
-            for (int n = 0; n < l.size; n++) {
-                pairItem(l.get(n), n);
+        updatePairs(other);
+    }
+
+    /// The pairs of an iterable with no keys(): a generator drained under
+    /// one handler (a setjmp per value otherwise), a filter or map stepped
+    /// by a direct call.
+    private void updatePairs(Object other) {
+        Object it = Py.iter(other);
+        int n = 0;
+        if (it instanceof PyGenerator) {
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object pair = PyGenerator.loopNext(g); pair != null; pair = PyGenerator.loopNext(g), n++) {
+                    pairItem(pair, n);
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
             }
             return;
         }
-        Object it = Py.iter(other);
-        int n = 0;
+        if (it instanceof Builtins.FilterIter) {
+            Builtins.FilterIter f = (Builtins.FilterIter) it;
+            for (Object pair = f.next(); pair != null; pair = f.next(), n++) {
+                pairItem(pair, n);
+            }
+            return;
+        }
         for (Object pair = Py.next(it); pair != null; pair = Py.next(it), n++) {
             pairItem(pair, n);
         }
     }
 
     private void pairItem(Object pair, int n) {
-        Object[] kv = Py.toArray(pair);
+        Object[] kv;
+        if (pair instanceof PyTuple) {
+            kv = ((PyTuple) pair).items;
+        } else if (pair instanceof PyList) {
+            kv = ((PyList) pair).toArray();
+        } else {
+            Object it;
+            try {
+                it = Py.iter(pair);
+            } catch (PyException e) {
+                // CPython 3.14's wording for an element that is no sequence.
+                if (e.matches(Py.TYPE_ERROR)) {
+                    throw Py.typeError("object is not iterable"); //NOPMD PreserveStackTrace - CPython raises a fresh TypeError here too
+                }
+                throw e;
+            }
+            kv = Py.toArray(it);
+        }
         if (kv.length != 2) {
             throw Py.valueError("dictionary update sequence element #" + n + " has length " + kv.length
                     + "; 2 is required");
