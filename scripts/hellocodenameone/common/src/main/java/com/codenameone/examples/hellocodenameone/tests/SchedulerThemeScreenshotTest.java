@@ -22,12 +22,25 @@
  */
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.scheduler.Scheduler;
 
 public class SchedulerThemeScreenshotTest extends DualAppearanceBaseTest {
+    @Override
+    public boolean runTest() {
+        // A watch face has no room for this and no use for it: the
+        // capture there would only record how it fails to fit.
+        if (CN.isWatch()) {
+            System.out.println("CN1SS:INFO:test=SchedulerTheme status=SKIPPED reason=calendar-grid-on-watch");
+            skipAppearances();
+            return true;
+        }
+        return super.runTest();
+    }
+
     @Override
     protected String baseName() {
         return "SchedulerTheme";

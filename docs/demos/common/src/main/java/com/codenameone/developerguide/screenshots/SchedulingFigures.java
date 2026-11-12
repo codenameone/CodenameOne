@@ -69,9 +69,11 @@ public final class SchedulingFigures {
     /// Monday 2026-03-09, as a count of days since 1970-01-01.
     private static final long MONDAY = 20521L;
 
-    /// 2024-06-15T12:00:00Z, the day the date pickers open on. Not the month
-    /// the figures are generated in, so no day is ever ringed as today.
-    private static final long PICKER_DAY = 1718452800000L;
+    /// Noon on 2024-06-15 where the figures are generated, the day the date
+    /// pickers open on. The picker reads a date in the device's zone, so noon
+    /// there is that date wherever that is. Not the month the figures are
+    /// generated in, so no day is ever ringed as today.
+    private static final long PICKER_DAY = TimeMath.at(19889L, 12 * 60, ZoneId.systemDefault());
 
     /// When the stopped clock starts, and when everything that was started
     /// before it has long finished.
@@ -220,8 +222,18 @@ public final class SchedulingFigures {
             return pickerForm("Date", p);
         }, null));
         v.add(cropped("picker-material-time", () -> pickerForm("Time", timePicker(true, 9, 25)), null));
-        v.add(cropped("picker-material-time-minutes", () -> pickerForm("Time", timePicker(true, 9, 25)),
-                f -> press(f, "25")));
+        // Pressing the minutes turns the hand to them. The clock is held
+        // across the press and moved on after it, so the figure shows the
+        // hand arrived and not wherever the turn had reached.
+        final MaterialTimePicker[] minutes = new MaterialTimePicker[1];
+        v.add(cropped("picker-material-time-minutes", () -> {
+            minutes[0] = timePicker(true, 9, 25);
+            minutes[0].setAnimationTime(T0);
+            return pickerForm("Time", minutes[0]);
+        }, f -> {
+            press(f, "25");
+            minutes[0].setAnimationTime(T1);
+        }));
         v.add(cropped("picker-material-time-24h", () -> pickerForm("Time", timePicker(false, 17, 25)), null));
         v.add(cropped("picker-material-time-input", () -> {
             MaterialTimePicker p = timePicker(true, 9, 25);
@@ -413,7 +425,12 @@ public final class SchedulingFigures {
         g.setLoadVisible(true);
         g.setColumns();
         if (leveled) {
-            g.level().apply();
+            // Applying the levelling slides the bars to their new dates. On
+            // the clock, the figure caught them wherever they were when the
+            // frame was taken; on a held one it shows them arrived.
+            g.setAnimationTime(T0);
+            g.level();
+            g.setAnimationTime(T1);
         }
         return ganttForm(g);
     }

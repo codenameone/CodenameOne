@@ -23,6 +23,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.Layout;
@@ -33,6 +34,18 @@ import java.util.Calendar;
 import java.util.Date;
 
 public class MaterialDatePickerThemeScreenshotTest extends DualAppearanceBaseTest {
+    @Override
+    public boolean runTest() {
+        // A watch face has no room for this and no use for it: the
+        // capture there would only record how it fails to fit.
+        if (CN.isWatch()) {
+            System.out.println("CN1SS:INFO:test=MaterialDatePickerTheme status=SKIPPED reason=phone-picker-dialog-on-watch");
+            skipAppearances();
+            return true;
+        }
+        return super.runTest();
+    }
+
     @Override
     protected String baseName() {
         return "MaterialDatePickerTheme";

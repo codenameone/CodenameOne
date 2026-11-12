@@ -2394,7 +2394,7 @@ Button placement options are:
 The date, time and date & time pickers also come as Material 3 dialogs: a month grid with a year list and a field to type the date in, and a clock dial with a keyboard mode. They're lightweight, so they look the same in the simulator and on the device, follow the theme's colors in light and dark mode, and honor the 12 or 24 hour setting of the picker.
 
 .The date picker
-image::img/generated/picker-material-date.png["A dialog with the chosen date as its headline over a month grid, the chosen day in a filled circle and today in an outlined one",scaledwidth=30%]
+image::img/generated/picker-material-date.png["A dialog with the chosen date as its headline over a month grid, with the chosen day in a filled circle",scaledwidth=30%]
 
 .A tap on the month opens the list of years
 image::img/generated/picker-material-date-years.png["The same dialog with a grid of years in place of the month, the chosen year in a filled pill",scaledwidth=30%]
@@ -2409,7 +2409,7 @@ image::img/generated/picker-material-date-range.png["The month grid with the fir
 image::img/generated/picker-material-time.png["A dialog with the hour and the minute in two boxes, an AM and PM switch, and a clock dial with its hand on the hour",scaledwidth=30%]
 
 .Once the hour is chosen the dial shows minutes
-image::img/generated/picker-material-time-minutes.png["The dial numbered in steps of five minutes with the hand between two of them",scaledwidth=30%]
+image::img/generated/picker-material-time-minutes.png["The dial numbered in steps of five minutes with the hand on the chosen minute",scaledwidth=30%]
 
 .A 24 hour picker has an inner ring for the hours after noon
 image::img/generated/picker-material-time-24h.png["The dial with two rings of numbers and no AM and PM switch",scaledwidth=30%]
