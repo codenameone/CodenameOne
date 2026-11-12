@@ -128,9 +128,22 @@ final class Layouts {
             l.classes.put(c, k);
             byName.put(c.name, k);
         }
-        Set<String> bodyNames = new HashSet<String>();
+        // A name a class body binds cannot be a field of that class, of any
+        // class above it, or of any compiled class below it (whose instances
+        // pass the `instanceof` of every class above). An unrelated class
+        // binding the same name changes nothing: only the exact compiled
+        // class gets the layout, so no instance of it reaches that body.
+        // Module-wide, a property `name` on `LoggerAdapter` cost `Logger`
+        // every field set after `name`, which then all lived in the shape.
+        Map<Cls, Set<String>> related = new LinkedHashMap<Cls, Set<String>>();
         for (Cls k : l.classes.values()) {
-            bodyNames.addAll(k.bodyNames);
+            Set<String> r = new HashSet<String>();
+            for (Cls c : l.classes.values()) {
+                if (ancestorOf(k, c) || ancestorOf(c, k)) {
+                    r.addAll(c.bodyNames);
+                }
+            }
+            related.put(k, r);
         }
         // `tag = None` in a class body is a default, not a descriptor: a
         // constant has no `__set__` or `__get__`, so a store to the name on an
@@ -167,13 +180,20 @@ final class Layouts {
             }
         }
         constants.removeAll(otherwise);
-        bodyNames.removeAll(constants);
+        for (Set<String> r : related.values()) {
+            r.removeAll(constants);
+        }
         boolean noFields = false;
         for (String st : attrStores) {
             int dot = st.indexOf('.');
-            if (byName.containsKey(st.substring(0, dot))) {
+            Cls owner = byName.get(st.substring(0, dot));
+            if (owner != null) {
                 String a = st.substring(dot + 1);
-                bodyNames.add(a);
+                for (Map.Entry<Cls, Set<String>> e : related.entrySet()) {
+                    if (ancestorOf(e.getKey(), owner) || ancestorOf(owner, e.getKey())) {
+                        e.getValue().add(a);
+                    }
+                }
                 // An attribute hook added from outside sees every access.
                 noFields |= "*".equals(a) || FORBIDDEN.contains(a);
             }
@@ -243,7 +263,7 @@ final class Layouts {
                 k.allFields.addAll(k.parent.allFields);
             }
             for (String f : stored) {
-                if (noFields || f.startsWith("__") && f.endsWith("__") || bodyNames.contains(f) || k.allFields.contains(f)) {
+                if (noFields || f.startsWith("__") && f.endsWith("__") || related.get(k).contains(f) || k.allFields.contains(f)) {
                     continue;
                 }
                 k.fields.add(f);
@@ -257,6 +277,16 @@ final class Layouts {
             }
         }
         return l;
+    }
+
+    /// Whether `a` is `k` or one of the compiled classes above it.
+    private static boolean ancestorOf(Cls a, Cls k) {
+        for (Cls c = k; c != null; c = c.parent) {
+            if (c == a) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Whether the method uses `super()` or `__class__`, the one way a method
