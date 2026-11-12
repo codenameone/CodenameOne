@@ -12341,6 +12341,8 @@ void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_M
 #endif // CN1_USE_APPREVIEW
 }
 
+extern BOOL cn1KeyboardTrackingSuspended;
+
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
 // Not implemented on the native macOS port: the body below is UIKit -- a
@@ -12376,6 +12378,14 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             
             [picker setBody:smsBody];
             
+            // The composer brings its own keyboard; keep our keyboard handlers out
+            // of it until the delegate dismisses the sheet (issue #6211). Not when
+            // something is already presented: UIKit then refuses this presentation,
+            // the delegate that clears the flag never runs, and the keyboard of
+            // whatever is up would go unhandled until that is dismissed.
+            if (cn1PresentingController().presentedViewController == nil) {
+                cn1KeyboardTrackingSuspended = YES;
+            }
             [cn1PresentingController() presentModalViewController:picker animated:YES];
             
 #ifndef CN1_USE_ARC
