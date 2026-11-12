@@ -398,17 +398,23 @@ public final class PyFunction extends PyObject {
     /// Whether a positional call with `n` arguments binds as `f(*args)` does:
     /// plain leading parameters and one `*args`, nothing keyword-only.
     private boolean starOnly(int n) {
-        return varArgs && kwOnly == 0 && !varKw && n >= positional;
+        return varArgs && kwOnly == 0 && n >= positional;
     }
 
-    /// [#call] of `f(*args)` from a fixed-arity call: the leading arguments go
-    /// to their slots and the rest straight into the tuple, with no argument
-    /// array built first and copied out of.
+    /// [#call] of `f(*args)` or `f(*args, **kwargs)` from a fixed-arity call
+    /// with no keywords: the leading arguments go to their slots and the rest
+    /// straight into the tuple, with no argument array built first and copied
+    /// out of. `**kwargs` gets an empty dict, the shared one when the function
+    /// never keeps it ([#kwShared]) -- a logger's `debug(msg, *args, **kwargs)`
+    /// is this shape and is called once per token by a parser that logs.
     private Object star(int n, Object a, Object b, Object c, Object d, Object e) {
         Object[] slots = spareSlots;
         spareSlots = null;
         if (slots == null) {
-            slots = new Object[positional + 1];
+            slots = new Object[positional + (varKw ? 2 : 1)];
+        }
+        if (varKw) {
+            slots[positional + 1] = kwShared ? NO_KWARGS : new PyDict();
         }
         int rest = n - positional;
         Object[] items = rest == 0 ? null : new Object[rest];
@@ -726,14 +732,17 @@ public final class PyFunction extends PyObject {
         if (kwNames.length == 0 && !varArgs && kwOnly == 0 && !varKw && args.length == positional) {
             return body.run(args);
         }
-        if (varArgs && kwNames.length == 0 && kwOnly == 0 && !varKw && args.length >= positional) {
-            // f(*args) called positionally: the slots are the leading
-            // arguments and one tuple of the rest, with none of bindArgs'
-            // keyword matching.
+        if (varArgs && kwNames.length == 0 && kwOnly == 0 && args.length >= positional) {
+            // f(*args) (or f(*args, **kwargs)) called positionally: the slots
+            // are the leading arguments, one tuple of the rest and an empty
+            // dict, with none of bindArgs' keyword matching.
             Object[] slots = spareSlots;
             spareSlots = null;
             if (slots == null) {
-                slots = new Object[positional + 1];
+                slots = new Object[positional + (varKw ? 2 : 1)];
+            }
+            if (varKw) {
+                slots[positional + 1] = kwShared ? NO_KWARGS : new PyDict();
             }
             System.arraycopy(args, 0, slots, 0, positional);
             int rest = args.length - positional;

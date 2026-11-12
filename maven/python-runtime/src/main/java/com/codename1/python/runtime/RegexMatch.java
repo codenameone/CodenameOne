@@ -312,6 +312,11 @@ final class RegexMatch extends PyObject {
             Object r = Regex.subn(p, (String) string, template, (int) Py.index(countObj));
             return withCount ? r : ((PyTuple) r).items[0];
         }
+        if (string instanceof String && !(repl instanceof String) && Builtins.isCallable(repl)
+                && !checkKind(p, pattern, string)) {
+            Object r = Regex.subCall(p, pattern, (String) string, repl, (int) Py.index(countObj));
+            return withCount ? r : ((PyTuple) r).items[0];
+        }
         if (subHook == null) {
             throw Py.runtimeError("re is not initialised");
         }

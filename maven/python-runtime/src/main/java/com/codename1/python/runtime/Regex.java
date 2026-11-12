@@ -135,6 +135,11 @@ final class Regex {
         /// sre's charset prefix does; MarkItDown's HTML and Markdown
         /// patterns spent most of their time failing at every offset.
         Op[] first;
+        /// For each ASCII char, whether one of the char-consuming [#first]
+        /// ops matches it; all false when there is no first set.
+        boolean[] firstAscii = NO_ASCII;
+        /// Whether [#first] holds an assertion, which the table cannot answer.
+        boolean firstAt;
         /// The text view, registers and backtracking stacks of the last run,
         /// handed back for the next one: a route table or a tokenizer runs
         /// one pattern per request, and these were most of what a run
@@ -171,6 +176,18 @@ final class Regex {
             p.prefix = Py.isTrue(a[3]) ? Py.toStr(a[3]) : null;
             p.anchored = Py.isTrue(a[4]);
             p.first = firstOps(p.ops);
+            if (p.first != null) {
+                p.firstAscii = new boolean[128];
+                for (Op op : p.first) {
+                    if (op.k == AT) {
+                        p.firstAt = true;
+                        continue;
+                    }
+                    for (int c = 0; c < 128; c++) {
+                        p.firstAscii[c] |= one(op, c);
+                    }
+                }
+            }
             return p;
         }));
         m.setAttr("run", new RunFn());
@@ -223,11 +240,16 @@ final class Regex {
                     break;
                 }
                 if (op.k == REPEAT_ONE || op.k == MIN_REPEAT_ONE) {
-                    if (op.lo < 1) {
-                        return null;
-                    }
                     out.add(op.one);
-                    break;
+                    if (op.lo >= 1) {
+                        break;
+                    }
+                    // Optional: a match begins with the item or with whatever
+                    // follows it. markdownify's `[\t \r\n]*[\r\n][\t \r\n]*`
+                    // ran the program at every offset without this, where sre
+                    // skips to the next whitespace.
+                    pc++;
+                    continue;
                 }
                 if (op.k == SAVE) {
                     pc++;
@@ -1045,40 +1067,34 @@ final class Regex {
 
     /// The first position at or after `start` whose character one of
     /// `first` matches, or -1: every match consumes a character first.
-    private static int skip(Op[] first, Text t, int start, int endpos) {
-        boolean[] f = first.length == 1 && t.cps == null ? table(first[0]) : null;
-        if (f != null) {
-            Op op = first[0];
-            String s = t.s;
-            for (int i = start; i < endpos; i++) {
-                char c = s.charAt(i);
-                if (c < 128 ? f[c] : set(op, c)) {
-                    return i;
-                }
-            }
-            return -1;
+    private static int skip(Op[] first, Prog p, Text t, int start, int endpos) {
+        if (first.length == 1 && t.cps == null && first[0].k == CHAR && endpos == t.s.length()) {
+            return t.s.indexOf(first[0].c, start);
         }
-        if (first.length == 2 && t.cps == null && first[1].k == AT && table(first[0]) != null) {
-            // One class or an assertion: `(\s|^)`.
-            Op op = first[0];
-            boolean[] g = table(op);
-            Op a = first[1];
+        if (t.cps == null) {
+            // One merged table for every class the match can begin with,
+            // and the assertions (`(\s|^)`) asked only where it says no.
+            boolean[] f = p.firstAscii;
+            boolean ats = p.firstAt;
             String s = t.s;
             for (int i = start; i <= endpos; i++) {
                 if (i < endpos) {
                     char c = s.charAt(i);
-                    if (c < 128 ? g[c] : set(op, c)) {
+                    if (c < 128 ? f[c] : anyFirst(first, c)) {
                         return i;
                     }
+                } else if (!ats) {
+                    return -1;
                 }
-                if (at(a.at, t, i, endpos, a.unicode)) {
-                    return i;
+                if (ats) {
+                    for (Op op : first) {
+                        if (op.k == AT && at(op.at, t, i, endpos, op.unicode)) {
+                            return i;
+                        }
+                    }
                 }
             }
             return -1;
-        }
-        if (first.length == 1 && t.cps == null && first[0].k == CHAR && endpos == t.s.length()) {
-            return t.s.indexOf(first[0].c, start);
         }
         for (int i = start; i <= endpos; i++) {
             int c = i < endpos ? t.at(i) : -1;
@@ -1093,6 +1109,16 @@ final class Regex {
             }
         }
         return -1;
+    }
+
+    /// Whether a char-consuming op of `first` matches the non-ASCII `c`.
+    private static boolean anyFirst(Op[] first, int c) {
+        for (Op op : first) {
+            if (op.k != AT && one(op, c)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// `_engine.run`: mode 0 matches, 1 fully matches, 2 searches. The
@@ -1127,7 +1153,10 @@ final class Regex {
     static Object subn(Prog p, String text, PyList template, int count) {
         Scratch sc = acquire(p);
         try {
-            int n = PyStr.codePoints(text);
+            // Counted once here; the runs below find the text already set.
+            Text tx = sc.text;
+            tx.reset(text);
+            int n = tx.cps == null ? text.length() : tx.cps.length;
             int[] regs = count >= 0 ? run(p, sc, text, 0, n, 2, -1) : new int[0];
             if (regs.length == 0) {
                 return Py.tuple(text, Long.valueOf(0));
@@ -1135,7 +1164,8 @@ final class Regex {
             // Made once, after the first match, and never reassigned: ParparVM
             // keeps a builder on the stack only when its local holds nothing
             // else and only StringBuilder methods receive it (no helper), and one
-            // on the heap pays a lock on every append. Without
+            // on the heap pays a lock on every append. A builder also keeps a
+            // Latin-1 text Latin-1, which a char array would widen. Without
             // surrogates a code point index is the char index, so the pieces are
             // appended straight from the text instead of as substrings.
             StringBuilder out = new StringBuilder(text.length() + 16);
@@ -1167,6 +1197,64 @@ final class Regex {
                             }
                         }
                     }
+                }
+                last = e;
+                done++;
+                if (e > n || count != 0 && done >= count) {
+                    break;
+                }
+                regs = run(p, sc, text, e, n, 2, s == e ? e : -1);
+                if (regs.length == 0) {
+                    break;
+                }
+            }
+            if (plain) {
+                out.append(text, last, n);
+            } else {
+                out.append(PyStr.substr(text, last, n));
+            }
+            return Py.tuple(out.toString(), Long.valueOf(done));
+        } finally {
+            release(p, sc);
+        }
+    }
+
+    /// `pattern.subn(fn, text, count)` for a callable `fn`, with the loop in
+    /// Java: one Match per match handed to `fn`, as sre does, and no generator
+    /// step, piece list or join around it. markdownify indents every quoted
+    /// line through `re_line_with_content.sub(fn, text)`. As in sre, `fn`
+    /// answering None adds nothing, and anything but a str is a TypeError.
+    static Object subCall(Prog p, Object pattern, String text, Object fn, int count) {
+        Scratch sc = acquire(p);
+        try {
+            // Counted once here; the runs below find the text already set.
+            Text tx = sc.text;
+            tx.reset(text);
+            int n = tx.cps == null ? text.length() : tx.cps.length;
+            int[] regs = count >= 0 ? run(p, sc, text, 0, n, 2, -1) : new int[0];
+            if (regs.length == 0) {
+                return Py.tuple(text, Long.valueOf(0));
+            }
+            StringBuilder out = new StringBuilder(text.length() + 16);
+            boolean plain = n == text.length();
+            PyObject f = Py.obj(fn);
+            int last = 0;
+            int done = 0;
+            while (true) {
+                int s = regs[0];
+                int e = regs[1];
+                if (plain) {
+                    out.append(text, last, s);
+                } else {
+                    out.append(PyStr.substr(text, last, s));
+                }
+                // The callable may run this same pattern; it then builds its
+                // own scratch, since this one is taken.
+                Object r = f.call1(new RegexMatch(pattern, text, text, false, 0, n, p.groups, regs));
+                if (r instanceof String) {
+                    out.append((String) r);
+                } else if (r != Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
+                    throw Py.typeError("expected str instance, " + Py.typeOf(r).name + " found");
                 }
                 last = e;
                 done++;
@@ -1251,7 +1339,7 @@ final class Regex {
                 }
                 start = found;
             } else if (mode == 2 && p.first != null) {
-                start = skip(p.first, t, start, endpos);
+                start = skip(p.first, p, t, start, endpos);
                 if (start < 0) {
                     return NO_MATCH;
                 }
