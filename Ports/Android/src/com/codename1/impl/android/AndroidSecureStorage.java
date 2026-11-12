@@ -1580,7 +1580,19 @@ public final class AndroidSecureStorage extends SecureStorage {
         keyRevoked = false;
         try {
             keyStore().load(null);
-            return (SecretKey) keyStore.getKey(KEY_ID, null);
+            SecretKey k = (SecretKey) keyStore.getKey(KEY_ID, null);
+            if (k == null) {
+                // Android deletes a biometric-bound key outright when the user removes
+                // EVERY enrolled biometric (and on some devices when the set changes),
+                // rather than leaving it to fail with KeyPermanentlyInvalidatedException.
+                // The only caller that reads this flag is the decrypt path, and get()
+                // returns before reaching it when no entry is stored -- so an absent key
+                // there always means an entry whose key was taken away: revoked. Reporting
+                // it as a generic failure made apps treat a re-enrolment as an error
+                // instead of asking the user to set biometric login up again.
+                keyRevoked = true;
+            }
+            return k;
         } catch (UnrecoverableKeyException e) {
             keyRevoked = true;
         } catch (KeyStoreException e) {

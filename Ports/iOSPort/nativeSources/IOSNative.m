@@ -23045,6 +23045,31 @@ static BOOL cn1_secureStorageHasLegacyService(NSString *current, NSString *legac
     return legacy != nil && current != nil && ![legacy isEqualToString:current];
 }
 
+// Not an OSStatus: Security.framework codes are all in -25xxx/-34xxx/-67xxx and -128, so this
+// cannot collide. Must match IOSSecureStorage.KEY_REVOKED_CODE.
+#define CN1_SECURE_STORAGE_KEY_REVOKED -990001
+
+// Whether the biometric item is in the keychain at all. Asks for attributes only, which an
+// access-control list does not guard, so it never prompts and still sees an item whose
+// biometric binding was invalidated.
+static BOOL cn1_secureStorageBiometricItemExists(NSString *account, NSString *appName, NSString *accessGroup) {
+    NSMutableDictionary *q = [NSMutableDictionary dictionary];
+    [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+    [q setObject:account forKey:(__bridge id)kSecAttrAccount];
+    [q setObject:appName forKey:(__bridge id)kSecAttrService];
+    [q setObject:@YES forKey:(__bridge id)kSecReturnAttributes];
+    [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+    if (accessGroup != nil) {
+        [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+    }
+    CFTypeRef attrs = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &attrs);
+    if (attrs != NULL) {
+        CFRelease(attrs);
+    }
+    return status == errSecSuccess;
+}
+
 void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
@@ -23075,6 +23100,25 @@ void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_ja
             NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
             JAVA_OBJECT jv = fromNSString(getThreadLocalData(), value);
             com_codename1_impl_ios_IOSSecureStorage_nativeStorageStringResult___int_java_lang_String(getThreadLocalData(), requestId, jv);
+        } else if (status == errSecItemNotFound && cn1_secureStorageBiometricItemExists(nsAccount, appName, accessGroup)) {
+            // The item is stored under kSecAccessControlTouchIDCurrentSet, so enrolling a
+            // different Face ID / Touch ID set invalidates it: its attributes are still
+            // there, but the data read answers errSecItemNotFound. That is a revoked key,
+            // the same case Android reports as KEY_REVOKED, and it used to surface as a
+            // generic failure -- iOS apps could never tell re-enrolment from an error.
+            // The item can never be read again, and leaving it makes a later set() fall
+            // into SecItemUpdate on an invalidated item, so delete it, as Android deletes
+            // its invalidated key.
+            NSMutableDictionary *del = [NSMutableDictionary dictionary];
+            [del setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+            [del setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+            [del setObject:appName forKey:(__bridge id)kSecAttrService];
+            if (accessGroup != nil) {
+                [del setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+            }
+            SecItemDelete((__bridge CFDictionaryRef)del);
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"Key has been invalidated");
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, CN1_SECURE_STORAGE_KEY_REVOKED, jmsg);
         } else {
             JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
             com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
