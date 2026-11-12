@@ -121,13 +121,28 @@ class CodecInfo(tuple):
         return f"<codecs.CodecInfo object for encoding {self.name}>"
 
 
+# One CodecInfo per encoding, as CPython's codec registry caches a lookup.
+# Making one per call also made two classes per call, and every class made
+# drops every attribute cache in the program.
+_cache = {}
+
+
 def lookup(encoding):
+    info = _cache.get(encoding)
+    if info is not None:
+        return info
     name = _canonical(encoding)
-    enc = type("IncrementalEncoder", (IncrementalEncoder,), {"_name": name})
-    dec = type("IncrementalDecoder", (IncrementalDecoder,), {"_name": name})
-    return CodecInfo(lambda s, errors="strict": _encode(s, errors, name),
-                     lambda b, errors="strict": _decode(b, errors, name),
-                     incrementalencoder=enc, incrementaldecoder=dec, name=name)
+    info = _cache.get(name)
+    if info is None:
+        enc = type("IncrementalEncoder", (IncrementalEncoder,), {"_name": name})
+        dec = type("IncrementalDecoder", (IncrementalDecoder,), {"_name": name})
+        info = CodecInfo(lambda s, errors="strict": _encode(s, errors, name),
+                         lambda b, errors="strict": _decode(b, errors, name),
+                         incrementalencoder=enc, incrementaldecoder=dec, name=name)
+        _cache[name] = info
+    if isinstance(encoding, str):
+        _cache[encoding] = info
+    return info
 
 
 def encode(obj, encoding="utf-8", errors="strict"):
