@@ -32,6 +32,31 @@ def _type_repr(obj):
 _tp_cache = {}
 
 
+# One dict per kind, of one dict per owner, for a subscript by a single
+# class (`List[str]` in a `cast` that runs in a loop): a class hashes and
+# compares by identity, so it is the key by itself -- no key tuple, and no
+# closure made on every hit as `_cached` needs.
+_by_class = ({}, {}, {}, {})
+
+
+def _cached_class(kind, owner, params, make):
+    per = _by_class[kind].get(owner)
+    if per is None:
+        per = {}
+        if len(_by_class[kind]) >= 4096:
+            _by_class[kind].clear()
+        _by_class[kind][owner] = per
+    hit = per.get(params)
+    if hit is None:
+        hit = make(owner, params)
+        per[params] = hit
+    return hit
+
+
+def _form_getitem(form, params):
+    return form._getitem(form, params)
+
+
 def _cached(kind, owner, params, make):
     key = (kind, owner, params, type(params))
     try:
@@ -91,6 +116,8 @@ class _SpecialForm(_Final):
     def __getitem__(self, params):
         if self._getitem is None:
             raise TypeError(self._name + " is not subscriptable")
+        if type(params) is type:
+            return _cached_class(0, self, params, _form_getitem)
         return _cached(0, self, params, lambda: self._getitem(self, params))
 
     def __call__(self, *args, **kwds):
@@ -144,6 +171,8 @@ class _GenericAlias(_Final):
         return result
 
     def __getitem__(self, params):
+        if type(params) is type:
+            return _cached_class(1, self, params, type(self)._subscript)
         return _cached(1, self, params, lambda: self._subscript(params))
 
     def _subscript(self, params):
@@ -266,6 +295,8 @@ class _SpecialGenericAlias(_Final):
         return "typing." + self._name
 
     def __getitem__(self, params):
+        if type(params) is type:
+            return _cached_class(2, self, params, _SpecialGenericAlias._subscript)
         return _cached(2, self, params, lambda: self._subscript(params))
 
     def _subscript(self, params):
@@ -436,6 +467,8 @@ class Generic:
     __slots__ = ()
 
     def __class_getitem__(cls, params):
+        if type(params) is type:
+            return _cached_class(3, cls, params, _generic_alias)
         return _cached(3, cls, params, lambda: _generic_alias(cls, params))
 
     def __init_subclass__(cls, *args, **kwargs):
