@@ -987,6 +987,39 @@ void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
 #endif
 
 
+
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH
+// A keyboard with no Return key: the toolbar is the only place its Next or Done
+// can live.
+static BOOL cn1IsPadKeyboard(UIKeyboardType type) {
+    return type == UIKeyboardTypeDecimalPad
+        || type == UIKeyboardTypePhonePad
+        || type == UIKeyboardTypeNumberPad;
+}
+
+static BOOL cn1ExplicitKeyboardAction(void) {
+#ifndef NEW_CODENAME_ONE_VM
+    return com_codename1_impl_ios_TextEditUtil_isExplicitKeyboardAction__();
+#else
+    return com_codename1_impl_ios_TextEditUtil_isExplicitKeyboardAction___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+#endif
+}
+
+// Whether such a keyboard gets the toolbar on this device. An iPad's docked
+// number pad is a full keyboard with a Return key, so it is left alone; its
+// floating keyboard is not, and nothing here can tell the two apart, so a field
+// that chose its action with "nextButton"/"doneButton" gets the toolbar on an
+// iPad whichever keyboard is up -- beside a Return key when it is the docked one.
+static BOOL cn1PadKeyboardNeedsToolbar(UIKeyboardType type) {
+    return cn1IsPadKeyboard(type) && (!isIPad() || cn1ExplicitKeyboardAction());
+}
+
+// The developer's choice (showToolbar), minus landscape -- except where the
+// toolbar is the keyboard's only action key. Unused on tvOS, which has no toolbar.
+__attribute__((unused)) static BOOL cn1EditToolbarAllowed(BOOL showToolbar, BOOL landscape, UIKeyboardType type) {
+    return showToolbar && (!landscape || cn1PadKeyboardNeedsToolbar(type));
+}
+#endif
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
@@ -1000,10 +1033,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #if TARGET_OS_OSX
 #else
 #if !TARGET_OS_WATCH
-    // don't show toolbar in iOS 8 in landscape since there is just no room for that...
-    if(isIOS8() && displayHeight < displayWidth) {
-        showToolbar = NO;
-    }
+    // In landscape there is little room for the toolbar, so it is left out -- but
+    // only for a keyboard that has a Return key. This used to be unconditional, and
+    // isIOS8() is true of every device now, so a number pad in landscape had neither
+    // a Return key nor a toolbar: no Next, no Done, no way to leave the field from
+    // the keyboard. See cn1EditToolbarAllowed.
+    __attribute__((unused)) const BOOL cn1LandscapeEdit = isIOS8() && displayHeight < displayWidth;
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
     // Honored by the UITextView shouldChangeTextInRange: delegate (METALView) to
@@ -1191,13 +1226,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
              name:UITextFieldTextDidChangeNotification
              object:utf];
             
-            if ((utf.keyboardType == UIKeyboardTypeDecimalPad
-                 || utf.keyboardType == UIKeyboardTypePhonePad
-                 || utf.keyboardType == UIKeyboardTypeNumberPad
-                 || (utf.returnKeyType == UIReturnKeyNext && isVKBAlwaysOpen())) && !isIPad()) {
+            if (cn1PadKeyboardNeedsToolbar(utf.keyboardType)
+                 || (utf.returnKeyType == UIReturnKeyNext && isVKBAlwaysOpen() && !isIPad())) {
                 //add navigation toolbar to the top of the keyboard
 #if !TARGET_OS_TV
-                if(showToolbar) {
+                if(cn1EditToolbarAllowed(showToolbar, cn1LandscapeEdit, utf.keyboardType)) {
 #ifndef CN1_USE_ARC
                     UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
 #else
@@ -1396,7 +1429,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
 
 #if !TARGET_OS_TV
-            if(showToolbar) {
+            if(cn1EditToolbarAllowed(showToolbar, cn1LandscapeEdit, utv.keyboardType)) {
                 //add navigation toolbar to the top of the keyboard
 #ifndef CN1_USE_ARC
                 UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];

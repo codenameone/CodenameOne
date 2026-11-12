@@ -2311,6 +2311,25 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// Sets a Done listener on the TextField - notice this listener will be called
     /// only on supported platforms that supports done action on the keyboard
     ///
+    /// The listener also affects which action the keyboard offers. On Android a
+    /// single line field with a listener shows Done even when another field
+    /// follows it, because Next would never fire the listener. To choose the
+    /// action yourself set the client property `"nextButton"` or `"doneButton"`
+    /// to any non-null value; that works with every input constraint, numeric
+    /// ones included:
+    ///
+    /// ```java
+    /// TextField quantity = new TextField();
+    /// quantity.setConstraint(TextArea.NUMERIC);
+    /// quantity.putClientProperty("nextButton", Boolean.TRUE);
+    /// ```
+    ///
+    /// A field that asks for Next moves to the following field without calling
+    /// this listener, and its keyboard usually has no Done to call it with. Set
+    /// the listener on a field that offers Done, typically the last one.
+    /// A field nothing follows offers Done even with `"nextButton"`, and
+    /// `"doneButton"` wins when both are set.
+    ///
     /// #### Parameters
     ///
     /// - `l`: the listener

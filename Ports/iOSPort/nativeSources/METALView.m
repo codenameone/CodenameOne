@@ -1852,10 +1852,13 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
  */
 -(void) keyboardDoneClicked {
     if(editingComponent != nil) {
+        // -3, not the -2 that Return and Next send: IOSImplementation.editingUpdate
+        // treats the two alike except for a field that asked for Next explicitly,
+        // where only this button fires the Done listener.
         if([editingComponent isKindOfClass:[UITextView class]]) {
-            stringEdit(YES, -2, ((UITextView*)editingComponent).text);
+            stringEdit(YES, -3, ((UITextView*)editingComponent).text);
         } else {
-            stringEdit(YES, -2, ((UITextField*)editingComponent).text);
+            stringEdit(YES, -3, ((UITextField*)editingComponent).text);
         }
         if(isVKBAlwaysOpen()) {
             com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
