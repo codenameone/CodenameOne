@@ -164,6 +164,19 @@ public class PyTuple extends PyObject {
         return items[(int) i];
     }
 
+    /// Over the array, identity first as CPython's tuple compares: the
+    /// inherited loop made an iterator and a `next` call per item for every
+    /// `x in t`.
+    @Override
+    public boolean contains(Object x) {
+        for (Object v : items) {
+            if (v == x || Py.eqBool(v, x)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public Object iter() {
         return new PyIter(items.length) {

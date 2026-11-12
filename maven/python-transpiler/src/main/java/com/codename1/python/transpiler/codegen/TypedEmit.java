@@ -1481,7 +1481,8 @@ final class TypedEmit {
                 }
                 sb.append(i == 0 ? "" : ", ").append(excRef(el.get(i)));
             }
-            return sb.append(')').toString();
+            sb.append(')');
+            return Emitter.foldable(el) ? em.hoist("PyTuple", sb.toString()) : sb.toString();
         }
         return box(expr(e));
     }
@@ -3995,7 +3996,8 @@ final class TypedEmit {
                 }
                 sb.append(i == 0 ? "" : ", ").append(box(expr(el.get(i))));
             }
-            return new E(sb.append(')').toString(), Ty.DYN);
+            sb.append(')');
+            return new E(Emitter.foldable(el) ? em.hoist("PyTuple", sb.toString()) : sb.toString(), Ty.DYN);
         }
         if (e instanceof ListExpr) {
             ListExpr l = (ListExpr) e;

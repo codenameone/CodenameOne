@@ -308,6 +308,16 @@ public final class PySet extends PyObject {
         return s;
     }
 
+    /// The frozenset constant CPython folds `x in {"a", "b"}` to; the
+    /// transpiler makes it once per module.
+    public static PySet frozenConstants(Object... items) {
+        PySet s = new PySet(true);
+        for (Object item : items) {
+            s.addRaw(item);
+        }
+        return s;
+    }
+
     private void merge(PySet other) {
         if (other == this || other.used == 0) { //NOPMD CompareObjectsWithEquals - identity is meant
             return;

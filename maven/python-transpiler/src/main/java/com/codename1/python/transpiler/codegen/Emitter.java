@@ -3082,10 +3082,14 @@ public final class Emitter {
             if (elts.isEmpty()) {
                 return "PyTuple.EMPTY";
             }
-            return display("new PyTuple(", elts, ")", "Py.tuple(");
+            String d = display("new PyTuple(", elts, ")", "Py.tuple(");
+            return foldable(elts) ? hoist("PyTuple", d) : d;
         }
         if (e instanceof SetExpr) {
             List<Expr> elts = ((SetExpr) e).elts;
+            if (((SetExpr) e).frozenConstant && foldable(elts)) {
+                return hoist("PySet", display("PySet.frozenConstants(", elts, ")", "PySet.frozenConstants("));
+            }
             if (elts.size() >= 3 && allConstant(elts)) {
                 return display("PySet.ofConstants(", elts, ")", "PySet.ofConstants(");
             }
@@ -4597,6 +4601,26 @@ public final class Emitter {
 
     /// Whether CPython's optimizer folds every element to a constant, which
     /// turns a set display of three or more into a frozenset constant.
+    /// A tuple of constants is one constant per module, as CPython folds it:
+    /// immutable, so every evaluation may share it. Capped so the static
+    /// initializer every hoisted constant lands in stays far from the JVM's
+    /// method size limit.
+    /// Only literal constants: an emitter writes `-1` with the temporaries of
+    /// the function it is in, which a static initializer does not have.
+    static boolean foldable(List<Expr> elts) {
+        if (elts.isEmpty() || elts.size() > FOLD_LIMIT) {
+            return false;
+        }
+        for (Expr x : elts) {
+            if (!(x instanceof Constant)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static final int FOLD_LIMIT = 64;
+
     private static boolean allConstant(List<Expr> elts) {
         for (Expr x : elts) {
             if (!isConstant(x)) {

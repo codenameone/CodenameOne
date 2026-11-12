@@ -1282,10 +1282,36 @@ public final class Parser {
         Compare c = new Compare(e).at(t.line, t.col);
         while (op != null) {
             c.ops.add(op);
-            c.comparators.add(bitOr());
+            c.comparators.add("in".equals(op) || "not in".equals(op) ? foldIn(bitOr()) : bitOr());
             op = compOp();
         }
         return c;
+    }
+
+    /// What CPython's optimizer does to the right side of `in` when it is a
+    /// display of constants: a list becomes a tuple constant (membership is
+    /// the same) and a set a frozenset constant, so no container is built
+    /// per test. The emitters hoist both.
+    private static Expr foldIn(Expr e) {
+        if (e instanceof ListExpr && plainConstants(((ListExpr) e).elts)) {
+            return new TupleExpr(((ListExpr) e).elts).at(e.line, e.col);
+        }
+        if (e instanceof SetExpr && plainConstants(((SetExpr) e).elts)) {
+            ((SetExpr) e).frozenConstant = true;
+        }
+        return e;
+    }
+
+    private static boolean plainConstants(List<Expr> elts) {
+        if (elts.isEmpty()) {
+            return false;
+        }
+        for (Expr x : elts) {
+            if (!(x instanceof Constant)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Expr bitOr() {
