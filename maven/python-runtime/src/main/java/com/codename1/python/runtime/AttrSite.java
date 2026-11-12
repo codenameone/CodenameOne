@@ -45,6 +45,8 @@ package com.codename1.python.runtime;
 public final class AttrSite {
     /// How many receiver layouts a site remembers.
     static final int WAYS = 4;
+    /// Overflow entries a megamorphic read site keeps past its four ways.
+    static final int HASHED = 256;
 
     private static final int NONE = 0;
     private static final int SLOT = 1;
@@ -90,7 +92,6 @@ public final class AttrSite {
     // the current class version.
     private int getVersion = -1;
     private int getUsed;
-    private int getNext;
     private PyType[] getTypes;
     private Shape[] getShapes;
     private int[] getKinds;
@@ -181,8 +182,11 @@ public final class AttrSite {
         if (getVersion != PyType.version) {
             getVersion = PyType.version;
             getUsed = 0;
-            getNext = 0;
             gt0 = gt1 = gt2 = gt3 = null;
+            if (getTypes != null && getTypes.length > WAYS) {
+                // The overflow entries name layouts of the old version.
+                getTypes = null;
+            }
             return -1;
         }
         for (int k = 0; k < getUsed; k++) {
@@ -190,7 +194,22 @@ public final class AttrSite {
                 return k;
             }
         }
+        if (getTypes != null && getTypes.length > WAYS) {
+            int k = WAYS + hash(t, shape);
+            if (getTypes[k] == t && getShapes[k] == shape) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return k;
+            }
+        }
         return -1;
+    }
+
+    /// The overflow slot of a layout. A megamorphic site -- one attribute
+    /// read on instances of dozens of classes, as an XML binding that defines
+    /// a class per tag does -- used to evict round robin past four layouts,
+    /// so nearly every read missed and went back to the class dictionaries.
+    private static int hash(PyType t, Shape shape) {
+        int h = t.id * 0x9E3779B1 + (shape == null ? 0 : shape.id * 0x85EBCA6B);
+        return h >>> (32 - 8);
     }
 
     private int addGet(PyType t, Shape shape, int kind, int slot, Object value) {
@@ -198,8 +217,14 @@ public final class AttrSite {
         if (getUsed < WAYS) {
             k = getUsed++;
         } else {
-            k = getNext;
-            getNext = (getNext + 1) % WAYS;
+            k = WAYS + hash(t, shape);
+            if (getTypes.length == WAYS) {
+                getTypes = java.util.Arrays.copyOf(getTypes, WAYS + HASHED);
+                getShapes = java.util.Arrays.copyOf(getShapes, WAYS + HASHED);
+                getKinds = java.util.Arrays.copyOf(getKinds, WAYS + HASHED);
+                getSlots = java.util.Arrays.copyOf(getSlots, WAYS + HASHED);
+                getValues = java.util.Arrays.copyOf(getValues, WAYS + HASHED);
+            }
         }
         if (getTypes == null) {
             // Made on the first entry: most sites of a large program are in
@@ -224,7 +249,7 @@ public final class AttrSite {
             gt1 = t; gs1 = shape; gk1 = fast; gi1 = slot; gf1 = f;
         } else if (k == 2) {
             gt2 = t; gs2 = shape; gk2 = fast; gi2 = slot; gf2 = f;
-        } else {
+        } else if (k == 3) {
             gt3 = t; gs3 = shape; gk3 = fast; gi3 = slot; gf3 = f;
         }
         return k;
