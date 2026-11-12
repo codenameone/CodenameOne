@@ -183,6 +183,21 @@ public final class Builtins {
             });
     public static final Object ANY = PyBuiltin.positional("any", a -> {
         Object it = Py.iter(one("any", a));
+        if (it instanceof PyGenerator) {
+            // A generator expression, the usual argument: stepped under ONE
+            // handler (see PyList.extend), not a try per value.
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    if (Py.isTrue(v)) {
+                        return Py.TRUE;
+                    }
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+            return Py.FALSE;
+        }
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             if (Py.isTrue(v)) {
                 return Py.TRUE;
@@ -192,6 +207,21 @@ public final class Builtins {
     });
     public static final Object ALL = PyBuiltin.positional("all", a -> {
         Object it = Py.iter(one("all", a));
+        if (it instanceof PyGenerator) {
+            // A generator expression, the usual argument: stepped under ONE
+            // handler (see PyList.extend), not a try per value.
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    if (!Py.isTrue(v)) {
+                        return Py.FALSE;
+                    }
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+            return Py.TRUE;
+        }
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             if (!Py.isTrue(v)) {
                 return Py.FALSE;
@@ -906,7 +936,7 @@ public final class Builtins {
             m = Py.typeOf(x).lookup("__index__");
         }
         if (m != null) {
-            return Py.obj(m).call(new Object[] {x}, Py.NO_KW);
+            return Py.obj(m).call1(x);
         }
         Object text = textBase(x);
         if (text != null) {
@@ -1063,7 +1093,7 @@ public final class Builtins {
         if (m == null) {
             throw Py.typeError("bad operand type for abs(): '" + Py.typeOf(x).name + "'");
         }
-        return Py.obj(m).call(new Object[] {x}, Py.NO_KW);
+        return Py.obj(m).call1(x);
     }
 
     static boolean isCallable(Object x) {
@@ -1162,7 +1192,7 @@ public final class Builtins {
         if (x instanceof PyInstance) {
             Object m = Py.typeOf(x).lookup("__round__");
             if (m != null) {
-                return nd == Py.NONE ? Py.obj(m).call(new Object[] {x}, Py.NO_KW) : Py.obj(m).call(new Object[] {x, nd}, Py.NO_KW); //NOPMD CompareObjectsWithEquals - identity is meant
+                return nd == Py.NONE ? Py.obj(m).call1(x) : Py.obj(m).call2(x, nd); //NOPMD CompareObjectsWithEquals - identity is meant
             }
         }
         if (Py.isInt(x)) {
@@ -1408,11 +1438,27 @@ public final class Builtins {
         }
         Object best = null;
         Object bestKey = null;
-        for (Object v = Py.next(it); v != null; v = Py.next(it)) {
-            Object k = key == null ? v : Py.obj(key).call(new Object[] {v}, Py.NO_KW);
-            if (best == null || (min ? Py.ltBool(k, bestKey) : Py.ltBool(bestKey, k))) {
-                best = v;
-                bestKey = k;
+        if (it instanceof PyGenerator) {
+            // Stepped under one handler (see PyList.extend).
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    Object k = key == null ? v : Py.obj(key).call1(v);
+                    if (best == null || (min ? Py.ltBool(k, bestKey) : Py.ltBool(bestKey, k))) {
+                        best = v;
+                        bestKey = k;
+                    }
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+        } else {
+            for (Object v = Py.next(it); v != null; v = Py.next(it)) {
+                Object k = key == null ? v : Py.obj(key).call1(v);
+                if (best == null || (min ? Py.ltBool(k, bestKey) : Py.ltBool(bestKey, k))) {
+                    best = v;
+                    bestKey = k;
+                }
             }
         }
         if (best == null) {
@@ -1427,7 +1473,7 @@ public final class Builtins {
     private static Object reversed(Object seq) {
         Object m = Py.typeOf(seq).lookup("__reversed__");
         if (m != null) {
-            return Py.obj(m).call(new Object[] {seq}, Py.NO_KW);
+            return Py.obj(m).call1(seq);
         }
         if (seq instanceof PyInstance && ((PyInstance) seq).base != null) {
             // A subclass of a built-in reverses as its built-in value does.

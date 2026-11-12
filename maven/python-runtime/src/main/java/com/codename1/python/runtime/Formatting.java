@@ -121,7 +121,7 @@ final class Formatting {
         if (v instanceof PyInstance) {
             Object m = Py.typeOf(v).lookup("__format__");
             if (m != null) {
-                return Py.strValue(Py.obj(m).call(new Object[] {v, Py.str(spec)}, Py.NO_KW), "__format__");
+                return Py.strValue(Py.obj(m).call2(v, Py.str(spec)), "__format__");
             }
             if (spec.length() == 0) {
                 return Py.toStr(v);

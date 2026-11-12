@@ -223,6 +223,20 @@ public final class PyList extends PyObject {
             return;
         }
         Object it = Py.iter(iterable);
+        if (it instanceof PyGenerator) {
+            // A generator drained under ONE handler, as a transpiled for
+            // loop drains it: next() enters a try per value, a setjmp on
+            // ParparVM.
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    append(v);
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+            return;
+        }
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             append(v);
         }

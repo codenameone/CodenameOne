@@ -136,29 +136,54 @@ final class TypeMethods {
         return sb == null ? s : sb.toString();
     }
 
+    /// `s` mapped by `m` when every char of it is Latin-1 and maps to one
+    /// Latin-1 char (null otherwise): the string itself when nothing
+    /// changes, else one byte array wrapped as a compact string. Never a
+    /// StringBuilder, whose native append takes the builder lock per char,
+    /// nor a char[], which a Latin-1 result does not need.
+    private static String mapLatin1(String s, Unicode.Mapping m) {
+        final short[] lat = m.latin1;
+        final int n = s.length();
+        int i = 0;
+        while (i < n) {
+            char c = s.charAt(i);
+            if (c >= 256) {
+                return null;
+            }
+            if (lat[c] != c) {
+                break;
+            }
+            i++;
+        }
+        if (i == n) {
+            return s;
+        }
+        byte[] out = new byte[n];
+        for (int k = 0; k < i; k++) {
+            out[k] = (byte) s.charAt(k);
+        }
+        while (i < n) {
+            char c = s.charAt(i);
+            if (c >= 256) {
+                return null;
+            }
+            int d = lat[c];
+            if (d < 0) {
+                return null;
+            }
+            out[i] = (byte) d;
+            i++;
+        }
+        return Codecs.latin1(out, 0, n);
+    }
+
     /// Unicode case mapping per character, which (unlike
     /// `String.toLowerCase()`) does not depend on the device locale.
     static String mapCase(String s, int mode) {
-        if (mode <= 1) {
-            // ASCII: one array, and the string itself when nothing changes.
-            // The chars are read out once; charAt per char is a call each.
-            int n = s.length();
-            char[] out = new char[n];
-            s.getChars(0, n, out, 0);
-            boolean changed = false;
-            int i = 0;
-            for (; i < n; i++) {
-                char c = out[i];
-                if (c >= 128) {
-                    break;
-                }
-                if (mode == 1 ? c >= 'a' && c <= 'z' : c >= 'A' && c <= 'Z') {
-                    out[i] = (char) (mode == 1 ? c - 32 : c + 32);
-                    changed = true;
-                }
-            }
-            if (i == n) {
-                return changed ? new String(out) : s;
+        if (mode <= 1 || mode == 4) {
+            String r = mapLatin1(s, mode == 0 ? Unicode.LOWER_MAP : mode == 1 ? Unicode.UPPER_MAP : Unicode.FOLD_MAP);
+            if (r != null) {
+                return r;
             }
         }
         StringBuilder sb = new StringBuilder(s.length());
@@ -782,6 +807,11 @@ final class TypeMethods {
     }
 
     /// `sep.join(items)`; a list is read in place, without an iterator.
+    /// Every path ends in the varargs String.join, which on ParparVM copies
+    /// Latin-1 parts straight into one allocation: a str subclass item
+    /// (bs4's NavigableString) is unwrapped to its value first, and an
+    /// iterable is gathered into an array. A StringBuilder here took the
+    /// builder lock twice per item.
     static String join(String sep, Object items) {
         if (items instanceof PyList) {
             PyList l = (PyList) items;
@@ -790,47 +820,48 @@ final class TypeMethods {
             if (only instanceof String) {
                 return (String) only;
             }
-            // All plain strings: String.join, which on ParparVM copies
-            // Latin-1 bytes straight into one allocation.
-            String[] parts = new String[n];
-            int i0 = 0;
-            for (; i0 < n; i0++) {
-                Object v = l.get(i0);
-                if (!(v instanceof String)) {
-                    break;
-                }
-                parts[i0] = (String) v;
+            if (n > 0 && (l.ints != null || l.floats != null)) {
+                // Unboxed numbers: the first item is already the error.
+                joinPart(l.get(0), 0);
             }
-            if (i0 == n) {
-                return String.join(sep, parts);
-            }
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < n; i++) {
-                Object v = joinItem(l.get(i));
-                if (!(v instanceof String)) {
-                    throw Py.typeError("sequence item " + i + ": expected str instance, " + Py.typeOf(v).name + " found");
-                }
-                if (i > 0) {
-                    sb.append(sep);
-                }
-                sb.append((String) v);
-            }
-            return sb.toString();
+            return joinArray(sep, l.items, n);
         }
-        Object it = Py.iter(items);
-        StringBuilder sb = new StringBuilder();
-        int i = 0;
-        for (Object v = Py.next(it); v != null; v = Py.next(it), i++) {
-            v = joinItem(v);
-            if (!(v instanceof String)) {
-                throw Py.typeError("sequence item " + i + ": expected str instance, " + Py.typeOf(v).name + " found");
-            }
-            if (i > 0) {
-                sb.append(sep);
-            }
-            sb.append((String) v);
+        // The whole iterable first, then the type checks, as CPython's
+        // PySequence_Fast does: a bad item leaves the iterator exhausted.
+        Object[] raw = Py.toArray(items);
+        int n = raw.length;
+        if (n == 1 && raw[0] instanceof String) {
+            return (String) raw[0];
         }
-        return sb.toString();
+        return joinArray(sep, raw, n);
+    }
+
+    /// The first `n` of `src` joined; read straight from the array, the
+    /// String test in line and the call only for a str subclass or an error.
+    private static String joinArray(String sep, Object[] src, int n) {
+        String[] parts = new String[n];
+        for (int i = 0; i < n; i++) {
+            Object v = src[i];
+            if (v instanceof String) {
+                parts[i] = (String) v;
+            } else if (v instanceof PyInstance && ((PyInstance) v).base instanceof String) {
+                parts[i] = (String) ((PyInstance) v).base;
+            } else {
+                parts[i] = joinPart(v, i);
+            }
+        }
+        return String.join(sep, parts);
+    }
+
+    private static String joinPart(Object v, int i) {
+        if (v instanceof String) {
+            return (String) v;
+        }
+        Object b = joinItem(v);
+        if (!(b instanceof String)) {
+            throw Py.typeError("sequence item " + i + ": expected str instance, " + Py.typeOf(b).name + " found");
+        }
+        return (String) b;
     }
 
     // A local builder on purpose: ParparVM keeps one that does not escape
@@ -1035,7 +1066,7 @@ final class TypeMethods {
         defKw(t, "format", (args, kw) -> {
             Object[] pos = new Object[args.length - kw.length - 1];
             System.arraycopy(args, 1, pos, 0, pos.length);
-            PyDict named = new PyDict();
+            PyDict named = kw.length == 0 ? null : new PyDict();
             for (int i = 0; i < kw.length; i++) {
                 named.setItem(Py.str(kw[i]), args[args.length - kw.length + i]);
             }

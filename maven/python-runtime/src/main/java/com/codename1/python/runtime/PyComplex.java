@@ -296,7 +296,7 @@ public final class PyComplex extends PyObject {
         }
         Object m = Py.typeOf(o).lookup("__complex__");
         if (m != null) {
-            Object r = Py.obj(m).call(new Object[] {o}, Py.NO_KW);
+            Object r = Py.obj(m).call1(o);
             if (r instanceof PyComplex) {
                 return (PyComplex) r;
             }
@@ -304,7 +304,7 @@ public final class PyComplex extends PyObject {
         }
         m = Py.typeOf(o).lookup("__float__");
         if (m != null) {
-            return new PyComplex(Py.asDouble(Py.obj(m).call(new Object[] {o}, Py.NO_KW)), 0);
+            return new PyComplex(Py.asDouble(Py.obj(m).call1(o)), 0);
         }
         throw Py.typeError(first ? "complex() argument must be a string or a number, not " + Py.typeOf(o).name
                 : "complex() argument 'imag' must be a real number, not " + Py.typeOf(o).name);

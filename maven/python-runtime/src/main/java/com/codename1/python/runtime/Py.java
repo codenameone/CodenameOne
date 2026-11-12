@@ -774,7 +774,7 @@ public final class Py {
         if (a instanceof PyInstance) {
             Object m = Py.typeOf(a).lookup("__ne__");
             if (m != null) {
-                Object r = Py.obj(m).call(new Object[] {a, b}, NO_KW);
+                Object r = Py.obj(m).call2(a, b);
                 if (r != NOT_IMPLEMENTED) {
                     return r;
                 }

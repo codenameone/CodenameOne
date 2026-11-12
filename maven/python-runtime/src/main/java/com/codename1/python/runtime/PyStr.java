@@ -238,9 +238,26 @@ public final class PyStr extends PyObject {
     /// quote and no double quote.
     public static String repr(String s) {
         char q = s.indexOf('\'') >= 0 && s.indexOf('"') < 0 ? '"' : '\'';
-        StringBuilder sb = new StringBuilder(s.length() + 2);
-        sb.append(q);
-        for (int i = 0; i < s.length(); i++) {
+        final int len = s.length();
+        int i = plainRun(s, 0, len, q);
+        String qs = q == '"' ? "\"" : "'";
+        if (i == len) {
+            // Nothing to escape, the usual case: one concatenation.
+            return qs + s + qs;
+        }
+        // Plain text is copied a run at a time: each append is a call that
+        // takes the builder's lock.
+        StringBuilder sb = new StringBuilder(len + 8);
+        sb.append(q).append(s, 0, i);
+        for (; i < len; i++) {
+            int run = plainRun(s, i, len, q);
+            if (run > i) {
+                sb.append(s, i, run);
+                i = run;
+                if (i == len) {
+                    break;
+                }
+            }
             char c = s.charAt(i);
             if (c == q || c == '\\') {
                 sb.append('\\').append(c);
@@ -277,6 +294,19 @@ public final class PyStr extends PyObject {
         }
         sb.append(q);
         return sb.toString();
+    }
+
+    /// The end of the run from `i` that repr() copies as it is: printable
+    /// ASCII other than the quote and backslash, and printable Latin-1.
+    private static int plainRun(String s, int i, int len, char q) {
+        while (i < len) {
+            char c = s.charAt(i);
+            if (c >= 0x20 && c < 0x7f ? c == q || c == '\\' : c <= 0xa0 || c > 0xff || c == 0xad) {
+                return i;
+            }
+            i++;
+        }
+        return len;
     }
 
     /// str.isprintable() for one code point: the C0 and C1 controls, DEL,

@@ -1578,7 +1578,7 @@ public final class StdModules {
                 x = y;
             }
         }));
-        m.setAttr("fsum", PyBuiltin.fixed1("fsum", a0 -> Py.obj(Builtins.SUM).call(new Object[] {a0, Py.ofFloat(0)}, Py.NO_KW)));
+        m.setAttr("fsum", PyBuiltin.fixed1("fsum", a0 -> Py.obj(Builtins.SUM).call2(a0, Py.ofFloat(0))));
         m.setAttr("prod", PyBuiltin.fixed1("prod", a0 -> {
             Object r = PyInt.of(1);
             Object it = Py.iter(a0);

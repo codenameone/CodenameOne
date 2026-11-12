@@ -47,7 +47,17 @@ final class StrFormat {
                 throw Py.valueError("Single '}' encountered in format string");
             }
             if (c != '{') {
-                sb.append(c);
+                // Literal text to the next brace in one append.
+                int j = i + 1;
+                while (j < n) {
+                    char d = fmt.charAt(j);
+                    if (d == '{' || d == '}') {
+                        break;
+                    }
+                    j++;
+                }
+                sb.append(fmt, i, j);
+                i = j - 1;
                 continue;
             }
             if (i + 1 < n && fmt.charAt(i + 1) == '{') {
@@ -68,6 +78,17 @@ final class StrFormat {
             }
             if (depth != 0) {
                 throw Py.valueError("expected '}' before end of string");
+            }
+            if (j == i + 2) {
+                // `{}`, the common field: no substrings, and a str argument
+                // appended as it is (str.__format__ with an empty spec).
+                if (manual) {
+                    throw Py.valueError("cannot switch from manual field specification to automatic field numbering");
+                }
+                Object v = posArg(pos, auto++);
+                sb.append(v instanceof String ? (String) v : Formatting.format(v, ""));
+                i = j - 1;
+                continue;
             }
             String field = fmt.substring(i + 1, j - 1);
             i = j - 1;
@@ -95,9 +116,16 @@ final class StrFormat {
                 }
                 v = posArg(pos, auto++);
             } else if (Character.isDigit(head.charAt(0))) {
+                if (auto > 0) {
+                    throw Py.valueError("cannot switch from automatic field numbering to manual field specification");
+                }
                 manual = true;
                 v = posArg(pos, Integer.parseInt(head));
             } else {
+                if (named == null) {
+                    // No keywords were passed: the lookup a dict would fail.
+                    throw Py.keyError(Py.str(head));
+                }
                 v = Py.obj(named).getItem(Py.str(head));
             }
             while (end < field.length()) {
@@ -127,7 +155,7 @@ final class StrFormat {
             } else if (conv == 's') {
                 v = Py.str(Py.toStr(v));
             } else if (conv == 'a') {
-                v = Py.obj(Builtins.ASCII).call(new Object[] {v}, Py.NO_KW);
+                v = Py.obj(Builtins.ASCII).call1(v);
             }
             sb.append(Formatting.format(v, spec));
         }

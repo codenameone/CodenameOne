@@ -283,7 +283,7 @@ public final class PyType extends PyObject {
                     out.add(bases[j]);
                 }
             }
-            Object entries = Py.obj(hook).call(new Object[] {PyTuple.of(bases)}, Py.NO_KW);
+            Object entries = Py.obj(hook).call1(PyTuple.of(bases));
             if (!(entries instanceof PyTuple)) {
                 throw Py.typeError("__mro_entries__ must return a tuple");
             }
@@ -582,7 +582,7 @@ public final class PyType extends PyObject {
             if (v instanceof PyInstance) {
                 Object sn = ((PyInstance) v).cls.lookup("__set_name__");
                 if (sn != null) {
-                    Py.obj(sn).call(new Object[] {v, this, e.getKey()}, Py.NO_KW);
+                    Py.obj(sn).call3(v, this, e.getKey());
                 }
             }
         }
@@ -802,7 +802,7 @@ public final class PyType extends PyObject {
         if (v instanceof PyInstance) {
             Object get = ((PyInstance) v).cls.lookup("__get__");
             if (get != null) {
-                return Py.obj(get).call(new Object[] {v, Py.NONE, this}, Py.NO_KW);
+                return Py.obj(get).call3(v, Py.NONE, this);
             }
         }
         return v;
