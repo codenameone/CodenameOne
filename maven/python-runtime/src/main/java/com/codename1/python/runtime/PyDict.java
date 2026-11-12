@@ -372,6 +372,14 @@ public class PyDict extends PyObject {
         return s >= 0 ? values[entry(s)] : null;
     }
 
+    /// `self[key]` for a str key whose hash the caller took once, up front
+    /// (operator.itemgetter), or `null` when absent.
+    Object getStrHashed(String key, long h) {
+        sync();
+        int s = findStr(key, h);
+        return s >= 0 ? values[entry(s)] : null;
+    }
+
     public Object getOrNull(Object key) {
         sync();
         int s = find(key, Py.keyHash(key, "a dict key"));
@@ -648,6 +656,9 @@ public class PyDict extends PyObject {
     /// by a direct call.
     private void updatePairs(Object other) {
         Object it = Py.iter(other);
+        // dict(pairs) is usually built for more than the four entries a
+        // dict's first growth makes room for: two growths become one.
+        reserve(8);
         int n = 0;
         if (it instanceof PyGenerator) {
             PyGenerator g = (PyGenerator) it;

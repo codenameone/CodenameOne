@@ -194,6 +194,34 @@ final class Operator {
             super(t);
             this.items = items;
             this.single = items.length == 1 ? items[0] : null;
+            long[] h = null;
+            for (int i = 0; i < items.length; i++) {
+                if (items[i] instanceof String) {
+                    if (h == null) {
+                        h = new long[items.length];
+                    }
+                    h[i] = Py.keyHash(items[i], "a dict key");
+                }
+            }
+            this.strHashes = h;
+        }
+
+        /// The hash of each str key, taken once: pdfplumber applies one getter
+        /// with four str keys to every char dict on a page.
+        private final long[] strHashes;
+
+        private Object item(Object obj, int i) {
+            Object k = items[i];
+            if (strHashes != null && k instanceof String && obj instanceof PyDict) {
+                PyDict d = (PyDict) obj;
+                if (d.type() == Py.DICT_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    Object v = d.getStrHashed((String) k, strHashes[i]);
+                    if (v != null) {
+                        return v;
+                    }
+                }
+            }
+            return Py.getitem(obj, k);
         }
 
         @Override
@@ -204,11 +232,11 @@ final class Operator {
         @Override
         Object apply(Object obj) {
             if (single != null) {
-                return Py.getitem(obj, single);
+                return item(obj, 0);
             }
             Object[] out = new Object[items.length];
             for (int i = 0; i < out.length; i++) {
-                out[i] = Py.getitem(obj, items[i]);
+                out[i] = item(obj, i);
             }
             return new PyTuple(out);
         }

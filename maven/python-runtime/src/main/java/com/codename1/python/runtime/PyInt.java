@@ -91,6 +91,12 @@ public class PyInt extends PyObject {
 
     /// Parses an integer literal or `int(str, base)` text.
     public static Object parse(String s, int base) {
+        return parse(s, base, s);
+    }
+
+    /// [#parse], naming `orig` (what int() was given: a str or bytes) as
+    /// CPython does, by its repr, in a failure.
+    public static Object parse(String s, int base, Object orig) {
         int len = s.length();
         if (base == 10 && len > 0 && len <= 18) {
             // The common case, ASCII digits with an optional minus, read
@@ -132,11 +138,11 @@ public class PyInt extends PyObject {
             }
         }
         if (t.length() == 0) {
-            throw Py.valueError("invalid literal for int() with base " + base + ": '" + s + "'");
+            throw Py.valueError("invalid literal for int() with base " + base + ": " + Py.toRepr(orig));
         }
         for (int i = 0; i < t.length(); i++) {
             if (Character.digit(t.charAt(i), base) < 0) {
-                throw Py.valueError("invalid literal for int() with base " + base + ": '" + s + "'");
+                throw Py.valueError("invalid literal for int() with base " + base + ": " + Py.toRepr(orig));
             }
         }
         if (t.length() <= 12 || base == 10 && t.length() <= 18) {

@@ -1565,6 +1565,23 @@ public final class Py {
         return m == MISS || m instanceof Miss ? dflt : m; //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
+    /// `o["k"]` for a str literal key: an exact dict is probed directly by
+    /// the str's cached hash, without the sequence checks of [#getitem] or
+    /// its virtual `getItem`. A miss, a dict subclass and anything else take
+    /// the general path, so `__missing__` and `__getitem__` still apply.
+    public static Object getitemS(Object o, String key) {
+        if (o instanceof PyDict) {
+            PyDict d = (PyDict) o;
+            if (d.type() == DICT_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                Object v = d.getStrHashed(key, key.hashCode());
+                if (v != null) {
+                    return v;
+                }
+            }
+        }
+        return getitem(o, key);
+    }
+
     public static Object getitem(Object o, Object key) {
         if (o instanceof PyList) {
             PyList l = (PyList) o;

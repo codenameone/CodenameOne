@@ -255,6 +255,13 @@ public final class Builtins {
     });
     public static final Object ZIP = new PyBuiltin("zip", (args, kw) -> {
         Args a = new Args("zip", args, kw).check(Integer.MAX_VALUE, "strict");
+        Object strictT = a.kw("strict");
+        if (a.npos > 0 && (strictT == null || !Py.isTrue(strictT))) {
+            Object z = zipTuples(args, a.npos);
+            if (z != null) {
+                return z;
+            }
+        }
         final Object[] its = new Object[a.npos];
         for (int i = 0; i < its.length; i++) {
             its[i] = Py.iter(args[i]);
@@ -285,6 +292,36 @@ public final class Builtins {
             return new PyTuple(row);
         });
     });
+    /// `zip(*rows)` over tuples, the transpose pdfplumber's merge_bboxes
+    /// does per word: tuples cannot change, so each column is read by index,
+    /// with no iterator per argument and no next() call per item. Null
+    /// when any argument is not a tuple.
+    private static Object zipTuples(Object[] args, int n) {
+        final Object[][] cols = new Object[n][];
+        int len = Integer.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            if (!(args[i] instanceof PyTuple)) {
+                return null;
+            }
+            cols[i] = ((PyTuple) args[i]).items;
+            len = Math.min(len, cols[i].length);
+        }
+        final int end = len;
+        final int[] pos = new int[1];
+        return new PyJavaIter(() -> {
+            int p = pos[0];
+            if (p >= end) {
+                return null;
+            }
+            pos[0] = p + 1;
+            Object[] row = new Object[cols.length];
+            for (int i = 0; i < row.length; i++) {
+                row[i] = cols[i][p];
+            }
+            return new PyTuple(row);
+        });
+    }
+
     public static final Object MAP = PyBuiltin.positional("map", a -> {
         if (a.length == 2) {
             return map1(a[0], a[1]);
@@ -761,7 +798,7 @@ public final class Builtins {
                 return PyInt.of(0);
             }
             if (base != null) {
-                return PyInt.parse(intText(x, true), (int) Py.asLong(base));
+                return PyInt.parse(intText(x, true), (int) Py.asLong(base), x);
             }
             return toInt(x);
         };
@@ -785,7 +822,7 @@ public final class Builtins {
         Py.SET_TYPE.unary = x -> PySet.of(x, false);
         Py.FROZENSET_TYPE.unary = x -> PySet.of(x, true);
         Py.TYPE_TYPE.unary = Py::typeOf;
-        Py.INT_TYPE.binary = (x, base) -> PyInt.parse(intText(x, true), (int) Py.asLong(base));
+        Py.INT_TYPE.binary = (x, base) -> PyInt.parse(intText(x, true), (int) Py.asLong(base), x);
         Py.STR_TYPE.binary = (x, enc) -> {
             if (!(x instanceof PyBytes)) {
                 throw Py.typeError("decoding to str: need a bytes-like object, " + Py.typeOf(x).name + " found");
@@ -1052,7 +1089,7 @@ public final class Builtins {
             return Py.mul(PyInt.parse(Formatting.fixed(Math.abs(d), 0), 10), PyInt.of(d < 0 ? -1 : 1));
         }
         if (x instanceof String || x instanceof PyBytes || x instanceof PyByteArray) {
-            return PyInt.parse(intText(x, false), 10);
+            return PyInt.parse(intText(x, false), 10, x);
         }
         Object m = Py.typeOf(x).lookup("__int__");
         if (m == null) {
@@ -1552,6 +1589,31 @@ public final class Builtins {
 
     /// `min(iterable)` / `max(iterable)` with no key or default.
     private static Object minMax1(String fn, Object iterable, boolean min) {
+        Object[] items = null;
+        int n = 0;
+        if (iterable instanceof PyTuple) {
+            items = ((PyTuple) iterable).items;
+            n = items.length;
+        } else if (iterable instanceof PyList) {
+            PyList l = (PyList) iterable;
+            if (l.floats == null && l.ints == null) {
+                items = l.items;
+                n = l.size;
+            }
+        }
+        if (items != null && n > 0) {
+            // A tuple or list is read in place, and two floats or two ints
+            // compared as such: pdfplumber's merge_bboxes takes min and max
+            // of each column of a word's character boxes.
+            Object best = items[0];
+            for (int i = 1; i < n; i++) {
+                Object v = items[i];
+                if (min ? less(v, best) : less(best, v)) {
+                    best = v;
+                }
+            }
+            return best;
+        }
         Object it = Py.iter(iterable);
         Object best = Py.next(it);
         if (best == null) {
@@ -1565,6 +1627,17 @@ public final class Builtins {
         return best;
     }
 
+    /// `a < b` as a bool, directly for two floats or two ints.
+    private static boolean less(Object a, Object b) {
+        if (a instanceof Double && b instanceof Double) {
+            return ((Double) a).doubleValue() < ((Double) b).doubleValue();
+        }
+        if (a instanceof Long && b instanceof Long) {
+            return ((Long) a).longValue() < ((Long) b).longValue();
+        }
+        return Py.ltBool(a, b);
+    }
+
     private static Object minMax(String fn, Object[] args, String[] kw, boolean min) {
         if (kw.length == 0 && args.length >= 2) {
             // min(a, b, ...) with no key: a straight scan over the arguments,
@@ -1573,7 +1646,7 @@ public final class Builtins {
             Object best = args[0];
             for (int i = 1; i < args.length; i++) {
                 Object v = args[i];
-                if (min ? Py.ltBool(v, best) : Py.ltBool(best, v)) {
+                if (min ? less(v, best) : less(best, v)) {
                     best = v;
                 }
             }

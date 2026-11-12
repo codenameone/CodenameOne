@@ -3084,7 +3084,11 @@ public final class Emitter {
             if (ci != null) {
                 return "Py.getitem(" + expr(s.value) + ", " + ci + ")";
             }
-            return "Py.getitem(" + expr(s.value) + ", " + expr(s.index) + ")";
+            String key = expr(s.index);
+            if (isStrLiteral(key)) {
+                return "Py.getitemS(" + expr(s.value) + ", " + key + ")";
+            }
+            return "Py.getitem(" + expr(s.value) + ", " + key + ")";
         }
         if (e instanceof Slice) {
             Slice s = (Slice) e;
@@ -3324,6 +3328,24 @@ public final class Emitter {
     String missTest(Call c) {
         return "Py.isMiss(" + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + ", "
                 + ("AttributeError".equals(((Name) c.args.get(1)).id) ? "Py.ATTRIBUTE_ERROR" : "Py.KEY_ERROR") + ")";
+    }
+
+    /// Whether generated code is exactly one Java string literal: a subscript
+    /// by one (`ch["top"]`) reads a dict through [Py#getitemS].
+    static boolean isStrLiteral(String code) {
+        int n = code.length();
+        if (n < 2 || code.charAt(0) != '"' || code.charAt(n - 1) != '"') {
+            return false;
+        }
+        for (int i = 1; i < n - 1; i++) {
+            char c = code.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == '"') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String probeRead(Expr e, boolean probe) {

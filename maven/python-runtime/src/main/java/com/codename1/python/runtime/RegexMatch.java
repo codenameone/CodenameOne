@@ -323,11 +323,77 @@ final class RegexMatch extends PyObject {
             Object r = Regex.subCall(p, pattern, (String) string, repl, (int) Py.index(countObj));
             return withCount ? r : ((PyTuple) r).items[0];
         }
+        if (string instanceof PyBytes && checkKind(p, pattern, string)) {
+            // A bytes subject runs here too, over its Latin-1 text, as a
+            // bytes search does: pdfminer subs every hex string it reads.
+            String text = latin1((PyBytes) string);
+            Object r = null;
+            if (repl instanceof PyBytes) {
+                java.util.HashMap<String, PyList> cache = p.byteTemplates;
+                if (cache == null) {
+                    cache = new java.util.HashMap<String, PyList>();
+                    p.byteTemplates = cache;
+                }
+                String key = latin1((PyBytes) repl);
+                PyList template = cache.get(key);
+                if (template == null && templateHook != null) {
+                    template = textTemplate(Py.obj(templateHook).call2(pattern, repl));
+                    if (template != null && cache.size() < TEMPLATES) {
+                        cache.put(key, template);
+                    }
+                }
+                if (template != null) {
+                    r = Regex.subn(p, text, template, (int) Py.index(countObj));
+                }
+            } else if (Builtins.isCallable(repl)) {
+                r = Regex.subCall(p, pattern, (PyBytes) string, text, repl, (int) Py.index(countObj));
+            }
+            if (r != null) {
+                Object[] items = ((PyTuple) r).items;
+                PyBytes out = new PyBytes(latin1Encode((String) items[0]));
+                return withCount ? Py.tuple(out, items[1]) : out;
+            }
+        }
         if (subHook == null) {
             throw Py.runtimeError("re is not initialised");
         }
         Object r = Py.obj(subHook).call4(pattern, repl, string, countObj);
         return withCount ? r : Py.obj(r).getItem(Long.valueOf(0));
+    }
+
+    /// A bytes template from `re._compile_template` with its literal parts
+    /// as Latin-1 text, the form [Regex#subn] takes; null for a part of
+    /// another kind, which the Python loop handles instead.
+    private static PyList textTemplate(Object t) {
+        if (!(t instanceof PyList)) {
+            return null;
+        }
+        PyList src = (PyList) t;
+        PyList out = Py.list();
+        int n = src.size();
+        for (int i = 0; i < n; i++) {
+            Object part = src.get(i);
+            if (part instanceof PyBytes) {
+                byte[] v = ((PyBytes) part).value;
+                out.append(Codecs.latin1(v, 0, v.length));
+            } else if (part instanceof Long) {
+                out.append(part);
+            } else {
+                return null;
+            }
+        }
+        return out;
+    }
+
+    /// The bytes of a text whose chars are all below 256 (a bytes subject's
+    /// Latin-1 text, with bytes put into it).
+    static byte[] latin1Encode(String s) {
+        int n = s.length();
+        byte[] b = new byte[n];
+        for (int i = 0; i < n; i++) {
+            b[i] = (byte) s.charAt(i);
+        }
+        return b;
     }
 
     private static RegexMatch self(Object o) {

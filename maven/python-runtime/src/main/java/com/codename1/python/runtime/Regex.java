@@ -156,6 +156,8 @@ final class Regex {
         /// Compiled replacement templates by text, as sre caches them; at
         /// most [RegexMatch#TEMPLATES].
         java.util.HashMap<String, PyList> templates;
+        /// The same for bytes replacements, keyed by their Latin-1 text.
+        java.util.HashMap<String, PyList> byteTemplates;
 
         @Override
         public PyType type() {
@@ -1388,6 +1390,12 @@ final class Regex {
     /// line through `re_line_with_content.sub(fn, text)`. As in sre, `fn`
     /// answering None adds nothing, and anything but a str is a TypeError.
     static Object subCall(Prog p, Object pattern, String text, Object fn, int count) {
+        return subCall(p, pattern, null, text, fn, count);
+    }
+
+    /// [#subCall] over a bytes subject's Latin-1 `text`: the callable gets
+    /// bytes matches and returns bytes.
+    static Object subCall(Prog p, Object pattern, PyBytes subject, String text, Object fn, int count) {
         Scratch sc = acquire(p);
         try {
             // Counted once here; the runs below find the text already set.
@@ -1398,7 +1406,7 @@ final class Regex {
             if (regs.length == 0) {
                 return Py.tuple(text, Long.valueOf(0));
             }
-            return subCallLoop(p, sc, pattern, text, n, regs, fn, count);
+            return subCallLoop(p, sc, pattern, subject, text, n, regs, fn, count);
         } finally {
             release(p, sc);
         }
@@ -1408,7 +1416,8 @@ final class Regex {
     /// value returned from inside a try in a spare local, and when that slot
     /// is the builder's the translator rightly keeps the builder on the
     /// heap, where every append takes its lock.
-    private static Object subCallLoop(Prog p, Scratch sc, Object pattern, String text, int n, int[] first, Object fn, int count) {
+    private static Object subCallLoop(Prog p, Scratch sc, Object pattern, PyBytes subject, String text, int n, int[] first,
+            Object fn, int count) {
         int[] regs = first;
         StringBuilder out = new StringBuilder(text.length() + 16);
         boolean plain = n == text.length();
@@ -1425,8 +1434,15 @@ final class Regex {
             }
             // The callable may run this same pattern; it then builds its
             // own scratch, since this one is taken.
-            Object r = f.call1(new RegexMatch(pattern, text, text, false, 0, n, p.groups, regs));
-            if (r instanceof String) {
+            Object r = f.call1(new RegexMatch(pattern, subject != null ? subject : text, text, subject != null, 0, n,
+                    p.groups, regs));
+            if (subject != null) {
+                if (!(r instanceof PyBytes)) {
+                    throw Py.typeError("expected a bytes-like object, " + Py.typeOf(r).name + " found");
+                }
+                byte[] v = ((PyBytes) r).value;
+                out.append(Codecs.latin1(v, 0, v.length));
+            } else if (r instanceof String) {
                 out.append((String) r);
             } else if (r != Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
                 throw Py.typeError("expected str instance, " + Py.typeOf(r).name + " found");
