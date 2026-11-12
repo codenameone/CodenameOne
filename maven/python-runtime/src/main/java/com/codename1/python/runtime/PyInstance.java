@@ -62,6 +62,21 @@ public class PyInstance extends PyObject {
     /// `o.__dict__ is o.__dict__` as in CPython. Null until then.
     private InstanceDict dictView;
 
+    /// The instance's one `__dict__` view, made on first use.
+    final PyDict dictView() {
+        InstanceDict d = dictView;
+        if (d == null) {
+            d = new InstanceDict(this);
+            dictView = d;
+        }
+        return d;
+    }
+
+    /// The view if one was made: what [AttrSite] compares a read with.
+    final Object dictViewOrNull() {
+        return dictView;
+    }
+
     /// The shape, the empty one for null.
     final Shape shape() {
         return shape == null ? Shape.EMPTY : shape;
@@ -288,10 +303,7 @@ public class PyInstance extends PyObject {
             }
             // One view per instance, refilled from the instance before
             // every read, so a view fetched earlier sees later writes.
-            if (dictView == null) {
-                dictView = new InstanceDict(this);
-            }
-            return dictView;
+            return dictView();
         }
         if ("__class__".equals(name)) {
             return cls;

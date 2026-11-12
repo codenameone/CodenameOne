@@ -347,6 +347,14 @@ public class PyDict extends PyObject {
     }
 
     /// `self[key]`, or `null` when absent.
+    /// [#getOrNull] with the key's hash already taken, by a caller that
+    /// had to hash it itself for its own error message (lru_cache).
+    Object getOrNullHashed(Object key, long h) {
+        sync();
+        int s = find(key, h);
+        return s >= 0 ? values[entry(s)] : null;
+    }
+
     public Object getOrNull(Object key) {
         sync();
         int s = find(key, Py.keyHash(key, "a dict key"));

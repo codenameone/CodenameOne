@@ -220,6 +220,23 @@ public final class PyList extends PyObject {
                 size += n;
                 return;
             }
+            if (o.ints == null && o.floats == null && ints == null && floats == null) {
+                // Objects into objects: one copy, as CPython's list_extend
+                // does, not an append (and a storage check) per element.
+                // The source array and length are read first, so
+                // x.extend(x) copies what x held before.
+                Object[] src = o.items;
+                Object[] dst = items;
+                if (size + n > dst.length) {
+                    Object[] g = new Object[Math.max(4, size == 0 ? n : size + n + (size >> 1))];
+                    System.arraycopy(dst, 0, g, 0, size);
+                    items = g;
+                    dst = g;
+                }
+                System.arraycopy(src, 0, dst, size, n);
+                size += n;
+                return;
+            }
             for (int i = 0; i < n; i++) {
                 append(o.get(i));
             }
@@ -892,27 +909,55 @@ public final class PyList extends PyObject {
     /// `list.sort(key=None, reverse=False)`: a stable merge sort. The order
     /// is an int array, and keys that are all ints compare as longs.
     public void sort(Object key, boolean reverse) {
-        objects();
         boolean none = key == null || key == Py.NONE; //NOPMD CompareObjectsWithEquals - identity is meant
+        if (none && ints != null) {
+            // Unboxed ints: equal ones cannot be told apart, so stability is
+            // moot and the array sorts in place, never boxed.
+            java.util.Arrays.sort(ints, 0, size);
+            if (reverse) {
+                int[] l = ints;
+                for (int i = 0, j = size - 1; i < j; i++, j--) {
+                    int t = l[i];
+                    l[i] = l[j];
+                    l[j] = t;
+                }
+            }
+            return;
+        }
+        objects();
+        PyObject kf = none ? null : Py.obj(key);
         Object[] keys = new Object[size];
         boolean longs = true;
+        boolean strs = true;
         for (int i = 0; i < size; i++) {
-            Object k = none ? items[i] : Py.call(key, items[i]);
+            Object k = none ? items[i] : kf.call1(items[i]);
             keys[i] = k;
             longs &= k instanceof Long;
+            strs &= k instanceof String;
+        }
+        if (longs && size > 1 && packable(keys)) {
+            sortPacked(keys, reverse);
+            return;
         }
         long[] lk = null;
+        Object[] tie = keys;
         if (longs) {
             lk = new long[size];
             for (int i = 0; i < size; i++) {
                 lk[i] = (Long) keys[i];
+            }
+            tie = null;
+        } else if (!strs) {
+            lk = new long[size];
+            if (!tupleFirsts(keys, lk)) {
+                lk = null;
             }
         }
         int[] order = new int[size];
         for (int i = 0; i < size; i++) {
             order[i] = i;
         }
-        mergeSort(order, new int[size], keys, lk, 0, size, reverse);
+        mergeSort(order, new int[size], tie, lk, strs && size > 0, 0, size, reverse);
         Object[] out = new Object[Math.max(4, size)];
         for (int i = 0; i < size; i++) {
             out[i] = items[order[i]];
@@ -920,15 +965,61 @@ public final class PyList extends PyObject {
         items = out;
     }
 
-    private static void mergeSort(int[] a, int[] tmp, Object[] keys, long[] lk, int lo, int hi, boolean rev) {
-        if (hi - lo < 2) {
-            return;
+    /// When every key is a tuple whose first item is an int, those ints, so
+    /// that most comparisons are settled without touching the tuples (as
+    /// CPython's unsafe_tuple_compare does), written into `r`; false when
+    /// some key is not such a tuple.
+    private static boolean tupleFirsts(Object[] keys, long[] r) {
+        for (int i = 0; i < keys.length; i++) {
+            if (!(keys[i] instanceof PyTuple)) {
+                return false;
+            }
+            Object[] t = ((PyTuple) keys[i]).items;
+            if (t.length == 0 || !(t[0] instanceof Long)) {
+                return false;
+            }
+            r[i] = ((Long) t[0]).longValue();
         }
-        if (hi - lo <= 8) {
+        return true;
+    }
+
+    private static boolean packable(Object[] keys) {
+        for (Object k : keys) {
+            long v = ((Long) k).longValue();
+            if (v != (int) v) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Int keys that fit in 32 bits: each packed above its index into one
+    /// long, so a primitive merge sort orders by key and breaks ties by
+    /// position -- stable, with no index indirection or boxed compare.
+    /// Reversed, the key is complemented, which keeps equal keys in their
+    /// original order as Python's reverse=True does.
+    private void sortPacked(Object[] keys, boolean reverse) {
+        int n = size;
+        long[] p = new long[n];
+        for (int i = 0; i < n; i++) {
+            int k = (int) ((Long) keys[i]).longValue();
+            p[i] = ((long) (reverse ? ~k : k) << 32) | i;
+        }
+        mergeLongs(p, new long[n], 0, n);
+        Object[] src = items;
+        Object[] out = new Object[Math.max(4, n)];
+        for (int i = 0; i < n; i++) {
+            out[i] = src[(int) p[i]];
+        }
+        items = out;
+    }
+
+    private static void mergeLongs(long[] a, long[] tmp, int lo, int hi) {
+        if (hi - lo <= 12) {
             for (int i = lo + 1; i < hi; i++) {
-                int v = a[i];
+                long v = a[i];
                 int j = i - 1;
-                while (j >= lo && before(keys, lk, v, a[j], rev)) {
+                while (j >= lo && a[j] > v) {
                     a[j + 1] = a[j];
                     j--;
                 }
@@ -937,9 +1028,47 @@ public final class PyList extends PyObject {
             return;
         }
         int mid = (lo + hi) >>> 1;
-        mergeSort(a, tmp, keys, lk, lo, mid, rev);
-        mergeSort(a, tmp, keys, lk, mid, hi, rev);
-        if (!before(keys, lk, a[mid], a[mid - 1], rev)) {
+        mergeLongs(a, tmp, lo, mid);
+        mergeLongs(a, tmp, mid, hi);
+        if (a[mid - 1] < a[mid]) {
+            return;
+        }
+        int i = lo;
+        int j = mid;
+        int k = lo;
+        while (i < mid && j < hi) {
+            tmp[k++] = a[j] < a[i] ? a[j++] : a[i++];
+        }
+        while (i < mid) {
+            tmp[k++] = a[i++];
+        }
+        while (j < hi) {
+            tmp[k++] = a[j++];
+        }
+        System.arraycopy(tmp, lo, a, lo, hi - lo);
+    }
+
+    private static void mergeSort(int[] a, int[] tmp, Object[] keys, long[] lk, boolean strs, int lo, int hi,
+            boolean rev) {
+        if (hi - lo < 2) {
+            return;
+        }
+        if (hi - lo <= 8) {
+            for (int i = lo + 1; i < hi; i++) {
+                int v = a[i];
+                int j = i - 1;
+                while (j >= lo && before(keys, lk, strs, v, a[j], rev)) {
+                    a[j + 1] = a[j];
+                    j--;
+                }
+                a[j + 1] = v;
+            }
+            return;
+        }
+        int mid = (lo + hi) >>> 1;
+        mergeSort(a, tmp, keys, lk, strs, lo, mid, rev);
+        mergeSort(a, tmp, keys, lk, strs, mid, hi, rev);
+        if (!before(keys, lk, strs, a[mid], a[mid - 1], rev)) {
             // Already in order: the two runs need no merge.
             return;
         }
@@ -947,7 +1076,7 @@ public final class PyList extends PyObject {
         int j = mid;
         int k = lo;
         while (i < mid && j < hi) {
-            if (before(keys, lk, a[j], a[i], rev)) {
+            if (before(keys, lk, strs, a[j], a[i], rev)) {
                 tmp[k++] = a[j++];
             } else {
                 tmp[k++] = a[i++];
@@ -962,9 +1091,22 @@ public final class PyList extends PyObject {
         System.arraycopy(tmp, lo, a, lo, hi - lo);
     }
 
-    private static boolean before(Object[] keys, long[] lk, int x, int y, boolean rev) {
+    private static boolean before(Object[] keys, long[] lk, boolean strs, int x, int y, boolean rev) {
         if (lk != null) {
-            return rev ? lk[y] < lk[x] : lk[x] < lk[y];
+            long a = lk[x];
+            long b = lk[y];
+            if (a != b) {
+                return rev ? b < a : a < b;
+            }
+            // Equal ints never move; equal first items of two tuples leave
+            // the rest of the tuples to decide.
+            return keys != null && before(keys[x], keys[y], rev);
+        }
+        if (strs) {
+            // Every key a str, checked once up front as CPython's
+            // unsafe_latin_compare is: no comparison can run user code.
+            int c = PyStr.compare((String) keys[x], (String) keys[y]);
+            return rev ? c > 0 : c < 0;
         }
         return before(keys[x], keys[y], rev);
     }

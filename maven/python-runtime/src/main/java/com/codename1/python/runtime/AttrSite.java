@@ -64,6 +64,11 @@ public final class AttrSite {
     /// runs. Both are what getSlow's CLASS_ATTR answer would be.
     private static final int CONST = 6;
     private static final int PROP = 7;
+    /// `obj.__dict__` of an instance whose class has no `__dict__` of its
+    /// own and no `__getattribute__`: the instance's one live view, without
+    /// the generic read (class lookup, own-attribute probe, name compares)
+    /// it took on every access.
+    private static final int DICT = 8;
     /// The layout [#getOrMiss] last found missing, checked before the ways:
     /// a probe that misses usually misses on one class.
     private PyType missType;
@@ -213,6 +218,22 @@ public final class AttrSite {
         return -1;
     }
 
+    /// [#findGet] for a caller whose four ways just missed: the overflow
+    /// slot is probed first, so a megamorphic site -- psparser's methods read
+    /// `self.x` on instances of half a dozen parser classes -- finds its
+    /// entry without comparing the ways a second time. An entry lives in
+    /// exactly one place (addGet runs only after findGet failed), so a miss
+    /// here still scans the ways.
+    private int findGetOverflowFirst(PyType t, Shape shape) {
+        if (getVersion == PyType.version && getTypes != null && getTypes.length > WAYS) {
+            int k = WAYS + hash(t, shape);
+            if (getTypes[k] == t && getShapes[k] == shape) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return k;
+            }
+        }
+        return findGet(t, shape);
+    }
+
     /// The overflow slot of a layout. A megamorphic site -- one attribute
     /// read on instances of dozens of classes, as an XML binding that defines
     /// a class per tag does -- used to evict round robin past four layouts,
@@ -251,7 +272,7 @@ public final class AttrSite {
         getKinds[k] = kind;
         getSlots[k] = slot;
         getValues[k] = value;
-        int fast = kind == SLOT || kind == FIELD ? kind : NONE;
+        int fast = kind == SLOT || kind == FIELD || kind == DICT ? kind : NONE;
         if (kind == CLASS_ATTR) {
             if (value instanceof PyProperty) {
                 fast = PROP;
@@ -296,6 +317,9 @@ public final class AttrSite {
                     if (gk0 == PROP) {
                         return ((PyProperty) gv0).get(i);
                     }
+                    if (gk0 == DICT) {
+                        return i.dictView();
+                    }
                 }
                 if (gs1 == s && gt1 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
                     if (gk1 == SLOT) {
@@ -312,6 +336,9 @@ public final class AttrSite {
                     }
                     if (gk1 == PROP) {
                         return ((PyProperty) gv1).get(i);
+                    }
+                    if (gk1 == DICT) {
+                        return i.dictView();
                     }
                 }
                 if (gs2 == s && gt2 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
@@ -330,6 +357,9 @@ public final class AttrSite {
                     if (gk2 == PROP) {
                         return ((PyProperty) gv2).get(i);
                     }
+                    if (gk2 == DICT) {
+                        return i.dictView();
+                    }
                 }
                 if (gs3 == s && gt3 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
                     if (gk3 == SLOT) {
@@ -346,6 +376,9 @@ public final class AttrSite {
                     }
                     if (gk3 == PROP) {
                         return ((PyProperty) gv3).get(i);
+                    }
+                    if (gk3 == DICT) {
+                        return i.dictView();
                     }
                 }
             }
@@ -418,7 +451,7 @@ public final class AttrSite {
     }
 
     private Object getSlow(PyInstance i) {
-        int k = findGet(i.cls, i.shape);
+        int k = findGetOverflowFirst(i.cls, i.shape);
         if (k >= 0) {
             int kind = getKinds[k];
             if (kind == SLOT) {
@@ -426,6 +459,9 @@ public final class AttrSite {
             }
             if (kind == CLASS_ATTR) {
                 return Py.bindAttr(getValues[k], i);
+            }
+            if (kind == DICT) {
+                return i.dictView();
             }
             if (kind == FIELD) {
                 Object v = i.getField(getSlots[k]);
@@ -473,6 +509,14 @@ public final class AttrSite {
                 kind = CLASS_ATTR;
                 value = clsAttr;
             }
+        }
+        if (kind == NONE && clsAttr == null && result == i.dictViewOrNull() //NOPMD CompareObjectsWithEquals - identity is meant
+                && !cls.hasCustomGetattribute()) {
+            // The generic read answered the instance's own view: no class
+            // attribute, no own attribute and no __getattribute__ stand in
+            // front of it, and a change to any of those moves the class
+            // version or the shape this entry is keyed on.
+            kind = DICT;
         }
         addGet(cls, shape, kind, slot, value);
         return result;
@@ -788,7 +832,7 @@ public final class AttrSite {
                     return gf3;
                 }
             }
-            int k = findGet(i.cls, i.shape);
+            int k = findGetOverflowFirst(i.cls, i.shape);
             if (k >= 0) {
                 return getKinds[k] == CLASS_ATTR && takesReceiver(getValues[k]) ? getValues[k] : null;
             }

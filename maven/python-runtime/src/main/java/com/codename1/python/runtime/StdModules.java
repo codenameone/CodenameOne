@@ -130,6 +130,16 @@ public final class StdModules {
             PyModule.registerModule(urlModule());
             return true;
         }
+        if (Functools.provide(name)) {
+            return true;
+        }
+        if (HeapqBisect.provide(name)) {
+            return true;
+        }
+        if ("_cn1itertools".equals(name)) {
+            PyModule.registerModule(Itertools.module());
+            return true;
+        }
         if ("_cn1collections".equals(name)) {
             PyModule.registerModule(PyCollections.module());
             return true;
@@ -1768,6 +1778,7 @@ public final class StdModules {
     private static PyModule operatorModule() {
         PyModule m = new PyModule("_cn1op", new String[0]);
         m.setAttr("cast", CAST);
+        Operator.install(m);
         m.setAttr("getitems", PyBuiltin.fixed2("getitems", (obj, keys) -> {
             Object[] k = ((PyTuple) keys).items;
             Object[] out = new Object[k.length];

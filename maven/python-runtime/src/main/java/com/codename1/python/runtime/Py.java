@@ -942,6 +942,16 @@ public final class Py {
         if (a instanceof String && b instanceof String) {
             return PyStr.compare((String) a, (String) b) < 0;
         }
+        if (a instanceof PyTuple && b instanceof PyTuple) {
+            // Two tuples (a heap's or a sort key's entries) compare
+            // element-wise here, without the boxed-bool round trip through
+            // PyTuple.lt. No Java subclass overrides the comparison (a struct
+            // sequence compares as a tuple, as in CPython), and a Python
+            // subclass is a PyInstance, which takes the long way below.
+            Object[] x = ((PyTuple) a).items;
+            Object[] y = ((PyTuple) b).items;
+            return seqCompare(x, x.length, y, y.length) < 0;
+        }
         return isTrue(lt(a, b));
     }
 

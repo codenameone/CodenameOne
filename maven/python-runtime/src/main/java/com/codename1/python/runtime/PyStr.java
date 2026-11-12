@@ -88,8 +88,10 @@ public final class PyStr extends PyObject {
     private static final int LONG = 1024;
     /// Strings up to this long are counted, never cached: a Latin-1 one --
     /// nearly all of them -- answers from its storage flag, and any other is
-    /// one vector scan, cheaper than hashing its identity into a table.
-    private static final int SHORT = 256;
+    /// one vector scan, cheaper than hashing its identity into a table. Kept
+    /// short: a 256-char table of non-Latin-1 text indexed per character
+    /// (pdfminer's PDFDocEncoding[o]) was a full scan per index.
+    private static final int SHORT = 32;
 
     private static int slot(String s, int size) {
         int h = System.identityHashCode(s);
