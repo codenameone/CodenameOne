@@ -6707,6 +6707,16 @@ bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java
   // ``not iterable`` TypeError.
   return yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding));
 });
+bindNative(["cn1_java_lang_String_cn1InlineSurrogatePairs_int_int_R_int"], function(__cn1ThisObject, from, to) {
+  const s = jvm.toNativeString(__cn1ThisObject);
+  let n = 0;
+  for (let i = from | 0; i + 1 < (to | 0); i++) {
+    if ((s.charCodeAt(i) & 0xFC00) === 0xD800 && (s.charCodeAt(i + 1) & 0xFC00) === 0xDC00) {
+      n++;
+    }
+  }
+  return n;
+});
 bindNative(["cn1_java_lang_String_surrogatePairs_char_1ARRAY_int_int_R_int"], function(chars, from, to) {
   let n = 0;
   for (let i = from | 0; i + 1 < (to | 0); i++) {

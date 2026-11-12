@@ -1113,8 +1113,19 @@ JAVA_OBJECT java_io_InputStreamReader_bytesToChars___byte_1ARRAY_int_int_java_la
     return java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(threadStateData, b, off, len, encoding);
 }
 
+static JAVA_INT cn1SurrogatePairsIn(const JAVA_ARRAY_CHAR* a, JAVA_INT from, JAVA_INT to);
+
 JAVA_INT java_lang_String_surrogatePairs___char_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr, JAVA_INT from, JAVA_INT to) {
-    const JAVA_ARRAY_CHAR* a = (const JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
+    return cn1SurrogatePairsIn((const JAVA_ARRAY_CHAR*)CN1_ARRAY_DATA((JAVA_ARRAY)arr), from, to);
+}
+
+// The same count over a UTF-16 inline store; String.java calls it only when value
+// is null and the string is not Latin-1, so cn1StrChars points at char units.
+JAVA_INT java_lang_String_cn1InlineSurrogatePairs___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT from, JAVA_INT to) {
+    return cn1SurrogatePairsIn((const JAVA_ARRAY_CHAR*)cn1StrChars(__cn1ThisObject), from, to);
+}
+
+static JAVA_INT cn1SurrogatePairsIn(const JAVA_ARRAY_CHAR* a, JAVA_INT from, JAVA_INT to) {
     // A pair is a high surrogate whose next char is a low one, and two pairs
     // can never share a char, so every such position counts.
     JAVA_INT n = 0;

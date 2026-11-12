@@ -94,6 +94,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * other method here goes through them or through charInternal. */
     private native boolean cn1InlineLatin1();
     private native char cn1InlineCharAt(int index);
+    /** Surrogate pairs in [from, to) of a UTF-16 inline store, counted in one call. */
+    private native int cn1InlineSurrogatePairs(int from, int to);
 
     // Bulk compare and search over either storage, so a search does not read
     // both strings a char at a time through charInternal -- a native call per
@@ -1567,6 +1569,11 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             // len() of every non-Latin-1 str comes here, so the count is a
             // native vector loop rather than a bounds-checked one per char.
             return n - surrogatePairs((char[]) v, beginIndex, endIndex);
+        }
+        if (v == null) {
+            // A short UTF-16 string lives inline; a native call per char was the
+            // whole cost of len() on text with a dash or a curly quote in it.
+            return n - cn1InlineSurrogatePairs(beginIndex, endIndex);
         }
         for (int i = beginIndex; i < endIndex - 1; i++) {
             char c = charInternal(i);
