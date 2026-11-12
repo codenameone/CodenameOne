@@ -99,16 +99,11 @@ class Pattern:
         elif isinstance(string, str):
             raise TypeError("cannot use a bytes pattern on a string-like object")
 
-    # One call into the runtime each: the checks, the bounds, the run and the
-    # Match are all Java (_cn1re.match), as sre's are C.
-    def match(self, string, pos=0, endpos=None):
-        return _cn1re.match(self._prog, self, string, pos, endpos, 0)
-
-    def fullmatch(self, string, pos=0, endpos=None):
-        return _cn1re.match(self._prog, self, string, pos, endpos, 1)
-
-    def search(self, string, pos=0, endpos=None):
-        return _cn1re.match(self._prog, self, string, pos, endpos, 2)
+    # Java builtins on the class, called with the pattern prepended: the
+    # checks, the bounds, the run and the Match are one call, as sre's are C.
+    match = _cn1re.pattern_match
+    fullmatch = _cn1re.pattern_fullmatch
+    search = _cn1re.pattern_search
 
     def finditer(self, string, pos=0, endpos=None):
         prog = self._prog

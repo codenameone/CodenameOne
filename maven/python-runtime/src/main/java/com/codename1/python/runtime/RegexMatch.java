@@ -76,7 +76,10 @@ final class RegexMatch extends PyObject {
             int at, int mode, int forbid) {
         boolean isBytes = checkKind(p, pattern, string);
         String text = isBytes ? latin1((PyBytes) string) : (String) string;
-        int n = isBytes ? ((PyBytes) string).value.length : length(text);
+        // Counted once: the run below is handed the count rather than
+        // taking it again (a decoded bytes text is Latin-1, without pairs).
+        int pairs = isBytes ? 0 : PyStr.surrogates(text);
+        int n = text.length() - pairs;
         long pos = Py.index(posObj);
         long endpos = endObj == Py.NONE ? n : Py.index(endObj); //NOPMD CompareObjectsWithEquals - None is a singleton
         if (endpos > n) {
@@ -95,7 +98,7 @@ final class RegexMatch extends PyObject {
         if (start > endpos) {
             return Py.NONE;
         }
-        int[] regs = Regex.run(p, text, start, (int) endpos, mode, forbid);
+        int[] regs = Regex.run(p, text, pairs, start, (int) endpos, mode, forbid);
         if (regs.length == 0) {
             return Py.NONE;
         }
@@ -125,10 +128,6 @@ final class RegexMatch extends PyObject {
                     + Py.typeOf(string).name + "'");
         }
         return true;
-    }
-
-    private static int length(String s) {
-        return s.length() - PyStr.surrogates(s);
     }
 
     /// The last bytes object decoded and its text. A tokenizer (pdfminer's)

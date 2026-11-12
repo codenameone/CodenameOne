@@ -259,7 +259,7 @@ public final class AttrSite {
                 fast = CONST;
             }
         }
-        Object f = kind == CLASS_ATTR && value instanceof PyFunction ? value : null;
+        Object f = kind == CLASS_ATTR && takesReceiver(value) ? value : null;
         if (k == 0) {
             gt0 = t; gs0 = shape; gk0 = fast; gi0 = slot; gf0 = f; gv0 = value;
         } else if (k == 1) {
@@ -757,6 +757,16 @@ public final class AttrSite {
         return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m);
     }
 
+    /// True for a class attribute whose read through an instance is only
+    /// `PyMethod(self, attr)` (see `Py.bindAttr`): calling it with the
+    /// receiver prepended is the same call without the bound method. A
+    /// builtin binds that way too (`PyBuiltin.bind`), which is how a stdlib
+    /// class method written in Java (`re.Pattern.match`, `defaultdict`'s
+    /// `__missing__`) costs no allocation per call.
+    private static boolean takesReceiver(Object v) {
+        return v instanceof PyFunction || v instanceof PyBuiltin;
+    }
+
     /// The function to call with the receiver prepended, when the call needs
     /// no bound method; otherwise null and the caller goes the generic way.
     private Object method(Object o) {
@@ -780,7 +790,7 @@ public final class AttrSite {
             }
             int k = findGet(i.cls, i.shape);
             if (k >= 0) {
-                return getKinds[k] == CLASS_ATTR && getValues[k] instanceof PyFunction ? getValues[k] : null;
+                return getKinds[k] == CLASS_ATTR && takesReceiver(getValues[k]) ? getValues[k] : null;
             }
             Object clsAttr = i.cls.lookup(name);
             if (i.cls.hasCustomGetattribute() || clsAttr instanceof PyProperty || readsThroughGet(clsAttr)
@@ -795,7 +805,7 @@ public final class AttrSite {
             }
             if (clsAttr != null) {
                 addGet(i.cls, i.shape, CLASS_ATTR, 0, clsAttr);
-                return clsAttr instanceof PyFunction ? clsAttr : null;
+                return takesReceiver(clsAttr) ? clsAttr : null;
             }
             addGet(i.cls, i.shape, NONE, 0, null);
             return null;

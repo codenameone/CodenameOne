@@ -192,6 +192,9 @@ final class Regex {
         }));
         m.setAttr("run", new RunFn());
         m.setAttr("match", new MatchFn());
+        m.setAttr("pattern_match", patternMethod("match", 0));
+        m.setAttr("pattern_fullmatch", patternMethod("fullmatch", 1));
+        m.setAttr("pattern_search", patternMethod("search", 2));
         // The module's own callers (re/__init__.py) pass every argument, so each
         // entry also has its array-free form for exactly that many.
         m.setAttr("iter", PyBuiltin.positional("iter", a -> RegexMatch.search(prog(a[0]), a[1], a[2], a[3],
@@ -432,6 +435,12 @@ final class Regex {
         }
 
         void reset(String s) {
+            reset(s, -1);
+        }
+
+        /// `pairs` is the text's surrogate pair count when the caller has it
+        /// already (a match measured the text for its bounds), -1 otherwise.
+        void reset(String s, int known) {
             if (s == this.s) { //NOPMD CompareObjectsWithEquals - the same text, whose count is known
                 // A substitution or findall runs once per match over one
                 // text, and a text of up to 256 chars is never cached, so
@@ -442,7 +451,7 @@ final class Regex {
             // PyStr keeps the count for the last long string, so a pattern
             // run again and again over one text (a scanner's match(text,
             // pos)) does not count it on every call.
-            int pairs = PyStr.surrogates(s);
+            int pairs = known >= 0 ? known : PyStr.surrogates(s);
             if (pairs == 0) {
                 cps = null;
             } else {
@@ -706,6 +715,52 @@ final class Regex {
     }
 
     /// `_cn1re.match(prog, pattern, string, pos, endpos, mode)`: see [RegexMatch].
+    /// `self._prog` of a `re.Pattern`, read through one cached site.
+    private static final AttrSite PROG = new AttrSite("_prog");
+
+    /// `re.Pattern.match`/`fullmatch`/`search` themselves, stored on the
+    /// class: `pattern.match(s)` is then one call into Java with the pattern
+    /// prepended, with no Python frame between, as sre's methods are C.
+    private static PyBuiltin patternMethod(final String name, final int mode) {
+        return new PyBuiltin(name, (a, kw) -> {
+            Object string = null;
+            Object pos = 0L;
+            Object end = Py.NONE;
+            int np = a.length - kw.length;
+            if (np < 1 || np > 4) {
+                throw Py.typeError("Pattern." + name + "() takes from 1 to 3 positional arguments but "
+                        + (np - 1) + " were given");
+            }
+            if (np > 1) {
+                string = a[1];
+            }
+            if (np > 2) {
+                pos = a[2];
+            }
+            if (np > 3) {
+                end = a[3];
+            }
+            for (int i = 0; i < kw.length; i++) {
+                Object v = a[np + i];
+                if ("string".equals(kw[i]) && np <= 1) {
+                    string = v;
+                } else if ("pos".equals(kw[i]) && np <= 2) {
+                    pos = v;
+                } else if ("endpos".equals(kw[i]) && np <= 3) {
+                    end = v;
+                } else {
+                    throw Py.typeError("Pattern." + name + "() got an unexpected keyword argument '" + kw[i] + "'");
+                }
+            }
+            if (string == null) {
+                throw Py.typeError("Pattern." + name + "() missing required argument 'string' (pos 1)");
+            }
+            return RegexMatch.match(PROG.get(a[0]), a[0], string, pos, end, mode);
+        }).with2((self, string) -> RegexMatch.match(PROG.get(self), self, string, 0L, Py.NONE, mode))
+                .with3((self, string, pos) -> RegexMatch.match(PROG.get(self), self, string, pos, Py.NONE, mode))
+                .with4((self, string, pos, end) -> RegexMatch.match(PROG.get(self), self, string, pos, end, mode));
+    }
+
     private static final class MatchFn extends PyObject {
         @Override
         public PyType type() {
@@ -1131,8 +1186,14 @@ final class Regex {
     /// `_engine.run`: mode 0 matches, 1 fully matches, 2 searches. The
     /// group registers then `lastindex`, or `NO_MATCH`.
     static int[] run(Prog p, String text, int pos, int endpos, int mode, int forbid) {
+        return run(p, text, -1, pos, endpos, mode, forbid);
+    }
+
+    /// [#run] for a text whose surrogate pair count the caller already took.
+    static int[] run(Prog p, String text, int pairs, int pos, int endpos, int mode, int forbid) {
         Scratch sc = acquire(p);
         try {
+            sc.text.reset(text, pairs);
             return run(p, sc, text, pos, endpos, mode, forbid);
         } finally {
             release(p, sc);
