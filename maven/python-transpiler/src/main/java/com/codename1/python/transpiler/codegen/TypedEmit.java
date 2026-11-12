@@ -3770,6 +3770,10 @@ final class TypedEmit {
                     return c;
                 }
             }
+            E fz = fusedDyn(e);
+            if (fz != null) {
+                return fz;
+            }
             E bl = expr(b.left);
             E br = expr(b.right);
             if (Infer.realPow(b, bl.t, br.t)) {
@@ -4939,6 +4943,36 @@ final class TypedEmit {
         return new E("new StringBuilder(" + cap + ")" + sb + ".toString()", Ty.STR);
     }
 
+    /// Arithmetic of two or more operators whose every leaf is of a type
+    /// not known here (`a * x + c * y + e` over a tuple's items): the
+    /// generic emitter's fused helper, which computes the whole tree in
+    /// doubles when the leaves are floats and boxes only the result,
+    /// instead of one boxed value per operator. Null when a leaf is typed;
+    /// the typed operators are better then.
+    private E fusedDyn(Expr e) {
+        if (Emitter.numOps(e) < 2) {
+            return null;
+        }
+        List<Expr> leaves = new ArrayList<Expr>();
+        Emitter.numLeaves(e, leaves);
+        if (leaves.isEmpty()) {
+            return null;
+        }
+        Map<Expr, String> code = new IdentityHashMap<Expr, String>();
+        for (Expr l : leaves) {
+            if (l instanceof Constant) {
+                continue;
+            }
+            E v = expr(l);
+            if (v.t.k != Ty.K.DYN) {
+                return null;
+            }
+            code.put(l, box(v));
+        }
+        String f = em.fused(e, null, x -> code.containsKey(x) ? code.get(x) : box(expr(x)));
+        return f == null ? null : new E(f, Ty.DYN);
+    }
+
     E binop(String op, E l, E r, Expr right) {
         Ty t = Infer.binop(op, l.t, r.t, right);
         if (l.t.k == Ty.K.LIST && "*".equals(op) && (r.t.k == Ty.K.INT || r.t.k == Ty.K.BOOL)) {
@@ -5052,6 +5086,16 @@ final class TypedEmit {
                 left = next;
             }
             return new E(sb.append(")").toString(), Ty.BOOL);
+        }
+        List<Expr> lit = Emitter.inTuple(c);
+        if (lit != null) {
+            // `x in ("ltr", "rtl")`: compared item by item, no tuple built.
+            StringBuilder r = new StringBuilder("not in".equals(c.ops.get(0)) ? "(!" : "(").append("Py.inOf(")
+                    .append(box(expr(c.left)));
+            for (Expr t : lit) {
+                r.append(", ").append(box(expr(t)));
+            }
+            return new E(r.append("))").toString(), Ty.BOOL);
         }
         return compareOp(c.ops.get(0), expr(c.left), expr(c.comparators.get(0)), c.comparators.get(0));
     }
@@ -5588,6 +5632,18 @@ final class TypedEmit {
                 if ("isinstance".equals(n) && c.args.size() == 2 && c.keywords.isEmpty()
                         && !(c.args.get(0) instanceof Starred) && !(c.args.get(1) instanceof Starred)) {
                     // A Java boolean: no argument array, no bool to box and test.
+                    if (c.args.get(1) instanceof TupleExpr) {
+                        List<Expr> ts = ((TupleExpr) c.args.get(1)).elts;
+                        if (ts.size() >= 2 && ts.size() <= 8 && !Infer.hasStarred(ts)) {
+                            // `isinstance(x, (A, B))`: no tuple built (Py.isinstanceAny).
+                            StringBuilder r = new StringBuilder("Py.isTrue(Py.isinstanceAny(").append(em.builtinRef(n))
+                                    .append(", ").append(box(expr(c.args.get(0))));
+                            for (Expr t : ts) {
+                                r.append(", ").append(box(expr(t)));
+                            }
+                            return new E(r.append("))").toString(), Ty.BOOL);
+                        }
+                    }
                     return new E("Py.isinstanceB(" + em.builtinRef(n) + ", " + box(expr(c.args.get(0))) + ", "
                             + box(expr(c.args.get(1))) + ")", Ty.BOOL);
                 }

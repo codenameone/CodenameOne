@@ -2773,6 +2773,10 @@ public final class Emitter {
         }
         if (e instanceof Compare) {
             Compare c = (Compare) e;
+            String lit = inLiteral(c);
+            if (lit != null) {
+                return lit;
+            }
             StringBuilder sb = new StringBuilder("(");
             String left = expr(c.left);
             for (int i = 0; i < c.ops.size(); i++) {
@@ -2798,6 +2802,31 @@ public final class Emitter {
             }
         }
         return truth(expr(e));
+    }
+
+    /// The items of `x in (a, b, ...)` / `x not in (...)` with the tuple
+    /// written out (two to eight items, none starred), or null.
+    static List<Expr> inTuple(Compare c) {
+        if (c.ops.size() != 1 || !("in".equals(c.ops.get(0)) || "not in".equals(c.ops.get(0)))
+                || !(c.comparators.get(0) instanceof TupleExpr)) {
+            return null;
+        }
+        List<Expr> ts = ((TupleExpr) c.comparators.get(0)).elts;
+        return ts.size() >= 2 && ts.size() <= 8 && !Infer.hasStarred(ts) ? ts : null;
+    }
+
+    /// [#inTuple] as a Java condition, with no tuple built (`Py.inOf`).
+    private String inLiteral(Compare c) {
+        List<Expr> ts = inTuple(c);
+        if (ts == null) {
+            return null;
+        }
+        StringBuilder r = new StringBuilder("not in".equals(c.ops.get(0)) ? "(!" : "(").append("Py.inOf(")
+                .append(expr(c.left));
+        for (Expr t : ts) {
+            r.append(", ").append(expr(t));
+        }
+        return r.append("))").toString();
     }
 
     private String cmpBool(String op, String l, String r) {
@@ -2891,7 +2920,7 @@ public final class Emitter {
         }
         if (e instanceof Compare) {
             Compare c = (Compare) e;
-            if (c.ops.size() == 1 && boolValued(e)) {
+            if (c.ops.size() == 1 && (boolValued(e) || inTuple(c) != null)) {
                 return "(" + cond(e) + " ? Py.TRUE : Py.FALSE)";
             }
             if (c.ops.size() == 1) {
@@ -3290,7 +3319,7 @@ public final class Emitter {
                 // as the builtin walks the tuple, and no tuple is built for a
                 // call that is often on a hot path (pdfplumber's resolve_all).
                 List<Expr> ts = ((TupleExpr) c.args.get(1)).elts;
-                if (ts.size() >= 2 && ts.size() <= 4 && !Infer.hasStarred(ts)) {
+                if (ts.size() >= 2 && ts.size() <= 8 && !Infer.hasStarred(ts)) {
                     StringBuilder r = new StringBuilder("Py.isinstanceAny(").append(expr(c.func)).append(", ")
                             .append(expr(c.args.get(0)));
                     for (Expr t : ts) {
@@ -4543,6 +4572,12 @@ public final class Emitter {
     }
 
     private String fused(Expr root, String current) {
+        return fused(root, current, this::expr);
+    }
+
+    /// [#fused(Expr, String)] with the leaves written by `leafCode`: the typed
+    /// emitter names locals its own way.
+    String fused(Expr root, String current, java.util.function.Function<Expr, String> leafCode) {
         if (numOps(root) < 2) {
             return null;
         }
@@ -4594,7 +4629,7 @@ public final class Emitter {
         StringBuilder call = new StringBuilder(name).append("(");
         for (int i = 0; i < leaves.size(); i++) {
             Expr leaf = leaves.get(i);
-            call.append(i == 0 ? "" : ", ").append(leaf == AUG_CURRENT ? current : expr(leaf));
+            call.append(i == 0 ? "" : ", ").append(leaf == AUG_CURRENT ? current : leafCode.apply(leaf));
         }
         return call.append(")").toString();
     }
@@ -4723,7 +4758,7 @@ public final class Emitter {
         return e instanceof UnaryOp && ("-".equals(((UnaryOp) e).op) || "~".equals(((UnaryOp) e).op));
     }
 
-    private static int numOps(Expr e) {
+    static int numOps(Expr e) {
         if (!numNode(e)) {
             return 0;
         }
@@ -4733,7 +4768,7 @@ public final class Emitter {
         return 1 + numOps(((BinOp) e).left) + numOps(((BinOp) e).right);
     }
 
-    private static void numLeaves(Expr e, List<Expr> out) {
+    static void numLeaves(Expr e, List<Expr> out) {
         if (numNode(e)) {
             if (e instanceof UnaryOp) {
                 numLeaves(((UnaryOp) e).operand, out);

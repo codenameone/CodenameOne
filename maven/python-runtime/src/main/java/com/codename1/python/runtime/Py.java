@@ -366,6 +366,65 @@ public final class Py {
         return call(f, o, tuple(a, b, c, d));
     }
 
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e));
+        }
+        return call(fn, o, tuple(a, b, c, d, e));
+    }
+
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e, Object f) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e) || isinstance(o, f));
+        }
+        return call(fn, o, tuple(a, b, c, d, e, f));
+    }
+
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e) || isinstance(o, f) || isinstance(o, g));
+        }
+        return call(fn, o, tuple(a, b, c, d, e, f, g));
+    }
+
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e) || isinstance(o, f) || isinstance(o, g) || isinstance(o, h));
+        }
+        return call(fn, o, tuple(a, b, c, d, e, f, g, h));
+    }
+
+    /// `x in (a, b, ...)` with the tuple written out: each item is compared
+    /// in turn, identity first as a tuple's `__contains__` does, and no tuple
+    /// is built.
+    public static boolean inOf(Object x, Object a, Object b) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e, Object f) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x) || f == x || eqBool(f, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x) || f == x || eqBool(f, x) || g == x || eqBool(g, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x) || f == x || eqBool(f, x) || g == x || eqBool(g, x) || h == x || eqBool(h, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
     /// `dict(o)`, as [#isinstance(Object, Object, Object)]: a copy of a dict
     /// made straight from it.
     public static Object dict1(Object f, Object o) {
