@@ -44,6 +44,8 @@ final class XmlScan {
         m.setAttr("findall", PyBuiltin.fixed2("findall", (a0, a1) -> children(a0, a1, true)));
         m.setAttr("build", PyBuiltin.positional("build",
                 a -> new Builder(Typed.asStr(a[0]), a[1], Py.isTrue(a[2]), a.length > 3 ? a[3] : null).build()));
+        m.setAttr("lxml_build", PyBuiltin.positional("lxml_build",
+                a -> new Builder(Typed.asStr(a[0]), Py.isTrue(a[1]), new Lxml(a)).build()));
         m.setAttr("scan_end", PyBuiltin.fixed2("scan_end", (a0, a1) -> scanEnd(Typed.asStr(a0), (int) Typed.toLong(a1))));
         return m;
     }
@@ -376,6 +378,54 @@ final class XmlScan {
         }
     }
 
+    /// What `_cn1xml.lxml_build` needs of the lxml shim to build a tree as
+    /// its `_XMLDriver` feeding a `_TreeSink` does: `(text, from_bytes,
+    /// class_for, lookup, nohint, cnt, remove_blank_text)`. `class_for(tag)`
+    /// answers the element class; the shim passes it only for a lookup whose
+    /// answer depends on nothing but the tag, so it is asked once per tag.
+    static final class Lxml {
+        final Object classFor;
+        final Object lookup;
+        final Object noHint;
+        final Object cnt;
+        final boolean removeBlankText;
+        final java.util.HashMap<String, Object> classes = new java.util.HashMap<String, Object>();
+
+        Lxml(Object[] a) {
+            classFor = a[2];
+            lookup = a[3];
+            noHint = a[4];
+            cnt = a[5];
+            removeBlankText = Py.isTrue(a[6]);
+        }
+
+        Object classFor(String tag) {
+            Object c = classes.get(tag);
+            if (c == null) {
+                c = Py.call(classFor, tag);
+                classes.put(tag, c);
+            }
+            return c;
+        }
+    }
+
+    private static final AttrSite NEW = new AttrSite("__new__");
+    private static final AttrSite INIT = new AttrSite("_init");
+    private static final AttrSite KIDS = new AttrSite("_xkids");
+    private static final StoreSite X_KIND = new StoreSite("_xkind");
+    private static final StoreSite X_TAG = new StoreSite("_xtag");
+    private static final StoreSite X_ATTRIB = new StoreSite("_xattrib");
+    private static final StoreSite X_NS = new StoreSite("_xns");
+    private static final StoreSite X_KIDS = new StoreSite("_xkids");
+    private static final StoreSite X_PARENT = new StoreSite("_xparent");
+    private static final StoreSite X_TEXT = new StoreSite("_xtext");
+    private static final StoreSite X_TAIL = new StoreSite("_xtail");
+    private static final StoreSite X_PFX = new StoreSite("_xpfx");
+    private static final StoreSite X_LOOKUP = new StoreSite("_xlookup");
+    private static final StoreSite X_DOC = new StoreSite("_xdoc");
+    private static final StoreSite X_TARGET = new StoreSite("_xtarget");
+    private static final StoreSite X_CNT = new StoreSite("_xcnt");
+
     private static final class Builder {
         private final String s;
         private final int n;
@@ -410,8 +460,22 @@ final class XmlScan {
         private int nameHash;
         private final java.util.ArrayList<String> attrNames = new java.util.ArrayList<String>();
         private final java.util.ArrayList<String> attrValues = new java.util.ArrayList<String>();
+        /// The lxml shim's tree, or null for ElementTree's.
+        private final Lxml lx;
+        /// Per open element, as the shim's driver keeps them: whether it has
+        /// had a child, and whether it has kept text (bit 0 and bit 1).
+        private final java.util.ArrayList<Integer> state = new java.util.ArrayList<Integer>();
+
+        Builder(String text, boolean fromBytes, Lxml lx) {
+            this(text, null, fromBytes, null, lx);
+        }
 
         Builder(String text, Object factory, boolean fromBytes, Object elementInit) {
+            this(text, factory, fromBytes, elementInit, null);
+        }
+
+        private Builder(String text, Object factory, boolean fromBytes, Object elementInit, Lxml lx) {
+            this.lx = lx;
             // Nothing the build runs can change the class: no Python code runs
             // while elements are made directly.
             this.direct = elementInit != null && factory instanceof PyType
@@ -543,7 +607,8 @@ final class XmlScan {
         }
 
         private void comment() {
-            if (!s.startsWith("<!--", i)) {
+            if (lx != null || !s.startsWith("<!--", i)) {
+                // A comment is an element of the lxml tree, made by the shim.
                 throw DECLINE;
             }
             int e = s.indexOf("-->", i + 4);
@@ -637,6 +702,9 @@ final class XmlScan {
         }
 
         private void flush() {
+            if (lx != null) {
+                return;
+            }
             if (data.length() > 0) {
                 if (last != null) {
                     Py.obj(last).setAttr(tail ? "tail" : "text", data.toString());
@@ -792,7 +860,8 @@ final class XmlScan {
                         throw DECLINE;
                     }
                     if (declared == null) {
-                        declared = new java.util.HashMap<String, String>();
+                        // In document order: it becomes the element's nsmap.
+                        declared = new java.util.LinkedHashMap<String, String>();
                     }
                     declared.put(prefix, av);
                 } else {
@@ -818,6 +887,13 @@ final class XmlScan {
                     throw DECLINE;
                 }
                 attrib.setItem(en, values.get(k));
+            }
+            if (lx != null) {
+                lxStart(tag, attrib, q, declared);
+                if (self) {
+                    close();
+                }
+                return;
             }
             flush();
             Object el;
@@ -861,8 +937,128 @@ final class XmlScan {
             close();
         }
 
+        /// `_XMLDriver.flush`: the text pending before a tag, given to the open
+        /// element as `_TreeSink.data` does, unless `remove_blank_text` drops
+        /// it. `end` is whether the tag that ends it is an end tag.
+        private void lxFlush(boolean end) {
+            if (data.length() == 0) {
+                return;
+            }
+            String text = data.toString();
+            data.setLength(0);
+            if (open.isEmpty()) {
+                return;
+            }
+            int top = state.size() - 1;
+            int st = state.get(top).intValue();
+            boolean hadChild = (st & 1) != 0;
+            if (lx.removeBlankText && blank(text)) {
+                if (!hadChild) {
+                    if (!end) {
+                        return;
+                    }
+                } else if ((st & 2) == 0) {
+                    return;
+                }
+            }
+            if (!hadChild) {
+                state.set(top, Integer.valueOf(st | 2));
+            }
+            Object parent = open.get(open.size() - 1);
+            Object kids = KIDS.get(parent);
+            if (!(kids instanceof PyList)) {
+                throw DECLINE;
+            }
+            PyList k = (PyList) kids;
+            if (k.size() > 0) {
+                X_TAIL.set(k.get(k.size() - 1), text);
+            } else {
+                X_TEXT.set(parent, text);
+            }
+        }
+
+        private boolean blank(String t) {
+            for (int k = 0; k < t.length(); k++) {
+                char c = t.charAt(k);
+                if (c != ' ' && c != '\t' && c != '\r' && c != '\n') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// `_XMLDriver.on_start` and `_TreeSink.start`, with `_blank`'s
+        /// fields stored in its order, so an element has the layout the
+        /// Python path gives it.
+        private void lxStart(String tag, PyDict attrib, String q, java.util.HashMap<String, String> declared) {
+            lxFlush(false);
+            if (!state.isEmpty()) {
+                int top = state.size() - 1;
+                state.set(top, Integer.valueOf(state.get(top).intValue() | 1));
+            }
+            Object hint;
+            if (tag.length() > 0 && tag.charAt(0) == '{') {
+                int colon = q.indexOf(':');
+                hint = colon < 0 ? Py.NONE : q.substring(0, colon);
+            } else {
+                hint = lx.noHint;
+            }
+            PyDict ns = new PyDict();
+            if (declared != null) {
+                for (java.util.Map.Entry<String, String> e : declared.entrySet()) {
+                    if (e.getValue().length() > 0) {
+                        ns.setItem(e.getKey().length() == 0 ? Py.NONE : e.getKey(), e.getValue());
+                    }
+                }
+            }
+            Object cls = lx.classFor(tag);
+            Object el = NEW.call1(cls, cls);
+            X_KIND.set(el, "e");
+            X_TAG.set(el, Py.NONE);
+            X_ATTRIB.set(el, new PyDict());
+            X_NS.set(el, new PyDict());
+            PyList kids = new PyList();
+            X_KIDS.set(el, kids);
+            X_PARENT.set(el, Py.NONE);
+            X_TEXT.set(el, Py.NONE);
+            X_TAIL.set(el, Py.NONE);
+            X_PFX.set(el, lx.noHint);
+            X_LOOKUP.set(el, lx.lookup);
+            X_DOC.set(el, Py.NONE);
+            X_TARGET.set(el, Py.NONE);
+            X_CNT.set(el, new PyList());
+            X_TAG.set(el, tag);
+            X_PFX.set(el, hint);
+            X_CNT.set(el, lx.cnt);
+            X_NS.set(el, ns);
+            X_ATTRIB.set(el, attrib);
+            if (!open.isEmpty()) {
+                Object parent = open.get(open.size() - 1);
+                X_PARENT.set(el, parent);
+                Object pk = KIDS.get(parent);
+                if (!(pk instanceof PyList)) {
+                    throw DECLINE;
+                }
+                ((PyList) pk).append(el);
+            } else {
+                root = el;
+            }
+            open.add(el);
+            openNames.add(q);
+            state.add(Integer.valueOf(0));
+            Object init = Py.orDefault(INIT.getOrMiss(el), Py.NONE);
+            if (init != null && init != Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
+                Py.call(init);
+            }
+        }
+
         private void close() {
-            flush();
+            if (lx != null) {
+                lxFlush(true);
+                state.remove(state.size() - 1);
+            } else {
+                flush();
+            }
             int depth = open.size() - 1;
             last = open.remove(depth);
             openNames.remove(depth);

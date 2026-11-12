@@ -30,6 +30,8 @@ from xml.parsers import expat as _expat
 
 from lxml import _xpath
 
+import _cn1xml
+
 __version__ = "5.3.0"
 
 XML_NS = "http://www.w3.org/XML/1998/namespace"
@@ -1241,7 +1243,13 @@ class _XMLDriver(object):
     def on_doctype(self, name, sysid, pubid, has_internal):
         self.sink.doctype(name, pubid, sysid)
 
+    def _fast(self, data):
+        return _fast_parse(self, data)
+
     def run(self, data):
+        root = self._fast(data)
+        if root is not None:
+            return root
         enc = self.opts.encoding if isinstance(data, bytes) else None
         p = _expat.ParserCreate(enc, " ")
         p.namespace_prefixes = True
@@ -1265,6 +1273,49 @@ class _XMLDriver(object):
                 self.state.pop()
                 self.sink.end(self.open_tags.pop())
         return self.sink.close()
+
+
+_PURE_LOOKUPS = (ElementClassLookup, ElementDefaultClassLookup, ElementNamespaceClassLookup)
+_NOT_UTF8_STARTS = (b"\xff\xfe", b"\xfe\xff", b"<\x00", b"\x00<")
+
+
+def _pure_lookup(lookup):
+    """Whether the class a lookup answers depends only on the tag."""
+    while lookup is not None:
+        if type(lookup) not in _PURE_LOOKUPS:
+            return False
+        lookup = getattr(lookup, "fallback", None)
+    return True
+
+
+def _fast_parse(driver, data):
+    # The tree a plain document parses to, built in one Java pass, as lxml
+    # builds it in C: per element the Python path ran the expat wrapper,
+    # on_start, _qname, _TreeSink.start, _class_for and _blank. It answers
+    # None for anything it does not reproduce exactly -- a comment, a PI, a
+    # DOCTYPE, CDATA, any error -- and the expat path below runs as before.
+    sink = driver.sink
+    opts = driver.opts
+    if type(sink) is not _TreeSink or sink.events is not None or opts.recover \
+            or not _pure_lookup(sink.lookup):
+        return None
+    if isinstance(data, str):
+        src = data
+    elif isinstance(data, (bytes, bytearray)) and not data.startswith(_NOT_UTF8_STARTS) \
+            and opts.encoding in (None, "utf-8", "UTF-8", "utf8"):
+        try:
+            src = bytes(data).decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+    else:
+        return None
+    lookup = sink.lookup
+
+    def class_for(tag):
+        return _class_for(lookup, "e", tag)
+
+    return _cn1xml.lxml_build(src, not isinstance(data, str), class_for, lookup, _NOHINT, sink.cnt,
+                              opts.remove_blank_text)
 
 
 class _BaseParser(object):
