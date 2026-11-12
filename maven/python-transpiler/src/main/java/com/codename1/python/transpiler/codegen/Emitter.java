@@ -4784,6 +4784,9 @@ public final class Emitter {
                 numPath(root, leaves, ints, "ints", m);
             }
         }
+        if (anyFloat) {
+            mixedPath(root, leaves, m);
+        }
         int[] counters = new int[2];
         String boxed = fuseBoxed(root, counters);
         if (current != null) {
@@ -5073,6 +5076,88 @@ public final class Emitter {
         } else {
             m.append("            return ").append(isInt ? "Long" : "Double").append(".valueOf(").append(r)
                     .append(");\n        }\n");
+        }
+    }
+
+    /// The bits an int value of the tree can need when every int leaf has
+    /// at most `k` bits (a literal its own); -1 when the tree has an
+    /// operator other than `+`, `-`, `*` or unary minus.
+    private static int mixedBits(Expr e, int k) {
+        if (!numNode(e)) {
+            if (e instanceof Constant) {
+                Long v = intLiteral(e);
+                if (v != null) {
+                    return 64 - Long.numberOfLeadingZeros(Math.abs(v.longValue()));
+                }
+                return floatConst(e) ? 0 : -1;
+            }
+            return k;
+        }
+        if (e instanceof UnaryOp) {
+            return "-".equals(((UnaryOp) e).op) ? mixedBits(((UnaryOp) e).operand, k) : -1;
+        }
+        BinOp b = (BinOp) e;
+        int l = mixedBits(b.left, k);
+        int r = mixedBits(b.right, k);
+        if (l < 0 || r < 0) {
+            return -1;
+        }
+        if ("*".equals(b.op)) {
+            return l + r;
+        }
+        return "+".equals(b.op) || "-".equals(b.op) ? Math.max(l, r) + 1 : -1;
+    }
+
+    /// Leaves that are a mix of floats and small ints, as a PDF matrix of
+    /// `(1, 0, 0, 1, 0, 0)` applied to a float point is: every leaf taken
+    /// as a double, which is exactly Python's answer when no int part of
+    /// the tree can pass 2**53 (each int leaf is bounded so that it cannot)
+    /// and the result is not zero -- the one value whose sign an int part
+    /// computed in doubles could get wrong (`0 * -1` is the int 0, not
+    /// -0.0). Before this, one int leaf sent the whole tree to one boxed
+    /// operation per operator.
+    private void mixedPath(Expr root, List<Expr> leaves, StringBuilder m) {
+        int k = 31;
+        while (k >= 8 && (mixedBits(root, k) < 0 || mixedBits(root, k) > 53)) {
+            k--;
+        }
+        if (k < 8) {
+            return;
+        }
+        long lim = 1L << k;
+        StringBuilder guard = new StringBuilder();
+        StringBuilder any = new StringBuilder();
+        StringBuilder unbox = new StringBuilder();
+        Map<Expr, Character> types = new java.util.IdentityHashMap<Expr, Character>();
+        Set<Expr> none = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Expr, Boolean>());
+        numType(root, none, new HashSet<String>(), types);
+        for (int i = 0; i < leaves.size(); i++) {
+            types.put(leaves.get(i), Character.valueOf('f'));
+            guard.append(i == 0 ? "" : " && ").append("(p").append(i).append(" instanceof Double || p").append(i)
+                    .append(" instanceof Long && ((Long) p").append(i).append(").longValue() > -").append(lim)
+                    .append("L && ((Long) p").append(i).append(").longValue() < ").append(lim).append("L)");
+            any.append(i == 0 ? "" : " || ").append("p").append(i).append(" instanceof Double");
+            unbox.append("            double d").append(i).append(" = p").append(i).append(" instanceof Double ? ((Double) p")
+                    .append(i).append(").doubleValue() : (double) ((Long) p").append(i).append(").longValue();\n");
+        }
+        retypeFloat(root, types);
+        m.append("        mixed: if (").append(guard).append(" && (").append(any).append(")) {\n").append(unbox);
+        int[] counters = new int[2];
+        String r = numPrim(root, types, "mixed", m, counters);
+        bail(m, r + " == 0.0", "mixed");
+        m.append("            return Double.valueOf(").append(r).append(");\n        }\n");
+    }
+
+    /// Every node of the tree float, for [#mixedPath].
+    private static void retypeFloat(Expr e, Map<Expr, Character> types) {
+        types.put(e, Character.valueOf('f'));
+        if (numNode(e)) {
+            if (e instanceof UnaryOp) {
+                retypeFloat(((UnaryOp) e).operand, types);
+            } else {
+                retypeFloat(((BinOp) e).left, types);
+                retypeFloat(((BinOp) e).right, types);
+            }
         }
     }
 
