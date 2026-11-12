@@ -1293,6 +1293,32 @@ public final class Emitter {
 
     /// `x.split()` with no arguments, which a loop walks word by word
     /// (Py.splitWords) instead of splitting into a list first.
+    /// The receiver of `x.items()` iterated into exactly two names, or null.
+    /// Such a loop walks the pairs with the runtime's `ItemWalk` instead of building a
+    /// tuple per entry; with any other target an item may be kept, so it is
+    /// a real tuple.
+    static Expr itemPairs(Expr iter, Expr target) {
+        if (!(iter instanceof Call) || !(target instanceof TupleExpr)) {
+            return null;
+        }
+        List<Expr> elts = ((TupleExpr) target).elts;
+        if (elts.size() != 2 || !(elts.get(0) instanceof Name) || !(elts.get(1) instanceof Name)) {
+            return null;
+        }
+        Call c = (Call) iter;
+        if (!c.args.isEmpty() || !c.keywords.isEmpty() || !(c.func instanceof Attribute)
+                || !"items".equals(((Attribute) c.func).attr)) {
+            return null;
+        }
+        return ((Attribute) c.func).value;
+    }
+
+    /// What a loop over `iter` into `target` iterates (see [#itemPairs]).
+    private String loopSource(Expr iter, Expr target) {
+        Expr recv = itemPairs(iter, target);
+        return recv != null ? "ItemWalk.of(" + expr(recv) + ")" : expr(iter);
+    }
+
     private static boolean splitWords(Expr e) {
         if (!(e instanceof Call)) {
             return false;
@@ -1684,7 +1710,7 @@ public final class Emitter {
                 Call sc1 = (Call) f.iter;
                 src = "Py.splitOn(" + expr(((Attribute) sc1.func).value) + ", " + expr(sc1.args.get(0)) + ")";
             } else {
-                src = expr(f.iter);
+                src = loopSource(f.iter, f.target);
             }
             out.append("final Object ").append(sq).append(" = ").append(src).append(";\n");
             indent(out, ind);
@@ -3490,7 +3516,7 @@ public final class Emitter {
         }
         Frame savedFrame = frame;
         Scope savedScope = sc;
-        String first = expr(c.generators.get(0).iter);
+        String first = loopSource(c.generators.get(0).iter, c.generators.get(0).target);
         Scope cs = c.scope;
         frame = new Frame(id(cs), cs);
         sc = cs;
@@ -3507,7 +3533,7 @@ public final class Emitter {
             String it = fresh("i");
             String x = fresh("x");
             indent(b, depth);
-            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? a : expr(g.iter))
+            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? a : loopSource(g.iter, g.target))
                     .append(");\n");
             indent(b, depth);
             b.append("for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
@@ -3654,7 +3680,7 @@ public final class Emitter {
     /// for a name that is a cell anyway, the cell) of every name it reads
     /// from enclosing functions.
     private String helperComprehension(Comp c) {
-        String first = expr(c.generators.get(0).iter);
+        String first = loopSource(c.generators.get(0).iter, c.generators.get(0).target);
         Scope cs = c.scope;
         StringBuilder call = new StringBuilder();
         StringBuilder sig = new StringBuilder();
@@ -3716,7 +3742,7 @@ public final class Emitter {
             String it = fresh("i");
             String x = fresh("x");
             indent(b, depth);
-            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? it0 : expr(g.iter))
+            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? it0 : loopSource(g.iter, g.target))
                     .append(");\n");
             indent(b, depth);
             b.append("for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
@@ -3804,7 +3830,7 @@ public final class Emitter {
         GenLowering savedGen = gen;
         boolean async = Linearize.isAsync(c);
         boolean genexp = c.kind == Comp.Kind.GENERATOR;
-        String first = expr(c.generators.get(0).iter);
+        String first = loopSource(c.generators.get(0).iter, c.generators.get(0).target);
         Scope cs = c.scope;
         frame = new Frame(id(cs), cs);
         sc = cs;

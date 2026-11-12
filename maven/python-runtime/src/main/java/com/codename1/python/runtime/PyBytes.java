@@ -591,8 +591,8 @@ public final class PyBytes extends PyObject {
             final String name = e;
             final int search = searchKind(name);
             Py.BYTES_TYPE.define(name, PyBuiltin.methodKw(Py.BYTES_TYPE, name, (args, kw) -> {
-                if (search != 0 && args.length == 2 && kw.length == 0) {
-                    Object r = searched(search, args[0], args[1]);
+                if (search != 0 && args.length >= 2 && args.length <= 4 && kw.length == 0) {
+                    Object r = searched(search, args);
                     if (r != null) {
                         return r;
                     }
@@ -637,10 +637,40 @@ public final class PyBytes extends PyObject {
     /// the whole receiver to text first, so testing how a file starts
     /// (`data.startswith(b"%PDF-")`, and a type sniffer asks that a dozen times)
     /// copied the file twice per question.
-    private static Object searched(int kind, Object self, Object arg) {
-        byte[] h = like(self);
+    ///
+    /// The optional start and end are taken as slice bounds, the way CPython's
+    /// `ADJUST_INDICES` takes them. A tokenizer scans a buffer with
+    /// `data.find(b">>", pos)`; that form used to copy the whole buffer to text
+    /// on every call, which made scanning a file quadratic in its size.
+    private static Object searched(int kind, Object[] args) {
+        byte[] h = like(args[0]);
         if (h == null) {
             return null;
+        }
+        Object arg = args[1];
+        int lo = 0;
+        int hi = h.length;
+        if (args.length > 2) {
+            long[] r = window(h.length, args);
+            if (r.length == 0) {
+                return null;
+            }
+            lo = (int) r[0];
+            hi = (int) r[1];
+            if (lo > h.length) {
+                // Past the end: nothing is found, not even an empty needle.
+                return kind <= 2 ? Py.FALSE : kind == 5 ? PyInt.of(0) : PyInt.of(-1);
+            }
+        }
+        if (kind >= 3 && arg instanceof Long) {
+            long v = ((Long) arg).longValue();
+            if (v < 0 || v > 255) {
+                return null;
+            }
+            arg = new PyBytes(new byte[] {(byte) v});
+        }
+        if (lo != 0 || hi != h.length) {
+            return searchedIn(kind, h, lo, hi, arg);
         }
         if (kind <= 2 && arg instanceof PyTuple) {
             Object[] each = ((PyTuple) arg).items;
@@ -689,6 +719,78 @@ public final class PyBytes extends PyObject {
         int count = 0;
         int i = 0;
         while (i + n.length <= h.length) {
+            if (h[i] == n[0] && matchesAt(h, n, i)) {
+                count++;
+                i += n.length;
+            } else {
+                i++;
+            }
+        }
+        return PyInt.of(count);
+    }
+
+    /// The start and end of a ranged search, clamped as slice bounds except that
+    /// a start past the end is kept so the caller can answer it; empty when
+    /// either is neither an int nor None.
+    private static final long[] NO_WINDOW = new long[0];
+
+    private static long[] window(int len, Object[] args) {
+        long lo = 0;
+        long hi = len;
+        Object a = args[2];
+        if (a instanceof Long) {
+            lo = ((Long) a).longValue();
+            if (lo < 0) {
+                lo = Math.max(0, lo + len);
+            }
+        } else if (a != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return NO_WINDOW;
+        }
+        if (args.length > 3) {
+            Object b = args[3];
+            if (b instanceof Long) {
+                hi = ((Long) b).longValue();
+                hi = hi < 0 ? Math.max(0, hi + len) : Math.min(hi, len);
+            } else if (b != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return NO_WINDOW;
+            }
+        }
+        return new long[] {lo, hi};
+    }
+
+    /// [#searched] over `h[lo:hi]`, `lo` at most the length; null for what it
+    /// leaves to the long way (a tuple of prefixes, an empty needle).
+    private static Object searchedIn(int kind, byte[] h, int lo, int hi, Object arg) {
+        byte[] n = like(arg);
+        if (n == null || n.length == 0) {
+            return null;
+        }
+        if (kind == 1) {
+            return Py.bool(hi - lo >= n.length && matchesAt(h, n, lo));
+        }
+        if (kind == 2) {
+            return Py.bool(hi - lo >= n.length && matchesAt(h, n, hi - n.length));
+        }
+        if (kind == 3) {
+            byte first = n[0];
+            for (int i = lo; i + n.length <= hi; i++) {
+                if (h[i] == first && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        if (kind == 4) {
+            for (int i = hi - n.length; i >= lo; i--) {
+                if (h[i] == n[0] && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        int count = 0;
+        int i = lo;
+        while (i + n.length <= hi) {
             if (h[i] == n[0] && matchesAt(h, n, i)) {
                 count++;
                 i += n.length;

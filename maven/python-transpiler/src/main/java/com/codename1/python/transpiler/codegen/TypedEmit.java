@@ -2160,7 +2160,7 @@ final class TypedEmit {
         nonNull.removeAll(inBody);
         shadow.keySet().removeAll(inBody);
         forgetPaths();
-        E it = expr(f.iter);
+        E it = loopSource(f.iter, f.target);
         String handled = null;
         indent(b, ind);
         b.append("{\n");
@@ -2331,6 +2331,13 @@ final class TypedEmit {
         return new E(r, c.kind == Comp.Kind.LIST ? in.type(c, cur, sc) : Ty.DYN);
     }
 
+    /// What a loop over `iter` into `target` iterates: `x.items()` into two
+    /// names walks the pairs (see Emitter.itemPairs).
+    private E loopSource(Expr iter, Expr target) {
+        Expr recv = Emitter.itemPairs(iter, target);
+        return recv != null ? new E("ItemWalk.of(" + box(expr(recv)) + ")", Ty.DYN) : expr(iter);
+    }
+
     /// The loop over one `for` clause of a comprehension: the statement
     /// evaluating what it iterates, the loop header, and the item (boxed).
     /// A `range` counts in a long and a list is indexed, as `for` does.
@@ -2346,7 +2353,7 @@ final class TypedEmit {
                 "for (long " + i + " = " + s0 + "; " + i + " < " + e + "; " + i + "++) {\n",
                 "Long.valueOf(" + i + ")"};
         }
-        E it = expr(g.iter);
+        E it = loopSource(g.iter, g.target);
         if (it.t.k == Ty.K.LIST && !it.t.opt) {
             String l = fresh();
             String k = fresh();

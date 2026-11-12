@@ -2413,6 +2413,10 @@ public final class Py {
                 return items;
             }
         }
+        if (o instanceof ItemWalk && n == 2) {
+            // Read at once, like a tuple's items (see ItemWalk).
+            return ((ItemWalk) o).current;
+        }
         return unpack(o, n);
     }
 
