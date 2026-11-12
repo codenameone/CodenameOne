@@ -4582,6 +4582,40 @@ BOOL patch = NO;
 int keyboardSlideOffset;
 int keyboardHeight;
 
+// Set while a system sheet that owns its own keyboard is presented over the
+// application -- today the SMS composer (IOSNative sendSMS). The keyboard
+// notifications are process wide, so the composer's keyboard reaches the two
+// handlers below exactly as one of our own text fields' would: they record a
+// keyboard height, call into Java (which can pad and revalidate the current
+// form, and fires the virtual keyboard listeners of the application) and
+// repaint underneath the sheet. None of that is about our UI, and issue #6211
+// reports the composer intermittently coming up with its entry field behind
+// the keyboard, so while the flag is set a "will show" is ignored.
+//
+// A "will hide" is never ignored on the flag alone. The one that pairs with an
+// ignored show is dropped (cn1KeyboardShowIgnored), so the listeners never see
+// a "hidden" for a keyboard they were not told about -- but only while we have
+// no keyboard of our own on record (keyboardIsShown). When one of OUR editors
+// had the keyboard up as the sheet opened, UIKit may hand that keyboard to the
+// sheet without a hide in between; the next hide is then the only one our own
+// keyboard will ever get, and it is what puts the view and the form back.
+BOOL cn1KeyboardTrackingSuspended = NO;
+static BOOL cn1KeyboardShowIgnored = NO;
+
+// A flag that stayed set would silently break every text field in the
+// application, so it is not trusted by itself: with nothing presented there is
+// no sheet whose keyboard this could be, and the flag is dropped.
+static BOOL cn1IsKeyboardTrackingSuspended(UIViewController* controller) {
+    if (!cn1KeyboardTrackingSuspended) {
+        return NO;
+    }
+    if (controller.presentedViewController == nil) {
+        cn1KeyboardTrackingSuspended = NO;
+        return NO;
+    }
+    return YES;
+}
+
 
 - (void)keyboardWillHide:(NSNotification *)n
 {
@@ -4589,6 +4623,14 @@ int keyboardHeight;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
+    if (cn1KeyboardShowIgnored) {
+        cn1KeyboardShowIgnored = NO;
+        if (!keyboardIsShown) {
+            // The keyboard of a system sheet going away, and none of ours to
+            // put away; see cn1KeyboardTrackingSuspended.
+            return;
+        }
+    }
     @synchronized([CodenameOne_GLViewController instance]) {
         [currentTarget removeAllObjects];
     }
@@ -4653,6 +4695,11 @@ BOOL prefersStatusBarHidden = NO;
 // renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
 #else
+    if (cn1IsKeyboardTrackingSuspended(self)) {
+        cn1KeyboardShowIgnored = YES;
+        return;
+    }
+    cn1KeyboardShowIgnored = NO;
     // Hide the datepicker if it is currently showing.
     [self datePickerCancel];
     
@@ -6152,6 +6199,9 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
 // only the body would leave a signature naming an unknown type.
 #if !TARGET_OS_OSX
 -(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result {
+	// Our own keyboard handling resumes here; the hide of the composer's keyboard
+	// that follows is still dropped, by cn1KeyboardShowIgnored.
+	cn1KeyboardTrackingSuspended = NO;
 	// Through the composer, for the reason given on the mail delegate above.
 	[controller dismissViewControllerAnimated:YES completion:nil];
 }
