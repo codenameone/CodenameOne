@@ -2873,7 +2873,21 @@ public final class Emitter {
                 return "Py.isTrue(Py.FALSE)";
             }
         }
+        if (e instanceof Call && isinstanceCall((Call) e) && !(((Call) e).args.get(1) instanceof TupleExpr)) {
+            // As the typed code does: the builtin's answer as a Java boolean,
+            // with no bool boxed and then tested three ways.
+            Call c = (Call) e;
+            return "Py.isinstanceB(" + expr(c.func) + ", " + expr(c.args.get(0)) + ", " + expr(c.args.get(1)) + ")";
+        }
         return truth(expr(e));
+    }
+
+    /// `isinstance(x, t)` with the builtin's name, two plain arguments and no
+    /// keywords: the call [#cond] answers as a Java boolean.
+    private boolean isinstanceCall(Call c) {
+        return c.func instanceof Name && "isinstance".equals(((Name) c.func).id) && c.keywords.isEmpty()
+                && c.args.size() == 2 && !Infer.hasStarred(c.args)
+                && sc.resolve("isinstance") == Scope.Binding.BUILTIN;
     }
 
     /// The items of `x in (a, b, ...)` / `x not in (...)` with the tuple

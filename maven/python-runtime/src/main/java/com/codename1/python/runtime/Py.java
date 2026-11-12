@@ -231,6 +231,15 @@ public final class Py {
     }
 
     public static PyType typeOf(Object o) {
+        // Asked first and answered here: isinstance, method lookup and every
+        // builtin's receiver check come through this, and going by way of
+        // obj() was a second call, frame and guard per ask.
+        if (o instanceof PyInstance) {
+            return ((PyInstance) o).cls;
+        }
+        if (o instanceof PyObject) {
+            return ((PyObject) o).type();
+        }
         if (o instanceof Long) {
             return INT_TYPE;
         }
@@ -2623,6 +2632,10 @@ public final class Py {
     }
 
     public static boolean isinstance(Object o, Object t) {
+        if (t instanceof PyType) {
+            // The common case first: a class, not a tuple or a union.
+            return ((PyType) t).instanceCheck(o);
+        }
         if (t instanceof PyTuple) {
             Object[] items = ((PyTuple) t).items;
             for (Object item : items) {
