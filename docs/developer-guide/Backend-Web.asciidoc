@@ -440,8 +440,8 @@ instead.
 ==== Server-Sent Events
 
 For a feed the server pushes and the client only reads -- tokens relayed from a
-language model as they are generated, prices, progress -- an event stream is
-simpler than a WebSocket: it is one ordinary `GET`, the browser's `EventSource`
+language model as they arrive, prices, progress -- an event stream is
+simpler than a WebSocket: it's one ordinary `GET`, the browser's `EventSource`
 reconnects by itself, and it passes through any proxy that passes HTTP.
 `Sse.stream` answers with `text/event-stream` and hands the handler an
 `Sse.Events`. Each `data` or `json` call sends one event and flushes it, so the
