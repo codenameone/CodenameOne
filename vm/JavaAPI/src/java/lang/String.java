@@ -1672,7 +1672,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (fused != null) {
             return fused;
         }
-        StringBuilder out = new StringBuilder();
+        // Sized exactly up front: growing the buffer copies it each time,
+        // and this is the path every join that is not all Latin-1 takes.
+        int total = elements.length > 1 ? delimiter.length() * (elements.length - 1) : 0;
+        for (int i = 0; i < elements.length; i++) {
+            CharSequence e = elements[i];
+            total += e == null ? 4 : e.length();
+        }
+        StringBuilder out = new StringBuilder(total);
         for (int i = 0; i < elements.length; i++) {
             if (i > 0) {
                 out.append(delimiter);

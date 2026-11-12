@@ -579,7 +579,9 @@ final class Formatting {
         }
         // Local on purpose: ParparVM keeps a builder that does not escape on the stack,
         // unlocked, where a shared static one is locked on every append.
-        StringBuilder sb = new StringBuilder();
+        // Sized for the format plus a typical argument each, so the common
+        // case never grows (and copies) the buffer.
+        StringBuilder sb = new StringBuilder(fmt.length() + 16 * count);
         int n = fmt.length();
         int ai = 0;
         int i = 0;
