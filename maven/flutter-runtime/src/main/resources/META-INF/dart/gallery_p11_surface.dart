@@ -47,6 +47,7 @@ class ScaleUpdateDetails {
   external double get horizontalScale;
   external double get verticalScale;
   external double get rotation;
+  external int get pointerCount;
 }
 
 // The end of a scale gesture.

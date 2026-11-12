@@ -53,6 +53,7 @@ class User {
   external String? get phoneNumber;
   external bool get isAnonymous;
   external bool get emailVerified;
+  external List<UserInfo> get providerData;
   external String? get refreshToken;
   external Future<String?> getIdToken([bool forceRefresh]);
   external Future<void> updateDisplayName(String? displayName);
@@ -202,4 +203,14 @@ class FirebaseMessaging {
   external Future<void> unsubscribeFromTopic(String topic);
   external Future<void> setForegroundNotificationPresentationOptions({bool alert, bool badge, bool sound});
   external Future<void> setAutoInitEnabled(bool enabled);
+}
+
+@JavaName('com.codename1.flutter.plugins.firebase.UserInfo')
+class UserInfo {
+  external String get providerId;
+  external String? get uid;
+  external String? get email;
+  external String? get displayName;
+  external String? get photoURL;
+  external String? get phoneNumber;
 }

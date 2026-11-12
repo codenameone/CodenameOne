@@ -626,7 +626,7 @@ public class TextFieldRenderElement extends RenderElement {
     /// The ambient {@code inputDecorationTheme}, or null when there is none.
     private InputDecorationThemeData inputDecorationTheme() {
         try {
-            return Theme.of(this).inputDecorationTheme();
+            return Theme.of(this).givenInputDecorationTheme();
         } catch (Throwable noTheme) {
             return null;
         }

@@ -59,34 +59,32 @@ public class TypeVariableWitnessTest {
         return n;
     }
 
-    /** {@code xs.whereType<T>()} where T is the enclosing generic method's type parameter. */
+    /**
+     * {@code xs.whereType<T>()} where T is the enclosing generic method's type parameter.
+     * The generic method takes a hidden witness of T. A call that writes nothing and lets
+     * nothing infer T gets T's bound, as Dart instantiates to bound (here dynamic), so
+     * neither call is an error.
+     */
     @Test
-    public void whereTypeOfATypeVariableIsDiagnosed() {
+    public void whereTypeOfAnUninferableTypeVariableUsesItsBound() {
         String src =
                 "Iterable<Object> only<T>(List<Object> xs) => xs.whereType<T>();\n"
               + "void main() { print(only<int>(<Object>[1])); print(only(<Object>[1])); }\n";
         TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
-        // The generic method takes a hidden witness of T; the call that writes <int> passes
-        // one, and only the call that neither writes nor lets T be inferred is an error.
-        assertEquals(1, count(r, "E0142"), "expected one E0142, at the uninferable call: " + r.diags.asList());
-        boolean namesConstruct = false;
-        for (Diagnostic d : r.diags.asList()) {
-            if (d.code.equals("E0142") && d.message.contains("only") && d.message.contains("'T'")) {
-                namesConstruct = true;
-            }
-        }
-        assertTrue(namesConstruct, "diagnostic should name whereType<T> and T: " + r.diags.asList());
+        assertEquals(0, count(r, "E0142"), "an uninferable T is its bound, not an error: " + r.diags.asList());
+        assertFalse(r.diags.hasErrors(), "diagnostics: " + r.diags.asList());
     }
 
     /** {@code x is T} where T is the enclosing generic method's type parameter. */
     @Test
-    public void isTestOfATypeVariableIsDiagnosed() {
+    public void isTestOfAnUninferableTypeVariableUsesItsBound() {
         String src =
                 "bool isa<T>(Object x) => x is T;\n"
               + "void main() { print(isa<String>(1)); print(isa(1)); }\n";
         TestSupport.Result r = TestSupport.transpile(new String[][] {{"main.dart", src}});
-        // Witnessed: never a guess for the call that gives T no type.
-        assertEquals(1, count(r, "E0142"), "expected one E0142, at isa(1): " + r.diags.asList());
+        // isa(1) is isa<dynamic>(1) in Dart (instantiate to bound): witnessed as dynamic.
+        assertEquals(0, count(r, "E0142"), "isa(1) is isa<dynamic>: " + r.diags.asList());
+        assertFalse(r.diags.hasErrors(), "diagnostics: " + r.diags.asList());
     }
 
     /**

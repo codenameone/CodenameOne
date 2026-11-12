@@ -127,6 +127,31 @@ class InputDecorationThemeData {
        Object? focusedBorder, Object? errorBorder, Object? focusedErrorBorder,
        Object? disabledBorder, Object? floatingLabelBehavior, double? gapPadding,
        bool? alignLabelWithHint, Object? constraints});
+  external TextStyle? get labelStyle;
+  external TextStyle? get floatingLabelStyle;
+  external TextStyle? get helperStyle;
+  external TextStyle? get hintStyle;
+  external TextStyle? get errorStyle;
+  external TextStyle? get prefixStyle;
+  external TextStyle? get suffixStyle;
+  external TextStyle? get counterStyle;
+  external bool get filled;
+  external Color? get fillColor;
+  external Color? get focusColor;
+  external Color? get hoverColor;
+  external EdgeInsetsGeometry? get contentPadding;
+  external bool get isDense;
+  external bool get isCollapsed;
+  external dynamic get border;
+  external dynamic get enabledBorder;
+  external dynamic get focusedBorder;
+  external dynamic get errorBorder;
+  external dynamic get focusedErrorBorder;
+  external dynamic get disabledBorder;
+  external dynamic get floatingLabelBehavior;
+  external double get gapPadding;
+  external bool get alignLabelWithHint;
+  external dynamic get constraints;
 }
 
 // ======================================================================

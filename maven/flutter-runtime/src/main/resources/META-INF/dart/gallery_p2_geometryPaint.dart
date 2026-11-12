@@ -125,11 +125,15 @@ abstract class Shader {}
 @JavaName('com.codename1.flutter.Gradient')
 abstract class Gradient {
   external Shader createShader(Rect rect, {Object? textDirection});
+  // dart:ui's Gradient.linear, which shares this name in the flat stub namespace.
+  external static Shader linear(Offset from, Offset to, List<Color> colors,
+      [List<double>? colorStops, TileMode? tileMode, Object? matrix4]);
 }
 
 @JavaName('com.codename1.flutter.LinearGradient')
 class LinearGradient extends Gradient {
   external LinearGradient({Object? begin, Object? end, List<Color> colors, List<double>? stops, TileMode? tileMode, Object? transform});
+  external List<Color> get colors;
 }
 
 @JavaName('com.codename1.flutter.RadialGradient')

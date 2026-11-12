@@ -13373,6 +13373,15 @@ public final class JavaEmitter {
             }
             // A call pinned to its class (a constructor tear-off through an import prefix,
             // `a.Item.new` beside an unprefixed `Item` of another library) builds that class.
+            if (cc.ctorName == null && CORE_ERRORS.containsKey(cc.type.name)
+                    && !program.classes.containsKey(cc.type.name)) {
+                // `const FormatException('bad')` / `new StateError(m)`: the dart:core error
+                // constructors are intrinsics of the bare-call path, not stub classes.
+                Call bare = new Call().at(cc.file, cc.line, cc.col);
+                bare.name = cc.type.name;
+                bare.args = cc.args;
+                return emitCall(bare, expected, ctx);
+            }
             ClassDecl pinnedCtor = cc.type.runtimeOnly ? null : cc.type.resolved;
             List<TypeRef> wta = inferredWitnessTypeArgs(pinnedCtor != null ? pinnedCtor
                     : classOfRef(cc.type), cc.type.args, expected);
@@ -17402,8 +17411,25 @@ public final class JavaEmitter {
             }
         }
         StringBuilder sb = new StringBuilder();
+        Map<String, TypeRef> bounds = decl instanceof MethodDecl ? ((MethodDecl) decl).typeParamBounds
+                : ((FunctionDecl) decl).typeParamBounds;
         for (String n : ws) {
             TypeRef t = m.get(n);
+            boolean contextCouldBind = expected != null && !expected.is("dynamic") && !expected.is("var")
+                    && !expected.is("void") && mentionsTypeVar(ret, n);
+            if (t == null && c.typeArgs.isEmpty() && !contextCouldBind && !argumentCouldBind(decl, c.args, n)) {
+                // Nothing written and nothing inferable: Dart instantiates to bound, so
+                // `Hive.openBox('x')` is `openBox<dynamic>` -- the same rule a construction
+                // with no type arguments follows (witnessArgList). Not when a concrete context
+                // type meets a return type naming the variable: Dart infers from that, and
+                // failing to here is this emitter's gap, which a default would hide.
+                TypeRef bound = bounds.get(n);
+                // `T extends Comparable<T>` is the raw Comparable: the witness erases the
+                // arguments either way.
+                t = bound != null && bound.funcReturn == null && bound.funcParams == null
+                        && !tps.contains(bound.name)
+                        ? (bound.args.isEmpty() ? bound : new TypeRef(bound.name)) : new TypeRef("dynamic");
+            }
             String w = t == null ? null : witnessOf(t, ctx);
             if (w == null && !hardMethodWitness(decl, n)) {
                 // Only runtimeType reads it: the callee records an unknown argument.
@@ -24990,6 +25016,60 @@ public final class JavaEmitter {
         return "$super$" + mx.name.replace('$', '_') + "$" + key.replace('$', '_');
     }
 
+    /**
+     * Whether an argument this call passes goes to a parameter whose type names {@code v}:
+     * Dart infers v from that argument, so when inference failed here the emitter could
+     * not type the argument, and defaulting v to its bound would hide that gap.
+     */
+    private static boolean argumentCouldBind(Object decl, Args args, String v) {
+        List<Param> params = decl instanceof MethodDecl ? ((MethodDecl) decl).params
+                : decl instanceof FunctionDecl ? ((FunctionDecl) decl).params : null;
+        if (params == null || args == null) {
+            return false;
+        }
+        int pos = 0;
+        for (Param p : params) {
+            boolean passed;
+            if (p.named) {
+                passed = false;
+                for (NamedArg na : args.named) {
+                    if (na.name.equals(p.name)) {
+                        passed = !(na.value instanceof NullLit);
+                    }
+                }
+            } else {
+                passed = pos < args.positional.size() && !(args.positional.get(pos) instanceof NullLit);
+                pos++;
+            }
+            if (passed && mentionsTypeVar(p.type, v)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean mentionsTypeVar(TypeRef t, String v) {
+        if (t == null) {
+            return false;
+        }
+        if (v.equals(t.name) && t.args.isEmpty()) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsTypeVar(a, v)) {
+                return true;
+            }
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (mentionsTypeVar(a, v)) {
+                    return true;
+                }
+            }
+        }
+        return mentionsTypeVar(t.funcReturn, v);
+    }
+
     private static boolean usesSuper(MethodDecl m) {
         LinkedHashMap<String, Integer> found = new LinkedHashMap<String, Integer>();
         collectSuperUses(m, found, java.util.Collections.newSetFromMap(
@@ -25539,7 +25619,22 @@ public final class JavaEmitter {
             for (int i = c.mixins.size() - 1; i >= 0; i--) {
                 ClassDecl mx = program.resolveClass(c.mixins.get(i).name, c.ownerLibrary);
                 if (mx == null) {
-                    // a runtime mixin: leave the access to Java's own resolution
+                    // A stub mixin (WidgetsBindingObserver, RestorationMixin) is a Java
+                    // interface whose default method is the super; name it, since Java's
+                    // plain `super.` only searches the superclass. Any other runtime mixin
+                    // is left to Java's own resolution.
+                    // Only a stub declared `mixin`, and only when nothing up the superclass
+                    // chain declares the member: an inherited superclass method overrides
+                    // the interface's, and javac rejects `X.super.m()` then (JLS 15.12.3)
+                    // -- `extends State with ChangeNotifier` calling super.dispose().
+                    TypeRef mixRef = c.mixins.get(i);
+                    ClassDecl stubMx = stubs.classes.get(mixRef.name);
+                    if (stubMx != null && stubMx.isMixin
+                            && (stubs.findMethod(mixRef.name, member, false) != null
+                                    || stubs.findMethod(mixRef.name, member, true) != null)
+                            && !superChainDeclares(c.superclass, member, c.ownerLibrary)) {
+                        return new Out(stubSimpleName(mixRef.name, ctx) + ".super", mixRef);
+                    }
                     return null;
                 }
                 if (!declaresConcrete(mx, member)) {
@@ -25576,6 +25671,31 @@ public final class JavaEmitter {
     }
 
     /** Whether mixin {@code mx} itself declares a non-abstract instance member {@code member}. */
+    /** Whether the superclass {@code sup} or anything above it (program or stub) declares {@code member}. */
+    private boolean superChainDeclares(TypeRef sup, String member, Library library) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        while (sup != null && sup.name != null && seen.add(sup.name)) {
+            ClassDecl pc = program.resolveClass(sup.name, library);
+            if (pc == null) {
+                return stubs.findMethod(sup.name, member, false) != null
+                        || stubs.findMethod(sup.name, member, true) != null;
+            }
+            if (pc.method(member) != null || pc.getter(member) != null || pc.field(member) != null) {
+                return true;
+            }
+            for (TypeRef m : pc.mixins) {
+                ClassDecl mc = program.resolveClass(m.name, library);
+                if ((mc != null && (mc.method(member) != null || mc.getter(member) != null))
+                        || (mc == null && (stubs.findMethod(m.name, member, false) != null
+                                || stubs.findMethod(m.name, member, true) != null))) {
+                    return true;
+                }
+            }
+            sup = pc.superclass;
+        }
+        return false;
+    }
+
     private static boolean declaresConcrete(ClassDecl mx, String member) {
         if (mx.field(member) != null) {
             return true;

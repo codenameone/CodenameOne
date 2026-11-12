@@ -77,6 +77,20 @@ public class SliverAppBar extends StatelessWidget {
         this.floating = v;
     }
 
+    /**
+     * Flutter's {@code stretch} (overscroll grows the bar): accepted, not applied. The
+     * scroll views here do not report overscroll to the slivers, so there is nothing to
+     * stretch with, and the bar stays at its expanded height.
+     */
+    public void stretch(boolean v) {
+    }
+
+    public void stretchTriggerOffset(double v) {
+    }
+
+    public void onStretchTrigger(Object v) {
+    }
+
     public boolean isPinned() {
         return pinned;
     }

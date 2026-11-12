@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -92,8 +93,11 @@ class InputDecorationDefaultsTest {
         InputDecorationThemeData t = darkFilledTheme();
         theme.inputDecorationTheme(t);
         assertEquals(t, theme.inputDecorationTheme());
-        // Anything else stays opaque rather than being mistaken for one.
+        assertEquals(t, theme.givenInputDecorationTheme());
+        // Anything else stays opaque rather than being mistaken for one: the runtime
+        // sees no theme, and Dart's non-null getter answers an empty default.
         theme.inputDecorationTheme("not a theme");
-        assertNull(theme.inputDecorationTheme());
+        assertNull(theme.givenInputDecorationTheme());
+        assertNotNull(theme.inputDecorationTheme());
     }
 }

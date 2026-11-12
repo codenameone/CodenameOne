@@ -84,11 +84,23 @@ class TabBarTheme {
       dynamic indicatorSize, dynamic labelPadding, dynamic overlayColor, dynamic dividerColor});
 }
 
+@JavaName('com.codename1.flutter.material.TabBarIndicatorSize')
+enum TabBarIndicatorSize { tab, label }
+
 @JavaName('com.codename1.flutter.material.TabBarThemeData')
 class TabBarThemeData {
   external TabBarThemeData({Color? indicatorColor, Color? labelColor, Color? unselectedLabelColor,
       TextStyle? labelStyle, TextStyle? unselectedLabelStyle, dynamic indicator,
       dynamic indicatorSize, dynamic labelPadding, dynamic overlayColor, dynamic dividerColor});
+  external Color? get indicatorColor;
+  external Color? get labelColor;
+  external Color? get unselectedLabelColor;
+  external TextStyle? get labelStyle;
+  external TextStyle? get unselectedLabelStyle;
+  external dynamic get indicator;
+  external dynamic get indicatorSize;
+  external dynamic get labelPadding;
+  external dynamic get dividerColor;
 }
 
 @JavaName('com.codename1.flutter.material.DialogTheme')

@@ -211,6 +211,33 @@ public class Matrix4 {
         set(11, 0.0);
     }
 
+    // vector_math's rotateX/Y/Z(radians): post-multiplies by the rotation, so the
+    // rotation applies in the matrix's own (already transformed) space. Column-major:
+    // only the two columns spanning the rotation plane change.
+
+    public void rotateX(double radians) {
+        rotateColumns(1, 2, radians);
+    }
+
+    public void rotateY(double radians) {
+        rotateColumns(2, 0, radians);
+    }
+
+    public void rotateZ(double radians) {
+        rotateColumns(0, 1, radians);
+    }
+
+    private void rotateColumns(int a, int b, double radians) {
+        double c = Math.cos(radians);
+        double s = Math.sin(radians);
+        for (int r = 0; r < 4; r++) {
+            double va = get(a * 4 + r);
+            double vb = get(b * 4 + r);
+            set(a * 4 + r, c * va + s * vb);
+            set(b * 4 + r, c * vb - s * va);
+        }
+    }
+
     // vector_math's translate(x, [y, z]) — arity overloads for the transpiler.
 
     public void translate(double x) {

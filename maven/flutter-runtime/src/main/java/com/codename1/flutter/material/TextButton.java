@@ -75,4 +75,23 @@ public class TextButton extends ButtonBase {
         return b;
     }
 
+
+    /**
+     * {@code TextButton.icon(..., iconAlignment:)}: {@code IconAlignment.end} puts the icon
+     * after the label, built as a min-size row so the button keeps its own padding.
+     */
+    public static TextButton icon(com.codename1.flutter.Key key, dart.runtime.Funcs.VoidFunc0 onPressed,
+            ButtonStyle style, com.codename1.flutter.Widget icon, com.codename1.flutter.Widget label,
+            IconAlignment iconAlignment) {
+        if (iconAlignment == IconAlignment.end && icon != null && label != null) {
+            com.codename1.flutter.widgets.Row row = new com.codename1.flutter.widgets.Row();
+            row.mainAxisSize(com.codename1.flutter.MainAxisSize.min);
+            com.codename1.flutter.widgets.SizedBox gap = new com.codename1.flutter.widgets.SizedBox();
+            gap.width(8.0);
+            row.children(dart.core.DartList.<com.codename1.flutter.Widget>of(label, gap, icon));
+            return icon(key, onPressed, style, null, row);
+        }
+        return icon(key, onPressed, style, icon, label);
+    }
+
 }

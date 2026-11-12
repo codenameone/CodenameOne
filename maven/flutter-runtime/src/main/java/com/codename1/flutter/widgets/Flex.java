@@ -57,8 +57,33 @@ public abstract class Flex extends Widget {
         this.mainAxisSize = v == null ? MainAxisSize.max : v;
     }
 
+    private com.codename1.flutter.VerticalDirection verticalDirection =
+            com.codename1.flutter.VerticalDirection.down;
+
+    /**
+     * Flutter's {@code verticalDirection}. {@code up} lays a Column out bottom to top,
+     * which is the reversed children with start and end swapped; on a Row it swaps the
+     * cross axis's start and end.
+     */
+    public void verticalDirection(com.codename1.flutter.VerticalDirection v) {
+        this.verticalDirection = v == null ? com.codename1.flutter.VerticalDirection.down : v;
+    }
+
+    private boolean up() {
+        return verticalDirection == com.codename1.flutter.VerticalDirection.up;
+    }
+
     public DartList<Widget> getChildren() {
-        return children;
+        if (!up() || !isVertical() || children == null) {
+            return children;
+        }
+        // Built on every read, never cached: a list kept in a field and changed in place
+        // would otherwise show its old order.
+        DartList<Widget> r = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
+        for (int i = children.size() - 1; i >= 0; i--) {
+            r.add(children.get(i));
+        }
+        return r;
     }
 
     private com.codename1.flutter.TextBaseline textBaseline;
@@ -73,10 +98,26 @@ public abstract class Flex extends Widget {
     }
 
     public MainAxisAlignment getMainAxisAlignment() {
+        if (up() && isVertical()) {
+            if (mainAxisAlignment == MainAxisAlignment.start) {
+                return MainAxisAlignment.end;
+            }
+            if (mainAxisAlignment == MainAxisAlignment.end) {
+                return MainAxisAlignment.start;
+            }
+        }
         return mainAxisAlignment;
     }
 
     public CrossAxisAlignment getCrossAxisAlignment() {
+        if (up() && !isVertical()) {
+            if (crossAxisAlignment == CrossAxisAlignment.start) {
+                return CrossAxisAlignment.end;
+            }
+            if (crossAxisAlignment == CrossAxisAlignment.end) {
+                return CrossAxisAlignment.start;
+            }
+        }
         return crossAxisAlignment;
     }
 

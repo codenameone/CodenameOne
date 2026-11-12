@@ -118,6 +118,7 @@ class DateTime implements Comparable<DateTime> {
   external static DateTime? tryParse(String formattedString);
   external String toIso8601String();
   external bool get isUtc;
+  external Duration get timeZoneOffset;
   external int get microsecond;
   external int get year;
   external int get month;
@@ -427,6 +428,10 @@ class NumberFormat {
   external static NumberFormat decimalPattern([String? locale]);
   external static NumberFormat percentPattern([String? locale]);
   external String format(dynamic number);
+  external int get minimumFractionDigits;
+  external set minimumFractionDigits(int v);
+  external int get maximumFractionDigits;
+  external set maximumFractionDigits(int v);
 }
 
 // --- fonts : GoogleFonts ---------------------------------------------------

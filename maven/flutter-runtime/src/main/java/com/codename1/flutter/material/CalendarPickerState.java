@@ -55,6 +55,8 @@ final class CalendarPickerState extends State<StatefulWidget> {
     private long month;
     private DateTime start;
     private DateTime end;
+    /// showDatePicker's selectableDayPredicate: a day it refuses is shown but cannot be picked.
+    private Funcs.Func1<DateTime, Boolean> predicate;
 
     CalendarPickerState(boolean range, DateTime initial, DateTime initialEnd, DateTime first,
             DateTime last, String help, String cancel, String confirm) {
@@ -71,8 +73,23 @@ final class CalendarPickerState extends State<StatefulWidget> {
         month = shown.month();
     }
 
+    void predicate(Funcs.Func1<DateTime, Boolean> p) {
+        predicate = p;
+    }
+
     private boolean selectable(long k) {
         return (first == null || k >= PickerKit.key(first)) && (last == null || k <= PickerKit.key(last));
+    }
+
+    private boolean selectable(long k, long d) {
+        if (!selectable(k)) {
+            return false;
+        }
+        if (predicate == null) {
+            return true;
+        }
+        Boolean ok = predicate.call(PickerKit.date(year, month, d));
+        return ok != null && ok;
     }
 
     private void shift(final int by) {
@@ -107,7 +124,7 @@ final class CalendarPickerState extends State<StatefulWidget> {
 
     private Widget day(final long d) {
         long k = year * 10000 + month * 100 + d;
-        boolean can = selectable(k);
+        boolean can = selectable(k, d);
         boolean edge = k == PickerKit.key(start) || k == PickerKit.key(end);
         boolean inside = range && start != null && end != null && k > PickerKit.key(start)
                 && k < PickerKit.key(end);

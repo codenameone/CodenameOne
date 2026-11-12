@@ -730,4 +730,13 @@ public class DateTime implements Comparable {
     private static String twoDigits(long n) {
         return n >= 10 ? "" + n : "0" + n;
     }
+
+    /**
+     * Dart's {@code timeZoneOffset}: zero for a UTC value, otherwise the zone's raw
+     * offset -- the same offset this class converts local wall time with.
+     */
+    public Duration timeZoneOffset() {
+        return Duration.ofMicroseconds(isUtc() ? 0L : TimeZone.getDefault().getRawOffset() * 1000L);
+    }
+
 }

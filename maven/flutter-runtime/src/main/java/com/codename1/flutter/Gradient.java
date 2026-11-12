@@ -109,6 +109,31 @@ public abstract class Gradient {
         return new GradientShader(this, rect);
     }
 
+    /// dart:ui's {@code Gradient.linear(from, to, colors, [stops, tileMode, matrix])}: a
+    /// shader running from {@code from} to {@code to} in canvas coordinates. Built as a
+    /// LinearGradient over the rectangle the two points span, with begin and end at
+    /// the points' positions in it; {@code matrix} is not applied.
+    public static Shader linear(Offset from, Offset to, Object colors, Object stops, TileMode tileMode,
+                                Object matrix) {
+        Rect r = Rect.fromPoints(from, to);
+        LinearGradient g = new LinearGradient();
+        g.begin(alignmentIn(r, from));
+        g.end(alignmentIn(r, to));
+        g.colors(colors);
+        g.stops(stops);
+        if (tileMode != null) {
+            g.tileMode(tileMode);
+        }
+        return new GradientShader(g, r);
+    }
+
+    private static Alignment alignmentIn(Rect r, Offset p) {
+        double w = r.width();
+        double h = r.height();
+        return new Alignment(w == 0 ? 0 : (p.dx() - r.left()) / w * 2 - 1,
+                h == 0 ? 0 : (p.dy() - r.top()) / h * 2 - 1);
+    }
+
     /** A concrete {@link Shader} bound to a gradient and a rectangle. */
     public static final class GradientShader extends Shader {
         final Gradient gradient;

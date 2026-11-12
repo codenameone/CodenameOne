@@ -46,6 +46,12 @@ public class ScaffoldMessengerState {
     // itself in ToastBar's own status list, where it stayed visible/pending
     // until its own expiry timer eventually fired.
     private ToastBar.Status activeStatus;
+    // The controller of the visible SnackBar, completed with the reason it closed.
+    private ScaffoldFeatureController activeController;
+    // The visible MaterialBanner: there is no banner slot in this runtime, so it is
+    // shown as a ToastBar status that stays until hidden, and its controller.
+    private ToastBar.Status bannerStatus;
+    private ScaffoldFeatureController bannerController;
 
     ScaffoldMessengerState() {
     }
@@ -60,6 +66,7 @@ public class ScaffoldMessengerState {
     public void hideCurrentSnackBar(Object reason) {
         lastMessage = null;
         clearActiveStatus();
+        finishActive(SnackBarClosedReason.hide);
     }
 
     /**
@@ -70,6 +77,7 @@ public class ScaffoldMessengerState {
     public void removeCurrentSnackBar(Object reason) {
         lastMessage = null;
         clearActiveStatus();
+        finishActive(SnackBarClosedReason.remove);
     }
 
     /** Flutter's {@code clearSnackBars}: removes the visible snack bar and any queued. */
@@ -77,9 +85,15 @@ public class ScaffoldMessengerState {
         removeCurrentSnackBar(null);
     }
 
-    public void showSnackBar(SnackBar snackBar) {
+    /// Shows {@code snackBar} and returns its controller, whose {@code closed} future
+    /// completes with a {@link SnackBarClosedReason}: {@code timeout} when its
+    /// duration runs out, {@code hide}/{@code remove} when dismissed explicitly, and
+    /// {@code remove} when a later SnackBar replaces it (this runtime does not queue).
+    public ScaffoldFeatureController showSnackBar(SnackBar snackBar) {
+        final ScaffoldFeatureController controller = new ScaffoldFeatureController();
         if (snackBar == null) {
-            return;
+            controller.finish(SnackBarClosedReason.remove);
+            return controller;
         }
         // Real Flutter queues a SnackBar shown while another is up, and only
         // starts it once the current one finishes hiding (scaffold.dart's
@@ -89,18 +103,98 @@ public class ScaffoldMessengerState {
         // superseded Status cleared, the same as an explicit hide/remove,
         // or its ToastBar entry and expiry timer would outlive it.
         clearActiveStatus();
+        finishActive(SnackBarClosedReason.remove);
         String msg = consumeMessage(snackBar.getContent());
         long ms = snackBar.durationMillis();
         lastMessage = msg;
         lastDurationMillis = ms;
+        activeController = controller;
+        controller.onClose(new Runnable() {
+            @Override
+            public void run() {
+                if (activeController == controller) {
+                    hideCurrentSnackBar(null);
+                }
+            }
+        });
         if (!Display.isInitialized()) {
-            return;
+            return controller;
         }
         ToastBar.Status status = ToastBar.getInstance().createStatus();
         status.setMessage(msg);
         status.setExpires((int) ms);
         activeStatus = status;
         status.show();
+        new dart.async.Timer(dart.core.Duration.of(0, 0, 0, 0, ms, 0), new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (activeController == controller) {
+                    activeStatus = null;
+                    lastMessage = null;
+                    finishActive(SnackBarClosedReason.timeout);
+                }
+            }
+        });
+        return controller;
+    }
+
+    private void finishActive(SnackBarClosedReason reason) {
+        ScaffoldFeatureController c = activeController;
+        activeController = null;
+        if (c != null) {
+            c.finish(reason);
+        }
+    }
+
+    /// Flutter's {@code showMaterialBanner}. A banner stays until it is hidden; with
+    /// no banner slot in this runtime its message is shown as a status that does
+    /// not expire. Replaces any visible banner.
+    public ScaffoldFeatureController showMaterialBanner(MaterialBanner banner) {
+        removeCurrentMaterialBanner(null);
+        final ScaffoldFeatureController controller = new ScaffoldFeatureController();
+        bannerController = controller;
+        controller.onClose(new Runnable() {
+            @Override
+            public void run() {
+                if (bannerController == controller) {
+                    hideCurrentMaterialBanner(null);
+                }
+            }
+        });
+        if (banner != null && Display.isInitialized()) {
+            ToastBar.Status status = ToastBar.getInstance().createStatus();
+            status.setMessage(consumeMessage(banner.getContent()));
+            bannerStatus = status;
+            status.show();
+        }
+        return controller;
+    }
+
+    /// Flutter's {@code hideCurrentMaterialBanner}.
+    public void hideCurrentMaterialBanner(Object reason) {
+        closeBanner(SnackBarClosedReason.hide);
+    }
+
+    /// Flutter's {@code removeCurrentMaterialBanner}.
+    public void removeCurrentMaterialBanner(Object reason) {
+        closeBanner(SnackBarClosedReason.remove);
+    }
+
+    /// Flutter's {@code clearMaterialBanners}.
+    public void clearMaterialBanners() {
+        removeCurrentMaterialBanner(null);
+    }
+
+    private void closeBanner(SnackBarClosedReason reason) {
+        if (bannerStatus != null) {
+            bannerStatus.clear();
+            bannerStatus = null;
+        }
+        ScaffoldFeatureController c = bannerController;
+        bannerController = null;
+        if (c != null) {
+            c.finish(reason);
+        }
     }
 
     private void clearActiveStatus() {

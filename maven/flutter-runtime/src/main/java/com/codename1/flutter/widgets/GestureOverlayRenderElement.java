@@ -320,6 +320,7 @@ public class GestureOverlayRenderElement extends RenderElement {
             double scale = scaleStartSpan > 0 && span > 0 ? span / scaleStartSpan : 1.0;
             com.codename1.flutter.gestures.ScaleUpdateDetails d = new com.codename1.flutter.gestures.ScaleUpdateDetails(
                     global((int) fx, (int) fy), local((int) fx, (int) fy), scale, n >= 2 ? angle - scaleStartAngle : 0);
+            d.pointerCount(n);
             double ratio = com.codename1.flutter.rendering.Dp.px(1);
             d.focalPointDelta(new com.codename1.flutter.Offset((fx - lastFocalX) / ratio, (fy - lastFocalY) / ratio));
             lastFocalX = fx;

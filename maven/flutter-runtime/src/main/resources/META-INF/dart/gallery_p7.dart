@@ -659,7 +659,7 @@ class AsyncSnapshot<T> {
 class DatePickerDialog extends Widget {
   external DatePickerDialog({Key? key, DateTime? initialDate, DateTime firstDate,
       DateTime lastDate, DateTime? currentDate, Object? initialEntryMode,
-      Object? selectableDayPredicate, String? helpText, String? cancelText,
+      bool Function(DateTime)? selectableDayPredicate, String? helpText, String? cancelText,
       String? confirmText, Object? initialCalendarMode, String? errorFormatText,
       String? errorInvalidText, String? fieldHintText, String? fieldLabelText,
       Object? keyboardType, Object? restorationId});
@@ -859,6 +859,7 @@ class WidgetsFlutterBinding extends WidgetsBinding {
 
 @JavaName('com.codename1.flutter.widgets.WidgetsBinding.PlatformDispatcher')
 class PlatformDispatcher {
+  external static PlatformDispatcher get instance;
   external Brightness get platformBrightness;
   external double get devicePixelRatio;
 }

@@ -125,7 +125,7 @@ class SliverChildListDelegate extends SliverChildDelegate {
 
 @JavaName('com.codename1.flutter.widgets.CustomScrollView')
 class CustomScrollView extends Widget {
-  external CustomScrollView({Key? key, List<Widget> slivers, Object? controller, Object? scrollDirection, bool? reverse, bool? shrinkWrap, Object? physics, double? cacheExtent, Object? primary, Clip? clipBehavior});
+  external CustomScrollView({Key? key, List<Widget> slivers, Object? controller, Object? scrollDirection, bool? reverse, bool? shrinkWrap, Object? physics, double? cacheExtent, Object? primary, Clip? clipBehavior, ScrollViewKeyboardDismissBehavior? keyboardDismissBehavior});
 }
 
 @JavaName('com.codename1.flutter.widgets.SliverList')
@@ -155,7 +155,7 @@ class SliverFillRemaining extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.SliverAppBar')
 class SliverAppBar extends Widget {
-  external SliverAppBar({Key? key, Widget? title, Widget? leading, List<Widget>? actions, Widget? flexibleSpace, Color? backgroundColor, bool? pinned, bool? floating, bool? snap, double? expandedHeight, bool? automaticallyImplyLeading, Widget? bottom, bool? centerTitle, double? elevation});
+  external SliverAppBar({Key? key, Widget? title, Widget? leading, List<Widget>? actions, Widget? flexibleSpace, Color? backgroundColor, bool? pinned, bool? floating, bool? snap, double? expandedHeight, bool? automaticallyImplyLeading, Widget? bottom, bool? centerTitle, double? elevation, bool? stretch, double? stretchTriggerOffset, Object? onStretchTrigger});
 }
 
 // ======================================================================

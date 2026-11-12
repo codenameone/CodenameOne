@@ -64,7 +64,28 @@ public class RadioRenderElement extends RenderElement {
      * Dart equality of value vs groupValue.
      */
     public boolean selected() {
-        return DartRuntime.eq(radio().getValue(), radio().getGroupValue());
+        return DartRuntime.eq(radio().getValue(), groupValue());
+    }
+
+    /// The radio's own onChanged, else its RadioGroup's (Flutter 3.32's RadioGroup).
+    @SuppressWarnings("unchecked")
+    private Funcs.VoidFunc1<Object> onChanged() {
+        Funcs.VoidFunc1<Object> own = radio().getOnChanged();
+        if (own != null) {
+            return own;
+        }
+        RadioGroup<?> g = RadioGroup.of(this);
+        return g == null ? null : (Funcs.VoidFunc1<Object>) g.onChanged();
+    }
+
+    /// The radio's own groupValue, else its RadioGroup's -- a radio under a group
+    /// sets neither.
+    private Object groupValue() {
+        if (radio().getOnChanged() != null || radio().getGroupValue() != null) {
+            return radio().getGroupValue();
+        }
+        RadioGroup<?> g = RadioGroup.of(this);
+        return g == null ? null : g.groupValue();
     }
 
     @Override
@@ -99,7 +120,7 @@ public class RadioRenderElement extends RenderElement {
             rb.setSelected(selected());
             // A null onChanged is Flutter's disabled radio, as the checkbox, switch and
             // slider renderers already mirror; the radio stayed enabled and focusable.
-            rb.setEnabled(radio().getOnChanged() != null);
+            rb.setEnabled(onChanged() != null);
         } finally {
             applying = false;
         }
@@ -111,7 +132,7 @@ public class RadioRenderElement extends RenderElement {
      * derived from the CURRENT groupValue.
      */
     public void userSelected() {
-        Funcs.VoidFunc1<Object> f = radio().getOnChanged();
+        Funcs.VoidFunc1<Object> f = onChanged();
         if (f != null) {
             f.call(radio().getValue());
         }

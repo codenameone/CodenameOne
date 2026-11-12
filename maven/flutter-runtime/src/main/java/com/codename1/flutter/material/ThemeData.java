@@ -73,6 +73,7 @@ public class ThemeData {
 
     private Object snackBarTheme;
     private Object inputDecorationTheme;
+    private Object tabBarTheme;
     private Object radioTheme;
     private Object switchTheme;
     private Object tooltipTheme;
@@ -148,6 +149,14 @@ public class ThemeData {
     public void snackBarTheme(Object v) { this.snackBarTheme = v; }
     public void inputDecorationTheme(Object v) { this.inputDecorationTheme = v; }
 
+    /// {@code tabBarTheme}: a TabBarThemeData (or the older TabBarTheme, held as given).
+    public void tabBarTheme(Object v) { this.tabBarTheme = v; }
+
+    /// Flutter's {@code ThemeData.tabBarTheme}; an empty theme when none was given.
+    public TabBarThemeData tabBarTheme() {
+        return tabBarTheme instanceof TabBarThemeData ? (TabBarThemeData) tabBarTheme : new TabBarThemeData();
+    }
+
     /**
      * {@code inputDecorationTheme}, when it is one this runtime understands.
      *
@@ -156,6 +165,17 @@ public class ThemeData {
      * are a dark fill on a dark page and rendered as white blocks without it.</p>
      */
     public InputDecorationThemeData inputDecorationTheme() {
+        // Never null: Flutter's ThemeData.inputDecorationTheme is a non-null default
+        // theme when none was given, and apps read members off it directly. The
+        // runtime's own decorators ask givenInputDecorationTheme(), where null still
+        // means "no theme".
+        InputDecorationThemeData given = givenInputDecorationTheme();
+        return given != null ? given : new InputDecorationThemeData();
+    }
+
+    /// The {@code inputDecorationTheme} the app set, or null when it set none (or set
+    /// something this runtime does not understand).
+    InputDecorationThemeData givenInputDecorationTheme() {
         return inputDecorationTheme instanceof InputDecorationThemeData
                 ? (InputDecorationThemeData) inputDecorationTheme : null;
     }
@@ -339,6 +359,7 @@ public class ThemeData {
         c.navigationRailTheme = navigationRailTheme;
         c.snackBarTheme = snackBarTheme;
         c.inputDecorationTheme = inputDecorationTheme;
+        c.tabBarTheme = tabBarTheme;
         c.navigationBarTheme = navigationBarTheme;
         c.bottomNavigationBarTheme = bottomNavigationBarTheme;
         c.radioTheme = radioTheme;
@@ -408,6 +429,7 @@ public class ThemeData {
         if (pageTransitionsTheme != null) c.pageTransitionsTheme(pageTransitionsTheme);
         if (indicatorColor != null) c.indicatorColor(indicatorColor);
         if (textSelectionTheme != null) c.textSelectionTheme(textSelectionTheme);
+        if (tabBarTheme != null) c.tabBarTheme(tabBarTheme);
         if (snackBarTheme != null) c.snackBarTheme(snackBarTheme);
         if (tooltipTheme != null) c.tooltipTheme(tooltipTheme);
         return c;

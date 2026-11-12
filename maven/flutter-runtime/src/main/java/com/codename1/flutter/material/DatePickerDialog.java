@@ -47,6 +47,7 @@ public class DatePickerDialog extends StatefulWidget {
     private String helpText;
     private String cancelText;
     private String confirmText;
+    private Funcs.Func1<DateTime, Boolean> selectableDayPredicate;
 
     public void restorationId(Object v) { }
     public void initialDate(DateTime v) { this.initialDate = v; }
@@ -56,18 +57,30 @@ public class DatePickerDialog extends StatefulWidget {
     public void helpText(String v) { this.helpText = v; }
     public void cancelText(String v) { this.cancelText = v; }
     public void confirmText(String v) { this.confirmText = v; }
+    public void selectableDayPredicate(Funcs.Func1<DateTime, Boolean> v) { this.selectableDayPredicate = v; }
 
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public State<? extends StatefulWidget> createState() {
-        return (State) new CalendarPickerState(false, initialDate, null, firstDate, lastDate, helpText,
+        CalendarPickerState s = new CalendarPickerState(false, initialDate, null, firstDate, lastDate, helpText,
                 cancelText, confirmText);
+        s.predicate(selectableDayPredicate);
+        return (State) s;
     }
 
     /** Top-level {@code showDatePicker(...)}: completes with the chosen date, or null when cancelled. */
     public static Future<DateTime> show(BuildContext context, DateTime initialDate, DateTime firstDate,
             DateTime lastDate, DateTime currentDate, String helpText, String cancelText, String confirmText) {
+        return show(context, initialDate, firstDate, lastDate, currentDate, helpText, cancelText, confirmText,
+                null);
+    }
+
+    /** {@code showDatePicker(..., selectableDayPredicate:)}. */
+    public static Future<DateTime> show(BuildContext context, DateTime initialDate, DateTime firstDate,
+            DateTime lastDate, DateTime currentDate, String helpText, String cancelText, String confirmText,
+            Funcs.Func1<DateTime, Boolean> selectableDayPredicate) {
         DatePickerDialog d = new DatePickerDialog();
+        d.selectableDayPredicate(selectableDayPredicate);
         d.initialDate(initialDate);
         d.firstDate(firstDate);
         d.lastDate(lastDate);
