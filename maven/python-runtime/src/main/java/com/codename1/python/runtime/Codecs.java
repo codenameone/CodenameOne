@@ -161,7 +161,7 @@ final class Codecs {
     static byte[] encode(String s, String encoding, String errors) {
         String enc = normalize(encoding);
         if ("utf-8".equals(enc)) {
-            return Utf8.encode(s);
+            return errors == null || "strict".equals(errors) ? Utf8.encode(s) : encodeUtf8(s, errors);
         }
         if ("utf-8-sig".equals(enc)) {
             byte[] body = Utf8.encode(s);
@@ -284,6 +284,59 @@ final class Codecs {
             sb.append((char) c);
         }
         return sb.toString();
+    }
+
+    /// UTF-8 under a named error handler. The strict encoder writes a lone
+    /// surrogate as U+FFFD rather than scan every string for one (see
+    /// [Utf8#encode]); a caller naming a handler gets what it defines:
+    /// `surrogatepass` writes the surrogate's own three bytes,
+    /// `surrogateescape` turns U+DC80..U+DCFF back into the byte it stands
+    /// for, `ignore` drops it and `replace` writes `?`.
+    private static byte[] encodeUtf8(String s, String errors) {
+        int n = s.length();
+        ByteArrayOutputStream out = null;
+        int from = 0;
+        for (int i = 0; i < n; i++) {
+            char c = s.charAt(i);
+            if ((c & 0xf800) != 0xd800) {
+                continue;
+            }
+            if ((c & 0xfc00) == 0xd800 && i + 1 < n && (s.charAt(i + 1) & 0xfc00) == 0xdc00) {
+                i++;
+                continue;
+            }
+            if (out == null) {
+                out = new ByteArrayOutputStream(n + 8);
+            }
+            byte[] head = Utf8.encode(s.substring(from, i));
+            out.write(head, 0, head.length);
+            from = i + 1;
+            if ("surrogatepass".equals(errors)) {
+                out.write(0xe0 | c >> 12);
+                out.write(0x80 | c >> 6 & 0x3f);
+                out.write(0x80 | c & 0x3f);
+            } else if ("surrogateescape".equals(errors) && c >= 0xdc80 && c <= 0xdcff) {
+                out.write(c & 0xff);
+            } else if ("replace".equals(errors)) {
+                out.write('?');
+            } else if ("backslashreplace".equals(errors)) {
+                String hex = Integer.toHexString(c);
+                out.write('\\');
+                out.write('u');
+                for (int k = 0; k < hex.length(); k++) {
+                    out.write(hex.charAt(k));
+                }
+            } else if (!"ignore".equals(errors)) {
+                int at = PyStr.cpIndex(s, i);
+                throw Py.encodeError("utf-8", s, at, at + 1, "surrogates not allowed");
+            }
+        }
+        if (out == null) {
+            return Utf8.encode(s);
+        }
+        byte[] tail = Utf8.encode(s.substring(from));
+        out.write(tail, 0, tail.length);
+        return out.toByteArray();
     }
 
     /// `utf-16` writes a byte order mark and little-endian units, as CPython

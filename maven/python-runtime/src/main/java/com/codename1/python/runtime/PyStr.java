@@ -65,6 +65,9 @@ public final class PyStr extends PyObject {
     private static final class Count {
         final String s;
         final int n;
+        /// The UTF-16 offsets at which the pairs start, ascending; built the
+        /// first time the string is indexed by code point.
+        int[] at;
 
         Count(String s, int n) {
             this.s = s;
@@ -164,11 +167,59 @@ public final class PyStr extends PyObject {
         if (surrogates(s) == 0) {
             return cp;
         }
-        int off = 0;
-        for (int i = 0; i < cp; i++) {
-            off += pairAt(s, off) ? 2 : 1;
+        int[] at = pairOffsets(s);
+        if (at.length == 0) {
+            int off = 0;
+            for (int i = 0; i < cp; i++) {
+                off += pairAt(s, off) ? 2 : 1;
+            }
+            return off;
         }
-        return off;
+        // Pair k starts at code point at[k] - k, a strictly increasing
+        // sequence; the offset is cp plus the pairs that start before it.
+        int lo = 0;
+        int hi = at.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (at[mid] - mid < cp) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return cp + lo;
+    }
+
+    /// The pair offsets of a cached string, or an empty array for a short
+    /// one, which is walked instead (a string with pairs has at least one). Walking a long one per index made every loop over
+    /// it quadratic: bs4 compiles a pattern of all 2,000 HTML entities, a
+    /// few of them outside the BMP, and `re._parser` reads it one character
+    /// at a time -- 120 ms of a cold page conversion.
+    private static final int[] NO_PAIRS = new int[0];
+
+    private static int[] pairOffsets(String s) {
+        int len = s.length();
+        if (len <= SHORT) {
+            return NO_PAIRS;
+        }
+        Count[] table = len >= LONG ? LONG_COUNTS : COUNTS;
+        Count c = table[slot(s, table.length)];
+        if (c == null || c.s != s) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return NO_PAIRS;
+        }
+        int[] at = c.at;
+        if (at == null) {
+            at = new int[c.n];
+            int k = 0;
+            for (int i = 0; i + 1 < len && k < at.length; i++) {
+                if (pairAt(s, i)) {
+                    at[k++] = i;
+                    i++;
+                }
+            }
+            c.at = at;
+        }
+        return at;
     }
 
     /// Whether a surrogate pair, one code point, starts at offset `i`; a
@@ -187,13 +238,29 @@ public final class PyStr extends PyObject {
         if (surrogates(s) == 0) {
             return off;
         }
-        int cp = 0;
-        for (int i = 0; i < off; i++) {
-            if (i == 0 || !pairAt(s, i - 1)) {
-                cp++;
+        int[] at = pairOffsets(s);
+        if (at.length == 0) {
+            int cp = 0;
+            for (int i = 0; i < off; i++) {
+                if (i == 0 || !pairAt(s, i - 1)) {
+                    cp++;
+                }
+            }
+            return cp;
+        }
+        // Every pair whose low half lies before `off` was one code point
+        // of two chars.
+        int lo = 0;
+        int hi = at.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (at[mid] + 1 < off) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
             }
         }
-        return cp;
+        return off - lo;
     }
 
     int cpIndex(int off) {

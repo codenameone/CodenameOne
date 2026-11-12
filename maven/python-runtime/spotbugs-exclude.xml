@@ -123,7 +123,7 @@
             <Bug pattern="UWF_NULL_FIELD"/>
         </Or>
     </Match>
-    <!-- PyStr.cachedSurrogates and XmlScan.Builder.startTag are identity
+    <!-- PyStr.cachedSurrogates, PyStr.pairOffsets and XmlScan.Builder.startTag are identity
          caches: the cached answer belongs to that very string object, and
          a string merely equal to it is looked up the slow way. -->
     <Match>
@@ -131,6 +131,10 @@
             <And>
                 <Class name="com.codename1.python.runtime.PyStr"/>
                 <Method name="cachedSurrogates"/>
+            </And>
+            <And>
+                <Class name="com.codename1.python.runtime.PyStr"/>
+                <Method name="pairOffsets"/>
             </And>
             <And>
                 <Class name="com.codename1.python.runtime.XmlScan$Builder"/>
