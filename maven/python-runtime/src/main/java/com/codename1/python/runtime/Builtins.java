@@ -1284,6 +1284,18 @@ public final class Builtins {
     }
 
     static Object ord(Object x) {
+        if (x instanceof String) {
+            // One code point is one char, or a surrogate pair: no count of
+            // the whole string for what is nearly always one char.
+            String s = (String) x;
+            int n = s.length();
+            if (n == 1) {
+                return PyInt.of(s.charAt(0));
+            }
+            if (n == 2 && Character.isHighSurrogate(s.charAt(0)) && Character.isLowSurrogate(s.charAt(1))) {
+                return PyInt.of(Character.toCodePoint(s.charAt(0), s.charAt(1)));
+            }
+        }
         if (!(x instanceof String) || PyStr.codePoints((String) x) != 1) {
             throw Py.typeError("ord() expected a character, but string of length "
                     + (x instanceof String ? PyStr.codePoints((String) x) : 0) + " found");

@@ -155,8 +155,22 @@ public final class StoreSite {
                     return;
                 }
             }
-            if (fieldSetType == i.cls && fieldSetVersion == PyType.version //NOPMD CompareObjectsWithEquals - identity is meant
-                    && (!i.extra || i.getField(fieldSetIndex) != null)) {
+            if (fieldSetType == i.cls && fieldSetVersion == PyType.version) { //NOPMD CompareObjectsWithEquals - identity is meant
+                if (i.extra && i.getField(fieldSetIndex) == null) {
+                    // A field first set after another attribute: its name
+                    // joins the shape as a marker (PyInstance.store). An
+                    // unset field never has one, as deleting it drops it.
+                    Shape from = i.shape;
+                    Shape to;
+                    if (from == markFrom && from != null) { //NOPMD CompareObjectsWithEquals - identity is meant
+                        to = markTo;
+                    } else {
+                        to = i.shape().with(name);
+                        markFrom = from;
+                        markTo = to;
+                    }
+                    i.append(to, PyInstance.FIELD_HERE);
+                }
                 i.setField(fieldSetIndex, v);
                 return;
             }
@@ -172,6 +186,9 @@ public final class StoreSite {
     private PyType fieldSetType;
     private int fieldSetIndex;
     private int fieldSetVersion = -1;
+    /// The last marker transition: the shape before and after.
+    private Shape markFrom;
+    private Shape markTo;
 
     private void setSlow(PyInstance i, Object v) {
         if (setVersion == PyType.version) {

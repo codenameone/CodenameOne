@@ -79,6 +79,23 @@ public class PyDict extends PyObject {
         }
     }
 
+    /// Takes `n` entries whose keys, hashes and index table are fresh copies
+    /// of ones an equal dict already built (an instance's `__dict__`, see
+    /// `PyInstance.InstanceDict`): no key is hashed or probed again.
+    void adopt(Object[] k, long[] h, int[] ix, Object[] v, int n) {
+        keys = k;
+        hashes = h;
+        index = ix;
+        values = v;
+        used = n;
+        size = n;
+    }
+
+    /// The index table, or null while the entries are scanned.
+    int[] indexTable() {
+        return index;
+    }
+
     private void allocate(int n) {
         keys = new Object[n];
         values = new Object[n];
@@ -716,6 +733,13 @@ public class PyDict extends PyObject {
         sync();
     }
 
+    /// [#sync] before an iteration, whose every step brings what it returns
+    /// up to date through [#syncStep] and [#valueAt]: a view need not
+    /// re-read every value first.
+    void syncForWalk() {
+        sync();
+    }
+
     /// Whether a `for k, v in d.items()` may walk this dict through
     /// [#sync], [#syncStep] and [#valueAt] instead of calling its items():
     /// true for a view whose items() is exactly that walk.
@@ -730,7 +754,7 @@ public class PyDict extends PyObject {
 
     /// Iterates over entries; `kind` 0 = keys, 1 = values, 2 = items.
     Object iterate(final int kind) {
-        sync();
+        syncForWalk();
         final int startSize = size;
         return new PyJavaIter(new PyJavaIter.Source() {
             int i;

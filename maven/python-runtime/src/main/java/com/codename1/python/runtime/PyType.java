@@ -149,6 +149,10 @@ public final class PyType extends PyObject {
     }
 
     private Layout layout;
+    /// The compiled class whose layout a class built at run time borrows
+    /// (see [#borrowLayout]), or null.
+    private PyType layoutFrom;
+    private boolean layoutDecided;
     private String[] compiledMethods;
     private String[] layoutFields;
     /// Set once a method the generated code calls directly may no longer be
@@ -174,22 +178,114 @@ public final class PyType extends PyObject {
 
     /// The compiled class this one's layout extends, or null.
     private PyType layoutParent() {
+        if (layoutFrom != null) {
+            return layoutFrom;
+        }
         return bases.length == 1 && bases[0].layout != null ? bases[0] : null;
     }
 
     /// Whether the class has a compiled layout.
     public boolean hasLayout() {
-        return layout != null;
+        return layout != null && layoutFrom == null;
     }
 
     /// A new, uninitialised instance.
     public PyInstance newInstance() {
+        if (!layoutDecided && layout == null) {
+            borrowLayout();
+        }
         PyInstance o = layout != null ? layout.create(this) : new PyInstance(this);
         if (solidBase != null && BuiltinSubclass.mutable(solidBase)) {
             // Filled by the builtin's __init__ (or the subclass's, through super()).
             o.base = solidBase.factory.create(solidBase, Py.NO_ARGS, Py.NO_KW);
         }
         return o;
+    }
+
+    /// Lets a class built at run time -- a subclass in another module of a
+    /// class the transpiler compiled -- make its instances with that class's
+    /// layout, so the compiled methods it inherits read their fields as
+    /// fields. Without it every one of pdfminer's parsers, all subclasses of
+    /// `psparser.PSBaseParser` defined in other modules, ran the compiled
+    /// tokenizer on a plain instance, every field through a megamorphic
+    /// site. Decided at the first instance, when the class namespace is
+    /// complete, and only when nothing in the MRO outside the compiled
+    /// chain can change what a field read or store means: no attribute
+    /// hooks or `__slots__`, and nothing but a function or a constant bound
+    /// to a field's name. A compiled method overridden below the compiled
+    /// class marks it `patched`, which sends every direct call the generic
+    /// way; later changes go through [#changed] as for a compiled class.
+    private void borrowLayout() {
+        layoutDecided = true;
+        if (solidBase != null || meta != Py.TYPE_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return;
+        }
+        PyType a = null;
+        for (int i = 1; i < mro.length && a == null; i++) {
+            if (mro[i].layout != null && mro[i].layoutFrom == null) {
+                a = mro[i];
+            }
+        }
+        if (a == null) {
+            return;
+        }
+        boolean overrides = false;
+        boolean beforeA = true;
+        for (PyType m : mro) {
+            if (m == a) { //NOPMD CompareObjectsWithEquals - identity is meant
+                beforeA = false;
+            }
+            if (m == Py.OBJECT_TYPE || m.layout != null && m.layoutFrom == null && a.isSubtype(m)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                continue;
+            }
+            for (Map.Entry<String, Object> e : m.dict.entrySet()) {
+                String k = e.getKey();
+                if ("__setattr__".equals(k) || "__getattribute__".equals(k) || "__delattr__".equals(k)
+                        || "__slots__".equals(k) && !emptySlots(e.getValue())) {
+                    return;
+                }
+                if (fieldOf(a, k) && !plainClassValue(e.getValue())) {
+                    return;
+                }
+                if (beforeA && methodOf(a, k)) {
+                    overrides = true;
+                }
+            }
+        }
+        layout = a.layout;
+        layoutFrom = a;
+        patched = overrides;
+        LAYOUTS.add(this);
+    }
+
+    /// `__slots__ = ()`, as `typing.Generic` declares: no slot descriptor.
+    private static boolean emptySlots(Object v) {
+        return v instanceof PyTuple && ((PyTuple) v).size() == 0;
+    }
+
+    private static boolean fieldOf(PyType a, String name) {
+        for (PyType u = a; u != null; u = u.layoutParent()) {
+            if (contains(u.layoutFields, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean methodOf(PyType a, String name) {
+        for (PyType u = a; u != null; u = u.layoutParent()) {
+            if (contains(u.compiledMethods, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// A class attribute that is not a descriptor: an instance attribute of
+    /// the same name, which a field holds, takes precedence over it.
+    private static boolean plainClassValue(Object v) {
+        return v == null || v == Py.NONE || v instanceof PyFunction || v instanceof String || v instanceof Long //NOPMD CompareObjectsWithEquals - identity is meant
+                || v instanceof Double || v instanceof Boolean || v instanceof PyTuple || v instanceof PyStr;
     }
 
     /// Invalidates direct calls to `attr` and refuses what a compiled field
@@ -966,6 +1062,18 @@ public final class PyType extends PyObject {
     /// the most seen: a new instance's first slot array is that long, so an
     /// `__init__` that sets a dozen names allocates once rather than at 4, 8
     /// and 16. Only a size hint -- any value is correct.
+    /// The last `__dict__` an instance of this class built from scratch:
+    /// the shape and set fields it was built for, the shape slots holding a
+    /// field marker, and copies of its keys, hashes, index table and value
+    /// sources (see `PyInstance.InstanceDict`).
+    Shape dictTplShape;
+    long dictTplMask;
+    boolean[] dictTplMarks;
+    Object[] dictTplKeys;
+    long[] dictTplHashes;
+    int[] dictTplIndex;
+    int[] dictTplMap;
+
     int slotHint = 4;
     Object truthLen;
     int truthVersion = -1;

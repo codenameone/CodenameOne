@@ -129,6 +129,10 @@ public class PyInstance extends PyObject {
 
     private static final String[] NO_NAMES = new String[0];
 
+    /// The slot value of a field's name in the shape: the name marks where
+    /// the attribute was first set (see [#store]), its value is the field.
+    static final Object FIELD_HERE = new Object();
+
     /// The instance attribute `name`, or null.
     Object own(String name) {
         int f = fieldIndex(name);
@@ -139,7 +143,8 @@ public class PyInstance extends PyObject {
             }
         }
         int i = shape == null ? -1 : shape.indexOf(name);
-        return i < 0 ? null : slots[i];
+        Object v = i < 0 ? null : slots[i];
+        return v == FIELD_HERE ? null : v; //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     /// The field index of each of `names` in this instance's class, -1 for
@@ -177,10 +182,17 @@ public class PyInstance extends PyObject {
     /// Stores `name`, adding it to the shape if the instance lacks it.
     void store(String name, Object value) {
         int f = fieldIndex(name);
-        // A field first set after some other attribute would list before
-        // it; such a late attribute is kept in the shape instead, which
-        // remembers the order.
-        if (f >= 0 && (!extra || getField(f) != null)) {
+        if (f >= 0) {
+            // A field first set after some other attribute would list before
+            // it: the shape takes its name, which keeps the order, and the
+            // value stays in the field, where compiled code reads and stores
+            // it. Kept in the shape instead, a subclass that sets one
+            // attribute of its own before calling the compiled __init__ had
+            // every compiled access to its fields go the generic way.
+            // An unset field has no marker: deleting one drops it.
+            if (extra && getField(f) == null) {
+                append(shape().with(name), FIELD_HERE);
+            }
             setField(f, value);
             return;
         }
@@ -217,6 +229,37 @@ public class PyInstance extends PyObject {
         extra = true;
     }
 
+    /// How many of the shape's names are fields listed at that place (see
+    /// [#store]).
+    int fieldMarkers() {
+        Object[] sl = slots;
+        int n = shape == null ? 0 : shape.size();
+        int c = 0;
+        for (int i = 0; i < n; i++) {
+            if (sl[i] == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                c++;
+            }
+        }
+        return c;
+    }
+
+    /// Which of the `n` fields have a marker in the shape, or null when none
+    /// has.
+    boolean[] markedFields(int n) {
+        Object[] sl = slots;
+        int size = shape == null ? 0 : shape.size();
+        boolean[] out = null;
+        for (int i = 0; i < size; i++) {
+            if (sl[i] == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                if (out == null) {
+                    out = new boolean[n];
+                }
+                out[fieldIndex(shape.names[i])] = true;
+            }
+        }
+        return out;
+    }
+
     /// The attribute names: the set fields, then the rest in the order they
     /// were first assigned.
     String[] attributeNames() {
@@ -225,8 +268,10 @@ public class PyInstance extends PyObject {
             return shape().names;
         }
         List<String> out = new ArrayList<String>();
+        boolean[] marked = markedFields(f.length);
         for (int i = 0; i < f.length; i++) {
-            if (getField(i) != null) {
+            // A field whose name the shape holds lists at that place.
+            if (getField(i) != null && (marked == null || !marked[i])) {
                 out.add(f[i]);
             }
         }
@@ -392,7 +437,10 @@ public class PyInstance extends PyObject {
                 setField(f, null);
                 // Set again, it is the newest attribute: see store.
                 extra = true;
-                return;
+                if (shape == null || shape.indexOf(name) < 0) {
+                    return;
+                }
+                // Its place in the shape goes too.
             }
         }
         int at = shape().indexOf(name);
@@ -841,17 +889,23 @@ public class PyInstance extends PyObject {
                 // clears `seen`, but a path that changes the instance without
                 // moving its shape or set fields would otherwise go unseen.
                 PyDict other0 = self.nonStrKeys;
-                int expected = Long.bitCount(mask) + self.shape().size() + (other0 == null ? 0 : other0.size);
+                int expected = Long.bitCount(mask) + self.shape().size() - self.fieldMarkers()
+                        + (other0 == null ? 0 : other0.size);
                 if (small && seen && seenShape == self.shape && seenFields == mask //NOPMD CompareObjectsWithEquals - identity is meant
-                        && size == expected && refreshValues(fields, mask)) {
+                        && size == expected && (keysOnly || refreshValues(fields, mask))) {
                     return;
                 }
                 seenShape = self.shape;
                 seenFields = mask;
                 seen = small;
-                String[] names = self.attributeNames();
                 PyDict other = self.nonStrKeys;
-                if (sameKeys(names, other)) {
+                if (size == 0 && other == null && small && fromTemplate(mask)) {
+                    return;
+                }
+                // A dict with no entries yet (the first read of this
+                // instance's __dict__) cannot hold the same keys already.
+                String[] names = size == 0 ? null : self.attributeNames();
+                if (names != null && sameKeys(names, other)) {
                     // The same keys in the same order: the values are
                     // brought up to date in place, so an iteration in
                     // progress over this dict is not disturbed.
@@ -866,6 +920,9 @@ public class PyInstance extends PyObject {
                 }
                 super.clear();
                 refill(fields, other == null ? 0 : other.size);
+                if (other == null && small) {
+                    keepTemplate(mask);
+                }
                 if (other != null) {
                     for (int i = 0; i < other.used; i++) {
                         if (other.keys[i] != null) {
@@ -895,24 +952,104 @@ public class PyInstance extends PyObject {
             reserve(fields.length + n + others);
             int[] map = new int[fields.length + n];
             int w = 0;
+            boolean[] marked = self.markedFields(fields.length);
             for (int i = 0; i < fields.length; i++) {
                 Object v = self.getField(i);
-                if (v != null) {
+                if (v != null && (marked == null || !marked[i])) {
                     super.setItem(fields[i], v);
                     map[w++] = i;
                 }
             }
             for (int j = 0; j < n; j++) {
-                // A name both set as a field and held in the shape is the
-                // field's, as own() answers: its entry is already there.
-                if (fields.length != 0 && super.getOrNull(shapeNames[j]) != null) {
+                Object v = sl == null || j >= sl.length ? null : sl[j];
+                if (v == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    // A field listed where it was first set (see store).
+                    int f = self.fieldIndex(shapeNames[j]);
+                    super.setItem(shapeNames[j], self.getField(f));
+                    map[w++] = f;
                     continue;
                 }
-                super.setItem(shapeNames[j], sl == null || j >= sl.length ? null : sl[j]);
+                super.setItem(shapeNames[j], v);
                 map[w++] = ~j;
             }
             src = used == w ? map : null;
             srcLen = w;
+        }
+
+        /// Fills this empty dict from the class's template when the instance
+        /// has the shape, the set fields and the field markers it was built
+        /// for: the keys, hashes and index table are copied, and only the
+        /// values are read. [#snap] holds the fields, from [#fieldMask].
+        private boolean fromTemplate(long mask) {
+            PyType c = self.cls;
+            Shape sh = self.shape;
+            if (c.dictTplKeys == null || c.dictTplShape != sh || c.dictTplMask != mask) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return false;
+            }
+            Object[] sl = self.slots;
+            boolean[] marks = c.dictTplMarks;
+            for (int j = 0; j < marks.length; j++) {
+                if ((sl[j] == FIELD_HERE) != marks[j]) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    return false;
+                }
+            }
+            int[] map = c.dictTplMap;
+            int n = map.length;
+            Object[] k = new Object[n];
+            long[] h = new long[n];
+            Object[] v = new Object[n];
+            System.arraycopy(c.dictTplKeys, 0, k, 0, n);
+            System.arraycopy(c.dictTplHashes, 0, h, 0, n);
+            int[] ix = null;
+            int[] tix = c.dictTplIndex;
+            if (tix != null) {
+                ix = new int[tix.length];
+                System.arraycopy(tix, 0, ix, 0, tix.length);
+            }
+            Object[] d = snap;
+            for (int i = 0; i < n; i++) {
+                int s = map[i];
+                v[i] = s >= 0 ? d[s] : sl[~s];
+            }
+            adopt(k, h, ix, v, n);
+            src = map;
+            srcLen = n;
+            return true;
+        }
+
+        /// Records what [#refill] just built as the class's template, when
+        /// the entries are exactly the ones its value map names.
+        private void keepTemplate(long mask) {
+            int[] map = src;
+            if (map == null || srcLen != used || used != size) {
+                return;
+            }
+            int n = used;
+            PyType c = self.cls;
+            int sn = self.shape == null ? 0 : self.shape.size();
+            boolean[] marks = new boolean[sn];
+            for (int j = 0; j < sn; j++) {
+                marks[j] = self.slots[j] == FIELD_HERE; //NOPMD CompareObjectsWithEquals - identity is meant
+            }
+            Object[] k = new Object[n];
+            long[] h = new long[n];
+            int[] m = new int[n];
+            System.arraycopy(keys, 0, k, 0, n);
+            System.arraycopy(hashes, 0, h, 0, n);
+            System.arraycopy(map, 0, m, 0, n);
+            int[] ix = indexTable();
+            int[] tix = null;
+            if (ix != null) {
+                tix = new int[ix.length];
+                System.arraycopy(ix, 0, tix, 0, ix.length);
+            }
+            c.dictTplShape = self.shape;
+            c.dictTplMask = mask;
+            c.dictTplMarks = marks;
+            c.dictTplKeys = k;
+            c.dictTplHashes = h;
+            c.dictTplIndex = tix;
+            c.dictTplMap = m;
         }
 
         /// Which of the instance's first `n` (at most 64) fields are set.
@@ -940,6 +1077,20 @@ public class PyInstance extends PyObject {
         // every step, quadratic in the attributes. While the keys are as last
         // read (same shape, same set fields), a step re-reads only the value
         // it returns.
+        /// Set while [#syncForWalk] runs: the keys are checked, the values
+        /// are left to each step's [#valueAt].
+        private boolean keysOnly;
+
+        @Override
+        void syncForWalk() {
+            keysOnly = true;
+            try {
+                sync();
+            } finally {
+                keysOnly = false;
+            }
+        }
+
         @Override
         void syncStep(boolean last) {
             // The set fields are compared (every field read) only at the end
@@ -987,6 +1138,18 @@ public class PyInstance extends PyObject {
         }
 
         private boolean refreshValues(String[] fieldNames, long mask) {
+            int[] m = src;
+            Object[] sl0 = self.slots;
+            if (m != null && srcLen == used) {
+                // The order refill recorded; the caller has matched the shape
+                // and the set fields, which fix it.
+                Object[] d = snap;
+                for (int i = 0; i < used; i++) {
+                    int s = m[i];
+                    values[i] = s >= 0 ? d[s] : sl0[~s];
+                }
+                return true;
+            }
             int fieldCount = fieldNames.length;
             String[] shapeNames = self.shape().names;
             int f = 0;
@@ -1006,7 +1169,7 @@ public class PyInstance extends PyObject {
                     // Read by the fieldMask the caller has just taken.
                     values[i] = snap[f++];
                 } else if (sl != null && slot < sl.length && slot < shapeNames.length) {
-                    if (!shapeNames[slot].equals(keys[i])) {
+                    if (!shapeNames[slot].equals(keys[i]) || sl[slot] == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
                         return false;
                     }
                     values[i] = sl[slot++];

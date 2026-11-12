@@ -3459,6 +3459,9 @@ public final class Emitter {
                 return "Py.nextB(" + expr(c.func) + ", " + expr(c.args.get(0))
                         + (c.args.size() == 2 ? ", " + expr(c.args.get(1)) : "") + ")";
             }
+            if (builtin && "ord".equals(fn) && c.args.size() == 1) {
+                return "Py.ord(" + expr(c.func) + ", " + expr(c.args.get(0)) + ")";
+            }
             if (builtin && "dict".equals(fn) && c.args.size() == 1) {
                 return "Py.dict1(" + expr(c.func) + ", " + expr(c.args.get(0)) + ")";
             }
@@ -3537,6 +3540,13 @@ public final class Emitter {
                 String helper = "c_" + mangle(a.attr) + "_" + n + "(";
                 String direct = directCall(a.attr, n, recv, args.toString(), helper, site(a.attr));
                 return direct != null ? direct : helper + recv + args + ", " + site(a.attr) + ")";
+            }
+            if (n <= 3 && selfLocal != null && selfTyped != null && layouts.fieldOwners.containsKey(a.attr)
+                    && selfLocal.equals(rawLocal(recv)) && selfOwner(a.attr) != null) {
+                // A field of self holding a callable: read it as a field and
+                // call it, the site only when it is unset (AttrSite.callF2).
+                return site(a.attr) + ".callF" + n + "(" + selfTyped + " != null ? " + selfTyped + ".f_"
+                        + mangle(a.attr) + " : null, " + recv + args + ")";
             }
             if (n <= 13) {
                 return site(a.attr) + ".call" + n + "(" + recv + args + ")";

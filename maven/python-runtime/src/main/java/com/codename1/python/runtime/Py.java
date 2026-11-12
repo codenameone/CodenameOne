@@ -342,6 +342,15 @@ public final class Py {
         return call(f, o);
     }
 
+    /// `ord(o)` where the name may still be rebound: the builtin's answer
+    /// with no dispatch through its function object when `f` is the builtin.
+    public static Object ord(Object f, Object o) {
+        if (f == Builtins.ORD) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return Builtins.ord(o);
+        }
+        return call(f, o);
+    }
+
     /// `isinstance(o, t)` where the name may still be rebound: the builtin's
     /// answer without its argument array when `f` is the builtin.
     public static Object isinstance(Object f, Object o, Object t) {

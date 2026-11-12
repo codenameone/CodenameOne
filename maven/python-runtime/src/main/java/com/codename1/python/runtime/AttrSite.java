@@ -597,6 +597,30 @@ public final class AttrSite {
         return f != null ? Py.obj(f).call2(o, a) : Py.obj(Py.obj(o).getAttr(name)).call1(a);
     }
 
+    /// `o.name(...)` where `name` is a compiled field of `o`'s class and
+    /// `f` is that field as the caller read it, null when the receiver is
+    /// of another class or the field is unset. A set field is the
+    /// instance's own attribute, which a method call reads first, so it is
+    /// called without the site: pdfminer's tokenizer keeps its state as a
+    /// bound method in `self._parse1` and calls it per token, and every
+    /// parser class it runs on passes through several layouts as optional
+    /// attributes appear, which drove the site megamorphic.
+    public Object callF0(Object f, Object o) {
+        return f != null ? Py.call(f) : call0(o);
+    }
+
+    public Object callF1(Object f, Object o, Object a) {
+        return f != null ? Py.call(f, a) : call1(o, a);
+    }
+
+    public Object callF2(Object f, Object o, Object a, Object b) {
+        return f != null ? Py.call(f, a, b) : call2(o, a, b);
+    }
+
+    public Object callF3(Object f, Object o, Object a, Object b, Object c) {
+        return f != null ? Py.call(f, a, b, c) : call3(o, a, b, c);
+    }
+
     public Object call2(Object o, Object a, Object b) {
         if (intrinsic == I_REPLACE && o instanceof String && a instanceof String && b instanceof String
                 && ((String) a).length() > 0) {
