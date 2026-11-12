@@ -130,6 +130,10 @@ public final class StdModules {
             PyModule.registerModule(urlModule());
             return true;
         }
+        if ("_cn1collections".equals(name)) {
+            PyModule.registerModule(PyCollections.module());
+            return true;
+        }
         if ("_cn1op".equals(name)) {
             PyModule.registerModule(operatorModule());
             return true;

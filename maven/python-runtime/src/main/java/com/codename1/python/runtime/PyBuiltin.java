@@ -60,6 +60,7 @@ public final class PyBuiltin extends PyObject {
     private Two two;
     private Three three;
     private Four four;
+    private Five five;
     private Six six;
     private Seven seven;
     /// The builtin type a [#method] belongs to; null for a function.
@@ -167,6 +168,17 @@ public final class PyBuiltin extends PyObject {
         return this;
     }
 
+    /// [One] for five arguments.
+    public interface Five {
+        Object call(Object a, Object b, Object c, Object d, Object e);
+    }
+
+    /// [#with1] for five arguments.
+    public PyBuiltin with5(Five f) {
+        five = f;
+        return this;
+    }
+
     /// [One] for six arguments.
     public interface Six {
         Object call(Object a, Object b, Object c, Object d, Object e, Object f);
@@ -241,6 +253,18 @@ public final class PyBuiltin extends PyObject {
         }
         Object s = receiver(a);
         return result(a, s, four.call(s, b, c, d));
+    }
+
+    @Override
+    public Object call5(Object a, Object b, Object c, Object d, Object e) {
+        if (five == null) {
+            return super.call5(a, b, c, d, e);
+        }
+        if (owner == null) {
+            return five.call(a, b, c, d, e);
+        }
+        Object s = receiver(a);
+        return result(a, s, five.call(s, b, c, d, e));
     }
 
     @Override
