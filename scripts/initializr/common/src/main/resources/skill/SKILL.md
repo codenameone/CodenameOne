@@ -1,6 +1,6 @@
 ---
 name: codename-one
-description: Build and modify Codename One cross-platform apps (Java 17, Maven or Gradle; iOS, Android, desktop, web) and their Codename One Backend. Use when the project has `codenameone_settings.properties`, applies the `com.codenameone` Gradle plugin or depends on `codenameone-core`; when editing `src/main/css/` or code using `com.codename1.*`; when running `cn1:run`, `cn1:test`, `cn1:build`, `cn1:backend` or `./gradlew run`; when the user asks for a UI, screen tests, screenshots, a server or a full-stack feature; when porting or running existing Android, Swing, JavaFX, Flutter/Dart or Unity code (`src/main/android|desktop|flutter|unity`, `import-*-project`, `transcode-flutter`); or when asking how a Codename One app is best structured (the Wayline, Savor, Parley, Bastion, Reel, Skirmish and Dash demos).
+description: Build and modify Codename One cross-platform apps (Java 17, Maven or Gradle; iOS, Android, desktop, web) and their Codename One Backend. Use when the project has `codenameone_settings.properties`, applies the `com.codenameone` Gradle plugin or depends on `codenameone-core`; when editing `src/main/css/` or code using `com.codename1.*`; when running `cn1:run`, `cn1:test`, `cn1:build`, `cn1:backend` or `./gradlew run`; when the user asks for a UI, screen tests, screenshots, a video of a flow, to run/verify/try the app (headless, simulator, iOS simulator, Android emulator), a server or a full-stack feature; when porting or running existing Android, Swing, JavaFX, Flutter/Dart or Unity code (`src/main/android|desktop|flutter|unity`, `import-*-project`, `transcode-flutter`); or when asking how a Codename One app is best structured (the Wayline, Savor, Parley, Bastion, Reel, Skirmish and Dash demos).
 metadata:
   type: skill
 ---
@@ -304,7 +304,7 @@ Run with `mvn -pl common cn1:test` (cn1:test runner only) or `mvn test` (both ru
 
 > Important: a "screenshot matches baseline" only proves consistency, **not** correctness. If you just generated the baseline yourself, you have not validated the screen — visually inspect at least once before treating that baseline as ground truth.
 
-> Headless caveat: any simulator-driven test (both flavors) needs an X server / Xvfb to construct the simulator's `JFrame`. The `@CodenameOneTest` extension auto-aborts the class on a headless JVM so you get "skipped" instead of "errored"; the `cn1:test` runner needs you to skip with `-DskipTests` or run under `xvfb-run`.
+> Headless: both flavors run without a monitor. macOS needs nothing; on Linux with no display wrap the command in `xvfb-run -a`. A `@CodenameOneTest` class on a JVM forced to `java.awt.headless=true` is reported skipped, not passed -- that is not verification.
 
 ## Build and run commands
 
@@ -360,14 +360,18 @@ See `references/build-and-run.md` for the local-vs-cloud matrix, automated-build
 
 ## Sanity-check loop before reporting "done"
 
+You can run, see and drive the app yourself -- no human, display or MCP host setup.
 For any UI-altering change:
 
-1. Run the simulator (`./gradlew run`, or `mvn -pl common cn1:run` under Maven) and click through the changed flow.
-2. Inspect at least one screenshot (capture via the simulator menu → Save Screenshot, or generate via a test).
-3. Resize the simulator window or toggle a different skin to confirm the layout doesn't break on a different form factor.
-4. If you wrote a `screenshotTest`, delete the auto-generated baseline once if the screen has changed, then re-run twice — the second run should pass with `true`.
+1. Start the app for yourself in the background: `./mvnw cn1:agent &` (Gradle: `./gradlew cn1Agent &`; Linux without a display: `xvfb-run -a ./gradlew cn1Agent &` -- the Maven goal starts Xvfb by itself). The window never takes the focus.
+2. From the project root, `java .agent-skills/codename-one/tools/Sim.java wait`, then `snapshot` to read the screen, `tap`/`type` to walk the changed flow (by label or node id), and `screenshot out.png` -- **open the PNG and look at it**.
+3. For a flow worth showing, `record-start flow.mp4` ... `record-stop` (needs ffmpeg). `call sim_rotate '{"orientation":"landscape"}'` checks another form factor.
+4. If you wrote a `screenshotTest`, delete the auto-generated baseline once if the screen has changed, then re-run twice -- the second run should pass with `true`.
+5. Stop the background simulator (`kill %1`) when you are done.
 
-If you cannot run the simulator (e.g. headless environment), **say so explicitly in the response** rather than claiming the UI works.
+Native behaviour: build a development build for the iOS simulator or an Android emulator, start `MCP.startSocketServer(8765)` in it, and drive it with the same `Sim.java` commands (`device-screenshot`, `device-record` capture it). See `references/mcp-agent-control.md`.
+
+Report "could not verify" only after one of these steps actually failed, and quote the failure.
 
 ## Reference quick-look index
 
@@ -401,7 +405,7 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Build against a Codename One SNAPSHOT from git" | `references/snapshot-builds.md` |
 | "Debug a faulty screen — attach `jdb` to the simulator" | `references/debugging.md` |
 | "It only breaks on the phone" / "attach a debugger to the Android/iOS build" / `android.onDeviceDebug`, `ios.onDeviceDebug` / drive the app on a device over MCP | `references/on-device-debugging.md` |
-| "Try the flow" / "fill in this form and press submit" / "drive the running app" / MCP | `references/mcp-agent-control.md` |
+| "Try the flow" / "fill in this form and press submit" / "drive the running app" / "show me a screenshot / video" / run headless / MCP | `references/mcp-agent-control.md` |
 | "Add an endpoint / a service / a scheduled job" / `@RestController`, `@Component`, `@Transactional`, `@Scheduled`, `@Async` / "the server side" | `references/backend.md` |
 | "Inspect or exercise the running backend" / `backend_*` MCP tools / "why did this request fail" | `references/backend.md` |
 | "Build this feature end to end" / "the screen should save to the server" / a bug that could be client or server | `references/full-stack-loop.md` |
