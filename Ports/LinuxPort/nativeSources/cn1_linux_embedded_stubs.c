@@ -32,7 +32,6 @@
  */
 #ifdef CN1_LINUX_EMBEDDED
 #include "cn1_linux_gfx.h"
-extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 
 /* ---- cn1_linux_desktopwindow.c ---- */
 JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT windowId, JAVA_OBJECT title, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot, JAVA_BOOLEAN positionSet) {
@@ -589,15 +588,6 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionStop___long(CODENAME
     (void) handle;
     cn1LinuxStubOnce("cameraSessionStop");
 }
-JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionSetPaused___long_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_BOOLEAN paused) {
-    (void) handle; (void) paused;
-    cn1LinuxStubOnce("cameraSessionSetPaused");
-}
-JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraSessionLatestFrame___long_int_1ARRAY_R_int_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT outDims) {
-    (void) handle; (void) outDims;
-    cn1LinuxStubOnce("cameraSessionLatestFrame");
-    return JAVA_NULL;
-}
 JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionSetZoom___long_float(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_FLOAT ratio) {
     (void) handle; (void) ratio;
     cn1LinuxStubOnce("cameraSessionSetZoom");
@@ -609,12 +599,21 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionFocus___long(CODENAM
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraSessionStartRecording___long_java_lang_String_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT path, JAVA_BOOLEAN audio) {
     (void) handle; (void) path; (void) audio;
     cn1LinuxStubOnce("cameraSessionStartRecording");
-    return newStringFromCString(threadStateData, "Video recording needs GStreamer, which this build does not include");
+    return JAVA_NULL;
 }
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_cameraSessionStopRecording___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     (void) handle;
     cn1LinuxStubOnce("cameraSessionStopRecording");
     return JAVA_FALSE;
+}
+JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionSetPaused___long_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_BOOLEAN paused) {
+    (void) handle; (void) paused;
+    cn1LinuxStubOnce("cameraSessionSetPaused");
+}
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraSessionLatestFrame___long_int_1ARRAY_R_int_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT outDims) {
+    (void) handle; (void) outDims;
+    cn1LinuxStubOnce("cameraSessionLatestFrame");
+    return JAVA_NULL;
 }
 #endif /* CN1_EMBEDDED_HAS_GST */
 

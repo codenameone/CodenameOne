@@ -366,7 +366,7 @@ look for those symbologies alone instead of every one they know. Name
 the formats you expect. For a dense code such as a PDF417 on an ID
 document, a detector that isn't also checking a dozen other symbologies
 on every frame reads noticeably more reliably. The scanner also asks the
-camera to focus on the center of the frame when it opens, and again
+camera to focus at the middle of the frame when it opens, and again
 every few seconds until it reads a code, so a small code held close is
 in focus even when continuous focus has settled on the background.
 
