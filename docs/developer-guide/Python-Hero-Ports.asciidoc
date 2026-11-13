@@ -108,52 +108,70 @@ listed differences, or fails a test CPython passes.
 ==== Measured against CPython
 
 `scripts/python-heroes/bench/run_heroes.py` builds a workload of each project
-with the production build steps, runs it on the JVM and under CPython 3.14 with
-the same package versions, checks that both produce the same output, and
-records the times, the memory and the size of what ships.
+with the production build steps, runs it as a native binary translated by
+ParparVM (what ships on iOS and the native desktop targets), on the JVM (the
+simulator) and under CPython 3.14 with the same package versions, checks that
+all three produce the same output, and records the times, the memory and
+the size of what ships.
 
 * `llm_session`: imports llm and its plugins, holds a conversation with a
   local model, logs every turn to `logs.db`, searches the log, and embeds and
   ranks a set of documents.
 * `markitdown_convert`: converts one document of each kind from MarkItDown's
   own test files (PDF, DOCX, PPTX, XLSX, EPUB, two HTML pages, RSS, a
-  notebook, JSON and a ZIP). The Markdown must hash identically on both sides.
+  notebook, JSON and a ZIP). The Markdown must hash identically on every
+  side.
 
-Measured on an Apple silicon Mac, JDK 17 against CPython 3.14.5, three rounds
-each, best round reported:
+Measured on an Apple silicon Mac against CPython 3.14.5, five rounds each.
+"Wall" is the whole process, from launch to exit:
 
-[cols="2,1,1,1,1,1",options="header"]
+[cols="3,1,1,1,1,1,1",options="header"]
 |===
-| Workload | Import | First round | Best round | Peak memory | Ships
+| Workload | Import | First round | Best round | Wall | Peak memory | Ships
 
 | `llm_session`, CPython
-| 266 ms | 147 ms | 143 ms | 72 MB | 55.8 MB
-| `llm_session`, Codename One
-| 914 ms | 1,451 ms | 813 ms | 1,300 MB | 48.1 MB
+| 372 ms | 132 ms | 118 ms | 1,062 ms | 72 MB | 55.9 MB
+| `llm_session`, Codename One native
+| 125 ms | 162 ms | 140 ms | 945 ms | 233 MB | 197.6 MB
+| `llm_session`, Codename One on the JVM
+| 1,291 ms | 1,296 ms | 176 ms | 3,749 ms | 634 MB | 56.9 MB
 | `markitdown_convert`, CPython
-| 417 ms | 537 ms | 493 ms | 213 MB | 281.3 MB
-| `markitdown_convert`, Codename One
-| 769 ms | 2,054 ms | 989 ms | 914 MB | 34.2 MB
+| 668 ms | 559 ms | 496 ms | 3,511 ms | 230 MB | 281.8 MB
+| `markitdown_convert`, Codename One native
+| 117 ms | 421 ms | 368 ms | 2,099 ms | 529 MB | 148.5 MB
+| `markitdown_convert`, Codename One on the JVM
+| 2,721 ms | 3,053 ms | 515 ms | 9,701 ms | 794 MB | 45.4 MB
 |===
 
 What the numbers say:
 
-* *Size.* What ships is smaller: 34 MB of classes against 281 MB of
-  installed packages for MarkItDown, and 48 MB against 56 MB for llm. The
-  build includes only the modules the application imports, and the
-  converters' native wheels, `onnxruntime` among them, aren't needed.
-* *Speed.* CPython is faster on both workloads today: about 2 times on
-  MarkItDown and 5.7 times on llm in the best round, and more in the first,
-  while the JVM compiles the hot code. These workloads exercise the runtime's
-  dynamic paths (attribute lookup on untyped objects, `pydantic` model
-  construction) rather than the typed arithmetic the transpiler compiles to
-  unboxed Java, so they're the hard case. They run as a nightly job, which
-  fails when a ratio grows by more than 30%, so they serve as a regression
-  guard for that work.
-* *Memory.* The JVM figure is a desktop JVM sizing its heap to the
-  machine, not what the application needs. A phone's runtime sizes the heap
-  to the device, and iOS runs the classes translated to C by ParparVM, with
-  no JVM at all.
+* *Startup.* The native binary imports llm three times faster than CPython
+  and MarkItDown 5.7 times faster: modules are compiled code, so
+  importing one runs its top level and nothing else.
+* *Speed.* The native MarkItDown converts the set about 25% faster than
+  CPython, and is faster on every document in it. llm's conversation round
+  is about 19% slower than CPython's: it spends its time in `pydantic` model
+  construction and SQLite, dynamic paths the transpiler can't type. Counting
+  startup, the whole run is faster than CPython for both projects, by 11% for
+  llm and 40% for MarkItDown.
+* *Size.* MarkItDown ships 149 MB natively against 282 MB of installed
+  packages; the build includes only the modules the application imports,
+  and the converters' native wheels, `onnxruntime` among them, aren't
+  needed. The llm binary is larger than its installed packages: it's the
+  whole application in one executable, runtime included, while the CPython
+  figure counts the installed packages and not the interpreter or its
+  standard library.
+* *Memory.* Peak memory is higher than CPython's, by about 3 times for llm
+  and 2 times for MarkItDown. Every Python value is an object on a garbage
+  collected heap, and the collector lets the heap grow before it reclaims
+  it, where CPython frees each object as its last reference goes.
+* *The JVM.* The simulator is a development tool and is slowest to start,
+  because the JVM compiles the hot code as it runs; its figures aren't
+  what a device runs.
+
+A nightly job runs both workloads and fails when a ratio to CPython grows by
+more than 30% (15% for memory), so the numbers are guarded against
+regression.
 
 The comparison is with a desktop interpreter because no phone ships one:
 on iOS and Android, the alternative to the translated application isn't
