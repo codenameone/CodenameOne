@@ -27,10 +27,10 @@ import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphGroup;
 import com.codename1.graph.GraphNode;
 import com.codename1.graph.GraphPort;
-import com.codename1.graph.layout.ForceLayout;
-import com.codename1.graph.layout.LayeredLayout;
-import com.codename1.graph.layout.RadialLayout;
-import com.codename1.graph.layout.TreeLayout;
+import com.codename1.graph.arrange.ForceArrangement;
+import com.codename1.graph.arrange.LayeredArrangement;
+import com.codename1.graph.arrange.RadialArrangement;
+import com.codename1.graph.arrange.TreeArrangement;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 import com.codename1.ui.Slider;
@@ -55,7 +55,7 @@ public class GraphSnippets {
         model.addEdge("billing", "db");
 
         NodeGraph graph = new NodeGraph(model);
-        graph.applyLayout(new LayeredLayout(), false);
+        graph.arrange(new LayeredArrangement(), false);
 
         Form form = new Form("Services", new BorderLayout());
         form.add(BorderLayout.CENTER, graph);
@@ -76,27 +76,27 @@ public class GraphSnippets {
         // end::graph-groups[]
     }
 
-    public void layouts(NodeGraph graph) {
-        // tag::graph-layouts[]
-        LayeredLayout layered = new LayeredLayout();
-        layered.setDirection(LayeredLayout.LEFT_TO_RIGHT);
-        graph.applyLayout(layered, true);
+    public void arrangements(NodeGraph graph) {
+        // tag::graph-arrangements[]
+        LayeredArrangement layered = new LayeredArrangement();
+        layered.setDirection(LayeredArrangement.LEFT_TO_RIGHT);
+        graph.arrange(layered, true);
 
-        TreeLayout tree = new TreeLayout();
+        TreeArrangement tree = new TreeArrangement();
         tree.setRootId("ceo");
-        graph.applyLayout(tree, true);
+        graph.arrange(tree, true);
 
-        graph.applyLayout(new RadialLayout(), true);
+        graph.arrange(new RadialArrangement(), true);
 
-        ForceLayout force = new ForceLayout();
+        ForceArrangement force = new ForceArrangement();
         force.setIdealLength(140);
-        graph.applyLayout(force, true);
-        // end::graph-layouts[]
+        graph.arrange(force, true);
+        // end::graph-arrangements[]
     }
 
-    public void liveLayout(NodeGraph graph) {
+    public void liveArrangement(NodeGraph graph) {
         // tag::graph-live[]
-        graph.setLiveLayout(new ForceLayout());
+        graph.setLiveArrangement(new ForceArrangement());
         // end::graph-live[]
     }
 

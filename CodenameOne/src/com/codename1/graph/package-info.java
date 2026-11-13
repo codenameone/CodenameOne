@@ -21,7 +21,7 @@
  * need additional information or have any questions.
  */
 /// Graphs as data: nodes, the edges between them, the groups they belong to,
-/// and the layouts that place them. What a
+/// and the arrangements that place them. What a
 /// `com.codename1.ui.graph.NodeGraph` shows.
 ///
 /// Nothing here draws, and everything runs without a component, on a server
@@ -33,7 +33,7 @@
 ///   editor, where edges join an output to an input of the same type; leave
 ///   it without for a diagram, where edges join nodes.
 /// - A `GraphGroup` is a box drawn around its members, and can collapse.
-/// - `com.codename1.graph.layout` places the nodes automatically.
+/// - `com.codename1.graph.arrange` places the nodes automatically.
 ///
 /// The classes are not thread safe: use a model from one thread, which for a
 /// model shown by a component is the EDT.

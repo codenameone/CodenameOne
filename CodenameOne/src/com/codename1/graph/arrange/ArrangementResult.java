@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphModel;
@@ -29,8 +29,8 @@ import com.codename1.graph.GraphNode;
 import java.util.HashMap;
 import java.util.Map;
 
-/// Where a layout wants every node, and the bends it wants in the edges.
-public class LayoutResult {
+/// Where an arrangement wants every node, and the bends it wants in the edges.
+public class ArrangementResult {
     private final Map<String, double[]> positions = new HashMap<String, double[]>();
     private final Map<String, double[]> routes = new HashMap<String, double[]>();
 
@@ -39,7 +39,7 @@ public class LayoutResult {
         positions.put(nodeId, new double[]{x, y});
     }
 
-    /// A node's top left corner as `{x, y}`, or null when the layout left it.
+    /// A node's top left corner as `{x, y}`, or null when the arrangement left it.
     public double[] getPosition(String nodeId) {
         return positions.get(nodeId);
     }
@@ -55,7 +55,7 @@ public class LayoutResult {
     }
 
     /// Moves every node at once through `GraphModel.moveNode` and sets every
-    /// edge's route. Edges the layout did not route lose any route they had.
+    /// edge's route. Edges the arrangement did not route lose any route they had.
     public void apply(GraphModel model) {
         for (GraphNode n : model.getNodes()) {
             double[] p = positions.get(n.getId());

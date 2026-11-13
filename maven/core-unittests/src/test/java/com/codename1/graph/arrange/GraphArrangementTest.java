@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.DefaultGraphModel;
 import com.codename1.graph.GraphEdge;
@@ -36,9 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// Every layout on the same graphs: nothing overlaps, every node gets a
+/// Every arrangement on the same graphs: nothing overlaps, every node gets a
 /// place, and each keeps the promise its name makes.
-class GraphLayoutTest {
+class GraphArrangementTest {
     /// A random tree of `n` nodes of mixed widths with `extra` more edges.
     private static DefaultGraphModel graph(int n, int extra, long seed) {
         Random r = new Random(seed);
@@ -55,7 +55,7 @@ class GraphLayoutTest {
         return m;
     }
 
-    private static void assertNoOverlap(DefaultGraphModel m, LayoutResult r) {
+    private static void assertNoOverlap(DefaultGraphModel m, ArrangementResult r) {
         List<GraphNode> ns = m.getNodes();
         for (int i = 0; i < ns.size(); i++) {
             GraphNode a = ns.get(i);
@@ -73,29 +73,29 @@ class GraphLayoutTest {
 
     @Test
     void noLayoutOverlapsNodes() {
-        GraphLayout[] layouts = {new LayeredLayout(), new TreeLayout(), new RadialLayout(), new ForceLayout()};
+        GraphArrangement[] arrangements = {new LayeredArrangement(), new TreeArrangement(), new RadialArrangement(), new ForceArrangement()};
         for (long seed = 1; seed <= 4; seed++) {
             DefaultGraphModel m = graph(80, 20, seed);
-            for (GraphLayout l : layouts) {
-                assertNoOverlap(m, l.layout(m));
+            for (GraphArrangement l : arrangements) {
+                assertNoOverlap(m, l.arrange(m));
             }
         }
-        LayeredLayout lr = new LayeredLayout();
-        lr.setDirection(LayeredLayout.LEFT_TO_RIGHT);
-        TreeLayout tr = new TreeLayout();
-        tr.setDirection(TreeLayout.LEFT_TO_RIGHT);
+        LayeredArrangement lr = new LayeredArrangement();
+        lr.setDirection(LayeredArrangement.LEFT_TO_RIGHT);
+        TreeArrangement tr = new TreeArrangement();
+        tr.setDirection(TreeArrangement.LEFT_TO_RIGHT);
         DefaultGraphModel m = graph(60, 10, 9);
-        assertNoOverlap(m, lr.layout(m));
-        assertNoOverlap(m, tr.layout(m));
+        assertNoOverlap(m, lr.arrange(m));
+        assertNoOverlap(m, tr.arrange(m));
     }
 
     @Test
     void layoutsAreDeterministic() {
         DefaultGraphModel m = graph(50, 15, 3);
-        GraphLayout[] layouts = {new LayeredLayout(), new TreeLayout(), new RadialLayout(), new ForceLayout()};
-        for (GraphLayout l : layouts) {
-            LayoutResult a = l.layout(m);
-            LayoutResult b = l.layout(m);
+        GraphArrangement[] arrangements = {new LayeredArrangement(), new TreeArrangement(), new RadialArrangement(), new ForceArrangement()};
+        for (GraphArrangement l : arrangements) {
+            ArrangementResult a = l.arrange(m);
+            ArrangementResult b = l.arrange(m);
             for (GraphNode n : m.getNodes()) {
                 assertEquals(a.getPosition(n.getId())[0], b.getPosition(n.getId())[0], 0, l.getClass().getName());
                 assertEquals(a.getPosition(n.getId())[1], b.getPosition(n.getId())[1], 0, l.getClass().getName());
@@ -114,7 +114,7 @@ class GraphLayoutTest {
         m.addEdge("c", "d");
         GraphEdge skip = m.addEdge("a", "d");
         GraphEdge back = m.addEdge("d", "b");
-        LayoutResult r = new LayeredLayout().layout(m);
+        ArrangementResult r = new LayeredArrangement().arrange(m);
         double ya = r.getPosition("a")[1];
         double yb = r.getPosition("b")[1];
         double yc = r.getPosition("c")[1];
@@ -137,7 +137,7 @@ class GraphLayoutTest {
         m.addEdge("b", "a2");
         m.addEdge("b2", "a3");
         m.addEdge("a2", "b3");
-        LayoutResult r = new LayeredLayout().layout(m);
+        ArrangementResult r = new LayeredArrangement().arrange(m);
         boolean leftA = r.getPosition("a")[0] < r.getPosition("b")[0];
         assertEquals(leftA, r.getPosition("b2")[0] < r.getPosition("a2")[0]);
         assertEquals(leftA, r.getPosition("a3")[0] < r.getPosition("b3")[0]);
@@ -152,7 +152,7 @@ class GraphLayoutTest {
         m.addEdge("root", "x");
         m.addEdge("root", "y");
         m.addEdge("root", "z");
-        LayoutResult r = new TreeLayout().layout(m);
+        ArrangementResult r = new TreeArrangement().arrange(m);
         double rootCentre = r.getPosition("root")[0] + 50;
         double childCentre = (r.getPosition("x")[0] + r.getPosition("z")[0]) / 2 + 50;
         assertEquals(childCentre, rootCentre, 0.001);
@@ -163,9 +163,9 @@ class GraphLayoutTest {
     @Test
     void radialPutsTheRootInTheMiddle() {
         DefaultGraphModel m = graph(30, 0, 5);
-        RadialLayout l = new RadialLayout();
+        RadialArrangement l = new RadialArrangement();
         l.setRootId("n0");
-        LayoutResult r = l.layout(m);
+        ArrangementResult r = l.arrange(m);
         GraphNode root = m.getNode("n0");
         assertEquals(0, r.getPosition("n0")[0] + root.getWidth() / 2, 0.001);
         assertEquals(0, r.getPosition("n0")[1] + root.getHeight() / 2, 0.001);
@@ -177,7 +177,7 @@ class GraphLayoutTest {
         GraphNode pinned = m.getNode("n3");
         pinned.setPosition(500, 500);
         pinned.setPinned(true);
-        ForceLayout f = new ForceLayout();
+        ForceArrangement f = new ForceArrangement();
         f.setIterations(10);
         f.start(m);
         int steps = 0;
@@ -185,7 +185,7 @@ class GraphLayoutTest {
             steps++;
         }
         assertEquals(9, steps);
-        LayoutResult r = f.result();
+        ArrangementResult r = f.result();
         assertEquals(500, r.getPosition("n3")[0], 0);
         r.apply(m);
         assertEquals(500, pinned.getX(), 0);
@@ -194,13 +194,13 @@ class GraphLayoutTest {
     @Test
     void emptyAndSingleNodeGraphsAreFine() {
         DefaultGraphModel m = new DefaultGraphModel();
-        GraphLayout[] layouts = {new LayeredLayout(), new TreeLayout(), new RadialLayout(), new ForceLayout()};
-        for (GraphLayout l : layouts) {
-            l.layout(m);
+        GraphArrangement[] arrangements = {new LayeredArrangement(), new TreeArrangement(), new RadialArrangement(), new ForceArrangement()};
+        for (GraphArrangement l : arrangements) {
+            l.arrange(m);
         }
         m.addNode(new GraphNode("only", "Only"));
-        for (GraphLayout l : layouts) {
-            assertNotNull(l.layout(m).getPosition("only"));
+        for (GraphArrangement l : arrangements) {
+            assertNotNull(l.arrange(m).getPosition("only"));
         }
     }
 }

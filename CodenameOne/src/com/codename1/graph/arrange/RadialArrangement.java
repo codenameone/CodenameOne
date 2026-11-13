@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphModel;
 import com.codename1.graph.GraphNode;
@@ -29,9 +29,9 @@ import com.codename1.graph.GraphNode;
 /// it, every subtree in a wedge as wide as its share of the leaves. Suits a
 /// mind map, or the neighbourhood of one node in a large network.
 ///
-/// The tree is found the way `TreeLayout` finds it. Rings grow apart as far
+/// The tree is found the way `TreeArrangement` finds it. Rings grow apart as far
 /// as the outermost needs to fit its nodes without overlapping.
-public class RadialLayout implements GraphLayout {
+public class RadialArrangement implements GraphArrangement {
     private double ringGap = 140;
     private String rootId;
 
@@ -57,10 +57,10 @@ public class RadialLayout implements GraphLayout {
     }
 
     @Override
-    public LayoutResult layout(GraphModel model) {
+    public ArrangementResult arrange(GraphModel model) {
         Forest f = new Forest(model, rootId);
         int n = f.graph.size();
-        LayoutResult r = new LayoutResult();
+        ArrangementResult r = new ArrangementResult();
         if (n == 0) {
             return r;
         }

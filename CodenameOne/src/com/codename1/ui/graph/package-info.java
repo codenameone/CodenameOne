@@ -27,7 +27,7 @@
 /// system, where boxes stand for services or ideas and edges join them, is
 /// made of nodes without ports; a node editor, where data flows from outputs
 /// to inputs of a matching type, is made of nodes with `GraphPort`s. Both can
-/// be laid out by hand or by a `com.codename1.graph.layout.GraphLayout`.
+/// be laid out by hand or by a `com.codename1.graph.arrange.GraphArrangement`.
 ///
 /// Nodes and edges are painted, with no component behind each, so a graph
 /// of thousands of nodes costs what is on screen. A node that needs a real

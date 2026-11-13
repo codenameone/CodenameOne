@@ -148,12 +148,12 @@ public class GraphNode {
         this.styleKey = styleKey;
     }
 
-    /// True when automatic layouts must leave the node where it is.
+    /// True when automatic arrangements must leave the node where it is.
     public boolean isPinned() {
         return pinned;
     }
 
-    /// Pins the node in place for automatic layouts.
+    /// Pins the node in place for automatic arrangements.
     public void setPinned(boolean pinned) {
         this.pinned = pinned;
     }

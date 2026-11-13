@@ -20,11 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphModel;
 
-/// A spanning forest of a graph: the tree and radial layouts place nodes by
+/// A spanning forest of a graph: the tree and radial arrangements place nodes by
 /// it and draw the edges it leaves out wherever their ends land.
 final class Forest {
     final Graphs graph;

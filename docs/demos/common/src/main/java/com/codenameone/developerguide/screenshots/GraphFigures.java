@@ -26,11 +26,11 @@ import com.codename1.graph.DefaultGraphModel;
 import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphGroup;
 import com.codename1.graph.GraphNode;
-import com.codename1.graph.layout.ForceLayout;
-import com.codename1.graph.layout.GraphLayout;
-import com.codename1.graph.layout.LayeredLayout;
-import com.codename1.graph.layout.RadialLayout;
-import com.codename1.graph.layout.TreeLayout;
+import com.codename1.graph.arrange.ForceArrangement;
+import com.codename1.graph.arrange.GraphArrangement;
+import com.codename1.graph.arrange.LayeredArrangement;
+import com.codename1.graph.arrange.RadialArrangement;
+import com.codename1.graph.arrange.TreeArrangement;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 import com.codename1.ui.Slider;
@@ -40,8 +40,8 @@ import com.codename1.ui.layouts.BorderLayout;
 import java.util.ArrayList;
 import java.util.List;
 
-/// The figures of the node graph chapter. Every layout is deterministic, and
-/// the force layout is run to completion before the picture is taken, so a
+/// The figures of the node graph chapter. Every arrangement is deterministic, and
+/// the force arrangement is run to completion before the picture is taken, so a
 /// figure is the same picture every run.
 public final class GraphFigures {
     private GraphFigures() {
@@ -88,14 +88,14 @@ public final class GraphFigures {
 
     public static FigureVariant[] variants() {
         List<FigureVariant> v = new ArrayList<FigureVariant>();
-        v.add(landscape("graph-services", () -> laid(services(), new LayeredLayout())));
+        v.add(landscape("graph-services", () -> laid(services(), new LayeredArrangement())));
         v.add(landscape("graph-groups", GraphFigures::grouped));
-        v.add(landscape("graph-tree", () -> laid(org(), new TreeLayout())));
-        v.add(landscape("graph-radial", () -> laid(small(org()), new RadialLayout())));
+        v.add(landscape("graph-tree", () -> laid(org(), new TreeArrangement())));
+        v.add(landscape("graph-radial", () -> laid(small(org()), new RadialArrangement())));
         v.add(landscape("graph-force", GraphFigures::force));
         v.add(landscape("graph-editor", GraphFigures::editor));
         v.add(landscape("graph-components", GraphFigures::embedded));
-        Fig dark = new Fig("graph-services-appearance", () -> laid(services(), new LayeredLayout()));
+        Fig dark = new Fig("graph-services-appearance", () -> laid(services(), new LayeredArrangement()));
         v.add(new FigureVariant(dark, FigureDevice.ANDROID, true, true, "graph-services-dark.png"));
         v.add(new FigureVariant(dark, FigureDevice.IOS, false, true, "graph-services-ios.png"));
         return v.toArray(new FigureVariant[v.size()]);
@@ -105,9 +105,9 @@ public final class GraphFigures {
         return new FigureVariant(new Fig(name, scene), FigureDevice.ANDROID, false, true, name + ".png");
     }
 
-    private static NodeGraph laid(DefaultGraphModel model, GraphLayout layout) {
+    private static NodeGraph laid(DefaultGraphModel model, GraphArrangement arrangement) {
         NodeGraph g = new NodeGraph(model);
-        g.applyLayout(layout, false);
+        g.arrange(arrangement, false);
         return g;
     }
 
@@ -149,7 +149,7 @@ public final class GraphFigures {
                 e.setLabel("SQL");
             }
         }
-        NodeGraph g = laid(m, new LayeredLayout());
+        NodeGraph g = laid(m, new LayeredArrangement());
         g.setEdgeStyle(NodeGraph.EDGE_ORTHOGONAL);
         return g;
     }
@@ -173,9 +173,9 @@ public final class GraphFigures {
     }
 
     private static NodeGraph force() {
-        ForceLayout layout = new ForceLayout();
-        layout.setIdealLength(110);
-        return laid(network(), layout);
+        ForceArrangement arrangement = new ForceArrangement();
+        arrangement.setIdealLength(110);
+        return laid(network(), arrangement);
     }
 
     private static DefaultGraphModel small(DefaultGraphModel m) {

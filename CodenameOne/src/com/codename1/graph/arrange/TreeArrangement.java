@@ -20,12 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphModel;
 import com.codename1.graph.GraphNode;
 
-/// A layout for hierarchies, such as an org chart or a file tree: every node
+/// An arrangement for hierarchies, such as an org chart or a file tree: every node
 /// below its parent, parents centred over their children, and no subtree
 /// overlapping another.
 ///
@@ -33,7 +33,7 @@ import com.codename1.graph.GraphNode;
 /// first from the root (`setRootId`, or every node no edge enters); the other
 /// edges are drawn straight between wherever their ends land. Several roots
 /// make a forest, laid out side by side.
-public class TreeLayout implements GraphLayout {
+public class TreeArrangement implements GraphArrangement {
     /// Children below their parent.
     public static final int TOP_TO_BOTTOM = 0;
 
@@ -86,10 +86,10 @@ public class TreeLayout implements GraphLayout {
     }
 
     @Override
-    public LayoutResult layout(GraphModel model) {
+    public ArrangementResult arrange(GraphModel model) {
         Forest f = new Forest(model, rootId);
         int n = f.graph.size();
-        LayoutResult r = new LayoutResult();
+        ArrangementResult r = new ArrangementResult();
         if (n == 0) {
             return r;
         }

@@ -20,17 +20,15 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
-
-import com.codename1.graph.GraphModel;
-
-/// Places the nodes of a graph. A layout computes positions without touching
-/// the model; `LayoutResult.apply` moves the nodes, and a
-/// `com.codename1.ui.graph.NodeGraph` animates them there instead.
+/// Automatic placement of the nodes of a `com.codename1.graph.GraphModel`.
 ///
-/// Pinned nodes keep their place in every layout that can honour it.
-public interface GraphLayout {
-    /// Computes a position for every node, and a route for edges the layout
-    /// bends.
-    LayoutResult layout(GraphModel model);
-}
+/// - `LayeredArrangement` for flows and pipelines: edges point one way, layer to
+///   layer, with few crossings.
+/// - `ForceArrangement` for networks: an organic picture that can also run live,
+///   a step a frame, while the user drags.
+/// - `TreeArrangement` for hierarchies, and `RadialArrangement` for a tree on rings.
+///
+/// An arrangement returns an `ArrangementResult` and leaves the model alone;
+/// `ArrangementResult.apply` moves the nodes. A graph laid out by hand needs no
+/// arrangement at all.
+package com.codename1.graph.arrange;

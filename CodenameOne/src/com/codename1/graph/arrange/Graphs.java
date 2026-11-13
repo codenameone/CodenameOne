@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphModel;
@@ -30,7 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/// The graph as index arrays, which every layout walks many times.
+/// The graph as index arrays, which every arrangement walks many times.
 final class Graphs {
     final GraphNode[] nodes;
     /// Successor indexes per node, deduplicated, self loops dropped.

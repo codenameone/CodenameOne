@@ -29,9 +29,9 @@ import com.codename1.graph.GraphGroup;
 import com.codename1.graph.GraphModel;
 import com.codename1.graph.GraphNode;
 import com.codename1.graph.GraphPort;
-import com.codename1.graph.layout.ForceLayout;
-import com.codename1.graph.layout.GraphLayout;
-import com.codename1.graph.layout.LayoutResult;
+import com.codename1.graph.arrange.ForceArrangement;
+import com.codename1.graph.arrange.GraphArrangement;
+import com.codename1.graph.arrange.ArrangementResult;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -61,7 +61,7 @@ import java.util.Map;
 /// model.addNode(new GraphNode("orders", "Orders"));
 /// model.addEdge("api", "orders");
 /// NodeGraph graph = new NodeGraph(model);
-/// graph.applyLayout(new LayeredLayout(), false);
+/// graph.arrange(new LayeredArrangement(), false);
 /// form.add(BorderLayout.CENTER, graph);
 /// ```
 ///
@@ -90,7 +90,7 @@ import java.util.Map;
 /// real component from a `NodeComponentFactory`.
 public class NodeGraph extends Container {
     /// Edges with ports curve between them; other edges are straight, or
-    /// follow the bends a layout gave them.
+    /// follow the bends an arrangement gave them.
     public static final int EDGE_AUTO = 0;
 
     /// Straight segments through the bends.
@@ -191,9 +191,9 @@ public class NodeGraph extends Container {
 
     // animation
     private Map<String, double[]> animFrom;
-    private LayoutResult animTo;
+    private ArrangementResult animTo;
     private long animStart;
-    private ForceLayout live;
+    private ForceArrangement live;
     private boolean liveRunning;
 
     // path buffers
@@ -619,14 +619,14 @@ public class NodeGraph extends Container {
         return true;
     }
 
-    // ----------------------------------------------------------------- layout
+    // ------------------------------------------------------------ arrangement
 
-    /// Places the nodes with a layout, gliding them there when `animate` is
-    /// true. Layouts are not user edits: a model that refuses moves is
+    /// Places the nodes with an arrangement, gliding them there when `animate` is
+    /// true. Arrangements are not user edits: a model that refuses moves is
     /// placed anyway, the nodes moved directly.
-    public void applyLayout(GraphLayout layout, boolean animate) {
+    public void arrange(GraphArrangement arrangement, boolean animate) {
         stopLive();
-        LayoutResult r = layout.layout(model);
+        ArrangementResult r = arrangement.arrange(model);
         if (!animate || canvas.getWidth() <= 0) {
             commit(r);
             if (!viewSet || canvas.getWidth() <= 0) {
@@ -649,7 +649,7 @@ public class NodeGraph extends Container {
         animateNow();
     }
 
-    private void commit(LayoutResult r) {
+    private void commit(ArrangementResult r) {
         for (GraphNode n : model.getNodes()) {
             double[] p = r.getPosition(n.getId());
             if (p != null && (p[0] != n.getX() || p[1] != n.getY()) && !model.moveNode(n, p[0], p[1])) {
@@ -664,16 +664,16 @@ public class NodeGraph extends Container {
         repaint();
     }
 
-    /// Runs a force layout live: the graph settles a step a frame, and
+    /// Runs a force arrangement live: the graph settles a step a frame, and
     /// follows a node while it is dragged. Null stops it.
-    public void setLiveLayout(ForceLayout layout) {
+    public void setLiveArrangement(ForceArrangement arrangement) {
         stopLive();
-        live = layout;
-        if (layout != null) {
+        live = arrangement;
+        if (arrangement != null) {
             for (GraphEdge e : model.getEdges()) {
                 e.setRoute(null);
             }
-            layout.start(model);
+            arrangement.start(model);
             liveRunning = true;
             animateNow();
         }
@@ -983,7 +983,7 @@ public class NodeGraph extends Container {
             int k = 0;
             pathX[k] = cx[0];
             pathY[k++] = cy[0];
-            // bends a layout routed through run along the flow
+            // bends an arrangement routed through run along the flow
             boolean flowVertical = Math.abs(cy[cn - 1] - cy[0]) > Math.abs(cx[cn - 1] - cx[0]);
             for (int i = 1; i < cn; i++) {
                 double px = cx[i - 1];
@@ -2028,7 +2028,7 @@ public class NodeGraph extends Container {
         canvas.animateNow();
     }
 
-    // The layout's own motion, every frame while it runs.
+    // The arrangement's own motion, every frame while it runs.
     boolean tick() {
         boolean busy = false;
         if (animTo != null) {
@@ -2043,7 +2043,7 @@ public class NodeGraph extends Container {
             }
             groupsDirty = true;
             if (t >= 1) {
-                LayoutResult r = animTo;
+                ArrangementResult r = animTo;
                 animTo = null;
                 animFrom = null;
                 commit(r);
@@ -2054,7 +2054,7 @@ public class NodeGraph extends Container {
         }
         if (live != null && liveRunning) {
             boolean more = live.step();
-            LayoutResult r = live.result();
+            ArrangementResult r = live.result();
             for (GraphNode n : model.getNodes()) {
                 if (moving.contains(n)) {
                     continue;

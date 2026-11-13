@@ -27,7 +27,7 @@ import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphGroup;
 import com.codename1.graph.GraphNode;
 import com.codename1.graph.GraphPort;
-import com.codename1.graph.layout.LayeredLayout;
+import com.codename1.graph.arrange.LayeredArrangement;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
@@ -238,7 +238,7 @@ class NodeGraphTest extends UITestBase {
         m.addEdge("a", "b");
         m.addEdge("b", "c");
         NodeGraph g = show(m);
-        g.applyLayout(new LayeredLayout(), false);
+        g.arrange(new LayeredArrangement(), false);
         assertTrue(m.getNode("a").getY() < m.getNode("b").getY());
         g.fitToView();
         for (GraphNode n : m.getNodes()) {

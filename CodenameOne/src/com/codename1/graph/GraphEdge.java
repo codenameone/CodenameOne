@@ -115,7 +115,7 @@ public class GraphEdge {
         this.userData = userData;
     }
 
-    /// The bend points a layout routed the edge through, as x, y pairs in
+    /// The bend points an arrangement routed the edge through, as x, y pairs in
     /// world units, or null for a direct line between its ends.
     public double[] getRoute() {
         return route;

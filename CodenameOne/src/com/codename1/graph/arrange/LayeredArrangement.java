@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphModel;
@@ -31,7 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/// A layout for flows: every edge points the same way, from one layer to the
+/// An arrangement for flows: every edge points the same way, from one layer to the
 /// next, with as few crossings as it can find.
 ///
 /// This is the method of Sugiyama, Tagawa and Toda in four passes. Cycles are
@@ -44,7 +44,7 @@ import java.util.Map;
 ///
 /// The edges get routes through their hidden points. Pinned nodes are placed
 /// like any other: a layered picture has no room for a node that stays put.
-public class LayeredLayout implements GraphLayout {
+public class LayeredArrangement implements GraphArrangement {
     /// Layers run down the screen and edges point down.
     public static final int TOP_TO_BOTTOM = 0;
 
@@ -87,10 +87,10 @@ public class LayeredLayout implements GraphLayout {
     }
 
     @Override
-    public LayoutResult layout(GraphModel model) {
+    public ArrangementResult arrange(GraphModel model) {
         Graphs g = new Graphs(model);
         int n = g.size();
-        LayoutResult result = new LayoutResult();
+        ArrangementResult result = new ArrangementResult();
         if (n == 0) {
             return result;
         }

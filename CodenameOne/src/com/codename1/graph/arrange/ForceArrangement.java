@@ -20,25 +20,25 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.graph.layout;
+package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphModel;
 import com.codename1.graph.GraphNode;
 
-/// An organic layout for networks: edges pull like springs and every node
+/// An organic arrangement for networks: edges pull like springs and every node
 /// pushes every other away, until the graph settles.
 ///
 /// This is Fruchterman and Reingold's method with a cooling schedule. Repulsion
 /// is summed through a Barnes-Hut quadtree, so a step costs n log n rather than
 /// n squared, and a graph of thousands of nodes settles in well under a second.
 ///
-/// `layout` runs every iteration at once. A view that animates the graph
+/// `arrange` runs every iteration at once. A view that animates the graph
 /// settling, or keeps it live while the user drags a node, calls `start` and
 /// then `step` once a frame instead. Starting positions come from the model, so
 /// a graph that was laid out before moves only as much as its changes need;
 /// nodes that are all at one point are first spread on a circle. The run is
 /// deterministic: the same graph gives the same picture.
-public class ForceLayout implements GraphLayout {
+public class ForceArrangement implements GraphArrangement {
     private double idealLength = 160;
     private int iterations = 300;
     private double theta = 0.8;
@@ -61,7 +61,7 @@ public class ForceLayout implements GraphLayout {
         this.idealLength = Math.max(10, idealLength);
     }
 
-    /// How many steps `layout` runs, 300 by default.
+    /// How many steps `arrange` runs, 300 by default.
     public int getIterations() {
         return iterations;
     }
@@ -72,7 +72,7 @@ public class ForceLayout implements GraphLayout {
     }
 
     @Override
-    public LayoutResult layout(GraphModel model) {
+    public ArrangementResult arrange(GraphModel model) {
         start(model);
         boolean more = true;
         while (more) {
@@ -232,8 +232,8 @@ public class ForceLayout implements GraphLayout {
     }
 
     /// The positions the run has reached.
-    public LayoutResult result() {
-        LayoutResult r = new LayoutResult();
+    public ArrangementResult result() {
+        ArrangementResult r = new ArrangementResult();
         if (graph == null) {
             return r;
         }
