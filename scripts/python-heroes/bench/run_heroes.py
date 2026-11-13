@@ -333,6 +333,10 @@ def suite(name, work, harness, args):
     spec = SUITES[name]
     upstream = args.llm_tests if name == "llm" else args.markitdown_tests
     tests = os.path.join(work, name + "-suite", "tests")
+    # A --work directory is reused by the next run, so the previous copy is
+    # replaced rather than merged into: a test deleted upstream must not run.
+    if os.path.isdir(tests):
+        shutil.rmtree(tests)
     shutil.copytree(upstream, tests, ignore=shutil.ignore_patterns("__pycache__"))
     init = os.path.join(tests, "__init__.py")
     if not os.path.exists(init):

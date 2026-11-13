@@ -74,8 +74,9 @@ final class RegexMatch extends PyObject {
     /// not have.
     static Object search(Regex.Prog p, Object pattern, Object string, Object posObj, Object endObj,
             int at, int mode, int forbid) {
-        boolean isBytes = checkKind(p, pattern, string);
-        String text = isBytes ? latin1((PyBytes) string) : (String) string;
+        Object subject = subject(string);
+        boolean isBytes = checkKind(p, pattern, subject);
+        String text = isBytes ? latin1((PyBytes) subject) : (String) subject;
         // Counted once: the run below is handed the count rather than
         // taking it again (a decoded bytes text is Latin-1, without pairs).
         int pairs = isBytes ? 0 : PyStr.surrogates(text);
@@ -105,6 +106,26 @@ final class RegexMatch extends PyObject {
         return new RegexMatch(pattern, string, text, isBytes, (int) pos, (int) endpos, p.groups, regs);
     }
 
+    /// The str or bytes a subject is: a str or bytes subclass (bs4's
+    /// NavigableString) by its value, a bytearray or memoryview by a copy of
+    /// its bytes, as sre's `getstring` reads any buffer. Anything else is
+    /// answered as it is, for the kind check to name.
+    private static Object subject(Object string) {
+        if (string instanceof String || string instanceof PyBytes) {
+            return string;
+        }
+        if (string instanceof PyInstance) {
+            Object base = ((PyInstance) string).base;
+            if (base instanceof String || base instanceof PyBytes) {
+                return base;
+            }
+        }
+        if (string instanceof PyByteArray || string instanceof PyMemoryView) {
+            return new PyBytes(PyBytes.like(string));
+        }
+        return string;
+    }
+
     /// True for bytes. A str pattern takes only str and a bytes one only
     /// bytes, as sre's `getstring` insists; which one a program is was fixed
     /// when it was compiled, so the pattern is asked once.
@@ -116,7 +137,11 @@ final class RegexMatch extends PyObject {
         }
         if (kind == 1) {
             if (!(string instanceof String)) {
-                throw Py.typeError("cannot use a string pattern on a bytes-like object");
+                if (string instanceof PyBytes) {
+                    throw Py.typeError("cannot use a string pattern on a bytes-like object");
+                }
+                throw Py.typeError("expected string or bytes-like object, got '"
+                        + Py.typeOf(string).name + "'");
             }
             return false;
         }
@@ -192,9 +217,13 @@ final class RegexMatch extends PyObject {
             return dflt;
         }
         if (bytes) {
-            byte[] v = ((PyBytes) string).value;
+            // Cut from the latin-1 text, one char per byte, never from
+            // `string`: that is the subject as given, a bytearray or a bytes
+            // subclass as often as a bytes.
             byte[] out = new byte[e - s];
-            System.arraycopy(v, s, out, 0, e - s);
+            for (int k = 0; k < out.length; k++) {
+                out[k] = (byte) text.charAt(s + k);
+            }
             return new PyBytes(out);
         }
         return PyStr.substr(text, s, e);

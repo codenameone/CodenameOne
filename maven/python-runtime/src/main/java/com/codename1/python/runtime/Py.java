@@ -1257,6 +1257,13 @@ public final class Py {
         if (a instanceof String) {
             return Formatting.percent((String) a, b);
         }
+        if (a instanceof PyBytes) {
+            return Formatting.percentBytes(((PyBytes) a).value, b);
+        }
+        if (a instanceof PyByteArray) {
+            PyByteArray ba = (PyByteArray) a;
+            return new PyByteArray(Formatting.percentBytes(ba.bytes(), b).value);
+        }
         if (a instanceof Long) {
             long x = ((Long) a).longValue();
             if (b instanceof Long) {

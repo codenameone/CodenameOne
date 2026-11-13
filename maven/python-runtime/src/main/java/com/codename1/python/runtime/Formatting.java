@@ -626,6 +626,43 @@ final class Formatting {
         if (simple != null) {
             return simple;
         }
+        return percent(fmt, args, false);
+    }
+
+    /// `fmt % args` for a bytes format (PEP 461): the format and every
+    /// bytes-like value are latin-1 chars here, one char per byte, so the
+    /// str formatter does the work and the result is encoded back.
+    static PyBytes percentBytes(byte[] fmt, Object args) {
+        return new PyBytes(latin1Bytes(percent(Codecs.latin1(fmt, 0, fmt.length), args, true)));
+    }
+
+    /// The chars of a latin-1 text as its bytes, one byte each.
+    private static byte[] latin1Bytes(String s) {
+        byte[] out = new byte[s.length()];
+        for (int k = 0; k < out.length; k++) {
+            out[k] = (byte) s.charAt(k);
+        }
+        return out;
+    }
+
+    /// The bytes `%s` and `%b` insert: a bytes-like value, or what its
+    /// `__bytes__` answers. A str is refused, as CPython refuses it.
+    private static String bytesArg(Object value) {
+        byte[] b = PyBytes.like(value);
+        if (b == null && !(value instanceof String)) {
+            Object m = Py.obj(value).getAttrOrNull("__bytes__");
+            if (m != null) {
+                b = PyBytes.like(Py.call(m));
+            }
+        }
+        if (b == null) {
+            throw Py.typeError("%b requires a bytes-like object, or an object that implements __bytes__, not '"
+                    + Py.typeOf(value).name + "'");
+        }
+        return Codecs.latin1(b, 0, b.length);
+    }
+
+    private static String percent(String fmt, Object args, boolean bytesMode) {
         Object[] items;
         PyDict mapping = null;
         if (args instanceof PyTuple) {
@@ -660,12 +697,13 @@ final class Formatting {
             char quick = fmt.charAt(i);
             if ((quick == 's' || quick == 'd' || quick == 'i') && mapping == null && ai < items.length) {
                 Object v = items[ai];
-                if (v instanceof Long) {
+                // In a bytes format %s takes no int, so only %d and %i come here.
+                if (v instanceof Long && !(bytesMode && quick == 's')) {
                     sb.append(((Long) v).longValue());
                     ai++;
                     continue;
                 }
-                if (quick == 's' && v instanceof String) {
+                if (quick == 's' && v instanceof String && !bytesMode) {
                     sb.append((String) v);
                     ai++;
                     continue;
@@ -697,7 +735,8 @@ final class Formatting {
                 if (mapping == null) {
                     throw Py.typeError("format requires a mapping");
                 }
-                value = mapping.getItem(Py.str(key));
+                // A bytes format names bytes keys: b"%(k)s" reads b"k".
+                value = mapping.getItem(bytesMode ? new PyBytes(latin1Bytes(key)) : Py.str(key));
                 i = close + 1;
             }
             StringBuilder spec = new StringBuilder();
@@ -756,6 +795,26 @@ final class Formatting {
             String align = left ? "<" : "";
             // printf-style padding right-justifies text too, unlike format().
             String textAlign = left ? "<" : ">";
+            if (bytesMode && (conv == 's' || conv == 'b')) {
+                sb.append(format(Py.str(bytesArg(value)), textAlign + width + prec));
+                continue;
+            }
+            if (bytesMode && (conv == 'r' || conv == 'a')) {
+                // %r is %a in a bytes format: repr() limited to ASCII.
+                sb.append(format(Py.call(Builtins.ASCII, value), textAlign + width + prec));
+                continue;
+            }
+            if (bytesMode && conv == 'c') {
+                byte[] one = PyBytes.like(value);
+                if (one != null && one.length == 1) {
+                    sb.append((char) (one[0] & 0xff));
+                } else if (Py.isInt(value) && Py.asLong(value) >= 0 && Py.asLong(value) < 256) {
+                    sb.append((char) Py.asLong(value));
+                } else {
+                    throw Py.typeError("%c requires an integer in range(256) or a single byte");
+                }
+                continue;
+            }
             switch (conv) {
                 case 's':
                     sb.append(format(Py.str(Py.toStr(value)), textAlign + width + prec));

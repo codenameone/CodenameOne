@@ -65,6 +65,15 @@ error = _parser.error
 PatternError = error
 
 
+
+def _sliceable(string):
+    """The subject the pieces are cut from: a bytearray or memoryview as
+    bytes, since split, sub and findall answer bytes for any buffer, as sre
+    does."""
+    if isinstance(string, (bytearray, memoryview)):
+        return bytes(string)
+    return string
+
 class Pattern:
     def __init__(self, pattern, flags, code):
         self.pattern = pattern
@@ -121,6 +130,7 @@ class Pattern:
             at = e
 
     def findall(self, string, pos=0, endpos=None):
+        string = _sliceable(string)
         if isinstance(string, str) and isinstance(self.pattern, str):
             # The loop in Java, without a Match per hit.
             n = len(string)
@@ -144,6 +154,7 @@ class Pattern:
             # The loop in Java, without a Match per piece.
             return _cn1re.split(self._prog, string, maxsplit)
         self._check(string)
+        string = _sliceable(string)
         out = []
         last = 0
         n = 0
@@ -177,6 +188,7 @@ class Pattern:
                 fn = lambda m: literal
             else:
                 fn = lambda m: _expand(template, m)
+        string = _sliceable(string)
         out = []
         last = 0
         n = 0
