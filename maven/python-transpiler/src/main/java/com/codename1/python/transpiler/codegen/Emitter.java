@@ -2763,6 +2763,29 @@ public final class Emitter {
         return new String[] {temp(), temp()};
     }
 
+    /// The head of one comprehension loop. A list is walked by index, re-reading its
+    /// length every step as its own iterator does, so the comprehension allocates no
+    /// iterator for it; anything else goes through `Py.iter`.
+    private void compLoopHead(StringBuilder b, int depth, String src, String it, String x) {
+        String sq = fresh("sq");
+        String ls = fresh("ls");
+        String li = fresh("li");
+        indent(b, depth);
+        b.append("final Object ").append(sq).append(" = ").append(src).append(";\n");
+        indent(b, depth);
+        b.append("final PyList ").append(ls).append(" = ").append(sq).append(" instanceof PyList ? (PyList) ")
+                .append(sq).append(" : null;\n");
+        indent(b, depth);
+        b.append("final PyObject ").append(it).append(" = ").append(ls).append(" != null ? null : Py.iter(")
+                .append(sq).append(");\n");
+        indent(b, depth);
+        b.append("int ").append(li).append(" = 0;\n");
+        indent(b, depth);
+        b.append("for (Object ").append(x).append("; (").append(x).append(" = ").append(it).append(" != null ? ")
+                .append(it).append(".next() : ").append(li).append(" < ").append(ls).append(".size() ? ")
+                .append(ls).append(".get(").append(li).append("++) : null) != null;) {\n");
+    }
+
     private String ltemp() {
         return "j" + frame.id + "_" + (frame.ltemps++);
     }
@@ -3686,12 +3709,7 @@ public final class Emitter {
             }
             String it = fresh("i");
             String x = fresh("x");
-            indent(b, depth);
-            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? a : loopSource(g.iter, g.target))
-                    .append(");\n");
-            indent(b, depth);
-            b.append("for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
-                    .append(".next()) != null;) {\n");
+            compLoopHead(b, depth, i == 0 ? a : loopSource(g.iter, g.target), it, x);
             depth++;
             store(g.target, x, b, depth);
             for (Expr cond : g.ifs) {
@@ -3895,12 +3913,7 @@ public final class Emitter {
             Comprehension g = c.generators.get(i);
             String it = fresh("i");
             String x = fresh("x");
-            indent(b, depth);
-            b.append("final PyObject ").append(it).append(" = Py.iter(").append(i == 0 ? it0 : loopSource(g.iter, g.target))
-                    .append(");\n");
-            indent(b, depth);
-            b.append("for (Object ").append(x).append("; (").append(x).append(" = ").append(it)
-                    .append(".next()) != null;) {\n");
+            compLoopHead(b, depth, i == 0 ? it0 : loopSource(g.iter, g.target), it, x);
             depth++;
             store(g.target, x, b, depth);
             for (Expr cond : g.ifs) {
