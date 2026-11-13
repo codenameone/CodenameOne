@@ -27,7 +27,9 @@ import com.codename1.backend.Config;
 import com.codename1.backend.aws.Credentials;
 import com.codename1.backend.dynamo.DynamoDb;
 import com.codename1.backend.mongo.MongoClient;
+import com.codename1.backend.search.SearchIndexer;
 import com.codename1.impl.orm.Attribute;
+import com.codename1.impl.orm.CommitObserver;
 import com.codename1.impl.orm.EntityModel;
 import com.codename1.impl.orm.Models;
 import com.codename1.impl.orm.Values;
@@ -63,10 +65,21 @@ public final class DocumentSession implements Closeable {
     private static final int POST_LOAD = 6;
 
     private final DocumentStore store;
+    // Keeps @Searchable entities indexed; null outside a server.
+    private final CommitObserver indexer;
 
-    /// A session over `store`; closing the session closes the store.
+    /// A session over `store`; closing the session closes the store. Opened
+    /// inside a server, it keeps each `@Searchable` entity's search index in
+    /// step with every write that succeeds.
     public DocumentSession(DocumentStore store) {
         this.store = store;
+        this.indexer = SearchIndexer.forServer();
+    }
+
+    private <T> void written(EntityModel<T> m, T entity, int event) {
+        if (indexer != null) {
+            indexer.committed(m, entity, event);
+        }
     }
 
     /// The session of the calling thread's server, opened from `cn1.document.url`
@@ -311,6 +324,7 @@ public final class DocumentSession implements Closeable {
             throw new PersistenceException("Duplicate id: " + m.type().getName());
         }
         m.lifecycle(entity, POST_PERSIST);
+        written(m, entity, CommitObserver.PERSISTED);
         return entity;
     }
 
@@ -345,6 +359,7 @@ public final class DocumentSession implements Closeable {
             entity = assign(m, entity, vi, next);
         }
         m.lifecycle(entity, POST_UPDATE);
+        written(m, entity, CommitObserver.UPDATED);
         return entity;
     }
 
@@ -371,6 +386,7 @@ public final class DocumentSession implements Closeable {
             return false;
         }
         m.lifecycle(entity, POST_REMOVE);
+        written(m, entity, CommitObserver.REMOVED);
         return true;
     }
 

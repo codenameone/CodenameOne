@@ -90,6 +90,15 @@ public abstract class EntityModel<T> {
     public int sortKeyIndex() {
         return -1;
     }
+    /// The search index an `@Searchable` entity is kept in, or null when the
+    /// entity is not searchable.
+    public String searchIndex() {
+        return null;
+    }
+    /// Whether attribute `index` goes into the search document.
+    public boolean searchField(int index) {
+        return true;
+    }
     public String generator() {
         return table() + "_id";
     }

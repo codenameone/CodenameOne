@@ -58,6 +58,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private final IdentityHashMap<Object, EntityState> valueStates = new IdentityHashMap<Object, EntityState>();
     private final IdentityHashMap<Object, Object> forwards = new IdentityHashMap<Object, Object>();
     private int loading;
+    // Told about each write once its transaction commits; see setCommitObserver.
+    private CommitObserver commitObserver;
+    private final List<Written> written = new ArrayList<Written>();
     private int mergeDepth;
     private int deferredFetch;
     private int aliasSequence;
@@ -283,6 +286,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             sql.commit();
             transaction = false;
             pruneForwards();
+            deliverCommitted();
         } catch (IOException e) {
             recoverTransactionFailure();
             throw failure(e);
@@ -298,6 +302,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new PersistenceException("No active transaction");
         }
         try {
+            written.clear();
             sql.rollback();
             transaction = false;
             rollbackOnly = false;
@@ -312,7 +317,44 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         transaction = sql.isTransactionActive();
         rollbackOnly = transaction;
         if (!transaction) {
+            written.clear();
             clear();
+        }
+    }
+    /// Registers the observer told about each entity this session inserts,
+    /// updates or deletes, after the transaction that wrote it commits. A
+    /// rollback reports nothing. `null` removes it.
+    public void setCommitObserver(CommitObserver observer) {
+        commitObserver = observer;
+        written.clear();
+    }
+    private void noteWritten(EntityModel<?> model, Object entity, int event) {
+        if (commitObserver != null) {
+            written.add(new Written(model, entity, event));
+        }
+    }
+    private void deliverCommitted() {
+        if (written.isEmpty()) {
+            return;
+        }
+        Written[] all = written.toArray(new Written[written.size()]);
+        written.clear();
+        CommitObserver observer = commitObserver;
+        if (observer == null) {
+            return;
+        }
+        for (Written w : all) {
+            observer.committed(w.model, w.entity, w.event);
+        }
+    }
+    private static final class Written {
+        final EntityModel<?> model;
+        final Object entity;
+        final int event;
+        Written(EntityModel<?> model, Object entity, int event) {
+            this.model = model;
+            this.entity = entity;
+            this.event = event;
         }
     }
     @Override
@@ -975,6 +1017,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 collectionsReady = inserted.size();
                 for (Entry entry : updated) {
                     entry.model.lifecycle(entry.entity, 3);
+                    noteWritten(entry.model, entry.entity, CommitObserver.UPDATED);
                 }
                 prepareDeletes();
                 boolean deleted = false;
@@ -3237,6 +3280,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             }
         }
         model.lifecycle(entry.entity, 1);
+        noteWritten(model, entry.entity, CommitObserver.PERSISTED);
         cascadePersist(entry);
     }
     /// Whether an INSERT names the column: not a generated key, and not a
@@ -3505,6 +3549,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         detachOne(entry.entity);
         entry.model.lifecycle(entry.entity, 5);
+        noteWritten(entry.model, entry.entity, CommitObserver.REMOVED);
     }
     private void checkManagedIdentity(Entry entry) {
         if (entry.snapshot == null) {
