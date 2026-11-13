@@ -140,4 +140,45 @@ class EnvironmentLightPostTest {
         assertTrue(frag.contains("if (u_shadow.w > 0.0)"), frag);
         assertTrue(frag.contains("p.xy = p.xy * u_shadow.w;"), frag);
     }
+
+    @Test
+    void bakedEnvironmentMapStacksSixBandsThatBlurTowardTheAverage() {
+        int w = EnvironmentMaps.WIDTH;
+        int h = EnvironmentMaps.BAND_HEIGHT;
+        float[] radiance = new float[w * h * 3];
+        // a bright horizon line on a dark world
+        int spot = (h / 2) * w + w / 2;
+        for (int i = (h / 2) * w * 3; i < (h / 2 + 1) * w * 3; i++) {
+            radiance[i] = 2f;
+        }
+        int[] px = EnvironmentMaps.bake(radiance);
+        assertEquals(w * h * EnvironmentMaps.BANDS, px.length);
+        int sharp = px[spot] & 0xff;
+        int blurred = px[(EnvironmentMaps.BANDS - 1) * w * h + spot] & 0xff;
+        assertEquals(255, sharp);
+        assertTrue(blurred < sharp, "the roughest band spreads the line: " + blurred);
+        int far = px[(EnvironmentMaps.BANDS - 1) * w * h + spot + 8 * w] & 0xff;
+        assertTrue(far > 0, "the roughest band reaches rows past the line");
+        for (int i = 0; i < px.length; i++) {
+            assertEquals(0xff, px[i] >>> 24);
+        }
+    }
+
+    @Test
+    void anEnvironmentMapSwitchesEveryGeneratorToImageBasedLighting() {
+        Environment env = new Environment().setEnvironmentMap(new Texture(128, 384));
+        Environment plain = new Environment();
+        assertNotEquals(env.getShaderKey(), plain.getShaderKey());
+        Material pbr = new Material(Material.Type.PBR);
+        String frag = new com.codename1.impl.gpu.GlslShaderGenerator(pbr, VertexFormat.POSITION_NORMAL_TEXCOORD, env, false)
+                .getFragmentSource();
+        assertTrue(frag.contains("uniform sampler2D u_envMap;"), frag);
+        assertTrue(frag.contains("envSpecular("), frag);
+        String none = new com.codename1.impl.gpu.GlslShaderGenerator(pbr, VertexFormat.POSITION_NORMAL_TEXCOORD, plain, false)
+                .getFragmentSource();
+        assertFalse(none.contains("u_envMap"), none);
+        Material unlit = new Material(Material.Type.UNLIT);
+        assertFalse(new com.codename1.impl.gpu.GlslShaderGenerator(unlit, VertexFormat.POSITION_NORMAL_TEXCOORD, env, false)
+                .getFragmentSource().contains("u_envMap"));
+    }
 }

@@ -137,6 +137,7 @@ public final class IOSMetalShaderGenerator {
         f.sky = sky && environment != null && environment.isSky();
         f.hemisphere = f.lit && environment != null && environment.isHemisphere();
         f.toneMap = f.lit && environment != null && environment.isToneMapping();
+        f.ibl = f.lit && environment != null && environment.isEnvironmentMap();
         f.shadow = f.lit && shadowed && material.isReceiveShadows();
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
         f.hasNormal = hasNormal;
@@ -150,6 +151,7 @@ public final class IOSMetalShaderGenerator {
             f.sky = false;
             f.hemisphere = false;
             f.toneMap = false;
+            f.ibl = false;
             f.shadow = false;
             f.emissive = false;
         }
@@ -171,6 +173,7 @@ public final class IOSMetalShaderGenerator {
         boolean fog;
         boolean hemisphere;
         boolean toneMap;
+        boolean ibl;
         boolean emissive;
         boolean sky;
         boolean shadow;
@@ -372,6 +375,19 @@ public final class IOSMetalShaderGenerator {
             sb.append("  return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n");
             sb.append("}\n");
         }
+        if (f.ibl) {
+            // the environment map lookup of GlslShaderGenerator: six
+            // equirectangular bands stacked in v, at half intensity
+            sb.append("float3 envAt(texture2d<float> m, float3 d, float band) {\n");
+            sb.append("  constexpr sampler es(coord::normalized, address::clamp_to_edge, filter::linear);\n");
+            sb.append("  float2 uv = float2(atan2(d.z, d.x) * 0.15915494 + 0.5, acos(clamp(d.y, -1.0, 1.0)) * 0.31830989);\n");
+            sb.append("  uv = float2(clamp(uv.x, 0.0039, 0.9961), (clamp(uv.y, 0.0079, 0.9921) + band) / 6.0);\n");
+            sb.append("  return m.sample(es, uv).rgb * 2.0;\n}\n");
+            sb.append("float3 envSpecular(texture2d<float> m, float3 d, float rough) {\n");
+            sb.append("  float lv = clamp(rough, 0.0, 1.0) * 4.0;\n");
+            sb.append("  float l0 = floor(lv);\n");
+            sb.append("  return mix(envAt(m, d, l0), envAt(m, d, min(l0 + 1.0, 4.0)), lv - l0);\n}\n");
+        }
         // Fragment function.
         sb.append(f.depthOnly ? "fragment void " : "fragment float4 ").append(FRAGMENT_FUNCTION).append("(\n");
         sb.append("    CN1VertexOut in [[stage_in]],\n");
@@ -382,6 +398,9 @@ public final class IOSMetalShaderGenerator {
         }
         if (f.shadow) {
             sb.append(",\n    depth2d<float> shadowMap [[texture(1)]]");
+        }
+        if (f.ibl) {
+            sb.append(",\n    texture2d<float> envMap [[texture(6)]]");
         }
         // custom textures on 2 and up; the native side binds a sampler with each
         int customTextures = f.shader == null ? 0 : f.shader.getTextureCount();
@@ -429,7 +448,9 @@ public final class IOSMetalShaderGenerator {
             }
             sb.append("  float3 l = normalize(-u.lightDir.xyz);\n");
             sb.append("  float ndotl = max(dot(n, l), 0.0);\n");
-            if (f.hemisphere) {
+            if (f.ibl) {
+                sb.append("  float3 ambient = envAt(envMap, n, 5.0);\n");
+            } else if (f.hemisphere) {
                 sb.append("  float3 ambient = mix(u.ground.xyz, u.skyC.xyz, n.y * 0.5 + 0.5);\n");
             } else {
                 sb.append("  float3 ambient = u.ambient.xyz;\n");
@@ -437,7 +458,7 @@ public final class IOSMetalShaderGenerator {
             sb.append(f.shadow ? "  float shade = cn1ShadowAt(in.shadowPos, n, l, u, shadowMap);\n"
                     : "  float shade = 1.0;\n");
             if (f.pbr) {
-                appendPbr(sb, f.hemisphere, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                appendPbr(sb, f.hemisphere, f.ibl, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
                         hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (ambient + u.lightColor.xyz * ndotl * shade);\n");
@@ -646,7 +667,8 @@ public final class IOSMetalShaderGenerator {
 
     // Cook-Torrance with a GGX distribution, Smith-Schlick geometry and
     // Schlick's Fresnel, matching the GLSL generator term for term.
-    private static void appendPbr(StringBuilder sb, boolean hemi, String metallicHook, String roughHook) {
+    private static void appendPbr(StringBuilder sb, boolean hemi, boolean ibl, String metallicHook,
+            String roughHook) {
         sb.append("  float metallic = ")
                 .append(metallicHook != null ? "clamp(" + metallicHook + ", 0.0, 1.0)" : "u.pbrP.x").append(";\n");
         // below 0.04 the GGX lobe is a sub-pixel spike that aliases
@@ -674,7 +696,12 @@ public final class IOSMetalShaderGenerator {
         // Karis' fitted split-sum BRDF instead of a baked lookup table
         sb.append("  float3 rr = reflect(-v, n);\n");
         sb.append("  float3 rdir = normalize(mix(rr, n, rough * rough));\n");
-        sb.append("  float3 envSpec = " + (hemi ? "mix(u.ground.xyz, u.skyC.xyz, rdir.y * 0.5 + 0.5)" : "ambient") + ";\n");
+        if (ibl) {
+            sb.append("  float3 envSpec = envSpecular(envMap, rr, rough);\n");
+        } else {
+            sb.append("  float3 envSpec = " + (hemi ? "mix(u.ground.xyz, u.skyC.xyz, rdir.y * 0.5 + 0.5)" : "ambient")
+                    + ";\n");
+        }
         sb.append("  float4 ec0 = float4(-1.0, -0.0275, -0.572, 0.022);\n");
         sb.append("  float4 ec1 = float4(1.0, 0.0425, 1.04, -0.04);\n");
         sb.append("  float4 er = rough * ec0 + ec1;\n");

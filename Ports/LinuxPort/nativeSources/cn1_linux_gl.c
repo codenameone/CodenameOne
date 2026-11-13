@@ -487,6 +487,12 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
                 glUniform1i(l, 2 + t);
             }
         }
+        {
+            GLint le = glGetUniformLocation(prog, "u_envMap");
+            if (le >= 0) {
+                glUniform1i(le, 6);
+            }
+        }
         glUseProgram((GLuint) prev);
     }
     p->uShadowMap = glGetUniformLocation(prog, "u_shadowMap");

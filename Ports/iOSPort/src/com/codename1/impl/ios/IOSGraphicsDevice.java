@@ -190,6 +190,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         int primitive = primitiveCode(type);
         int strideBytes = fmt.getStrideBytes();
         bindShaderTextures(material);
+        bindEnvironmentMap();
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -365,6 +366,17 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
     }
 
+    // binds the environment map image based lighting samples, slot 6, when
+    // the environment has one; programs without IBL ignore the slot
+    private void bindEnvironmentMap() {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null || !(t.getHandle() instanceof Long)) {
+            return;
+        }
+        IOSImplementation.nativeInstance.gl3dBindTexture(contextPeer, 6, ((Long) t.getHandle()).longValue(), 1, 0);
+    }
+
     private void packShadow(Light light) {
         for (int i = 0; i < 16; i++) {
             uniforms[108 + i] = shadowMatrix[i];
@@ -506,6 +518,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
             texWrap = tex.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
         }
         bindShaderTextures(material);
+        bindEnvironmentMap();
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
         if (mesh.isIndexed()) {

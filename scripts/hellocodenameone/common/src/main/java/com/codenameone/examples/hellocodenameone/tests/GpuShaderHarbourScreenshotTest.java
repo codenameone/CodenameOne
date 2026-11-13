@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.gpu.Camera;
+import com.codename1.gpu.EnvironmentMaps;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
@@ -76,6 +77,9 @@ public class GpuShaderHarbourScreenshotTest extends BaseTest {
                 look.apply(device);
                 // crisp shadows on the quay, a coarse far cascade over the water
                 look.getLight().setShadowCenter(-1f, 0f, 0f).setShadowCascades(2, 60f);
+                // the dusk sky, pre-filtered, lights the metal and the water's reflections
+                device.getEnvironment().setEnvironmentMap(
+                        EnvironmentMaps.fromSky(device, device.getEnvironment(), look.getLight()));
             }
 
             public void onResize(GraphicsDevice device, int w, int h) {

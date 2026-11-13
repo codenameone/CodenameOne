@@ -655,7 +655,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         for (int i = 0; i < sm.getTextureCount(); i++) {
             Texture t = sm.getTexture(i);
             int l = loc(p, CT_NAMES[i]);
-            if (l >= 0 && t != null && t.getHandle() instanceof TexHandle) {
+            if (l >= 0 && t.getHandle() instanceof TexHandle) {
                 GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + 2 + i);
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
                 int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GLES20.GL_REPEAT : GLES20.GL_CLAMP_TO_EDGE;
@@ -666,6 +666,29 @@ class AndroidGraphicsDevice extends GraphicsDevice {
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter);
                 GLES20.glUniform1i(l, 2 + i);
             }
+        }
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+    }
+
+    // Binds the environment map image based lighting reads (unit 6) when the
+    // program declares it.
+    private void applyEnvironmentMap(Program p) {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null) {
+            return;
+        }
+        int l = loc(p, "u_envMap");
+        if (l >= 0 && t.getHandle() instanceof TexHandle) {
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + 6);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+            int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GLES20.GL_REPEAT : GLES20.GL_CLAMP_TO_EDGE;
+            int filter = t.getFilter() == Texture.Filter.NEAREST ? GLES20.GL_NEAREST : GLES20.GL_LINEAR;
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, wrap);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, wrap);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter);
+            GLES20.glUniform1i(l, 6);
         }
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
     }
@@ -689,6 +712,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
         uniformColor(p, "u_emissive", material.getEmissive());
         applyShader(p, material);
+        applyEnvironmentMap(p);
         if (shadowed) {
             int l = loc(p, "u_shadowMatrix");
             if (l >= 0) {

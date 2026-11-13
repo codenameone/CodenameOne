@@ -170,6 +170,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
         bindShaderTextures(material);
+        bindEnvironmentMap();
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -390,6 +391,17 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         }
     }
 
+    // binds the environment map image based lighting samples, slot 6, when
+    // the environment has one; programs without IBL ignore the slot
+    private void bindEnvironmentMap() {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null || !(t.getHandle() instanceof Long)) {
+            return;
+        }
+        LinuxNative.gl3dBindTexture(contextPeer, 6, ((Long) t.getHandle()).longValue(), 1, 0);
+    }
+
     public boolean beginShadowPass(Light light) {
         if (contextPeer == 0) {
             return false;
@@ -463,6 +475,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             }
             packUniforms(material, model, getEnvironment(), false);
             bindShaderTextures(material);
+        bindEnvironmentMap();
             Texture tex = material.getTexture();
             if (tex != null && tex.getHandle() instanceof Long) {
                 texHandle = ((Long) tex.getHandle()).longValue();

@@ -138,6 +138,7 @@ public final class HlslShaderGenerator {
         boolean skyOn = !depthOnly && sky && environment != null && environment.isSky();
         boolean hemi = lit && environment != null && environment.isHemisphere();
         boolean tone = lit && environment != null && environment.isToneMapping();
+        boolean ibl = lit && environment != null && environment.isEnvironmentMap();
         boolean emissive = lit && (material.getEmissive() & 0xffffff) != 0;
         boolean shadow = lit && shadowed && material.isReceiveShadows();
         ShaderMaterial sm = material.getEffectiveShader();
@@ -152,7 +153,7 @@ public final class HlslShaderGenerator {
             c.fragUv = hasTexcoord && ShaderEmitter.uses(sm, true, "uv");
         }
         this.source = build(lit, phong, pbr, textured, hasNormal, hasTexcoord, fog, skyOn,
-                hemi, tone, emissive, shadow, c, depthOnly);
+                hemi, tone, emissive, shadow, c, depthOnly, ibl);
     }
 
     // a material's ShaderMaterial and which inputs its fragment graphs read
@@ -235,7 +236,7 @@ public final class HlslShaderGenerator {
     private static String build(boolean lit, boolean phong, boolean pbr, boolean textured,
                                 boolean hasNormal, boolean hasTexcoord, boolean fog,
                                 boolean sky, boolean hemi, boolean tone, boolean emissive,
-                                boolean shadow, Custom c, boolean depthOnly) {
+                                boolean shadow, Custom c, boolean depthOnly, boolean ibl) {
         if (c != null) {
             c.lit = lit;
             c.textured = textured;
@@ -283,6 +284,20 @@ public final class HlslShaderGenerator {
         if (shadow) {
             sb.append("Texture2D cn1_shadowMap : register(t1);\n");
             sb.append("SamplerState cn1_shadowSampler : register(s1);\n");
+        }
+        if (ibl) {
+            // the environment map lookup of GlslShaderGenerator: six
+            // equirectangular bands stacked in v, at half intensity
+            sb.append("Texture2D cn1_envMap : register(t6);\n");
+            sb.append("SamplerState cn1_envSampler : register(s6);\n");
+            sb.append("float3 envAt(float3 d, float band) {\n");
+            sb.append("  float2 uv = float2(atan2(d.z, d.x) * 0.15915494 + 0.5, acos(clamp(d.y, -1.0, 1.0)) * 0.31830989);\n");
+            sb.append("  uv = float2(clamp(uv.x, 0.0039, 0.9961), (clamp(uv.y, 0.0079, 0.9921) + band) / 6.0);\n");
+            sb.append("  return cn1_envMap.SampleLevel(cn1_envSampler, uv, 0).rgb * 2.0;\n}\n");
+            sb.append("float3 envSpecular(float3 d, float rough) {\n");
+            sb.append("  float lv = saturate(rough) * 4.0;\n");
+            sb.append("  float l0 = floor(lv);\n");
+            sb.append("  return lerp(envAt(d, l0), envAt(d, min(l0 + 1.0, 4.0)), lv - l0);\n}\n");
         }
         int customTextures = c == null ? 0 : c.shader.getTextureCount();
         for (int i = 0; i < customTextures; i++) {
@@ -408,14 +423,16 @@ public final class HlslShaderGenerator {
             }
             sb.append("  float3 l = normalize(-lightDir.xyz);\n");
             sb.append("  float ndotl = max(dot(n, l), 0.0);\n");
-            if (hemi) {
+            if (ibl) {
+                sb.append("  float3 amb = envAt(n, 5.0);\n");
+            } else if (hemi) {
                 sb.append("  float3 amb = lerp(groundColor.xyz, skyColor.xyz, n.y * 0.5 + 0.5);\n");
             } else {
                 sb.append("  float3 amb = ambient.xyz;\n");
             }
             sb.append(shadow ? "  float shade = shadowAt(input.shadowPos, n, l);\n" : "  float shade = 1.0;\n");
             if (pbr) {
-                appendPbr(sb, hemi, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                appendPbr(sb, hemi, ibl, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
                         hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (amb + lightColor.xyz * ndotl * shade);\n");
@@ -635,7 +652,8 @@ public final class HlslShaderGenerator {
 
     // Cook-Torrance with a GGX distribution, Smith-Schlick geometry and
     // Schlick's Fresnel, as in the GLSL generator.
-    private static void appendPbr(StringBuilder sb, boolean hemi, String metallicHook, String roughHook) {
+    private static void appendPbr(StringBuilder sb, boolean hemi, boolean ibl, String metallicHook,
+            String roughHook) {
         sb.append("  float metallic = ")
                 .append(metallicHook != null ? "saturate(" + metallicHook + ")" : "params.y").append(";\n");
         // below 0.04 the GGX lobe is a sub-pixel spike that aliases
@@ -663,7 +681,12 @@ public final class HlslShaderGenerator {
         // Karis' fitted split-sum BRDF instead of a baked lookup table
         sb.append("  float3 rr = reflect(-v, n);\n");
         sb.append("  float3 rdir = normalize(lerp(rr, n, rough * rough));\n");
-        sb.append("  float3 envSpec = " + (hemi ? "lerp(groundColor.xyz, skyColor.xyz, rdir.y * 0.5 + 0.5)" : "amb") + ";\n");
+        if (ibl) {
+            sb.append("  float3 envSpec = envSpecular(rr, rough);\n");
+        } else {
+            sb.append("  float3 envSpec = " + (hemi ? "lerp(groundColor.xyz, skyColor.xyz, rdir.y * 0.5 + 0.5)" : "amb")
+                    + ";\n");
+        }
         sb.append("  float4 ec0 = float4(-1.0, -0.0275, -0.572, 0.022);\n");
         sb.append("  float4 ec1 = float4(1.0, 0.0425, 1.04, -0.04);\n");
         sb.append("  float4 er = rough * ec0 + ec1;\n");

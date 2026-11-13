@@ -633,7 +633,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         for (int i = 0; i < sm.getTextureCount(); i++) {
             Texture t = sm.getTexture(i);
             int l = loc(p, CT_NAMES[i]);
-            if (l >= 0 && t != null && t.getHandle() instanceof TexHandle) {
+            if (l >= 0 && t.getHandle() instanceof TexHandle) {
                 gl.glActiveTexture(GL2ES2.GL_TEXTURE0 + 2 + i);
                 gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
                 int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GL2ES2.GL_REPEAT : GL2ES2.GL_CLAMP_TO_EDGE;
@@ -644,6 +644,29 @@ class JavaSEGLDevice extends GraphicsDevice {
                 gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, filter);
                 gl.glUniform1i(l, 2 + i);
             }
+        }
+        gl.glActiveTexture(GL2ES2.GL_TEXTURE0);
+    }
+
+    // Binds the environment map image based lighting reads (unit 6) when the
+    // program declares it.
+    private void applyEnvironmentMap(Program p) {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null) {
+            return;
+        }
+        int l = loc(p, "u_envMap");
+        if (l >= 0 && t.getHandle() instanceof TexHandle) {
+            gl.glActiveTexture(GL2ES2.GL_TEXTURE0 + 6);
+            gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+            int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GL2ES2.GL_REPEAT : GL2ES2.GL_CLAMP_TO_EDGE;
+            int filter = t.getFilter() == Texture.Filter.NEAREST ? GL2ES2.GL_NEAREST : GL2ES2.GL_LINEAR;
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, wrap);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, wrap);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, filter);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, filter);
+            gl.glUniform1i(l, 6);
         }
         gl.glActiveTexture(GL2ES2.GL_TEXTURE0);
     }
@@ -667,6 +690,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
         uniformColor(p, "u_emissive", material.getEmissive());
         applyShader(p, material);
+        applyEnvironmentMap(p);
         if (shadowed) {
             int l = loc(p, "u_shadowMatrix");
             if (l >= 0) {

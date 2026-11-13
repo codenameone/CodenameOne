@@ -173,6 +173,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
         bindShaderTextures(material);
+        bindEnvironmentMap();
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -353,6 +354,17 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
     }
 
+    // binds the environment map image based lighting samples, slot 6, when
+    // the environment has one; programs without IBL ignore the slot
+    private void bindEnvironmentMap() {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null || !(t.getHandle() instanceof Long)) {
+            return;
+        }
+        WindowsNative.gl3dBindTexture(contextPeer, 6, ((Long) t.getHandle()).longValue(), 1, 0);
+    }
+
     public boolean beginShadowPass(Light light) {
         if (contextPeer == 0) {
             return false;
@@ -472,6 +484,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             texWrap = tex.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
         }
         bindShaderTextures(material);
+        bindEnvironmentMap();
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
         if (mesh.isIndexed()) {

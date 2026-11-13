@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 import com.codename1.gpu.Environment;
+import com.codename1.gpu.Texture;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.VertexFormat;
 import com.codename1.gpu.shader.ShaderMaterial;
@@ -95,6 +96,18 @@ public class ShaderDump {
                 write(d + ".hlsl",
                         HlslShaderGenerator.depthOnly(mat, VertexFormat.POSITION_NORMAL_TEXCOORD).getSource());
             }
+        }
+        // image based lighting: the built-in lit types and one library shader
+        Environment ibl = ScenePresets.harbourDusk().getEnvironment().setEnvironmentMap(new Texture(128, 384));
+        Material[] lit = {new Material(Material.Type.PBR), new Material(Material.Type.PHONG),
+                new Material(Material.Type.LAMBERT), new Material(Material.Type.PBR).setShader(Water.ocean())};
+        for (int i = 0; i < lit.length; i++) {
+            String b = dir + "/ibl" + i;
+            GlslShaderGenerator g = new GlslShaderGenerator(lit[i], VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true);
+            write(b + ".vert", "#version 100\n" + g.getVertexSource());
+            write(b + ".frag", "#version 100\n" + g.getFragmentSource());
+            write(b + ".metal", new IOSMetalShaderGenerator(lit[i], VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true).getSource());
+            write(b + ".hlsl", new HlslShaderGenerator(lit[i], VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true).getSource());
         }
         write(dir + "/post.frag", "#version 100\n" + GlslShaderGenerator.compositeFragment());
         write(dir + "/post.metal", IOSMetalShaderGenerator.postSource());

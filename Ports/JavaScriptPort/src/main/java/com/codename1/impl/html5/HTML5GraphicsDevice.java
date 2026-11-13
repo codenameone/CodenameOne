@@ -628,7 +628,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         for (int i = 0; i < sm.getTextureCount(); i++) {
             Texture t = sm.getTexture(i);
             WebGLUniformLocation l = loc(p, CT_NAMES[i]);
-            if (l != null && t != null && t.getHandle() instanceof WebGLTexture) {
+            if (l != null && t.getHandle() instanceof WebGLTexture) {
                 gl.activeTexture(TEXTURE0 + 2 + i);
                 gl.bindTexture(TEXTURE_2D, (WebGLTexture) t.getHandle());
                 int wrap = t.getWrap() == Texture.Wrap.REPEAT ? REPEAT : CLAMP_TO_EDGE;
@@ -639,6 +639,29 @@ class HTML5GraphicsDevice extends GraphicsDevice {
                 gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, filter);
                 gl.uniform1i(l, 2 + i);
             }
+        }
+        gl.activeTexture(TEXTURE0);
+    }
+
+    // Binds the environment map image based lighting reads (unit 6) when the
+    // program declares it.
+    private void applyEnvironmentMap(ProgramEntry p) {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null) {
+            return;
+        }
+        WebGLUniformLocation l = loc(p, "u_envMap");
+        if (l != null && t.getHandle() instanceof WebGLTexture) {
+            gl.activeTexture(TEXTURE0 + 6);
+            gl.bindTexture(TEXTURE_2D, (WebGLTexture) t.getHandle());
+            int wrap = t.getWrap() == Texture.Wrap.REPEAT ? REPEAT : CLAMP_TO_EDGE;
+            int filter = t.getFilter() == Texture.Filter.NEAREST ? NEAREST : LINEAR;
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, wrap);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, wrap);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, filter);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, filter);
+            gl.uniform1i(l, 6);
         }
         gl.activeTexture(TEXTURE0);
     }
@@ -662,6 +685,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
         uniformColor(p, "u_emissive", material.getEmissive());
         applyShader(p, material);
+        applyEnvironmentMap(p);
         if (shadowed) {
             WebGLUniformLocation l = loc(p, "u_shadowMatrix");
             if (l != null) {

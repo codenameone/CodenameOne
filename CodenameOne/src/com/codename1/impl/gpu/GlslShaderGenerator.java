@@ -133,6 +133,22 @@ public final class GlslShaderGenerator {
         return new GlslShaderGenerator(material, format, null, false, true);
     }
 
+    // The environment map lookup (EnvironmentMaps): six equirectangular bands
+    // stacked in v, five roughness levels then the irradiance, at half
+    // intensity. v keeps half a texel inside its band so filtering never
+    // reads the next one.
+    private static final String ENV_LOOKUP =
+            "vec3 envAt(vec3 d, float band) {\n"
+            + "  vec2 uv = vec2(atan(d.z, d.x) * 0.15915494 + 0.5, acos(clamp(d.y, -1.0, 1.0)) * 0.31830989);\n"
+            + "  uv = vec2(clamp(uv.x, 0.0039, 0.9961), (clamp(uv.y, 0.0079, 0.9921) + band) / 6.0);\n"
+            + "  return texture2D(u_envMap, uv).rgb * 2.0;\n"
+            + "}\n"
+            + "vec3 envSpecular(vec3 d, float rough) {\n"
+            + "  float lv = clamp(rough, 0.0, 1.0) * 4.0;\n"
+            + "  float l0 = floor(lv);\n"
+            + "  return mix(envAt(d, l0), envAt(d, min(l0 + 1.0, 4.0)), lv - l0);\n"
+            + "}\n";
+
     /// Prints the cascade choice every generator's shadow lookup shares, on
     /// `p`, the position in the near cascade's normalized device coordinates.
     /// With a ratio above 0 the map is two squares wide: a position inside
@@ -191,6 +207,7 @@ public final class GlslShaderGenerator {
         f.sky = sky && environment != null && environment.isSky();
         f.hemisphere = f.lit && environment != null && environment.isHemisphere();
         f.toneMap = f.lit && environment != null && environment.isToneMapping();
+        f.ibl = f.lit && environment != null && environment.isEnvironmentMap();
         f.shadow = f.lit && shadowed && material.isReceiveShadows();
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
         ShaderMaterial sm = material.getEffectiveShader();
@@ -219,6 +236,7 @@ public final class GlslShaderGenerator {
             f.sky = false;
             f.hemisphere = false;
             f.toneMap = false;
+            f.ibl = false;
             f.shadow = false;
             f.emissive = false;
         }
@@ -250,6 +268,7 @@ public final class GlslShaderGenerator {
         boolean fog;
         boolean hemisphere;
         boolean toneMap;
+        boolean ibl;
         boolean shadow;
         boolean emissive;
         boolean sky;
@@ -504,6 +523,10 @@ public final class GlslShaderGenerator {
             sb.append("uniform vec3 u_fogColor;\n");
             sb.append("uniform vec3 u_fog;\n");
         }
+        if (f.ibl) {
+            sb.append("uniform sampler2D u_envMap;\n");
+            sb.append(ENV_LOOKUP);
+        }
         if (f.shadow) {
             sb.append("uniform sampler2D u_shadowMap;\n");
             // bias, strength, texel size, cascade ratio (0 = one map)
@@ -572,14 +595,16 @@ public final class GlslShaderGenerator {
             }
             sb.append("  vec3 l = normalize(-u_lightDir);\n");
             sb.append("  float ndotl = max(dot(n, l), 0.0);\n");
-            if (f.hemisphere) {
+            if (f.ibl) {
+                sb.append("  vec3 ambient = envAt(n, 5.0);\n");
+            } else if (f.hemisphere) {
                 sb.append("  vec3 ambient = mix(u_ground, u_sky, n.y * 0.5 + 0.5);\n");
             } else {
                 sb.append("  vec3 ambient = u_ambient;\n");
             }
             sb.append(f.shadow ? "  float shade = shadowAt(n, l);\n" : "  float shade = 1.0;\n");
             if (f.pbr) {
-                appendPbr(sb, f.hemisphere, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                appendPbr(sb, f.hemisphere, f.ibl, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
                         hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (ambient + u_lightColor * ndotl * shade);\n");
@@ -687,7 +712,8 @@ public final class GlslShaderGenerator {
     // Schlick's Fresnel: the metallic/roughness model glTF assets are authored
     // for. The light colour is scaled by pi so a white light on a white
     // dielectric gives the same brightness as LAMBERT does.
-    private static void appendPbr(StringBuilder sb, boolean hemi, String metallicHook, String roughHook) {
+    private static void appendPbr(StringBuilder sb, boolean hemi, boolean ibl, String metallicHook,
+            String roughHook) {
         sb.append("  float metallic = ")
                 .append(metallicHook != null ? "clamp(" + metallicHook + ", 0.0, 1.0)" : "u_pbr.x").append(";\n");
         // below 0.04 the GGX lobe is a sub-pixel spike that aliases
@@ -715,7 +741,13 @@ public final class GlslShaderGenerator {
         // Karis' fitted split-sum BRDF instead of a baked lookup table
         sb.append("  vec3 rr = reflect(-v, n);\n");
         sb.append("  vec3 rdir = normalize(mix(rr, n, rough * rough));\n");
-        sb.append("  vec3 envSpec = " + (hemi ? "mix(u_ground, u_sky, rdir.y * 0.5 + 0.5)" : "ambient") + ";\n");
+        if (ibl) {
+            // the baked map is already blurred per roughness, so it is read
+            // along the true reflection
+            sb.append("  vec3 envSpec = envSpecular(rr, rough);\n");
+        } else {
+            sb.append("  vec3 envSpec = " + (hemi ? "mix(u_ground, u_sky, rdir.y * 0.5 + 0.5)" : "ambient") + ";\n");
+        }
         sb.append("  vec4 ec0 = vec4(-1.0, -0.0275, -0.572, 0.022);\n");
         sb.append("  vec4 ec1 = vec4(1.0, 0.0425, 1.04, -0.04);\n");
         sb.append("  vec4 er = rough * ec0 + ec1;\n");
