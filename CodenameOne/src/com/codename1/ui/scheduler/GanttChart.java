@@ -249,6 +249,11 @@ final class GanttChart extends ScrollSurface {
         // after the last bar.
         long from = TimeMath.startOfDay(first, zone) - 3 * TimeMath.DAY;
         long to = TimeMath.startOfDay(last, zone) + 12 * TimeMath.DAY;
+        // What fitting shows: the project's own days, not the room around
+        // them, or a week's plan fits as three weeks.
+        long fitFrom = TimeMath.startOfDay(first, zone);
+        long fitTo = Math.max(fitFrom + TimeMath.DAY,
+                TimeMath.startOfDay(last - 1, zone) + TimeMath.DAY);
         long keep = scaled ? axis.time(getOffX()) : Long.MIN_VALUE;
         axis.setZone(zone);
         axis.setFirstDayOfWeek(owner.getFirstDayOfWeek());
@@ -293,13 +298,13 @@ final class GanttChart extends ScrollSurface {
         if (!scaled && width > 0) {
             scaled = true;
             if (fit) {
-                axis.setMillisPerPixel((double) span / bodyW);
+                axis.setMillisPerPixel((double) (fitTo - fitFrom) / bodyW);
             } else {
                 axis.setMillisPerPixel(Math.min(dayScale, Math.max((double) span / bodyW,
                         (double) TimeMath.DAY / Look.mm(14))));
             }
+            setOffsets(fit ? axis.x(fitFrom) : 0, getOffY());
             fit = false;
-            setOffsets(0, getOffY());
         } else if (keep != Long.MIN_VALUE) {
             // The range may have grown at its start: what was at the left
             // edge stays there.

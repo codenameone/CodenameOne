@@ -132,7 +132,7 @@ This is the lightweight argument in one picture. A native date picker looks the 
 ## Slate: a booking app you can ship
 
 {{< guide-block >}}
-<video controls playsinline preload="metadata" poster="/blog/release-2026-11-13/slate-desktop-demo-poster.jpg" width="1280" height="746" style="width:100%;height:auto;display:block;margin:16px auto" aria-label="Slate on the desktop: booking, the provider week and the owner dashboard"><source src="/blog/release-2026-11-13/slate-desktop-demo.mp4" type="video/mp4"><a href="/blog/release-2026-11-13/slate-desktop-demo.mp4">Download the desktop video</a>.</video>
+<video controls playsinline preload="metadata" poster="/blog/release-2026-11-13/slate-desktop-demo-poster.jpg" width="1280" height="746" style="width:100%;height:auto;display:block;margin:16px auto" aria-label="Slate on the desktop: a client picks a service, a day and a free time, and books it"><source src="/blog/release-2026-11-13/slate-desktop-demo.mp4" type="video/mp4"><a href="/blog/release-2026-11-13/slate-desktop-demo.mp4">Download the desktop video</a>.</video>
 {{< /guide-block >}}
 
 Slate is our new full-stack template: an appointment booking app and its server, in one Maven project. Salons, clinics, tutors, personal trainers: anyone who sells time. Generate it from the [Initializr](/initializr/) under your own name and package. The source is MIT-0, so you owe nothing and credit nobody.
@@ -142,6 +142,7 @@ Slate is our new full-stack template: an appointment booking app and its server,
 <figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/slate-book-slots.png" alt="Slate showing free times for a service" loading="lazy" style="width:100%;height:auto" /><figcaption>Free times.</figcaption></figure>
 <figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/slate-book-confirm.png" alt="Slate confirming a booking with a deposit" loading="lazy" style="width:100%;height:auto" /><figcaption>Confirm, with a deposit.</figcaption></figure>
 <figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/slate-provider-week.png" alt="A provider's week in Slate" loading="lazy" style="width:100%;height:auto" /><figcaption>The provider's week.</figcaption></figure>
+<figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/slate-owner-staffing.png" alt="The owner's staffing plan as a Gantt chart, with each provider's load under it" loading="lazy" style="width:100%;height:auto" /><figcaption>The week's staffing, as a Gantt chart.</figcaption></figure>
 <figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/slate-owner-preview.png" alt="The owner previewing booking rules on a real day" loading="lazy" style="width:100%;height:auto" /><figcaption>Rules, previewed on a real day.</figcaption></figure>
 </div>
 {{< /guide-block >}}
@@ -150,7 +151,7 @@ It has three roles, and the server decides which screens an account sees:
 
 - **Clients** see free times by day or week, with times that clash with their own phone calendar marked. A hold keeps the slot while they book, they can pay a deposit, and the booking lands in their calendar with a reminder that moves if they reschedule. There's a waitlist for full days.
 - **Providers** manage hours and time off, mark appointments complete or no-show, and sync their calendars from the phone, Google, Microsoft or an ICS address. Event titles never leave the device; Slate only needs to know when they're busy.
-- **Owners** get a dashboard, a board for the day, the service catalog and booking rules they can preview on a real day before saving them.
+- **Owners** get a dashboard, a board for the day, a staffing plan for the week, the service catalog and booking rules they can preview on a real day before saving them.
 
 The hard part of a booking product is the slot engine, and that's where most of Slate's server lives. It weighs providers, rooms, buffers between appointments, travel time, gap rules and the client's own calendar together, and the hold prevents two clients from getting the same slot.
 
@@ -158,9 +159,9 @@ The hard part of a booking product is the slot engine, and that's where most of 
 
 It runs on iOS, Android, the desktop and the web, and the backend runs on SQLite, PostgreSQL, MySQL, or MariaDB.
 
-### Slate predates the scheduler
+### Slate runs on the scheduler and the Gantt chart
 
-Slate was finished before the scheduler landed, so its calendar screens are hand built. Over the coming week we'll move the provider and owner views onto `Scheduler`, which should delete a good chunk of code and give providers drag to reschedule for free. If you generate Slate today you'll get that update through the template.
+Slate's calendar screens are the components in this post. The provider's day and week are `Scheduler` views, and the owner's day board is the `RESOURCE_DAY` view with a column per provider. The owner's staffing plan is a `Gantt` chart: a row per provider, a bar per shift filled as far as it's booked, and the resource load under it showing who has room this week. The [implementor's guide](/slate/) walks through how a week of schedules becomes a project model.
 
 ## Learn more
 

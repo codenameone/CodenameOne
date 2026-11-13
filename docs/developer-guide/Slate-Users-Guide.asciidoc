@@ -31,7 +31,8 @@ switches between them from the menu.
   calendars that make you busy.
 
 | Owner
-| Read the dashboard, see every provider's day side by side, edit services,
+| Read the dashboard, see every provider's day side by side, plan the week's
+  staffing, edit services,
   providers, locations and rooms, and change the booking rules with a preview.
 |===
 
@@ -204,6 +205,16 @@ wide enough on a tablet or a desktop to see who is free at a glance, and scrolls
 sideways on a phone.
 
 image::img/slate-owner-board.png["The day board with one column per provider",scaledwidth=40%]
+
+*Staffing*, or *Plan the week* on the dashboard, shows the whole week as a
+Gantt chart. Each provider has a row with a bar for every shift they work. The
+filled part of a bar is how much of that shift is booked, and the chart under
+the bars shows each provider's load hour by hour, so a provider who is fully
+booked stands out next to one with empty afternoons. A shift lost to time off
+is marked as such. The arrows move a week at a time, and opening a shift opens
+that day's board. To change the hours themselves, edit the provider.
+
+image::img/slate-owner-staffing.png["The staffing plan: a row per provider, a bar per shift filled as far as it's booked, and each provider's load under the chart",scaledwidth=40%]
 
 ==== The catalogue
 

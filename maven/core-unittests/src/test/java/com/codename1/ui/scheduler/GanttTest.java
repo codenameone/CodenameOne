@@ -121,6 +121,33 @@ class GanttTest extends UITestBase {
     }
 
     @FormTest
+    void zoomToFitShowsTheProjectsDaysAndNotTheRoomAroundThem() {
+        ProjectModel p = project();
+        // Long enough that the finest zoom does not stop the fit short.
+        GanttTask a = task(p, null, "a", 15);
+        GanttTask b = task(p, null, "b", 10);
+        p.link(a, b);
+        p.update();
+        Gantt g = show(p);
+        GanttChart chart = g.surface();
+        long first = at(5, 0);
+        long end = 0;
+        for (GanttTask t : p.getTasks()) {
+            end = Math.max(end, t.getEnd());
+        }
+        long last = TimeMath.startOfDay(end - 1, UTC) + TimeMath.DAY;
+
+        g.zoomToFit();
+        chart.layoutNow();
+
+        int left = chart.axis().x(first) - chart.getOffX();
+        int right = chart.axis().x(last) - chart.getOffX();
+        int body = chart.bodyWidth();
+        assertEquals(0, left, 1, "the first day starts at the left edge");
+        assertEquals(body, right, 2, "the last day ends at the right edge");
+    }
+
+    @FormTest
     void rowsFollowTheTreeAndACollapsedSummaryHidesItsChildren() {
         ProjectModel p = project();
         GanttTask phase = task(p, null, "phase", 0);
