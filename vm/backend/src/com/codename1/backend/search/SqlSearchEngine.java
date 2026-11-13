@@ -55,7 +55,9 @@ import java.util.Map;
 /// Matching, as on a search cluster, requires every word. Filters, field
 /// restrictions, sorting, facets and paging are then applied in memory over at
 /// most [#MAX_CANDIDATES] matches; past that [SearchResult#isTotalExact()] is
-/// false. Highlights are not produced.
+/// false, and a filter or a sort sees only those candidates (the best scored,
+/// or the first by id for an empty query), so a selective filter over a larger
+/// index belongs in a search cluster. Highlights are not produced.
 public final class SqlSearchEngine implements SearchEngine {
     /// The most matches read from the database for one query.
     public static final int MAX_CANDIDATES = 5000;
@@ -123,7 +125,18 @@ public final class SqlSearchEngine implements SearchEngine {
                 + (kind == MYSQL
                 ? "ON DUPLICATE KEY UPDATE body = VALUES(body), doc = VALUES(doc)"
                 : "ON CONFLICT (idx, id) DO UPDATE SET body = excluded.body, doc = excluded.doc");
-        data.execute(sql, new Object[] {index, id, body.toString(), Json.write(document)});
+        String text = body.toString();
+        if (kind == POSTGRES) {
+            // PostgreSQL's parser keeps an e-mail, a host or report.pdf as one
+            // token, so a query for "report" would miss it; store the words
+            // exactly as terms() splits a query instead.
+            StringBuilder w = new StringBuilder();
+            for (Object eachWord : words(text, Integer.MAX_VALUE)) {
+                w.append(w.length() == 0 ? "" : " ").append(eachWord);
+            }
+            text = w.toString();
+        }
+        data.execute(sql, new Object[] {index, id, text, Json.write(document)});
     }
 
     private static void collectText(Object value, StringBuilder out, int depth) {

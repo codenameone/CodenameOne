@@ -37,7 +37,7 @@ import java.util.Map;
 /// Elasticsearch (7 and 8) and OpenSearch over their REST API.
 ///
 /// The request bodies used are the subset both projects share: `bool` queries
-/// with `multi_match`, `match_phrase` and `term`, `terms` aggregations,
+/// with `multi_match` and `term`, `terms` aggregations,
 /// `highlight` and `track_total_hits`. Basic authentication comes from the URL,
 /// an API key from `cn1.search.apiKey`, and an Amazon OpenSearch domain is signed
 /// with SigV4 instead.
@@ -47,6 +47,8 @@ public final class ElasticsearchEngine implements SearchEngine {
     private final String awsHost;
     private final String awsService;
     private final String awsRegion;
+    // "index/field" -> the name sorts, facets and filters use on that field.
+    private final Map exactNames = new java.util.HashMap();
 
     private ElasticsearchEngine(String base, String authorization, String awsHost,
             String awsService, String awsRegion) {
@@ -230,6 +232,13 @@ public final class ElasticsearchEngine implements SearchEngine {
 
     /// The request body for a query; package visible for tests.
     static Map body(SearchQuery q) {
+        return body(q, new LinkedHashMap());
+    }
+
+    /// `exact` maps a field to the name its exact operations (filter, sort,
+    /// facet) go to: the `keyword` sub-field of a string the dynamic mapping
+    /// made `text`, which cannot be sorted or aggregated and compares by token.
+    static Map body(SearchQuery q, Map exact) {
         Map bool = new LinkedHashMap();
         if (q.getText().length() > 0) {
             Map mm = new LinkedHashMap();
@@ -248,10 +257,9 @@ public final class ElasticsearchEngine implements SearchEngine {
             Map.Entry e = (Map.Entry) it.next();
             Map clause = new LinkedHashMap();
             Map inner = new LinkedHashMap();
-            inner.put(e.getKey(), e.getValue());
-            // A string compared as a phrase works on text and keyword fields alike;
-            // term on an analyzed text field would miss anything with capitals.
-            clause.put(e.getValue() instanceof String ? "match_phrase" : "term", inner);
+            inner.put(exactName(exact, (String) e.getKey()), e.getValue());
+            // Equality, as the SQL engine compares: term on the keyword form.
+            clause.put("term", inner);
             filters.add(clause);
         }
         if (!filters.isEmpty()) {
@@ -272,7 +280,7 @@ public final class ElasticsearchEngine implements SearchEngine {
             Map order = new LinkedHashMap();
             order.put("order", q.isSortAscending() ? "asc" : "desc");
             Map s = new LinkedHashMap();
-            s.put(q.getSortField(), order);
+            s.put(exactName(exact, q.getSortField()), order);
             List sort = new ArrayList();
             sort.add(s);
             body.put("sort", sort);
@@ -295,7 +303,7 @@ public final class ElasticsearchEngine implements SearchEngine {
             for (int i = 0; i < q.getFacets().size(); i++) {
                 String f = (String) q.getFacets().get(i);
                 Map terms = new LinkedHashMap();
-                terms.put("field", f);
+                terms.put("field", exactName(exact, f));
                 terms.put("size", Integer.valueOf(50));
                 Map agg = new LinkedHashMap();
                 agg.put("terms", terms);
@@ -309,7 +317,18 @@ public final class ElasticsearchEngine implements SearchEngine {
     @Override
     public SearchResult search(String index, SearchQuery q) throws IOException {
         requireIndexName(index);
-        Web.Result r = send("POST", "/" + index + "/_search", null, body(q));
+        Map exact = new LinkedHashMap();
+        Iterator fit = q.getFilters().keySet().iterator();
+        while (fit.hasNext()) {
+            resolveExact(index, (String) fit.next(), exact);
+        }
+        if (q.getSortField() != null) {
+            resolveExact(index, q.getSortField(), exact);
+        }
+        for (Object f : q.getFacets()) {
+            resolveExact(index, (String) f, exact);
+        }
+        Web.Result r = send("POST", "/" + index + "/_search", null, body(q, exact));
         if (r.getStatus() == 404) {
             return new SearchResult(new ArrayList(), 0, true, null);
         }
@@ -317,6 +336,66 @@ public final class ElasticsearchEngine implements SearchEngine {
             throw failure("Searching " + index, r);
         }
         return parse(json(r));
+    }
+
+    private static String exactName(Map exact, String field) {
+        Object n = exact.get(field);
+        return n == null ? field : (String) n;
+    }
+
+    /// Looks up how `field` is mapped and records the name exact operations
+    /// use: `field.keyword` for a text field that has that sub-field, the
+    /// field itself otherwise. Cached once the field is mapped.
+    @SuppressWarnings("unchecked")
+    private void resolveExact(String index, String field, Map exact) throws IOException {
+        boolean plain = field.length() > 0;
+        for (int i = 0; plain && i < field.length(); i++) {
+            char c = field.charAt(i);
+            plain = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || c == '_' || c == '-' || c == '.';
+        }
+        if (!plain) {
+            // Not a name to put in a path; the query uses it as given.
+            exact.put(field, field);
+            return;
+        }
+        String key = index + "/" + field;
+        String name = (String) exactNames.get(key);
+        if (name == null) {
+            Web.Result r = send("GET", "/" + index + "/_mapping/field/" + field, null, null);
+            if (r.getStatus() != 200) {
+                exact.put(field, field);
+                return;
+            }
+            name = keywordName(json(r), index, field);
+            if (name == null) {
+                // Not mapped yet: decide again once documents carry it.
+                exact.put(field, field);
+                return;
+            }
+            exactNames.put(key, name);
+        }
+        exact.put(field, name);
+    }
+
+    /// The exact-operation name in a `_mapping/field` response, or null if
+    /// the field is not mapped. Package visible for tests.
+    static String keywordName(Map response, String index, String field) {
+        Object idx = response.get(index);
+        Object mappings = idx instanceof Map ? ((Map) idx).get("mappings") : null;
+        Object entry = mappings instanceof Map ? ((Map) mappings).get(field) : null;
+        Object mapping = entry instanceof Map ? ((Map) entry).get("mapping") : null;
+        if (!(mapping instanceof Map) || ((Map) mapping).isEmpty()) {
+            return null;
+        }
+        Object def = ((Map) mapping).values().iterator().next();
+        if (!(def instanceof Map) || !"text".equals(((Map) def).get("type"))) {
+            return field;
+        }
+        Object fields = ((Map) def).get("fields");
+        Object kw = fields instanceof Map ? ((Map) fields).get("keyword") : null;
+        return kw instanceof Map && "keyword".equals(((Map) kw).get("type"))
+                ? field + ".keyword" : field;
     }
 
     static SearchResult parse(Map response) {

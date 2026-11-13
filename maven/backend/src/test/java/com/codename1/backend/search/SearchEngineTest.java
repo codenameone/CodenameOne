@@ -68,7 +68,7 @@ class SearchEngineTest {
                 "CN1_TEST_SEARCH_URL is not set");
         SearchEngine e = SearchEngines.open(url, null);
         try {
-            scenario(e, "color.keyword");
+            scenario(e, "color");
         } finally {
             e.close();
         }
@@ -81,7 +81,7 @@ class SearchEngineTest {
         assertEquals(Integer.valueOf(20), body.get("from"));
         String json = com.codename1.backend.Json.write(body);
         assertTrue(json.indexOf("\"multi_match\"") > 0);
-        assertTrue(json.indexOf("\"match_phrase\":{\"brand\":\"acme\"}") > 0);
+        assertTrue(json.indexOf("\"term\":{\"brand\":\"acme\"}") > 0);
         assertTrue(json.indexOf("\"term\":{\"stock\":3}") > 0);
         assertEquals(Arrays.asList(new Object[] {"red", "shoes", "o", "brien"}),
                 SqlSearchEngine.terms(" Red+SHOES  O'Brien% "));
@@ -148,6 +148,22 @@ class SearchEngineTest {
             assertEquals(1, e.search(index, new SearchQuery("the matrix")).getTotal());
             assertEquals(1, e.search(index, new SearchQuery("go kart")).getTotal());
             assertEquals(1, e.search(index, new SearchQuery("\u00e9lan")).getTotal());
+            // The SQL engines split words at punctuation on every database (a
+            // cluster's analyzer keeps report.pdf whole, which is its own rule).
+            if (e instanceof SqlSearchEngine) {
+            e.index(index, "7", product("See report.pdf from bob@example.com", "neo", "grey", 1));
+            e.refresh(index);
+            assertEquals(1, e.search(index, new SearchQuery("report")).getTotal());
+            assertEquals(1, e.search(index, new SearchQuery("example")).getTotal());
+            e.delete(index, "7");
+            e.refresh(index);
+            }
+            // A string filter is equality and a string sorts, on every engine.
+            assertEquals(2, e.search(index, new SearchQuery("").filter("brand", "neo")).getTotal());
+            assertEquals(0, e.search(index, new SearchQuery("").filter("brand", "Neo")).getTotal());
+            assertEquals(0, e.search(index, new SearchQuery("").filter("name", "Matrix")).getTotal());
+            r = e.search(index, new SearchQuery("").sort("name", true).page(0, 1));
+            assertEquals("3", ((SearchHit) r.getHits().get(0)).getId());
             assertEquals(0, e.search(index, new SearchQuery("cat")).getTotal());
         } finally {
             e.deleteIndex(index);

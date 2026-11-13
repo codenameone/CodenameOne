@@ -223,8 +223,12 @@ public final class MongoDocumentStore implements DocumentStore {
                 default: {
                     Object[] values = (Object[]) cr.getValue();
                     List l = new ArrayList();
+                    // A null element would make $in match a missing field; like
+                    // SQL's IN (and the in-memory matcher), null matches nothing.
                     for (Object eachValue : values) {
-                        l.add(eachValue);
+                        if (eachValue != null) {
+                            l.add(eachValue);
+                        }
                     }
                     inner.put("$in", l);
                     break;
@@ -258,7 +262,9 @@ public final class MongoDocumentStore implements DocumentStore {
                 sb.append(c);
             }
         }
-        return sb.append('$').toString();
+        // \\z, not $: PCRE's $ also matches before a final newline, so
+        // 'abc' would match "abc\n" here and nowhere else.
+        return sb.append("\\z").toString();
     }
 
     @Override

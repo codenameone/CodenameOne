@@ -121,7 +121,7 @@ public final class Criterion {
                 return false;
             }
             default: {
-                if (actual == null || value == null) {
+                if (actual == null || value == null || !comparable(actual, value)) {
                     return false;
                 }
                 int c = compare(actual, value);
@@ -170,6 +170,35 @@ public final class Criterion {
             boolean x = ((Boolean) a).booleanValue();
             return x == ((Boolean) b).booleanValue() ? 0 : (x ? 1 : -1);
         }
+        if (a instanceof String && b instanceof String) {
+            return ((String) a).compareTo((String) b);
+        }
+        // Values of different types: a stable order for sorting, by type.
+        // A range test never gets here (see comparable).
+        int x = rank(a);
+        int y = rank(b);
+        if (x != y) {
+            return x < y ? -1 : 1;
+        }
         return String.valueOf(a).compareTo(String.valueOf(b));
+    }
+
+    /// Whether a range test between the two can hold. Like the stores, a
+    /// number is never greater or less than a string.
+    static boolean comparable(Object a, Object b) {
+        return rank(a) == rank(b);
+    }
+
+    private static int rank(Object v) {
+        if (v instanceof Number) {
+            return 0;
+        }
+        if (v instanceof String) {
+            return 1;
+        }
+        if (v instanceof java.util.Date) {
+            return 2;
+        }
+        return v instanceof Boolean ? 3 : 4;
     }
 }

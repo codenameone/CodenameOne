@@ -247,7 +247,10 @@ final class MongoConnection {
         }
         // Without skipEmptyExchange support (servers before 4.4) one more empty
         // round completes the conversation.
-        while (!Boolean.TRUE.equals(last.get("done"))) {
+        for (int round = 0; !Boolean.TRUE.equals(last.get("done")); round++) {
+            if (round >= 2) {
+                throw new IOException("MongoDB did not finish the SCRAM conversation");
+            }
             Map more = new LinkedHashMap();
             more.put("saslContinue", Integer.valueOf(1));
             more.put("conversationId", first.get("conversationId"));
