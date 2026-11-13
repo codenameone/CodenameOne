@@ -52,12 +52,15 @@ import java.util.Map;
 public final class DynamoDb {
     private static final String TARGET_PREFIX = "DynamoDB_20120810.";
     private static final long REFRESH_MARGIN_MILLIS = 300000L;
+    private static final int TABLE_WAIT_ATTEMPTS = 300;
+    private static final long TABLE_WAIT_MILLIS = 1000L;
 
     private final String region;
     private final String host;
     private final boolean secure;
     private final boolean refreshCredentials;
     private Credentials credentials;
+    private boolean consistentReads = true;
 
     private DynamoDb(Credentials credentials, String region, String host, boolean secure,
             boolean refreshCredentials) {
@@ -168,6 +171,7 @@ public final class DynamoDb {
         Map req = new LinkedHashMap();
         req.put("TableName", table);
         req.put("Key", Items.toAttributes(key));
+        consistent(req, null);
         Object item = call("GetItem", req).get("Item");
         return item instanceof Map ? Items.fromAttributes((Map) item) : null;
     }
@@ -239,6 +243,7 @@ public final class DynamoDb {
             req.put("IndexName", index);
         }
         req.put("KeyConditionExpression", keyCondition);
+        consistent(req, index);
         if (names != null && !names.isEmpty()) {
             req.put("ExpressionAttributeNames", names);
         }
@@ -253,11 +258,29 @@ public final class DynamoDb {
             throws IOException {
         Map req = new LinkedHashMap();
         req.put("TableName", table);
+        consistent(req, null);
         if (names != null && !names.isEmpty()) {
             req.put("ExpressionAttributeNames", names);
         }
         expression(req, "FilterExpression", filter, values);
         return pages("Scan", req, limit);
+    }
+
+    /// Whether reads of a table are strongly consistent; true by default.
+    ///
+    /// DynamoDB's own default is eventually consistent, under which an item
+    /// just written can be missing from the next read, and a version read for
+    /// an optimistic update can be stale. Strong reads cost twice the read
+    /// capacity. A secondary index read is always eventually consistent.
+    public void setConsistentReads(boolean consistent) {
+        consistentReads = consistent;
+    }
+
+    private void consistent(Map req, String index) {
+        // DynamoDB refuses ConsistentRead on a global secondary index.
+        if (consistentReads && index == null) {
+            req.put("ConsistentRead", Boolean.TRUE);
+        }
     }
 
     private List pages(String op, Map req, int limit) throws IOException {
@@ -357,6 +380,27 @@ public final class DynamoDb {
                 throw err;
             }
         }
+        awaitActive(table);
+    }
+
+    /// Waits until `table` can be read and written. A new table is CREATING for
+    /// some seconds, and every item operation on it fails until it is ACTIVE.
+    private void awaitActive(String table) throws IOException {
+        Map req = new LinkedHashMap();
+        req.put("TableName", table);
+        for (int attempt = 0; attempt < TABLE_WAIT_ATTEMPTS; attempt++) {
+            Object desc = call("DescribeTable", req).get("Table");
+            if (desc instanceof Map && "ACTIVE".equals(((Map) desc).get("TableStatus"))) {
+                return;
+            }
+            try {
+                Thread.sleep(TABLE_WAIT_MILLIS);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted waiting for table " + table, err);
+            }
+        }
+        throw new IOException("Table " + table + " did not become ACTIVE");
     }
 
     /// Deletes a table; a missing one is not an error.

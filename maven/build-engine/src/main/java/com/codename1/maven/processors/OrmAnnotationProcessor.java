@@ -1179,6 +1179,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     if(entity.embeddedId!=null) ctx.error("Multiple embedded identifiers");
                     entity.embeddedId=path;
                 }
+                if(field.getAnnotation("Lcom/codename1/annotations/db/SearchField;")!=null) {
+                    // The value is stored as its own columns; marking the holder
+                    // would otherwise be dropped and every column indexed.
+                    ctx.error("@SearchField goes on the fields of the @Embeddable, not on the embedded value: "+path);
+                }
                 if(field.isFinal() && !cls.isRecord()) { ctx.error("Embedded field must be writable: "+path);continue; }
                 String type=org.objectweb.asm.Type.getType(field.getDescriptor()).getClassName();
                 AnnotatedClass embedded=findType(type,ctx);

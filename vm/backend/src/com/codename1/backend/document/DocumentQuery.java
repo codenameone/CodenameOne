@@ -55,7 +55,13 @@ public final class DocumentQuery<T> implements Query<T> {
     /// A value as the store holds it for `field`: a key column is stored in its
     /// storage form (see [DocumentSession]), every other one in its own type.
     private Object stored(String field, Object value) {
-        return model.attributes()[model.index(field)].id ? Values.storage(value)
+        int i = model.index(field);
+        // Compared against what toDocument(m, entity) wrote, so the value goes
+        // through the same attribute conversion first.
+        if (model.mapping(i).length() > 0) {
+            value = model.parameter(i, value);
+        }
+        return model.attributes()[i].id ? Values.storage(value)
                 : DocumentSession.toDocument(value);
     }
 

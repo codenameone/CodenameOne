@@ -279,7 +279,10 @@ public final class Bson {
                 need(p, 8, limit);
                 at[0] = p + 8;
                 return Double.valueOf(Double.longBitsToDouble(longAt(d, p)));
-            case 0x02: {
+            case 0x02:
+            case 0x0D:
+            case 0x0E: {
+                // A string; JavaScript code and the deprecated symbol share it.
                 need(p, 4, limit);
                 int n = intAt(d, p);
                 need(p + 4, n, limit);
@@ -319,8 +322,34 @@ public final class Bson {
                 need(p, 8, limit);
                 at[0] = p + 8;
                 return new Date(longAt(d, p));
+            case 0x06:
             case 0x0A:
+            case 0x7F:
+            case 0xFF:
+                // undefined, null, and the max and min keys, which hold nothing.
                 return null;
+            case 0x0B: {
+                // A regular expression, read as JavaScript writes it.
+                String pattern = cstring(d, at, limit);
+                String options = cstring(d, at, limit);
+                return "/" + pattern + "/" + options;
+            }
+            case 0x0C: {
+                // The deprecated DBPointer: a namespace and an id; the id is kept.
+                readValue(d, at, limit, 0x02, depth);
+                return readValue(d, at, limit, 0x07, depth);
+            }
+            case 0x0F: {
+                // JavaScript code with a scope: the code is kept.
+                need(p, 4, limit);
+                int total = intAt(d, p);
+                need(p, total, limit);
+                at[0] = p + 4;
+                Object code = readValue(d, at, p + total, 0x02, depth);
+                readDocument(d, at, p + total, depth + 1);
+                at[0] = p + total;
+                return code;
+            }
             case 0x10:
                 need(p, 4, limit);
                 at[0] = p + 4;

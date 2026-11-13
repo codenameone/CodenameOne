@@ -34,7 +34,8 @@ public interface CommitObserver {
     int REMOVED = 5;
 
     /// `entity` of `model` was written with `event` by a transaction that has
-    /// committed. The data is already durable, so a failure here must not be
-    /// reported as a failed commit.
+    /// committed. The data is already durable: an exception thrown here does
+    /// not stop the other writes being delivered, and reaches the caller of
+    /// `commitTransaction` only after the commit, with the session intact.
     void committed(EntityModel<?> model, Object entity, int event);
 }

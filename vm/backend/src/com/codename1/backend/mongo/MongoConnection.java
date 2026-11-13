@@ -36,11 +36,14 @@ import java.util.Map;
 /// Not thread safe; [MongoClient] lends each connection to one caller at a time.
 final class MongoConnection {
     private static final int OP_MSG = 2013;
+    private static final int MIN_SCRAM_ITERATIONS = 4096;
     private static final int MAX_SCRAM_ITERATIONS = 1000000;
 
     private final WireBuffer wire;
     private int nextRequest = 1;
     private boolean broken;
+    private boolean writablePrimary;
+    private long releasedAt;
 
     private MongoConnection(WireBuffer wire) {
         this.wire = wire;
@@ -61,7 +64,9 @@ final class MongoConnection {
             hello.put("hello", Integer.valueOf(1));
             // No client metadata: the server requires driver.version and os.type
             // in it once it is sent at all, and it is diagnostics only.
-            c.command("admin", hello);
+            Map reply = c.command("admin", hello);
+            c.writablePrimary = Boolean.TRUE.equals(reply.get("isWritablePrimary"))
+                    || Boolean.TRUE.equals(reply.get("ismaster"));
             if (uri.user != null) {
                 c.scram(uri.authSource, uri.user, uri.password == null ? "" : uri.password);
             }
@@ -74,6 +79,20 @@ final class MongoConnection {
             }
             throw err;
         }
+    }
+
+    /// Whether the server said it accepts writes: a standalone, a mongos, or a
+    /// replica set's primary.
+    boolean isWritablePrimary() {
+        return writablePrimary;
+    }
+
+    long releasedAt() {
+        return releasedAt;
+    }
+
+    void markReleased(long now) {
+        releasedAt = now;
     }
 
     boolean isBroken() {
@@ -186,7 +205,7 @@ final class MongoConnection {
         String saltText = field(serverFirst, 's');
         String iterText = field(serverFirst, 'i');
         if (nonce == null || saltText == null || iterText == null
-                || !nonce.startsWith(clientNonce)) {
+                || !nonce.startsWith(clientNonce) || nonce.length() <= clientNonce.length()) {
             throw new IOException("MongoDB's SCRAM message is malformed or replayed");
         }
         byte[] salt = Base64.decode(saltText);
@@ -196,7 +215,9 @@ final class MongoConnection {
         } catch (NumberFormatException err) {
             iterations = -1;
         }
-        if (salt == null || iterations < 1 || iterations > MAX_SCRAM_ITERATIONS) {
+        // RFC 7677 asks for at least 4096; a server offering fewer, which a
+        // man in the middle could do, would make the proof cheap to attack.
+        if (salt == null || iterations < MIN_SCRAM_ITERATIONS || iterations > MAX_SCRAM_ITERATIONS) {
             throw new IOException("MongoDB's SCRAM salt or iteration count is unusable");
         }
         byte[] salted = Crypto.pbkdf2Sha256(WireBuffer.utf8(password), salt, iterations, 32);

@@ -177,13 +177,19 @@ public final class Items {
     }
 
     static Object number(String text) {
-        boolean integral = text.length() > 0 && text.length() <= 18;
+        // Up to 19 digits and a sign is a long when it fits; one past the range
+        // falls through to a double rather than wrapping.
+        boolean integral = text.length() > 0 && text.length() <= 20;
         for (int i = 0; integral && i < text.length(); i++) {
             char c = text.charAt(i);
             integral = (c >= '0' && c <= '9') || (i == 0 && c == '-' && text.length() > 1);
         }
         if (integral) {
-            return Long.valueOf(Long.parseLong(text));
+            try {
+                return Long.valueOf(Long.parseLong(text));
+            } catch (NumberFormatException outOfRange) {
+                return Double.valueOf(Double.parseDouble(text));
+            }
         }
         return Double.valueOf(Double.parseDouble(text));
     }

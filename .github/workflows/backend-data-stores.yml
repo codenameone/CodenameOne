@@ -22,6 +22,7 @@ on:
     paths:
       - '.github/workflows/backend-data-stores.yml'
       - 'scripts/ci/retry.sh'
+      - '.github/scripts/require-no-skipped-tests.sh'
       - 'vm/backend/src/com/codename1/backend/aws/**'
       - 'vm/backend/src/com/codename1/backend/bson/**'
       - 'vm/backend/src/com/codename1/backend/document/**'
@@ -32,6 +33,12 @@ on:
       - 'maven/backend/src/test/java/com/codename1/backend/dynamo/**'
       - 'maven/backend/src/test/java/com/codename1/backend/mongo/**'
       - 'maven/backend/src/test/java/com/codename1/backend/search/**'
+      - 'maven/backend/src/test/java/com/codename1/backend/orm/SearchIndexerTest.java'
+      - 'maven/backend/pom.xml'
+      # Where sessions get their search indexer, and the generator of the
+      # sortKeyIndex/searchIndex/searchField methods the stores read.
+      - 'vm/backend/src/com/codename1/backend/orm/EntityManager.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/processors/OrmAnnotationProcessor.java'
       - 'CodenameOne/src/com/codename1/impl/orm/**'
       - 'CodenameOne/src/com/codename1/annotations/db/**'
   schedule:
@@ -131,35 +138,33 @@ jobs:
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
 
       # Not through retry.sh: it retries every nonzero exit, and a failing test
-      # must fail once, not three times.
+      # must fail once, not three times. Not offline either: -DskipTests above
+      # never resolved surefire's JUnit provider.
+      #
+      # A test that finds its variable unset skips, and a skipped suite is
+      # green, so each step then requires that every named suite ran in full.
+      # Each step checks its own reports, before the next run replaces them.
       - name: Data store tests (MongoDB, DynamoDB, OpenSearch, PostgreSQL)
         working-directory: maven
         env:
           CN1_TEST_DATABASE_URL: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
         run: |
-          mvn -B -o -pl backend test \
+          mvn -B -pl backend test \
             -Dtest='MongoClientTest,DynamoDbTest,DocumentSessionTest,SearchEngineTest,SearchIndexerTest' \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+          bash "$GITHUB_WORKSPACE/.github/scripts/require-no-skipped-tests.sh" backend/target/surefire-reports \
+            MongoClientTest DynamoDbTest DocumentSessionTest SearchEngineTest SearchIndexerTest
 
       - name: SQL full-text search on MariaDB
         working-directory: maven
         env:
           CN1_TEST_DATABASE_URL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
         run: |
-          mvn -B -o -pl backend test -Dtest='SearchEngineTest' \
+          mvn -B -pl backend test -Dtest='SearchEngineTest' \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
-
-      # A test that finds its variable unset skips, and a skipped suite is
-      # green. Every one of these must have actually run.
-      - name: Require that nothing skipped
-        working-directory: maven/backend/target/surefire-reports
-        run: |
-          set -e
-          for t in MongoClientTest DynamoDbTest DocumentSessionTest SearchEngineTest SearchIndexerTest; do
-            f=$(ls *."$t".txt)
-            grep -q "Skipped: 0," "$f" || { echo "::error::$t skipped tests"; cat "$f"; exit 1; }
-          done
+          bash "$GITHUB_WORKSPACE/.github/scripts/require-no-skipped-tests.sh" backend/target/surefire-reports \
+            SearchEngineTest

@@ -200,7 +200,9 @@ public final class MongoDocumentStore implements DocumentStore {
                     inner.put("$eq", cr.getValue());
                     break;
                 case Criterion.NE:
-                    inner.put("$ne", cr.getValue());
+                    // $ne alone also matches a missing or null field; SQL's <>
+                    // and the in-memory matcher do not, so null is excluded too.
+                    inner.put("$nin", java.util.Arrays.asList(new Object[] {cr.getValue(), null}));
                     break;
                 case Criterion.GT:
                     inner.put("$gt", cr.getValue());

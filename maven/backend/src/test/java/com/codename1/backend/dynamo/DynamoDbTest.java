@@ -65,6 +65,14 @@ class DynamoDbTest {
     }
 
     @Test
+    void largeNumbersStayExact() {
+        assertEquals(Long.valueOf(1234567890123456789L), Items.number("1234567890123456789"));
+        assertEquals(Long.valueOf(Long.MIN_VALUE), Items.number("-9223372036854775808"));
+        assertEquals(Double.valueOf(1e20), Items.number("100000000000000000000"));
+        assertEquals(Double.valueOf(9.5), Items.number("9.5"));
+    }
+
+    @Test
     void crudAgainstServer() throws Exception {
         String endpoint = System.getenv("CN1_TEST_DYNAMODB_ENDPOINT");
         Assumptions.assumeTrue(endpoint != null && endpoint.length() > 0,

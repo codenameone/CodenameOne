@@ -346,6 +346,12 @@ public final class DynamoDocumentStore implements DocumentStore {
             }
         }
         values.put(val, plain(v));
+        if (c.getOp() == Criterion.NE) {
+            // DynamoDB's <> holds for a missing or null attribute; SQL's does not.
+            values.put(":nullType", "NULL");
+            return "attribute_exists(" + name + ") AND NOT attribute_type(" + name
+                    + ", :nullType) AND " + name + " <> " + val;
+        }
         return name + " " + OPS[c.getOp()] + " " + val;
     }
 

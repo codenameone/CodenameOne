@@ -132,15 +132,29 @@ public final class Criterion {
 
     static boolean same(Object a, Object b) {
         if (a instanceof Number && b instanceof Number) {
+            if (integral(a) && integral(b)) {
+                return ((Number) a).longValue() == ((Number) b).longValue();
+            }
             return ((Number) a).doubleValue() == ((Number) b).doubleValue();
         }
         return a == null ? b == null : a.equals(b);
+    }
+
+    private static boolean integral(Object n) {
+        return n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte;
     }
 
     /// Orders two field values; nulls first.
     static int compare(Object a, Object b) {
         if (a == null || b == null) {
             return a == null ? (b == null ? 0 : -1) : 1;
+        }
+        if (a instanceof Number && b instanceof Number && integral(a) && integral(b)) {
+            // Exact: a double holds no more than 53 bits, and ids and versions
+            // past 2^53 would otherwise compare equal to their neighbours.
+            long x = ((Number) a).longValue();
+            long y = ((Number) b).longValue();
+            return x < y ? -1 : (x > y ? 1 : 0);
         }
         if (a instanceof Number && b instanceof Number) {
             double x = ((Number) a).doubleValue();

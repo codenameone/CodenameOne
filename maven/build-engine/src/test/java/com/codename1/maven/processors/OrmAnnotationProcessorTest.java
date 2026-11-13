@@ -3103,6 +3103,10 @@ public class OrmAnnotationProcessorTest {
         sources.clear();
         sources.put("badsearch.Stray","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Stray { @Id public long id; @SearchField public String name; }");
         rejectsMappingForBothRuntimes(sources,"@SearchField name needs @Searchable");
+        sources.clear();
+        sources.put("badsearch.Money","package badsearch; import com.codename1.annotations.db.*; @Embeddable public class Money { public long cents; public String currency; }");
+        sources.put("badsearch.Order","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Searchable public class Order { @Id public long id; @Embedded @SearchField public Money total; }");
+        rejectsMappingForBothRuntimes(sources,"@SearchField goes on the fields of the @Embeddable");
     }
 
     @Test

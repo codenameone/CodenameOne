@@ -31,7 +31,7 @@ import java.util.List;
 /// `mongodb://user:pass@host1:27017,host2/db?authSource=admin&tls=true`. The
 /// options read are `authSource`, `tls`/`ssl`, `tlsCAFile`,
 /// `tlsAllowInvalidHostnames`, `connectTimeoutMS`, `socketTimeoutMS` and
-/// `maxPoolSize`; others are ignored, as the official drivers ignore options
+/// `maxPoolSize`, `maxIdleTimeMS` and `directConnection`; others are ignored, as the official drivers ignore options
 /// they do not know.
 final class MongoUri {
     final List hosts = new ArrayList();
@@ -45,6 +45,10 @@ final class MongoUri {
     int connectTimeoutMillis = 10000;
     int socketTimeoutMillis;
     int maxPoolSize = 16;
+    // A pooled connection idle longer than this is closed rather than reused:
+    // a proxy or Atlas may already have dropped it. Zero keeps them forever.
+    int maxIdleTimeMillis = 60000;
+    boolean directConnection;
 
     static MongoUri parse(String uri) throws IOException {
         if (uri == null) {
@@ -129,6 +133,10 @@ final class MongoUri {
             socketTimeoutMillis = number(key, value);
         } else if ("maxPoolSize".equalsIgnoreCase(key)) {
             maxPoolSize = number(key, value);
+        } else if ("maxIdleTimeMS".equalsIgnoreCase(key)) {
+            maxIdleTimeMillis = number(key, value);
+        } else if ("directConnection".equalsIgnoreCase(key)) {
+            directConnection = on;
         } else if ("authMechanism".equalsIgnoreCase(key)
                 && !"SCRAM-SHA-256".equalsIgnoreCase(value)) {
             throw new IOException("authMechanism=" + value + " is not supported; this "

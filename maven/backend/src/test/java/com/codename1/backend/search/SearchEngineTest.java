@@ -140,6 +140,15 @@ class SearchEngineTest {
             assertNull(e.get(index, "2"));
             e.refresh(index);
             assertEquals(2, e.search(index, new SearchQuery("running")).getTotal());
+
+            // Whole words, Unicode case, and words InnoDB does not index.
+            e.index(index, "5", product("The Matrix on a go kart", "neo", "black", 10));
+            e.index(index, "6", product("\u00c9lan category", "neo", "white", 10));
+            e.refresh(index);
+            assertEquals(1, e.search(index, new SearchQuery("the matrix")).getTotal());
+            assertEquals(1, e.search(index, new SearchQuery("go kart")).getTotal());
+            assertEquals(1, e.search(index, new SearchQuery("\u00e9lan")).getTotal());
+            assertEquals(0, e.search(index, new SearchQuery("cat")).getTotal());
         } finally {
             e.deleteIndex(index);
         }

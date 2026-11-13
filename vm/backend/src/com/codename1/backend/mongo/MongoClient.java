@@ -48,7 +48,8 @@ import java.util.Map;
 ///
 /// Calls borrow a connection, use it and give it back. With none idle another is
 /// opened rather than making the caller wait, and at most `maxPoolSize` (16) are
-/// kept idle. Hosts are tried in order and the first that answers is used.
+/// kept idle. Hosts are tried in order and the first that answers is used; of
+/// several, the first that is the replica set's primary.
 public final class MongoClient implements java.io.Closeable {
     private static final String RESOURCE = "cn1.mongodb";
 
@@ -114,6 +115,15 @@ public final class MongoClient implements java.io.Closeable {
         MongoConnection c = borrow();
         try {
             return c.command(database, command);
+        } catch (IOException err) {
+            if (!c.isBroken()) {
+                // A command the server refused; the connection is fine.
+                throw err;
+            }
+            // Whatever dropped this connection (a restart, a proxy's idle
+            // timeout) has likely dropped the idle ones beside it too.
+            closeIdle();
+            throw err;
         } finally {
             release(c);
         }
@@ -123,17 +133,35 @@ public final class MongoClient implements java.io.Closeable {
         if (closed.get()) {
             throw new IOException("The MongoDB client is closed");
         }
-        synchronized (idle) {
-            int n = idle.size();
-            if (n > 0) {
-                return (MongoConnection) idle.remove(n - 1);
+        long now = System.currentTimeMillis();
+        while (true) {
+            MongoConnection pooled;
+            synchronized (idle) {
+                int n = idle.size();
+                if (n == 0) {
+                    break;
+                }
+                pooled = (MongoConnection) idle.remove(n - 1);
             }
+            if (uri.maxIdleTimeMillis <= 0 || now - pooled.releasedAt() <= uri.maxIdleTimeMillis) {
+                return pooled;
+            }
+            pooled.close();
         }
         IOException last = null;
+        // With several hosts (a replica set) only the primary takes writes; a
+        // secondary that answers first would fail every write. One host is a
+        // direct connection and is used as it is.
+        boolean needPrimary = uri.hosts.size() > 1 && !uri.directConnection;
         for (int i = 0; i < uri.hosts.size(); i++) {
             String h = (String) uri.hosts.get(i);
             try {
-                return MongoConnection.open(uri, MongoUri.hostName(h), MongoUri.port(h));
+                MongoConnection c = MongoConnection.open(uri, MongoUri.hostName(h), MongoUri.port(h));
+                if (!needPrimary || c.isWritablePrimary()) {
+                    return c;
+                }
+                c.close();
+                last = new IOException("MongoDB host " + h + " is not the primary");
             } catch (MongoException err) {
                 // Authentication refused: another host of the same deployment
                 // would refuse the same credentials.
@@ -152,6 +180,7 @@ public final class MongoClient implements java.io.Closeable {
         }
         synchronized (idle) {
             if (!closed.get() && idle.size() < uri.maxPoolSize) {
+                c.markReleased(System.currentTimeMillis());
                 idle.add(c);
                 return;
             }
@@ -163,6 +192,10 @@ public final class MongoClient implements java.io.Closeable {
     @Override
     public void close() {
         closed.set(true);
+        closeIdle();
+    }
+
+    private void closeIdle() {
         List drained;
         synchronized (idle) {
             drained = new ArrayList(idle);

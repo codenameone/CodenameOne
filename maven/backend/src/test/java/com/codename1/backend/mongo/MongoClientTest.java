@@ -41,6 +41,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// `mongodb://root:pass@127.0.0.1:27017/cn1test?authSource=admin`).
 class MongoClientTest {
     @Test
+    void decodesTheRareTypes() throws Exception {
+        // { r: /ab/i, u: undefined, m: MinKey, j: code "x" }
+        byte[] d = {
+            0, 0, 0, 0,
+            0x0B, 'r', 0, 'a', 'b', 0, 'i', 0,
+            0x06, 'u', 0,
+            (byte) 0xFF, 'm', 0,
+            0x0D, 'j', 0, 2, 0, 0, 0, 'x', 0,
+            0
+        };
+        d[0] = (byte) d.length;
+        Map m = Bson.decode(d);
+        assertEquals("/ab/i", m.get("r"));
+        assertTrue(m.containsKey("u") && m.get("u") == null);
+        assertTrue(m.containsKey("m") && m.get("m") == null);
+        assertEquals("x", m.get("j"));
+    }
+
+    @Test
     void bsonRoundTripKeepsTypesAndOrder() throws Exception {
         Map doc = new LinkedHashMap();
         doc.put("z", "first");

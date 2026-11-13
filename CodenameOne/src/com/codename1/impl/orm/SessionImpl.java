@@ -286,7 +286,6 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             sql.commit();
             transaction = false;
             pruneForwards();
-            deliverCommitted();
         } catch (IOException e) {
             recoverTransactionFailure();
             throw failure(e);
@@ -294,6 +293,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             recoverTransactionFailure();
             throw e;
         }
+        // Outside the try: the transaction is durable now, so nothing an
+        // observer does may be treated as a failed commit and clear the session.
+        deliverCommitted();
     }
     @Override
     public void rollbackTransaction() {
@@ -343,8 +345,20 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (observer == null) {
             return;
         }
+        // Every write is delivered even if one observer call throws; the first
+        // failure then reaches the caller, after the commit it cannot undo.
+        RuntimeException first = null;
         for (Written w : all) {
-            observer.committed(w.model, w.entity, w.event);
+            try {
+                observer.committed(w.model, w.entity, w.event);
+            } catch (RuntimeException e) {
+                if (first == null) {
+                    first = e;
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
         }
     }
     private static final class Written {

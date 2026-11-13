@@ -64,13 +64,15 @@ public final class SearchIndexer implements CommitObserver {
     }
 
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public void committed(EntityModel<?> model, Object entity, int event) {
         String index = model.searchIndex();
         if (index == null) {
             return;
         }
-        String id = id(model, entity);
+        String id = null;
         try {
+            id = documentId(model, ((EntityModel) model).identifier(entity));
             SearchEngine target = engine != null ? engine : SearchEngines.current();
             if (event == REMOVED) {
                 target.delete(index, id);
@@ -82,17 +84,35 @@ public final class SearchIndexer implements CommitObserver {
         }
     }
 
-    /// The document id: the identifier's columns, joined by `:` when there
-    /// are several.
+    /// The search document id of the entity whose identifier is `id` (what
+    /// `Session.find` takes): its columns joined by `:`. ASCII letters, digits,
+    /// `-` and `_` stand as they are; every other character, `.` and `:`
+    /// included, is written `.` and four hex digits. So `42` and a UUID are
+    /// unchanged, `a@b.com` is `a.0040b.002ecom`, no two keys share an id, and
+    /// every id fits the alphabet Elasticsearch's document paths accept.
     @SuppressWarnings({"unchecked", "rawtypes"})
-    static String id(EntityModel model, Object entity) {
-        Object[] key = model.keyValues(model.identifier(entity));
+    public static String documentId(EntityModel model, Object id) {
+        Object[] key = model.keyValues(id);
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < key.length; i++) {
             if (i > 0) {
                 b.append(':');
             }
-            b.append(String.valueOf(key[i]));
+            String part = String.valueOf(key[i]);
+            for (int j = 0; j < part.length(); j++) {
+                char c = part.charAt(j);
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                        || c == '-' || c == '_') {
+                    b.append(c);
+                } else {
+                    b.append('.');
+                    String hex = Integer.toHexString(c);
+                    for (int k = hex.length(); k < 4; k++) {
+                        b.append('0');
+                    }
+                    b.append(hex);
+                }
+            }
         }
         return b.toString();
     }

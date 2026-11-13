@@ -185,6 +185,8 @@ public class DocumentSessionTest {
         assertEquals(6, s.query(Note.class).eq("done", Boolean.TRUE).count());
         assertEquals(6, s.query(Note.class).isNull("due").count());
         assertEquals(6, s.query(Note.class).isNotNull("due").count());
+        // Like SQL's <>, a null never differs from a value.
+        assertEquals(5, s.query(Note.class).ne("due", new Date(1700000000000L)).count());
         assertEquals(4, s.query(Note.class).like("title", "%urgent").count());
         assertEquals(3, s.query(Note.class).in("stars", 1L, 2L, 99L, 11L).count());
         assertEquals(0, s.query(Note.class).in("stars").count());
@@ -235,6 +237,14 @@ public class DocumentSessionTest {
             scenario(s);
             sortKeyScenario(s);
         }
+    }
+
+    @Test
+    public void numbersPast2To53CompareExactly() {
+        assertFalse(Criterion.same(Long.valueOf(9007199254740993L), Long.valueOf(9007199254740992L)));
+        assertTrue(Criterion.compare(Long.valueOf(9007199254740993L), Long.valueOf(9007199254740992L)) > 0);
+        assertTrue(Criterion.same(Long.valueOf(3), Integer.valueOf(3)));
+        assertTrue(Criterion.same(Long.valueOf(3), Double.valueOf(3)));
     }
 
     @Test

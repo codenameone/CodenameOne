@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
 /// A searchable entity is indexed when its transaction commits, never when it
 /// rolls back, and leaves the index when it is removed.
 class SearchIndexerTest {
-    static final class Searchable extends ManagedSessionTest.Model {
+    static class Searchable extends ManagedSessionTest.Model {
         @Override
         public String searchIndex() {
             return "records";
@@ -51,6 +51,27 @@ class SearchIndexerTest {
         public boolean searchField(int index) {
             return index != 2;
         }
+    }
+
+    static com.codename1.impl.orm.Attribute[] textId(com.codename1.impl.orm.Attribute[] base) {
+        com.codename1.impl.orm.Attribute[] out = base.clone();
+        out[0] = new com.codename1.impl.orm.Attribute("id", "id", com.codename1.impl.orm.Attribute.TEXT,
+                true, false, false, false);
+        return out;
+    }
+
+    @Test
+    void documentIdsFitTheEngineAlphabet() {
+        assertEquals("42", SearchIndexer.documentId(new Searchable(), Long.valueOf(42)));
+        Searchable textKeyed = new Searchable() {
+            private final com.codename1.impl.orm.Attribute[] attrs = textId(super.attributes());
+            @Override
+            public com.codename1.impl.orm.Attribute[] attributes() {
+                return attrs;
+            }
+        };
+        assertEquals("a.0040b.002ecom", SearchIndexer.documentId(textKeyed, "a@b.com"));
+        assertEquals("x.003ay_z", SearchIndexer.documentId(textKeyed, "x:y_z"));
     }
 
     @Test

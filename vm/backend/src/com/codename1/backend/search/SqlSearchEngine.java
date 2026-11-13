@@ -45,11 +45,12 @@ import java.util.Map;
 ///   does not stem, so "shoe" does not find "shoes"; it is the one configuration
 ///   that behaves the same for every language.
 /// - **MySQL and MariaDB** match every word with a `FULLTEXT` index in boolean
-///   mode. InnoDB ignores words shorter than `innodb_ft_min_token_size` (3) and
-///   its stop words, which a query cannot override.
-/// - **SQLite** scans with `LIKE`, one condition per word, and scores by how
-///   often the words occur. Correct, and linear in the size of the index;
-///   SQLite's `LIKE` folds case for ASCII letters only.
+///   mode. InnoDB does not index words shorter than `innodb_ft_min_token_size`
+///   (3) or its default stop words, so those are matched as whole words in
+///   memory over what the index found.
+/// - **SQLite** narrows with `LIKE`, one condition per word, then requires
+///   each word as a whole word, and scores by how often the words occur.
+///   Correct, and linear in the size of the index.
 ///
 /// Matching, as on a search cluster, requires every word. Filters, field
 /// restrictions, sorting, facets and paging are then applied in memory over at
@@ -164,6 +165,10 @@ public final class SqlSearchEngine implements SearchEngine {
 
     /// The words of a query: runs of letters and digits, at most [#MAX_TERMS].
     static List terms(String text) {
+        return words(text, MAX_TERMS);
+    }
+
+    private static List words(String text, int max) {
         List out = new ArrayList();
         int start = -1;
         for (int i = 0; i <= text.length(); i++) {
@@ -171,7 +176,7 @@ public final class SqlSearchEngine implements SearchEngine {
             if (word && start < 0) {
                 start = i;
             } else if (!word && start >= 0) {
-                if (out.size() < MAX_TERMS) {
+                if (out.size() < max) {
                     out.add(fold(text.substring(start, i)));
                 }
                 start = -1;
@@ -223,10 +228,19 @@ public final class SqlSearchEngine implements SearchEngine {
         }
         if (kind == MYSQL) {
             StringBuilder q = new StringBuilder();
-            for (int i = 0; i < terms.size(); i++) {
-                // Each word is letters and digits only (see terms), so none of the
-                // boolean-mode operators can reach the server from user input.
-                q.append(i == 0 ? "+" : " +").append(terms.get(i));
+            for (Object eachTerm : terms) {
+                String t = (String) eachTerm;
+                // A required word InnoDB does not index matches nothing, so the
+                // whole query would; those words are checked in memory instead.
+                if (innodbIndexes(t)) {
+                    // Each word is letters and digits only (see terms), so none of
+                    // the boolean-mode operators can reach the server from input.
+                    q.append(q.length() == 0 ? "+" : " +").append(t);
+                }
+            }
+            if (q.length() == 0) {
+                return data.query("SELECT id, doc, body FROM " + TABLE + " WHERE idx = ? "
+                        + "ORDER BY id LIMIT " + cap, new Object[] {index});
             }
             String match = "MATCH(body) AGAINST(? IN BOOLEAN MODE)";
             return data.query("SELECT id, doc, body, " + match + " AS score FROM " + TABLE
@@ -237,9 +251,20 @@ public final class SqlSearchEngine implements SearchEngine {
                 + " WHERE idx = ?");
         Object[] params = new Object[terms.size() + 1];
         params[0] = index;
-        for (int i = 0; i < terms.size(); i++) {
-            sql.append(" AND body LIKE ? ESCAPE '\\'");
-            params[i + 1] = "%" + likeEscape((String) terms.get(i)) + "%";
+        int n = 1;
+        for (Object eachTerm : terms) {
+            String t = (String) eachTerm;
+            // LIKE folds ASCII only, so a word with any other letter would miss
+            // its own capitalised form; such words are checked in memory alone.
+            if (isAscii(t)) {
+                sql.append(" AND body LIKE ? ESCAPE '\\'");
+                params[n++] = "%" + likeEscape(t) + "%";
+            }
+        }
+        if (n < params.length) {
+            Object[] used = new Object[n];
+            System.arraycopy(params, 0, used, 0, n);
+            params = used;
         }
         sql.append(" ORDER BY id LIMIT ").append(cap);
         return data.query(sql.toString(), params);
@@ -250,10 +275,14 @@ public final class SqlSearchEngine implements SearchEngine {
         ElasticsearchEngine.requireIndexName(index);
         List terms = terms(q.getText());
         List rows = candidates(index, terms);
+        List checked = checkedTerms(terms);
         boolean exact = rows.size() <= MAX_CANDIDATES;
         List matched = new ArrayList();
         for (int i = 0; i < rows.size() && i < MAX_CANDIDATES; i++) {
             Map row = (Map) rows.get(i);
+            if (!checked.isEmpty() && !hasWords(String.valueOf(row.get("body")), checked)) {
+                continue;
+            }
             Map doc = Json.parseObject(String.valueOf(row.get("doc")));
             if (!q.getFields().isEmpty() && !termsInFields(doc, q.getFields(), terms)) {
                 continue;
@@ -281,6 +310,65 @@ public final class SqlSearchEngine implements SearchEngine {
             page.add(matched.get(i));
         }
         return new SearchResult(page, matched.size(), exact, facets);
+    }
+
+    /// The words the database's own match cannot be trusted with: every word
+    /// on SQLite, whose `LIKE` also matches inside a longer word, and on MySQL
+    /// the words InnoDB leaves out of its index.
+    private List checkedTerms(List terms) {
+        if (kind == SQLITE) {
+            return terms;
+        }
+        List out = new ArrayList();
+        if (kind == MYSQL) {
+            for (Object t : terms) {
+                if (!innodbIndexes((String) t)) {
+                    out.add(t);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Whether `body` holds each of `terms` as a whole word, case folded.
+    private static boolean hasWords(String body, List terms) {
+        List bodyWords = words(body, Integer.MAX_VALUE);
+        for (Object t : terms) {
+            if (!bodyWords.contains(t)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// InnoDB's default stop words, which its full-text index never holds.
+    private static final String[] INNODB_STOP_WORDS = {
+        "a", "about", "an", "are", "as", "at", "be", "by", "com", "de", "en", "for",
+        "from", "how", "i", "in", "is", "it", "la", "of", "on", "or", "that", "the",
+        "this", "to", "was", "what", "when", "where", "who", "will", "with", "und", "www"
+    };
+
+    /// Whether InnoDB indexes `word`: three characters or more
+    /// (`innodb_ft_min_token_size`) and not a default stop word.
+    static boolean innodbIndexes(String word) {
+        if (word.length() < 3) {
+            return false;
+        }
+        for (String stop : INNODB_STOP_WORDS) {
+            if (stop.equals(word)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isAscii(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) > 127) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static double occurrences(String body, List terms) {
