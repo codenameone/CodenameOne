@@ -208,9 +208,19 @@ public final class BiquadFilterNode extends AudioNode {
         boolean qType = type == BiquadFilterType.BANDPASS || type == BiquadFilterType.NOTCH
                 || type == BiquadFilterType.ALLPASS || type == BiquadFilterType.PEAKING;
         if (qType && !(qv > 0)) { // NOPMD LogicInversion - NaN takes this path too
-            // The specification's Q <= 0 cases: alpha would be infinite or
-            // negative, so the filter collapses to a constant gain.
-            double gain = type == BiquadFilterType.BANDPASS ? 0 : type == BiquadFilterType.PEAKING ? a * a : 1;
+            // The specification's Q <= 0 cases: each formula's limit as alpha
+            // grows without bound, a constant gain -- bandpass passes (1),
+            // notch silences (0), allpass inverts (-1), peaking is A^2.
+            double gain;
+            if (type == BiquadFilterType.BANDPASS) {
+                gain = 1;
+            } else if (type == BiquadFilterType.NOTCH) {
+                gain = 0;
+            } else if (type == BiquadFilterType.ALLPASS) {
+                gain = -1;
+            } else {
+                gain = a * a;
+            }
             c[0] = gain;
             c[1] = 0;
             c[2] = 0;

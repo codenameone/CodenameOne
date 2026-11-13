@@ -367,6 +367,11 @@ public final class AudioParam {
     /// Drops events the timeline can no longer reach, fills in each event's
     /// start state and hands the new array to the renderer.
     private void publish(Event[] ev) {
+        if (ev == events) { // NOPMD CompareObjectsWithEquals - identity: the published array itself
+            Event[] fresh = new Event[ev.length];
+            System.arraycopy(ev, 0, fresh, 0, ev.length);
+            ev = fresh;
+        }
         double now = context.getCurrentTime();
         int last = -1;
         for (int i = 0; i < ev.length; i++) {
@@ -387,6 +392,15 @@ public final class AudioParam {
             // as past, and the start it gave is what the ramp still needs.
             if (k == 0 && e.t0Fixed) {
                 continue;
+            }
+            if (e.t0Fixed) {
+                // Published events are read by the render thread as they
+                // are, so a start worked out again goes into a copy rather
+                // than into the shared one, which never changes once out.
+                Event c = new Event(e.type, e.time, e.value, e.timeConstant, e.curve, e.duration);
+                c.callTime = e.callTime;
+                ev[k] = c;
+                e = c;
             }
             if (k == 0) {
                 e.t0 = Math.min(e.callTime, e.time);

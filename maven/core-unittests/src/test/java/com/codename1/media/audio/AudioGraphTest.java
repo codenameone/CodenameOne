@@ -887,4 +887,22 @@ class AudioGraphTest extends UITestBase {
             }
         }
     }
+
+    @FormTest
+    void biquadWithZeroQCollapsesToTheFormulasLimit() {
+        BiquadFilterType[] types = {BiquadFilterType.BANDPASS, BiquadFilterType.NOTCH, BiquadFilterType.ALLPASS};
+        float[] expected = {1f, 0f, -1f};
+        for (int t = 0; t < types.length; t++) {
+            OfflineAudioContext c = ctx(1, 256);
+            ConstantSourceNode s = c.createConstantSource();
+            BiquadFilterNode f = c.createBiquadFilter();
+            f.setType(types[t]);
+            f.getQ().setValue(0);
+            s.connect(f);
+            f.connect(c.getDestination());
+            s.start();
+            float[] d = c.startRendering().getChannelData(0);
+            Assertions.assertEquals(expected[t], d[200], 1e-5f, types[t].toString());
+        }
+    }
 }
