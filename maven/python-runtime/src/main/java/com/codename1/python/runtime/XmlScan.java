@@ -459,6 +459,11 @@ final class XmlScan {
         private final String[] tagNames = new String[TAG_CACHE];
         /// Attribute names as written, one string per distinct name.
         private final String[] attrRaw = new String[TAG_CACHE];
+        /// The expanded name of `attrRaw[slot]` under the current
+        /// namespace scope, or null until one is needed.
+        private final String[] attrExp = new String[TAG_CACHE];
+        /// The `attrRaw` slot of each name in `attrNames`.
+        private int[] attrSlots = new int[16];
         /// The hash of the name [#nameEnd] last scanned.
         private int nameHash;
         private final java.util.ArrayList<String> attrNames = new java.util.ArrayList<String>();
@@ -818,6 +823,7 @@ final class XmlScan {
                 if (!named(na, ne, an)) {
                     an = s.substring(na, ne);
                     attrRaw[as] = an;
+                    attrExp[as] = null;
                 }
                 skipSpace();
                 if (i >= n || s.charAt(i) != '=') {
@@ -868,6 +874,10 @@ final class XmlScan {
                     }
                     declared.put(prefix, av);
                 } else {
+                    if (names.size() == attrSlots.length) {
+                        attrSlots = java.util.Arrays.copyOf(attrSlots, attrSlots.length * 2);
+                    }
+                    attrSlots[names.size()] = attrRaw[as] == an ? as : -1; //NOPMD CompareObjectsWithEquals - the cached string itself
                     names.add(an);
                     values.add(av);
                 }
@@ -876,6 +886,7 @@ final class XmlScan {
                 scopes.add(declared);
                 scopeDepth.add(Integer.valueOf(open.size()));
                 java.util.Arrays.fill(rawNames, null);
+                java.util.Arrays.fill(attrExp, null);
             }
             String tag = rawNames[slot] == q ? tagNames[slot] : null; //NOPMD CompareObjectsWithEquals - the cached string itself
             if (tag == null) {
@@ -885,7 +896,14 @@ final class XmlScan {
             }
             PyDict attrib = new PyDict();
             for (int k = 0; k < names.size(); k++) {
-                String en = expand(names.get(k), false);
+                int sl = attrSlots[k];
+                String en = sl >= 0 && attrRaw[sl] == names.get(k) ? attrExp[sl] : null; //NOPMD CompareObjectsWithEquals - the cached string itself
+                if (en == null) {
+                    en = expand(names.get(k), false);
+                    if (sl >= 0 && attrRaw[sl] == names.get(k)) { //NOPMD CompareObjectsWithEquals - the cached string itself
+                        attrExp[sl] = en;
+                    }
+                }
                 if (attrib.getOrNull(en) != null) {
                     throw DECLINE;
                 }
@@ -1145,6 +1163,7 @@ final class XmlScan {
                 scopes.remove(scopes.size() - 1);
                 scopeDepth.remove(scopeDepth.size() - 1);
                 java.util.Arrays.fill(rawNames, null);
+                java.util.Arrays.fill(attrExp, null);
             }
         }
     }
