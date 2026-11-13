@@ -22,7 +22,7 @@ Install writes a command that launches `MCPStdioLauncher`, a small bridge that r
 
 === Starting the server
 
-Invoking the API is the switch. There is no build hint or property to set. The socket server lets an agent attach to a session a person is watching, which is the usual choice in the simulator:
+Invoking the API is the switch in application code; no build hint is involved. The simulator can also start the server itself, as the next section describes. The socket server lets an agent attach to a session a person is watching, which is the usual choice in the simulator:
 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-start-socket,indent=0]
@@ -33,6 +33,29 @@ A tool that a host launches as a subprocess can serve over standard input and ou
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-start-stdio,indent=0]
 
 The stdio transport is the standard MCP local transport, exchanging newline delimited JSON-RPC messages. While it runs, application logging is redirected away from standard output so it can't corrupt the protocol stream. The stdio transport lives in the JavaSE port because it needs process standard input, which isn't available on every target.
+
+=== Running the simulator for an agent
+
+An agent working in a terminal can't click a menu or restart its host, so the build tools start the simulator for it. `./mvnw cn1:agent` (Gradle: `./gradlew cn1Agent`) is `cn1:run` with three differences:
+
+- The loopback MCP server listens from the first frame, on port 8765 or the port given by `-Dcn1.mcp.port` (`-Pcn1.mcp.port`). When 8765 is taken and no port was given, a free one is used and written to `common/target/cn1-agent.port` (`build/cn1-agent.port` under Gradle).
+- The simulator window never takes the keyboard focus and shows no Dock icon on macOS, so a developer can keep working while an agent drives it.
+- On Linux with no display, the Maven goal starts a virtual X server (Xvfb) for the simulator. Under Gradle, run the task with `xvfb-run -a`.
+
+The same switch is available to any launcher as the system property `cn1.mcp.port`, or the environment variable `CN1_MCP_PORT`, which reaches the simulator even when a project's run configuration forwards no JVM arguments.
+
+Projects created by the Initializr include `Sim.java`, a single-file client in `.agent-skills/codename-one/tools/`. It wraps the tools as shell commands, so an agent needs no MCP host at all:
+
+----
+./mvnw cn1:agent &
+java .agent-skills/codename-one/tools/Sim.java wait
+java .agent-skills/codename-one/tools/Sim.java tap "Sign In"
+java .agent-skills/codename-one/tools/Sim.java screenshot target/after.png
+java .agent-skills/codename-one/tools/Sim.java record-start target/flow.mp4
+java .agent-skills/codename-one/tools/Sim.java record-stop
+----
+
+It also drives a development build on the iOS simulator or an Android device, and captures them with `device-screenshot` and `device-record`, which call `xcrun simctl` and `adb`.
 
 === Attaching to an application on a device
 

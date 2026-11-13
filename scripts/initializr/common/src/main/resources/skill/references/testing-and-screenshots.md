@@ -212,7 +212,7 @@ When the user asks "evaluate this screen looks right":
 3. Show the image / inspect it visually before claiming the change is correct.
 4. Optionally write `screenshotTest("...")` and run it twice to lock in a baseline for regression.
 
-If you cannot run the simulator (headless container, no display), **say so explicitly** — do not claim UI correctness based purely on a passing screenshot test you just generated, because you'd be comparing the new code to itself.
+A headless container is not "cannot run": tests work under `xvfb-run -a`, and `./mvnw cn1:agent` plus `tools/Sim.java screenshot` gives you a PNG of any screen (see `references/mcp-agent-control.md`). If a step really fails, **say so explicitly** — do not claim UI correctness based purely on a passing screenshot test you just generated, because you'd be comparing the new code to itself.
 
 ## Common pitfalls
 

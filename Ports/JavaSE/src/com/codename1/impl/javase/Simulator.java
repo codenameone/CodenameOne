@@ -125,6 +125,21 @@ public class Simulator {
         if (System.getenv("CN1_SIMULATOR_SKIN") != null) {
             System.setProperty("skin", System.getenv("CN1_SIMULATOR_SKIN"));
         }
+        // cn1:agent / cn1Agent start the simulator for an AI agent through the
+        // project's ordinary run profile, whose exec arguments an existing project
+        // cannot be expected to forward. The environment is inherited by the
+        // forked JVM whatever the pom says, so the agent settings travel there.
+        String agentMcpPort = System.getenv("CN1_MCP_PORT");
+        if (agentMcpPort != null && System.getProperty("cn1.mcp.port") == null) {
+            System.setProperty("cn1.mcp.port", agentMcpPort.trim());
+        }
+        if ("1".equals(System.getenv("CN1_AGENT_BACKGROUND"))) {
+            // Never steal focus or put an icon in the macOS Dock while an agent
+            // drives the window; frames are still painted, so screenshots and
+            // recordings are unaffected.
+            System.setProperty("apple.awt.UIElement", "true");
+            System.setProperty("cn1.agent.background", "true");
+        }
 
         String classPathStr = System.getProperty("java.class.path");
         if (System.getProperty("cn1.class.path") != null) {

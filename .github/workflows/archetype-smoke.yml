@@ -27,6 +27,8 @@ on:
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
       - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'maven/integration-tests/cn1app-agent-loop-test.sh'
+      - 'scripts/initializr/common/src/main/resources/skill/tools/Sim.java'
       - 'scripts/check-first-build-footprint.py'
       # Any module's dependencies can land on the class path a first build
       # downloads; the footprint gate has to see the change that adds one.
@@ -59,6 +61,8 @@ on:
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
       - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'maven/integration-tests/cn1app-agent-loop-test.sh'
+      - 'scripts/initializr/common/src/main/resources/skill/tools/Sim.java'
       - 'scripts/check-first-build-footprint.py'
       # Any module's dependencies can land on the class path a first build
       # downloads; the footprint gate has to see the change that adds one.
@@ -172,6 +176,14 @@ jobs:
         run: |
           cd maven/integration-tests
           env -u DISPLAY -u WAYLAND_DISPLAY bash backend-cn1lib-test.sh
+      # The loop an AI agent uses to check its own UI work: cn1:agent in the
+      # background, the project's own Sim.java to snapshot, tap, screenshot and
+      # record. DISPLAY is cleared and this is NOT wrapped in xvfb-run on
+      # purpose -- cn1:agent must start Xvfb by itself.
+      - name: Check the headless agent loop
+        run: |
+          cd maven/integration-tests
+          env -u DISPLAY -u WAYLAND_DISPLAY bash cn1app-agent-loop-test.sh
       # The jar cn1:build would upload, for every target the generated build.sh
       # offers. #5380 put ~300 MB of ffmpeg natives into every desktop upload and
       # the build client refused them; nothing looked at this jar for two months.
