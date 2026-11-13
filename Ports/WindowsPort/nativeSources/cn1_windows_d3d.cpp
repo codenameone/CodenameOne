@@ -882,7 +882,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_
     if (c->postCb == NULL) {
         D3D11_BUFFER_DESC cbd;
         ZeroMemory(&cbd, sizeof(cbd));
-        cbd.ByteWidth = 96;
+        cbd.ByteWidth = 128;
         cbd.Usage = D3D11_USAGE_DYNAMIC;
         cbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         cbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -904,10 +904,20 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_
     c->activeRtv = c->rtv;
     c->activeDsv = c->dsv;
     if (c->postCb && c->quad) {
-        float k[24];
+        // g0-g3 the composite, g4/g5 the bloom passes, g6/g7 the effects
+        // GraphicsDevice.packPostEffects wrote at 16 to 21
+        float k[32];
         const JAVA_ARRAY_FLOAT* in = (const JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(params);
+        int count = ((JAVA_ARRAY) params)->length;
         for (int i = 0; i < 16; i++) { k[i] = in[i]; }
-        for (int i = 16; i < 24; i++) { k[i] = 0.0f; }
+        for (int i = 16; i < 32; i++) { k[i] = 0.0f; }
+        if (count >= 21) {
+            k[24] = in[16];
+            k[25] = in[17];
+            k[26] = in[18];
+            k[28] = in[19];
+            k[29] = in[20];
+        }
         k[13] = (float) c->scene.width;
         k[14] = (float) c->scene.height;
         ID3D11ShaderResourceView* bloomSrv = c->scene.srv;

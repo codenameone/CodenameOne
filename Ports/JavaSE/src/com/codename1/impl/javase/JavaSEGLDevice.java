@@ -63,6 +63,8 @@ import java.util.Map;
 /// application `Renderer` callbacks from inside the `GLEventListener` hooks.
 class JavaSEGLDevice extends GraphicsDevice {
     private GL2ES2 gl;
+    // chromatic aberration, FXAA, god rays and the sun, for the composite
+    private final float[] postFx = new float[6];
 
     private final Map<String, Program> programs = new HashMap<String, Program>();
     private GpuCapabilities caps;
@@ -847,6 +849,9 @@ class JavaSEGLDevice extends GraphicsDevice {
         uniform1(c, "u_grain", pp.getGrain());
         uniform1(c, "u_time", timeSeconds);
         uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        packPostEffects(pp, postFx, 0);
+        uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
+        uniform2(c, "u_sun", postFx[3], postFx[4]);
         drawQuad(c);
         gl.glDepthMask(true);
     }

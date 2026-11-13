@@ -699,11 +699,87 @@ public final class GlslShaderGenerator {
                 + "}\n";
     }
 
+    /// The post effects every composite pass shares, in one of the three
+    /// shading languages: FXAA, chromatic aberration and god rays. Written
+    /// once so GLSL, Metal and HLSL cannot drift apart. The block declares
+    /// `c` (the scene colour, before bloom) from `uv0`, which the caller
+    /// declares. `fx` is (aberration, fxaa, rays, unused) and `sun` the
+    /// sun's texture position, as `GraphicsDevice.packPostEffects` packs
+    /// them; `res` is the target size in pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lang`: "glsl", "msl" or "hlsl"
+    ///
+    /// - `fx`: the expression of the effect parameters
+    ///
+    /// - `sun`: the expression of the sun position
+    ///
+    /// - `res`: the expression of the resolution
+    ///
+    /// #### Returns
+    ///
+    /// the statements
+    public static String postEffects(String lang, String fx, String sun, String res) {
+        String t = "  V2 px1 = 1.0 / RES;\n"
+                + "  V3 L = V3(0.299, 0.587, 0.114);\n"
+                + "  V3 c = PX(uv0);\n"
+                + "  if (FX.y > 0.5) {\n"
+                + "    float lNW = dot(PX(uv0 + V2(-1.0, -1.0) * px1), L);\n"
+                + "    float lNE = dot(PX(uv0 + V2(1.0, -1.0) * px1), L);\n"
+                + "    float lSW = dot(PX(uv0 + V2(-1.0, 1.0) * px1), L);\n"
+                + "    float lSE = dot(PX(uv0 + V2(1.0, 1.0) * px1), L);\n"
+                + "    float lM = dot(c, L);\n"
+                + "    float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));\n"
+                + "    float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));\n"
+                + "    V2 dir = V2(-((lNW + lNE) - (lSW + lSE)), (lNW + lSW) - (lNE + lSE));\n"
+                + "    float reduce = max((lNW + lNE + lSW + lSE) * 0.03125, 0.0078125);\n"
+                + "    float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + reduce);\n"
+                + "    dir = clamp(dir * rcp, V2(-8.0, -8.0), V2(8.0, 8.0)) * px1;\n"
+                + "    V3 a = 0.5 * (PX(uv0 + dir * -0.1666667) + PX(uv0 + dir * 0.1666667));\n"
+                + "    V3 b = a * 0.5 + 0.25 * (PX(uv0 + dir * -0.5) + PX(uv0 + dir * 0.5));\n"
+                + "    float lB = dot(b, L);\n"
+                + "    float useA = step(lB, lMin) + step(lMax, lB);\n"
+                + "    c = mix(b, a, min(useA, 1.0));\n"
+                + "  }\n"
+                + "  if (FX.x > 0.0) {\n"
+                + "    V2 off = (uv0 - 0.5) * FX.x;\n"
+                + "    c.r = PX(uv0 + off).r;\n"
+                + "    c.b = PX(uv0 - off).b;\n"
+                + "  }\n"
+                + "  if (FX.z > 0.0) {\n"
+                + "    V2 step1 = (uv0 - SUN) * 0.0625;\n"
+                + "    V2 tuv = uv0;\n"
+                + "    float w = 1.0;\n"
+                + "    V3 acc = V3(0.0, 0.0, 0.0);\n"
+                + "    for (int i = 0; i < 16; i++) {\n"
+                + "      tuv -= step1;\n"
+                + "      V3 s = PX(tuv);\n"
+                + "      acc += s * (smoothstep(0.6, 1.0, dot(s, L)) * w);\n"
+                + "      w *= 0.92;\n"
+                + "    }\n"
+                + "    c += acc * (FX.z * 0.125);\n"
+                + "  }\n";
+        boolean glsl = "glsl".equals(lang);
+        boolean msl = "msl".equals(lang);
+        t = t.replace("V2", glsl ? "vec2" : "float2").replace("V3", glsl ? "vec3" : "float3")
+                .replace("FX", fx).replace("SUN", sun).replace("RES", res)
+                .replace("PX(", msl ? "cn1Px(scene, " : "cn1Px(");
+        if (!glsl) {
+            // HLSL and MSL have no vector by scalar clamp overload difference; lerp is HLSL's mix
+            if (!msl) {
+                t = t.replace("mix(", "lerp(");
+            }
+        }
+        return t;
+    }
+
     /// Returns the final pass: the scene plus bloom, colour graded, with
     /// vignette and grain. Uniforms: `u_scene` (unit 0), `u_bloom` (unit 1),
     /// `u_bloomIntensity`, `u_grade` (vec2: contrast, saturation),
     /// `u_lift` and `u_gain` (vec3), `u_vignette`, `u_grain`, `u_time` (float)
-    /// and `u_resolution` (vec2, pixels).
+    /// and `u_resolution` (vec2, pixels), `u_fx` (vec3: chromatic
+    /// aberration, FXAA, god rays) and `u_sun` (vec2, the sun in uv).
     public static String compositeFragment() {
         return "precision mediump float;\n"
                 + "uniform sampler2D u_scene;\n"
@@ -716,9 +792,13 @@ public final class GlslShaderGenerator {
                 + "uniform float u_grain;\n"
                 + "uniform float u_time;\n"
                 + "uniform vec2 u_resolution;\n"
+                + "uniform vec3 u_fx;\n"
+                + "uniform vec2 u_sun;\n"
                 + "varying vec2 v_uv;\n"
+                + "vec3 cn1Px(vec2 p) {\n  return texture2D(u_scene, p).rgb;\n}\n"
                 + "void main() {\n"
-                + "  vec3 c = texture2D(u_scene, v_uv).rgb;\n"
+                + "  vec2 uv0 = v_uv;\n"
+                + postEffects("glsl", "u_fx", "u_sun", "u_resolution")
                 + "  c += texture2D(u_bloom, v_uv).rgb * u_bloomIntensity;\n"
                 + "  c = (c - 0.5) * u_grade.x + 0.5;\n"
                 + "  float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));\n"

@@ -22,6 +22,7 @@
  */
 package com.codename1.gpu;
 
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.ui.Image;
 
 /// The low level command surface of the 3D API, bound to a single `RenderView`
@@ -270,6 +271,64 @@ public abstract class GraphicsDevice {
     ///   the identity
     public abstract void draw(Mesh mesh, Material material, float[] modelMatrix);
 
+    private final float[] instanceMatrix = new float[16];
+
+    /// Draws `count` copies of a mesh, each with its own transform and,
+    /// optionally, colour: crates along a quay, a field of grass, a flock.
+    /// The material's shader tells the copies apart with
+    /// `ShaderNode.instanceId`, `instanceRandom` and `instanceColor`, so
+    /// one material varies size, tint and motion across thousands of
+    /// copies.
+    ///
+    /// Every device draws the copies one after another from a single
+    /// compiled pipeline, changing only the transform and the per copy
+    /// uniforms between them, which is what makes it cheaper than a model
+    /// per copy: no state is looked up or rebound and the scene walks one
+    /// node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mesh`: the mesh
+    ///
+    /// - `material`: the material shared by every copy
+    ///
+    /// - `matrices`: 16 column-major floats per copy
+    ///
+    /// - `colors`: an ARGB colour per copy, or null for white
+    ///
+    /// - `count`: how many copies to draw
+    public void drawInstanced(Mesh mesh, Material material, float[] matrices, int[] colors, int count) {
+        ShaderMaterial sm = material.getShader();
+        int idSlot = sm == null ? -1 : sm.getUniformSlot(ShaderMaterial.INSTANCE);
+        int colorSlot = sm == null ? -1 : sm.getUniformSlot(ShaderMaterial.INSTANCE_COLOR);
+        float[] u = sm == null ? null : sm.getUniformValues();
+        float[] m = instanceMatrix;
+        for (int i = 0; i < count; i++) {
+            System.arraycopy(matrices, i * 16, m, 0, 16);
+            if (idSlot >= 0) {
+                u[idSlot * 4] = i;
+                // a cheap integer hash, the same copy always gets the same number
+                int h = i * 0x27d4eb2d;
+                h ^= h >>> 15;
+                h *= 0x165667b1;
+                h ^= h >>> 13;
+                u[idSlot * 4 + 1] = (h & 0xffff) / 65535f;
+            }
+            if (colorSlot >= 0) {
+                int c = colors == null ? 0xffffffff : colors[i];
+                u[colorSlot * 4] = ((c >> 16) & 0xff) / 255f;
+                u[colorSlot * 4 + 1] = ((c >> 8) & 0xff) / 255f;
+                u[colorSlot * 4 + 2] = (c & 0xff) / 255f;
+                u[colorSlot * 4 + 3] = ((c >>> 24) & 0xff) / 255f;
+            }
+            draw(mesh, material, m);
+        }
+        if (idSlot >= 0) {
+            u[idSlot * 4] = 0f;
+            u[idSlot * 4 + 1] = 0f;
+        }
+    }
+
     /// Releases the GPU resources backing a vertex buffer.
     public abstract void dispose(VertexBuffer buffer);
 
@@ -278,4 +337,51 @@ public abstract class GraphicsDevice {
 
     /// Releases the GPU resources backing a texture.
     public abstract void dispose(Texture texture);
+
+    /// Writes the parameters of the post effects added after grain into
+    /// `out` from `offset`: chromatic aberration, FXAA (0 or 1), god ray
+    /// strength scaled by how visible the sun is, and the sun's position in
+    /// texture space (0, 0 is the top left). Every device packs them in this
+    /// order, so the composite passes of every shading language agree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the post process being composited
+    ///
+    /// - `out`: the parameter array
+    ///
+    /// - `offset`: where to write the six floats
+    protected final void packPostEffects(PostProcess effects, float[] out, int offset) {
+        out[offset] = effects.getChromaticAberration();
+        out[offset + 1] = effects.isFxaa() ? 1f : 0f;
+        out[offset + 2] = 0f;
+        out[offset + 3] = 0.5f;
+        out[offset + 4] = 0.5f;
+        out[offset + 5] = 0f;
+        Camera cam = getCamera();
+        Light light = getLight();
+        if (effects.getGodRays() <= 0f || cam == null || light == null) {
+            return;
+        }
+        // the sun is far along the reverse of the light's direction
+        float sx = cam.getEyeX() - light.getDirectionX() * 1000f;
+        float sy = cam.getEyeY() - light.getDirectionY() * 1000f;
+        float sz = cam.getEyeZ() - light.getDirectionZ() * 1000f;
+        float[] m = cam.getViewProjection();
+        float cx = m[0] * sx + m[4] * sy + m[8] * sz + m[12];
+        float cy = m[1] * sx + m[5] * sy + m[9] * sz + m[13];
+        float cw = m[3] * sx + m[7] * sy + m[11] * sz + m[15];
+        if (cw <= 0.0001f) {
+            return;
+        }
+        float u = cx / cw * 0.5f + 0.5f;
+        float v = 0.5f - cy / cw * 0.5f;
+        // full strength on screen, fading to nothing half a screen outside it
+        float du = Math.max(0f, Math.abs(u - 0.5f) - 0.5f);
+        float dv = Math.max(0f, Math.abs(v - 0.5f) - 0.5f);
+        float fade = Math.max(0f, 1f - (du + dv) * 2f);
+        out[offset + 2] = effects.getGodRays() * fade;
+        out[offset + 3] = u;
+        out[offset + 4] = v;
+    }
 }

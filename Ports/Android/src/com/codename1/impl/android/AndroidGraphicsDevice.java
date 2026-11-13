@@ -100,6 +100,8 @@ class AndroidGraphicsDevice extends GraphicsDevice {
     }
 
     private final Map<String, Program> programs = new HashMap<String, Program>();
+    // chromatic aberration, FXAA, god rays and the sun, for the composite
+    private final float[] postFx = new float[6];
 
     private GpuCapabilities caps;
 
@@ -866,6 +868,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         uniform1(c, "u_grain", pp.getGrain());
         uniform1(c, "u_time", timeSeconds);
         uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        packPostEffects(pp, postFx, 0);
+        uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
+        uniform2(c, "u_sun", postFx[3], postFx[4]);
         drawQuad(c);
         GLES20.glDepthMask(true);
     }

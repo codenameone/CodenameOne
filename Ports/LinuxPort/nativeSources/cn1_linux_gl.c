@@ -848,7 +848,8 @@ static void cn1GlQuad(CN1GlContext* c) {
 }
 
 /* params: threshold, bloomIntensity, contrast, saturation, lift rgb, gain rgb,
- * vignette, grain, time (13 floats). */
+ * vignette, grain, time (13 floats), then the six of
+ * GraphicsDevice.packPostEffects. */
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long_boolean_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG brightPeer, JAVA_LONG blurPeer, JAVA_LONG compositePeer, JAVA_BOOLEAN bloom, JAVA_OBJECT params) {
     CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
     CN1GlPipeline* bright = (CN1GlPipeline*) (intptr_t) brightPeer;
@@ -902,6 +903,13 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long
     cn1GlUniform1(comp->program, "u_grain", pr[11]);
     cn1GlUniform1(comp->program, "u_time", pr[12]);
     cn1GlUniform2(comp->program, "u_resolution", (float) c->scene.w, (float) c->scene.h);
+    if (((JAVA_ARRAY) params)->length >= 18) {
+        cn1GlUniform3(comp->program, "u_fx", pr[13], pr[14], pr[15]);
+        cn1GlUniform2(comp->program, "u_sun", pr[16], pr[17]);
+    } else {
+        cn1GlUniform3(comp->program, "u_fx", 0.0f, 0.0f, 0.0f);
+        cn1GlUniform2(comp->program, "u_sun", 0.5f, 0.5f);
+    }
     cn1GlQuad(c);
     glDepthMask(GL_TRUE);
 }

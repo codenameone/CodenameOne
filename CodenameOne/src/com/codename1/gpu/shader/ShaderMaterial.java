@@ -124,6 +124,9 @@ public final class ShaderMaterial {
         if (graph != null && graph.getType() != hook.getType()) {
             throw new IllegalArgumentException(hook + " takes a " + hook.getType() + ", not a " + graph.getType());
         }
+        if (graph != null) {
+            declareInstanceInputs(graph, new java.util.HashMap<ShaderNode, Boolean>());
+        }
         hooks[hook.ordinal()] = graph;
         changed();
         return this;
@@ -434,6 +437,38 @@ public final class ShaderMaterial {
             key = sb.toString();
         }
         return key;
+    }
+
+    /// The uniform `GraphicsDevice.drawInstanced` writes before each copy:
+    /// x is the copy's index, y a stable random number in 0 to 1 for it.
+    public static final String INSTANCE = "cn1Instance";
+
+    /// The uniform holding the colour `GraphicsDevice.drawInstanced` gives
+    /// each copy, white when it gives none.
+    public static final String INSTANCE_COLOR = "cn1InstanceColor";
+
+    // ShaderNode.instanceId() and friends read these uniforms; declaring them
+    // here keeps the graph the only thing an author writes
+    private void declareInstanceInputs(ShaderNode n, java.util.Map<ShaderNode, Boolean> seen) {
+        if (seen.containsKey(n)) {
+            return;
+        }
+        seen.put(n, Boolean.TRUE);
+        if (n.getKind() == ShaderNode.UNIFORM && (INSTANCE.equals(n.getName()) || INSTANCE_COLOR.equals(n.getName()))) {
+            if (uniformIndex(n.getName()) < 0) {
+                declareUniform(n.getName(), ShaderType.VEC4);
+                int i = uniformIndex(n.getName());
+                if (INSTANCE_COLOR.equals(n.getName())) {
+                    for (int c = 0; c < 4; c++) {
+                        uniformValues[i * 4 + c] = 1f;
+                    }
+                }
+            }
+            return;
+        }
+        for (int i = 0; i < n.getArgCount(); i++) {
+            declareInstanceInputs(n.getArg(i), seen);
+        }
     }
 
     private void changed() {

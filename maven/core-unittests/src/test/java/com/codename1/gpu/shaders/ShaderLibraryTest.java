@@ -125,4 +125,25 @@ class ShaderLibraryTest {
         int slot = s.getUniformSlot("splatP" + (Surface.MAX_SPLATS - 1));
         assertEquals(0.5f, s.getUniformValues()[slot * 4 + 3], 0f);
     }
+
+    @Test
+    void readingTheInstanceInputsDeclaresThem() {
+        ShaderMaterial sm = new ShaderMaterial();
+        sm.set(ShaderMaterial.Hook.BASE_COLOR, com.codename1.gpu.shader.ShaderNode.instanceColor()
+                .mul(com.codename1.gpu.shader.ShaderNode.instanceRandom()));
+        assertTrue(sm.getUniformSlot(ShaderMaterial.INSTANCE) >= 0);
+        int c = sm.getUniformSlot(ShaderMaterial.INSTANCE_COLOR);
+        assertEquals(1f, sm.getUniformValues()[c * 4 + 3], 0f);
+        Material mat = new Material(Material.Type.UNLIT).setShader(sm);
+        assertTrue(new GlslShaderGenerator(mat, VertexFormat.POSITION_NORMAL_TEXCOORD, null, false)
+                .getFragmentSource().length() > 0);
+    }
+
+    @Test
+    void compositeDeclaresTheNewEffects() {
+        String src = GlslShaderGenerator.compositeFragment();
+        assertTrue(src.contains("uniform vec3 u_fx;"));
+        assertTrue(src.contains("uniform vec2 u_sun;"));
+        assertTrue(GlslShaderGenerator.postEffects("hlsl", "g6", "g7.xy", "g3.yz").contains("lerp("));
+    }
 }

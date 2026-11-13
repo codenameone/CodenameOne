@@ -92,7 +92,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
     private boolean shadowReady;
     private PostProcess activePost;
     private String postSource;
-    private final float[] postParams = new float[16];
+    private final float[] postParams = new float[24];
     private final float[] uniforms = allocAligned(UNIFORM_FLOATS);
 
     IOSGraphicsDevice(long contextPeer) {
@@ -482,6 +482,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         p[13] = pp.getGrain();
         p[14] = timeSeconds;
         p[15] = pp.isBloom() ? 1.0f : 0.0f;
+        packPostEffects(pp, p, 16);
         IOSImplementation.nativeInstance.gl3dEndPostProcess(contextPeer, p);
     }
 

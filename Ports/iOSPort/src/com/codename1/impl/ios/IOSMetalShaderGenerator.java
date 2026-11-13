@@ -502,6 +502,8 @@ public final class IOSMetalShaderGenerator {
         sb.append("  float4 lift;\n");
         sb.append("  float4 gain;\n");
         sb.append("  float4 b;\n");     // grain, time, width, height
+        sb.append("  float4 fx;\n");    // aberration, fxaa, god rays, unused
+        sb.append("  float4 sun;\n");   // sun position in uv
         sb.append("};\n");
         sb.append("vertex CN1PostV cn1_post_vertex(uint vid [[vertex_id]]) {\n");
         sb.append("  float2 p = float2((vid & 1u) != 0u ? 1.0 : -1.0, (vid & 2u) != 0u ? 1.0 : -1.0);\n");
@@ -534,9 +536,11 @@ public final class IOSMetalShaderGenerator {
         sb.append("  c += scene.sample(cn1PostS, in.uv - a.xy * 3.2307692).rgb * 0.0702703;\n");
         sb.append("  return float4(c, 1.0);\n");
         sb.append("}\n");
+        sb.append("float3 cn1Px(texture2d<float> t, float2 p) {\n  return t.sample(cn1PostS, p).rgb;\n}\n");
         sb.append("fragment float4 cn1_composite_fragment(CN1PostV in [[stage_in]], constant CN1PostU& u [[buffer(0)]],\n");
         sb.append("    texture2d<float> scene [[texture(0)]], texture2d<float> bloom [[texture(1)]]) {\n");
-        sb.append("  float3 c = scene.sample(cn1PostS, in.uv).rgb;\n");
+        sb.append("  float2 uv0 = in.uv;\n");
+        sb.append(com.codename1.impl.gpu.GlslShaderGenerator.postEffects("msl", "u.fx", "u.sun.xy", "u.b.zw"));
         sb.append("  c += bloom.sample(cn1PostS, in.uv).rgb * u.a.x;\n");
         sb.append("  c = (c - 0.5) * u.a.y + 0.5;\n");
         sb.append("  float luma = dot(c, float3(0.2126, 0.7152, 0.0722));\n");

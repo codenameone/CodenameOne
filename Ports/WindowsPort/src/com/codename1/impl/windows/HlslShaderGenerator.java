@@ -479,6 +479,8 @@ public final class HlslShaderGenerator {
                 + "  float4 g3;\n"   // time, resolution x, resolution y, bloom on
                 + "  float4 g4;\n"   // bright pass: texel in uv
                 + "  float4 g5;\n"   // blur pass: direction in uv
+                + "  float4 g6;\n"   // aberration, fxaa, god rays, unused
+                + "  float4 g7;\n"   // sun position in uv
                 + "};\n"
                 + "Texture2D cn1_scene : register(t0);\n"
                 + "Texture2D cn1_bloom : register(t1);\n"
@@ -490,6 +492,7 @@ public final class HlslShaderGenerator {
                 + "  output.uv = float2(input.position.x * 0.5 + 0.5, 0.5 - input.position.y * 0.5);\n"
                 + "  output.position = float4(input.position.xy, 0.0, 1.0);\n"
                 + "  return output;\n}\n"
+                + "float3 cn1Px(float2 p) {\n  return cn1_scene.SampleLevel(cn1_sampler, p, 0).rgb;\n}\n"
                 + "float4 " + FRAGMENT_FUNCTION + "(VSOutput input) : SV_Target {\n";
     }
 
@@ -535,7 +538,8 @@ public final class HlslShaderGenerator {
     /// the combined vertex and pixel source
     public static String postCompositeSource() {
         return postPrologue()
-                + "  float3 c = cn1_scene.SampleLevel(cn1_sampler, input.uv, 0).rgb;\n"
+                + "  float2 uv0 = input.uv;\n"
+                + com.codename1.impl.gpu.GlslShaderGenerator.postEffects("hlsl", "g6", "g7.xy", "g3.yz")
                 + "  c += cn1_bloom.SampleLevel(cn1_sampler, input.uv, 0).rgb * g0.y;\n"
                 + "  c = (c - 0.5) * g0.z + 0.5;\n"
                 + "  float luma = dot(c, float3(0.2126, 0.7152, 0.0722));\n"

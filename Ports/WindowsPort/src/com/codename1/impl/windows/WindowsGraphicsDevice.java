@@ -88,7 +88,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     private long postBright;
     private long postBlur;
     private long postComposite;
-    private final float[] postParams = new float[16];
+    private final float[] postParams = new float[24];
 
     WindowsGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -463,6 +463,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         p[13] = 0f;
         p[14] = 0f;
         p[15] = pp.isBloom() ? 1f : 0f;
+        packPostEffects(pp, p, 16);
         WindowsNative.gl3dEndPost(contextPeer, postBright, postBlur, postComposite, p);
         shadowSampling = false;
     }

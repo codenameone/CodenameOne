@@ -300,7 +300,40 @@ public final class ShaderNode {
         return builtin("sunColor", ShaderType.VEC3);
     }
 
-    /// Seconds, as set with `GraphicsDevice.setTime`. Both stages.
+    /// The index of the copy `GraphicsDevice.drawInstanced` is drawing, 0
+    /// for an ordinary draw. Both stages. Reading it (or `instanceRandom`,
+    /// `instanceColor`) declares the uniform it needs on the material.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode instanceId() {
+        return uniform(ShaderMaterial.INSTANCE, ShaderType.VEC4).x();
+    }
+
+    /// A random number in 0 to 1 that stays the same for each copy drawn by
+    /// `GraphicsDevice.drawInstanced` (and 0 otherwise): vary the size, tint
+    /// or sway phase of a field of grass or a crowd with it. Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode instanceRandom() {
+        return uniform(ShaderMaterial.INSTANCE, ShaderType.VEC4).y();
+    }
+
+    /// The colour `GraphicsDevice.drawInstanced` gives the copy being drawn,
+    /// white when it gives none. Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC4` node
+    public static ShaderNode instanceColor() {
+        return uniform(ShaderMaterial.INSTANCE_COLOR, ShaderType.VEC4);
+    }
+
+    /// The clock in seconds that `GraphicsDevice.setTime` sets; the scene
+    /// renderer advances it every frame. Both stages.
     ///
     /// #### Returns
     ///

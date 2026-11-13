@@ -443,7 +443,7 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
 }
 
 // params: 0 threshold, 1 bloom intensity, 2 contrast, 3 saturation, 4-7 lift,
-// 8-11 gain, 12 vignette, 13 grain, 14 time, 15 bloom on.
+// 8-11 gain, 12 vignette, 13 grain, 14 time, 15 bloom on, 16-21 effects.
 - (void)endPostProcess:(const float *)p {
     if (!_postActive) {
         return;
@@ -468,13 +468,16 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         }
         bloomTex = self.bloomA;
     }
-    float u[16] = {
+    // 16-21 are the effects GraphicsDevice.packPostEffects writes
+    float u[24] = {
         bloom ? p[1] : 0.0f, p[2], p[3], p[12],
         p[4], p[5], p[6], 0.0f,
         p[8], p[9], p[10], 0.0f,
-        p[13], p[14], (float) scene.width, (float) scene.height
+        p[13], p[14], (float) scene.width, (float) scene.height,
+        p[16], p[17], p[18], 0.0f,
+        p[19], p[20], 0.0f, 0.0f
     };
-    [self postPass:_frameDrawable.texture pipeline:self.post.composite tex0:scene tex1:bloomTex bytes:u length:64];
+    [self postPass:_frameDrawable.texture pipeline:self.post.composite tex0:scene tex1:bloomTex bytes:u length:96];
     // Drawing continues on the screen, which now holds the composite; its depth
     // was never stored, so it starts clean.
     _pendingClearColor = NO;

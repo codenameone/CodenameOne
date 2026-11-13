@@ -88,7 +88,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     private boolean shadowReady;
     private int shadowSize;
     private PostProcess activePost;
-    private final float[] postParams = new float[13];
+    private final float[] postParams = new float[19];
 
     LinuxGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -469,6 +469,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         p[10] = pp.getVignette();
         p[11] = pp.getGrain();
         p[12] = timeSeconds;
+        packPostEffects(pp, p, 13);
         LinuxNative.gl3dEndPost(contextPeer, brightPipeline, blurPipeline, compositePipeline,
                 pp.isBloom(), p);
     }

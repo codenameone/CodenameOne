@@ -72,6 +72,8 @@ import java.util.Map;
 class HTML5GraphicsDevice extends GraphicsDevice {
     // WebGL enum values (fixed by the OpenGL ES 2 / WebGL 1 spec).
     private static final int DEPTH_BUFFER_BIT = 0x0100;
+    // chromatic aberration, FXAA, god rays and the sun, for the composite
+    private final float[] postFx = new float[6];
     private static final int COLOR_BUFFER_BIT = 0x4000;
     private static final int POINTS = 0x0000;
     private static final int LINES = 0x0001;
@@ -850,6 +852,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         uniform1(c, "u_grain", pp.getGrain());
         uniform1(c, "u_time", timeSeconds);
         uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        packPostEffects(pp, postFx, 0);
+        uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
+        uniform2(c, "u_sun", postFx[3], postFx[4]);
         drawQuad(c);
         gl.depthMask(true);
     }

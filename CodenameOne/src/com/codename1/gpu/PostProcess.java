@@ -55,6 +55,9 @@ public final class PostProcess {
     private int highlightTint = 0xffffffff;
     private float vignette;
     private float grain;
+    private float aberration;
+    private boolean fxaa;
+    private float godRays;
 
     /// Makes bright parts of the frame glow into their surroundings.
     ///
@@ -170,5 +173,70 @@ public final class PostProcess {
     /// Returns the grain amount.
     public float getGrain() {
         return grain;
+    }
+
+    /// Splits the colour channels toward the edges of the frame, the fringe
+    /// of a cheap lens. Subtle values sell an action camera; strong ones a
+    /// hit or a glitch.
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: 0 for none; 0.004 to 0.01 is subtle
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess setChromaticAberration(float amount) {
+        this.aberration = Math.max(0f, Math.min(0.05f, amount));
+        return this;
+    }
+
+    /// Returns the chromatic aberration amount.
+    public float getChromaticAberration() {
+        return aberration;
+    }
+
+    /// Smooths jagged edges with FXAA, a single full screen pass that finds
+    /// edges by contrast and blends along them. Cheaper than multisampling
+    /// and it also smooths edges inside textures and shaders.
+    ///
+    /// #### Parameters
+    ///
+    /// - `on`: true to smooth
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess setFxaa(boolean on) {
+        this.fxaa = on;
+        return this;
+    }
+
+    /// Returns true when FXAA is on.
+    public boolean isFxaa() {
+        return fxaa;
+    }
+
+    /// Light shafts from the sun: bright parts of the frame (sky, a sunlit
+    /// wall) are smeared radially from where the sun sits on screen, so they
+    /// stream past whatever stands in front of it. The sun's position comes
+    /// from the scene's light and camera each frame; the shafts fade out as
+    /// the sun leaves the screen or drops behind the camera.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strength`: 0 for none; 0.3 to 0.8 for visible shafts
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess setGodRays(float strength) {
+        this.godRays = Math.max(0f, Math.min(2f, strength));
+        return this;
+    }
+
+    /// Returns the god ray strength.
+    public float getGodRays() {
+        return godRays;
     }
 }
