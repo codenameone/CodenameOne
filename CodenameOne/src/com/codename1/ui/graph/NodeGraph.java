@@ -62,7 +62,9 @@ import java.util.Map;
 /// model.addEdge("api", "orders");
 /// NodeGraph graph = new NodeGraph(model);
 /// graph.arrange(new LayeredArrangement(), false);
+/// Form form = new Form("Services", new BorderLayout());
 /// form.add(BorderLayout.CENTER, graph);
+/// form.show();
 /// ```
 ///
 /// What a user can do:

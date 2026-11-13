@@ -31,6 +31,7 @@ import com.codename1.graph.arrange.ForceArrangement;
 import com.codename1.graph.arrange.LayeredArrangement;
 import com.codename1.graph.arrange.RadialArrangement;
 import com.codename1.graph.arrange.TreeArrangement;
+import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 import com.codename1.ui.Slider;
@@ -64,8 +65,13 @@ public class GraphSnippets {
         // end::graph-first[]
     }
 
-    public void groupsAndLabels(DefaultGraphModel model) {
+    public void groupsAndLabels() {
         // tag::graph-groups[]
+        DefaultGraphModel model = new DefaultGraphModel();
+        model.addNode(new GraphNode("orders", "Orders"));
+        model.addNode(new GraphNode("billing", "Billing"));
+        model.addNode(new GraphNode("db", "Database"));
+
         model.addGroup(new GraphGroup("backend", "Backend"));
         model.getNode("orders").setGroupId("backend");
         model.getNode("billing").setGroupId("backend");
@@ -76,8 +82,16 @@ public class GraphSnippets {
         // end::graph-groups[]
     }
 
-    public void arrangements(NodeGraph graph) {
+    public void arrangements() {
         // tag::graph-arrangements[]
+        DefaultGraphModel model = new DefaultGraphModel();
+        model.addNode(new GraphNode("ceo", "CEO"));
+        model.addNode(new GraphNode("cto", "CTO"));
+        model.addNode(new GraphNode("cfo", "CFO"));
+        model.addEdge("ceo", "cto");
+        model.addEdge("ceo", "cfo");
+        NodeGraph graph = new NodeGraph(model);
+
         LayeredArrangement layered = new LayeredArrangement();
         layered.setDirection(LayeredArrangement.LEFT_TO_RIGHT);
         graph.arrange(layered, true);
@@ -94,8 +108,9 @@ public class GraphSnippets {
         // end::graph-arrangements[]
     }
 
-    public void liveArrangement(NodeGraph graph) {
+    public void liveArrangement() {
         // tag::graph-live[]
+        NodeGraph graph = new NodeGraph();
         graph.setLiveArrangement(new ForceArrangement());
         // end::graph-live[]
     }
@@ -120,7 +135,8 @@ public class GraphSnippets {
         // end::graph-editor[]
 
         // tag::graph-veto[]
-        graph.addGraphListener(new GraphAdapter() {
+        NodeGraph editor = new NodeGraph();
+        editor.addGraphListener(new GraphAdapter() {
             @Override
             public boolean edgeCreating(NodeGraph g, GraphNode source, GraphPort sourcePort,
                     GraphNode target, GraphPort targetPort) {
@@ -129,14 +145,15 @@ public class GraphSnippets {
 
             @Override
             public void edgeCreated(NodeGraph g, GraphEdge edge) {
-                save(g);
+                Log.p("Connected " + edge.getSourceId() + " to " + edge.getTargetId());
             }
         });
         // end::graph-veto[]
     }
 
-    public void embedded(NodeGraph graph) {
+    public void embedded() {
         // tag::graph-components[]
+        NodeGraph graph = new NodeGraph();
         graph.setNodeComponentFactory(new NodeComponentFactory() {
             @Override
             public Component createComponent(NodeGraph g, GraphNode node) {
@@ -149,6 +166,4 @@ public class GraphSnippets {
         // end::graph-components[]
     }
 
-    private void save(NodeGraph g) {
-    }
 }
